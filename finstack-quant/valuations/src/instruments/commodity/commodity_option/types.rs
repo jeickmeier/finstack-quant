@@ -5,7 +5,7 @@ use crate::instruments::common_impl::parameters::{
     CommodityConvention, CommodityUnderlyingParams, OptionMarketParams,
 };
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
-use crate::instruments::{ExerciseStyle, OptionType, PricingOverrides, SettlementType};
+use crate::instruments::{ExerciseStyle, OptionType, SettlementType};
 use crate::models::trees::binomial_tree::BinomialTree;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -96,9 +96,7 @@ pub enum CommodityPricingModel {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 pub struct CommodityOption {
     /// Unique instrument identifier.
@@ -152,10 +150,15 @@ pub struct CommodityOption {
     #[serde(default = "crate::serde_defaults::day_count_act365f")]
     #[builder(default = DayCount::Act365F)]
     pub day_count: DayCount,
-    /// Pricing overrides (implied vol, tree steps, etc.).
-    #[serde(default)]
+    /// Instrument-owned pricing inputs.
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Optional market convention for this commodity.
     ///
     /// When set, provides default premium settlement days and calendar.
@@ -246,7 +249,6 @@ impl CommodityOption {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("WTI-VOL"))
             .day_count(DayCount::Act365F)
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("Example commodity option construction should not fail")
@@ -276,7 +278,7 @@ impl CommodityOption {
         )?;
 
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &self.pricing_overrides.market_quotes,
+            &self.instrument_pricing_overrides.market_quotes,
             market,
             self.vol_surface_id.as_str(),
             t,
@@ -699,7 +701,7 @@ impl Instrument for CommodityOption {
             }
             ExerciseStyle::American => {
                 let steps = self
-                    .pricing_overrides
+                    .instrument_pricing_overrides
                     .model_config
                     .tree_steps
                     .unwrap_or(201);
@@ -722,7 +724,7 @@ impl Instrument for CommodityOption {
                     )
                 })?;
                 let steps = self
-                    .pricing_overrides
+                    .instrument_pricing_overrides
                     .model_config
                     .tree_steps
                     .unwrap_or(201);
@@ -774,17 +776,7 @@ impl Instrument for CommodityOption {
         Some(self.expiry)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for CommodityOption {
@@ -830,7 +822,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         }
 
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &self.pricing_overrides.market_quotes,
+            &self.instrument_pricing_overrides.market_quotes,
             market,
             self.vol_surface_id.as_str(),
             t,
@@ -878,7 +870,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         }
 
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &self.pricing_overrides.market_quotes,
+            &self.instrument_pricing_overrides.market_quotes,
             market,
             self.vol_surface_id.as_str(),
             t,

@@ -62,8 +62,7 @@ use rust_decimal::Decimal;
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 pub struct CommoditySwap {
     /// Unique instrument identifier.
@@ -79,6 +78,7 @@ pub struct CommoditySwap {
     pub floating_index_id: CurveId,
     /// Direction of the swap: Pay means paying the fixed price leg,
     /// Receive means receiving the fixed price leg.
+    #[serde(default = "default_pay_receive")]
     pub side: PayReceive,
     /// Start date of the swap.
     #[schemars(with = "String")]
@@ -118,78 +118,28 @@ pub struct CommoditySwap {
     #[serde(default)]
     #[schemars(with = "Vec<(String, f64)>")]
     pub realized_fixings: Vec<(Date, f64)>,
-    /// Attributes for tagging and selection.
-    #[serde(default)]
+    /// Instrument-owned pricing inputs.
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     #[serde(default)]
     #[builder(default)]
     pub attributes: Attributes,
+    /// Rejects unknown JSON fields despite the flattened underlying.
+    #[serde(flatten)]
+    #[schemars(skip)]
+    #[builder(default)]
+    pub(crate) unknown_fields: crate::instruments::common_impl::serde_guard::UnknownFieldGuard,
 }
 
-/// Custom deserializer for CommoditySwap that reads the `side` field
-/// (PayReceive enum), defaulting to `Pay` when omitted.
-impl<'de> serde::Deserialize<'de> for CommoditySwap {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(serde::Deserialize)]
-        struct Helper {
-            id: InstrumentId,
-            #[serde(flatten)]
-            underlying: CommodityUnderlyingParams,
-            quantity: f64,
-            fixed_price: Decimal,
-            floating_index_id: CurveId,
-            #[serde(default)]
-            side: Option<PayReceive>,
-            start_date: Date,
-            maturity: Date,
-            frequency: Tenor,
-            #[serde(default)]
-            calendar_id: Option<CalendarId>,
-            #[serde(default = "crate::serde_defaults::bdc_modified_following")]
-            bdc: BusinessDayConvention,
-            discount_curve_id: CurveId,
-            #[serde(default)]
-            index_lag_days: Option<i32>,
-            #[serde(default)]
-            realized_fixings: Vec<(Date, f64)>,
-            #[serde(default)]
-            pricing_overrides: crate::instruments::PricingOverrides,
-            attributes: Attributes,
-            /// Rejects unknown JSON fields (restores `deny_unknown_fields`
-            /// despite the `#[serde(flatten)]` on `underlying`).
-            #[serde(flatten)]
-            #[allow(dead_code)]
-            unknown_fields: crate::instruments::common_impl::serde_guard::UnknownFieldGuard,
-        }
-
-        let helper = Helper::deserialize(deserializer)?;
-
-        let side = helper.side.unwrap_or(PayReceive::Pay);
-
-        Ok(CommoditySwap {
-            id: helper.id,
-            underlying: helper.underlying,
-            quantity: helper.quantity,
-            fixed_price: helper.fixed_price,
-            floating_index_id: helper.floating_index_id,
-            side,
-            start_date: helper.start_date,
-            maturity: helper.maturity,
-            frequency: helper.frequency,
-            calendar_id: helper.calendar_id,
-            bdc: helper.bdc,
-            discount_curve_id: helper.discount_curve_id,
-            index_lag_days: helper.index_lag_days,
-            realized_fixings: helper.realized_fixings,
-            pricing_overrides: helper.pricing_overrides,
-            attributes: helper.attributes,
-        })
-    }
+fn default_pay_receive() -> PayReceive {
+    PayReceive::Pay
 }
 
 impl CommoditySwap {
@@ -581,17 +531,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
         Some(self.maturity)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {

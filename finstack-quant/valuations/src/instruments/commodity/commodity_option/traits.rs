@@ -4,8 +4,8 @@ use crate::instruments::commodity::commodity_option::CommodityOption;
 use crate::metrics::{HasDayCount, HasExpiry, HasPricingOverrides};
 
 impl HasPricingOverrides for CommodityOption {
-    fn pricing_overrides_mut(&mut self) -> &mut crate::instruments::PricingOverrides {
-        &mut self.pricing_overrides
+    fn metric_pricing_overrides_mut(&mut self) -> &mut crate::instruments::MetricPricingOverrides {
+        &mut self.metric_pricing_overrides
     }
 }
 

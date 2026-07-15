@@ -461,8 +461,8 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
 
 // Declare canonical market dependencies for the DV01 calculator.
 impl crate::metrics::HasPricingOverrides for RangeAccrual {
-    fn pricing_overrides_mut(&mut self) -> &mut crate::instruments::PricingOverrides {
-        &mut self.pricing_overrides
+    fn metric_pricing_overrides_mut(&mut self) -> &mut crate::instruments::MetricPricingOverrides {
+        &mut self.pricing_overrides.metrics
     }
 }
 

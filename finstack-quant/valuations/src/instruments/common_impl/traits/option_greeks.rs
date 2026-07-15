@@ -178,7 +178,7 @@ pub trait OptionGreeksProvider: Send + Sync {
 }
 
 /// Implement standard equity-exotic trait boilerplate for instruments with
-/// `pricing_overrides` and `day_count` fields.
+/// focused metric overrides and `day_count` fields.
 ///
 /// For types with custom `HasExpiry`, use the internal `@mc_overrides` and
 /// `@mc_daycount` arms directly and implement `HasExpiry` manually.
@@ -203,10 +203,10 @@ macro_rules! impl_equity_exotic_traits {
     (@mc_overrides $ty:ty) => {
 
         impl $crate::metrics::HasPricingOverrides for $ty {
-            fn pricing_overrides_mut(
+            fn metric_pricing_overrides_mut(
                 &mut self,
-            ) -> &mut $crate::instruments::PricingOverrides {
-                &mut self.pricing_overrides
+            ) -> &mut $crate::instruments::MetricPricingOverrides {
+                &mut self.pricing_overrides.metrics
             }
         }
     };

@@ -22,7 +22,6 @@ use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::exotics::asian_option::AveragingMethod;
 use crate::instruments::OptionType;
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -55,9 +54,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 pub struct CommodityAsianOption {
     /// Unique instrument identifier.
@@ -96,10 +93,15 @@ pub struct CommodityAsianOption {
     #[serde(default = "crate::serde_defaults::day_count_act365f")]
     #[builder(default = DayCount::Act365F)]
     pub day_count: DayCount,
-    /// Pricing overrides.
-    #[serde(default)]
+    /// Instrument-owned pricing inputs.
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping.
     #[builder(default)]
     #[serde(default)]
@@ -146,7 +148,6 @@ impl CommodityAsianOption {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("CL-VOL"))
             .day_count(DayCount::Act365F)
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("Example CommodityAsianOption with valid constants should never fail")
@@ -295,17 +296,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommodityAsianOptio
         Some(self.expiry)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

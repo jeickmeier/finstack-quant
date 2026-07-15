@@ -21,7 +21,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 ///
 /// This pricer is registered under `ModelKey::MonteCarloSchwartzSmith` and
 /// delegates to `CommodityOption::npv_mc`. The `CommodityMcParams` must be
-/// supplied via the instrument's `pricing_overrides.mc_config` (future work)
+/// supplied via the instrument's focused model configuration (future work)
 /// or by calling `npv_mc` directly.
 pub struct CommodityOptionMcPricer {
     mc_params: super::types::CommodityMcParams,
@@ -58,7 +58,7 @@ impl Pricer for CommodityOptionMcPricer {
         // Instrument-level mc_paths override takes precedence over the pricer
         // registration defaults (consistent with autocallable/asian/lookback/etc.).
         let mut mc_params = self.mc_params.clone();
-        if let Some(n) = option.pricing_overrides.model_config.mc_paths {
+        if let Some(n) = option.instrument_pricing_overrides.model_config.mc_paths {
             if n > 0 {
                 mc_params.n_paths = n;
             }

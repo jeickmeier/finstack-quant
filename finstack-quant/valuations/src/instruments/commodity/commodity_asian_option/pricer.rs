@@ -106,7 +106,7 @@ pub(crate) fn compute_pv(
     let df = disc_curve.df_between_dates(as_of, inst.expiry)?;
 
     let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-        &inst.pricing_overrides.market_quotes,
+        &inst.instrument_pricing_overrides.market_quotes,
         market,
         inst.vol_surface_id.as_str(),
         t,
@@ -550,7 +550,6 @@ mod tests {
     use super::*;
     use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
     use crate::instruments::exotics::asian_option::AveragingMethod;
-    use crate::instruments::PricingOverrides;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::surfaces::VolSurface;
@@ -647,7 +646,6 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("CL-VOL"))
             .day_count(DayCount::Act365F)
-            .pricing_overrides(PricingOverrides::default())
             .attributes(crate::instruments::common_impl::traits::Attributes::new())
             .build()
             .expect("should build")

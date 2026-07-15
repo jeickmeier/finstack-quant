@@ -183,15 +183,8 @@ where
     I: Clone + Instrument + HasPricingOverrides,
 {
     let mut seeded = instrument.clone();
-    if let Some(overrides) = seeded.get_metric_pricing_overrides_mut() {
-        overrides.mc_seed_scenario = Some(CRN_SEED_SCENARIO.to_string());
-    } else {
-        // Temporary B14-B17 compatibility fallback for implementations that
-        // have not yet moved from the full override bag.
-        <I as HasPricingOverrides>::pricing_overrides_mut(&mut seeded)
-            .metrics
-            .mc_seed_scenario = Some(CRN_SEED_SCENARIO.to_string());
-    }
+    <I as HasPricingOverrides>::metric_pricing_overrides_mut(&mut seeded).mc_seed_scenario =
+        Some(CRN_SEED_SCENARIO.to_string());
     seeded
 }
 
@@ -359,15 +352,15 @@ pub trait HasDayCount {
 ///
 /// ```ignore
 /// use finstack_quant_valuations::metrics::HasPricingOverrides;
-/// use finstack_quant_valuations::instruments::PricingOverrides;
+/// use finstack_quant_valuations::instruments::MetricPricingOverrides;
 ///
 /// struct McOption {
-///     overrides: PricingOverrides,
+///     overrides: MetricPricingOverrides,
 ///     // ... other fields
 /// }
 ///
 /// impl HasPricingOverrides for McOption {
-///     fn pricing_overrides_mut(&mut self) -> &mut PricingOverrides {
+///     fn metric_pricing_overrides_mut(&mut self) -> &mut MetricPricingOverrides {
 ///         &mut self.overrides
 ///     }
 /// }
@@ -382,9 +375,9 @@ pub trait HasPricingOverrides {
     ///
     /// // Set deterministic MC seed for greek calculation
     /// # let instrument: &mut dyn HasPricingOverrides = todo!("a Monte Carlo priced instrument");
-    /// instrument.pricing_overrides_mut().metrics.mc_seed_scenario = Some("delta_up".to_string());
+    /// instrument.metric_pricing_overrides_mut().mc_seed_scenario = Some("delta_up".to_string());
     /// ```
-    fn pricing_overrides_mut(&mut self) -> &mut crate::instruments::PricingOverrides;
+    fn metric_pricing_overrides_mut(&mut self) -> &mut crate::instruments::MetricPricingOverrides;
 }
 
 // ================================================================================================
@@ -1028,8 +1021,10 @@ mod tests {
     }
 
     impl HasPricingOverrides for TestFdInstrument {
-        fn pricing_overrides_mut(&mut self) -> &mut PricingOverrides {
-            &mut self.overrides
+        fn metric_pricing_overrides_mut(
+            &mut self,
+        ) -> &mut crate::instruments::MetricPricingOverrides {
+            &mut self.overrides.metrics
         }
     }
 
@@ -1046,8 +1041,10 @@ mod tests {
     }
 
     impl HasPricingOverrides for RoundingSensitiveInstrument {
-        fn pricing_overrides_mut(&mut self) -> &mut PricingOverrides {
-            &mut self.overrides
+        fn metric_pricing_overrides_mut(
+            &mut self,
+        ) -> &mut crate::instruments::MetricPricingOverrides {
+            &mut self.overrides.metrics
         }
     }
 
@@ -1500,8 +1497,10 @@ mod tests {
     }
 
     impl HasPricingOverrides for VolLinearInstrument {
-        fn pricing_overrides_mut(&mut self) -> &mut PricingOverrides {
-            &mut self.overrides
+        fn metric_pricing_overrides_mut(
+            &mut self,
+        ) -> &mut crate::instruments::MetricPricingOverrides {
+            &mut self.overrides.metrics
         }
     }
 

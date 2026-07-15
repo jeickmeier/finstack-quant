@@ -57,6 +57,49 @@ macro_rules! impl_instrument_base {
     };
 }
 
+/// Implements the focused pricing-override accessors for instruments that
+/// store the three canonical runtime categories directly.
+#[macro_export]
+macro_rules! impl_focused_pricing_overrides {
+    () => {
+        fn get_instrument_pricing_overrides(
+            &self,
+        ) -> Option<&$crate::instruments::InstrumentPricingOverrides> {
+            Some(&self.instrument_pricing_overrides)
+        }
+
+        fn get_instrument_pricing_overrides_mut(
+            &mut self,
+        ) -> Option<&mut $crate::instruments::InstrumentPricingOverrides> {
+            Some(&mut self.instrument_pricing_overrides)
+        }
+
+        fn get_metric_pricing_overrides(
+            &self,
+        ) -> Option<&$crate::instruments::MetricPricingOverrides> {
+            Some(&self.metric_pricing_overrides)
+        }
+
+        fn get_metric_pricing_overrides_mut(
+            &mut self,
+        ) -> Option<&mut $crate::instruments::MetricPricingOverrides> {
+            Some(&mut self.metric_pricing_overrides)
+        }
+
+        fn get_scenario_pricing_overrides(
+            &self,
+        ) -> Option<&$crate::instruments::ScenarioPricingOverrides> {
+            Some(&self.scenario_pricing_overrides)
+        }
+
+        fn get_scenario_pricing_overrides_mut(
+            &mut self,
+        ) -> Option<&mut $crate::instruments::ScenarioPricingOverrides> {
+            Some(&mut self.scenario_pricing_overrides)
+        }
+    };
+}
+
 /// Implement a standard empty-schedule `CashflowProvider` for products whose
 /// waterfall policy is intentionally empty for now.
 #[macro_export]

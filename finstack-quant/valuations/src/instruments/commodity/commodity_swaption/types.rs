@@ -75,9 +75,7 @@ use finstack_quant_core::Result;
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[builder(validate = CommoditySwaption::validate)]
 pub struct CommoditySwaption {
@@ -121,10 +119,15 @@ pub struct CommoditySwaption {
     #[serde(default = "crate::serde_defaults::day_count_act365f")]
     #[builder(default = DayCount::Act365F)]
     pub day_count: DayCount,
-    /// Pricing overrides (implied vol, etc.).
-    #[serde(default)]
+    /// Instrument-owned pricing inputs.
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging.
     #[builder(default)]
     #[serde(default)]
@@ -195,7 +198,6 @@ impl CommoditySwaption {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("NG-VOL"))
             .day_count(DayCount::Act365F)
-            .pricing_overrides(crate::instruments::PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("Example commodity swaption construction should not fail")
@@ -415,7 +417,7 @@ impl CommoditySwaption {
         let annuity = self.annuity(market, as_of)?;
         let sigma = if time > 0.0 {
             crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-                &self.pricing_overrides.market_quotes,
+                &self.instrument_pricing_overrides.market_quotes,
                 market,
                 self.vol_surface_id.as_str(),
                 time,
@@ -514,17 +516,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
         Some(self.expiry)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for CommoditySwaption {
@@ -878,6 +870,52 @@ mod tests {
         assert_eq!(swaption.fixed_price, deserialized.fixed_price);
     }
 
+    #[test]
+    fn focused_overrides_preserve_legacy_wire_shape() {
+        let mut swaption = CommoditySwaption::example();
+        swaption
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.31);
+        swaption.metric_pricing_overrides.mc_seed_scenario = Some("vega_up".to_string());
+        swaption
+            .scenario_pricing_overrides
+            .scenario_price_shock_pct = Some(-0.05);
+
+        let value = serde_json::to_value(&swaption).expect("serialize focused overrides");
+        let wire = value
+            .get("pricing_overrides")
+            .and_then(serde_json::Value::as_object)
+            .expect("legacy pricing_overrides object");
+        assert_eq!(wire.get("implied_volatility"), Some(&serde_json::json!(0.31)));
+        assert_eq!(wire.get("mc_seed_scenario"), Some(&serde_json::json!("vega_up")));
+        assert_eq!(
+            wire.get("scenario_price_shock_pct"),
+            Some(&serde_json::json!(-0.05))
+        );
+        assert!(value.get("instrument_pricing_overrides").is_none());
+
+        let roundtrip: CommoditySwaption =
+            serde_json::from_value(value).expect("deserialize legacy wire");
+        assert_eq!(
+            roundtrip
+                .instrument_pricing_overrides
+                .market_quotes
+                .implied_volatility,
+            Some(0.31)
+        );
+        assert_eq!(
+            roundtrip.metric_pricing_overrides.mc_seed_scenario.as_deref(),
+            Some("vega_up")
+        );
+        assert_eq!(
+            roundtrip
+                .scenario_pricing_overrides
+                .scenario_price_shock_pct,
+            Some(-0.05)
+        );
+    }
+
     /// W-02 / M-commodity-averaging: `forward_swap_rate` must use the
     /// **period-average** forward over each half-open settlement window —
     /// the same business-day average the underlying floating leg settles on
@@ -1067,7 +1105,10 @@ mod tests {
             .vol_surface_id(CurveId::new("NG-VOL"))
             .build()
             .expect("swaption");
-        swaption.pricing_overrides.market_quotes.implied_volatility = Some(0.0);
+        swaption
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.0);
 
         let swaption_pv = swaption
             .value(&market, as_of)
@@ -1286,7 +1327,10 @@ mod tests {
 
         // Use pricing override for zero vol to bypass vol surface
         let mut swaption = base_swaption(OptionType::Call, strike);
-        swaption.pricing_overrides.market_quotes.implied_volatility = Some(0.0);
+        swaption
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.0);
 
         let market = build_market(as_of, fwd, 0.30, 0.05);
 
@@ -1313,7 +1357,10 @@ mod tests {
         let strike = 4.00;
 
         let mut swaption = base_swaption(OptionType::Call, strike);
-        swaption.pricing_overrides.market_quotes.implied_volatility = Some(0.0);
+        swaption
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.0);
 
         let market = build_market(as_of, fwd, 0.30, 0.05);
 
@@ -1342,7 +1389,10 @@ mod tests {
 
         // Monthly settlement (τ ≈ 1/12) makes the old mis-scaling ~12×.
         let mut swaption = base_swaption(OptionType::Call, strike);
-        swaption.pricing_overrides.market_quotes.implied_volatility = Some(0.0);
+        swaption
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.0);
 
         let market = build_market(as_of, fwd, 0.30, 0.05);
         let pv = swaption

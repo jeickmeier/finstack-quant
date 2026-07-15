@@ -74,6 +74,9 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     let mut has_optional_spot_rate: bool = false;
     let mut has_base_currency: bool = false;
     let mut has_quote_currency: bool = false;
+    let mut has_instrument_pricing_overrides: bool = false;
+    let mut has_metric_pricing_overrides: bool = false;
+    let mut has_scenario_pricing_overrides: bool = false;
 
     for attr in &input.attrs {
         if attr.path().is_ident("builder") {
@@ -157,6 +160,15 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
             }
             if ident == format_ident!("quote_currency") {
                 has_quote_currency = true;
+            }
+            if ident == format_ident!("instrument_pricing_overrides") {
+                has_instrument_pricing_overrides = true;
+            }
+            if ident == format_ident!("metric_pricing_overrides") {
+                has_metric_pricing_overrides = true;
+            }
+            if ident == format_ident!("scenario_pricing_overrides") {
+                has_scenario_pricing_overrides = true;
             }
             if ident == format_ident!("notional") && is_option_ty {
                 has_optional_notional = true;
@@ -388,6 +400,26 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     let new_doc = "Creates a new builder instance.";
     let build_doc = "Builds the final instance.";
     let builder_method_doc = "Creates a new builder.";
+    let focused_override_compatibility = (has_instrument_pricing_overrides
+        && has_metric_pricing_overrides
+        && has_scenario_pricing_overrides)
+        .then(|| {
+            quote! {
+                /// Sets focused runtime fields from the temporary compatibility bag.
+                pub fn pricing_overrides(
+                    mut self,
+                    value: crate::instruments::PricingOverrides,
+                ) -> Self {
+                    self.instrument_pricing_overrides =
+                        ::core::option::Option::Some(value.instrument);
+                    self.metric_pricing_overrides =
+                        ::core::option::Option::Some(value.metrics);
+                    self.scenario_pricing_overrides =
+                        ::core::option::Option::Some(value.scenario);
+                    self
+                }
+            }
+        });
 
     let expanded = quote! {
         #[doc = #builder_doc]
@@ -403,6 +435,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
             pub fn new() -> Self { Self::default() }
             #(#setter_req)*
             #(#setter_opt)*
+            #focused_override_compatibility
 
             #[doc = #build_doc]
             pub fn build(self) -> finstack_quant_core::Result<#struct_name> {
