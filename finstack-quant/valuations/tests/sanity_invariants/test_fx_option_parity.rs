@@ -16,9 +16,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::{
-    Attributes, FxOption, Instrument, PricingOverrides, SettlementType,
-};
+use finstack_quant_valuations::instruments::{Attributes, FxOption, Instrument, SettlementType};
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
@@ -123,7 +121,6 @@ fn create_fx_option(expiry: Date, option_type: OptionType) -> FxOption {
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .vol_surface_id(CurveId::new("EURUSD-VOL"))
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("FX option should build")

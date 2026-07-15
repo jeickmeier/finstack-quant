@@ -1,4 +1,4 @@
-use crate::instruments::PricingOverrides;
+use crate::instruments::InstrumentPricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -37,8 +37,8 @@ pub(crate) struct FxOptionInputRequest<'a> {
     pub(crate) vol_surface_id: &'a str,
     /// Strike used for volatility lookup.
     pub(crate) strike: f64,
-    /// Pricing overrides used for implied-vol overrides.
-    pub(crate) pricing_overrides: &'a PricingOverrides,
+    /// Instrument-owned inputs used for implied-vol overrides.
+    pub(crate) instrument_pricing_overrides: &'a InstrumentPricingOverrides,
     /// Spot source.
     pub(crate) spot_source: FxSpotSource<'a>,
     /// Context label for rate-conversion errors.
@@ -169,7 +169,7 @@ pub(crate) fn collect_fx_option_inputs(
     }
 
     let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-        &request.pricing_overrides.market_quotes,
+        &request.instrument_pricing_overrides.market_quotes,
         request.market,
         request.vol_surface_id,
         no_vol.t,
@@ -250,7 +250,7 @@ mod tests {
             foreign_discount_curve_id: &CurveId::new("EUR-OIS"),
             vol_surface_id: "EURUSD-VOL",
             strike: 1.1,
-            pricing_overrides: &PricingOverrides::default(),
+            instrument_pricing_overrides: &InstrumentPricingOverrides::default(),
             spot_source: FxSpotSource::Matrix,
             rate_context: "test",
         })
@@ -291,7 +291,7 @@ mod tests {
             foreign_discount_curve_id: &CurveId::new("EUR-OIS"),
             vol_surface_id: "EURUSD-VOL",
             strike: 1.1,
-            pricing_overrides: &PricingOverrides::default(),
+            instrument_pricing_overrides: &InstrumentPricingOverrides::default(),
             spot_source: FxSpotSource::ScalarId(Some(&spot_id)),
             rate_context: "test",
         })

@@ -124,7 +124,7 @@ impl FxTouchOptionCalculator {
             .rate;
 
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.pricing_overrides.market_quotes,
+            &inst.instrument_pricing_overrides.market_quotes,
             curves,
             inst.vol_surface_id.as_str(),
             t_vol,
@@ -242,7 +242,6 @@ fn price_touch(
 mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::{Attributes, Instrument};
-    use crate::instruments::PricingOverrides;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::surfaces::VolSurface;
@@ -304,7 +303,6 @@ mod tests {
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("fx touch option")
@@ -343,7 +341,6 @@ mod tests {
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("fx no-touch option")

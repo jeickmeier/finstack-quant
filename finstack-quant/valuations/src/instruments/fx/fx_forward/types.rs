@@ -61,9 +61,7 @@ use time::macros::date;
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[builder(validate = FxForward::validate)]
 #[serde(deny_unknown_fields, try_from = "FxForwardUnchecked")]
@@ -102,7 +100,16 @@ pub struct FxForward {
     /// Attributes for tagging and selection.
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -139,7 +146,11 @@ struct FxForwardUnchecked {
     quote_calendar_id: Option<String>,
     /// Per-instrument pricing/sensitivity override knobs.
     #[serde(default)]
-    pricing_overrides: crate::instruments::PricingOverrides,
+    instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    #[serde(default)]
+    metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    #[serde(default)]
+    scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging.
     attributes: Attributes,
 }
@@ -160,7 +171,9 @@ impl TryFrom<FxForwardUnchecked> for FxForward {
             spot_rate_override: value.spot_rate_override,
             base_calendar_id: value.base_calendar_id,
             quote_calendar_id: value.quote_calendar_id,
-            pricing_overrides: value.pricing_overrides,
+            instrument_pricing_overrides: value.instrument_pricing_overrides,
+            metric_pricing_overrides: value.metric_pricing_overrides,
+            scenario_pricing_overrides: value.scenario_pricing_overrides,
             attributes: value.attributes,
         };
         forward.validate()?;
@@ -699,17 +712,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxForward {
         ))
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
@@ -796,6 +799,60 @@ mod tests {
     }
 
     #[test]
+    fn focused_overrides_preserve_legacy_wire_shape() {
+        let mut forward = FxForward::example().expect("valid FX forward");
+        forward
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.17);
+        forward.metric_pricing_overrides.mc_seed_scenario = Some("rho_up".to_string());
+        forward.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.03);
+
+        let value = serde_json::to_value(&forward).expect("serialize focused overrides");
+        assert!(value.get("instrument_pricing_overrides").is_none());
+        assert!(value.get("metric_pricing_overrides").is_none());
+        assert!(value.get("scenario_pricing_overrides").is_none());
+        let wire = value
+            .get("pricing_overrides")
+            .and_then(serde_json::Value::as_object)
+            .expect("legacy pricing_overrides object");
+        assert_eq!(
+            wire.get("implied_volatility"),
+            Some(&serde_json::json!(0.17))
+        );
+        assert_eq!(
+            wire.get("mc_seed_scenario"),
+            Some(&serde_json::json!("rho_up"))
+        );
+        assert_eq!(
+            wire.get("scenario_price_shock_pct"),
+            Some(&serde_json::json!(-0.03))
+        );
+
+        let roundtrip: FxForward = serde_json::from_value(value).expect("deserialize legacy wire");
+        assert_eq!(
+            roundtrip
+                .instrument_pricing_overrides
+                .market_quotes
+                .implied_volatility,
+            Some(0.17)
+        );
+        assert_eq!(
+            roundtrip
+                .metric_pricing_overrides
+                .mc_seed_scenario
+                .as_deref(),
+            Some("rho_up")
+        );
+        assert_eq!(
+            roundtrip
+                .scenario_pricing_overrides
+                .scenario_price_shock_pct,
+            Some(-0.03)
+        );
+    }
+
+    #[test]
     fn test_validation_same_currency_fails() {
         let forward = FxForward {
             id: InstrumentId::new("TEST"),
@@ -809,7 +866,9 @@ mod tests {
             spot_rate_override: None,
             base_calendar_id: None,
             quote_calendar_id: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         };
 
@@ -835,7 +894,9 @@ mod tests {
             spot_rate_override: None,
             base_calendar_id: None,
             quote_calendar_id: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         };
 
@@ -861,7 +922,9 @@ mod tests {
             spot_rate_override: None,
             base_calendar_id: None,
             quote_calendar_id: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         };
 
@@ -887,7 +950,9 @@ mod tests {
             spot_rate_override: Some(-1.10), // Negative rate - invalid
             base_calendar_id: None,
             quote_calendar_id: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         };
 

@@ -37,7 +37,7 @@ impl FxBarrierOptionMcPricer {
 
     fn merged_path_config(&self, inst: &FxBarrierOption) -> PathDependentPricerConfig {
         let mut c = self.config.clone();
-        if let Some(n) = inst.pricing_overrides.model_config.mc_paths {
+        if let Some(n) = inst.instrument_pricing_overrides.model_config.mc_paths {
             if n > 0 {
                 c.num_paths = n;
             }
@@ -138,7 +138,7 @@ impl FxBarrierOptionMcPricer {
 
         use finstack_quant_monte_carlo::seed;
 
-        let seed = if let Some(ref scenario) = inst.pricing_overrides.metrics.mc_seed_scenario {
+        let seed = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
@@ -376,7 +376,7 @@ fn resolve_fx_spot(
         foreign_discount_curve_id: &inst.foreign_discount_curve_id,
         vol_surface_id: inst.vol_surface_id.as_str(),
         strike: inst.strike,
-        pricing_overrides: &inst.pricing_overrides,
+        instrument_pricing_overrides: &inst.instrument_pricing_overrides,
         spot_source: FxSpotSource::ScalarId(inst.fx_spot_id.as_ref()),
         rate_context: "FxBarrierOption",
     })
@@ -415,7 +415,7 @@ fn collect_fx_barrier_inputs(
         foreign_discount_curve_id: &inst.foreign_discount_curve_id,
         vol_surface_id: inst.vol_surface_id.as_str(),
         strike: inst.strike,
-        pricing_overrides: &inst.pricing_overrides,
+        instrument_pricing_overrides: &inst.instrument_pricing_overrides,
         spot_source: FxSpotSource::ScalarId(inst.fx_spot_id.as_ref()),
         rate_context: "FxBarrierOption",
     })?;
@@ -766,7 +766,6 @@ mod tests {
             .foreign_discount_curve_id("EUR-OIS".into())
             .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
             .vol_surface_id("EURUSD-VOL".into())
-            .pricing_overrides(crate::instruments::PricingOverrides::default())
             .attributes(crate::instruments::Attributes::new())
             .build()
             .expect("fx barrier option");
@@ -910,7 +909,6 @@ mod tests {
             .foreign_discount_curve_id("EUR-OIS".into())
             .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
             .vol_surface_id("EURUSD-VOL".into())
-            .pricing_overrides(crate::instruments::PricingOverrides::default())
             .attributes(crate::instruments::common_impl::traits::Attributes::new())
             .build()
             .expect("mc put option");
@@ -934,7 +932,6 @@ mod tests {
             .foreign_discount_curve_id("EUR-OIS".into())
             .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
             .vol_surface_id("EURUSD-VOL".into())
-            .pricing_overrides(crate::instruments::PricingOverrides::default())
             .attributes(crate::instruments::common_impl::traits::Attributes::new())
             .build()
             .expect("analytical put option");
@@ -1025,7 +1022,6 @@ mod tests {
             .foreign_discount_curve_id("EUR-OIS".into())
             .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
             .vol_surface_id("EURUSD-VOL".into())
-            .pricing_overrides(crate::instruments::PricingOverrides::default())
             .attributes(crate::instruments::common_impl::traits::Attributes::new())
             .build()
             .expect("fx barrier option");

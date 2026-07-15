@@ -12,7 +12,7 @@ use crate::models::closed_form::barrier::{
 use crate::instruments::exotics::barrier_option::BarrierType;
 use crate::instruments::fx::fx_barrier_option::FxBarrierOption;
 use crate::instruments::{Attributes, Instrument};
-use crate::instruments::{OptionType, PricingOverrides};
+use crate::instruments::{OptionType};
 use test_utils::{date, flat_discount_with_tenor, flat_vol_surface};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
@@ -58,7 +58,6 @@ fn test_fx_barrier_rebate_added_to_closed_form_price() {
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .fx_spot_id("EURUSD-SPOT".into())
         .vol_surface_id(CurveId::new("EURUSD-VOL"))
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("Base FX barrier option should build");

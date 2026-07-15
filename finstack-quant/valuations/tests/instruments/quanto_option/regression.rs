@@ -13,7 +13,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fx::quanto_option::QuantoOption;
 use finstack_quant_valuations::instruments::{
     Attributes, Instrument, OptionGreekKind, OptionGreeksProvider, OptionGreeksRequest, OptionType,
-    PricingOptions, PricingOverrides,
+    PricingOptions,
 };
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
@@ -102,7 +102,6 @@ fn build_option(correlation: f64) -> QuantoOption {
         .div_yield_id_opt(Some(CurveId::new("NKY-DIV")))
         .fx_rate_id_opt(Some("JPYUSD-SPOT".to_string()))
         .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("quanto option")

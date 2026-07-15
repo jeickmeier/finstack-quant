@@ -90,9 +90,7 @@ use finstack_quant_core::Result;
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[builder(validate = FxSpot::validate_economics)]
 #[serde(deny_unknown_fields, try_from = "FxSpotUnchecked")]
@@ -124,7 +122,16 @@ pub struct FxSpot {
     /// Per-instrument pricing/sensitivity override knobs.
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Business day convention to apply when adjusting settlement (default: ModifiedFollowing)
     ///
     /// Note: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align
@@ -166,7 +173,11 @@ struct FxSpotUnchecked {
     base_calendar_id: Option<String>,
     quote_calendar_id: Option<String>,
     #[serde(default)]
-    pricing_overrides: crate::instruments::PricingOverrides,
+    instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    #[serde(default)]
+    metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    #[serde(default)]
+    scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     attributes: Attributes,
 }
 
@@ -183,7 +194,9 @@ impl TryFrom<FxSpotUnchecked> for FxSpot {
             spot_rate: value.spot_rate,
             discount_curve_id: value.discount_curve_id,
             notional: value.notional,
-            pricing_overrides: value.pricing_overrides,
+            instrument_pricing_overrides: value.instrument_pricing_overrides,
+            metric_pricing_overrides: value.metric_pricing_overrides,
+            scenario_pricing_overrides: value.scenario_pricing_overrides,
             bdc: value.bdc,
             base_calendar_id: value.base_calendar_id,
             quote_calendar_id: value.quote_calendar_id,
@@ -208,7 +221,9 @@ impl FxSpot {
             spot_rate: None,
             discount_curve_id: None,
             notional: Money::new(1.0, base_currency),
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             bdc: BusinessDayConvention::ModifiedFollowing,
             base_calendar_id: None,
             quote_calendar_id: None,
@@ -529,17 +544,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxSpot {
         None
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.

@@ -8,7 +8,6 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::exotics::barrier_option::types::BarrierType;
 use crate::instruments::OptionType;
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
@@ -19,9 +18,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[builder(validate = FxBarrierOption::validate)]
 #[serde(deny_unknown_fields)]
@@ -96,7 +93,16 @@ pub struct FxBarrierOption {
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
@@ -181,7 +187,6 @@ impl FxBarrierOption {
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("Example FxBarrierOption construction should not fail")
@@ -318,7 +323,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         }
 
         let base_pv = self.value(market, as_of)?.amount();
-        let bump_bp = self.pricing_overrides.rho_bump_bp();
+        let bump_bp = self.metric_pricing_overrides.rho_bump_bp();
         let bumped = crate::metrics::bump_discount_curve_parallel(
             market,
             &self.domestic_discount_curve_id,
@@ -505,17 +510,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxBarrierOption {
         None
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(
@@ -598,7 +593,6 @@ mod tests {
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should build");
@@ -650,7 +644,6 @@ mod tests {
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("USDUSD-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build();
 

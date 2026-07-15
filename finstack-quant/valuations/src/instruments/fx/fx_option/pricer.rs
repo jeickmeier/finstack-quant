@@ -107,7 +107,7 @@ fn input_request<'a>(
         foreign_discount_curve_id: &inst.foreign_discount_curve_id,
         vol_surface_id: inst.vol_surface_id.as_str(),
         strike: inst.strike,
-        pricing_overrides: &inst.pricing_overrides,
+        instrument_pricing_overrides: &inst.instrument_pricing_overrides,
         spot_source: FxSpotSource::Matrix,
         rate_context: "FxOption",
     }
@@ -330,7 +330,7 @@ fn price_gk_core(
 mod delegation_tests {
     use super::*;
     use crate::instruments::common_impl::traits::{Attributes, Instrument};
-    use crate::instruments::{ExerciseStyle, PricingOverrides, SettlementType};
+    use crate::instruments::{ExerciseStyle, SettlementType};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::surfaces::VolSurface;
@@ -390,7 +390,6 @@ mod delegation_tests {
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("fx option")

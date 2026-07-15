@@ -55,7 +55,7 @@ fn collect_quanto_inputs(
     )?;
 
     let sigma_equity = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-        &inst.pricing_overrides.market_quotes,
+        &inst.instrument_pricing_overrides.market_quotes,
         curves,
         inst.vol_surface_id.as_str(),
         t,

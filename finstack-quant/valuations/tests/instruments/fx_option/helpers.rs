@@ -15,8 +15,8 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::{PricingOverrides, SettlementType};
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
 
@@ -149,7 +149,6 @@ pub fn build_call_option(_as_of: Date, expiry: Date, strike: f64, notional: f64)
         .domestic_discount_curve_id(CurveId::new(DOMESTIC_ID))
         .foreign_discount_curve_id(CurveId::new(FOREIGN_ID))
         .vol_surface_id(CurveId::new(VOL_ID))
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .unwrap()
@@ -171,7 +170,6 @@ pub fn build_put_option(_as_of: Date, expiry: Date, strike: f64, notional: f64) 
         .domestic_discount_curve_id(CurveId::new(DOMESTIC_ID))
         .foreign_discount_curve_id(CurveId::new(FOREIGN_ID))
         .vol_surface_id(CurveId::new(VOL_ID))
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .unwrap()

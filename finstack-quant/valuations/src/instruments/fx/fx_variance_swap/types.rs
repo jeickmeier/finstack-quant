@@ -26,9 +26,7 @@ fn default_observation_bdc() -> BusinessDayConvention {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct FxVarianceSwap {
@@ -106,7 +104,16 @@ pub struct FxVarianceSwap {
     /// Attributes for scenario selection
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -383,6 +390,8 @@ impl InstrumentTrait for FxVarianceSwap {
     fn base_value(&self, context: &MarketContext, as_of: Date) -> Result<Money> {
         pricer::compute_pv(self, context, as_of)
     }
+
+    crate::impl_focused_pricing_overrides!();
 }
 
 // FxVarianceSwap uses both domestic and foreign curves for forward construction

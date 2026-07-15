@@ -304,7 +304,9 @@ fn test_implied_vol_recovers_price_after_override_is_removed() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
     let mut call = build_call_option(as_of, expiry, 1.20, 1_000_000.0);
-    call.pricing_overrides.market_quotes.implied_volatility = Some(0.25);
+    call.instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(0.25);
 
     let params = MarketParams::atm();
     let market = build_market_context(as_of, params);
@@ -314,7 +316,9 @@ fn test_implied_vol_recovers_price_after_override_is_removed() {
         finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
 
     // Remove override for IV solve
-    call.pricing_overrides.market_quotes.implied_volatility = None;
+    call.instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = None;
 
     // Act: Solve from the target price.
     let implied_vol = call.implied_vol(&market, as_of, pv.amount()).unwrap();

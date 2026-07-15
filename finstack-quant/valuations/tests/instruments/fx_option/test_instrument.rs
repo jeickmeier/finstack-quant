@@ -10,9 +10,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
 use finstack_quant_valuations::instruments::FxUnderlyingParams;
+use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::{PricingOverrides, SettlementType};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -33,7 +33,6 @@ fn test_builder_pattern_creates_valid_option() {
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .vol_surface_id(CurveId::new("EURUSD-VOL"))
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build();
 
@@ -110,7 +109,6 @@ fn test_builder_with_underlying_params() {
         .domestic_discount_curve_id(underlying_params.domestic_discount_curve_id.clone())
         .foreign_discount_curve_id(underlying_params.foreign_discount_curve_id.clone())
         .vol_surface_id(CurveId::new("EURUSD-VOL"))
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("builder should create option");
@@ -330,7 +328,9 @@ fn test_pricing_overrides_applied() {
 
     // Act
     let pv_surface = call.value(&market, as_of).unwrap();
-    call.pricing_overrides.market_quotes.implied_volatility = Some(0.30); // Override to 30%
+    call.instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(0.30); // Override to 30%
     let pv_override = call.value(&market, as_of).unwrap();
 
     // Assert: Higher vol should increase option PV

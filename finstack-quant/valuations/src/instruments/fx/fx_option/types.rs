@@ -43,7 +43,6 @@
 
 use crate::instruments::common_impl::parameters::FxUnderlyingParams;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::PricingOverrides;
 use crate::instruments::{ExerciseStyle, OptionType, SettlementType};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -67,9 +66,7 @@ fn default_fx_underlying(base_currency: Currency, quote_currency: Currency) -> F
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[builder(validate = FxOption::validate)]
 #[serde(deny_unknown_fields)]
@@ -115,7 +112,16 @@ pub struct FxOption {
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
@@ -210,7 +216,6 @@ impl FxOption {
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
     }
@@ -252,7 +257,6 @@ impl FxOption {
             .domestic_discount_curve_id(fx_underlying.domestic_discount_curve_id.to_owned())
             .foreign_discount_curve_id(fx_underlying.foreign_discount_curve_id)
             .vol_surface_id(vol_surface_id.into())
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
     }
@@ -320,7 +324,6 @@ impl FxOption {
             .domestic_discount_curve_id(fx_underlying.domestic_discount_curve_id.to_owned())
             .foreign_discount_curve_id(fx_underlying.foreign_discount_curve_id)
             .vol_surface_id(vol_surface_id.into())
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
     }
@@ -511,17 +514,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxOption {
         ))
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption {
@@ -701,7 +694,6 @@ mod validation_tests {
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("USDUSD-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build();
 

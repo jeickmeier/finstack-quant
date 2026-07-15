@@ -3,7 +3,6 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::OptionType;
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
@@ -17,9 +16,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[builder(validate = QuantoOption::validate)]
 #[serde(deny_unknown_fields, try_from = "QuantoOptionUnchecked")]
@@ -92,7 +89,16 @@ pub struct QuantoOption {
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
@@ -146,7 +152,11 @@ struct QuantoOptionUnchecked {
     fx_vol_id: Option<CurveId>,
     /// Pricing overrides (manual price, yield, spread).
     #[serde(default)]
-    pricing_overrides: PricingOverrides,
+    instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    #[serde(default)]
+    metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    #[serde(default)]
+    scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping.
     attributes: Attributes,
 }
@@ -175,7 +185,9 @@ impl TryFrom<QuantoOptionUnchecked> for QuantoOption {
             div_yield_id: value.div_yield_id,
             fx_rate_id: value.fx_rate_id,
             fx_vol_id: value.fx_vol_id,
-            pricing_overrides: value.pricing_overrides,
+            instrument_pricing_overrides: value.instrument_pricing_overrides,
+            metric_pricing_overrides: value.metric_pricing_overrides,
+            scenario_pricing_overrides: value.scenario_pricing_overrides,
             attributes: value.attributes,
         };
         quanto.validate()?;
@@ -210,7 +222,6 @@ impl QuantoOption {
             .div_yield_id_opt(Some(CurveId::new("NKY-DIV")))
             .fx_rate_id_opt(Some("JPYUSD-SPOT".to_string()))
             .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("Example QuantoOption construction should not fail")
@@ -476,7 +487,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         }
 
         let base_pv = self.value(market, as_of)?.amount();
-        let bump_bp = self.pricing_overrides.rho_bump_bp();
+        let bump_bp = self.metric_pricing_overrides.rho_bump_bp();
         let bumped = crate::metrics::bump_discount_curve_parallel(
             market,
             &self.domestic_discount_curve_id,
@@ -503,7 +514,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         }
 
         let base_pv = self.value(market, as_of)?.amount();
-        let bump_bp = self.pricing_overrides.rho_bump_bp();
+        let bump_bp = self.metric_pricing_overrides.rho_bump_bp();
         let bumped = crate::metrics::bump_discount_curve_parallel(
             market,
             &self.foreign_discount_curve_id,
@@ -709,17 +720,7 @@ impl crate::instruments::common_impl::traits::Instrument for QuantoOption {
         ))
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(
