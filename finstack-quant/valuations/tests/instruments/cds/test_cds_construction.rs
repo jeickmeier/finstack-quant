@@ -103,7 +103,7 @@ fn test_builder_pattern() {
         PremiumLegSpec, ProtectionLegSpec,
     };
     use finstack_quant_valuations::instruments::Attributes;
-    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 
     let start = test_date(2025, Month::January, 1);
     let end = test_date(2030, Month::January, 1);
@@ -130,7 +130,7 @@ fn test_builder_pattern() {
             recovery_rate: 0.40,
             settlement_delay: 3,
         })
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .unwrap();

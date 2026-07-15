@@ -169,7 +169,11 @@ impl CDSTranchePricer {
             self.discount_projected_rows(&rows, discount_curve.as_ref(), as_of)?
         };
 
-        if let Some(upfront) = tranche.pricing_overrides.market_quotes.upfront_payment {
+        if let Some(upfront) = tranche
+            .instrument_pricing_overrides
+            .market_quotes
+            .upfront_payment
+        {
             net_pv += match tranche.side {
                 TrancheSide::BuyProtection => -upfront.amount(),
                 TrancheSide::SellProtection => upfront.amount(),

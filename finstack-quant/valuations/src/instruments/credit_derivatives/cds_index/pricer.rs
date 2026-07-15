@@ -145,7 +145,11 @@ impl CDSIndexPricer {
                 Ok(Money::new(raw, cds.notional.currency()))
             },
         )?;
-        if let Some(upfront) = index.pricing_overrides.market_quotes.upfront_payment {
+        if let Some(upfront) = index
+            .instrument_pricing_overrides
+            .market_quotes
+            .upfront_payment
+        {
             result.total = match index.side {
                 PayReceive::Pay => result.total.checked_sub(upfront)?,
                 PayReceive::Receive => result.total.checked_add(upfront)?,
@@ -730,7 +734,9 @@ impl CDSIndexPricer {
             cds.protection.credit_curve_id = con.credit.credit_curve_id.to_owned();
             cds.protection.recovery_rate = con.credit.recovery_rate;
             // Index-level upfront is applied once after aggregation.
-            cds.pricing_overrides.market_quotes.upfront_payment = None;
+            cds.instrument_pricing_overrides
+                .market_quotes
+                .upfront_payment = None;
             out.push(ResolvedConstituent {
                 cds,
                 credit_curve_id: con.credit.credit_curve_id.to_owned(),
@@ -782,7 +788,9 @@ impl CDSIndexPricer {
         // The index applies its `upfront_payment` override once at the
         // aggregate level in `npv_detailed`; clear it on the synthetic CDS
         // so `CDSPricer::npv_full` does not subtract it a second time.
-        cds.pricing_overrides.market_quotes.upfront_payment = None;
+        cds.instrument_pricing_overrides
+            .market_quotes
+            .upfront_payment = None;
         cds
     }
 
@@ -1054,7 +1062,9 @@ mod tests {
         let upfront = Money::new(125_000.0, Currency::USD);
 
         let mut pay = CDSIndex::example();
-        pay.pricing_overrides.market_quotes.upfront_payment = Some(upfront);
+        pay.instrument_pricing_overrides
+            .market_quotes
+            .upfront_payment = Some(upfront);
         let pay_base = pricer
             .npv(&CDSIndex::example(), &market, as_of)
             .expect("base pay npv");
@@ -1066,7 +1076,7 @@ mod tests {
         receive.side = crate::instruments::credit_derivatives::cds::PayReceive::Receive;
         let mut receive_with_upfront = receive.clone();
         receive_with_upfront
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .upfront_payment = Some(upfront);
         let receive_base = pricer

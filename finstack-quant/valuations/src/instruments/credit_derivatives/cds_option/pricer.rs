@@ -183,7 +183,7 @@ pub(crate) fn resolve_sigma(
     let t = option.time_to_expiry(as_of)?;
     let strike = decimal_to_f64(option.strike, "strike")?;
     let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-        &option.pricing_overrides.market_quotes,
+        &option.instrument_pricing_overrides.market_quotes,
         curves,
         option.vol_surface_id.as_str(),
         t,
@@ -246,7 +246,8 @@ pub fn synthetic_underlying_cds(
     // IMM` (≤ as_of), `protection_start()` returns `premium.start` and
     // `pv_protection_leg` integrates over `[as_of, T_mat]` — i.e., spot
     // protection.
-    cds.pricing_overrides.model_config = option.pricing_overrides.model_config.clone();
+    cds.instrument_pricing_overrides.model_config =
+        option.instrument_pricing_overrides.model_config.clone();
     cds.valuation_convention = CdsValuationConvention::BloombergCdswClean;
     Ok(cds)
 }

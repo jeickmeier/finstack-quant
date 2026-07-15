@@ -42,7 +42,6 @@
 use crate::constants::isda::STANDARD_RECOVERY_SENIOR;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
-use crate::instruments::PricingOverrides;
 use crate::market::conventions::ids::CdsDocClause;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -565,9 +564,7 @@ fn resolve_doc_clause(clause: CdsDocClause) -> CdsDocClause {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 // Note: JsonSchema derive requires finstack-quant-core types to implement JsonSchema
@@ -585,10 +582,15 @@ pub struct CreditDefaultSwap {
     pub premium: PremiumLegSpec,
     /// Protection leg specification
     pub protection: ProtectionLegSpec,
-    /// Pricing overrides (including upfront payment)
-    #[serde(default)]
+    /// Instrument-owned pricing overrides (including upfront payment).
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Valuation presentation convention.
     #[serde(default)]
     #[builder(default)]
@@ -679,7 +681,7 @@ impl CreditDefaultSwap {
                 recovery_rate: STANDARD_RECOVERY_SENIOR,
                 settlement_delay: convention.settlement_delay(),
             })
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(Default::default())
             .attributes(Attributes::new())
             .build()
             .expect("Example CDS construction should not fail");
@@ -735,7 +737,7 @@ impl CreditDefaultSwap {
                 recovery_rate: STANDARD_RECOVERY_SENIOR,
                 settlement_delay: convention.settlement_delay(),
             })
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(Default::default())
             .upfront_opt(Some((
                 upfront_date,
                 Money::new(200_000.0, Currency::EUR), // 2% of 10M notional
@@ -799,7 +801,9 @@ impl CreditDefaultSwap {
                 recovery_rate,
                 settlement_delay: convention.settlement_delay(),
             },
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             valuation_convention: CdsValuationConvention::default(),
             upfront: None,
             doc_clause: None,
@@ -850,7 +854,7 @@ impl CreditDefaultSwap {
     ///         recovery_rate: STANDARD_RECOVERY_SENIOR,
     ///         settlement_delay: CDSConvention::IsdaNa.settlement_delay(),
     ///     })
-    ///     .pricing_overrides(PricingOverrides::default())
+    ///     .instrument_pricing_overrides(InstrumentPricingOverrides::default())
     ///     .attributes(Attributes::new())
     ///     .build()?;
     /// cds.validate()?; // Validates all parameters
@@ -893,7 +897,11 @@ impl CreditDefaultSwap {
                 )));
             }
         }
-        if let Some(upfront) = self.pricing_overrides.market_quotes.upfront_payment {
+        if let Some(upfront) = self
+            .instrument_pricing_overrides
+            .market_quotes
+            .upfront_payment
+        {
             if upfront.currency() != currency {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "CDS upfront override currency {} must match notional currency {}",
@@ -1091,17 +1099,7 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
         Some(self.premium.start)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl crate::cashflow::traits::CashflowScheduleSource for CreditDefaultSwap {

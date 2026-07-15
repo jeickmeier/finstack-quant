@@ -52,9 +52,7 @@ impl std::str::FromStr for TrancheSide {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct CDSTranche {
@@ -102,10 +100,15 @@ pub struct CDSTranche {
     #[serde(default)]
     #[schemars(with = "Option<(String, Money)>")]
     pub upfront: Option<(Date, Money)>,
-    /// Attributes for tagging and selection
-    #[serde(default)]
+    /// Instrument-owned pricing overrides.
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -191,7 +194,11 @@ impl CDSTranche {
                 )));
             }
         }
-        if let Some(upfront) = self.pricing_overrides.market_quotes.upfront_payment {
+        if let Some(upfront) = self
+            .instrument_pricing_overrides
+            .market_quotes
+            .upfront_payment
+        {
             if upfront.currency() != currency {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "CDS tranche upfront override currency {} must match notional currency {}",
@@ -304,7 +311,9 @@ impl CDSTranche {
             accumulated_loss: tranche_params.accumulated_loss,
             standard_imm_dates: false,
             upfront: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         })
     }
@@ -490,17 +499,7 @@ impl Instrument for CDSTranche {
         self.effective_date
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CDSTranche {

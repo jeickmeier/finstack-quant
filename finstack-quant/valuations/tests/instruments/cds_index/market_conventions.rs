@@ -333,7 +333,9 @@ fn test_upfront_affects_dirty_npv_not_leg_pvs() {
         .expect("base metrics");
 
     let upfront = Money::new(100_000.0, Currency::USD);
-    idx.pricing_overrides.market_quotes.upfront_payment = Some(upfront);
+    idx.instrument_pricing_overrides
+        .market_quotes
+        .upfront_payment = Some(upfront);
 
     let dirty_npv = idx.value(&ctx, as_of).expect("dirty index pricing");
     let dirty_metrics = idx

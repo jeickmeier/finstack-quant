@@ -181,7 +181,10 @@ fn upfront_override_uses_protection_side_and_survives_wipeout() {
     let seller_base = pricer
         .price_tranche(&seller, &market, as_of)
         .expect("seller base");
-    seller.pricing_overrides.market_quotes.upfront_payment = Some(upfront);
+    seller
+        .instrument_pricing_overrides
+        .market_quotes
+        .upfront_payment = Some(upfront);
     let seller_with = pricer
         .price_tranche(&seller, &market, as_of)
         .expect("seller upfront");
@@ -189,11 +192,17 @@ fn upfront_override_uses_protection_side_and_survives_wipeout() {
 
     let mut buyer = seller;
     buyer.side = TrancheSide::BuyProtection;
-    buyer.pricing_overrides.market_quotes.upfront_payment = None;
+    buyer
+        .instrument_pricing_overrides
+        .market_quotes
+        .upfront_payment = None;
     let buyer_base = pricer
         .price_tranche(&buyer, &market, as_of)
         .expect("buyer base");
-    buyer.pricing_overrides.market_quotes.upfront_payment = Some(upfront);
+    buyer
+        .instrument_pricing_overrides
+        .market_quotes
+        .upfront_payment = Some(upfront);
     let buyer_with = pricer
         .price_tranche(&buyer, &market, as_of)
         .expect("buyer upfront");

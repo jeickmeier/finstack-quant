@@ -409,7 +409,10 @@ fn test_cds_par_spread_metric_does_not_return_quoted_spread_override() {
 
     let cds = create_test_cds(as_of, maturity);
     let mut quoted_cds = cds.clone();
-    quoted_cds.pricing_overrides.market_quotes.cds_quote_bp = Some(999.0);
+    quoted_cds
+        .instrument_pricing_overrides
+        .market_quotes
+        .cds_quote_bp = Some(999.0);
     let market = create_test_market(as_of);
 
     let base = cds

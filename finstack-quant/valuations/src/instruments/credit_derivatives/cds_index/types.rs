@@ -10,7 +10,6 @@
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::parameters::CreditParams;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -137,9 +136,7 @@ pub struct IndexParSpreadResult {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct CDSIndex {
@@ -180,10 +177,15 @@ pub struct CDSIndex {
     #[serde(default)]
     #[builder(default)]
     pub num_constituents: Option<u32>,
-    /// Pricing overrides (including upfront payment)
-    #[serde(default)]
+    /// Instrument-owned pricing overrides (including upfront payment).
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Optional OTC margin specification for VM/IM.
     ///
     /// CDS indices are typically cleared through ICE Clear Credit. Use
@@ -252,7 +254,9 @@ impl CDSIndex {
             pricing: IndexPricing::SingleCurve,
             constituents: Vec::new(),
             num_constituents: Some(125),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             margin_spec: None,
             attributes: Attributes::new(),
         }
@@ -338,7 +342,9 @@ impl CDSIndex {
             pricing: IndexPricing::SingleCurve,
             constituents: Vec::new(),
             num_constituents: preset.num_constituents,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             margin_spec: None,
             attributes: Attributes::new(),
         })
@@ -381,7 +387,11 @@ impl CDSIndex {
                 self.notional.amount()
             )));
         }
-        if let Some(upfront) = self.pricing_overrides.market_quotes.upfront_payment {
+        if let Some(upfront) = self
+            .instrument_pricing_overrides
+            .market_quotes
+            .upfront_payment
+        {
             if upfront.currency() != self.notional.currency() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "CDS Index '{}' upfront override currency {} must match notional currency {}",
@@ -411,7 +421,9 @@ impl CDSIndex {
             convention: self.convention,
             premium: self.premium_with_standard_defaults(),
             protection: self.protection_with_standard_defaults(),
-            pricing_overrides: self.pricing_overrides.clone(),
+            instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
+            metric_pricing_overrides: self.metric_pricing_overrides.clone(),
+            scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
             valuation_convention:
                 crate::instruments::credit_derivatives::cds::CdsValuationConvention::default(),
             upfront: None,
@@ -615,17 +627,7 @@ impl crate::instruments::common_impl::traits::Instrument for CDSIndex {
         Some(self.premium.start)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CDSIndex {

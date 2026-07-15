@@ -43,7 +43,7 @@ pub(crate) fn delta(
     }
     let strike = decimal_to_f64(option.strike, "strike")?;
     let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-        &option.pricing_overrides.market_quotes,
+        &option.instrument_pricing_overrides.market_quotes,
         curves,
         option.vol_surface_id.as_str(),
         t,

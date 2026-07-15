@@ -17,7 +17,12 @@ impl MetricCalculator for RiskyPv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let use_deal_quote = {
             let cds: &CreditDefaultSwap = context.instrument_as()?;
-            cds.uses_clean_price() && cds.pricing_overrides.market_quotes.cds_quote_bp.is_some()
+            cds.uses_clean_price()
+                && cds
+                    .instrument_pricing_overrides
+                    .market_quotes
+                    .cds_quote_bp
+                    .is_some()
         };
         if use_deal_quote {
             return crate::metrics::sensitivities::cs01::CreditParallelCs01::<

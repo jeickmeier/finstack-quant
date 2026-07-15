@@ -430,8 +430,9 @@ fn test_upfront_payment_larger_than_npv() {
     let as_of = start;
 
     let mut idx = standard_single_curve_index("CDX-BIG-UPFRONT", start, end, 10_000_000.0);
-    idx.pricing_overrides.market_quotes.upfront_payment =
-        Some(Money::new(10_000_000.0, Currency::USD));
+    idx.instrument_pricing_overrides
+        .market_quotes
+        .upfront_payment = Some(Money::new(10_000_000.0, Currency::USD));
 
     let ctx = standard_market_context(as_of);
     let result = idx.value(&ctx, as_of);
@@ -447,8 +448,9 @@ fn test_negative_upfront_payment() {
     let as_of = start;
 
     let mut idx = standard_single_curve_index("CDX-NEG-UPFRONT", start, end, 10_000_000.0);
-    idx.pricing_overrides.market_quotes.upfront_payment =
-        Some(Money::new(-100_000.0, Currency::USD));
+    idx.instrument_pricing_overrides
+        .market_quotes
+        .upfront_payment = Some(Money::new(-100_000.0, Currency::USD));
 
     let ctx = standard_market_context(as_of);
     let result = idx.value(&ctx, as_of);

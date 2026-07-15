@@ -481,7 +481,9 @@ fn test_npv_full_combines_dated_and_market_quote_upfronts() {
         dated_upfront_date,
         Money::new(dated_upfront_amount, Currency::USD),
     ));
-    cds.pricing_overrides.market_quotes.upfront_payment = Some(quote_adjustment);
+    cds.instrument_pricing_overrides
+        .market_quotes
+        .upfront_payment = Some(quote_adjustment);
 
     let dated_df = disc
         .df_between_dates(as_of, dated_upfront_date)

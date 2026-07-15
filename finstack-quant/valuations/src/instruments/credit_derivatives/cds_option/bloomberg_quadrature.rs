@@ -872,7 +872,10 @@ mod tests {
         let credit = CreditParams::corporate_standard("SN", "HZ-SN");
         let mut option = CDSOption::new("CDSO-UNIT", &params, &credit, "USD-OIS", "CDSO-VOL")
             .expect("valid cds option");
-        option.pricing_overrides.market_quotes.implied_volatility = Some(vol);
+        option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(vol);
         option
     }
 

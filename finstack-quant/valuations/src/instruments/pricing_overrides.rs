@@ -635,6 +635,18 @@ impl InstrumentPricingOverrides {
         self
     }
 
+    /// Set the CDS par-spread quote in basis points.
+    pub fn with_cds_quote_bp(mut self, spread_bp: f64) -> Self {
+        self.market_quotes.cds_quote_bp = Some(spread_bp);
+        self
+    }
+
+    /// Set the upfront payment used by credit-derivative pricers.
+    pub fn with_upfront(mut self, upfront: Money) -> Self {
+        self.market_quotes.upfront_payment = Some(upfront);
+        self
+    }
+
     /// Set the volatility-surface extrapolation policy.
     pub fn with_vol_surface_extrapolation(mut self, policy: VolSurfaceExtrapolation) -> Self {
         self.model_config.vol_surface_extrapolation = policy;

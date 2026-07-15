@@ -324,7 +324,7 @@ fn test_pricing_overrides_default() {
     let idx = standard_single_curve_index("CDX-OVERRIDE", start, end, 10_000_000.0);
 
     assert!(idx
-        .pricing_overrides
+        .instrument_pricing_overrides
         .market_quotes
         .upfront_payment
         .is_none());

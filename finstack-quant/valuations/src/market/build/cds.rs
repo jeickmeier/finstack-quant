@@ -6,7 +6,6 @@ use crate::instruments::common_impl::parameters::legs::{
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::credit_derivatives::cds::{CDSConvention, CreditDefaultSwap};
 use crate::instruments::Instrument;
-use crate::instruments::PricingOverrides;
 use crate::market::build::helpers::{resolve_calendar, resolve_spot_date};
 use crate::market::conventions::ids::CdsConventionKey;
 use crate::market::conventions::registry::ConventionRegistry;
@@ -279,7 +278,9 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
             recovery_rate,
             settlement_delay: conv.settlement_days as u16,
         },
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         valuation_convention: ctx.cds_valuation_convention().unwrap_or_default(),
         upfront: upfront_payment,
         doc_clause: Some(convention_key.doc_clause),

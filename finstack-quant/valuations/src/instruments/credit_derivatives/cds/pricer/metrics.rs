@@ -158,7 +158,7 @@ impl CDSPricer {
         // tests; production CDS pricing uses the standard Bloomberg CDSW
         // rule below.
         if cds
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .cds_act360_include_last_day
             && cds.premium.day_count == finstack_quant_core::dates::DayCount::Act360
@@ -570,7 +570,7 @@ impl CDSPricer {
     ///    payment on a specific date, discounted from `as_of`. Positive
     ///    amount = paid by Buyer (reduces Buyer NPV).
     /// 3. **PV-adjustment upfront**
-    ///    (`cds.pricing_overrides.market_quotes.upfront_payment: Option<Money>`):
+    ///    (`cds.instrument_pricing_overrides.market_quotes.upfront_payment: Option<Money>`):
     ///    already-discounted PV adjustment at `as_of`. Positive = paid by
     ///    Buyer.
     /// 4. **Clean-price accrued add-back**: when [`CreditDefaultSwap::uses_clean_price`]
@@ -599,7 +599,7 @@ impl CDSPricer {
 
         // PV-adjustment upfront: already-discounted; positive = paid by Buyer.
         let upfront_adjustment = cds
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .upfront_payment
             .map(|m| m.amount())

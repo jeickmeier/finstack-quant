@@ -20,7 +20,7 @@ fn test_implied_vol_round_trip() {
         // Solve for implied vol
         let mut option_for_solve = option.clone();
         option_for_solve
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .implied_volatility = None;
 
@@ -74,7 +74,7 @@ fn test_implied_vol_call_vs_put() {
     // Solve for IV
     let mut call_solve = call;
     call_solve
-        .pricing_overrides
+        .instrument_pricing_overrides
         .market_quotes
         .implied_volatility = None;
     let call_iv = call_solve
@@ -82,7 +82,10 @@ fn test_implied_vol_call_vs_put() {
         .unwrap();
 
     let mut put_solve = put;
-    put_solve.pricing_overrides.market_quotes.implied_volatility = None;
+    put_solve
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = None;
     let put_iv = put_solve.implied_vol(&market, as_of, put_pv, None).unwrap();
 
     assert_approx_eq(call_iv, vol, 1e-6, "Call IV");
@@ -105,7 +108,7 @@ fn test_implied_vol_moneyness_independence() {
 
         let mut option_solve = option.clone();
         option_solve
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .implied_volatility = None;
         let solved_iv = option_solve.implied_vol(&market, as_of, pv, None).unwrap();
@@ -139,7 +142,7 @@ fn test_implied_vol_with_initial_guess() {
 
     let mut option_solve = option;
     option_solve
-        .pricing_overrides
+        .instrument_pricing_overrides
         .market_quotes
         .implied_volatility = None;
 
@@ -162,7 +165,7 @@ fn test_implied_vol_distressed_credit() {
     let pv = option.value(&market, as_of).unwrap().amount();
     let mut option_solve = option;
     option_solve
-        .pricing_overrides
+        .instrument_pricing_overrides
         .market_quotes
         .implied_volatility = None;
 
@@ -205,7 +208,7 @@ fn test_implied_vol_convergence_atm() {
 
     let mut option_solve = option;
     option_solve
-        .pricing_overrides
+        .instrument_pricing_overrides
         .market_quotes
         .implied_volatility = None;
     let iv = option_solve.implied_vol(&market, as_of, pv, None).unwrap();
@@ -230,7 +233,7 @@ fn test_implied_vol_convergence_itm() {
 
     let mut option_solve = option;
     option_solve
-        .pricing_overrides
+        .instrument_pricing_overrides
         .market_quotes
         .implied_volatility = None;
     let iv = option_solve.implied_vol(&market, as_of, pv, None).unwrap();
@@ -255,7 +258,7 @@ fn test_implied_vol_convergence_otm() {
 
     let mut option_solve = option;
     option_solve
-        .pricing_overrides
+        .instrument_pricing_overrides
         .market_quotes
         .implied_volatility = None;
     let iv = option_solve.implied_vol(&market, as_of, pv, None).unwrap();

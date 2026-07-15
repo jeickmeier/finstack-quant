@@ -54,7 +54,7 @@ pub(crate) fn hazard_with_deal_quote(
     cds: &crate::instruments::credit_derivatives::cds::CreditDefaultSwap,
     hazard: &HazardCurve,
 ) -> finstack_quant_core::Result<Option<HazardCurve>> {
-    let Some(quote_bp) = cds.pricing_overrides.market_quotes.cds_quote_bp else {
+    let Some(quote_bp) = cds.instrument_pricing_overrides.market_quotes.cds_quote_bp else {
         return Ok(None);
     };
     if !cds.uses_clean_price() {

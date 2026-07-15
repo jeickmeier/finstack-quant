@@ -319,7 +319,7 @@ impl CDSPricer {
         // `IsdaCdsEngine`.
         let tau_remaining = if inp
             .cds
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .cds_act360_include_last_day
             && inp.cds.premium.day_count == finstack_quant_core::dates::DayCount::Act360
@@ -405,13 +405,18 @@ impl CDSPricer {
             if inp.cds.premium.day_count == finstack_quant_core::dates::DayCount::Act360 {
                 if inp
                     .cds
-                    .pricing_overrides
+                    .instrument_pricing_overrides
                     .model_config
                     .cds_act360_include_last_day
                 {
                     bias_days += 0.5;
                 }
-                if inp.cds.pricing_overrides.model_config.cds_aod_half_day_bias {
+                if inp
+                    .cds
+                    .instrument_pricing_overrides
+                    .model_config
+                    .cds_aod_half_day_bias
+                {
                     bias_days += 0.5;
                 }
             }

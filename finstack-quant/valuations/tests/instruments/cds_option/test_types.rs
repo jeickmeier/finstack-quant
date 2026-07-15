@@ -146,14 +146,23 @@ fn test_pricing_overrides() {
     let mut option = CDSOptionBuilder::new().implied_vol(0.45).build(as_of);
 
     assert_eq!(
-        option.pricing_overrides.market_quotes.implied_volatility,
+        option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility,
         Some(0.45)
     );
 
     // Test modification
-    option.pricing_overrides.market_quotes.implied_volatility = Some(0.25);
+    option
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(0.25);
     assert_eq!(
-        option.pricing_overrides.market_quotes.implied_volatility,
+        option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility,
         Some(0.25)
     );
 }

@@ -25,7 +25,6 @@
 
 use crate::instruments::common_impl::parameters::CreditParams;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::PricingOverrides;
 use crate::instruments::{ExerciseStyle, OptionType, SettlementType};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{
@@ -76,9 +75,7 @@ pub enum ProtectionStartConvention {
     Debug,
     Clone,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct CDSOption {
@@ -147,10 +144,15 @@ pub struct CDSOption {
     #[serde(default)]
     #[builder(default)]
     pub underlying_convention: crate::instruments::credit_derivatives::cds::CDSConvention,
-    /// Pricing overrides (including implied volatility)
-    #[serde(default)]
+    /// Instrument-owned pricing overrides (including implied volatility).
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Additional attributes
     #[serde(default)]
     #[builder(default)]
@@ -271,7 +273,11 @@ impl CDSOption {
         }
 
         // Implied volatility override validation
-        if let Some(vol) = self.pricing_overrides.market_quotes.implied_volatility {
+        if let Some(vol) = self
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility
+        {
             if vol <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "implied_volatility must be positive, got {}",
@@ -353,7 +359,9 @@ impl CDSOption {
             vol_surface_id: vol_surface_id.into(),
             underlying_convention:
                 crate::instruments::credit_derivatives::cds::CDSConvention::default(),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
             underlying_is_index: option_params.underlying_is_index,
             index_factor: option_params.index_factor,
@@ -386,7 +394,9 @@ impl CDSOption {
                 vol, MAX_IMPLIED_VOL
             )));
         }
-        self.pricing_overrides.market_quotes.implied_volatility = Some(vol);
+        self.instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(vol);
         Ok(self)
     }
 
@@ -587,17 +597,7 @@ impl crate::instruments::common_impl::traits::Instrument for CDSOption {
         None
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.
@@ -646,6 +646,75 @@ mod tests {
         assert_eq!(
             option.effective_underlying_effective_date(as_of),
             date!(2026 - 03 - 21)
+        );
+    }
+
+    #[test]
+    fn focused_overrides_preserve_legacy_wire_shape() {
+        let option_params = CDSOptionParams::call(
+            Decimal::from_str_exact("0.0058395400").expect("valid strike"),
+            date!(2026 - 06 - 26),
+            date!(2031 - 06 - 20),
+            Money::new(10_000_000.0, Currency::USD),
+        )
+        .expect("valid option params");
+        let credit_params = CreditParams::corporate_standard("IBM", "IBM-USD-SENIOR");
+        let mut option = CDSOption::new(
+            "IBM-USD-CDSO-WIRE",
+            &option_params,
+            &credit_params,
+            "USD-S531-SWAP",
+            "IBM-CDSO-VOL",
+        )
+        .expect("valid option");
+        option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.31);
+        option.metric_pricing_overrides.mc_seed_scenario = Some("vega_down".to_string());
+        option.scenario_pricing_overrides.scenario_spread_shock_bp = Some(8.0);
+
+        let value = serde_json::to_value(&option).expect("serialize focused overrides");
+        assert!(value.get("instrument_pricing_overrides").is_none());
+        assert!(value.get("metric_pricing_overrides").is_none());
+        assert!(value.get("scenario_pricing_overrides").is_none());
+        let wire = value
+            .get("pricing_overrides")
+            .and_then(serde_json::Value::as_object)
+            .expect("legacy pricing_overrides object");
+        assert_eq!(
+            wire.get("implied_volatility"),
+            Some(&serde_json::json!(0.31))
+        );
+        assert_eq!(
+            wire.get("mc_seed_scenario"),
+            Some(&serde_json::json!("vega_down"))
+        );
+        assert_eq!(
+            wire.get("scenario_spread_shock_bp"),
+            Some(&serde_json::json!(8.0))
+        );
+
+        let roundtrip: CDSOption = serde_json::from_value(value).expect("deserialize legacy wire");
+        assert_eq!(
+            roundtrip
+                .instrument_pricing_overrides
+                .market_quotes
+                .implied_volatility,
+            Some(0.31)
+        );
+        assert_eq!(
+            roundtrip
+                .metric_pricing_overrides
+                .mc_seed_scenario
+                .as_deref(),
+            Some("vega_down")
+        );
+        assert_eq!(
+            roundtrip
+                .scenario_pricing_overrides
+                .scenario_spread_shock_bp,
+            Some(8.0)
         );
     }
 
