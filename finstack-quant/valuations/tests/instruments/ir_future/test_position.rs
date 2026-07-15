@@ -13,6 +13,10 @@ fn test_position_display() {
 fn test_position_from_str() {
     assert_eq!(Position::from_str("long").unwrap(), Position::Long);
     assert_eq!(Position::from_str("short").unwrap(), Position::Short);
+    assert_eq!(Position::from_str("buy").unwrap(), Position::Long);
+    assert_eq!(Position::from_str("buyer").unwrap(), Position::Long);
+    assert_eq!(Position::from_str("sell").unwrap(), Position::Short);
+    assert_eq!(Position::from_str("seller").unwrap(), Position::Short);
     assert_eq!(Position::from_str("Long").unwrap(), Position::Long);
     assert_eq!(Position::from_str("SHORT").unwrap(), Position::Short);
     assert_eq!(Position::from_str("LONG").unwrap(), Position::Long);
@@ -26,8 +30,7 @@ fn test_position_from_str_mixed_case() {
 
 #[test]
 fn test_position_from_str_invalid() {
-    assert!(Position::from_str("buy").is_err());
-    assert!(Position::from_str("sell").is_err());
+    assert!(Position::from_str("flat").is_err());
     assert!(Position::from_str("invalid").is_err());
     assert!(Position::from_str("").is_err());
 }
