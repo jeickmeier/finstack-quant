@@ -15,6 +15,20 @@ use finstack_quant_core::money::Money;
 use indexmap::IndexMap;
 use std::sync::Arc;
 
+/// Apply an instrument's scenario price adjustment to a base present value.
+///
+/// Registry, direct-value, and metric assembly paths all route through this
+/// helper so the adjustment remains an exactly-once lifecycle step.
+#[inline]
+pub(crate) fn apply_scenario_value<I>(instrument: &I, base_value: Money) -> Money
+where
+    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+{
+    instrument
+        .scenario_overrides()
+        .map_or(base_value, |overrides| overrides.apply_to_value(base_value))
+}
+
 /// Convert a discount factor to an effective continuously-compounded zero rate.
 ///
 /// Returns `r` such that `exp(-r * t) = df`. Returns `Ok(0.0)` at expiry
@@ -400,9 +414,7 @@ pub(crate) fn build_with_metrics_dyn(
         Arc::clone(&instrument),
         curves,
         as_of,
-        instrument
-            .scenario_overrides()
-            .map_or(base_value, |overrides| overrides.apply_to_value(base_value)),
+        apply_scenario_value(instrument.as_ref(), base_value),
         finstack_config,
     );
 

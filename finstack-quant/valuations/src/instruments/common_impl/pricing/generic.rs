@@ -7,6 +7,10 @@
 //! The pricer returns the **unshocked** base PV; the scenario shock is applied
 //! by [`build_with_metrics_dyn`](crate::instruments::common_impl::helpers::build_with_metrics_dyn)
 //! in the metrics pipeline so that the shock is applied exactly once.
+//!
+//! [`Pricer::price_dyn`] is the unchecked model kernel. The registry validates
+//! the instrument before invoking it; direct callers are responsible for doing
+//! the same.
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::pricer::{

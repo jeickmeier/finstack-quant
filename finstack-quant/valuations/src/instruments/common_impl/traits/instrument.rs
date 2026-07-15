@@ -652,9 +652,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     fn value(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<Money> {
         self.validate_for_pricing()?;
         let base = self.base_value(market, as_of)?;
-        Ok(self
-            .scenario_overrides()
-            .map_or(base, |overrides| overrides.apply_to_value(base)))
+        Ok(crate::instruments::common_impl::helpers::apply_scenario_value(self, base))
     }
 
     /// Compute the base present value as raw f64, before scenario adjustments.

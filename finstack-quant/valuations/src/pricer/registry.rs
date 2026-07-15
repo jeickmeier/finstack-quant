@@ -36,7 +36,11 @@ pub trait Pricer: Send + Sync {
     /// Get the (instrument, model) key this pricer handles
     fn key(&self) -> PricerKey;
 
-    /// Price an instrument using this pricer's model
+    /// Price an instrument using this pricer's model.
+    ///
+    /// This is a low-level dispatch hook that assumes the instrument has already
+    /// passed [`Priceable::validate_for_pricing`]. Canonical callers must enter
+    /// through [`PricerRegistry::price_with_metrics`] or its internal raw path.
     fn price_dyn(
         &self,
         instrument: &dyn Priceable,
@@ -154,8 +158,33 @@ impl PricerRegistry {
     }
 
     /// Look up a pricer for a specific (instrument type, model) combination.
+    ///
+    /// The returned low-level pricer does not validate instruments itself.
+    /// Canonical pricing should use [`Self::price_with_metrics`].
     pub fn get_pricer(&self, key: PricerKey) -> Option<&dyn Pricer> {
         self.pricers.get(&key).map(|p| p.as_ref())
+    }
+
+    /// Validate an instrument, then resolve its registered pricer.
+    ///
+    /// Keeping this order in one helper ensures malformed instruments fail as
+    /// invalid input before model lookup or any market-dependent computation.
+    fn validated_pricer(
+        &self,
+        instrument: &dyn Priceable,
+        model: ModelKey,
+    ) -> std::result::Result<&dyn Pricer, PricingError> {
+        let context = PricingErrorContext::from_instrument(instrument).model(model);
+        instrument
+            .validate_for_pricing()
+            .map_err(|error| PricingError::from_core(error, context))?;
+
+        let key = PricerKey::new(instrument.key(), model);
+        self.get_pricer(key)
+            .ok_or_else(|| PricingError::UnknownPricer {
+                key,
+                available_models: self.available_models_for_instrument(key.instrument),
+            })
     }
 
     /// Return every [`ModelKey`] registered for the given instrument type.
@@ -300,13 +329,7 @@ impl PricerRegistry {
         } = options;
 
         // --- Base PV through the registered pricer ---
-        let key = PricerKey::new(instrument.key(), model);
-        let Some(pricer) = self.get_pricer(key) else {
-            return Err(PricingError::UnknownPricer {
-                key,
-                available_models: self.available_models_for_instrument(key.instrument),
-            });
-        };
+        let pricer = self.validated_pricer(instrument, model)?;
         tracing::debug!(
             instrument_id = %instrument.id(),
             instrument_type = %instrument.key(),
@@ -324,9 +347,10 @@ impl PricerRegistry {
         if metrics.is_empty() {
             // No extra metrics requested: apply scenario overrides and return.
             // Keeps empty-metrics behavior consistent with `Instrument::value`.
-            if let Some(overrides) = instrument.scenario_overrides() {
-                base_result.value = overrides.apply_to_value(base_result.value);
-            }
+            base_result.value = crate::instruments::common_impl::helpers::apply_scenario_value(
+                instrument,
+                base_result.value,
+            );
             return Ok(base_result);
         }
 
@@ -397,11 +421,10 @@ impl PricerRegistry {
             // overrides here so the documented contract ("scenario price
             // overrides are always applied to the returned value") holds on the
             // risk-only non-discounting path too.
-            let value = instrument
-                .scenario_overrides()
-                .map_or(base_result.value, |overrides| {
-                    overrides.apply_to_value(base_result.value)
-                });
+            let value = crate::instruments::common_impl::helpers::apply_scenario_value(
+                instrument,
+                base_result.value,
+            );
             crate::results::ValuationResult::stamped_with_meta(
                 instrument.id(),
                 as_of,
@@ -449,13 +472,7 @@ impl PricerRegistry {
         market: &Market,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<f64, PricingError> {
-        let key = PricerKey::new(instrument.key(), model);
-        let Some(pricer) = self.get_pricer(key) else {
-            return Err(PricingError::UnknownPricer {
-                key,
-                available_models: self.available_models_for_instrument(key.instrument),
-            });
-        };
+        let pricer = self.validated_pricer(instrument, model)?;
         pricer.price_raw_dyn(instrument, market, as_of)
     }
 
@@ -604,6 +621,7 @@ fn collect_fx_policy_from_curves(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -752,6 +770,189 @@ mod tests {
     }
 
     // ─── Parity tests: instrument trait path vs registry path ────────────────
+
+    #[derive(Clone)]
+    struct InvalidTestInstrument {
+        id: finstack_quant_core::types::InstrumentId,
+        attributes: finstack_quant_core::types::Attributes,
+        base_calls: Arc<AtomicUsize>,
+    }
+
+    crate::impl_empty_cashflow_provider!(
+        InvalidTestInstrument,
+        crate::cashflow::builder::CashflowRepresentation::NoResidual
+    );
+
+    impl Priceable for InvalidTestInstrument {
+        crate::impl_instrument_base!(InstrumentType::Bond);
+
+        fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+            Err(finstack_quant_core::Error::Validation(
+                "synthetic invalid instrument".to_string(),
+            ))
+        }
+
+        fn base_value(
+            &self,
+            _market: &Market,
+            _as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+            self.base_calls.fetch_add(1, Ordering::SeqCst);
+            Ok(finstack_quant_core::money::Money::new(
+                100.0,
+                finstack_quant_core::currency::Currency::USD,
+            ))
+        }
+    }
+
+    struct CountingBondPricer {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl Pricer for CountingBondPricer {
+        fn key(&self) -> PricerKey {
+            PricerKey::new(InstrumentType::Bond, ModelKey::Discounting)
+        }
+
+        fn price_dyn(
+            &self,
+            instrument: &dyn Priceable,
+            _market: &Market,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(crate::results::ValuationResult::stamped(
+                instrument.id(),
+                as_of,
+                finstack_quant_core::money::Money::new(
+                    100.0,
+                    finstack_quant_core::currency::Currency::USD,
+                ),
+            ))
+        }
+    }
+
+    #[test]
+    fn canonical_pricing_routes_validate_before_dispatch_or_model_resolution() {
+        use crate::instruments::Instrument;
+        use time::macros::date;
+
+        let base_calls = Arc::new(AtomicUsize::new(0));
+        let pricer_calls = Arc::new(AtomicUsize::new(0));
+        let instrument = InvalidTestInstrument {
+            id: finstack_quant_core::types::InstrumentId::new("INVALID-TEST"),
+            attributes: finstack_quant_core::types::Attributes::default(),
+            base_calls: Arc::clone(&base_calls),
+        };
+        let market = Market::new();
+        let as_of = date!(2025 - 01 - 15);
+        let mut registry = PricerRegistry::new();
+        registry.register(
+            InstrumentType::Bond,
+            ModelKey::Discounting,
+            CountingBondPricer {
+                calls: Arc::clone(&pricer_calls),
+            },
+        );
+
+        let registry_err = registry
+            .price_with_metrics(
+                &instrument,
+                ModelKey::Discounting,
+                &market,
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect_err("invalid registry request must fail validation");
+        assert!(matches!(registry_err, PricingError::InvalidInput { .. }));
+
+        let metric_err = registry
+            .price_with_metrics(
+                &instrument,
+                ModelKey::Discounting,
+                &market,
+                as_of,
+                &[crate::metrics::MetricId::Dv01],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect_err("invalid metric request must fail validation");
+        assert!(matches!(metric_err, PricingError::InvalidInput { .. }));
+
+        let raw_err = registry
+            .price_raw(&instrument, ModelKey::Discounting, &market, as_of)
+            .expect_err("invalid raw request must fail validation");
+        assert!(matches!(raw_err, PricingError::InvalidInput { .. }));
+
+        let batch = registry.price_batch(
+            &[&instrument],
+            ModelKey::Discounting,
+            &market,
+            as_of,
+            &[],
+            crate::instruments::PricingOptions::default(),
+        );
+        assert!(matches!(
+            batch.as_slice(),
+            [Err(PricingError::InvalidInput { .. })]
+        ));
+
+        let unknown_model_err = registry
+            .price_with_metrics(
+                &instrument,
+                ModelKey::HazardRate,
+                &market,
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect_err("validation must precede unknown-model resolution");
+        assert!(matches!(
+            unknown_model_err,
+            PricingError::InvalidInput { .. }
+        ));
+
+        let registry = Arc::new(registry);
+        let trait_err = instrument
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default().with_registry(registry),
+            )
+            .expect_err("trait pricing request must fail validation");
+        assert!(matches!(
+            trait_err,
+            finstack_quant_core::Error::Validation(_)
+        ));
+
+        let value_err = instrument
+            .value(&market, as_of)
+            .expect_err("direct value request must fail validation");
+        assert!(matches!(
+            value_err,
+            finstack_quant_core::Error::Validation(_)
+        ));
+
+        let base_raw_err = instrument
+            .base_value_raw(&market, as_of)
+            .expect_err("direct base raw request must fail validation");
+        assert!(matches!(
+            base_raw_err,
+            finstack_quant_core::Error::Validation(_)
+        ));
+
+        let raw_value_err = instrument
+            .value_raw(&market, as_of)
+            .expect_err("direct raw value request must fail validation");
+        assert!(matches!(
+            raw_value_err,
+            finstack_quant_core::Error::Validation(_)
+        ));
+
+        assert_eq!(pricer_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(base_calls.load(Ordering::SeqCst), 0);
+    }
 
     /// Default discounting path parity:
     /// `Bond::price_with_metrics` (trait default, discount engine) and
