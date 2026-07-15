@@ -10,25 +10,8 @@ use finstack_quant_core::Error as CoreError;
 use finstack_quant_monte_carlo::traits::PathState;
 use finstack_quant_monte_carlo::traits::Payoff;
 
-/// Final payoff type for autocallable products.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum FinalPayoffType {
-    /// Capital protection: max(floor, participation * min(S_T/S_0, cap))
-    CapitalProtection {
-        /// Floor level (e.g., 0.9 for 90% protection)
-        floor: f64,
-    },
-    /// Participation: 1 + participation_rate * max(0, S_T/S_0 - 1)
-    Participation {
-        /// Participation rate (e.g., 1.0 for 100% participation)
-        rate: f64,
-    },
-    /// Knock-in put: Put option if barrier breached, otherwise return principal
-    KnockInPut {
-        /// Put strike price
-        strike: f64,
-    },
-}
+/// Backward-compatible Monte Carlo path for the canonical instrument enum.
+pub use super::types::FinalPayoffType;
 
 /// Autocallable structured product payoff.
 ///

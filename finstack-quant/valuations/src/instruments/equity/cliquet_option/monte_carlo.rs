@@ -9,6 +9,9 @@ use finstack_quant_core::Error as CoreError;
 use finstack_quant_monte_carlo::traits::PathState;
 use finstack_quant_monte_carlo::traits::Payoff;
 
+/// Backward-compatible Monte Carlo path for the canonical instrument enum.
+pub use super::types::CliquetPayoffType;
+
 /// Cliquet call option payoff.
 ///
 /// A cliquet option accumulates returns over multiple periods with periodic resets.
@@ -62,16 +65,6 @@ pub struct CliquetCallPayoff {
     next_reset_idx: usize,
     /// Payoff type (Additive or Multiplicative)
     pub payoff_type: CliquetPayoffType,
-}
-
-/// Cliquet payoff aggregation type.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum CliquetPayoffType {
-    /// Additive: Sum of period returns
-    #[default]
-    Additive,
-    /// Multiplicative: Product of (1 + period returns) - 1
-    Multiplicative,
 }
 
 impl CliquetCallPayoff {

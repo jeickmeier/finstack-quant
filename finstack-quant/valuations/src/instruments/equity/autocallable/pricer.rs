@@ -1,10 +1,8 @@
 //! Autocallable Monte Carlo pricer.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::equity::autocallable::monte_carlo::{
-    AutocallablePayoff, FinalPayoffType as McFinalPayoffType,
-};
-use crate::instruments::equity::autocallable::types::{Autocallable, FinalPayoffType};
+use crate::instruments::equity::autocallable::monte_carlo::AutocallablePayoff;
+use crate::instruments::equity::autocallable::types::Autocallable;
 use crate::instruments::equity::piecewise_gbm::{bootstrap_forward_gbm, PiecewiseExactGbm};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
@@ -29,16 +27,6 @@ impl AutocallableMcPricer {
     pub fn new() -> Self {
         Self {
             config: PathDependentPricerConfig::default(),
-        }
-    }
-
-    fn convert_final_payoff_type(ft: FinalPayoffType) -> McFinalPayoffType {
-        match ft {
-            FinalPayoffType::CapitalProtection { floor } => {
-                McFinalPayoffType::CapitalProtection { floor }
-            }
-            FinalPayoffType::Participation { rate } => McFinalPayoffType::Participation { rate },
-            FinalPayoffType::KnockInPut { strike } => McFinalPayoffType::KnockInPut { strike },
         }
     }
 
@@ -134,7 +122,7 @@ impl AutocallableMcPricer {
                 vec![],
                 inst.memory_coupons,
                 inst.final_barrier,
-                Self::convert_final_payoff_type(inst.final_payoff_type),
+                inst.final_payoff_type,
                 inst.participation_rate,
                 inst.cap_level,
                 inst.notional.amount(),
@@ -211,8 +199,6 @@ impl AutocallableMcPricer {
             &format!("Autocallable {}", inst.id),
         )?;
 
-        let mc_final_payoff = Self::convert_final_payoff_type(inst.final_payoff_type);
-
         // Calculate discount factor ratios for each remaining observation date
         // Ratio = DF(as_of, T_obs) / DF(as_of, T_mat)
         // This corrects for the engine applying DF(T_mat) to early cashflows.
@@ -239,7 +225,7 @@ impl AutocallableMcPricer {
             future_coupons,
             inst.memory_coupons,
             inst.final_barrier,
-            mc_final_payoff,
+            inst.final_payoff_type,
             inst.participation_rate,
             inst.cap_level,
             inst.notional.amount(),

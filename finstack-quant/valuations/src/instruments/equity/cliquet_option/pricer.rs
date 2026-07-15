@@ -1,9 +1,7 @@
 //! Cliquet option Monte Carlo pricer.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::equity::cliquet_option::monte_carlo::{
-    CliquetCallPayoff, CliquetPayoffType as McPayoffType,
-};
+use crate::instruments::equity::cliquet_option::monte_carlo::CliquetCallPayoff;
 use crate::instruments::equity::cliquet_option::types::{CliquetOption, CliquetPayoffType};
 use crate::instruments::equity::piecewise_gbm::PiecewiseExactGbm;
 use crate::pricer::{
@@ -220,11 +218,6 @@ impl CliquetOptionMcPricer {
             .filter(|&t| t > 0.0)
             .collect();
 
-        let payoff_type = match inst.payoff_type {
-            CliquetPayoffType::Additive => McPayoffType::Additive,
-            CliquetPayoffType::Multiplicative => McPayoffType::Multiplicative,
-        };
-
         // Derive deterministic seed from instrument ID and scenario
 
         use finstack_quant_monte_carlo::seed;
@@ -272,7 +265,7 @@ impl CliquetOptionMcPricer {
             inst.notional.amount(),
             inst.notional.currency(),
             sim_anchor,
-            payoff_type,
+            inst.payoff_type,
         )?
         .with_prior_locked_returns(locked_sum, locked_growth);
 
