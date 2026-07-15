@@ -542,6 +542,26 @@ impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexOpti
         self.validate()
     }
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_series_id(self.vol_index_curve_id.as_str());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_of_vol_surface_id.clone(),
+                Some(finstack_quant_core::types::PriceId::new(
+                    self.vol_index_curve_id.as_str(),
+                )),
+                Some(self.strike),
+            ),
+        );
+        Ok(deps)
+    }
+
     fn base_value(
         &self,
         curves: &MarketContext,
@@ -843,6 +863,29 @@ mod tests {
             serde_json::from_str(&json).expect("json deserialization");
         assert_eq!(option.id, recovered.id);
         assert!((option.strike - recovered.strike).abs() < 1e-10);
+    }
+
+    #[test]
+    fn canonical_dependencies_include_vol_index_curve_and_surface_context() {
+        let option = VolatilityIndexOption::example().expect("example");
+        let deps = option.market_dependencies().expect("dependencies");
+
+        assert_eq!(
+            deps.curves.discount_curves.as_slice(),
+            &[option.discount_curve_id.clone()]
+        );
+        assert_eq!(
+            deps.series_ids,
+            vec![option.vol_index_curve_id.as_str().to_string()]
+        );
+        assert_eq!(deps.volatility_dependencies.len(), 1);
+        let volatility = &deps.volatility_dependencies[0];
+        assert_eq!(volatility.surface_id, option.vol_of_vol_surface_id);
+        assert_eq!(
+            volatility.underlying_id.as_ref().map(|id| id.as_str()),
+            Some(option.vol_index_curve_id.as_str())
+        );
+        assert_eq!(volatility.reference_strike, Some(option.strike));
     }
 
     fn base_builder() -> super::VolatilityIndexOptionBuilder {

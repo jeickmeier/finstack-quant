@@ -351,6 +351,28 @@ impl Instrument for Basket {
         self.validate()
     }
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        for constituent in &self.constituents {
+            match &constituent.reference {
+                ConstituentReference::Instrument(instrument) => deps.merge(
+                    crate::instruments::common_impl::dependencies::MarketDependencies::from_instrument_json(
+                        instrument,
+                    )?,
+                ),
+                ConstituentReference::MarketData { price_id, .. } => {
+                    deps.add_spot_id(price_id.as_str());
+                }
+            }
+        }
+        Ok(deps)
+    }
+
     // === Pricing Methods ===
 
     fn base_value(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
@@ -466,5 +488,21 @@ mod tests {
         // Edge: just outside 10bp tolerance should fail
         basket.constituents[0].weight = 0.602;
         assert!(basket.validate().is_err());
+    }
+
+    #[test]
+    fn canonical_dependencies_include_constituent_prices() {
+        let basket = Basket::example().expect("example");
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&basket).expect("dependencies");
+
+        assert_eq!(
+            deps.curves.discount_curves.as_slice(),
+            &[basket.discount_curve_id]
+        );
+        assert_eq!(
+            deps.spot_ids,
+            vec!["AAPL-SPOT".to_string(), "UST10Y-PRICE".to_string()]
+        );
     }
 }

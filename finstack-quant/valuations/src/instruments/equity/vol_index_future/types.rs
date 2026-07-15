@@ -253,6 +253,16 @@ impl VolatilityIndexFuture {
 impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexFuture {
     impl_instrument_base!(crate::pricer::InstrumentType::VolatilityIndexFuture);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_series_id(self.vol_index_curve_id.as_str());
+        Ok(deps)
+    }
+
     fn base_value(
         &self,
         curves: &MarketContext,

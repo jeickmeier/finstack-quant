@@ -468,10 +468,8 @@ impl crate::instruments::common_impl::traits::Instrument for EquityIndexFuture {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_spot_id(self.spot_id.as_str());
         Ok(deps)
     }

@@ -150,6 +150,16 @@ impl PrivateMarketsFund {
 impl Instrument for PrivateMarketsFund {
     impl_instrument_base!(crate::pricer::InstrumentType::PrivateMarketsFund);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        // Contractual events and the optional NAV are stored on the
+        // instrument; pricing performs no market-data lookup.
+        Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
+    }
+
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.waterfall_spec.validate()?;
 

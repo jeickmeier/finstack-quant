@@ -435,6 +435,21 @@ impl crate::instruments::common_impl::traits::Instrument for EquityTotalReturnSw
         self.validate()
     }
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.financing.discount_curve_id.clone());
+        deps.add_forward_curve(self.financing.forward_curve_id.clone());
+        deps.add_spot_id(self.underlying.spot_id.as_str());
+        if let Some(dividend_yield) = &self.underlying.div_yield_id {
+            deps.add_series_id(dividend_yield.as_str());
+        }
+        Ok(deps)
+    }
+
     fn base_value(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
         // Validate configuration
         self.validate()?;
@@ -554,6 +569,33 @@ mod validation_tests {
     fn validate_accepts_default_example() {
         let trs = base();
         assert!(trs.validate().is_ok());
+    }
+
+    #[test]
+    fn canonical_dependencies_preserve_financing_roles_and_underlying() {
+        let trs = base();
+        let deps = crate::instruments::Instrument::market_dependencies(&trs).expect("dependencies");
+
+        assert_eq!(
+            deps.curves.discount_curves.as_slice(),
+            &[trs.financing.discount_curve_id.clone()]
+        );
+        assert_eq!(
+            deps.curves.forward_curves.as_slice(),
+            &[trs.financing.forward_curve_id.clone()]
+        );
+        assert_eq!(
+            deps.spot_ids,
+            vec![trs.underlying.spot_id.as_str().to_string()]
+        );
+        assert_eq!(
+            deps.series_ids,
+            trs.underlying
+                .div_yield_id
+                .iter()
+                .map(|id| id.as_str().to_string())
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]

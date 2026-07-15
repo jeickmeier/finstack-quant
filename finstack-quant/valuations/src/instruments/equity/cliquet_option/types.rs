@@ -308,9 +308,20 @@ impl crate::instruments::common_impl::traits::Instrument for CliquetOption {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        crate::instruments::common_impl::dependencies::MarketDependencies::from_curves_and_equity(
-            self,
-        )
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_spot_id(self.spot_id.as_str());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                Some(self.spot_id.clone()),
+                None,
+            ),
+        );
+        if let Some(dividend_yield) = &self.div_yield_id {
+            deps.add_series_id(dividend_yield.as_str());
+        }
+        Ok(deps)
     }
 
     fn base_value(

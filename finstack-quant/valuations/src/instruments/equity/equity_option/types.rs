@@ -683,12 +683,19 @@ impl crate::instruments::common_impl::traits::Instrument for EquityOption {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_spot_id(self.spot_id.as_str());
-        deps.add_vol_surface_id(self.vol_surface_id.as_str());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                Some(self.spot_id.clone()),
+                Some(self.strike),
+            ),
+        );
+        if let Some(dividend_yield) = &self.div_yield_id {
+            deps.add_series_id(dividend_yield.as_str());
+        }
         Ok(deps)
     }
 
@@ -752,6 +759,31 @@ mod tests {
         money::Money,
         types::{CurveId, InstrumentId},
     };
+
+    #[test]
+    fn canonical_dependencies_preserve_equity_surface_context() {
+        let option = EquityOption::example().expect("example");
+        let deps = option.market_dependencies().expect("dependencies");
+
+        assert_eq!(
+            deps.curves.discount_curves.as_slice(),
+            &[option.discount_curve_id.clone()]
+        );
+        assert_eq!(deps.spot_ids, vec![option.spot_id.as_str().to_string()]);
+        assert_eq!(deps.volatility_dependencies.len(), 1);
+        let volatility = &deps.volatility_dependencies[0];
+        assert_eq!(volatility.surface_id, option.vol_surface_id);
+        assert_eq!(volatility.underlying_id.as_ref(), Some(&option.spot_id));
+        assert_eq!(volatility.reference_strike, Some(option.strike));
+        assert_eq!(
+            deps.series_ids,
+            option
+                .div_yield_id
+                .iter()
+                .map(|id| id.as_str().to_string())
+                .collect::<Vec<_>>()
+        );
+    }
     use test_utils::{date, flat_discount_with_tenor, flat_vol_surface};
 
     const DISC_ID: &str = "USD-OIS";

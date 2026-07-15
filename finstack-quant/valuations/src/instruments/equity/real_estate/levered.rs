@@ -125,6 +125,23 @@ impl LeveredRealEstateEquity {
 impl Instrument for LeveredRealEstateEquity {
     impl_instrument_base!(InstrumentType::LeveredRealEstateEquity);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = self.asset.market_dependencies()?;
+        for instrument in &self.financing {
+            deps.merge(
+                crate::instruments::common_impl::dependencies::MarketDependencies::from_instrument_json(
+                    instrument,
+                )?,
+            );
+        }
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        Ok(deps)
+    }
+
     fn base_value(
         &self,
         market: &MarketContext,

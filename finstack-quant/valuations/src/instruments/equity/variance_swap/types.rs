@@ -413,7 +413,8 @@ impl crate::instruments::common_impl::traits::Instrument for VarianceSwap {
     }
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
-        let mut deps = MarketDependencies::from_curve_dependencies(self)?;
+        let mut deps = MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
         if self.realized_var_method.requires_ohlc() {
             for series_id in [
                 self.open_series_id.as_deref(),

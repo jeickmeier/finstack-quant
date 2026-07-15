@@ -380,7 +380,8 @@ impl crate::instruments::common_impl::traits::Instrument for Equity {
     impl_instrument_base!(crate::pricer::InstrumentType::Equity);
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
-        let mut deps = MarketDependencies::from_curve_dependencies(self)?;
+        let mut deps = MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
         for spot_id in self.price_id_candidates() {
             deps.add_spot_id(spot_id);
         }
