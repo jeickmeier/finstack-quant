@@ -4,7 +4,7 @@ use crate::instruments::common_impl::traits::{
     CurveDependencies, EquityDependencies, EquityInstrumentDeps, InstrumentCurves,
 };
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::types::CurveId;
+use finstack_quant_core::types::{CurveId, PriceId};
 use smallvec::SmallVec;
 
 use crate::instruments::json_loader::InstrumentJson;
@@ -25,6 +25,42 @@ impl FxPair {
     }
 }
 
+/// A volatility-surface dependency with the context needed for diagnostics.
+#[derive(Debug, Clone)]
+pub struct VolatilityDependency {
+    /// Volatility surface identifier.
+    pub surface_id: CurveId,
+    /// Optional underlying price identifier paired with the surface.
+    pub underlying_id: Option<PriceId>,
+    /// Optional contractual strike used by local volatility diagnostics.
+    pub reference_strike: Option<f64>,
+}
+
+impl VolatilityDependency {
+    /// Create a volatility dependency descriptor.
+    pub fn new(
+        surface_id: impl Into<CurveId>,
+        underlying_id: Option<PriceId>,
+        reference_strike: Option<f64>,
+    ) -> Self {
+        Self {
+            surface_id: surface_id.into(),
+            underlying_id,
+            reference_strike,
+        }
+    }
+}
+
+impl PartialEq for VolatilityDependency {
+    fn eq(&self, other: &Self) -> bool {
+        self.surface_id == other.surface_id
+            && self.underlying_id == other.underlying_id
+            && self.reference_strike.map(f64::to_bits) == other.reference_strike.map(f64::to_bits)
+    }
+}
+
+impl Eq for VolatilityDependency {}
+
 /// Unified dependency container for instrument market data requirements.
 #[derive(Debug, Clone, Default)]
 pub struct MarketDependencies {
@@ -33,7 +69,12 @@ pub struct MarketDependencies {
     /// Spot identifiers (equity, FX spot IDs, commodity spot IDs).
     pub spot_ids: Vec<String>,
     /// Volatility surface identifiers.
+    ///
+    /// Temporary B09-B13 compatibility projection. New code should use
+    /// [`MarketDependencies::volatility_dependencies`].
     pub vol_surface_ids: Vec<String>,
+    /// Typed volatility dependencies in deterministic insertion order.
+    pub volatility_dependencies: Vec<VolatilityDependency>,
     /// FX pairs required for pricing (spot matrices).
     pub fx_pairs: Vec<FxPair>,
     /// Scalar time series identifiers (e.g., OHLC price series for realized variance).
@@ -55,13 +96,16 @@ impl MarketDependencies {
     ///
     /// This returns the first spot/vol IDs when multiple are present (e.g., baskets).
     pub fn equity_dependencies(&self) -> EquityInstrumentDeps {
+        let volatility = self.volatility_dependencies.first();
         EquityInstrumentDeps {
-            spot_id: self.spot_ids.first().cloned(),
-            vol_surface_id: self.vol_surface_ids.first().cloned(),
-            // Basket / multi-strike aggregations don't carry a single
-            // reference strike; the FD vega clamp detection falls back to
-            // the conservative global-min check for these.
-            reference_strike: None,
+            spot_id: volatility
+                .and_then(|dependency| dependency.underlying_id.as_ref())
+                .map(|id| id.as_str().to_string())
+                .or_else(|| self.spot_ids.first().cloned()),
+            vol_surface_id: volatility
+                .map(|dependency| dependency.surface_id.as_str().to_string())
+                .or_else(|| self.vol_surface_ids.first().cloned()),
+            reference_strike: volatility.and_then(|dependency| dependency.reference_strike),
         }
     }
 
@@ -102,11 +146,21 @@ impl MarketDependencies {
 
     /// Merge equity dependencies into this set.
     pub fn add_equity_dependencies(&mut self, deps: EquityInstrumentDeps) {
-        if let Some(spot_id) = deps.spot_id {
+        let EquityInstrumentDeps {
+            spot_id,
+            vol_surface_id,
+            reference_strike,
+        } = deps;
+        let underlying_id = spot_id.as_deref().map(PriceId::new);
+        if let Some(spot_id) = spot_id {
             self.add_spot_id(spot_id);
         }
-        if let Some(vol_surface_id) = deps.vol_surface_id {
-            self.add_vol_surface_id(vol_surface_id);
+        if let Some(vol_surface_id) = vol_surface_id {
+            self.add_volatility_dependency(VolatilityDependency::new(
+                CurveId::new(vol_surface_id),
+                underlying_id,
+                reference_strike,
+            ));
         }
     }
 
@@ -117,7 +171,39 @@ impl MarketDependencies {
 
     /// Add a volatility surface identifier.
     pub fn add_vol_surface_id(&mut self, id: impl Into<String>) {
-        push_unique_string(&mut self.vol_surface_ids, id.into());
+        self.add_volatility_dependency(VolatilityDependency::new(
+            CurveId::new(id.into()),
+            None,
+            None,
+        ));
+    }
+
+    /// Add a typed volatility dependency and synchronize the legacy surface projection.
+    pub fn add_volatility_dependency(&mut self, dependency: VolatilityDependency) {
+        push_unique_string(
+            &mut self.vol_surface_ids,
+            dependency.surface_id.as_str().to_string(),
+        );
+        if !self.volatility_dependencies.contains(&dependency) {
+            self.volatility_dependencies.push(dependency);
+        }
+    }
+
+    /// Return unique volatility surface IDs in first-descriptor order.
+    pub fn unique_vol_surface_ids(&self) -> Vec<CurveId> {
+        let mut ids = Vec::new();
+        for dependency in &self.volatility_dependencies {
+            if !ids.contains(&dependency.surface_id) {
+                ids.push(dependency.surface_id.clone());
+            }
+        }
+        for id in &self.vol_surface_ids {
+            let id = CurveId::new(id);
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        ids
     }
 
     /// Add a scalar time series identifier.
@@ -136,8 +222,13 @@ impl MarketDependencies {
         for id in other.spot_ids {
             self.add_spot_id(id);
         }
+        for dependency in other.volatility_dependencies {
+            self.add_volatility_dependency(dependency);
+        }
         for id in other.vol_surface_ids {
-            self.add_vol_surface_id(id);
+            if !self.vol_surface_ids.contains(&id) {
+                self.add_vol_surface_id(id);
+            }
         }
         for pair in other.fx_pairs {
             self.add_fx_pair(pair.base, pair.quote);
@@ -177,4 +268,87 @@ fn push_unique_fx_pair(target: &mut Vec<FxPair>, pair: FxPair) {
         return;
     }
     target.push(pair);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_equity_adapter_preserves_underlying_surface_and_strike() {
+        let mut dependencies = MarketDependencies::new();
+        dependencies.add_equity_dependencies(EquityInstrumentDeps {
+            spot_id: Some("SPX-SPOT".to_string()),
+            vol_surface_id: Some("SPX-VOL".to_string()),
+            reference_strike: Some(4_500.0),
+        });
+
+        assert_eq!(
+            dependencies.volatility_dependencies,
+            vec![VolatilityDependency::new(
+                CurveId::new("SPX-VOL"),
+                Some(PriceId::new("SPX-SPOT")),
+                Some(4_500.0),
+            )]
+        );
+        assert_eq!(dependencies.vol_surface_ids, vec!["SPX-VOL"]);
+
+        let roundtrip = dependencies.equity_dependencies();
+        assert_eq!(roundtrip.spot_id.as_deref(), Some("SPX-SPOT"));
+        assert_eq!(roundtrip.vol_surface_id.as_deref(), Some("SPX-VOL"));
+        assert_eq!(roundtrip.reference_strike, Some(4_500.0));
+    }
+
+    #[test]
+    fn exact_descriptors_deduplicate_in_insertion_order_but_surfaces_can_repeat() {
+        let first = VolatilityDependency::new(
+            CurveId::new("SPX-VOL"),
+            Some(PriceId::new("SPX-SPOT")),
+            Some(4_500.0),
+        );
+        let second = VolatilityDependency::new(
+            CurveId::new("SPX-VOL"),
+            Some(PriceId::new("SPX-SPOT")),
+            Some(4_600.0),
+        );
+        let mut dependencies = MarketDependencies::new();
+        dependencies.add_volatility_dependency(first.clone());
+        dependencies.add_volatility_dependency(first.clone());
+        dependencies.add_volatility_dependency(second.clone());
+
+        assert_eq!(dependencies.volatility_dependencies, vec![first, second]);
+        assert_eq!(dependencies.vol_surface_ids, vec!["SPX-VOL"]);
+        assert_eq!(
+            dependencies.unique_vol_surface_ids(),
+            vec![CurveId::new("SPX-VOL")]
+        );
+    }
+
+    #[test]
+    fn merge_preserves_descriptor_order_and_projection() {
+        let mut left = MarketDependencies::new();
+        left.add_volatility_dependency(VolatilityDependency::new(
+            CurveId::new("LEFT-VOL"),
+            None,
+            None,
+        ));
+        let mut right = MarketDependencies::new();
+        right.add_volatility_dependency(VolatilityDependency::new(
+            CurveId::new("RIGHT-VOL"),
+            None,
+            None,
+        ));
+        right.add_volatility_dependency(VolatilityDependency::new(
+            CurveId::new("LEFT-VOL"),
+            None,
+            None,
+        ));
+
+        left.merge(right);
+        assert_eq!(left.vol_surface_ids, vec!["LEFT-VOL", "RIGHT-VOL"]);
+        assert_eq!(
+            left.unique_vol_surface_ids(),
+            vec![CurveId::new("LEFT-VOL"), CurveId::new("RIGHT-VOL")]
+        );
+    }
 }

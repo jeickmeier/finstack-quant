@@ -97,7 +97,7 @@ mod tests {
         deps.curves.discount_curves.push(CurveId::new("USD-OIS"));
         deps.curves.credit_curves.push(CurveId::new("ACME-HAZARD"));
         deps.spot_ids.push("AAPL".into());
-        deps.vol_surface_ids.push("AAPL-VOL".into());
+        deps.add_vol_surface_id("AAPL-VOL");
         deps.fx_pairs
             .push(crate::instruments::common_impl::dependencies::FxPair::new(
                 Currency::USD,
