@@ -17,9 +17,7 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::{currency::Currency, money::Money};
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
-use finstack_quant_valuations::instruments::{
-    Attributes, Instrument, PricingOverrides, SettlementType,
-};
+use finstack_quant_valuations::instruments::{Attributes, Instrument, SettlementType};
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
 use finstack_quant_valuations::metrics::MetricId;
 use time::Month;
@@ -91,7 +89,9 @@ fn create_option(expiry: Date, option_type: OptionType) -> EquityOption {
         vol_surface_id: "SPOT_VOL".into(),
         div_yield_id: Some("SPOT_DIV".into()),
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Attributes::new(),
     }

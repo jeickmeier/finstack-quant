@@ -3,7 +3,6 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::OptionType;
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
@@ -97,9 +96,7 @@ impl std::str::FromStr for AveragingMethod {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct AsianOption {
@@ -138,7 +135,13 @@ pub struct AsianOption {
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
     /// Past fixings for seasoned options (date, observed price pairs).
@@ -180,7 +183,6 @@ impl AsianOption {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
     }
@@ -344,17 +346,7 @@ impl crate::instruments::common_impl::traits::Instrument for AsianOption {
         self.fixing_dates.first().copied()
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

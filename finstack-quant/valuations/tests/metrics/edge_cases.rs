@@ -18,8 +18,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::{PricingOverrides, SettlementType};
 use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
 use std::sync::Arc;
 use time::macros::date;
@@ -222,7 +222,9 @@ fn test_zero_volatility_option_limits() {
         vol_surface_id: "SPOT_VOL".into(),
         div_yield_id: None,
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -262,7 +264,9 @@ fn test_zero_volatility_option_limits() {
         vol_surface_id: "SPOT_VOL".into(),
         div_yield_id: None,
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -316,7 +320,9 @@ fn test_zero_notional_is_rejected() {
         vol_surface_id: "SPOT_VOL".into(),
         div_yield_id: None,
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -351,7 +357,9 @@ fn test_deep_otm_option_greeks() {
         vol_surface_id: "SPOT_VOL".into(),
         div_yield_id: None,
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -403,7 +411,9 @@ fn test_deep_itm_put_greeks() {
         vol_surface_id: "SPOT_VOL".into(),
         div_yield_id: None,
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -454,7 +464,9 @@ fn test_deep_otm_put_greeks() {
         vol_surface_id: "SPOT_VOL".into(),
         div_yield_id: None,
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -520,7 +532,9 @@ fn test_atm_option_gamma_peak() {
             vol_surface_id: "SPOT_VOL".into(),
             div_yield_id: None,
             discrete_dividends: Vec::new(),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             exercise_schedule: None,
             attributes: Default::default(),
         };
@@ -581,7 +595,9 @@ fn test_extreme_volatility_handling() {
         vol_surface_id: "SPOT_VOL".into(),
         div_yield_id: None,
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -636,7 +652,9 @@ fn test_very_short_dated_option() {
         vol_surface_id: "SPOT_VOL".into(),
         div_yield_id: None,
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -713,7 +731,9 @@ fn test_very_low_interest_rate_greeks() {
         vol_surface_id: "SPOT_VOL".into(),
         div_yield_id: None,
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -795,7 +815,9 @@ fn test_vol_smile_greeks() {
         vol_surface_id: "SMILE_VOL".into(),
         div_yield_id: None,
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };

@@ -190,7 +190,7 @@ impl AutocallableMcPricer {
         let process = bootstrap_forward_gbm(
             disc_curve.as_ref(),
             curves,
-            &inst.pricing_overrides.market_quotes,
+            &inst.instrument_pricing_overrides.market_quotes,
             inst.vol_surface_id.as_str(),
             as_of,
             initial_spot,
@@ -237,7 +237,7 @@ impl AutocallableMcPricer {
 
         // Derive deterministic seed from instrument ID and scenario.
         use finstack_quant_monte_carlo::seed;
-        let seed = if let Some(ref scenario) = inst.pricing_overrides.metrics.mc_seed_scenario {
+        let seed = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
@@ -245,7 +245,7 @@ impl AutocallableMcPricer {
 
         let merged_cfg = crate::instruments::common_impl::helpers::merged_path_config(
             &self.config,
-            &inst.pricing_overrides,
+            &inst.instrument_pricing_overrides,
         )?;
 
         // Identical grid to the previous constant-GBM path (uniform steps plus the

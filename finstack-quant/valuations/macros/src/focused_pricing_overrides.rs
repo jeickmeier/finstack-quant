@@ -225,6 +225,15 @@ fn parse_try_from(attrs: &[syn::Attribute]) -> syn::Result<Option<Path>> {
             }
         })?;
     }
+    for attr in attrs.iter().filter(|attr| attr.path().is_ident("serde")) {
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("try_from") {
+                let value: LitStr = meta.value()?.parse()?;
+                result = Some(value.parse()?);
+            }
+            Ok(())
+        })?;
+    }
     Ok(result)
 }
 

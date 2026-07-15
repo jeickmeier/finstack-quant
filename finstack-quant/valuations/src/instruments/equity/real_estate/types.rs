@@ -51,9 +51,7 @@ pub enum RealEstateValuationMethod {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[builder(validate = RealEstateAsset::validate)]
 #[serde(deny_unknown_fields, try_from = "RealEstateAssetUnchecked")]
@@ -159,7 +157,13 @@ pub struct RealEstateAsset {
     /// Attributes for tagging and scenarios.
     #[builder(default)]
     #[serde(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     #[serde(default)]
     #[builder(default)]
@@ -213,7 +217,11 @@ struct RealEstateAssetUnchecked {
     day_count: DayCount,
     discount_curve_id: CurveId,
     #[serde(default)]
-    pricing_overrides: crate::instruments::PricingOverrides,
+    instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    #[serde(default)]
+    metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    #[serde(default)]
+    scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     #[serde(default)]
     attributes: Attributes,
 }
@@ -245,7 +253,9 @@ impl TryFrom<RealEstateAssetUnchecked> for RealEstateAsset {
             appraisal_value: value.appraisal_value,
             day_count: value.day_count,
             discount_curve_id: value.discount_curve_id,
-            pricing_overrides: value.pricing_overrides,
+            instrument_pricing_overrides: value.instrument_pricing_overrides,
+            metric_pricing_overrides: value.metric_pricing_overrides,
+            scenario_pricing_overrides: value.scenario_pricing_overrides,
             attributes: value.attributes,
         };
         inst.validate()?;
@@ -514,17 +524,7 @@ impl Instrument for RealEstateAsset {
         None
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 impl crate::cashflow::traits::CashflowScheduleSource for RealEstateAsset {
     fn raw_cashflow_schedule(

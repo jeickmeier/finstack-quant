@@ -22,7 +22,7 @@ mod cv_notional_tests {
     use finstack_quant_valuations::instruments::exotics::asian_option::{
         AsianOption, AveragingMethod,
     };
-    use finstack_quant_valuations::instruments::OptionType;
+    use finstack_quant_valuations::instruments::{InstrumentPricingOverrides, OptionType};
     use finstack_quant_valuations::pricer::{
         standard_registry, InstrumentType, ModelKey, PricerKey,
     };
@@ -62,7 +62,7 @@ mod cv_notional_tests {
     }
 
     fn arithmetic_asian(option_type: OptionType, notional: f64, expiry: Date) -> AsianOption {
-        let mut overrides = finstack_quant_valuations::instruments::PricingOverrides::default();
+        let mut overrides = InstrumentPricingOverrides::default();
         overrides.model_config.mc_paths = Some(20_000);
         AsianOption {
             id: InstrumentId::new("ASIAN-CV-NOTIONAL"),
@@ -83,7 +83,9 @@ mod cv_notional_tests {
             discount_curve_id: "USD-OIS".into(),
             vol_surface_id: "SPX-VOL".into(),
             div_yield_id: Some("SPX-DIV".into()),
-            pricing_overrides: overrides,
+            instrument_pricing_overrides: overrides,
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
             past_fixings: vec![],
         }

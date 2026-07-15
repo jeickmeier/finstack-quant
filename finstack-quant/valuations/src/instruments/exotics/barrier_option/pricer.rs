@@ -104,7 +104,7 @@ impl BarrierOptionMcPricer {
 
         // Get volatility (override → surface, using vol surface time basis)
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.pricing_overrides.market_quotes,
+            &inst.instrument_pricing_overrides.market_quotes,
             curves,
             inst.vol_surface_id.as_str(),
             t_vol,
@@ -173,7 +173,7 @@ impl BarrierOptionMcPricer {
 
         use finstack_quant_monte_carlo::seed;
 
-        let seed = if let Some(ref scenario) = inst.pricing_overrides.metrics.mc_seed_scenario {
+        let seed = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
@@ -521,7 +521,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
 mod tests {
     use super::*;
     use crate::instruments::exotics::barrier_option::types::{BarrierOption, BarrierType};
-    use crate::instruments::{Attributes, OptionType, PricingOverrides};
+    use crate::instruments::{Attributes, OptionType};
     use crate::models::closed_form::barrier::{
         barrier_call_continuous, barrier_put_continuous, barrier_rebate_continuous, down_out_call,
         BarrierParams, BarrierType as AnalyticalBarrierType,
@@ -583,7 +583,9 @@ mod tests {
             spot_id: "SPX".into(),
             vol_surface_id: "SPX_VOL".into(),
             div_yield_id: Some("SPX_DIV".into()),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             monitoring_frequency: None,
             attributes: Attributes::new(),
         }
@@ -1111,7 +1113,9 @@ mod tests {
             spot_id: "SPX".into(),
             vol_surface_id: "SPX_VOL".into(),
             div_yield_id: Some("SPX_DIV".into()),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             monitoring_frequency: None,
             attributes: Attributes::new(),
         };

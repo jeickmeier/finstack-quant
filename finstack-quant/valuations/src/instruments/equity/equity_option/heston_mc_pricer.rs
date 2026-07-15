@@ -114,12 +114,12 @@ impl EquityOptionHestonMcPricer {
         let maturity_step = time_grid.num_steps();
 
         let num_paths = crate::instruments::common_impl::helpers::resolve_mc_paths(
-            inst.pricing_overrides.model_config.mc_paths,
+            inst.instrument_pricing_overrides.model_config.mc_paths,
             self.num_paths,
         )?;
 
         // Derive deterministic seed
-        let seed_val = if let Some(ref scenario) = inst.pricing_overrides.metrics.mc_seed_scenario {
+        let seed_val = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
@@ -233,7 +233,7 @@ impl Pricer for EquityOptionHestonMcPricer {
 mod tests {
     use super::*;
     use crate::instruments::common_impl::parameters::{ExerciseStyle, OptionType};
-    use crate::instruments::{Attributes, PricingOverrides, SettlementType};
+    use crate::instruments::{Attributes, SettlementType};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::scalars::MarketScalar;
@@ -282,7 +282,6 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("equity option")

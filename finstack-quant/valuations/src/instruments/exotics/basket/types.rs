@@ -175,9 +175,7 @@ impl Default for BasketPricingConfig {
     Debug,
     Clone,
     finstack_quant_valuations_macros::FinancialBuilder,
-    Serialize,
-    Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct Basket {
@@ -197,7 +195,13 @@ pub struct Basket {
     /// Attributes for scenario selection and tagging
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
     /// Pricing configuration
@@ -387,17 +391,7 @@ impl Instrument for Basket {
         None
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.
@@ -419,7 +413,9 @@ mod tests {
             currency: Currency::USD,
             notional: Money::new(1_000_000.0, Currency::USD),
             discount_curve_id: "USD-OIS".into(),
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
             pricing_config: BasketPricingConfig::default(),
         };
@@ -458,7 +454,9 @@ mod tests {
             currency: Currency::USD,
             notional: Money::new(1_000_000.0, Currency::USD),
             discount_curve_id: "USD-OIS".into(),
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
             pricing_config: BasketPricingConfig::default(),
         };

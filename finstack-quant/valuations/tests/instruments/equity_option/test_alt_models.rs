@@ -236,7 +236,7 @@ fn heston_mc_collapses_to_black_scholes() {
         var,
     );
     let mut call = create_call(as_of, expiry, strike);
-    call.pricing_overrides.model_config.mc_paths = Some(80_000);
+    call.instrument_pricing_overrides.model_config.mc_paths = Some(80_000);
     let pv = standard_registry()
         .price_with_metrics(
             &call,
@@ -357,7 +357,7 @@ fn rough_heston_mc_atm_is_positive_and_sane() {
         0.04,
     );
     let mut call = create_call(as_of, expiry, 100.0);
-    call.pricing_overrides.model_config.mc_paths = Some(4_000);
+    call.instrument_pricing_overrides.model_config.mc_paths = Some(4_000);
     let pv = standard_registry()
         .price_with_metrics(
             &call,

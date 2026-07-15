@@ -273,7 +273,9 @@ impl TestOptionBuilder {
             vol_surface_id: self.vol_surface_id.into(),
             div_yield_id: self.div_yield_id,
             discrete_dividends: Vec::new(),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             exercise_schedule: None,
             attributes: Default::default(),
         }

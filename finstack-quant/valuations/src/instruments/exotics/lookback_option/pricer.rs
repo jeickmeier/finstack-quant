@@ -35,7 +35,7 @@ impl LookbackOptionMcPricer {
 
     fn merged_path_config(&self, inst: &LookbackOption) -> PathDependentPricerConfig {
         let mut c = self.config.clone();
-        if let Some(n) = inst.pricing_overrides.model_config.mc_paths {
+        if let Some(n) = inst.instrument_pricing_overrides.model_config.mc_paths {
             if n > 0 {
                 c.num_paths = n;
             }
@@ -93,7 +93,7 @@ impl LookbackOptionMcPricer {
 
         let strike_val = inst.strike.unwrap_or(spot);
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.pricing_overrides.market_quotes,
+            &inst.instrument_pricing_overrides.market_quotes,
             curves,
             inst.vol_surface_id.as_str(),
             t,
@@ -136,7 +136,7 @@ impl LookbackOptionMcPricer {
 
         use finstack_quant_monte_carlo::seed;
 
-        let seed = if let Some(ref scenario) = inst.pricing_overrides.metrics.mc_seed_scenario {
+        let seed = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
@@ -416,7 +416,7 @@ fn collect_lookback_inputs(
 
     let strike_val = inst.strike.unwrap_or(spot);
     let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-        &inst.pricing_overrides.market_quotes,
+        &inst.instrument_pricing_overrides.market_quotes,
         curves,
         inst.vol_surface_id.as_str(),
         t,
@@ -596,7 +596,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
 mod tests {
     use super::*;
     use crate::instruments::exotics::lookback_option::{LookbackOption, LookbackType};
-    use crate::instruments::{Attributes, OptionType, PricingOverrides};
+    use crate::instruments::{Attributes, OptionType};
     use crate::models::closed_form::lookback::{
         fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
         floating_strike_lookback_put,
@@ -655,7 +655,6 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .observed_max_opt(observed_max.map(|value| Money::new(value, Currency::USD)))
             .attributes(Attributes::new())
             .build()
@@ -676,7 +675,6 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .observed_min_opt(observed_min.map(|value| Money::new(value, Currency::USD)))
             .attributes(Attributes::new())
             .build()
@@ -697,7 +695,6 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .observed_min_opt(observed_min.map(|value| Money::new(value, Currency::USD)))
             .attributes(Attributes::new())
             .build()
@@ -718,7 +715,6 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .observed_max_opt(observed_max.map(|value| Money::new(value, Currency::USD)))
             .attributes(Attributes::new())
             .build()
@@ -871,7 +867,6 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("lookback option");

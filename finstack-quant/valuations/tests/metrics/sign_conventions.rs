@@ -22,8 +22,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::{PricingOverrides, SettlementType};
 use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
 use std::sync::Arc;
 use time::macros::date;
@@ -81,7 +81,9 @@ fn test_call_delta_positive() {
         vol_surface_id: "AAPL_VOL".into(),
         div_yield_id: Some("AAPL_DIV".into()),
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -126,7 +128,9 @@ fn test_put_delta_negative() {
         vol_surface_id: "AAPL_VOL".into(),
         div_yield_id: Some("AAPL_DIV".into()),
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -174,7 +178,9 @@ fn test_theta_negative_for_long_positions() {
             vol_surface_id: "AAPL_VOL".into(),
             div_yield_id: Some("AAPL_DIV".into()),
             discrete_dividends: Vec::new(),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             exercise_schedule: None,
             attributes: Default::default(),
         };
@@ -267,7 +273,9 @@ fn test_vega_always_positive() {
             vol_surface_id: "AAPL_VOL".into(),
             div_yield_id: Some("AAPL_DIV".into()),
             discrete_dividends: Vec::new(),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             exercise_schedule: None,
             attributes: Default::default(),
         };
@@ -321,7 +329,9 @@ fn test_gamma_always_positive() {
             vol_surface_id: "AAPL_VOL".into(),
             div_yield_id: Some("AAPL_DIV".into()),
             discrete_dividends: Vec::new(),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             exercise_schedule: None,
             attributes: Default::default(),
         };
@@ -374,7 +384,9 @@ fn test_call_rho_positive() {
         vol_surface_id: "AAPL_VOL".into(),
         div_yield_id: Some("AAPL_DIV".into()),
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -417,7 +429,9 @@ fn test_put_rho_negative() {
         vol_surface_id: "AAPL_VOL".into(),
         div_yield_id: Some("AAPL_DIV".into()),
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -724,7 +738,9 @@ fn test_put_call_parity() {
         vol_surface_id: "AAPL_VOL".into(),
         div_yield_id: Some("AAPL_DIV".into()),
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -745,7 +761,9 @@ fn test_put_call_parity() {
         vol_surface_id: "AAPL_VOL".into(),
         div_yield_id: Some("AAPL_DIV".into()),
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -814,7 +832,9 @@ fn test_put_call_parity_delta_relationship() {
         vol_surface_id: "AAPL_VOL".into(),
         div_yield_id: Some("AAPL_DIV".into()),
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };
@@ -834,7 +854,9 @@ fn test_put_call_parity_delta_relationship() {
         vol_surface_id: "AAPL_VOL".into(),
         div_yield_id: Some("AAPL_DIV".into()),
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     };

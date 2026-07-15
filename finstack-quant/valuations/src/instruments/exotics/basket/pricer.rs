@@ -390,7 +390,9 @@ mod tests {
             currency: Currency::USD,
             notional: Money::new(1.0, Currency::USD),
             discount_curve_id: "USD-OIS".into(),
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
             pricing_config: BasketPricingConfig::default(),
         }

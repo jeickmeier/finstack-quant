@@ -206,7 +206,7 @@ macro_rules! impl_equity_exotic_traits {
             fn metric_pricing_overrides_mut(
                 &mut self,
             ) -> &mut $crate::instruments::MetricPricingOverrides {
-                &mut self.pricing_overrides.metrics
+                &mut self.metric_pricing_overrides
             }
         }
     };

@@ -122,7 +122,7 @@ fn build_xi0_from_surface(
     use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
 
     if let Some(iv) = equity_option
-        .pricing_overrides
+        .instrument_pricing_overrides
         .market_quotes
         .implied_volatility
     {
@@ -380,7 +380,7 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
 
         // Derive deterministic seed from instrument id
         let seed_val =
-            if let Some(ref scenario) = equity_option.pricing_overrides.metrics.mc_seed_scenario {
+            if let Some(ref scenario) = equity_option.metric_pricing_overrides.mc_seed_scenario {
                 finstack_quant_monte_carlo::seed::derive_seed(&equity_option.id, scenario)
             } else {
                 finstack_quant_monte_carlo::seed::derive_seed(&equity_option.id, "base")
@@ -391,7 +391,10 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
         // allocating, so a malicious or typo'd `mc_paths` override can't OOM
         // the host.
         let num_paths = crate::instruments::common_impl::helpers::resolve_mc_paths(
-            equity_option.pricing_overrides.model_config.mc_paths,
+            equity_option
+                .instrument_pricing_overrides
+                .model_config
+                .mc_paths,
             self.num_paths,
         )
         .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;

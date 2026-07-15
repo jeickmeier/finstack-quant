@@ -176,7 +176,7 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
 
         // Derive deterministic seed from instrument id
         let seed_val =
-            if let Some(ref scenario) = equity_option.pricing_overrides.metrics.mc_seed_scenario {
+            if let Some(ref scenario) = equity_option.metric_pricing_overrides.mc_seed_scenario {
                 finstack_quant_monte_carlo::seed::derive_seed(&equity_option.id, scenario)
             } else {
                 finstack_quant_monte_carlo::seed::derive_seed(&equity_option.id, "base")
@@ -186,7 +186,10 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
         // allocating, so a malicious or typo'd `mc_paths` override can't OOM
         // the host.
         let num_paths = crate::instruments::common_impl::helpers::resolve_mc_paths(
-            equity_option.pricing_overrides.model_config.mc_paths,
+            equity_option
+                .instrument_pricing_overrides
+                .model_config
+                .mc_paths,
             self.num_paths,
         )
         .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
@@ -257,7 +260,7 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
 mod tests {
     use super::*;
     use crate::instruments::common_impl::parameters::ExerciseStyle;
-    use crate::instruments::{Attributes, PricingOverrides, SettlementType};
+    use crate::instruments::{Attributes, SettlementType};
     use crate::pricer::Pricer;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
@@ -307,7 +310,6 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("equity option")

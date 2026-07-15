@@ -8,8 +8,8 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::{PricingOverrides, SettlementType};
 
 /// Standard curve IDs
 pub const DISC_ID: &str = "USD_DISC";
@@ -101,7 +101,9 @@ pub fn create_call(_as_of: Date, expiry: Date, strike: f64) -> EquityOption {
         vol_surface_id: VOL_ID.into(),
         div_yield_id: Some(DIV_ID.into()),
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     }
@@ -124,7 +126,9 @@ pub fn create_put(_as_of: Date, expiry: Date, strike: f64) -> EquityOption {
         vol_surface_id: VOL_ID.into(),
         div_yield_id: Some(DIV_ID.into()),
         discrete_dividends: Vec::new(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         exercise_schedule: None,
         attributes: Default::default(),
     }

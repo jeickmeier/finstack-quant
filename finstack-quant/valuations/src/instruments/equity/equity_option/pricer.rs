@@ -62,7 +62,7 @@ pub(crate) fn compute_pv(
         ExerciseStyle::American => {
             // Use Leisen-Reimer tree for American options
             let steps = inst
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .model_config
                 .tree_steps
                 .unwrap_or(201);
@@ -85,7 +85,7 @@ pub(crate) fn compute_pv(
                 )
             })?;
             let steps = inst
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .model_config
                 .tree_steps
                 .unwrap_or(201);
@@ -328,7 +328,7 @@ pub(crate) fn collect_inputs_extended(
     };
 
     let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-        &inst.pricing_overrides.market_quotes,
+        &inst.instrument_pricing_overrides.market_quotes,
         curves,
         inst.vol_surface_id.as_str(),
         t_vol,
@@ -562,7 +562,7 @@ pub(crate) fn compute_greeks(
         ExerciseStyle::American => {
             // American: Use Tree with Finite Differences
             let steps = inst
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .model_config
                 .tree_steps
                 .unwrap_or(201);
@@ -590,7 +590,7 @@ pub(crate) fn compute_greeks(
                 )
             })?;
             let steps = inst
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .model_config
                 .tree_steps
                 .unwrap_or(201);
@@ -991,7 +991,7 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
 mod tests {
     use super::*;
     use crate::instruments::equity::equity_option::types::EquityOption;
-    use crate::instruments::{Attributes, PricingOverrides, SettlementType};
+    use crate::instruments::{Attributes, SettlementType};
     use crate::pricer::Pricer;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
@@ -1048,7 +1048,6 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("equity option")
@@ -1203,7 +1202,10 @@ mod tests {
         // ~3-week expiry: short enough that a 1%-of-spot bump is noise-prone.
         let expiry = date(2025, 1, 22);
         let mut american = option(expiry, OptionType::Call, ExerciseStyle::American);
-        american.pricing_overrides.model_config.tree_steps = Some(201);
+        american
+            .instrument_pricing_overrides
+            .model_config
+            .tree_steps = Some(201);
         // Zero dividend yield => American call == European call.
         let curves = market(as_of, 100.0, 0.20, 0.03, 0.0);
 
@@ -1244,8 +1246,14 @@ mod tests {
         let expiry = date(2025, 7, 1);
         let mut european = option(expiry, OptionType::Call, ExerciseStyle::European);
         let mut american = option(expiry, OptionType::Call, ExerciseStyle::American);
-        european.pricing_overrides.model_config.tree_steps = Some(51);
-        american.pricing_overrides.model_config.tree_steps = Some(51);
+        european
+            .instrument_pricing_overrides
+            .model_config
+            .tree_steps = Some(51);
+        american
+            .instrument_pricing_overrides
+            .model_config
+            .tree_steps = Some(51);
         let curves = market(as_of, 105.0, 0.22, 0.03, 0.01);
 
         let european_pv = compute_pv(&european, &curves, as_of).expect("european pv");
@@ -1261,8 +1269,11 @@ mod tests {
         let expiry = date(2025, 7, 1);
         let mut filtered = option(expiry, OptionType::Put, ExerciseStyle::Bermudan);
         let mut noisy = option(expiry, OptionType::Put, ExerciseStyle::Bermudan);
-        filtered.pricing_overrides.model_config.tree_steps = Some(51);
-        noisy.pricing_overrides.model_config.tree_steps = Some(51);
+        filtered
+            .instrument_pricing_overrides
+            .model_config
+            .tree_steps = Some(51);
+        noisy.instrument_pricing_overrides.model_config.tree_steps = Some(51);
         filtered.exercise_schedule = Some(vec![date(2025, 3, 1), date(2025, 5, 1)]);
         noisy.exercise_schedule = Some(vec![
             as_of,

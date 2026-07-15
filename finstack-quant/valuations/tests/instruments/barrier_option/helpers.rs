@@ -9,7 +9,6 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::exotics::barrier_option::{BarrierOption, BarrierType};
 use finstack_quant_valuations::instruments::OptionType;
-use finstack_quant_valuations::instruments::PricingOverrides;
 
 /// Standard curve IDs
 pub const DISC_ID: &str = "USD_DISC";
@@ -102,7 +101,9 @@ pub fn create_down_and_out_call(
         spot_id: SPOT_ID.into(),
         vol_surface_id: VOL_ID.into(),
         div_yield_id: Some(DIV_ID.into()),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         monitoring_frequency: None,
         attributes: Default::default(),
     }

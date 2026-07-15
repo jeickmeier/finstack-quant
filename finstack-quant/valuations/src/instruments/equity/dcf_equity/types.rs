@@ -210,9 +210,7 @@ pub struct DilutionSecurity {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[builder(validate = DiscountedCashFlow::validate)]
 #[serde(deny_unknown_fields, try_from = "DiscountedCashFlowUnchecked")]
@@ -289,7 +287,13 @@ pub struct DiscountedCashFlow {
     /// Attributes for tagging and scenarios.
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -322,7 +326,11 @@ struct DiscountedCashFlowUnchecked {
     #[serde(default)]
     valuation_discounts: Option<ValuationDiscounts>,
     #[serde(default)]
-    pricing_overrides: crate::instruments::PricingOverrides,
+    instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    #[serde(default)]
+    metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    #[serde(default)]
+    scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     attributes: Attributes,
 }
 
@@ -345,7 +353,9 @@ impl TryFrom<DiscountedCashFlowUnchecked> for DiscountedCashFlow {
             shares_outstanding: value.shares_outstanding,
             dilution_securities: value.dilution_securities,
             valuation_discounts: value.valuation_discounts,
-            pricing_overrides: value.pricing_overrides,
+            instrument_pricing_overrides: value.instrument_pricing_overrides,
+            metric_pricing_overrides: value.metric_pricing_overrides,
+            scenario_pricing_overrides: value.scenario_pricing_overrides,
             attributes: value.attributes,
         };
         inst.validate()?;
@@ -890,17 +900,7 @@ impl Instrument for DiscountedCashFlow {
         None
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 impl crate::cashflow::traits::CashflowScheduleSource for DiscountedCashFlow {
     fn raw_cashflow_schedule(
@@ -966,7 +966,9 @@ mod tests {
             shares_outstanding: None,
             dilution_securities: Vec::new(),
             valuation_discounts: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::default(),
         }
     }
@@ -1253,7 +1255,9 @@ mod tests {
             shares_outstanding: None,
             dilution_securities: Vec::new(),
             valuation_discounts: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::default(),
         };
 
@@ -1321,7 +1325,9 @@ mod tests {
             shares_outstanding: None,
             dilution_securities: Vec::new(),
             valuation_discounts: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::default(),
         };
 

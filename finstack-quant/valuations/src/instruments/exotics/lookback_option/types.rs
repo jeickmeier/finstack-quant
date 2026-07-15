@@ -45,7 +45,6 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::OptionType;
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
@@ -108,9 +107,7 @@ impl std::str::FromStr for LookbackType {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct LookbackOption {
@@ -160,7 +157,13 @@ pub struct LookbackOption {
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Observed minimum spot price since inception (required for Floating Call / Fixed Put)
     pub observed_min: Option<Money>,
     /// Observed maximum spot price since inception (required for Floating Put / Fixed Call)
@@ -190,7 +193,6 @@ impl LookbackOption {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .observed_min_opt(None)
             .observed_max_opt(None)
             .attributes(Attributes::new())
@@ -287,17 +289,7 @@ impl crate::instruments::common_impl::traits::Instrument for LookbackOption {
         None
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

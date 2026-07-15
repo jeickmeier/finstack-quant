@@ -188,7 +188,7 @@ impl CliquetOptionMcPricer {
         let process = crate::instruments::equity::piecewise_gbm::bootstrap_forward_gbm(
             disc_curve.as_ref(),
             curves,
-            &inst.pricing_overrides.market_quotes,
+            &inst.instrument_pricing_overrides.market_quotes,
             inst.vol_surface_id.as_str(),
             as_of,
             initial_spot,
@@ -222,7 +222,7 @@ impl CliquetOptionMcPricer {
 
         use finstack_quant_monte_carlo::seed;
 
-        let seed = if let Some(ref scenario) = inst.pricing_overrides.metrics.mc_seed_scenario {
+        let seed = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
@@ -271,7 +271,7 @@ impl CliquetOptionMcPricer {
 
         let merged_cfg = crate::instruments::common_impl::helpers::merged_path_config(
             &self.config,
-            &inst.pricing_overrides,
+            &inst.instrument_pricing_overrides,
         )?;
         let engine_config = McEngineConfig {
             num_paths: merged_cfg.num_paths,
@@ -363,7 +363,7 @@ pub(crate) fn compute_pv(
 mod tests {
     use super::*;
     use crate::instruments::equity::cliquet_option::types::{CliquetOption, CliquetPayoffType};
-    use crate::instruments::{Attributes, PricingOverrides};
+    use crate::instruments::Attributes;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
@@ -417,7 +417,6 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("cliquet option")
@@ -552,7 +551,6 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("non-monotone cliquet");
@@ -694,7 +692,6 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("with-t0 cliquet");
@@ -715,7 +712,6 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("without-t0 cliquet");

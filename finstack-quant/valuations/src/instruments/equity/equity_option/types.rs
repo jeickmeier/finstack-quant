@@ -68,7 +68,6 @@
 // pricing formulas are implemented in the pricing engine; keep this module free of direct math imports
 use crate::instruments::common_impl::parameters::underlying::EquityUnderlyingParams;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::PricingOverrides;
 use crate::instruments::{ExerciseStyle, OptionType, SettlementType};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -85,9 +84,7 @@ use crate::instruments::common_impl::validation;
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct EquityOption {
@@ -179,7 +176,13 @@ pub struct EquityOption {
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
@@ -206,7 +209,6 @@ impl EquityOption {
             .spot_id(market_data.spot_id)
             .vol_surface_id(market_data.vol_surface_id)
             .div_yield_id_opt(market_data.div_yield_id)
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
     }
@@ -386,7 +388,9 @@ impl EquityOption {
             div_yield_id: underlying_params.div_yield_id.clone(),
             discrete_dividends: Vec::new(),
             exercise_schedule: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }
@@ -688,17 +692,7 @@ impl crate::instruments::common_impl::traits::Instrument for EquityOption {
         None
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(
@@ -720,7 +714,7 @@ mod tests {
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::equity::equity_option::pricer;
     use crate::instruments::{
-        Attributes, ExerciseStyle, OptionType, PricingOverrides, SettlementType,
+        Attributes, ExerciseStyle, InstrumentPricingOverrides, OptionType, SettlementType,
     };
     use finstack_quant_core::{
         currency::Currency,
@@ -794,7 +788,6 @@ mod tests {
             .spot_id(SPOT_ID.into())
             .vol_surface_id(CurveId::new(VOL_ID))
             .div_yield_id_opt(Some(CurveId::new(DIV_ID)))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should succeed")
@@ -946,8 +939,8 @@ mod tests {
         approx_eq(implied, 0.30, 1e-5);
 
         let mut override_option = base_option(expiry);
-        let overrides = PricingOverrides::default().with_implied_vol(0.45);
-        override_option.pricing_overrides = overrides;
+        let overrides = InstrumentPricingOverrides::default().with_implied_vol(0.45);
+        override_option.instrument_pricing_overrides = overrides;
         let override_price = override_option
             .value(&curves, as_of)
             .expect("should succeed");

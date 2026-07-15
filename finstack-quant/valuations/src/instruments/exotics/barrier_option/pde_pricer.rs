@@ -494,7 +494,7 @@ impl Pricer for BarrierOptionPdePricer {
 mod tests {
     use super::*;
     use crate::instruments::exotics::barrier_option::types::{BarrierOption, BarrierType};
-    use crate::instruments::{Attributes, OptionType, PricingOverrides};
+    use crate::instruments::{Attributes, OptionType};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::scalars::MarketScalar;
@@ -557,7 +557,9 @@ mod tests {
             spot_id: "SPX".into(),
             vol_surface_id: "SPX_VOL".into(),
             div_yield_id: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             monitoring_frequency: None,
             attributes: Attributes::new(),
         }

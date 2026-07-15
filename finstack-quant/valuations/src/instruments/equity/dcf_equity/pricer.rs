@@ -141,7 +141,9 @@ mod tests {
             shares_outstanding: None,
             dilution_securities: Vec::new(),
             valuation_discounts: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: crate::instruments::common_impl::traits::Attributes::default(),
         }
     }

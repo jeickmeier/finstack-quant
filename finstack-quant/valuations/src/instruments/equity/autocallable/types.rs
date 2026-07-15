@@ -35,7 +35,6 @@
 
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
@@ -68,9 +67,7 @@ pub enum FinalPayoffType {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[builder(validate = Autocallable::validate)]
 #[serde(deny_unknown_fields, try_from = "AutocallableUnchecked")]
@@ -156,7 +153,13 @@ pub struct Autocallable {
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
@@ -193,7 +196,11 @@ struct AutocallableUnchecked {
     #[schemars(with = "Vec<(String, f64)>")]
     past_fixings: Vec<(Date, f64)>,
     #[serde(default)]
-    pricing_overrides: PricingOverrides,
+    instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    #[serde(default)]
+    metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    #[serde(default)]
+    scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     attributes: Attributes,
 }
 
@@ -221,7 +228,9 @@ impl TryFrom<AutocallableUnchecked> for Autocallable {
             div_yield_id: value.div_yield_id,
             initial_level: value.initial_level,
             past_fixings: value.past_fixings,
-            pricing_overrides: value.pricing_overrides,
+            instrument_pricing_overrides: value.instrument_pricing_overrides,
+            metric_pricing_overrides: value.metric_pricing_overrides,
+            scenario_pricing_overrides: value.scenario_pricing_overrides,
             attributes: value.attributes,
         };
         inst.validate()?;
@@ -401,7 +410,6 @@ impl Autocallable {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
     }
@@ -457,17 +465,7 @@ impl crate::instruments::common_impl::traits::Instrument for Autocallable {
         Some(self.expiry)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(
@@ -501,8 +499,53 @@ mod validation_tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
+    }
+
+    #[test]
+    fn focused_overrides_preserve_legacy_wire_shape() {
+        let mut autocall = base_builder().build().expect("valid autocallable");
+        autocall.instrument_pricing_overrides.model_config.mc_paths = Some(12_345);
+        autocall.metric_pricing_overrides.mc_seed_scenario = Some("delta_up".to_string());
+        autocall.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.08);
+
+        let value = serde_json::to_value(&autocall).expect("serialize focused overrides");
+        assert!(value.get("instrument_pricing_overrides").is_none());
+        assert!(value.get("metric_pricing_overrides").is_none());
+        assert!(value.get("scenario_pricing_overrides").is_none());
+        let wire = value
+            .get("pricing_overrides")
+            .and_then(serde_json::Value::as_object)
+            .expect("legacy pricing_overrides object");
+        assert_eq!(wire.get("mc_paths"), Some(&serde_json::json!(12_345)));
+        assert_eq!(
+            wire.get("mc_seed_scenario"),
+            Some(&serde_json::json!("delta_up"))
+        );
+        assert_eq!(
+            wire.get("scenario_price_shock_pct"),
+            Some(&serde_json::json!(-0.08))
+        );
+
+        let roundtrip: Autocallable =
+            serde_json::from_value(value).expect("deserialize legacy wire");
+        assert_eq!(
+            roundtrip.instrument_pricing_overrides.model_config.mc_paths,
+            Some(12_345)
+        );
+        assert_eq!(
+            roundtrip
+                .metric_pricing_overrides
+                .mc_seed_scenario
+                .as_deref(),
+            Some("delta_up")
+        );
+        assert_eq!(
+            roundtrip
+                .scenario_pricing_overrides
+                .scenario_price_shock_pct,
+            Some(-0.08)
+        );
     }
 
     #[test]

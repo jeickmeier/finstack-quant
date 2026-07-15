@@ -50,9 +50,7 @@ use time::macros::date;
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[builder(validate = EquityTotalReturnSwap::validate)]
 #[serde(deny_unknown_fields, try_from = "EquityTotalReturnSwapUnchecked")]
@@ -117,7 +115,13 @@ pub struct EquityTotalReturnSwap {
     /// Attributes for scenario selection and tagging.
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-only pricing controls.
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only valuation adjustments.
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -145,7 +149,11 @@ struct EquityTotalReturnSwapUnchecked {
     #[schemars(with = "Vec<(String, f64)>")]
     discrete_dividends: Vec<(Date, f64)>,
     #[serde(default)]
-    pricing_overrides: crate::instruments::PricingOverrides,
+    instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    #[serde(default)]
+    metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    #[serde(default)]
+    scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     attributes: Attributes,
 }
 
@@ -165,7 +173,9 @@ impl TryFrom<EquityTotalReturnSwapUnchecked> for EquityTotalReturnSwap {
             margin_spec: value.margin_spec,
             dividend_tax_rate: value.dividend_tax_rate,
             discrete_dividends: value.discrete_dividends,
-            pricing_overrides: value.pricing_overrides,
+            instrument_pricing_overrides: value.instrument_pricing_overrides,
+            metric_pricing_overrides: value.metric_pricing_overrides,
+            scenario_pricing_overrides: value.scenario_pricing_overrides,
             attributes: value.attributes,
         };
         inst.validate()?;
@@ -481,17 +491,7 @@ impl crate::instruments::common_impl::traits::Instrument for EquityTotalReturnSw
         Some(self.schedule.start)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap {

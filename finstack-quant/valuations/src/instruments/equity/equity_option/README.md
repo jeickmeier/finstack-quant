@@ -16,7 +16,7 @@
 
 ```rust
 use finstack_quant_valuations::instruments::{
-    Attributes, EquityOption, ExerciseStyle, Instrument, OptionType, PricingOverrides,
+    Attributes, EquityOption, ExerciseStyle, Instrument, OptionType,
     SettlementType,
 };
 use finstack_quant_core::currency::Currency;
@@ -67,7 +67,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .spot_id("SPX-SPOT".into())
         .vol_surface_id(CurveId::new("SPX-VOL"))
         .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()?;
 

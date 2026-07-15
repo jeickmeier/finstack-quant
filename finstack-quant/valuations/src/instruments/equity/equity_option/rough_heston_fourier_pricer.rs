@@ -154,7 +154,7 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonFourierPricer {
 mod tests {
     use super::*;
     use crate::instruments::common_impl::parameters::ExerciseStyle;
-    use crate::instruments::{Attributes, PricingOverrides, SettlementType};
+    use crate::instruments::{Attributes, SettlementType};
     use crate::pricer::Pricer;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
@@ -208,7 +208,6 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("equity option")

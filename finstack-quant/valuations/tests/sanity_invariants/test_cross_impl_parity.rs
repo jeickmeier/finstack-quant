@@ -96,7 +96,7 @@ mod gbm_barrier {
     use finstack_quant_valuations::instruments::exotics::barrier_option::{
         BarrierOption, BarrierType,
     };
-    use finstack_quant_valuations::instruments::{Attributes, OptionType, PricingOverrides};
+    use finstack_quant_valuations::instruments::{Attributes, OptionType};
     use finstack_quant_valuations::metrics::MetricId;
     use finstack_quant_valuations::pricer::{
         standard_registry, InstrumentType, ModelKey, PricerKey,
@@ -183,7 +183,9 @@ mod gbm_barrier {
             spot_id: "SPX".into(),
             vol_surface_id: "SPX-VOL".into(),
             div_yield_id: Some("SPX-DIV".into()),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             monitoring_frequency: None,
             attributes: Attributes::new(),
         }
@@ -534,7 +536,7 @@ mod asian_geometric {
     use finstack_quant_valuations::instruments::exotics::asian_option::{
         AsianOption, AveragingMethod,
     };
-    use finstack_quant_valuations::instruments::{Attributes, OptionType, PricingOverrides};
+    use finstack_quant_valuations::instruments::{Attributes, OptionType};
     use finstack_quant_valuations::pricer::{
         standard_registry, InstrumentType, ModelKey, PricerKey,
     };
@@ -597,7 +599,9 @@ mod asian_geometric {
             spot_id: "SPX".into(),
             vol_surface_id: "SPX-VOL".into(),
             div_yield_id: Some("SPX-DIV".into()),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
             past_fixings: Vec::new(),
         }

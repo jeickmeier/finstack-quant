@@ -300,7 +300,7 @@ impl AsianOptionMcPricer {
 
     fn merged_path_config(&self, inst: &AsianOption) -> PathDependentPricerConfig {
         let mut c = self.config.clone();
-        if let Some(n) = inst.pricing_overrides.model_config.mc_paths {
+        if let Some(n) = inst.instrument_pricing_overrides.model_config.mc_paths {
             if n > 0 {
                 c.num_paths = n;
             }
@@ -378,7 +378,7 @@ impl AsianOptionMcPricer {
 
         // Get volatility (override → surface)
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.pricing_overrides.market_quotes,
+            &inst.instrument_pricing_overrides.market_quotes,
             curves,
             inst.vol_surface_id.as_str(),
             t,
@@ -441,7 +441,7 @@ impl AsianOptionMcPricer {
         // Derive deterministic seed from instrument ID and scenario
         use finstack_quant_monte_carlo::seed;
 
-        let seed = if let Some(ref scenario) = inst.pricing_overrides.metrics.mc_seed_scenario {
+        let seed = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
@@ -1252,7 +1252,6 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(Default::default())
             .attributes(Default::default())
             .build()
             .expect("asian option")

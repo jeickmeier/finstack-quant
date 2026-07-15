@@ -570,6 +570,12 @@ pub struct InstrumentPricingOverrides {
 }
 
 impl InstrumentPricingOverrides {
+    /// Set implied volatility (flat σ across tenor and strike).
+    pub fn with_implied_vol(mut self, vol: f64) -> Self {
+        self.market_quotes.implied_volatility = Some(vol);
+        self
+    }
+
     /// Validate instrument-owned override fields.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.market_quotes.validate()?;
@@ -668,6 +674,11 @@ impl MetricPricingOverrides {
             var_config.validate()?;
         }
         Ok(())
+    }
+
+    /// Rho bump size in basis points for curve-bump APIs.
+    pub fn rho_bump_bp(&self) -> f64 {
+        self.bump_config.rho_bump_decimal.unwrap_or(0.0001) * 10_000.0
     }
 
     /// Bond risk basis, defaulting to Bloomberg-style workout/bullet risk.
@@ -961,7 +972,7 @@ impl PricingOverrides {
     /// This helper exists to prevent accidental \(10{,}000\times\) unit errors when
     /// calling APIs that expect bp units.
     pub fn rho_bump_bp(&self) -> f64 {
-        self.metrics.bump_config.rho_bump_decimal.unwrap_or(0.0001) * 10000.0
+        self.metrics.rho_bump_bp()
     }
 
     // -- Market Quote builders -----------------------------------------------

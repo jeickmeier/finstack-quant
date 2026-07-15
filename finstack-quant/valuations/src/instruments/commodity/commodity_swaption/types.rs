@@ -878,17 +878,21 @@ mod tests {
             .market_quotes
             .implied_volatility = Some(0.31);
         swaption.metric_pricing_overrides.mc_seed_scenario = Some("vega_up".to_string());
-        swaption
-            .scenario_pricing_overrides
-            .scenario_price_shock_pct = Some(-0.05);
+        swaption.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.05);
 
         let value = serde_json::to_value(&swaption).expect("serialize focused overrides");
         let wire = value
             .get("pricing_overrides")
             .and_then(serde_json::Value::as_object)
             .expect("legacy pricing_overrides object");
-        assert_eq!(wire.get("implied_volatility"), Some(&serde_json::json!(0.31)));
-        assert_eq!(wire.get("mc_seed_scenario"), Some(&serde_json::json!("vega_up")));
+        assert_eq!(
+            wire.get("implied_volatility"),
+            Some(&serde_json::json!(0.31))
+        );
+        assert_eq!(
+            wire.get("mc_seed_scenario"),
+            Some(&serde_json::json!("vega_up"))
+        );
         assert_eq!(
             wire.get("scenario_price_shock_pct"),
             Some(&serde_json::json!(-0.05))
@@ -905,7 +909,10 @@ mod tests {
             Some(0.31)
         );
         assert_eq!(
-            roundtrip.metric_pricing_overrides.mc_seed_scenario.as_deref(),
+            roundtrip
+                .metric_pricing_overrides
+                .mc_seed_scenario
+                .as_deref(),
             Some("vega_up")
         );
         assert_eq!(

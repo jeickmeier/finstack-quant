@@ -39,7 +39,7 @@ impl MetricCalculator for SpeedCalculator {
         };
 
         // Use adaptive/custom bump from pricing overrides if configured
-        let overrides = &option.pricing_overrides.metrics.bump_config;
+        let overrides = &option.metric_pricing_overrides.bump_config;
         let bump_pct = if let Some(custom) = overrides.spot_bump_pct {
             custom
         } else if overrides.adaptive_bumps {

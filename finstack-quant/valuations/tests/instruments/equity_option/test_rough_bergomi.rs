@@ -49,7 +49,7 @@ fn price_rbergomi_call(
 ) -> f64 {
     let mut call = create_call(as_of, expiry, strike);
     // Cap the path count so the test runs quickly.
-    call.pricing_overrides.model_config.mc_paths = Some(mc_paths);
+    call.instrument_pricing_overrides.model_config.mc_paths = Some(mc_paths);
 
     let registry = standard_registry();
     let result = registry
@@ -215,7 +215,7 @@ fn rbergomi_rejects_in_window_discrete_dividend() {
 
     let mut call = create_call(as_of, expiry, 100.0);
     call.discrete_dividends = vec![(ex_date, 2.0)];
-    call.pricing_overrides.model_config.mc_paths = Some(500);
+    call.instrument_pricing_overrides.model_config.mc_paths = Some(500);
 
     let registry = standard_registry();
     let result = registry.price_with_metrics(
@@ -257,7 +257,7 @@ fn rbergomi_accepts_out_of_window_discrete_dividend() {
     // Past ex-date: should succeed.
     let mut call_past = create_call(as_of, expiry, 100.0);
     call_past.discrete_dividends = vec![(ex_date_past, 2.0)];
-    call_past.pricing_overrides.model_config.mc_paths = Some(500);
+    call_past.instrument_pricing_overrides.model_config.mc_paths = Some(500);
     let result_past = registry.price_with_metrics(
         &call_past,
         ModelKey::MonteCarloRoughBergomi,
@@ -274,7 +274,10 @@ fn rbergomi_accepts_out_of_window_discrete_dividend() {
     // Future ex-date (after expiry): should succeed.
     let mut call_future = create_call(as_of, expiry, 100.0);
     call_future.discrete_dividends = vec![(ex_date_future, 2.0)];
-    call_future.pricing_overrides.model_config.mc_paths = Some(500);
+    call_future
+        .instrument_pricing_overrides
+        .model_config
+        .mc_paths = Some(500);
     let result_future = registry.price_with_metrics(
         &call_future,
         ModelKey::MonteCarloRoughBergomi,
@@ -304,7 +307,7 @@ fn rbergomi_reports_mc_stderr_that_shrinks_with_paths() {
 
     let stderr_for = |mc_paths: usize| -> f64 {
         let mut call = create_call(as_of, expiry, strike);
-        call.pricing_overrides.model_config.mc_paths = Some(mc_paths);
+        call.instrument_pricing_overrides.model_config.mc_paths = Some(mc_paths);
         let result = registry
             .price_with_metrics(
                 &call,
@@ -349,7 +352,7 @@ fn rbergomi_missing_scalars_error() {
     let market = build_standard_market(as_of, 100.0, 0.20, 0.0, 0.0);
 
     let mut call = create_call(as_of, expiry, 100.0);
-    call.pricing_overrides.model_config.mc_paths = Some(500);
+    call.instrument_pricing_overrides.model_config.mc_paths = Some(500);
 
     let registry = standard_registry();
     let result = registry.price_with_metrics(
@@ -390,8 +393,10 @@ fn rbergomi_flat_surface_matches_flat_override() {
 
     let price_with = |override_vol: Option<f64>| -> f64 {
         let mut call = create_call(as_of, expiry, strike);
-        call.pricing_overrides.model_config.mc_paths = Some(20_000);
-        call.pricing_overrides.market_quotes.implied_volatility = override_vol;
+        call.instrument_pricing_overrides.model_config.mc_paths = Some(20_000);
+        call.instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = override_vol;
         registry
             .price_with_metrics(
                 &call,
@@ -428,11 +433,11 @@ fn rbergomi_price_scales_with_notional() {
 
     let mut call_100 = create_call(as_of, expiry, strike);
     call_100.notional = Money::new(100.0, Currency::USD);
-    call_100.pricing_overrides.model_config.mc_paths = Some(30_000);
+    call_100.instrument_pricing_overrides.model_config.mc_paths = Some(30_000);
 
     let mut call_300 = create_call(as_of, expiry, strike);
     call_300.notional = Money::new(300.0, Currency::USD);
-    call_300.pricing_overrides.model_config.mc_paths = Some(30_000);
+    call_300.instrument_pricing_overrides.model_config.mc_paths = Some(30_000);
 
     let registry = standard_registry();
     let pv_100 = registry

@@ -161,14 +161,14 @@ impl AsianOptionHestonMcPricer {
         let time_grid = TimeGrid::uniform(t, num_steps)?;
 
         let num_paths = inst
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .mc_paths
             .filter(|&n| n > 0)
             .unwrap_or(self.num_paths);
 
         // Derive deterministic seed
-        let seed_val = if let Some(ref scenario) = inst.pricing_overrides.metrics.mc_seed_scenario {
+        let seed_val = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
