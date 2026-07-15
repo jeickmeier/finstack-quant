@@ -144,6 +144,26 @@ impl MarketDependencies {
         }
     }
 
+    /// Add a discount-curve dependency.
+    pub fn add_discount_curve(&mut self, id: impl Into<CurveId>) {
+        push_unique_curve(&mut self.curves.discount_curves, id.into());
+    }
+
+    /// Add a forward/projection-curve dependency.
+    pub fn add_forward_curve(&mut self, id: impl Into<CurveId>) {
+        push_unique_curve(&mut self.curves.forward_curves, id.into());
+    }
+
+    /// Add a credit/hazard-curve dependency.
+    pub fn add_credit_curve(&mut self, id: impl Into<CurveId>) {
+        push_unique_curve(&mut self.curves.credit_curves, id.into());
+    }
+
+    /// Add an inflation-curve or published-index dependency.
+    pub fn add_inflation_curve(&mut self, id: impl Into<CurveId>) {
+        push_unique_curve(&mut self.curves.inflation_curves, id.into());
+    }
+
     /// Merge equity dependencies into this set.
     pub fn add_equity_dependencies(&mut self, deps: EquityInstrumentDeps) {
         let EquityInstrumentDeps {

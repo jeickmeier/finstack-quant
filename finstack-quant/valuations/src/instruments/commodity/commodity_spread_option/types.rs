@@ -221,17 +221,24 @@ impl Instrument for CommoditySpreadOption {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
-        deps.add_vol_surface_id(self.leg1_vol_surface_id.as_str());
-        deps.add_vol_surface_id(self.leg2_vol_surface_id.as_str());
-        // Add leg2 forward curve as an additional forward dependency
-        let leg2_curves = InstrumentCurves::builder()
-            .forward(self.leg2_forward_curve_id.clone())
-            .build()?;
-        deps.add_curves(leg2_curves);
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_forward_curve(self.leg1_forward_curve_id.clone());
+        deps.add_forward_curve(self.leg2_forward_curve_id.clone());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.leg1_vol_surface_id.clone(),
+                None,
+                None,
+            ),
+        );
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.leg2_vol_surface_id.clone(),
+                None,
+                None,
+            ),
+        );
         Ok(deps)
     }
 

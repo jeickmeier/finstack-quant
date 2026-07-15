@@ -648,14 +648,23 @@ impl Instrument for CommodityOption {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_forward_curve(self.forward_curve_id.clone());
+        let underlying_id = self
+            .spot_id
+            .as_deref()
+            .map(finstack_quant_core::types::PriceId::new);
         if let Some(spot_id) = self.spot_id.as_deref() {
             deps.add_spot_id(spot_id);
         }
-        deps.add_vol_surface_id(self.vol_surface_id.as_str());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                underlying_id,
+                Some(self.strike),
+            ),
+        );
         Ok(deps)
     }
 
@@ -1176,6 +1185,31 @@ mod tests {
         obj.remove("settlement");
         let option: CommodityOption = serde_json::from_value(value).expect("deserialize");
         assert_eq!(option.settlement, SettlementType::Cash);
+    }
+
+    #[test]
+    fn canonical_dependencies_preserve_surface_pairing_and_strike() {
+        let mut option = CommodityOption::example();
+        option.spot_id = Some("WTI-SPOT".to_string());
+
+        let deps = option.market_dependencies().expect("dependencies");
+        assert_eq!(
+            deps.curves.discount_curves.as_slice(),
+            &[option.discount_curve_id.clone()]
+        );
+        assert_eq!(
+            deps.curves.forward_curves.as_slice(),
+            &[option.forward_curve_id.clone()]
+        );
+        assert_eq!(deps.spot_ids, vec!["WTI-SPOT".to_string()]);
+        assert_eq!(deps.volatility_dependencies.len(), 1);
+        let volatility = &deps.volatility_dependencies[0];
+        assert_eq!(volatility.surface_id, option.vol_surface_id);
+        assert_eq!(
+            volatility.underlying_id.as_ref().map(|id| id.as_str()),
+            Some("WTI-SPOT")
+        );
+        assert_eq!(volatility.reference_strike, Some(option.strike));
     }
 
     #[test]

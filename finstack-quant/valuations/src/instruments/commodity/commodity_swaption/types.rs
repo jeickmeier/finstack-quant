@@ -466,11 +466,16 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
-        deps.add_vol_surface_id(self.vol_surface_id.as_str());
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_forward_curve(self.forward_curve_id.clone());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                None,
+                Some(self.fixed_price),
+            ),
+        );
         Ok(deps)
     }
 

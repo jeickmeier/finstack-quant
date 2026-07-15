@@ -429,10 +429,9 @@ impl crate::instruments::common_impl::traits::Instrument for CommodityForward {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_forward_curve(self.forward_curve_id.clone());
         if let Some(spot_id) = self.spot_id.as_deref() {
             deps.add_spot_id(spot_id);
         }

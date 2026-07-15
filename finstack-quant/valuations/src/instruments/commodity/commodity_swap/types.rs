@@ -549,6 +549,17 @@ impl crate::instruments::common_impl::traits::CurveDependencies for CommoditySwa
 impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
     impl_instrument_base!(crate::pricer::InstrumentType::CommoditySwap);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_forward_curve(self.floating_index_id.clone());
+        Ok(deps)
+    }
+
     fn base_value(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -1193,6 +1204,22 @@ mod tests {
                 .filter(|(_, money)| money.amount() > 0.0)
                 .count(),
             3
+        );
+    }
+
+    #[test]
+    fn canonical_dependencies_include_discount_and_price_projection_curves() {
+        let swap = CommoditySwap::example();
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&swap).expect("dependencies");
+
+        assert_eq!(
+            deps.curves.discount_curves.as_slice(),
+            &[swap.discount_curve_id]
+        );
+        assert_eq!(
+            deps.curves.forward_curves.as_slice(),
+            &[swap.floating_index_id]
         );
     }
 }
