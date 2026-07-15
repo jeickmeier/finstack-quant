@@ -168,6 +168,10 @@ pub mod dependencies_flatten;
 /// Model parameter snapshots used by attribution.
 pub mod model_params;
 
+/// Canonical long/short position direction.
+pub mod position;
+pub use position::Position;
+
 // === Category Modules ===
 /// Commodity derivatives.
 pub mod commodity;

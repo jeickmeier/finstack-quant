@@ -13,7 +13,7 @@ use finstack_quant_core::Result;
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::Bond;
-use crate::instruments::rates::ir_future::Position;
+use crate::instruments::Position;
 
 /// Bond future pricer.
 ///

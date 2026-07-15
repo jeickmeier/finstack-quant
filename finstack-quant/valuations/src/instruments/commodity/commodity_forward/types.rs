@@ -20,7 +20,7 @@ use finstack_quant_core::Result;
 pub use crate::instruments::common_impl::parameters::SettlementType;
 
 /// Position direction (long/short) for commodity contracts.
-pub use crate::instruments::common_impl::parameters::Position;
+pub use crate::instruments::Position;
 
 /// Commodity forward or futures contract.
 ///

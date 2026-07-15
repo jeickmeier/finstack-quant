@@ -38,6 +38,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 use time::macros::date;
 
+/// Backward-compatible path for the canonical position type.
+pub use crate::instruments::Position;
+
 /// Interest Rate Future instrument.
 #[derive(
     Clone,
@@ -156,40 +159,6 @@ impl Default for FutureContractSpecs {
     /// looking them up in a registry, so it cannot panic.
     fn default() -> Self {
         Self::CME_SR3
-    }
-}
-
-/// Position side for futures.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum Position {
-    /// Long position (buyer of futures contract)
-    Long,
-    /// Short position (seller of futures contract)
-    Short,
-}
-
-impl std::fmt::Display for Position {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Position::Long => write!(f, "long"),
-            Position::Short => write!(f, "short"),
-        }
-    }
-}
-
-impl std::str::FromStr for Position {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_ascii_lowercase().as_str() {
-            "long" => Ok(Position::Long),
-            "short" => Ok(Position::Short),
-            other => Err(format!("Unknown position: {}", other)),
-        }
     }
 }
 
@@ -385,10 +354,7 @@ impl InterestRateFuture {
         }
 
         // Position sign: Long benefits when implied > model (rates down → price up)
-        let sign = match self.position {
-            Position::Long => 1.0,
-            Position::Short => -1.0,
-        };
+        let sign = self.position.sign();
 
         // Scale by contracts: notional may represent multiples of face value.
         // Zero face value means zero exposure (no contracts).

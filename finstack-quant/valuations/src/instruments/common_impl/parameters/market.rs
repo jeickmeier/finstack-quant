@@ -87,56 +87,8 @@ pub enum SettlementType {
     Cash,
 }
 
-/// Position direction for futures and forwards.
-///
-/// Indicates whether the holder is long (buyer) or short (seller) of the contract.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum Position {
-    /// Long position (buyer of futures/forward contract).
-    ///
-    /// Profits when the underlying price increases.
-    #[default]
-    Long,
-    /// Short position (seller of futures/forward contract).
-    ///
-    /// Profits when the underlying price decreases.
-    Short,
-}
-
-impl Position {
-    /// Returns the sign multiplier for this position (+1.0 for Long, -1.0 for Short).
-    #[inline]
-    pub fn sign(&self) -> f64 {
-        match self {
-            Position::Long => 1.0,
-            Position::Short => -1.0,
-        }
-    }
-}
-
-impl std::fmt::Display for Position {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Position::Long => write!(f, "long"),
-            Position::Short => write!(f, "short"),
-        }
-    }
-}
-
-impl std::str::FromStr for Position {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_ascii_lowercase().as_str() {
-            "long" | "buy" | "buyer" => Ok(Position::Long),
-            "short" | "sell" | "seller" => Ok(Position::Short),
-            other => Err(format!("Unknown position: {}", other)),
-        }
-    }
-}
+/// Backward-compatible path for the canonical position type.
+pub use crate::instruments::Position;
 
 impl std::fmt::Display for SettlementType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -263,13 +215,6 @@ mod tests {
             Ok(SettlementType::Physical)
         );
         assert!("gross".parse::<SettlementType>().is_err());
-
-        assert_eq!(Position::default(), Position::Long);
-        assert_eq!(Position::Long.sign(), 1.0);
-        assert_eq!(Position::Short.sign(), -1.0);
-        assert_eq!("buyer".parse::<Position>(), Ok(Position::Long));
-        assert_eq!("sell".parse::<Position>(), Ok(Position::Short));
-        assert!("flat".parse::<Position>().is_err());
     }
 
     #[test]

@@ -12,8 +12,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
-// Re-export Position from ir_future module
-pub use crate::instruments::rates::ir_future::Position;
+// Re-export the canonical position type from the historical module path.
+pub use crate::instruments::Position;
 
 /// Day-count basis used to annualize implied repo rates.
 #[derive(
