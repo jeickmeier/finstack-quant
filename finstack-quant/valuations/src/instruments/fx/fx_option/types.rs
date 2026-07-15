@@ -471,11 +471,16 @@ impl crate::instruments::common_impl::traits::Instrument for FxOption {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
-        deps.add_vol_surface_id(self.vol_surface_id.as_str());
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.domestic_discount_curve_id.clone());
+        deps.add_discount_curve(self.foreign_discount_curve_id.clone());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                None,
+                Some(self.strike),
+            ),
+        );
         deps.add_fx_pair(self.base_currency, self.quote_currency);
         Ok(deps)
     }
@@ -671,6 +676,29 @@ crate::impl_empty_cashflow_provider!(
 #[cfg(test)]
 mod validation_tests {
     use super::*;
+
+    #[test]
+    fn canonical_dependencies_preserve_fx_orientation_and_strike() {
+        let option = FxOption::example().expect("example");
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&option).expect("dependencies");
+
+        assert_eq!(
+            deps.curves.discount_curves.as_slice(),
+            &[
+                option.domestic_discount_curve_id.clone(),
+                option.foreign_discount_curve_id.clone(),
+            ]
+        );
+        assert_eq!(deps.fx_pairs.len(), 1);
+        assert_eq!(deps.fx_pairs[0].base, option.base_currency);
+        assert_eq!(deps.fx_pairs[0].quote, option.quote_currency);
+        assert_eq!(deps.volatility_dependencies.len(), 1);
+        assert_eq!(
+            deps.volatility_dependencies[0].reference_strike,
+            Some(option.strike)
+        );
+    }
 
     #[test]
     fn builder_rejects_same_base_and_quote_currency() {

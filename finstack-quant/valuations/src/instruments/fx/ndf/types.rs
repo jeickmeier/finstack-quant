@@ -868,10 +868,11 @@ impl crate::instruments::common_impl::traits::Instrument for Ndf {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.domestic_discount_curve_id.clone());
+        if let Some(foreign_curve) = &self.foreign_discount_curve_id {
+            deps.add_discount_curve(foreign_curve.clone());
+        }
         deps.add_fx_pair(self.base_currency, self.settlement_currency);
         Ok(deps)
     }

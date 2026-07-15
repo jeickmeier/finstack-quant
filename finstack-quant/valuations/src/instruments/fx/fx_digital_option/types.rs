@@ -254,8 +254,16 @@ impl crate::instruments::common_impl::traits::Instrument for FxDigitalOption {
     }
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
-        let mut deps = MarketDependencies::from_curve_dependencies(self)?;
-        deps.add_vol_surface_id(self.vol_surface_id.as_str());
+        let mut deps = MarketDependencies::new();
+        deps.add_discount_curve(self.domestic_discount_curve_id.clone());
+        deps.add_discount_curve(self.foreign_discount_curve_id.clone());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                None,
+                Some(self.strike),
+            ),
+        );
         deps.add_fx_pair(self.base_currency, self.quote_currency);
         Ok(deps)
     }

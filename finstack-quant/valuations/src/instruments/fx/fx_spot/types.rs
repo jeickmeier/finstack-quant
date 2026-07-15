@@ -484,10 +484,10 @@ impl crate::instruments::common_impl::traits::Instrument for FxSpot {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        if let Some(discount_curve) = &self.discount_curve_id {
+            deps.add_discount_curve(discount_curve.clone());
+        }
         deps.add_fx_pair(self.base_currency, self.quote_currency);
         Ok(deps)
     }

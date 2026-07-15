@@ -342,10 +342,13 @@ impl InstrumentTrait for FxVarianceSwap {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.domestic_discount_curve_id.clone());
+        deps.add_discount_curve(self.foreign_discount_curve_id.clone());
+        let underlying_id = self
+            .spot_id
+            .as_deref()
+            .map(finstack_quant_core::types::PriceId::new);
         if let Some(spot_id) = self.spot_id.as_deref() {
             deps.add_spot_id(spot_id);
         }
@@ -368,7 +371,13 @@ impl InstrumentTrait for FxVarianceSwap {
                     .unwrap_or_else(|| self.series_id()),
             );
         }
-        deps.add_vol_surface_id(self.vol_surface_id.as_str());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                underlying_id,
+                None,
+            ),
+        );
         deps.add_fx_pair(self.base_currency, self.quote_currency);
         Ok(deps)
     }

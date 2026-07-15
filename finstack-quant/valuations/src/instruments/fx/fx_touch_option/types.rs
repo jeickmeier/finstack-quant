@@ -320,6 +320,25 @@ impl crate::instruments::common_impl::traits::Instrument for FxTouchOption {
         crate::pricer::ModelKey::Black76
     }
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.domestic_discount_curve_id.clone());
+        deps.add_discount_curve(self.foreign_discount_curve_id.clone());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                None,
+                Some(self.barrier_level),
+            ),
+        );
+        deps.add_fx_pair(self.base_currency, self.quote_currency);
+        Ok(deps)
+    }
+
     fn base_value(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,

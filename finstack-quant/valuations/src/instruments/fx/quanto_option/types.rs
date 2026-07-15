@@ -645,12 +645,33 @@ impl crate::instruments::common_impl::traits::Instrument for QuantoOption {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.domestic_discount_curve_id.clone());
+        deps.add_discount_curve(self.foreign_discount_curve_id.clone());
         deps.add_spot_id(self.spot_id.as_str());
-        deps.add_vol_surface_id(self.vol_surface_id.as_str());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                Some(self.spot_id.clone()),
+                Some(self.equity_strike.amount()),
+            ),
+        );
+        if let Some(dividend_yield) = &self.div_yield_id {
+            deps.add_series_id(dividend_yield.as_str());
+        }
+        let fx_underlying_id = self.fx_rate_id.as_deref().map(|id| {
+            deps.add_spot_id(id);
+            finstack_quant_core::types::PriceId::new(id)
+        });
+        if let Some(fx_volatility) = &self.fx_vol_id {
+            deps.add_volatility_dependency(
+                crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                    fx_volatility.clone(),
+                    fx_underlying_id,
+                    None,
+                ),
+            );
+        }
         deps.add_fx_pair(self.base_currency, self.quote_currency);
         Ok(deps)
     }
@@ -743,6 +764,46 @@ mod tests {
         assert_eq!(deps.discount_curves.len(), 2);
         assert!(deps.discount_curves.iter().any(|c| c.as_str() == "USD-OIS"));
         assert!(deps.discount_curves.iter().any(|c| c.as_str() == "JPY-OIS"));
+    }
+
+    #[test]
+    fn canonical_dependencies_keep_equity_and_fx_volatility_contexts() {
+        let option = QuantoOption::example();
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&option).expect("dependencies");
+
+        assert_eq!(
+            deps.curves.discount_curves.as_slice(),
+            &[
+                option.domestic_discount_curve_id.clone(),
+                option.foreign_discount_curve_id.clone(),
+            ]
+        );
+        assert_eq!(
+            deps.spot_ids,
+            vec![
+                option.spot_id.as_str().to_string(),
+                option.fx_rate_id.clone().expect("FX rate id"),
+            ]
+        );
+        assert_eq!(deps.volatility_dependencies.len(), 2);
+        assert_eq!(
+            deps.volatility_dependencies[0].underlying_id.as_ref(),
+            Some(&option.spot_id)
+        );
+        assert_eq!(
+            deps.volatility_dependencies[0].reference_strike,
+            Some(option.equity_strike.amount())
+        );
+        assert_eq!(
+            deps.volatility_dependencies[1]
+                .underlying_id
+                .as_ref()
+                .map(|id| id.as_str()),
+            option.fx_rate_id.as_deref()
+        );
+        assert_eq!(deps.fx_pairs[0].base, option.base_currency);
+        assert_eq!(deps.fx_pairs[0].quote, option.quote_currency);
     }
 
     #[test]

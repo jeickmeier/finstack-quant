@@ -470,14 +470,19 @@ impl crate::instruments::common_impl::traits::Instrument for FxBarrierOption {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.domestic_discount_curve_id.clone());
+        deps.add_discount_curve(self.foreign_discount_curve_id.clone());
         if let Some(spot_id) = self.fx_spot_id.as_ref() {
             deps.add_spot_id(spot_id.as_str());
         }
-        deps.add_vol_surface_id(self.vol_surface_id.as_str());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                self.fx_spot_id.clone(),
+                Some(self.strike),
+            ),
+        );
         deps.add_fx_pair(self.base_currency, self.quote_currency);
         Ok(deps)
     }
