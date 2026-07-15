@@ -473,6 +473,17 @@ impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
         InflationSwap::validate(self)
     }
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_inflation_curve(self.inflation_index_id.clone());
+        Ok(deps)
+    }
+
     fn base_value(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
@@ -973,6 +984,17 @@ impl YoYInflationSwapBuilder {
 
 impl crate::instruments::common_impl::traits::Instrument for YoYInflationSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::YoYInflationSwap);
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_inflation_curve(self.inflation_index_id.clone());
+        Ok(deps)
+    }
 
     fn base_value(
         &self,

@@ -608,6 +608,25 @@ impl crate::instruments::common_impl::traits::Instrument for BasisSwap {
         BasisSwap::validate(self)
     }
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.primary_leg.discount_curve_id.clone());
+        deps.add_discount_curve(self.reference_leg.discount_curve_id.clone());
+        deps.add_forward_curve(self.primary_leg.forward_curve_id.clone());
+        deps.add_forward_curve(self.reference_leg.forward_curve_id.clone());
+        deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+            self.primary_leg.forward_curve_id.as_str(),
+        ));
+        deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+            self.reference_leg.forward_curve_id.as_str(),
+        ));
+        Ok(deps)
+    }
+
     fn base_value(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,

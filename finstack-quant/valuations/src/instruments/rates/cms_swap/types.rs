@@ -654,11 +654,20 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSwap {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(self)?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_forward_curve(self.forward_curve_id.clone());
+        deps.add_series_id(
+            finstack_quant_core::market_data::fixings::cms_fixing_series_id(
+                self.forward_curve_id.as_str(),
+                self.cms_tenor,
+            ),
+        );
         if let FundingLeg::Floating {
             forward_curve_id, ..
         } = &self.funding_leg
         {
+            deps.add_forward_curve(forward_curve_id.clone());
             deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
                 forward_curve_id.as_str(),
             ));

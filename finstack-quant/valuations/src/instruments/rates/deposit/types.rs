@@ -258,9 +258,9 @@ impl crate::instruments::common_impl::traits::Instrument for Deposit {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-            self,
-        )
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        Ok(deps)
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {

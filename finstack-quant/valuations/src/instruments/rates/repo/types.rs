@@ -620,6 +620,17 @@ impl Instrument for Repo {
         Repo::validate(self)
     }
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_spot_id(&self.collateral.market_value_id);
+        Ok(deps)
+    }
+
     // === Pricing Methods ===
 
     fn base_value(&self, context: &MarketContext, as_of: Date) -> Result<Money> {

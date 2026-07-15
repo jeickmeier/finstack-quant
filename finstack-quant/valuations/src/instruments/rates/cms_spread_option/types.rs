@@ -246,9 +246,51 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSpreadOption {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-            self,
-        )
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_forward_curve(self.forward_curve_id.clone());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.long_vol_surface_id.clone(),
+                None,
+                Some(self.strike),
+            ),
+        );
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.short_vol_surface_id.clone(),
+                None,
+                Some(self.strike),
+            ),
+        );
+        let long_tenor_years = self.long_cms_tenor.months().map(f64::from).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "CMS long tenor must be month- or year-based".to_string(),
+            )
+        })? / 12.0;
+        let short_tenor_years = self
+            .short_cms_tenor
+            .months()
+            .map(f64::from)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "CMS short tenor must be month- or year-based".to_string(),
+                )
+            })?
+            / 12.0;
+        deps.add_series_id(
+            finstack_quant_core::market_data::fixings::cms_fixing_series_id(
+                self.forward_curve_id.as_str(),
+                long_tenor_years,
+            ),
+        );
+        deps.add_series_id(
+            finstack_quant_core::market_data::fixings::cms_fixing_series_id(
+                self.forward_curve_id.as_str(),
+                short_tenor_years,
+            ),
+        );
+        Ok(deps)
     }
 
     fn base_value(

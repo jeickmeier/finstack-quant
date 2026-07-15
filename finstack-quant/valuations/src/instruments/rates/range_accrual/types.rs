@@ -412,9 +412,25 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        crate::instruments::common_impl::dependencies::MarketDependencies::from_curves_and_equity(
-            self,
-        )
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        if let Some(projection_curve) = &self.projection_curve_id {
+            deps.add_forward_curve(projection_curve.clone());
+        }
+        deps.add_spot_id(self.spot_id.as_str());
+        for strike in [self.lower_bound, self.upper_bound] {
+            deps.add_volatility_dependency(
+                crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                    self.vol_surface_id.clone(),
+                    Some(self.spot_id.clone()),
+                    Some(strike),
+                ),
+            );
+        }
+        if let Some(dividend_yield) = &self.div_yield_id {
+            deps.add_series_id(dividend_yield.as_str());
+        }
+        Ok(deps)
     }
 
     fn base_value(
@@ -526,5 +542,23 @@ mod audit_regression_tests {
         range.payment_date = Some(date!(2024 - 06 - 01));
         let err = range.validate().expect_err("early payment must fail");
         assert!(err.to_string().contains("final observation"));
+    }
+
+    #[test]
+    fn canonical_dependencies_keep_both_range_strikes() {
+        let range = RangeAccrual::example();
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&range).expect("dependencies");
+
+        assert_eq!(deps.volatility_dependencies.len(), 2);
+        assert_eq!(
+            deps.volatility_dependencies
+                .iter()
+                .map(|dependency| dependency.reference_strike)
+                .collect::<Vec<_>>(),
+            vec![Some(range.lower_bound), Some(range.upper_bound)]
+        );
+        assert_eq!(deps.unique_vol_surface_ids(), vec![range.vol_surface_id]);
+        assert_eq!(deps.spot_ids, vec![range.spot_id.as_str().to_string()]);
     }
 }

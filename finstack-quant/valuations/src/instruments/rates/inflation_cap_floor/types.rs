@@ -632,6 +632,24 @@ impl crate::instruments::common_impl::traits::Instrument for InflationCapFloor {
         crate::pricer::ModelKey::Black76
     }
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_inflation_curve(self.inflation_index_id.clone());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                None,
+                Some(self.strike_f64()?),
+            ),
+        );
+        Ok(deps)
+    }
+
     fn base_value(
         &self,
         curves: &MarketContext,

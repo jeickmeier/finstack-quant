@@ -167,12 +167,17 @@ impl crate::instruments::common_impl::traits::Instrument for Tarn {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_forward_curve(self.floating_index_id.clone());
         if let Some(surface_id) = &self.vol_surface_id {
-            deps.add_vol_surface_id(surface_id.as_str());
+            deps.add_volatility_dependency(
+                crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                    surface_id.clone(),
+                    None,
+                    None,
+                ),
+            );
         }
         Ok(deps)
     }

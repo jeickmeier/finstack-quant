@@ -659,12 +659,14 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        // Without this override the trait default returns EMPTY dependencies,
-        // which silently zeroed the rates factor in metrics-based P&L
-        // attribution for every IRS (the move fell into the residual).
-        crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-            self,
-        )
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.fixed.discount_curve_id.clone());
+        deps.add_discount_curve(self.float.discount_curve_id.clone());
+        deps.add_forward_curve(self.float.forward_curve_id.clone());
+        deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+            self.float.forward_curve_id.as_str(),
+        ));
+        Ok(deps)
     }
 }
 
@@ -715,6 +717,31 @@ mod tests {
         let swap = InterestRateSwap::example_standard().expect("example swap");
         // Should pass validation
         assert!(swap.validate().is_ok(), "Valid swap should pass validation");
+    }
+
+    #[test]
+    fn canonical_dependencies_preserve_curve_roles_and_fixings() {
+        let swap = InterestRateSwap::example_standard().expect("example swap");
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&swap).expect("dependencies");
+
+        assert_eq!(
+            deps.curves.discount_curves.as_slice(),
+            &[
+                swap.fixed.discount_curve_id.clone(),
+                swap.float.discount_curve_id.clone(),
+            ][..deps.curves.discount_curves.len()]
+        );
+        assert_eq!(
+            deps.curves.forward_curves.as_slice(),
+            &[swap.float.forward_curve_id.clone()]
+        );
+        assert_eq!(
+            deps.series_ids,
+            vec![finstack_quant_core::market_data::fixings::fixing_series_id(
+                swap.float.forward_curve_id.as_str()
+            )]
+        );
     }
 
     #[test]

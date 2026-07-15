@@ -841,10 +841,11 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.leg1.discount_curve_id.clone());
+        deps.add_discount_curve(self.leg2.discount_curve_id.clone());
+        deps.add_forward_curve(self.leg1.forward_curve_id.clone());
+        deps.add_forward_curve(self.leg2.forward_curve_id.clone());
         if self.leg1.currency != self.reporting_currency {
             deps.add_fx_pair(self.leg1.currency, self.reporting_currency);
         }
