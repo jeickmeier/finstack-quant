@@ -786,6 +786,23 @@ impl RevolvingCredit {
 impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
     impl_instrument_base!(crate::pricer::InstrumentType::RevolvingCredit);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        if let Some(credit_curve_id) = &self.credit_curve_id {
+            deps.add_credit_curve(credit_curve_id.clone());
+        }
+        if let BaseRateSpec::Floating(spec) = &self.base_rate_spec {
+            deps.add_forward_curve(spec.index_id.clone());
+            deps.add_series_id(spec.index_id.as_str());
+        }
+        Ok(deps)
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         self.attributes()
             .get_meta("pricing_model")

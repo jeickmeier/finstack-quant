@@ -884,6 +884,39 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
 impl Instrument for StructuredCredit {
     impl_instrument_base!(crate::pricer::InstrumentType::StructuredCredit);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+
+        for index_id in self
+            .pool
+            .assets
+            .iter()
+            .filter_map(|asset| asset.index_id.as_deref())
+            .chain(
+                self.pool
+                    .rep_lines
+                    .iter()
+                    .flatten()
+                    .filter_map(|line| line.index_id.as_deref()),
+            )
+        {
+            deps.add_forward_curve(index_id);
+            deps.add_series_id(index_id);
+        }
+        for tranche in &self.tranches.tranches {
+            if let TrancheCoupon::Floating(spec) = &tranche.coupon {
+                deps.add_forward_curve(spec.index_id.clone());
+                deps.add_series_id(spec.index_id.as_str());
+            }
+        }
+        Ok(deps)
+    }
+
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         if let Some(threshold) = self.cleanup_call_pct {
             if !threshold.is_finite() || threshold <= 0.0 || threshold >= 1.0 {

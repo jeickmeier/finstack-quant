@@ -462,6 +462,16 @@ impl crate::instruments::common_impl::traits::CurveDependencies for AgencyMbsPas
 impl crate::instruments::common_impl::traits::Instrument for AgencyMbsPassthrough {
     impl_instrument_base!(crate::pricer::InstrumentType::AgencyMbsPassthrough);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        Ok(deps)
+    }
+
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate_coupon_consistency()?;
         if let Some(last_paid) = self.last_paid_accrual_end {

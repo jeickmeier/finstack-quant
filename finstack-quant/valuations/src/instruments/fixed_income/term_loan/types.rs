@@ -747,6 +747,23 @@ fn validate_currency(expected: Currency, money: Money) -> Result<(), finstack_qu
 impl crate::instruments::common_impl::traits::Instrument for TermLoan {
     impl_instrument_base!(crate::pricer::InstrumentType::TermLoan);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        if let Some(credit_curve_id) = &self.credit_curve_id {
+            deps.add_credit_curve(credit_curve_id.clone());
+        }
+        if let RateSpec::Floating(spec) = &self.rate {
+            deps.add_forward_curve(spec.index_id.clone());
+            deps.add_series_id(spec.index_id.as_str());
+        }
+        Ok(deps)
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         // A supplied hazard curve is part of the economic contract even for
         // non-callable loans. Route those loans through the rates+credit tree

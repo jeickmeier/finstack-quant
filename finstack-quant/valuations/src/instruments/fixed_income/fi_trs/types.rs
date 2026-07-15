@@ -237,6 +237,23 @@ impl FIIndexTotalReturnSwap {
 impl crate::instruments::common_impl::traits::Instrument for FIIndexTotalReturnSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::FIIndexTotalReturnSwap);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.financing.discount_curve_id.clone());
+        deps.add_forward_curve(self.financing.forward_curve_id.clone());
+        if let Some(yield_id) = &self.underlying.yield_id {
+            deps.add_spot_id(yield_id);
+        }
+        if let Some(duration_id) = &self.underlying.duration_id {
+            deps.add_spot_id(duration_id);
+        }
+        Ok(deps)
+    }
+
     fn base_value(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
         // Calculate total return leg PV
         let total_return_pv = self.pv_total_return_leg(curves, as_of)?;

@@ -706,14 +706,38 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        let mut deps =
-            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-                self,
-            )?;
+        use crate::instruments::common_impl::dependencies::VolatilityDependency;
+        use finstack_quant_core::types::PriceId;
+
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        if let Some(credit_curve_id) = &self.credit_curve_id {
+            deps.add_credit_curve(credit_curve_id.clone());
+        }
+        if let Some(floating_coupon) = &self.floating_coupon {
+            deps.add_forward_curve(floating_coupon.rate_spec.index_id.clone());
+            deps.add_series_id(floating_coupon.rate_spec.index_id.as_str());
+        }
+        if let Some(call_put) = &self.call_put {
+            for option in call_put.calls.iter().chain(&call_put.puts) {
+                if let Some(make_whole) = &option.make_whole {
+                    deps.add_discount_curve(make_whole.reference_curve_id.clone());
+                }
+            }
+        }
         if let Some(underlying_id) = &self.underlying_equity_id {
             deps.add_spot_id(underlying_id.as_str());
+            let price_id = PriceId::new(underlying_id);
+            let reference_strike = self
+                .effective_conversion_ratio()
+                .filter(|ratio| *ratio > 0.0)
+                .map(|ratio| self.notional.amount() / ratio);
             for vol_surface_id in self.vol_surface_dependency_ids() {
-                deps.add_vol_surface_id(vol_surface_id);
+                deps.add_volatility_dependency(VolatilityDependency::new(
+                    vol_surface_id,
+                    Some(price_id.clone()),
+                    reference_strike,
+                ));
             }
         }
         Ok(deps)

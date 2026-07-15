@@ -265,6 +265,19 @@ impl crate::instruments::common_impl::traits::CurveDependencies for DollarRoll {
 impl crate::instruments::common_impl::traits::Instrument for DollarRoll {
     impl_instrument_base!(crate::pricer::InstrumentType::DollarRoll);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        if let Some(repo_curve_id) = &self.repo_curve_id {
+            deps.add_forward_curve(repo_curve_id.clone());
+        }
+        Ok(deps)
+    }
+
     fn base_value(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

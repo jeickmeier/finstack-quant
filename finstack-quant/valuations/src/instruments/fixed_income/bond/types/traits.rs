@@ -115,9 +115,41 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-            self,
-        )
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        if let Some(forward_curve_id) = &self.forward_curve_id {
+            deps.add_forward_curve(forward_curve_id.clone());
+        }
+        if let Some(credit_curve_id) = &self.credit_curve_id {
+            deps.add_credit_curve(credit_curve_id.clone());
+        }
+        match &self.cashflow_spec {
+            CashflowSpec::Floating(spec) => {
+                deps.add_forward_curve(spec.rate_spec.index_id.clone());
+                deps.add_series_id(spec.rate_spec.index_id.as_str());
+            }
+            CashflowSpec::Amortizing { base, .. } => {
+                if let CashflowSpec::Floating(spec) = base.as_ref() {
+                    deps.add_forward_curve(spec.rate_spec.index_id.clone());
+                    deps.add_series_id(spec.rate_spec.index_id.as_str());
+                }
+            }
+            _ => {}
+        }
+        if let Some(call_put) = &self.call_put {
+            for option in call_put.calls.iter().chain(&call_put.puts) {
+                if let Some(make_whole) = &option.make_whole {
+                    deps.add_discount_curve(make_whole.reference_curve_id.clone());
+                }
+            }
+        }
+        if let Some(curve_id) = &self.pricing_overrides.model_config.tree_discount_curve_id {
+            deps.add_discount_curve(curve_id.clone());
+        }
+        if let Some(curve_id) = &self.pricing_overrides.model_config.asw_forward_curve_id {
+            deps.add_forward_curve(curve_id.clone());
+        }
+        Ok(deps)
     }
 
     fn pricing_overrides_mut(

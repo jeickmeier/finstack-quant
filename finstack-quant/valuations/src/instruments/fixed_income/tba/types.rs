@@ -315,6 +315,16 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyTba {
 impl crate::instruments::common_impl::traits::Instrument for AgencyTba {
     impl_instrument_base!(crate::pricer::InstrumentType::AgencyTba);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        Ok(deps)
+    }
+
     fn base_value(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

@@ -1115,7 +1115,10 @@ impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond
     impl_instrument_base!(crate::pricer::InstrumentType::InflationLinkedBond);
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
-        MarketDependencies::from_curve_dependencies(self)
+        let mut deps = MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_inflation_curve(self.inflation_index_id.clone());
+        Ok(deps)
     }
 
     fn base_value(

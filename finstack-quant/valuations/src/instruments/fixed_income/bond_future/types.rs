@@ -1942,7 +1942,17 @@ impl crate::instruments::common_impl::traits::Instrument for BondFuture {
     }
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
-        MarketDependencies::from_curve_dependencies(self)
+        let mut deps = MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        if let Some(repo_curve_id) = &self.repo_curve_id {
+            deps.add_forward_curve(repo_curve_id.clone());
+        }
+        if let Some(ctd_bond) = &self.ctd_bond {
+            deps.merge(
+                crate::instruments::common_impl::traits::Instrument::market_dependencies(ctd_bond)?,
+            );
+        }
+        Ok(deps)
     }
 
     fn base_value(
