@@ -269,7 +269,7 @@ impl BootstrapTarget for XccyBasisTarget {
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
         self.scratch.with_curve(curve, |ctx| {
-            quote.get_instrument().value_raw(ctx, self.params.base_date)
+            quote.calibration_value_raw(ctx, self.params.base_date)
         })
     }
 

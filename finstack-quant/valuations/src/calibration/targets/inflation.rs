@@ -428,7 +428,7 @@ impl BootstrapTarget for InflationCurveTarget {
         let base_date = self.params.base_date;
         // Context needs the curve being calibrated + discount curve
         self.with_temp_context(curve, |ctx| {
-            let pv = quote.get_instrument().value_raw(ctx, base_date)?;
+            let pv = quote.calibration_value_raw(ctx, base_date)?;
             Ok(pv / self.params.notional)
         })
     }
@@ -585,9 +585,7 @@ Global solve requires strictly increasing times.",
 
         self.with_temp_context(curve, |ctx| {
             for (i, quote) in quotes.iter().enumerate() {
-                let pv = quote
-                    .get_instrument()
-                    .value_raw(ctx, self.params.base_date)?;
+                let pv = quote.calibration_value_raw(ctx, self.params.base_date)?;
                 residuals[i] = pv / self.params.notional;
             }
             Ok(())

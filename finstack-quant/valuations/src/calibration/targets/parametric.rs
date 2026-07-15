@@ -308,7 +308,7 @@ impl GlobalSolveTarget for ParametricCurveTarget {
 
         self.scratch.with_curve(&disc_curve, |ctx| {
             for (i, q) in quotes.iter().enumerate() {
-                let pv = q.get_instrument().value_raw(ctx, self.params.base_date)?;
+                let pv = q.calibration_value_raw(ctx, self.params.base_date)?;
                 residuals[i] = pv / self.residual_notional;
             }
             Ok(())

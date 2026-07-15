@@ -207,13 +207,17 @@ impl Deposit {
         Ok(deposit)
     }
 
-    /// Calculate the raw (unrounded) net present value of this deposit.
+    /// Calculate the raw (unrounded) trade NPV of this deposit.
+    ///
+    /// Unlike holder-view [`crate::instruments::Instrument::value`], this
+    /// includes an initial exchange dated exactly on `as_of`. Truly past
+    /// cashflows remain excluded.
     pub fn npv_raw(
         &self,
         context: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        crate::instruments::common_impl::helpers::schedule_pv_raw(
+        crate::instruments::common_impl::helpers::schedule_trade_pv_raw(
             self,
             context,
             as_of,
@@ -257,7 +261,12 @@ impl crate::instruments::common_impl::traits::Instrument for Deposit {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        self.npv_raw(curves, as_of)
+        crate::instruments::common_impl::helpers::schedule_pv_raw(
+            self,
+            curves,
+            as_of,
+            &self.discount_curve_id,
+        )
     }
 
     fn market_dependencies(

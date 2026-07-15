@@ -918,7 +918,7 @@ impl BootstrapTarget for DiscountCurveTarget {
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
         self.scratch.with_curve(curve, |ctx| {
-            let pv = quote.get_instrument().value_raw(ctx, self.base_date)?;
+            let pv = quote.calibration_value_raw(ctx, self.base_date)?;
             if !self.residual_notional.is_finite() || self.residual_notional <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Invalid residual_notional {}: expected finite positive value",
@@ -1153,7 +1153,7 @@ Ensure quotes map to strictly increasing year fractions.",
                 if i >= residuals.len() {
                     break;
                 }
-                let pv = quote.get_instrument().value_raw(ctx, self.base_date)?;
+                let pv = quote.calibration_value_raw(ctx, self.base_date)?;
                 residuals[i] = pv / self.residual_notional;
             }
             Ok(())
@@ -1314,7 +1314,7 @@ Ensure quotes map to strictly increasing year fractions.",
                     if has_local_interpolation && quote_times[i] < t_cutoff - 1e-4 {
                         continue;
                     }
-                    let pv = quote.get_instrument().value_raw(ctx_plus, self.base_date)?;
+                    let pv = quote.calibration_value_raw(ctx_plus, self.base_date)?;
                     vals_plus[i] = pv / self.residual_notional;
                 }
                 Ok(())
@@ -1329,9 +1329,7 @@ Ensure quotes map to strictly increasing year fractions.",
                         jacobian[i][j] = 0.0;
                         continue;
                     }
-                    let pv = quote
-                        .get_instrument()
-                        .value_raw(ctx_minus, self.base_date)?;
+                    let pv = quote.calibration_value_raw(ctx_minus, self.base_date)?;
                     let val_minus = pv / self.residual_notional;
 
                     jacobian[i][j] = (vals_plus[i] - val_minus) / (2.0 * h);

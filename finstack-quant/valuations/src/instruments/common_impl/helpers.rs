@@ -129,6 +129,37 @@ where
     npv_amounts_with_curve(disc.as_ref(), as_of, &amounts)
 }
 
+/// Schedule → raw trade NPV, including cashflows dated exactly on `as_of`.
+///
+/// This is narrower than [`schedule_pv_raw`]: truly past cashflows are excluded,
+/// while an inception exchange settling on the valuation date is retained at
+/// unit discount factor. Calibration instruments such as T+0 deposits need this
+/// convention so their quoted rate can zero the complete trade NPV.
+pub fn schedule_trade_pv_raw<S>(
+    instrument: &S,
+    curves: &MarketContext,
+    as_of: Date,
+    discount_curve_id: &finstack_quant_core::types::CurveId,
+) -> finstack_quant_core::Result<f64>
+where
+    S: crate::cashflow::traits::CashflowProvider,
+{
+    use finstack_quant_core::math::NeumaierAccumulator;
+
+    let flows = S::dated_cashflows(instrument, curves, as_of)?;
+    let disc = curves.get_discount(discount_curve_id.as_str())?;
+    let mut total = NeumaierAccumulator::new();
+
+    for (date, amount) in flows {
+        if date < as_of {
+            continue;
+        }
+        total.add(amount.amount() * disc.df_between_dates(as_of, date)?);
+    }
+
+    Ok(total.total())
+}
+
 /// Resolve an optional dividend-yield scalar from the market context.
 ///
 /// Returns `0.0` only when no dividend yield ID is configured. If an ID is
