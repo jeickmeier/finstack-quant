@@ -75,9 +75,8 @@ fn get_fx_spot(inst: &RangeAccrual, curves: &MarketContext) -> Result<f64> {
 /// **Use the static-replication pricer (`ModelKey::StaticReplication`, the
 /// default) for any surface that is not flat.** This MC path is retained for
 /// flat-vol scenarios and as a cross-check; it is selected only explicitly
-/// (`ModelKey::MonteCarloGBM`) or by the deprecated `mc_seed_scenario`
-/// override. Capturing skew/term-structure here would require a local- or
-/// stochastic-volatility process, which is outside this crate.
+/// (`ModelKey::MonteCarloGBM`). Capturing skew/term-structure here would require
+/// a local- or stochastic-volatility process, which is outside this crate.
 pub struct RangeAccrualMcPricer {
     config: PathDependentPricerConfig,
 }
@@ -364,17 +363,7 @@ pub(crate) fn compute_pv(
             inst.id
         )));
     }
-    if inst.pricing_overrides.metrics.mc_seed_scenario.is_some() {
-        tracing::warn!(
-            instrument_id = %inst.id,
-            "range_accrual mc_seed_scenario override forcing MonteCarloGBM is deprecated; \
-             price with ModelKey::MonteCarloGBM instead"
-        );
-        let pricer = RangeAccrualMcPricer::new();
-        pricer.price_internal(inst, curves, as_of)
-    } else {
-        npv_analytic(inst, curves, as_of)
-    }
+    npv_analytic(inst, curves, as_of)
 }
 
 /// Present value using Static Replication (Analytic).
@@ -706,5 +695,43 @@ mod tests {
         let pv_explicit_none = npv_analytic(&no_div_inst, &base_market, as_of)
             .expect("explicitly absent dividend yield is zero carry");
         assert!(pv_explicit_none.amount().is_finite());
+    }
+
+    #[test]
+    fn model_selection_is_independent_of_mc_seed_override() {
+        let as_of = date(2024, 1, 1);
+        let curves = market(as_of);
+        let mut without_seed = RangeAccrual::example();
+        without_seed.observation_dates = vec![date(2024, 6, 30), date(2024, 12, 31)];
+        without_seed.payment_date = Some(date(2025, 1, 2));
+        let mut with_seed = without_seed.clone();
+        with_seed.pricing_overrides.metrics.mc_seed_scenario = Some("stress".to_string());
+
+        let analytic_without_seed =
+            compute_pv(&without_seed, &curves, as_of).expect("default model without seed");
+        let analytic_with_seed =
+            compute_pv(&with_seed, &curves, as_of).expect("default model with seed");
+        let direct_analytic =
+            npv_analytic(&without_seed, &curves, as_of).expect("direct analytic price");
+
+        assert_eq!(analytic_without_seed, direct_analytic);
+        assert_eq!(analytic_with_seed, direct_analytic);
+
+        let mc = RangeAccrualMcPricer::new();
+        let mc_without_seed_first = mc
+            .price_internal(&without_seed, &curves, as_of)
+            .expect("MC without seed");
+        let mc_without_seed_second = mc
+            .price_internal(&without_seed, &curves, as_of)
+            .expect("repeat MC without seed");
+        let mc_with_seed_first = mc
+            .price_internal(&with_seed, &curves, as_of)
+            .expect("MC with seed");
+        let mc_with_seed_second = mc
+            .price_internal(&with_seed, &curves, as_of)
+            .expect("repeat MC with seed");
+
+        assert_eq!(mc_without_seed_first, mc_without_seed_second);
+        assert_eq!(mc_with_seed_first, mc_with_seed_second);
     }
 }
