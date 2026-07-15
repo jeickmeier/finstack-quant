@@ -5,7 +5,6 @@
 //! (quote, scalar, surface, etc.) and is serialized with a `kind` tag so the
 //! envelope can carry a heterogeneous list in JSON/YAML.
 
-use crate::calibration::api::prior_market::PriorMarketObject;
 use crate::market::quotes::bond::BondQuote;
 use crate::market::quotes::cds::CdsQuote;
 use crate::market::quotes::cds_tranche::CDSTrancheQuote;
@@ -17,7 +16,7 @@ use crate::market::quotes::vol::VolQuote;
 use crate::market::quotes::xccy::XccyQuote;
 use f64;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::market_data::context::{CreditIndexState, CurveState, MarketContextState};
+use finstack_quant_core::market_data::context::CreditIndexState;
 use finstack_quant_core::market_data::dividends::DividendSchedule;
 use finstack_quant_core::market_data::scalars::{InflationIndex, MarketScalar, ScalarTimeSeries};
 use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, VolCube};
@@ -239,111 +238,6 @@ impl From<MarketQuote> for MarketDatum {
     }
 }
 
-/// Result of splitting a legacy [`MarketContextState`] into v3 envelope inputs.
-///
-/// Wraps the `(prior, market_data)` pair produced by
-/// [`TryFrom<MarketContextState>`]. A local newtype is required because Rust's
-/// orphan rules forbid implementing `TryFrom` for a bare tuple of foreign
-/// `Vec<_>`.
-#[derive(Clone, Debug, Default)]
-pub struct MarketContextSplit {
-    /// Pre-built calibrated objects extracted from the snapshot's curves /
-    /// surfaces.
-    pub prior: Vec<PriorMarketObject>,
-    /// Flat market-data inputs extracted from the snapshot's scalars,
-    /// fixings, FX, dividends, credit indices, vol surfaces / cubes, and
-    /// CSA collateral mappings.
-    pub data: Vec<MarketDatum>,
-}
-
-impl From<MarketContextSplit> for (Vec<PriorMarketObject>, Vec<MarketDatum>) {
-    fn from(split: MarketContextSplit) -> Self {
-        (split.prior, split.data)
-    }
-}
-
-/// Split a legacy [`MarketContextState`] snapshot into the v3 envelope inputs.
-///
-/// Curves and surfaces become [`PriorMarketObject`]s; scalars, fixings, FX
-/// quotes, dividends, credit indices, FX-vol surfaces, vol cubes, and CSA
-/// collateral mappings become [`MarketDatum`] entries.
-impl TryFrom<MarketContextState> for MarketContextSplit {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(state: MarketContextState) -> std::result::Result<Self, Self::Error> {
-        let mut prior = Vec::new();
-        for curve in state.curves {
-            prior.push(match curve {
-                CurveState::Discount(c) => PriorMarketObject::DiscountCurve(c),
-                CurveState::Forward(c) => PriorMarketObject::ForwardCurve(c),
-                CurveState::Hazard(c) => PriorMarketObject::HazardCurve(c),
-                CurveState::Inflation(c) => PriorMarketObject::InflationCurve(c),
-                CurveState::BaseCorrelation(c) => PriorMarketObject::BaseCorrelationCurve(c),
-                CurveState::BasisSpread(c) => PriorMarketObject::BasisSpreadCurve(c),
-                CurveState::Parametric(c) => PriorMarketObject::ParametricCurve(c),
-                CurveState::Price(c) => PriorMarketObject::PriceCurve(c),
-                CurveState::VolIndex(c) => PriorMarketObject::VolatilityIndexCurve(c),
-            });
-        }
-        for surface in state.surfaces {
-            prior.push(PriorMarketObject::VolSurface(surface));
-        }
-
-        let mut data = Vec::new();
-        if let Some(fx) = state.fx {
-            for (from, to, rate) in fx.quotes {
-                data.push(MarketDatum::FxSpot(FxSpotDatum {
-                    id: format!("{from}/{to}"),
-                    from,
-                    to,
-                    rate,
-                }));
-            }
-        }
-        for (id, scalar) in state.prices {
-            data.push(MarketDatum::Price(PriceDatum { id, scalar }));
-        }
-        for s in state.series {
-            data.push(MarketDatum::FixingSeries(s));
-        }
-        for i in state.inflation_indices {
-            data.push(MarketDatum::InflationFixings(i));
-        }
-        for d in state.dividends {
-            data.push(MarketDatum::DividendSchedule(DividendScheduleDatum {
-                schedule: d,
-            }));
-        }
-        for c in state.credit_indices {
-            data.push(MarketDatum::CreditIndex(c));
-        }
-        for s in state.fx_delta_vol_surfaces {
-            data.push(MarketDatum::FxVolSurface(s));
-        }
-        for c in state.vol_cubes {
-            data.push(MarketDatum::VolCube(c));
-        }
-        for (ccy, csa_ccy) in state.collateral {
-            let id = parse_snapshot_currency(&ccy, "collateral currency")?;
-            let csa_currency = parse_snapshot_currency(&csa_ccy, "CSA currency")?;
-            data.push(MarketDatum::Collateral(CollateralEntry {
-                id,
-                csa_currency,
-            }));
-        }
-        Ok(Self { prior, data })
-    }
-}
-
-fn parse_snapshot_currency(value: &str, field: &str) -> finstack_quant_core::Result<Currency> {
-    value
-        .parse()
-        .map_err(|err| finstack_quant_core::Error::Calibration {
-            message: format!("Invalid {field} in market context snapshot: '{value}' ({err})"),
-            category: "market_context_split".to_string(),
-        })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -417,32 +311,5 @@ mod tests {
         });
         assert_eq!(datum.id(), "USD");
         assert_eq!(datum.kind_name(), "collateral");
-    }
-
-    #[test]
-    fn market_context_state_splits_into_prior_and_data() {
-        use crate::calibration::api::prior_market::PriorMarketObject;
-        use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
-
-        let state: MarketContextState = (&MarketContext::new()).into();
-        let split = MarketContextSplit::try_from(state).expect("split market context");
-        let (prior, data): (Vec<PriorMarketObject>, Vec<MarketDatum>) = split.into();
-        assert!(prior.is_empty());
-        assert!(data.is_empty());
-    }
-
-    #[test]
-    fn market_context_state_split_rejects_malformed_collateral_currency() {
-        use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
-
-        let mut state: MarketContextState = (&MarketContext::new()).into();
-        state
-            .collateral
-            .insert("NOT_A_CURRENCY".to_string(), "USD".to_string());
-
-        let err = MarketContextSplit::try_from(state).expect_err("invalid currency should error");
-        let msg = err.to_string();
-        assert!(msg.contains("Invalid collateral currency"));
-        assert!(msg.contains("NOT_A_CURRENCY"));
     }
 }
