@@ -217,18 +217,6 @@ pub struct FxTouchOption {
     pub attributes: Attributes,
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for FxTouchOption {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.domestic_discount_curve_id.clone())
-            .discount(self.foreign_discount_curve_id.clone())
-            .build()
-    }
-}
-
 impl FxTouchOption {
     /// Validate FX touch option input invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {

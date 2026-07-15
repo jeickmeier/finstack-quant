@@ -679,18 +679,6 @@ impl crate::instruments::common_impl::traits::Instrument for InflationCapFloor {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for InflationCapFloor {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .inflation(self.inflation_index_id.clone())
-            .build()
-    }
-}
-
 crate::impl_empty_cashflow_provider!(
     InflationCapFloor,
     crate::cashflow::builder::CashflowRepresentation::Placeholder

@@ -566,18 +566,6 @@ impl FxForward {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for FxForward {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.domestic_discount_curve_id.clone())
-            .discount(self.foreign_discount_curve_id.clone())
-            .build()
-    }
-}
-
 impl crate::instruments::common_impl::traits::Instrument for FxForward {
     impl_instrument_base!(crate::pricer::InstrumentType::FxForward);
 

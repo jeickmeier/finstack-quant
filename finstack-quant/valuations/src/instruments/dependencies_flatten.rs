@@ -51,7 +51,7 @@ pub fn decompose(deps: &MarketDependencies) -> Vec<MarketDependency> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::dependencies::MarketDependencies;
+    use crate::instruments::common_impl::dependencies::{MarketDependencies, VolatilityDependency};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::types::CurveId;
 
@@ -99,7 +99,11 @@ mod tests {
         deps.curves.discount_curves.push(CurveId::new("USD-OIS"));
         deps.curves.credit_curves.push(CurveId::new("ACME-HAZARD"));
         deps.spot_ids.push("AAPL".into());
-        deps.add_vol_surface_id("AAPL-VOL");
+        deps.add_volatility_dependency(VolatilityDependency::new(
+            CurveId::new("AAPL-VOL"),
+            None,
+            None,
+        ));
         deps.fx_pairs
             .push(crate::instruments::common_impl::dependencies::FxPair::new(
                 Currency::USD,

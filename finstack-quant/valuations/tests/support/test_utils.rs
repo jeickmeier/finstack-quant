@@ -156,11 +156,7 @@ impl Instrument for TestInstrument {
         let mut deps =
             finstack_quant_valuations::instruments::MarketDependencies::new();
         for curve in &self.discount_curves {
-            deps.add_curves(
-                finstack_quant_valuations::instruments::InstrumentCurves::builder()
-                    .discount(curve.clone())
-                    .build()?,
-            );
+            deps.add_discount_curve(curve.clone());
         }
         Ok(deps)
     }

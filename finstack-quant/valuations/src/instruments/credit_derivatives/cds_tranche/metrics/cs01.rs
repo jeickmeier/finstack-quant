@@ -8,7 +8,7 @@
 //!
 //! These calculators differ from the workspace generics only in how they
 //! resolve the credit curve. The generic CS01 calculator assumes
-//! `CurveDependencies::credit_curves` contains direct hazard curve IDs;
+//! `MarketDependencies::curves.credit_curves` contains direct hazard curve IDs;
 //! for CDS tranches, however, the credit dependency is a **credit index ID**
 //! (e.g. `"CDX.NA.IG.HAZARD"`), and the actual hazard curve sits inside the
 //! `CreditIndexData` under a different ID (e.g. `"CDX-HAZ"`). These

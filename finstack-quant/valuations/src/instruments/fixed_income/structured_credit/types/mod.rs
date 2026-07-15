@@ -1011,17 +1011,6 @@ impl Instrument for StructuredCredit {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for StructuredCredit {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .build()
-    }
-}
-
 impl StructuredCredit {
     /// Generate cashflows for a specific tranche after waterfall allocation.
     pub fn get_tranche_cashflows(

@@ -20,7 +20,8 @@
 //! - Hull, J. C. (2018). *Options, Futures, and Other Derivatives*. Chapter 7.
 //! - Tuckman, B., & Serrat, A. (2011). *Fixed Income Securities*. Chapter 5.
 
-use crate::instruments::common_impl::traits::{Instrument, RatesCurveKind};
+use crate::instruments::common_impl::dependencies::RatesCurveKind;
+use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::InterestRateSwap;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};

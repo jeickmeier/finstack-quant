@@ -296,7 +296,7 @@ fn test_discount_curve_dependency() {
     let disc_id = idx
         .market_dependencies()
         .expect("market_dependencies")
-        .curve_dependencies()
+        .curves
         .discount_curves
         .first()
         .cloned()

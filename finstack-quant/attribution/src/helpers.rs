@@ -268,7 +268,7 @@ fn build_flat_ytm_market(
 ) -> Result<MarketContext> {
     let curve_id = instrument
         .market_dependencies()?
-        .curve_dependencies()
+        .curves
         .discount_curves
         .first()
         .cloned()

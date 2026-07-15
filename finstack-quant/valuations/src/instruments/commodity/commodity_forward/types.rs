@@ -392,35 +392,6 @@ impl CommodityForward {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for CommodityForward {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .forward(self.forward_curve_id.clone())
-            .build()
-    }
-}
-
-impl crate::instruments::common_impl::traits::EquityDependencies for CommodityForward {
-    fn equity_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::EquityInstrumentDeps>
-    {
-        Ok(
-            crate::instruments::common_impl::traits::EquityInstrumentDeps {
-                spot_id: self.spot_id.clone(),
-                vol_surface_id: None,
-                // Forward (linear in spot, no vol surface) — strike-aware
-                // vega clamp detection is irrelevant.
-                reference_strike: None,
-            },
-        )
-    }
-}
-
 impl crate::instruments::common_impl::traits::Instrument for CommodityForward {
     impl_instrument_base!(crate::pricer::InstrumentType::CommodityForward);
 
@@ -771,11 +742,12 @@ mod tests {
     }
 
     #[test]
-    fn test_commodity_forward_curve_dependencies() {
-        use crate::instruments::common_impl::traits::CurveDependencies;
-
+    fn test_commodity_forward_market_dependencies() {
         let forward = CommodityForward::example();
-        let deps = forward.curve_dependencies().expect("curve_dependencies");
+        let deps = forward
+            .market_dependencies()
+            .expect("market_dependencies")
+            .curves;
 
         assert_eq!(deps.discount_curves.len(), 1);
         assert_eq!(deps.forward_curves.len(), 1);

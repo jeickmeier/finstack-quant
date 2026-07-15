@@ -645,26 +645,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CDSIndex {
     }
 }
 
-// Implement CurveDependencies for DV01 calculator.
+// Declare canonical market dependencies for the DV01 calculator.
 // In Constituents mode, include per-constituent credit curves so that DV01/BucketedDV01
 // correctly bump all credit curves, not just the index-level one.
-impl crate::instruments::common_impl::traits::CurveDependencies for CDSIndex {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        let mut builder = crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.premium.discount_curve_id.clone())
-            .credit(self.protection.credit_curve_id.clone());
-
-        if self.pricing == IndexPricing::Constituents {
-            for constituent in &self.constituents {
-                if !constituent.defaulted {
-                    builder = builder.credit(constituent.credit.credit_curve_id.clone());
-                }
-            }
-        }
-
-        builder.build()
-    }
-}

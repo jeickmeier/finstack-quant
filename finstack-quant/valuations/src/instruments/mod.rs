@@ -79,7 +79,7 @@
 //! # API Layers
 //!
 //! - **Public**: `finstack_quant_valuations::instruments::*` — instrument types, shared traits
-//!   (`Instrument`, `CurveDependencies`, ...), parameter types, and the `pricing`
+//!   (`Instrument`, ...), parameter types, and the `pricing`
 //!   submodule for shared pricing infrastructure.
 //! - **Internal**: `common_impl` is crate-private plumbing; nothing below it needs to be
 //!   referenced from outside the crate.
@@ -237,13 +237,13 @@ pub use exotics::{
 };
 
 // === Common Functionality ===
-pub use common_impl::dependencies::{FxPair, MarketDependencies, VolatilityDependency};
+pub use common_impl::dependencies::{
+    FxPair, InstrumentCurves, MarketDependencies, RatesCurveKind, VolatilityDependency,
+};
 pub use common_impl::pricing::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
 pub use common_impl::traits::{
-    Attributes, CurveDependencies, EquityDependencies, EquityInstrumentDeps,
-    EquityInstrumentDepsBuilder, Instrument, InstrumentCurves, InstrumentCurvesBuilder,
-    OptionGreekKind, OptionGreeks, OptionGreeksProvider, OptionGreeksRequest, PricingOptions,
-    RatesCurveKind,
+    Attributes, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
+    OptionGreeksRequest, PricingOptions,
 };
 
 // === Parameter Types ===

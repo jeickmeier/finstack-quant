@@ -11,7 +11,7 @@
 - Simple interest accrual on chosen day-count; PV computed via discount curve day-count to align with par-rate conventions.
 - When spot lag and business-day conventions are provided, `start` is treated as trade date and accrual uses the effective start/end dates.
 - No optionality or convexity; mirrors standard money-market deposit pricing.
-- Integration with DV01 metrics through `CurveDependencies` support.
+- Integration with DV01 metrics through canonical market dependencies.
 
 ## Usage Example
 

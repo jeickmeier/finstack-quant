@@ -325,18 +325,6 @@ impl crate::instruments::common_impl::traits::Instrument for Snowball {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for Snowball {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .forward(self.floating_index_id.clone())
-            .build()
-    }
-}
-
 crate::impl_empty_cashflow_provider!(
     Snowball,
     crate::cashflow::builder::CashflowRepresentation::Placeholder

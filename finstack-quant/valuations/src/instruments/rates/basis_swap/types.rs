@@ -673,20 +673,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for BasisSwap {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for BasisSwap {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.primary_leg.discount_curve_id.clone())
-            .discount(self.reference_leg.discount_curve_id.clone())
-            .forward(self.primary_leg.forward_curve_id.clone())
-            .forward(self.reference_leg.forward_curve_id.clone())
-            .build()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

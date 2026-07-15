@@ -1104,18 +1104,6 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for CreditDefaultSwap {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.premium.discount_curve_id.clone())
-            .credit(self.protection.credit_curve_id.clone())
-            .build()
-    }
-}
-
 impl crate::cashflow::traits::CashflowScheduleSource for CreditDefaultSwap {
     fn notional(&self) -> Option<finstack_quant_core::money::Money> {
         Some(self.notional)

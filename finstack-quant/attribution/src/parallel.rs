@@ -1399,12 +1399,8 @@ mod tests {
         ) -> finstack_quant_core::Result<finstack_quant_valuations::instruments::MarketDependencies>
         {
             let mut deps = finstack_quant_valuations::instruments::MarketDependencies::new();
-            deps.add_curves(
-                finstack_quant_valuations::instruments::InstrumentCurves::builder()
-                    .discount(finstack_quant_core::types::CurveId::new("USD-OIS"))
-                    .credit(finstack_quant_core::types::CurveId::new("ACME-HAZ"))
-                    .build()?,
-            );
+            deps.add_discount_curve("USD-OIS");
+            deps.add_credit_curve("ACME-HAZ");
             Ok(deps)
         }
 

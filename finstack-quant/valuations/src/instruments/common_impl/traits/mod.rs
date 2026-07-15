@@ -59,8 +59,6 @@
 //! assert!(attrs.matches_selector("*")); // Matches all
 //! ```
 
-mod curve_dependencies;
-mod equity_dependencies;
 mod instrument;
 #[macro_use]
 mod macros;
@@ -68,12 +66,6 @@ mod option_greeks;
 mod pricing_options;
 
 // Re-export all public items to preserve the existing API surface.
-pub use curve_dependencies::{
-    CurveDependencies, InstrumentCurves, InstrumentCurvesBuilder, RatesCurveKind,
-};
-pub use equity_dependencies::{
-    EquityDependencies, EquityInstrumentDeps, EquityInstrumentDepsBuilder,
-};
 pub use instrument::Instrument;
 pub use option_greeks::{OptionGreekKind, OptionGreeks, OptionGreeksProvider, OptionGreeksRequest};
 pub use pricing_options::PricingOptions;

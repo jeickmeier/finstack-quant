@@ -178,17 +178,6 @@ impl crate::instruments::common_impl::traits::Instrument for CallableRangeAccrua
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for CallableRangeAccrual {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.range_accrual.discount_curve_id.clone())
-            .build()
-    }
-}
-
 crate::impl_empty_cashflow_provider!(
     CallableRangeAccrual,
     crate::cashflow::builder::CashflowRepresentation::Placeholder

@@ -1,6 +1,6 @@
 //! Forward curve dependency completeness tests.
 //!
-//! Ensures instruments that declare forward curves via `CurveDependencies`
+//! Ensures instruments declare complete forward curves via `MarketDependencies`
 //! can be priced with only those curves in the market context.
 
 use finstack_quant_core::currency::Currency;
@@ -11,7 +11,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
 use finstack_quant_valuations::instruments::rates::irs::PayReceive;
-use finstack_quant_valuations::instruments::{CurveDependencies, Instrument};
+use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
 
 fn build_discount_curve(id: &str, rate: f64) -> DiscountCurve {
@@ -72,7 +72,10 @@ fn test_fra_forward_dependencies_complete() {
         .build()
         .expect("FRA construction should succeed");
 
-    let deps = fra.curve_dependencies().expect("curve_dependencies");
+    let deps = fra
+        .market_dependencies()
+        .expect("market_dependencies")
+        .curves;
     let discount_ids: Vec<&str> = deps.discount_curves.iter().map(|id| id.as_str()).collect();
     let forward_ids: Vec<&str> = deps.forward_curves.iter().map(|id| id.as_str()).collect();
 

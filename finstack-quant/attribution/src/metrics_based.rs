@@ -755,7 +755,7 @@ pub fn attribute_pnl_metrics_based(
     //
     // Iteration order is identical to the previous per-block loops:
     //   - discount_curves / credit_curves / spot_ids in the order returned
-    //     by `market_deps.curve_dependencies()` / `market_deps.spot_ids`
+    //     by `market_deps.curves` / `market_deps.spot_ids`
     //     (preserve the existing HashMap/Vec iteration order — do NOT sort).
     //   - FX exposure / vol surface: single-valued, no ordering concern.
     //
@@ -768,7 +768,7 @@ pub fn attribute_pnl_metrics_based(
     // discount+forward DV01, and basis moves require measuring both
     // families). Order: discount first, then forward — deterministic.
     let rates_curve_ids: Vec<CurveId> = {
-        let curves = market_deps.curve_dependencies();
+        let curves = &market_deps.curves;
         curves
             .discount_curves
             .iter()
@@ -798,7 +798,7 @@ pub fn attribute_pnl_metrics_based(
     let (avg_credit_shift_bp, credit_curves_measured): (Option<f64>, usize) = {
         let mut total = 0.0;
         let mut count = 0usize;
-        for curve_id in &market_deps.curve_dependencies().credit_curves {
+        for curve_id in &market_deps.curves.credit_curves {
             if let Ok(shift) = measure_credit_curve_shift(
                 curve_id.as_str(),
                 market_t0,
@@ -816,13 +816,20 @@ pub fn attribute_pnl_metrics_based(
         }
     };
 
-    let avg_vol_shift_abs: Option<f64> = market_deps
-        .equity_dependencies()
-        .vol_surface_id
-        .as_ref()
-        .and_then(|surface_id| {
-            measure_vol_surface_shift(surface_id.as_str(), market_t0, market_t1, None, None).ok()
-        });
+    let avg_vol_shift_abs: Option<f64> =
+        market_deps
+            .volatility_dependencies
+            .first()
+            .and_then(|dependency| {
+                measure_vol_surface_shift(
+                    dependency.surface_id.as_str(),
+                    market_t0,
+                    market_t1,
+                    None,
+                    None,
+                )
+                .ok()
+            });
 
     let fx_shift_pct: Option<f64> = instrument.fx_exposure().and_then(|(base_ccy, quote_ccy)| {
         measure_fx_shift(
@@ -1247,7 +1254,7 @@ pub fn attribute_pnl_metrics_based(
     //   (a) key-rate: per-tenor BucketedCs01 × per-tenor credit-curve move —
     //       correct for non-parallel (steepener / twist) credit-curve moves.
     //   (b) aggregate: Cs01 × avg(credit-curve move). Coarser; assumes parallel.
-    let credit_curve_ids = &market_deps.curve_dependencies().credit_curves;
+    let credit_curve_ids = &market_deps.curves.credit_curves;
     let keyrate_cs01 = extract_keyrate_cs01_per_curve(&val_t0.measures, credit_curve_ids);
     let mut credit_has_data = false;
     // Mean par-spread shift fed to the credit-convexity (second-order) block.
@@ -1354,7 +1361,7 @@ pub fn attribute_pnl_metrics_based(
     let avg_credit_abs_shift_bp: Option<f64> = {
         let mut total = 0.0;
         let mut count = 0usize;
-        for curve_id in &market_deps.curve_dependencies().credit_curves {
+        for curve_id in &market_deps.curves.credit_curves {
             let v = credit_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
             if v > 0.0 {
                 total += v;
@@ -1778,7 +1785,7 @@ pub fn attribute_pnl_metrics_based(
         // Restrict the shift to the instrument's declared inflation sources.
         // This keeps unrelated curves in a shared market context from
         // contaminating the instrument-level attribution.
-        let curve_ids = &market_deps.curve_dependencies().inflation_curves;
+        let curve_ids = &market_deps.curves.inflation_curves;
 
         let mut total_shift = 0.0;
         let mut curve_count = 0;
@@ -1977,7 +1984,13 @@ mod tests {
         {
             let mut deps = finstack_quant_valuations::instruments::MarketDependencies::new();
             deps.add_spot_id("TEST-SPOT");
-            deps.add_vol_surface_id("TEST-VOL");
+            deps.add_volatility_dependency(
+                finstack_quant_valuations::instruments::VolatilityDependency::new(
+                    finstack_quant_core::types::CurveId::new("TEST-VOL"),
+                    Some(finstack_quant_core::types::PriceId::new("TEST-SPOT")),
+                    None,
+                ),
+            );
             Ok(deps)
         }
 
@@ -2221,7 +2234,7 @@ mod tests {
     }
 
     #[test]
-    fn inflation_attribution_uses_only_declared_curve_dependencies() {
+    fn inflation_attribution_uses_only_declared_market_dependencies() {
         use finstack_quant_core::market_data::term_structures::InflationCurve;
 
         let as_of_t0 = date!(2025 - 01 - 15);

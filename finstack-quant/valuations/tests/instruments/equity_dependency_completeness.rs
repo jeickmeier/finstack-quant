@@ -85,8 +85,7 @@ fn test_commodity_option_equity_dependencies_complete() {
         .expect("Commodity option construction should succeed");
 
     let market_deps = option.market_dependencies().expect("market_dependencies");
-    let curve_deps = market_deps.curve_dependencies();
-    let equity_deps = market_deps.equity_dependencies();
+    let curve_deps = &market_deps.curves;
 
     let mut market = MarketContext::new();
     for id in curve_deps.discount_curves.iter() {
@@ -95,12 +94,12 @@ fn test_commodity_option_equity_dependencies_complete() {
     for id in curve_deps.forward_curves.iter() {
         market = market.insert(build_forward_curve(id.as_str(), 0.25, 0.04));
     }
-    if let Some(vol_id) = equity_deps.vol_surface_id {
-        market = market.insert_surface(build_vol_surface(&vol_id));
+    for volatility in &market_deps.volatility_dependencies {
+        market = market.insert_surface(build_vol_surface(volatility.surface_id.as_str()));
     }
-    if let Some(spot_id) = equity_deps.spot_id {
+    for spot_id in &market_deps.spot_ids {
         market = market.insert_price(
-            &spot_id,
+            spot_id,
             MarketScalar::Price(Money::new(100.0, Currency::USD)),
         );
     }
@@ -143,8 +142,7 @@ fn test_missing_equity_spot_fails() {
         .expect("Commodity option construction should succeed");
 
     let market_deps = option.market_dependencies().expect("market_dependencies");
-    let curve_deps = market_deps.curve_dependencies();
-    let equity_deps = market_deps.equity_dependencies();
+    let curve_deps = &market_deps.curves;
 
     let mut market = MarketContext::new();
     for id in curve_deps.discount_curves.iter() {
@@ -153,8 +151,8 @@ fn test_missing_equity_spot_fails() {
     for id in curve_deps.forward_curves.iter() {
         market = market.insert(build_forward_curve(id.as_str(), 0.25, 0.04));
     }
-    if let Some(vol_id) = equity_deps.vol_surface_id {
-        market = market.insert_surface(build_vol_surface(&vol_id));
+    for volatility in &market_deps.volatility_dependencies {
+        market = market.insert_surface(build_vol_surface(volatility.surface_id.as_str()));
     }
 
     let result = option.value(&market, as_of);

@@ -1,7 +1,7 @@
 //! Curve dependency completeness tests.
 //!
 //! These tests verify that instruments correctly declare all their curve
-//! dependencies. When an instrument's `curve_dependencies()` method returns
+//! dependencies. When an instrument's canonical dependency declaration returns
 //! a set of curves, pricing should succeed with only those curves in the
 //! market context.
 //!
@@ -89,8 +89,7 @@ fn test_bond_curve_dependencies_complete() {
     let deps = bond
         .market_dependencies()
         .expect("market_dependencies")
-        .curve_dependencies()
-        .clone();
+        .curves;
 
     // Extract discount curve IDs
     let disc_ids: Vec<&str> = deps.discount_curves.iter().map(|id| id.as_str()).collect();
@@ -128,8 +127,7 @@ fn test_cds_curve_dependencies_complete() {
     let deps = cds
         .market_dependencies()
         .expect("market_dependencies")
-        .curve_dependencies()
-        .clone();
+        .curves;
 
     // Extract curve IDs
     let disc_ids: Vec<&str> = deps.discount_curves.iter().map(|id| id.as_str()).collect();
@@ -205,8 +203,7 @@ fn test_dependency_count_reasonable() {
     let bond_deps = bond
         .market_dependencies()
         .expect("market_dependencies")
-        .curve_dependencies()
-        .clone();
+        .curves;
     assert_eq!(
         bond_deps.discount_curves.len(),
         1,
@@ -233,8 +230,7 @@ fn test_dependency_count_reasonable() {
     let cds_deps = cds
         .market_dependencies()
         .expect("market_dependencies")
-        .curve_dependencies()
-        .clone();
+        .curves;
     assert_eq!(
         cds_deps.discount_curves.len(),
         1,

@@ -7,7 +7,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
-use finstack_quant_valuations::instruments::{CurveDependencies, Instrument};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::Month;
 
@@ -159,14 +159,14 @@ fn test_floating_rcf_declares_forward_dependency() {
         .build()
         .unwrap();
 
-    let fixed_deps = fixed_facility.curve_dependencies().unwrap();
+    let fixed_deps = fixed_facility.market_dependencies().unwrap().curves;
     assert!(
         fixed_deps.forward_curves.is_empty(),
         "Fixed-rate facility should declare no forward curves"
     );
     assert_eq!(fixed_deps.discount_curves.len(), 1);
 
-    let float_deps = floating_facility.curve_dependencies().unwrap();
+    let float_deps = floating_facility.market_dependencies().unwrap().curves;
     assert_eq!(
         float_deps.forward_curves.len(),
         1,

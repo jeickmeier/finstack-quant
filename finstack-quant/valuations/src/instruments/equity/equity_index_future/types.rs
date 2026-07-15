@@ -532,28 +532,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityIndexFuture {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for EquityIndexFuture {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .build()
-    }
-}
-
-impl crate::instruments::common_impl::traits::EquityDependencies for EquityIndexFuture {
-    fn equity_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::EquityInstrumentDeps>
-    {
-        crate::instruments::common_impl::traits::EquityInstrumentDeps::builder()
-            .spot(self.spot_id.as_str())
-            .build()
-    }
-}
-
 // =============================================================================
 // Tests
 // =============================================================================

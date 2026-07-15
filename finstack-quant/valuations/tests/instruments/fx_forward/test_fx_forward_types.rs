@@ -5,7 +5,7 @@ use finstack_quant_core::dates::{BusinessDayConvention, Date};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
-use finstack_quant_valuations::instruments::{Attributes, CurveDependencies, Instrument};
+use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::pricer::InstrumentType;
 use time::Month;
 
@@ -106,9 +106,12 @@ fn test_fx_forward_instrument_trait() {
 }
 
 #[test]
-fn test_fx_forward_curve_dependencies() {
+fn test_fx_forward_market_dependencies() {
     let forward = FxForward::example().unwrap();
-    let deps = forward.curve_dependencies().expect("curve_dependencies");
+    let deps = forward
+        .market_dependencies()
+        .expect("market_dependencies")
+        .curves;
 
     assert_eq!(deps.discount_curves.len(), 2);
     assert!(deps.discount_curves.iter().any(|c| c.as_str() == "USD-OIS"));
@@ -121,9 +124,8 @@ fn test_fx_forward_required_discount_curves() {
     let curves = forward
         .market_dependencies()
         .expect("market_dependencies")
-        .curve_dependencies()
-        .discount_curves
-        .clone();
+        .curves
+        .discount_curves;
 
     assert_eq!(curves.len(), 2);
 }

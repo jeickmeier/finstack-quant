@@ -109,8 +109,8 @@ pub fn flatten_dependencies(deps: &MarketDependencies) -> HashSet<MarketFactorKe
     for spot_id in &deps.spot_ids {
         keys.insert(MarketFactorKey::Spot(spot_id.clone()));
     }
-    for vol_id in &deps.vol_surface_ids {
-        keys.insert(MarketFactorKey::VolSurface(vol_id.clone()));
+    for vol_id in deps.unique_vol_surface_ids() {
+        keys.insert(MarketFactorKey::VolSurface(vol_id.as_str().to_string()));
     }
     for pair in &deps.fx_pairs {
         keys.insert(MarketFactorKey::Fx {
@@ -320,7 +320,6 @@ impl DependencyIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_valuations::instruments::InstrumentCurves;
 
     #[test]
     fn flatten_empty_deps() {
@@ -332,13 +331,10 @@ mod tests {
     #[test]
     fn flatten_deduplicates() {
         let mut deps = MarketDependencies::new();
-        let curves = InstrumentCurves::builder()
-            .discount("USD".into())
-            .forward("USD".into())
-            .build()
-            .expect("valid curves");
-        deps.add_curves(curves.clone());
-        deps.add_curves(curves);
+        deps.add_discount_curve("USD");
+        deps.add_forward_curve("USD");
+        deps.add_discount_curve("USD");
+        deps.add_forward_curve("USD");
         deps.add_spot_id("SPX");
         deps.add_spot_id("SPX");
 
@@ -359,12 +355,7 @@ mod tests {
     #[test]
     fn flatten_preserves_inflation_curve_kind() {
         let mut deps = MarketDependencies::new();
-        deps.add_curves(
-            InstrumentCurves::builder()
-                .inflation("US-CPI".into())
-                .build()
-                .expect("valid curves"),
-        );
+        deps.add_inflation_curve("US-CPI");
 
         let keys = flatten_dependencies(&deps);
         assert!(keys.contains(&MarketFactorKey::curve(

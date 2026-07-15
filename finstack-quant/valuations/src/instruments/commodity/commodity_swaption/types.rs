@@ -20,7 +20,7 @@
 
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
-use crate::instruments::common_impl::traits::{Attributes, CurveDependencies, InstrumentCurves};
+use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::OptionType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
@@ -351,15 +351,6 @@ impl CommoditySwaption {
         self.day_count
             .year_fraction(as_of, self.expiry, DayCountContext::default())
             .map(|t| t.max(0.0))
-    }
-}
-
-impl CurveDependencies for CommoditySwaption {
-    fn curve_dependencies(&self) -> finstack_quant_core::Result<InstrumentCurves> {
-        InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .forward(self.forward_curve_id.clone())
-            .build()
     }
 }
 
@@ -867,9 +858,12 @@ mod tests {
     }
 
     #[test]
-    fn test_commodity_swaption_curve_dependencies() {
+    fn test_commodity_swaption_market_dependencies() {
         let swaption = CommoditySwaption::example();
-        let deps = swaption.curve_dependencies().expect("curve_dependencies");
+        let deps = swaption
+            .market_dependencies()
+            .expect("market_dependencies")
+            .curves;
         assert_eq!(deps.discount_curves.len(), 1);
         assert_eq!(deps.forward_curves.len(), 1);
     }

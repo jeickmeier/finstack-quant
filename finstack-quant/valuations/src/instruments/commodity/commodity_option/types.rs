@@ -4,9 +4,7 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::{
     CommodityConvention, CommodityUnderlyingParams, OptionMarketParams,
 };
-use crate::instruments::common_impl::traits::{
-    Attributes, CurveDependencies, Instrument, InstrumentCurves,
-};
+use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::{ExerciseStyle, OptionType, PricingOverrides, SettlementType};
 use crate::models::trees::binomial_tree::BinomialTree;
 use finstack_quant_core::currency::Currency;
@@ -625,15 +623,6 @@ fn black76_unit_price(
         }
     };
     price * df
-}
-
-impl CurveDependencies for CommodityOption {
-    fn curve_dependencies(&self) -> finstack_quant_core::Result<InstrumentCurves> {
-        InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .forward(self.forward_curve_id.clone())
-            .build()
-    }
 }
 
 impl Instrument for CommodityOption {

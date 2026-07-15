@@ -350,18 +350,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for VolatilityIndexFuture 
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for VolatilityIndexFuture {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        // Daily-margined future: PV is undiscounted and no Dv01 is
-        // registered, so there is no discount-curve dependency to report.
-        // Vol index curve sensitivity is handled separately via delta_vol.
-        crate::instruments::common_impl::traits::InstrumentCurves::builder().build()
-    }
-}
-
 // =============================================================================
 // Tests
 // =============================================================================

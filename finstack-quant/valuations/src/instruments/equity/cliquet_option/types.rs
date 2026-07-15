@@ -171,18 +171,7 @@ impl TryFrom<CliquetOptionUnchecked> for CliquetOption {
     }
 }
 
-// Implement CurveDependencies for DV01 calculator
-impl crate::instruments::common_impl::traits::CurveDependencies for CliquetOption {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .build()
-    }
-}
-
+// Declare canonical market dependencies for the DV01 calculator.
 impl CliquetOption {
     /// Validate structural invariants required by the pricing engine.
     ///

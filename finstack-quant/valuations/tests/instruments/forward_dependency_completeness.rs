@@ -39,9 +39,9 @@ fn build_market_from_deps(
     for curve_id in deps.curves.forward_curves.iter() {
         market = market.insert(flat_price_curve(curve_id.as_str(), as_of, 80.0, 5.0));
     }
-    for surface_id in deps.vol_surface_ids.iter() {
+    for dependency in &deps.volatility_dependencies {
         market = market.insert_surface(flat_vol_surface(
-            surface_id.as_str(),
+            dependency.surface_id.as_str(),
             &[0.25, 0.5, 1.0],
             &[50.0, 75.0, 100.0],
             0.2,
@@ -96,9 +96,9 @@ fn test_missing_forward_curve_with_spot_succeeds() {
             5.0,
         ));
     }
-    for surface_id in deps.vol_surface_ids.iter() {
+    for dependency in &deps.volatility_dependencies {
         market = market.insert_surface(flat_vol_surface(
-            surface_id.as_str(),
+            dependency.surface_id.as_str(),
             &[0.25, 0.5, 1.0],
             &[50.0, 75.0, 100.0],
             0.2,
@@ -140,9 +140,9 @@ fn test_missing_both_forward_and_spot_fails() {
             5.0,
         ));
     }
-    for surface_id in deps.vol_surface_ids.iter() {
+    for dependency in &deps.volatility_dependencies {
         market = market.insert_surface(flat_vol_surface(
-            surface_id.as_str(),
+            dependency.surface_id.as_str(),
             &[0.25, 0.5, 1.0],
             &[50.0, 75.0, 100.0],
             0.2,

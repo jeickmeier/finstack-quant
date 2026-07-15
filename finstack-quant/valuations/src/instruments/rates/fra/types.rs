@@ -558,18 +558,6 @@ impl crate::instruments::common_impl::traits::Instrument for ForwardRateAgreemen
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for ForwardRateAgreement {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .forward(self.forward_curve_id.clone())
-            .build()
-    }
-}
-
 impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)

@@ -5,7 +5,7 @@ use finstack_quant_core::dates::{BusinessDayConvention, Date};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
-use finstack_quant_valuations::instruments::{Attributes, CurveDependencies, Instrument};
+use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::pricer::InstrumentType;
 use time::Month;
 
@@ -125,7 +125,10 @@ fn test_ndf_instrument_trait() {
 #[test]
 fn test_ndf_curve_dependencies_single() {
     let ndf = Ndf::example();
-    let deps = ndf.curve_dependencies().expect("curve_dependencies");
+    let deps = ndf
+        .market_dependencies()
+        .expect("market_dependencies")
+        .curves;
 
     // Without foreign curve, only settlement curve
     assert_eq!(deps.discount_curves.len(), 1);
@@ -149,7 +152,10 @@ fn test_ndf_curve_dependencies_with_foreign() {
         .build()
         .expect("should build");
 
-    let deps = ndf.curve_dependencies().expect("curve_dependencies");
+    let deps = ndf
+        .market_dependencies()
+        .expect("market_dependencies")
+        .curves;
 
     assert_eq!(deps.discount_curves.len(), 2);
 }
@@ -160,9 +166,8 @@ fn test_ndf_required_discount_curves() {
     let curves = ndf
         .market_dependencies()
         .expect("market_dependencies")
-        .curve_dependencies()
-        .discount_curves
-        .clone();
+        .curves
+        .discount_curves;
     assert_eq!(curves.len(), 1);
 
     let ndf_with_foreign = Ndf::builder()
@@ -183,9 +188,8 @@ fn test_ndf_required_discount_curves() {
     let curves = ndf_with_foreign
         .market_dependencies()
         .expect("market_dependencies")
-        .curve_dependencies()
-        .discount_curves
-        .clone();
+        .curves
+        .discount_curves;
     assert_eq!(curves.len(), 2);
 }
 

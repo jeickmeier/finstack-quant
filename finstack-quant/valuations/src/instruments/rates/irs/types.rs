@@ -691,21 +691,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateSwap {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for InterestRateSwap {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        // Both legs' discount curves (they may differ, e.g. CSA discounting on
-        // one leg); the builder de-duplicates identical ids.
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.fixed.discount_curve_id.clone())
-            .discount(self.float.discount_curve_id.clone())
-            .forward(self.float.forward_curve_id.clone())
-            .build()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -734,7 +719,7 @@ mod tests {
         );
         assert_eq!(
             deps.curves.forward_curves.as_slice(),
-            &[swap.float.forward_curve_id.clone()]
+            std::slice::from_ref(&swap.float.forward_curve_id)
         );
         assert_eq!(
             deps.series_ids,

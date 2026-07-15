@@ -1,13 +1,119 @@
 //! Unified market data dependency representation for instruments.
 
-use crate::instruments::common_impl::traits::{
-    CurveDependencies, EquityDependencies, EquityInstrumentDeps, InstrumentCurves,
-};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::{CurveId, PriceId};
 use smallvec::SmallVec;
 
 use crate::instruments::json_loader::InstrumentJson;
+
+/// Collection of curves used by an instrument, categorized by market role.
+#[derive(Default, Clone, Debug)]
+pub struct InstrumentCurves {
+    /// Discount curves used by the instrument (including primary and foreign).
+    pub discount_curves: SmallVec<[CurveId; 2]>,
+    /// Forward/projection curves used by the instrument.
+    pub forward_curves: SmallVec<[CurveId; 2]>,
+    /// Credit/hazard curves used by the instrument.
+    pub credit_curves: SmallVec<[CurveId; 2]>,
+    /// Inflation curves or published inflation indices used by the instrument.
+    pub inflation_curves: SmallVec<[CurveId; 2]>,
+}
+
+impl InstrumentCurves {
+    /// Create an empty curve collection.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Iterate over every curve with its market role.
+    pub fn all_with_kind(&self) -> impl Iterator<Item = (CurveId, RatesCurveKind)> + '_ {
+        self.discount_curves
+            .iter()
+            .map(|curve| (curve.clone(), RatesCurveKind::Discount))
+            .chain(
+                self.forward_curves
+                    .iter()
+                    .map(|curve| (curve.clone(), RatesCurveKind::Forward)),
+            )
+            .chain(
+                self.credit_curves
+                    .iter()
+                    .map(|curve| (curve.clone(), RatesCurveKind::Credit)),
+            )
+            .chain(
+                self.inflation_curves
+                    .iter()
+                    .map(|curve| (curve.clone(), RatesCurveKind::Inflation)),
+            )
+    }
+
+    /// Return whether no curves are present.
+    pub fn is_empty(&self) -> bool {
+        self.discount_curves.is_empty()
+            && self.forward_curves.is_empty()
+            && self.credit_curves.is_empty()
+            && self.inflation_curves.is_empty()
+    }
+
+    /// Return the total number of curves.
+    pub fn len(&self) -> usize {
+        self.discount_curves.len()
+            + self.forward_curves.len()
+            + self.credit_curves.len()
+            + self.inflation_curves.len()
+    }
+}
+
+/// Identifies a rate curve's market role for risk calculations.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+pub enum RatesCurveKind {
+    /// Discount curve used for present-value discounting.
+    Discount,
+    /// Forward curve used for floating-rate projection.
+    Forward,
+    /// Credit or hazard curve.
+    Credit,
+    /// Inflation curve or published inflation index.
+    Inflation,
+}
+
+impl core::fmt::Display for RatesCurveKind {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Discount => write!(formatter, "discount"),
+            Self::Forward => write!(formatter, "forward"),
+            Self::Credit => write!(formatter, "credit"),
+            Self::Inflation => write!(formatter, "inflation"),
+        }
+    }
+}
+
+impl core::str::FromStr for RatesCurveKind {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let normalized = value.trim().to_ascii_lowercase().replace('-', "_");
+        match normalized.as_str() {
+            "discount" => Ok(Self::Discount),
+            "forward" => Ok(Self::Forward),
+            "credit" => Ok(Self::Credit),
+            "inflation" => Ok(Self::Inflation),
+            other => Err(format!(
+                "Unknown curve kind: '{other}'. Valid: discount, forward, credit, inflation"
+            )),
+        }
+    }
+}
 
 /// FX pair identifier using base/quote currency ordering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -68,11 +174,6 @@ pub struct MarketDependencies {
     pub curves: InstrumentCurves,
     /// Spot identifiers (equity, FX spot IDs, commodity spot IDs).
     pub spot_ids: Vec<String>,
-    /// Volatility surface identifiers.
-    ///
-    /// Temporary B09-B13 compatibility projection. New code should use
-    /// [`MarketDependencies::volatility_dependencies`].
-    pub vol_surface_ids: Vec<String>,
     /// Typed volatility dependencies in deterministic insertion order.
     pub volatility_dependencies: Vec<VolatilityDependency>,
     /// FX pairs required for pricing (spot matrices).
@@ -85,47 +186,6 @@ impl MarketDependencies {
     /// Create an empty dependency set.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Return the curve dependencies view for this market dependency set.
-    pub fn curve_dependencies(&self) -> &InstrumentCurves {
-        &self.curves
-    }
-
-    /// Return the primary equity dependencies view for this market dependency set.
-    ///
-    /// This returns the first spot/vol IDs when multiple are present (e.g., baskets).
-    pub fn equity_dependencies(&self) -> EquityInstrumentDeps {
-        let volatility = self.volatility_dependencies.first();
-        EquityInstrumentDeps {
-            spot_id: volatility
-                .and_then(|dependency| dependency.underlying_id.as_ref())
-                .map(|id| id.as_str().to_string())
-                .or_else(|| self.spot_ids.first().cloned()),
-            vol_surface_id: volatility
-                .map(|dependency| dependency.surface_id.as_str().to_string())
-                .or_else(|| self.vol_surface_ids.first().cloned()),
-            reference_strike: volatility.and_then(|dependency| dependency.reference_strike),
-        }
-    }
-
-    /// Build dependencies from an instrument implementing [`CurveDependencies`].
-    pub fn from_curve_dependencies<T: CurveDependencies>(
-        instrument: &T,
-    ) -> finstack_quant_core::Result<Self> {
-        let mut deps = Self::new();
-        deps.add_curves(instrument.curve_dependencies()?);
-        Ok(deps)
-    }
-
-    /// Build dependencies from an instrument implementing both curve and equity traits.
-    pub fn from_curves_and_equity<T: CurveDependencies + EquityDependencies>(
-        instrument: &T,
-    ) -> finstack_quant_core::Result<Self> {
-        let mut deps = Self::new();
-        deps.add_curves(instrument.curve_dependencies()?);
-        deps.add_equity_dependencies(instrument.equity_dependencies()?);
-        Ok(deps)
     }
 
     /// Merge curve dependencies into this set.
@@ -164,46 +224,13 @@ impl MarketDependencies {
         push_unique_curve(&mut self.curves.inflation_curves, id.into());
     }
 
-    /// Merge equity dependencies into this set.
-    pub fn add_equity_dependencies(&mut self, deps: EquityInstrumentDeps) {
-        let EquityInstrumentDeps {
-            spot_id,
-            vol_surface_id,
-            reference_strike,
-        } = deps;
-        let underlying_id = spot_id.as_deref().map(PriceId::new);
-        if let Some(spot_id) = spot_id {
-            self.add_spot_id(spot_id);
-        }
-        if let Some(vol_surface_id) = vol_surface_id {
-            self.add_volatility_dependency(VolatilityDependency::new(
-                CurveId::new(vol_surface_id),
-                underlying_id,
-                reference_strike,
-            ));
-        }
-    }
-
     /// Add a spot identifier.
     pub fn add_spot_id(&mut self, id: impl Into<String>) {
         push_unique_string(&mut self.spot_ids, id.into());
     }
 
-    /// Add a volatility surface identifier.
-    pub fn add_vol_surface_id(&mut self, id: impl Into<String>) {
-        self.add_volatility_dependency(VolatilityDependency::new(
-            CurveId::new(id.into()),
-            None,
-            None,
-        ));
-    }
-
-    /// Add a typed volatility dependency and synchronize the legacy surface projection.
+    /// Add a typed volatility dependency.
     pub fn add_volatility_dependency(&mut self, dependency: VolatilityDependency) {
-        push_unique_string(
-            &mut self.vol_surface_ids,
-            dependency.surface_id.as_str().to_string(),
-        );
         if !self.volatility_dependencies.contains(&dependency) {
             self.volatility_dependencies.push(dependency);
         }
@@ -215,12 +242,6 @@ impl MarketDependencies {
         for dependency in &self.volatility_dependencies {
             if !ids.contains(&dependency.surface_id) {
                 ids.push(dependency.surface_id.clone());
-            }
-        }
-        for id in &self.vol_surface_ids {
-            let id = CurveId::new(id);
-            if !ids.contains(&id) {
-                ids.push(id);
             }
         }
         ids
@@ -244,11 +265,6 @@ impl MarketDependencies {
         }
         for dependency in other.volatility_dependencies {
             self.add_volatility_dependency(dependency);
-        }
-        for id in other.vol_surface_ids {
-            if !self.vol_surface_ids.contains(&id) {
-                self.add_vol_surface_id(id);
-            }
         }
         for pair in other.fx_pairs {
             self.add_fx_pair(pair.base, pair.quote);
@@ -295,13 +311,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn legacy_equity_adapter_preserves_underlying_surface_and_strike() {
+    fn typed_volatility_dependency_preserves_underlying_surface_and_strike() {
         let mut dependencies = MarketDependencies::new();
-        dependencies.add_equity_dependencies(EquityInstrumentDeps {
-            spot_id: Some("SPX-SPOT".to_string()),
-            vol_surface_id: Some("SPX-VOL".to_string()),
-            reference_strike: Some(4_500.0),
-        });
+        dependencies.add_spot_id("SPX-SPOT");
+        dependencies.add_volatility_dependency(VolatilityDependency::new(
+            CurveId::new("SPX-VOL"),
+            Some(PriceId::new("SPX-SPOT")),
+            Some(4_500.0),
+        ));
 
         assert_eq!(
             dependencies.volatility_dependencies,
@@ -311,12 +328,7 @@ mod tests {
                 Some(4_500.0),
             )]
         );
-        assert_eq!(dependencies.vol_surface_ids, vec!["SPX-VOL"]);
-
-        let roundtrip = dependencies.equity_dependencies();
-        assert_eq!(roundtrip.spot_id.as_deref(), Some("SPX-SPOT"));
-        assert_eq!(roundtrip.vol_surface_id.as_deref(), Some("SPX-VOL"));
-        assert_eq!(roundtrip.reference_strike, Some(4_500.0));
+        assert_eq!(dependencies.spot_ids, vec!["SPX-SPOT"]);
     }
 
     #[test]
@@ -337,7 +349,6 @@ mod tests {
         dependencies.add_volatility_dependency(second.clone());
 
         assert_eq!(dependencies.volatility_dependencies, vec![first, second]);
-        assert_eq!(dependencies.vol_surface_ids, vec!["SPX-VOL"]);
         assert_eq!(
             dependencies.unique_vol_surface_ids(),
             vec![CurveId::new("SPX-VOL")]
@@ -345,7 +356,7 @@ mod tests {
     }
 
     #[test]
-    fn merge_preserves_descriptor_order_and_projection() {
+    fn merge_preserves_descriptor_order() {
         let mut left = MarketDependencies::new();
         left.add_volatility_dependency(VolatilityDependency::new(
             CurveId::new("LEFT-VOL"),
@@ -365,7 +376,6 @@ mod tests {
         ));
 
         left.merge(right);
-        assert_eq!(left.vol_surface_ids, vec!["LEFT-VOL", "RIGHT-VOL"]);
         assert_eq!(
             left.unique_vol_surface_ids(),
             vec![CurveId::new("LEFT-VOL"), CurveId::new("RIGHT-VOL")]

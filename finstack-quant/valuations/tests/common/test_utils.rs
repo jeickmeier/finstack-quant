@@ -3,9 +3,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::{
-    Attributes, Instrument, InstrumentCurves, MarketDependencies,
-};
+use finstack_quant_valuations::instruments::{Attributes, Instrument, MarketDependencies};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::results::ValuationResult;
 use smallvec::SmallVec;
@@ -71,11 +69,7 @@ impl Instrument for TestInstrument {
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();
         for curve in &self.discount_curves {
-            deps.add_curves(
-                InstrumentCurves::builder()
-                    .discount(curve.clone())
-                    .build()?,
-            );
+            deps.add_discount_curve(curve.clone());
         }
         Ok(deps)
     }

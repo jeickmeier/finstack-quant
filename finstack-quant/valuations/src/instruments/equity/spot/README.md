@@ -4,7 +4,7 @@
 
 - Spot equity position with optional explicit share count, price quote, dividend yield ID, and discount curve.
 - Uses market data IDs for spot/dividend lookup or accepts embedded price quotes for offline valuation.
-- Integrates with generic DV01 metrics via `CurveDependencies` and supports JSON serialization for pipeline use.
+- Integrates with generic DV01 metrics via canonical market dependencies and supports JSON serialization for pipeline use.
 
 ## Methodology & References
 

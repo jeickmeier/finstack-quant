@@ -323,18 +323,6 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSpreadOption {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for CmsSpreadOption {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .forward(self.forward_curve_id.clone())
-            .build()
-    }
-}
-
 crate::impl_empty_cashflow_provider!(
     CmsSpreadOption,
     crate::cashflow::builder::CashflowRepresentation::Placeholder

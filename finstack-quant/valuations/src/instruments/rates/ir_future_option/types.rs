@@ -420,17 +420,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for IrFutureO
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for IrFutureOption {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .build()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -459,33 +459,7 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
     }
 }
 
-// Implement CurveDependencies for DV01 calculator
-impl crate::instruments::common_impl::traits::CurveDependencies for RangeAccrual {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        let mut builder = crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone());
-        if let Some(projection) = &self.projection_curve_id {
-            builder = builder.forward(projection.clone());
-        }
-        builder.build()
-    }
-}
-
-impl crate::instruments::common_impl::traits::EquityDependencies for RangeAccrual {
-    fn equity_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::EquityInstrumentDeps>
-    {
-        crate::instruments::common_impl::traits::EquityInstrumentDeps::builder()
-            .spot(self.spot_id.as_str())
-            .vol_surface(self.vol_surface_id.as_str())
-            .build()
-    }
-}
-
+// Declare canonical market dependencies for the DV01 calculator.
 impl crate::metrics::HasPricingOverrides for RangeAccrual {
     fn pricing_overrides_mut(&mut self) -> &mut crate::instruments::PricingOverrides {
         &mut self.pricing_overrides

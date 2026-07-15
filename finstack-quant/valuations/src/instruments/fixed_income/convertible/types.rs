@@ -811,23 +811,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
     }
 }
 
-// Implement CurveDependencies for DV01 calculator
-impl crate::instruments::common_impl::traits::CurveDependencies for ConvertibleBond {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        let builder = crate::instruments::common_impl::traits::InstrumentCurves::builder();
-        let builder = builder.discount(self.discount_curve_id.clone());
-        let builder = if let Some(credit_curve) = &self.credit_curve_id {
-            builder.credit(credit_curve.clone())
-        } else {
-            builder
-        };
-        builder.build()
-    }
-}
-
+// Declare canonical market dependencies for the DV01 calculator.
 #[cfg(test)]
 mod tests {
     use super::*;

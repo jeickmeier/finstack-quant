@@ -8,7 +8,7 @@ use finstack_quant_valuations::instruments::equity::equity_index_future::{
     EquityFutureSpecs, EquityIndexFuture,
 };
 use finstack_quant_valuations::instruments::rates::ir_future::Position;
-use finstack_quant_valuations::instruments::Attributes;
+use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use time::Month;
 
 #[test]
@@ -215,11 +215,12 @@ fn test_instrument_trait() {
 }
 
 #[test]
-fn test_curve_dependencies() {
-    use finstack_quant_valuations::instruments::CurveDependencies;
-
+fn test_market_dependencies() {
     let future = EquityIndexFuture::example().unwrap();
-    let deps = future.curve_dependencies().expect("curve_dependencies");
+    let deps = future
+        .market_dependencies()
+        .expect("market_dependencies")
+        .curves;
 
     assert_eq!(deps.discount_curves.len(), 1);
     assert_eq!(deps.discount_curves[0].as_str(), "USD-OIS");

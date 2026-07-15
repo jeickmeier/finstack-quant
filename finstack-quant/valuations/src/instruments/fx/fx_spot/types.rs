@@ -542,20 +542,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxSpot {
     }
 }
 
-// Implement CurveDependencies for DV01 calculator
-impl crate::instruments::common_impl::traits::CurveDependencies for FxSpot {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        let mut builder = crate::instruments::common_impl::traits::InstrumentCurves::builder();
-        if let Some(ref id) = self.discount_curve_id {
-            builder = builder.discount(id.clone());
-        }
-        builder.build()
-    }
-}
-
+// Declare canonical market dependencies for the DV01 calculator.
 impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)

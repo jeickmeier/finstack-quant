@@ -120,20 +120,8 @@ pub struct FxOption {
     pub attributes: Attributes,
 }
 
-// Implement CurveDependencies for DV01 calculator
+// Declare canonical market dependencies for the DV01 calculator.
 // FxOption uses both domestic and foreign curves for Garman-Kohlhagen pricing
-impl crate::instruments::common_impl::traits::CurveDependencies for FxOption {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.domestic_discount_curve_id.clone())
-            .discount(self.foreign_discount_curve_id.clone())
-            .build()
-    }
-}
-
 /// Delta conventions relevant for FX ATM DNS strikes.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,

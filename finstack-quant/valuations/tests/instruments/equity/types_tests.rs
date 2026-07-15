@@ -242,7 +242,7 @@ fn test_equity_discount_curve_id() {
     let disc_id = equity
         .market_dependencies()
         .expect("market_dependencies")
-        .curve_dependencies()
+        .curves
         .discount_curves
         .first()
         .cloned()

@@ -604,19 +604,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
     }
 }
 
-// Implement CurveDependencies for DV01 calculator
-impl crate::instruments::common_impl::traits::CurveDependencies for InflationSwap {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .inflation(self.inflation_index_id.clone())
-            .build()
-    }
-}
-
+// Declare canonical market dependencies for the DV01 calculator.
 /// Year-on-year (YoY) Inflation Swap instrument.
 ///
 /// Pays periodic inflation rates (CPI ratios over each period) versus a fixed rate.
@@ -1057,18 +1045,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for YoYInflationSwap {
         );
         Ok(schedule
             .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
-    }
-}
-
-impl crate::instruments::common_impl::traits::CurveDependencies for YoYInflationSwap {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .inflation(self.inflation_index_id.clone())
-            .build()
     }
 }
 

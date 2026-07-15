@@ -1,4 +1,4 @@
-//! Trait implementations for Bond (Instrument, CurveDependencies, Monte Carlo).
+//! Trait implementations for Bond (Instrument and Monte Carlo).
 
 use crate::impl_instrument_base;
 use finstack_quant_core::types::CurveId;
@@ -219,42 +219,7 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
     }
 }
 
-// Implement CurveDependencies for DV01/CS01 calculators
-impl crate::instruments::common_impl::traits::CurveDependencies for Bond {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        let mut builder = crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone());
-
-        if let Some(ref forward_curve_id) = self.forward_curve_id {
-            builder = builder.forward(forward_curve_id.clone());
-        }
-
-        // Add credit curve if present
-        if let Some(ref credit_curve_id) = self.credit_curve_id {
-            builder = builder.credit(credit_curve_id.clone());
-        }
-
-        // For floating rate bonds, add forward curve from the cashflow spec
-        match &self.cashflow_spec {
-            CashflowSpec::Floating(floating_spec) => {
-                builder = builder.forward(floating_spec.rate_spec.index_id.clone());
-            }
-            CashflowSpec::Amortizing { base, .. } => {
-                // Check if the base spec is floating
-                if let CashflowSpec::Floating(floating_spec) = base.as_ref() {
-                    builder = builder.forward(floating_spec.rate_spec.index_id.clone());
-                }
-            }
-            _ => {}
-        }
-
-        builder.build()
-    }
-}
-
+// Declare canonical market dependencies for DV01/CS01 calculators.
 impl Bond {
     /// Price this bond using the Merton Monte Carlo structural credit model.
     ///

@@ -840,22 +840,6 @@ impl Ndf {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for Ndf {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        let mut builder = crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.domestic_discount_curve_id.clone());
-
-        if let Some(ref foreign_curve) = self.foreign_discount_curve_id {
-            builder = builder.discount(foreign_curve.clone());
-        }
-
-        builder.build()
-    }
-}
-
 impl crate::instruments::common_impl::traits::Instrument for Ndf {
     impl_instrument_base!(crate::pricer::InstrumentType::Ndf);
 

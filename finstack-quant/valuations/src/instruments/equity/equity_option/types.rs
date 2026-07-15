@@ -184,35 +184,7 @@ pub struct EquityOption {
     pub attributes: Attributes,
 }
 
-// Implement CurveDependencies for DV01 calculator
-impl crate::instruments::common_impl::traits::CurveDependencies for EquityOption {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .build()
-    }
-}
-
-impl crate::instruments::common_impl::traits::EquityDependencies for EquityOption {
-    fn equity_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::EquityInstrumentDeps>
-    {
-        // Vanilla European with a single contractual strike — declare it so
-        // the FD vega clamp detection only inspects the strikes adjacent to
-        // `self.strike` rather than the entire surface grid (avoids a
-        // forward-difference fallback when only a far-OTM wing has σ < bump).
-        crate::instruments::common_impl::traits::EquityInstrumentDeps::builder()
-            .spot(self.spot_id.as_str())
-            .vol_surface(self.vol_surface_id.as_str())
-            .reference_strike(self.strike)
-            .build()
-    }
-}
-
+// Declare canonical market dependencies for the DV01 calculator.
 impl EquityOption {
     fn build_vanilla_with_market_data(
         id: impl Into<String>,
@@ -767,7 +739,7 @@ mod tests {
 
         assert_eq!(
             deps.curves.discount_curves.as_slice(),
-            &[option.discount_curve_id.clone()]
+            std::slice::from_ref(&option.discount_curve_id)
         );
         assert_eq!(deps.spot_ids, vec![option.spot_id.as_str().to_string()]);
         assert_eq!(deps.volatility_dependencies.len(), 1);

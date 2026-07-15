@@ -16,9 +16,7 @@
 //!   Price Risk, Risk Publications.
 
 use crate::impl_instrument_base;
-use crate::instruments::common_impl::traits::{
-    Attributes, CurveDependencies, Instrument, InstrumentCurves,
-};
+use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::{OptionType, PricingOverrides};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -193,15 +191,6 @@ impl CommoditySpreadOption {
             )));
         }
         Ok(())
-    }
-}
-
-impl CurveDependencies for CommoditySpreadOption {
-    fn curve_dependencies(&self) -> finstack_quant_core::Result<InstrumentCurves> {
-        InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .forward(self.leg1_forward_curve_id.clone())
-            .build()
     }
 }
 

@@ -535,18 +535,6 @@ impl crate::instruments::common_impl::traits::Instrument for BermudanSwaption {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for BermudanSwaption {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .forward(self.forward_curve_id.clone())
-            .build()
-    }
-}
-
 /// Convert lognormal (Black) volatility to normal (Bachelier) volatility.
 ///
 /// Uses the Brenner-Subrahmanyam (1988) / Hagan (2002) approximation with

@@ -261,15 +261,11 @@ pub(crate) fn plan_credit_cascade(
 
     // Resolve hazard + discount curves from the instrument's market dependencies.
     let market_deps = instrument.market_dependencies()?;
-    let credit_curves: Vec<CurveId> = market_deps.curve_dependencies().credit_curves.to_vec();
+    let credit_curves: Vec<CurveId> = market_deps.curves.credit_curves.to_vec();
     if credit_curves.is_empty() {
         return Ok(None);
     }
-    let discount_curve_id: Option<CurveId> = market_deps
-        .curve_dependencies()
-        .discount_curves
-        .first()
-        .cloned();
+    let discount_curve_id: Option<CurveId> = market_deps.curves.discount_curves.first().cloned();
 
     // Measure the average **par CDS spread** ΔS_i across the issuer's hazard
     // curves (in bp). The cascade is par-spread-consistent: this

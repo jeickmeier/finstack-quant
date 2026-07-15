@@ -8,10 +8,8 @@
 use super::levered_pricer;
 use super::types::RealEstateAsset;
 use crate::impl_instrument_base;
-use crate::instruments::common_impl::traits::{
-    Attributes, CurveDependencies, Instrument, InstrumentCurves,
-};
-use crate::instruments::{InstrumentJson, MarketDependencies};
+use crate::instruments::common_impl::traits::{Attributes, Instrument};
+use crate::instruments::InstrumentJson;
 use crate::pricer::InstrumentType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -164,27 +162,6 @@ impl Instrument for LeveredRealEstateEquity {
         &self,
     ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
         Some(&self.pricing_overrides)
-    }
-}
-
-impl CurveDependencies for LeveredRealEstateEquity {
-    fn curve_dependencies(&self) -> finstack_quant_core::Result<InstrumentCurves> {
-        let mut deps = MarketDependencies::from_curve_dependencies(&self.asset)?;
-        for inst in &self.financing {
-            deps.merge(MarketDependencies::from_instrument_json(inst)?);
-        }
-        let mut curves = deps.curves;
-
-        // Also include a top-level discount curve id for attribution if provided.
-        if !curves
-            .discount_curves
-            .iter()
-            .any(|c| c == &self.discount_curve_id)
-        {
-            curves.discount_curves.push(self.discount_curve_id.clone());
-        }
-
-        Ok(curves)
     }
 }
 

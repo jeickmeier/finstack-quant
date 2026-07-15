@@ -484,7 +484,7 @@ fn test_discount_curve_dependency() {
     let curve_id = ilb
         .market_dependencies()
         .expect("market_dependencies")
-        .curve_dependencies()
+        .curves
         .discount_curves
         .first()
         .cloned()

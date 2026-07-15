@@ -2,9 +2,7 @@
 
 use super::pricer;
 use crate::impl_instrument_base;
-use crate::instruments::common_impl::traits::{
-    Attributes, CurveDependencies, Instrument, InstrumentCurves,
-};
+use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::pricer::InstrumentType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -528,14 +526,6 @@ impl Instrument for RealEstateAsset {
         Some(&self.pricing_overrides)
     }
 }
-impl CurveDependencies for RealEstateAsset {
-    fn curve_dependencies(&self) -> finstack_quant_core::Result<InstrumentCurves> {
-        InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .build()
-    }
-}
-
 impl crate::cashflow::traits::CashflowScheduleSource for RealEstateAsset {
     fn raw_cashflow_schedule(
         &self,

@@ -1149,19 +1149,7 @@ impl crate::instruments::common_impl::traits::Instrument for Swaption {
     }
 }
 
-// Implement CurveDependencies for DV01 calculator
-impl crate::instruments::common_impl::traits::CurveDependencies for Swaption {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.underlying_discount_curve_id().clone())
-            .forward(self.underlying_forward_curve_id().clone())
-            .build()
-    }
-}
-
+// Declare canonical market dependencies for the DV01 calculator.
 crate::impl_empty_cashflow_provider!(
     Swaption,
     crate::cashflow::builder::CashflowRepresentation::Placeholder

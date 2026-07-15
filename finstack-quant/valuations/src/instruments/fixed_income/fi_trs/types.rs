@@ -332,15 +332,3 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FIIndexTotalReturnSwap
         Ok(schedule)
     }
 }
-
-impl crate::instruments::common_impl::traits::CurveDependencies for FIIndexTotalReturnSwap {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.financing.discount_curve_id.clone())
-            .forward(self.financing.forward_curve_id.clone())
-            .build()
-    }
-}

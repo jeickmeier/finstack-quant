@@ -123,7 +123,7 @@ fn test_fx_digital_direct_dependencies_match_json_dependencies() {
         "direct dependencies should declare the same discount curves as JSON dependencies"
     );
     assert_eq!(
-        direct_deps.vol_surface_ids, json_deps.vol_surface_ids,
+        direct_deps.volatility_dependencies, json_deps.volatility_dependencies,
         "direct dependencies should declare the FX vol surface"
     );
     assert_eq!(

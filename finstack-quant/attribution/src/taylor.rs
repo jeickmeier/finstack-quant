@@ -250,13 +250,13 @@ fn compute_taylor_result(
     };
     let rate_results = match execution_policy {
         ExecutionPolicy::Parallel => market_deps
-            .curve_dependencies()
+            .curves
             .discount_curves
             .par_iter()
             .map(compute_rate)
             .collect::<Vec<_>>(),
         ExecutionPolicy::Serial => market_deps
-            .curve_dependencies()
+            .curves
             .discount_curves
             .iter()
             .map(compute_rate)
@@ -285,13 +285,13 @@ fn compute_taylor_result(
     };
     let forward_results = match execution_policy {
         ExecutionPolicy::Parallel => market_deps
-            .curve_dependencies()
+            .curves
             .forward_curves
             .par_iter()
             .map(compute_forward)
             .collect::<Vec<_>>(),
         ExecutionPolicy::Serial => market_deps
-            .curve_dependencies()
+            .curves
             .forward_curves
             .iter()
             .map(compute_forward)
@@ -316,7 +316,7 @@ fn compute_taylor_result(
     // rate moves. `BucketedCs01` is requested once here; instruments without that
     // calculator yield no per-tenor keys and the per-curve `compute_credit_factor`
     // falls back to an aggregate CS01 times an average credit-curve move.
-    let credit_curves = &market_deps.curve_dependencies().credit_curves;
+    let credit_curves = &market_deps.curves.credit_curves;
     let credit_keyrate = if credit_curves.is_empty() {
         None
     } else {
@@ -369,8 +369,8 @@ fn compute_taylor_result(
     }
 
     // Volatility sensitivity (vega)
-    if let Some(ref surface_id_str) = market_deps.equity_dependencies().vol_surface_id {
-        let surface_id = CurveId::new(surface_id_str.as_str());
+    if let Some(dependency) = market_deps.volatility_dependencies.first() {
+        let surface_id = dependency.surface_id.clone();
         let result = compute_vol_factor(
             instrument,
             market_t0,

@@ -2016,23 +2016,7 @@ Provide it at construction time via BondFutureBuilder::ctd_bond(...) or by using
     }
 }
 
-// Implement CurveDependencies for DV01 calculators
-impl crate::instruments::common_impl::traits::CurveDependencies for BondFuture {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        let builder = crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone());
-        let builder = if let Some(repo_curve) = &self.repo_curve_id {
-            builder.forward(repo_curve.clone())
-        } else {
-            builder
-        };
-        builder.build()
-    }
-}
-
+// Declare canonical market dependencies for DV01 calculators.
 impl finstack_quant_cashflows::CashflowScheduleSource for BondFuture {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
@@ -2053,6 +2037,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for BondFuture {
 #[cfg(test)]
 mod instrument_trait_tests {
     use super::*;
+    use crate::instruments::common_impl::traits::Instrument;
     use finstack_quant_core::currency::Currency;
     use time::Month;
 
@@ -2239,15 +2224,14 @@ mod instrument_trait_tests {
         let curves = future
             .market_dependencies()
             .expect("market_dependencies should succeed")
-            .curve_dependencies()
-            .discount_curves
-            .clone();
+            .curves
+            .discount_curves;
         assert_eq!(curves.len(), 1);
         assert_eq!(curves[0].as_str(), "USD-TREASURY");
     }
 
     #[test]
-    fn test_curve_dependencies() {
+    fn test_market_dependencies() {
         let deliverable = DeliverableBond {
             bond_id: InstrumentId::new("US912828XG33"),
             conversion_factor: 0.8234,
@@ -2269,9 +2253,10 @@ mod instrument_trait_tests {
             .build()
             .expect("Valid bond future");
 
-        use crate::instruments::common_impl::traits::CurveDependencies;
-
-        let curves = future.curve_dependencies().expect("curve_dependencies");
+        let curves = future
+            .market_dependencies()
+            .expect("market_dependencies")
+            .curves;
         assert_eq!(curves.discount_curves.len(), 1);
         assert_eq!(curves.discount_curves[0].as_str(), "USD-TREASURY");
         assert_eq!(curves.forward_curves.len(), 0);

@@ -963,20 +963,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for XccySwap {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.leg1.discount_curve_id.clone())
-            .discount(self.leg2.discount_curve_id.clone())
-            .forward(self.leg1.forward_curve_id.clone())
-            .forward(self.leg2.forward_curve_id.clone())
-            .build()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -419,17 +419,6 @@ impl AgencyCmo {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for AgencyCmo {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .build()
-    }
-}
-
 impl finstack_quant_cashflows::CashflowScheduleSource for AgencyCmo {
     fn notional(&self) -> Option<Money> {
         self.reference_tranche().map(|tranche| tranche.current_face)

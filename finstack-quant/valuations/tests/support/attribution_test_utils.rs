@@ -71,15 +71,13 @@ impl Instrument for TestInstrument {
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<crate::instruments::common_impl::dependencies::MarketDependencies> {
-        let mut builder = crate::instruments::common_impl::traits::InstrumentCurves::builder();
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         for curve in &self.discount_curves {
-            builder = builder.discount(curve.clone());
+            deps.add_discount_curve(curve.clone());
         }
         for curve in &self.forward_curves {
-            builder = builder.forward(curve.clone());
+            deps.add_forward_curve(curve.clone());
         }
-        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
-        deps.add_curves(builder.build()?);
         Ok(deps)
     }
 

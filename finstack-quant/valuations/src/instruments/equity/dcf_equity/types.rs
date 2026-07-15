@@ -6,9 +6,7 @@
 
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
-use crate::instruments::common_impl::traits::{
-    Attributes, CurveDependencies, Instrument, InstrumentCurves,
-};
+use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::equity::dcf_equity::pricer;
 use crate::pricer::InstrumentType;
 use finstack_quant_core::currency::Currency;
@@ -904,14 +902,6 @@ impl Instrument for DiscountedCashFlow {
         Some(&self.pricing_overrides)
     }
 }
-impl CurveDependencies for DiscountedCashFlow {
-    fn curve_dependencies(&self) -> finstack_quant_core::Result<InstrumentCurves> {
-        InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .build()
-    }
-}
-
 impl crate::cashflow::traits::CashflowScheduleSource for DiscountedCashFlow {
     fn raw_cashflow_schedule(
         &self,
@@ -1352,13 +1342,15 @@ mod tests {
         let required = dcf
             .market_dependencies()
             .expect("market_dependencies should succeed")
-            .curve_dependencies()
-            .discount_curves
-            .clone();
+            .curves
+            .discount_curves;
         assert_eq!(required.len(), 1);
         assert_eq!(required[0], dcf.discount_curve_id);
 
-        let deps = dcf.curve_dependencies().expect("curve_dependencies");
+        let deps = dcf
+            .market_dependencies()
+            .expect("market_dependencies")
+            .curves;
         assert_eq!(deps.discount_curves.len(), 1);
         assert_eq!(deps.discount_curves[0], dcf.discount_curve_id);
     }

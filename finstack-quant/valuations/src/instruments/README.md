@@ -30,7 +30,7 @@ All instruments implement [`Instrument`](common/traits/mod.rs):
 - `price_with_metrics(market, as_of, metrics)` — NPV plus requested `MetricId` values
 - `cashflow_schedule` / `dated_cashflows` — schedule output (empty schedules are explicit when there is no residual exposure)
 
-Curve requirements are expressed through [`CurveDependencies`](common/traits/mod.rs) where applicable.
+Curve requirements are expressed through each instrument's canonical `MarketDependencies` declaration.
 
 ## JSON
 

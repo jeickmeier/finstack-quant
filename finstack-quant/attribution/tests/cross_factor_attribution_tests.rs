@@ -12,9 +12,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-use finstack_quant_valuations::instruments::{
-    Attributes, Instrument, InstrumentCurves, MarketDependencies,
-};
+use finstack_quant_valuations::instruments::{Attributes, Instrument, MarketDependencies};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::results::ValuationResult;
@@ -96,12 +94,8 @@ impl Instrument for RatesCreditInteractionInstrument {
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();
-        deps.add_curves(
-            InstrumentCurves::builder()
-                .discount(CurveId::new("USD-OIS"))
-                .credit(CurveId::new("ACME-HAZ"))
-                .build()?,
-        );
+        deps.add_discount_curve(CurveId::new("USD-OIS"));
+        deps.add_credit_curve(CurveId::new("ACME-HAZ"));
         Ok(deps)
     }
 

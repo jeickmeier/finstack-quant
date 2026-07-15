@@ -284,17 +284,6 @@ impl crate::instruments::common_impl::traits::Instrument for Deposit {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for Deposit {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .build()
-    }
-}
-
 /// Minimum reasonable deposit rate (-10% = -1000 bps).
 /// Rates below this are likely data errors or misconfigured instruments.
 const MIN_REASONABLE_RATE: f64 = -0.10;

@@ -101,20 +101,8 @@ pub struct FxBarrierOption {
     pub attributes: Attributes,
 }
 
-// Implement CurveDependencies for DV01 calculator
+// Declare canonical market dependencies for the DV01 calculator.
 // FxBarrierOption uses both domestic and foreign curves for FX carry calculation
-impl crate::instruments::common_impl::traits::CurveDependencies for FxBarrierOption {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.domestic_discount_curve_id.clone())
-            .discount(self.foreign_discount_curve_id.clone())
-            .build()
-    }
-}
-
 impl FxBarrierOption {
     /// Validate FX barrier option currency invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
@@ -538,12 +526,15 @@ crate::impl_empty_cashflow_provider!(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::CurveDependencies;
+    use crate::instruments::common_impl::traits::Instrument;
 
     #[test]
     fn test_fx_barrier_option_curve_dependencies_includes_both_curves() {
         let option = FxBarrierOption::example();
-        let deps = option.curve_dependencies().expect("curve_dependencies");
+        let deps = option
+            .market_dependencies()
+            .expect("market_dependencies")
+            .curves;
 
         // Should include both domestic and foreign discount curves
         assert_eq!(

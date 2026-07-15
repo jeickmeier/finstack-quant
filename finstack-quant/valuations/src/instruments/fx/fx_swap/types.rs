@@ -418,23 +418,11 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for FxSwap {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.domestic_discount_curve_id.clone())
-            .discount(self.foreign_discount_curve_id.clone())
-            .build()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::cashflow::CashflowProvider;
-    use crate::instruments::common_impl::traits::{CurveDependencies, Instrument};
+    use crate::instruments::common_impl::traits::Instrument;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
@@ -480,9 +468,12 @@ mod tests {
     }
 
     #[test]
-    fn test_fx_swap_curve_dependencies() {
+    fn test_fx_swap_market_dependencies() {
         let swap = FxSwap::example();
-        let deps = swap.curve_dependencies().expect("curve_dependencies");
+        let deps = swap
+            .market_dependencies()
+            .expect("market_dependencies")
+            .curves;
 
         assert_eq!(deps.discount_curves.len(), 2);
         assert!(deps.discount_curves.iter().any(|c| c.as_str() == "USD-OIS"));

@@ -724,24 +724,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for CmsSwap {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        let mut builder = crate::instruments::common_impl::traits::InstrumentCurves::builder();
-        builder = builder.discount(self.discount_curve_id.clone());
-        builder = builder.forward(self.forward_curve_id.clone());
-        if let FundingLeg::Floating {
-            forward_curve_id, ..
-        } = &self.funding_leg
-        {
-            builder = builder.forward(forward_curve_id.clone());
-        }
-        builder.build()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #[allow(dead_code, unused_imports)]

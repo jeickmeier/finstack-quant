@@ -849,23 +849,6 @@ impl crate::cashflow::traits::CashflowScheduleSource for TermLoan {
     }
 }
 
-impl crate::instruments::common_impl::traits::CurveDependencies for TermLoan {
-    fn curve_dependencies(
-        &self,
-    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
-    {
-        let mut builder = crate::instruments::common_impl::traits::InstrumentCurves::builder();
-        builder = builder.discount(self.discount_curve_id.clone());
-        if let Some(cc) = &self.credit_curve_id {
-            builder = builder.credit(cc.clone());
-        }
-        if let RateSpec::Floating(ref spec) = self.rate {
-            builder = builder.forward(spec.index_id.clone());
-        }
-        builder.build()
-    }
-}
-
 impl finstack_quant_covenants::InstrumentMutator for TermLoan {
     fn set_default_status(
         &mut self,

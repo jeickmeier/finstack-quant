@@ -223,8 +223,8 @@ impl AttributionSpec {
 
         // 2. Find a credit (hazard) curve and discount curve on the instrument.
         let market_deps = instrument.market_dependencies()?;
-        let credit_curves = &market_deps.curve_dependencies().credit_curves;
-        let discount_curves = &market_deps.curve_dependencies().discount_curves;
+        let credit_curves = &market_deps.curves.credit_curves;
+        let discount_curves = &market_deps.curves.discount_curves;
         let credit_curve_id = match credit_curves.first() {
             Some(c) => c.clone(),
             None => return Ok(()),
