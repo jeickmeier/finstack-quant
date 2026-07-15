@@ -9,9 +9,9 @@ use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
+use finstack_quant_valuations::instruments::FxUnderlyingParams;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::{FxOptionParams, FxUnderlyingParams};
 use finstack_quant_valuations::instruments::{PricingOverrides, SettlementType};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
@@ -91,14 +91,8 @@ fn test_european_put_convenience_constructor() {
 }
 
 #[test]
-fn test_new_with_parameter_structs() {
+fn test_builder_with_underlying_params() {
     // Arrange
-    let option_params = FxOptionParams::new(
-        1.20,
-        date!(2025 - 01 - 01),
-        OptionType::Call,
-        Money::new(1_000_000.0, Currency::EUR),
-    );
     let underlying_params = FxUnderlyingParams::usd_eur();
 
     // Act
@@ -106,13 +100,13 @@ fn test_new_with_parameter_structs() {
         .id("TEST_OPTION".into())
         .base_currency(underlying_params.base_currency)
         .quote_currency(underlying_params.quote_currency)
-        .strike(option_params.strike)
-        .option_type(option_params.option_type)
-        .exercise_style(option_params.exercise_style)
-        .expiry(option_params.expiry)
+        .strike(1.20)
+        .option_type(OptionType::Call)
+        .exercise_style(ExerciseStyle::European)
+        .expiry(date!(2025 - 01 - 01))
         .day_count(DayCount::Act365F)
-        .notional(option_params.notional)
-        .settlement(option_params.settlement)
+        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .settlement(SettlementType::Physical)
         .domestic_discount_curve_id(underlying_params.domestic_discount_curve_id.clone())
         .foreign_discount_curve_id(underlying_params.foreign_discount_curve_id.clone())
         .vol_surface_id(CurveId::new("EURUSD-VOL"))
@@ -125,8 +119,8 @@ fn test_new_with_parameter_structs() {
     assert_eq!(option.id.as_str(), "TEST_OPTION");
     assert_eq!(option.base_currency, underlying_params.base_currency);
     assert_eq!(option.quote_currency, underlying_params.quote_currency);
-    assert_eq!(option.strike, option_params.strike);
-    assert_eq!(option.option_type, option_params.option_type);
+    assert_eq!(option.strike, 1.20);
+    assert_eq!(option.option_type, OptionType::Call);
 }
 
 #[test]
