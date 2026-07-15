@@ -241,7 +241,7 @@ impl AgencyTba {
         let agency_str = match self.agency {
             AgencyProgram::Fnma => "FN",
             AgencyProgram::Fhlmc => "FH",
-            AgencyProgram::Gnma | AgencyProgram::GnmaII | AgencyProgram::GnmaI => "GN",
+            AgencyProgram::GnmaII | AgencyProgram::GnmaI => "GN",
         };
         let term_str = match self.term {
             TbaTerm::FifteenYear => "15",

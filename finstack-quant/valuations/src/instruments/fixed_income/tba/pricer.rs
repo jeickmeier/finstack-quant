@@ -37,9 +37,7 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba, _as_of: Date) -> Result<Agenc
     // Standard servicing and g-fee assumptions
     let servicing_fee = defaults.servicing_fee_rate;
     let guarantee_fee = match tba.agency {
-        AgencyProgram::Gnma | AgencyProgram::GnmaI | AgencyProgram::GnmaII => {
-            defaults.gnma_guarantee_fee_rate
-        }
+        AgencyProgram::GnmaI | AgencyProgram::GnmaII => defaults.gnma_guarantee_fee_rate,
         _ => defaults.agency_guarantee_fee_rate,
     };
 

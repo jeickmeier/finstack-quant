@@ -224,7 +224,6 @@ mod tests {
     fn test_payment_lag_days() {
         assert_eq!(payment_lag_days(AgencyProgram::Fnma), 55);
         assert_eq!(payment_lag_days(AgencyProgram::Fhlmc), 55);
-        assert_eq!(payment_lag_days(AgencyProgram::Gnma), 50);
         assert_eq!(payment_lag_days(AgencyProgram::GnmaI), 14);
         assert_eq!(payment_lag_days(AgencyProgram::GnmaII), 50);
     }

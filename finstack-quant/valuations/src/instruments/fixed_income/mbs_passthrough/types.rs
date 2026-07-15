@@ -26,8 +26,8 @@ use time::Month;
 /// - **GNMA I**: Single-issuer pools with a 14-day stated delay. Payments on the 15th.
 /// - **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.
 ///
-/// Use `GnmaI` or `GnmaII` to select the appropriate convention. The legacy `Gnma`
-/// variant maps to GNMA II (the larger and more actively traded program).
+/// Use `GnmaI` or `GnmaII` to select the appropriate convention. Legacy `GNMA`
+/// and `GNMA_I_I` payloads deserialize as `GnmaII`.
 #[derive(
     Debug,
     Clone,
@@ -45,11 +45,6 @@ pub enum AgencyProgram {
     Fnma,
     /// Freddie Mac (Federal Home Loan Mortgage Corporation)
     Fhlmc,
-    /// Ginnie Mae II (Government National Mortgage Association) - multi-issuer pools.
-    ///
-    /// This is the legacy variant; equivalent to `GnmaII`. Use `GnmaI` or `GnmaII`
-    /// for explicit program selection.
-    Gnma,
     /// Ginnie Mae I - single-issuer pools with 14-day stated delay.
     ///
     /// GNMA I securities pay on the 15th of the month following the accrual
@@ -60,6 +55,7 @@ pub enum AgencyProgram {
     /// GNMA II securities pay on the 20th of the month following the accrual
     /// period, resulting in a ~50-day stated delay from accrual start. This is
     /// the larger and more actively traded GNMA program.
+    #[serde(rename = "GNMA_II", alias = "GNMA", alias = "GNMA_I_I")]
     GnmaII,
 }
 
@@ -87,7 +83,7 @@ impl AgencyProgram {
         match self {
             AgencyProgram::Fnma | AgencyProgram::Fhlmc => 55,
             AgencyProgram::GnmaI => 14,
-            AgencyProgram::Gnma | AgencyProgram::GnmaII => 50,
+            AgencyProgram::GnmaII => 50,
         }
     }
 
@@ -120,7 +116,7 @@ impl AgencyProgram {
                 // GNMA I pays on the 15th of the accrual month (not M+1)
                 (accrual_year, accrual_month, 15_u8)
             }
-            AgencyProgram::Gnma | AgencyProgram::GnmaII => {
+            AgencyProgram::GnmaII => {
                 let (y, m) = advance_month(accrual_year, accrual_month);
                 (y, m, 20_u8)
             }
@@ -138,17 +134,14 @@ impl AgencyProgram {
         match self {
             AgencyProgram::Fnma => "FNMA",
             AgencyProgram::Fhlmc => "FHLMC",
-            AgencyProgram::Gnma | AgencyProgram::GnmaII => "GNMA_II",
+            AgencyProgram::GnmaII => "GNMA_II",
             AgencyProgram::GnmaI => "GNMA_I",
         }
     }
 
     /// Returns `true` if this is a Ginnie Mae program (any variant).
     pub fn is_gnma(&self) -> bool {
-        matches!(
-            self,
-            AgencyProgram::Gnma | AgencyProgram::GnmaI | AgencyProgram::GnmaII
-        )
+        matches!(self, AgencyProgram::GnmaI | AgencyProgram::GnmaII)
     }
 }
 
@@ -515,7 +508,6 @@ mod tests {
     fn test_agency_program_payment_delays() {
         assert_eq!(AgencyProgram::Fnma.payment_lag_days(), 55);
         assert_eq!(AgencyProgram::Fhlmc.payment_lag_days(), 55);
-        assert_eq!(AgencyProgram::Gnma.payment_lag_days(), 50);
         assert_eq!(AgencyProgram::GnmaI.payment_lag_days(), 14);
         assert_eq!(AgencyProgram::GnmaII.payment_lag_days(), 50);
     }
@@ -566,7 +558,6 @@ mod tests {
         for agency in [
             AgencyProgram::Fnma,
             AgencyProgram::Fhlmc,
-            AgencyProgram::Gnma,
             AgencyProgram::GnmaI,
             AgencyProgram::GnmaII,
         ] {
@@ -592,7 +583,6 @@ mod tests {
     fn test_agency_program_display() {
         assert_eq!(AgencyProgram::Fnma.as_str(), "FNMA");
         assert_eq!(AgencyProgram::Fhlmc.as_str(), "FHLMC");
-        assert_eq!(AgencyProgram::Gnma.as_str(), "GNMA_II");
         assert_eq!(AgencyProgram::GnmaI.as_str(), "GNMA_I");
         assert_eq!(AgencyProgram::GnmaII.as_str(), "GNMA_II");
     }
@@ -601,9 +591,21 @@ mod tests {
     fn test_agency_program_is_gnma() {
         assert!(!AgencyProgram::Fnma.is_gnma());
         assert!(!AgencyProgram::Fhlmc.is_gnma());
-        assert!(AgencyProgram::Gnma.is_gnma());
         assert!(AgencyProgram::GnmaI.is_gnma());
         assert!(AgencyProgram::GnmaII.is_gnma());
+    }
+
+    #[test]
+    fn legacy_gnma_names_deserialize_as_canonical_gnma_ii() {
+        for legacy in ["GNMA", "GNMA_I_I", "GNMA_II"] {
+            let agency = serde_json::from_str::<AgencyProgram>(&format!("\"{legacy}\""))
+                .expect("accepted GNMA spelling");
+            assert_eq!(agency, AgencyProgram::GnmaII);
+            assert_eq!(
+                serde_json::to_string(&agency).expect("serialize agency"),
+                "\"GNMA_II\""
+            );
+        }
     }
 
     #[test]
