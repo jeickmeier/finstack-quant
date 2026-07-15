@@ -7,7 +7,7 @@
 //! - Use the shared tree framework (`TreeModel` + `TreeValuator`)
 //! - Support deterministic discounting (via the calibrated rate tree) and an optional
 //!   credit-spread tree path
-//! - Apply `PricingOverrides::call_friction_cents` as an exercise threshold uplift
+//! - Apply `InstrumentPricingOverrides::call_friction_cents` as an exercise threshold uplift
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::term_loan::TermLoan;
@@ -314,7 +314,7 @@ impl TermLoanValuator {
         };
 
         let call_friction_cents = loan
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .call_friction_cents
             .unwrap_or(0.0);
@@ -458,12 +458,12 @@ impl TermLoanTreePricer {
 
         let cfg = TermLoanTreePricerConfig {
             tree_steps: loan
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .model_config
                 .tree_steps
                 .unwrap_or(self.config.tree_steps),
             volatility: loan
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .market_quotes
                 .implied_volatility
                 .unwrap_or(self.config.volatility),
@@ -564,12 +564,12 @@ impl TermLoanTreePricer {
 
         let cfg = TermLoanTreePricerConfig {
             tree_steps: loan
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .model_config
                 .tree_steps
                 .unwrap_or(self.config.tree_steps),
             volatility: loan
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .market_quotes
                 .implied_volatility
                 .unwrap_or(self.config.volatility),

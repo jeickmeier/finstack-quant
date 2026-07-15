@@ -17,7 +17,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -91,12 +91,12 @@ fn test_ytm_uses_bond_daycount() {
 
     // Price both bonds at par (same price)
     let mut bond_act365_quoted = bond_act365;
-    bond_act365_quoted.pricing_overrides =
-        PricingOverrides::default().with_quoted_clean_price(100.0);
+    bond_act365_quoted.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
 
     let mut bond_30360_quoted = bond_30360;
-    bond_30360_quoted.pricing_overrides =
-        PricingOverrides::default().with_quoted_clean_price(100.0);
+    bond_30360_quoted.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
 
     let result_act365 = bond_act365_quoted
         .price_with_metrics(
@@ -157,7 +157,8 @@ fn test_ytm_par_equals_coupon_for_matching_daycount() {
         let market = MarketContext::new().insert(disc);
 
         let mut bond_at_par = bond.clone();
-        bond_at_par.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
+        bond_at_par.instrument_pricing_overrides =
+            InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
 
         let result = bond_at_par
             .price_with_metrics(
@@ -197,7 +198,8 @@ fn test_duration_consistent_with_ytm() {
     let market = MarketContext::new().insert(disc);
 
     let mut bond_quoted = bond;
-    bond_quoted.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
+    bond_quoted.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
 
     let result = bond_quoted
         .price_with_metrics(

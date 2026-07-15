@@ -62,7 +62,10 @@ impl MetricCalculator for YtmCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         // Extract fields we need from the bond
         let bond: &Bond = context.instrument_as()?;
-        let maybe_clean_px = bond.pricing_overrides.market_quotes.quoted_clean_price;
+        let maybe_clean_px = bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price;
         let notional = bond.notional;
         let dc = bond.cashflow_spec.day_count();
         let discount_curve_id = bond.discount_curve_id.to_owned();

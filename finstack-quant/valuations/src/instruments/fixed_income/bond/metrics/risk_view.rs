@@ -53,7 +53,11 @@ pub(crate) fn bond_risk_view(
     // Phase 1: read everything off the (immutable) bond, ending the borrow.
     let (bond_clone, has_options, credit_id) = {
         let bond: &Bond = context.instrument_as()?;
-        if !bond.pricing_overrides.market_quotes.has_price_driver() {
+        if !bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .has_price_driver()
+        {
             return Ok(None);
         }
         let has_options = bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
@@ -120,7 +124,10 @@ pub(crate) fn bond_risk_view(
         .ok_or_else(|| crate::metrics::metric_not_found(MetricId::ZSpread))?;
     let mut cleared = bond_clone;
     clear_price_driving_overrides(&mut cleared);
-    cleared.pricing_overrides.market_quotes.quoted_z_spread = Some(z);
+    cleared
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_z_spread = Some(z);
     Ok(Some((
         Arc::new(cleared) as Arc<dyn Instrument>,
         Arc::clone(&context.curves),

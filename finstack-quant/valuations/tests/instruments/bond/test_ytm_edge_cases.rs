@@ -15,7 +15,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 use time::Month;
 
@@ -60,7 +60,8 @@ fn test_deep_discount_bond_ytm() {
     let market = create_test_market(issue);
 
     // Set quoted price at deep discount
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(50.0); // 50 cents on dollar
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(50.0); // 50 cents on dollar
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -111,7 +112,8 @@ fn test_zero_coupon_bond_ytm() {
     let market = create_test_market(issue);
 
     // Price at 80 cents on dollar
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(80.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(80.0);
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -179,7 +181,8 @@ fn test_odd_first_coupon_ytm() {
     let market = create_test_market(issue);
 
     // Price at par
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -230,7 +233,8 @@ fn test_eom_february_maturity_ytm() {
     let market = create_test_market(issue);
 
     // Price slightly above par
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(102.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(102.0);
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -293,7 +297,8 @@ fn test_long_first_coupon_ytm() {
 
     let market = create_test_market(issue);
 
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(98.0); // Slight discount
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(98.0); // Slight discount
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -334,7 +339,8 @@ fn test_premium_bond_ytm_solver_convergence() {
     let market = create_test_market(issue);
 
     // Price at premium
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(115.0); // 115 cents on dollar
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(115.0); // 115 cents on dollar
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -384,7 +390,8 @@ fn test_ytm_price_roundtrip() {
     let original_price = 95.0; // Discount price
 
     // Step 1: Calculate YTM from price
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(original_price);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(original_price);
 
     let result1 = bond
         .price_with_metrics(
@@ -399,7 +406,7 @@ fn test_ytm_price_roundtrip() {
 
     // Step 2: Calculate price without quote (use market curve)
     // Reset pricing overrides
-    bond.pricing_overrides = PricingOverrides::default();
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default();
 
     let result2 = bond
         .price_with_metrics(
@@ -445,7 +452,8 @@ fn test_very_long_maturity_bond() {
 
     let market = create_test_market(issue);
 
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(90.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(90.0);
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -494,7 +502,8 @@ fn test_near_maturity_bond_ytm() {
 
     let market = create_test_market(as_of);
 
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(99.5);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(99.5);
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -541,7 +550,8 @@ fn test_negative_ytm_extreme_premium() {
     let market = create_test_market(issue);
 
     // Price at 103 (extreme premium for 0.5% coupon)
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(103.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(103.0);
 
     let result = bond
         .price_with_metrics(

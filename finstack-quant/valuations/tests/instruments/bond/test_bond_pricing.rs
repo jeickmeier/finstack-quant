@@ -83,7 +83,9 @@ fn test_bond_pv_determinism() {
 fn test_bond_ytm_determinism() {
     let mut bond = create_test_bond();
     // Set quoted clean price at par (100% of face) to enable YTM calculation
-    bond.pricing_overrides.market_quotes.quoted_clean_price = Some(100.0);
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(100.0);
 
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let market = create_test_market(as_of);

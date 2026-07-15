@@ -128,9 +128,12 @@ pub(crate) fn option_risk_bond_and_base_price(
         return Ok((risk_bond.clone(), risk_bond.value(market, as_of)?.amount()));
     };
 
-    if let Some(oas) = bond.pricing_overrides.market_quotes.quoted_oas {
+    if let Some(oas) = bond.instrument_pricing_overrides.market_quotes.quoted_oas {
         clear_price_driving_overrides(&mut risk_bond);
-        risk_bond.pricing_overrides.market_quotes.quoted_oas = Some(oas);
+        risk_bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_oas = Some(oas);
         return Ok((risk_bond, base_price));
     }
 
@@ -145,12 +148,15 @@ pub(crate) fn option_risk_bond_and_base_price(
     )?;
 
     clear_price_driving_overrides(&mut risk_bond);
-    risk_bond.pricing_overrides.market_quotes.quoted_oas = Some(oas_bp / 10_000.0);
+    risk_bond
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_oas = Some(oas_bp / 10_000.0);
     Ok((risk_bond, base_price))
 }
 
 pub(crate) fn option_risk_curve_id(bond: &Bond) -> CurveId {
-    bond.pricing_overrides
+    bond.instrument_pricing_overrides
         .model_config
         .tree_discount_curve_id
         .clone()
@@ -161,7 +167,7 @@ pub(crate) fn option_risk_curve_id(bond: &Bond) -> CurveId {
 mod tests {
     use super::*;
     use crate::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec};
-    use crate::instruments::PricingOverrides;
+    use crate::instruments::InstrumentPricingOverrides;
     use crate::metrics::{standard_registry, MetricContext, MetricId};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
@@ -200,7 +206,7 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id(CurveId::new("USD-OIS"))
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Default::default())
             .build()
             .expect("valid bond")
@@ -219,7 +225,7 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id(CurveId::new("USD-OIS"))
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Default::default())
             .build()
             .expect("valid bond");
@@ -266,7 +272,9 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id(CurveId::new("USD-OIS"))
-            .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(98.0))
+            .instrument_pricing_overrides(
+                InstrumentPricingOverrides::default().with_quoted_clean_price(98.0),
+            )
             .settlement_convention_opt(Some(BondSettlementConvention {
                 settlement_days: 2,
                 ..Default::default()
@@ -364,7 +372,9 @@ mod tests {
             )
             .discount_curve_id(CurveId::new("USD-OIS"))
             // Quote via OAS directly (decimal: 0.005 = 50 bp).
-            .pricing_overrides(PricingOverrides::default().with_quoted_oas(0.005))
+            .instrument_pricing_overrides(
+                InstrumentPricingOverrides::default().with_quoted_oas(0.005),
+            )
             .settlement_convention_opt(Some(BondSettlementConvention {
                 settlement_days: 2,
                 ..Default::default()

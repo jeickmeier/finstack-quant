@@ -1555,7 +1555,9 @@ mod tests {
             soft_call_trigger: None,
             fixed_coupon: Some(fixed_coupon),
             floating_coupon: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
         }
     }
@@ -1906,7 +1908,9 @@ mod tests {
             soft_call_trigger: None,
             fixed_coupon: Some(fixed_coupon),
             floating_coupon: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
         };
 

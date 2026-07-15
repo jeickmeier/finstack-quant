@@ -9,7 +9,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
     AmortizationSpec, LoanCall, LoanCallSchedule, LoanCallType, RateSpec, TermLoan,
 };
-use finstack_quant_valuations::instruments::{Instrument, PricingOverrides};
+use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -37,7 +37,6 @@ fn test_ytw_is_minimum_of_ytm_and_ytc() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -104,7 +103,6 @@ fn test_ytw_callable_amortizing_loan_coupon_on_call_date() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -174,7 +172,6 @@ fn test_ytw_uses_quoted_clean_price_when_present() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -200,7 +197,8 @@ fn test_ytw_uses_quoted_clean_price_when_present() {
         .unwrap();
     let ytw_base = *base.measures.get("ytw").unwrap();
 
-    loan.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(95.0);
+    loan.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
     let quoted = loan
         .price_with_metrics(
             &market,

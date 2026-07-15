@@ -271,11 +271,14 @@ impl Default for TreePricerConfig {
 /// let config = bond_tree_config(&bond)?;
 /// ```
 pub fn bond_tree_config(bond: &Bond) -> finstack_quant_core::Result<TreePricerConfig> {
-    let implied_volatility = bond.pricing_overrides.market_quotes.implied_volatility;
+    let implied_volatility = bond
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility;
     let volatility = implied_volatility.unwrap_or(0.01);
 
     let uses_black_lognormal = matches!(
-        bond.pricing_overrides.model_config.vol_model,
+        bond.instrument_pricing_overrides.model_config.vol_model,
         Some(crate::instruments::common_impl::parameters::VolatilityModel::Black)
     );
 
@@ -293,7 +296,7 @@ pub fn bond_tree_config(bond: &Bond) -> finstack_quant_core::Result<TreePricerCo
                 )));
             };
             let mean_reversion = bond
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .model_config
                 .mean_reversion
                 .unwrap_or(0.0);
@@ -303,7 +306,7 @@ pub fn bond_tree_config(bond: &Bond) -> finstack_quant_core::Result<TreePricerCo
             }
         } else {
             let mean_reversion = bond
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .model_config
                 .mean_reversion
                 .unwrap_or(0.03);
@@ -323,7 +326,7 @@ pub fn bond_tree_config(bond: &Bond) -> finstack_quant_core::Result<TreePricerCo
 
     Ok(TreePricerConfig {
         tree_steps: bond
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .tree_steps
             .unwrap_or(100),
@@ -331,15 +334,24 @@ pub fn bond_tree_config(bond: &Bond) -> finstack_quant_core::Result<TreePricerCo
         tolerance: 1e-6,
         max_iterations: 50,
         initial_bracket_size_bp: Some(1000.0),
-        mean_reversion: bond.pricing_overrides.model_config.mean_reversion,
+        mean_reversion: bond
+            .instrument_pricing_overrides
+            .model_config
+            .mean_reversion,
         tree_model,
         tree_discount_curve_id: bond
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .tree_discount_curve_id
             .clone(),
-        oas_quote_compounding: bond.pricing_overrides.model_config.oas_quote_compounding,
-        oas_price_basis: bond.pricing_overrides.model_config.oas_price_basis,
+        oas_quote_compounding: bond
+            .instrument_pricing_overrides
+            .model_config
+            .oas_quote_compounding,
+        oas_price_basis: bond
+            .instrument_pricing_overrides
+            .model_config
+            .oas_price_basis,
         tree_compounding,
     })
 }
@@ -659,8 +671,10 @@ mod tests {
             }],
             puts: vec![],
         });
-        bond.pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
-        bond.pricing_overrides.market_quotes.implied_volatility = Some(0.20);
+        bond.instrument_pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.20);
 
         let config = bond_tree_config(&bond).expect("explicit vol should produce a config");
 
@@ -691,7 +705,7 @@ mod tests {
             }],
             puts: vec![],
         });
-        bond.pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
+        bond.instrument_pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
 
         let err = bond_tree_config(&bond).expect_err("missing BDT vol must error");
         assert!(err.to_string().contains("implied_volatility"));

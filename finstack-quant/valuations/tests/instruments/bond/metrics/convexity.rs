@@ -4,6 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -26,8 +27,8 @@ fn test_convexity_positive() {
         "USD-OIS",
     )
     .unwrap();
-    bond.pricing_overrides = finstack_quant_valuations::instruments::PricingOverrides::default()
-        .with_quoted_clean_price(100.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
 
     let curve =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")

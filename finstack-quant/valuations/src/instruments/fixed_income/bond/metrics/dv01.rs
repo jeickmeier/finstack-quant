@@ -28,7 +28,12 @@ impl MetricCalculator for BondDv01Calculator {
         let basis = super::bond_risk_basis(context);
 
         if basis != BondRiskBasis::CallableOas {
-            if !bond.pricing_overrides.market_quotes.has_price_driver() && !has_options {
+            if !bond
+                .instrument_pricing_overrides
+                .market_quotes
+                .has_price_driver()
+                && !has_options
+            {
                 return crate::metrics::UnifiedDv01Calculator::<Bond>::new(
                     crate::metrics::Dv01CalculatorConfig::parallel_combined(),
                 )
@@ -59,7 +64,12 @@ impl MetricCalculator for BondDv01Calculator {
             return super::yield_dv01::yield_basis_dv01(bond, context, duration_mod, ytm);
         }
 
-        if !has_options || !bond.pricing_overrides.market_quotes.has_price_driver() {
+        if !has_options
+            || !bond
+                .instrument_pricing_overrides
+                .market_quotes
+                .has_price_driver()
+        {
             return crate::metrics::UnifiedDv01Calculator::<Bond>::new(
                 crate::metrics::Dv01CalculatorConfig::parallel_combined(),
             )

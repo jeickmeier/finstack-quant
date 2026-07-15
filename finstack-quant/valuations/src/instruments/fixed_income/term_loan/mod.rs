@@ -28,7 +28,7 @@
 //! use finstack_quant_valuations::instruments::fixed_income::term_loan::{TermLoan, TermLoanSpec, RateSpec};
 //! use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::AmortizationSpec;
 //! use finstack_quant_cashflows::builder::specs::CouponType;
-//! use finstack_quant_valuations::instruments::pricing_overrides::PricingOverrides;
+//! use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::*;
@@ -57,7 +57,9 @@
 //!     ddtl: None,
 //!     covenants: None,
 //!     credit_curve_id: None,
-//!     pricing_overrides: PricingOverrides::default(),
+//!     instrument_pricing_overrides: InstrumentPricingOverrides::default(),
+//!     metric_pricing_overrides: Default::default(),
+//!     scenario_pricing_overrides: Default::default(),
 //!     oid_eir: None,
 //!     call_schedule: None,
 //!     settlement_days: 2,

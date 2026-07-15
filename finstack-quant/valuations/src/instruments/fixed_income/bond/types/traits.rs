@@ -30,7 +30,7 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         // price. Restricted to configurations where that is exact — vanilla
         // discount-priced bonds — so the shock can never silently no-op:
         // unsupported configurations error with guidance instead.
-        if let Some(shock_bp) = self.pricing_overrides.scenario.scenario_spread_shock_bp {
+        if let Some(shock_bp) = self.scenario_pricing_overrides.scenario_spread_shock_bp {
             if self
                 .call_put
                 .as_ref()
@@ -51,7 +51,7 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
                 )));
             }
             if self
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .market_quotes
                 .has_non_z_price_driver()
             {
@@ -63,7 +63,7 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
                 )));
             }
             let z_eff = self
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .market_quotes
                 .quoted_z_spread
                 .unwrap_or(0.0)
@@ -143,20 +143,24 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
                 }
             }
         }
-        if let Some(curve_id) = &self.pricing_overrides.model_config.tree_discount_curve_id {
+        if let Some(curve_id) = &self
+            .instrument_pricing_overrides
+            .model_config
+            .tree_discount_curve_id
+        {
             deps.add_discount_curve(curve_id.clone());
         }
-        if let Some(curve_id) = &self.pricing_overrides.model_config.asw_forward_curve_id {
+        if let Some(curve_id) = &self
+            .instrument_pricing_overrides
+            .model_config
+            .asw_forward_curve_id
+        {
             deps.add_forward_curve(curve_id.clone());
         }
         Ok(deps)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 
     fn scenario_spread_shock_supported(&self) -> bool {
         // Mirrors the guards in `base_value`: the shock is exact only for
@@ -168,15 +172,9 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
             .is_some_and(super::definitions::CallPutSchedule::has_options)
             && self.credit_curve_id.is_none()
             && !self
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .market_quotes
                 .has_non_z_price_driver()
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
@@ -209,7 +207,10 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         }
 
         {
-            clone.pricing_overrides.model_config.merton_mc_config = None;
+            clone
+                .instrument_pricing_overrides
+                .model_config
+                .merton_mc_config = None;
         }
         Box::new(clone)
     }

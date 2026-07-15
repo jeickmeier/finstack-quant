@@ -7,7 +7,7 @@
 use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::PricingOverrides;
+use crate::instruments::InstrumentPricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
@@ -269,9 +269,7 @@ pub enum PoolType {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct AgencyMbsPassthrough {
@@ -339,7 +337,16 @@ pub struct AgencyMbsPassthrough {
     /// Pricing overrides (including quoted price for OAS).
     #[builder(default)]
     #[serde(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging.
     #[builder(default)]
     #[serde(default)]
@@ -372,7 +379,7 @@ impl AgencyMbsPassthrough {
             .prepayment_model(PrepaymentModelSpec::psa(1.0))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Thirty360)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(
                 Attributes::new()
                     .with_tag("mbs")
@@ -486,17 +493,7 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyMbsPassthroug
         Some(self.issue_date)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 #[cfg(test)]

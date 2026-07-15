@@ -24,7 +24,7 @@ impl MetricCalculator for OasCalculator {
         let loan: &TermLoan = context.instrument_as()?;
 
         let clean_price = loan
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .quoted_clean_price
             .ok_or_else(|| {

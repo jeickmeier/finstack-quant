@@ -46,7 +46,11 @@ impl MetricCalculator for AccruedInterestCalculator {
             // Build full schedule with market context (supports FRNs, amortization, custom schedules)
             let schedule = bond.full_cashflow_schedule(&context.curves)?;
 
-            let accrual_date = if bond.pricing_overrides.market_quotes.has_price_driver() {
+            let accrual_date = if bond
+                .instrument_pricing_overrides
+                .market_quotes
+                .has_price_driver()
+            {
                 settlement_date(bond, context.as_of)?
             } else {
                 context.as_of

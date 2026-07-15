@@ -54,7 +54,11 @@ impl ZSpreadCs01 for TermLoan {
     ) -> finstack_quant_core::Result<Option<f64>> {
         // Loan-market quote convention: `quoted_clean_price` is a percent of
         // the funded outstanding at settlement; the dirty anchor adds accrued.
-        let Some(px) = self.pricing_overrides.market_quotes.quoted_clean_price else {
+        let Some(px) = self
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price
+        else {
             return Ok(None);
         };
         let schedule = crate::instruments::fixed_income::term_loan::cashflows::generate_cashflows(

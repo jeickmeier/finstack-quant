@@ -450,8 +450,8 @@ mod tests {
     #[test]
     fn test_breakeven_via_standard_registry() {
         use crate::instruments::common_impl::traits::Instrument;
+        use crate::instruments::MetricPricingOverrides;
         use crate::instruments::PricingOptions;
-        use crate::instruments::PricingOverrides;
 
         let as_of = date!(2025 - 01 - 15);
         let mut bond = Bond::fixed(
@@ -464,7 +464,7 @@ mod tests {
         )
         .expect("bond");
 
-        bond.pricing_overrides = PricingOverrides::default()
+        bond.metric_pricing_overrides = MetricPricingOverrides::default()
             .with_theta_period("6M")
             .with_breakeven_config(BreakevenConfig {
                 target: BreakevenTarget::ZSpread,
@@ -509,8 +509,8 @@ mod tests {
     #[test]
     fn test_breakeven_horizon_matches_carry_horizon() {
         use crate::instruments::common_impl::traits::Instrument;
+        use crate::instruments::MetricPricingOverrides;
         use crate::instruments::PricingOptions;
-        use crate::instruments::PricingOverrides;
 
         let as_of = date!(2025 - 01 - 15);
 
@@ -525,7 +525,7 @@ mod tests {
         )
         .expect("bond");
 
-        bond_1m.pricing_overrides = PricingOverrides::default()
+        bond_1m.metric_pricing_overrides = MetricPricingOverrides::default()
             .with_theta_period("1M")
             .with_breakeven_config(BreakevenConfig {
                 target: BreakevenTarget::ZSpread,
@@ -554,7 +554,7 @@ mod tests {
         )
         .expect("bond");
 
-        bond_6m.pricing_overrides = PricingOverrides::default()
+        bond_6m.metric_pricing_overrides = MetricPricingOverrides::default()
             .with_theta_period("6M")
             .with_breakeven_config(BreakevenConfig {
                 target: BreakevenTarget::ZSpread,

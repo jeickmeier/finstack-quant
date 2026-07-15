@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::{Instrument, PricingOverrides};
+use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -88,7 +88,8 @@ fn test_quoted_price_accrued_uses_settlement_date() {
         "USD-OIS",
     )
     .unwrap();
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(98.5);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(98.5);
 
     let market = create_curve(as_of);
     let result = bond
@@ -142,7 +143,6 @@ fn test_accrued_frn_uses_forward_rate() {
     use finstack_quant_core::dates::Tenor;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
-    use finstack_quant_valuations::instruments::pricing_overrides::PricingOverrides;
     use finstack_quant_valuations::instruments::Attributes;
     let bond = Bond::builder()
         .id("FRN1".into())
@@ -161,7 +161,6 @@ fn test_accrued_frn_uses_forward_rate() {
         )
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .unwrap();

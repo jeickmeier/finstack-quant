@@ -42,7 +42,11 @@ impl MetricCalculator for DirtyPriceCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = context.instrument_as()?;
 
-        if let Some(clean_px) = bond.pricing_overrides.market_quotes.quoted_clean_price {
+        if let Some(clean_px) = bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price
+        {
             // Market-quote path: accrued at the quote/settlement date, consistent
             // with how YTM, Z-spread, and the quote engine interpret market prices.
             let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
@@ -57,7 +61,7 @@ impl MetricCalculator for DirtyPriceCalculator {
 /// Calculates clean price for bonds (dirty price - accrued interest).
 ///
 /// Clean price is the quoted price excluding accrued interest. It can be:
-/// - Retrieved directly from `bond.pricing_overrides.market_quotes.quoted_clean_price` if set
+/// - Retrieved directly from `bond.instrument_pricing_overrides.market_quotes.quoted_clean_price` if set
 /// - Computed from the base value (model PV) minus accrued interest at `as_of`
 ///
 /// # Dependencies
@@ -88,7 +92,11 @@ impl MetricCalculator for CleanPriceCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = context.instrument_as()?;
 
-        if let Some(clean_px) = bond.pricing_overrides.market_quotes.quoted_clean_price {
+        if let Some(clean_px) = bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price
+        {
             return Ok(clean_px * bond.notional.amount() / 100.0);
         }
 

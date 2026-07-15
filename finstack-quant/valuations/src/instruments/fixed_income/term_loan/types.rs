@@ -53,7 +53,7 @@ use crate::cashflow::builder::specs::CouponType;
 use crate::cashflow::builder::FloatingRateSpec;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::pricing_overrides::PricingOverrides;
+use crate::instruments::pricing_overrides::InstrumentPricingOverrides;
 
 fn default_settlement_days() -> u32 {
     2
@@ -195,9 +195,7 @@ impl RateSpec {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct TermLoan {
@@ -266,7 +264,16 @@ pub struct TermLoan {
     /// Pricing overrides (quoted price, seed, etc.)
     #[builder(default)]
     #[serde(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
 
     /// Optional EIR amortization settings for reporting schedules
     pub oid_eir: Option<OidEirSpec>,
@@ -329,7 +336,7 @@ impl TermLoan {
             .upfront_fee_opt(None)
             .ddtl_opt(None)
             .covenants_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .oid_eir_opt(None)
             .call_schedule_opt(None)
             .attributes(Attributes::new())
@@ -412,7 +419,7 @@ impl TermLoan {
             .upfront_fee_opt(None)
             .ddtl_opt(Some(ddtl))
             .covenants_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .oid_eir_opt(None)
             .call_schedule_opt(None)
             .attributes(Attributes::new())
@@ -485,7 +492,7 @@ impl TermLoan {
             .upfront_fee_opt(None)
             .ddtl_opt(None)
             .covenants_opt(Some(covenants))
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .oid_eir_opt(None)
             .call_schedule_opt(Some(call_schedule))
             .attributes(Attributes::new())
@@ -544,7 +551,7 @@ impl TermLoan {
             .upfront_fee_opt(None)
             .ddtl_opt(None)
             .covenants_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .oid_eir_opt(None)
             .call_schedule_opt(Some(call_schedule))
             .settlement_days(2)
@@ -616,7 +623,9 @@ impl TryFrom<TermLoanSpec> for TermLoan {
             upfront_fee,
             ddtl,
             covenants,
-            pricing_overrides,
+            instrument_pricing_overrides,
+            metric_pricing_overrides,
+            scenario_pricing_overrides,
             oid_eir,
             call_schedule,
             settlement_days,
@@ -728,7 +737,9 @@ impl TryFrom<TermLoanSpec> for TermLoan {
             .upfront_fee_opt(upfront_fee)
             .ddtl_opt(ddtl)
             .covenants_opt(covenants)
-            .pricing_overrides(pricing_overrides)
+            .instrument_pricing_overrides(instrument_pricing_overrides)
+            .metric_pricing_overrides(metric_pricing_overrides)
+            .scenario_pricing_overrides(scenario_pricing_overrides)
             .oid_eir_opt(oid_eir)
             .call_schedule_opt(call_schedule)
             .settlement_days(settlement_days)
@@ -817,17 +828,7 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
         Some(self.issue_date)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl crate::cashflow::traits::CashflowScheduleSource for TermLoan {
@@ -904,7 +905,6 @@ mod tests {
     use super::*;
     use crate::cashflow::builder::specs::CouponType;
     use crate::instruments::fixed_income::term_loan::spec::CommitmentFeeBase;
-    use crate::instruments::pricing_overrides::PricingOverrides;
     use finstack_quant_core::dates::Date;
     use time::Month;
 
@@ -932,7 +932,9 @@ mod tests {
             upfront_fee: None,
             ddtl: None,
             covenants: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             oid_eir: None,
             call_schedule: None,
             settlement_days: 2,
@@ -980,7 +982,9 @@ mod tests {
             upfront_fee: None,
             ddtl: Some(ddtl),
             covenants: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             oid_eir: None,
             call_schedule: None,
             settlement_days: 2,
@@ -1014,7 +1018,9 @@ mod tests {
             upfront_fee: None,
             ddtl: None,
             covenants: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             oid_eir: None,
             call_schedule: None,
             settlement_days: 2,

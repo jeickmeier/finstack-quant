@@ -116,7 +116,7 @@ impl PoolAsset {
             is_defaulted: false,
             recovery_amount: None,
             purchase_price: bond
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .market_quotes
                 .quoted_clean_price
                 .map(|p| Money::new(p * bond.notional.amount() / 100.0, bond.notional.currency())),

@@ -302,7 +302,6 @@ fn test_accrued_interest_amortizing_schedule_driven() {
         .maturity(maturity)
         .cashflow_spec(cashflow_spec)
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(Default::default())
         .build()
         .unwrap();
 

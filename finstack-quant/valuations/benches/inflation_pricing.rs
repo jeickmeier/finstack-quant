@@ -25,8 +25,8 @@ use finstack_quant_valuations::instruments::rates::inflation_swap::{
 };
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::PricingOverrides;
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
@@ -161,7 +161,7 @@ fn inflation_cap_floor(
         .inflation_index_id(CurveId::new("US-CPI-U"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .lag_override_opt(None)
         .attributes(Attributes::new())
         .build()

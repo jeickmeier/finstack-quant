@@ -136,9 +136,13 @@ impl MetricCalculator for EmbeddedOptionValueCalculator {
 
         let oas_decimal = if let Some(oas) = context.computed.get(&MetricId::Oas) {
             *oas
-        } else if let Some(oas) = bond.pricing_overrides.market_quotes.quoted_oas {
+        } else if let Some(oas) = bond.instrument_pricing_overrides.market_quotes.quoted_oas {
             oas
-        } else if let Some(clean_price) = bond.pricing_overrides.market_quotes.quoted_clean_price {
+        } else if let Some(clean_price) = bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price
+        {
             let pricer = TreePricer::with_config(bond_tree_config(bond)?);
             pricer.calculate_oas(bond, market, as_of, clean_price)? / 10_000.0
         } else {
@@ -200,7 +204,7 @@ mod tests {
     use crate::instruments::fixed_income::bond::BondSettlementConvention;
     use crate::instruments::fixed_income::bond::CashflowSpec;
     use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
-    use crate::instruments::PricingOverrides;
+    use crate::instruments::InstrumentPricingOverrides;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -251,7 +255,7 @@ mod tests {
             )
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .call_put_opt(Some(call_put))
             .custom_cashflows_opt(None)
             .attributes(Default::default())
@@ -294,7 +298,7 @@ mod tests {
             )
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .call_put_opt(Some(call_put))
             .custom_cashflows_opt(None)
             .attributes(Default::default())
@@ -328,7 +332,7 @@ mod tests {
             )
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .call_put_opt(None)
             .custom_cashflows_opt(None)
             .attributes(Default::default())

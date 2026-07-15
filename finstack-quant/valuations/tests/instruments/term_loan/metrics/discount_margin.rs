@@ -12,7 +12,7 @@ use finstack_quant_valuations::instruments::fixed_income::term_loan::{
     AmortizationSpec, LoanCall, LoanCallSchedule, RateSpec, TermLoan,
 };
 use finstack_quant_valuations::instruments::pricing_overrides::{
-    MarketQuoteOverrides, PricingOverrides,
+    InstrumentPricingOverrides, MarketQuoteOverrides,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
@@ -23,7 +23,7 @@ use crate::common::test_helpers::flat_discount_curve;
 
 fn build_floating_loan(
     call_schedule: Option<LoanCallSchedule>,
-    overrides: PricingOverrides,
+    overrides: InstrumentPricingOverrides,
 ) -> TermLoan {
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2028 - 01 - 01);
@@ -62,7 +62,7 @@ fn build_floating_loan(
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(overrides)
+        .instrument_pricing_overrides(overrides)
         .call_schedule_opt(call_schedule)
         .attributes(Default::default())
         .build()
@@ -83,7 +83,7 @@ fn build_market() -> MarketContext {
 /// DM should work on non-callable floating-rate loans without a quoted price.
 #[test]
 fn test_dm_non_callable_succeeds() {
-    let loan = build_floating_loan(None, PricingOverrides::default());
+    let loan = build_floating_loan(None, InstrumentPricingOverrides::default());
     let market = build_market();
     let as_of = date!(2025 - 01 - 01);
 
@@ -110,7 +110,7 @@ fn test_dm_callable_without_price_rejects() {
             call_type: Default::default(),
         }],
     };
-    let loan = build_floating_loan(Some(call_schedule), PricingOverrides::default());
+    let loan = build_floating_loan(Some(call_schedule), InstrumentPricingOverrides::default());
     let market = build_market();
     let as_of = date!(2025 - 01 - 01);
 
@@ -151,12 +151,9 @@ fn test_dm_callable_with_quoted_price_succeeds() {
             call_type: Default::default(),
         }],
     };
-    let overrides = PricingOverrides {
-        instrument: finstack_quant_valuations::instruments::InstrumentPricingOverrides {
-            market_quotes: MarketQuoteOverrides {
-                quoted_clean_price: Some(99.0),
-                ..Default::default()
-            },
+    let overrides = InstrumentPricingOverrides {
+        market_quotes: MarketQuoteOverrides {
+            quoted_clean_price: Some(99.0),
             ..Default::default()
         },
         ..Default::default()

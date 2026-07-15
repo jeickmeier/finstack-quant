@@ -18,7 +18,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::exotics::barrier_option::{BarrierOption, BarrierType};
-use finstack_quant_valuations::instruments::{Instrument, OptionType, PricingOverrides};
+use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides, OptionType};
 use finstack_quant_valuations::metrics::MetricId;
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 mod test_utils {
@@ -99,7 +99,9 @@ fn create_barrier_option() -> BarrierOption {
         spot_id: "SPX".into(),
         vol_surface_id: "SPX_VOL".into(),
         div_yield_id: Some("SPX_DIV".into()),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: InstrumentPricingOverrides::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
         monitoring_frequency: None,
     }

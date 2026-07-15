@@ -143,7 +143,9 @@ mod tests {
     use crate::instruments::common_impl::parameters::BondConvention;
     use crate::instruments::common_impl::traits::{Attributes, Instrument};
     use crate::instruments::fixed_income::bond::{Bond, CashflowSpec};
-    use crate::instruments::PricingOverrides;
+    use crate::instruments::{
+        InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
+    };
     use crate::pricer::InstrumentType;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
@@ -164,7 +166,7 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build();
 
@@ -281,9 +283,7 @@ mod tests {
 
     #[test]
     fn test_bond_with_pricing_overrides() {
-        let overrides = PricingOverrides::default()
-            .with_quoted_clean_price(98.5)
-            .with_ytm_bump_decimal(1e-4);
+        let overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(98.5);
 
         let bond = Bond::builder()
             .id("BOND_OVERRIDE".into())
@@ -295,17 +295,20 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(overrides)
+            .instrument_pricing_overrides(overrides)
+            .metric_pricing_overrides(MetricPricingOverrides::default().with_ytm_bump_decimal(1e-4))
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
 
         assert_eq!(
-            bond.pricing_overrides.market_quotes.quoted_clean_price,
+            bond.instrument_pricing_overrides
+                .market_quotes
+                .quoted_clean_price,
             Some(98.5)
         );
         assert_eq!(
-            bond.pricing_overrides.metrics.bump_config.ytm_bump_decimal,
+            bond.metric_pricing_overrides.bump_config.ytm_bump_decimal,
             Some(1e-4)
         );
     }
@@ -324,7 +327,7 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .settlement_convention_opt(Some(BondSettlementConvention {
                 settlement_days: 2,
                 ex_coupon_days: 7,
@@ -356,7 +359,7 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(attrs)
             .build()
             .expect("should succeed");
@@ -380,7 +383,7 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
@@ -405,7 +408,7 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
@@ -446,7 +449,7 @@ mod tests {
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(CashflowSpec::Fixed(spec))
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
@@ -493,7 +496,7 @@ mod tests {
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(CashflowSpec::Fixed(spec_short))
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
@@ -532,7 +535,7 @@ mod tests {
             .maturity(date!(2030 - 02 - 15))
             .cashflow_spec(CashflowSpec::Fixed(spec_long))
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
@@ -563,7 +566,7 @@ mod tests {
                         .expect("finite test coupon"),
                 )
                 .discount_curve_id(CurveId::new(format!("{}-OIS", code)))
-                .pricing_overrides(PricingOverrides::default())
+                .instrument_pricing_overrides(InstrumentPricingOverrides::default())
                 .attributes(Attributes::new())
                 .build()
                 .expect("should succeed");
@@ -669,13 +672,18 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(105.0))
+            .instrument_pricing_overrides(
+                InstrumentPricingOverrides::default().with_quoted_clean_price(105.0),
+            )
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
 
         assert_eq!(
-            premium.pricing_overrides.market_quotes.quoted_clean_price,
+            premium
+                .instrument_pricing_overrides
+                .market_quotes
+                .quoted_clean_price,
             Some(105.0)
         );
 
@@ -690,13 +698,18 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(95.0))
+            .instrument_pricing_overrides(
+                InstrumentPricingOverrides::default().with_quoted_clean_price(95.0),
+            )
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
 
         assert_eq!(
-            discount.pricing_overrides.market_quotes.quoted_clean_price,
+            discount
+                .instrument_pricing_overrides
+                .market_quotes
+                .quoted_clean_price,
             Some(95.0)
         );
 
@@ -711,13 +724,17 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(100.0))
+            .instrument_pricing_overrides(
+                InstrumentPricingOverrides::default().with_quoted_clean_price(100.0),
+            )
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
 
         assert_eq!(
-            par.pricing_overrides.market_quotes.quoted_clean_price,
+            par.instrument_pricing_overrides
+                .market_quotes
+                .quoted_clean_price,
             Some(100.0)
         );
     }
@@ -734,7 +751,7 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should succeed with defaulted issue_date");
@@ -758,7 +775,7 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
@@ -770,7 +787,7 @@ mod tests {
     //
     // Verify that every price-driving field on `MarketQuoteOverrides` drives
     // `Bond::base_value` through the precedence chain defined on the struct.
-    fn build_test_bond(overrides: PricingOverrides) -> Bond {
+    fn build_test_bond(overrides: InstrumentPricingOverrides) -> Bond {
         Bond::builder()
             .id("BOND_QUOTE".into())
             .notional(Money::new(1_000_000.0, Currency::USD))
@@ -781,7 +798,7 @@ mod tests {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(overrides)
+            .instrument_pricing_overrides(overrides)
             .attributes(Attributes::new())
             .build()
             .expect("bond should build")
@@ -801,7 +818,7 @@ mod tests {
 
     #[test]
     fn bond_value_honors_quoted_clean_price_override() {
-        let overrides = PricingOverrides::default().with_quoted_clean_price(98.5);
+        let overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(98.5);
         let bond = build_test_bond(overrides);
         let market = flat_discount_market(0.03);
         let pv = bond.value(&market, date!(2025 - 01 - 01)).expect("value");
@@ -811,7 +828,7 @@ mod tests {
 
     #[test]
     fn bond_value_honors_quoted_dirty_price_override() {
-        let overrides = PricingOverrides::default().with_quoted_dirty_price(987_654.32);
+        let overrides = InstrumentPricingOverrides::default().with_quoted_dirty_price(987_654.32);
         let bond = build_test_bond(overrides);
         let market = flat_discount_market(0.03);
         let pv = bond.value(&market, date!(2025 - 01 - 01)).expect("value");
@@ -822,7 +839,7 @@ mod tests {
     fn bond_value_honors_quoted_ytm_override() {
         // A bond quoted at YTM = its coupon rate on a coupon date trades at par
         // (clean == 100, dirty == notional).
-        let overrides = PricingOverrides::default().with_quoted_ytm(0.05);
+        let overrides = InstrumentPricingOverrides::default().with_quoted_ytm(0.05);
         let bond = build_test_bond(overrides);
         let market = flat_discount_market(0.03);
         let pv = bond.value(&market, date!(2025 - 01 - 01)).expect("value");
@@ -841,12 +858,13 @@ mod tests {
         // A zero Z-spread over the same flat discount curve reproduces the
         // discount-engine PV (within f64 noise).
         let market = flat_discount_market(0.04);
-        let base_pv = build_test_bond(PricingOverrides::default())
+        let base_pv = build_test_bond(InstrumentPricingOverrides::default())
             .value(&market, date!(2025 - 01 - 01))
             .expect("base");
-        let zspread_pv = build_test_bond(PricingOverrides::default().with_quoted_z_spread(0.0))
-            .value(&market, date!(2025 - 01 - 01))
-            .expect("zspread");
+        let zspread_pv =
+            build_test_bond(InstrumentPricingOverrides::default().with_quoted_z_spread(0.0))
+                .value(&market, date!(2025 - 01 - 01))
+                .expect("zspread");
         assert!((base_pv.amount() - zspread_pv.amount()).abs() < 1.0);
     }
 
@@ -855,19 +873,23 @@ mod tests {
         let market = flat_discount_market(0.04);
         let as_of = date!(2025 - 01 - 01);
 
-        let base_pv = build_test_bond(PricingOverrides::default())
+        let base_pv = build_test_bond(InstrumentPricingOverrides::default())
             .value(&market, as_of)
             .expect("base")
             .amount();
-        let shocked_pv = build_test_bond(PricingOverrides::default().with_spread_shock_bp(100.0))
+        let mut shocked_bond = build_test_bond(InstrumentPricingOverrides::default());
+        shocked_bond.scenario_pricing_overrides =
+            ScenarioPricingOverrides::default().with_spread_shock_bp(100.0);
+        let shocked_pv = shocked_bond
             .value(&market, as_of)
             .expect("shocked")
             .amount();
         // The shock must reprice identically to a quoted Z-spread of 100bp.
-        let z_quoted_pv = build_test_bond(PricingOverrides::default().with_quoted_z_spread(0.01))
-            .value(&market, as_of)
-            .expect("z quoted")
-            .amount();
+        let z_quoted_pv =
+            build_test_bond(InstrumentPricingOverrides::default().with_quoted_z_spread(0.01))
+                .value(&market, as_of)
+                .expect("z quoted")
+                .amount();
 
         assert!(
             shocked_pv < base_pv,
@@ -884,18 +906,16 @@ mod tests {
         let market = flat_discount_market(0.04);
         let as_of = date!(2025 - 01 - 01);
 
-        let combined_pv = build_test_bond(
-            PricingOverrides::default()
-                .with_quoted_z_spread(0.0050)
-                .with_spread_shock_bp(50.0),
-        )
-        .value(&market, as_of)
-        .expect("combined")
-        .amount();
-        let equivalent_pv = build_test_bond(PricingOverrides::default().with_quoted_z_spread(0.01))
-            .value(&market, as_of)
-            .expect("equivalent")
-            .amount();
+        let mut combined =
+            build_test_bond(InstrumentPricingOverrides::default().with_quoted_z_spread(0.0050));
+        combined.scenario_pricing_overrides =
+            ScenarioPricingOverrides::default().with_spread_shock_bp(50.0);
+        let combined_pv = combined.value(&market, as_of).expect("combined").amount();
+        let equivalent_pv =
+            build_test_bond(InstrumentPricingOverrides::default().with_quoted_z_spread(0.01))
+                .value(&market, as_of)
+                .expect("equivalent")
+                .amount();
 
         assert!(
             (combined_pv - equivalent_pv).abs() < 1e-6,
@@ -906,11 +926,10 @@ mod tests {
     #[test]
     fn bond_scenario_spread_shock_rejects_price_pinning_quote() {
         let market = flat_discount_market(0.04);
-        let bond = build_test_bond(
-            PricingOverrides::default()
-                .with_quoted_clean_price(98.5)
-                .with_spread_shock_bp(50.0),
-        );
+        let mut bond =
+            build_test_bond(InstrumentPricingOverrides::default().with_quoted_clean_price(98.5));
+        bond.scenario_pricing_overrides =
+            ScenarioPricingOverrides::default().with_spread_shock_bp(50.0);
         let err = bond
             .value(&market, date!(2025 - 01 - 01))
             .expect_err("spread shock with a price-pinning quote must error, not silently no-op");
@@ -920,14 +939,15 @@ mod tests {
 
     #[test]
     fn bond_scenario_spread_shock_supported_reflects_configuration() {
-        assert!(build_test_bond(PricingOverrides::default()).scenario_spread_shock_supported());
+        assert!(build_test_bond(InstrumentPricingOverrides::default())
+            .scenario_spread_shock_supported());
         assert!(
-            build_test_bond(PricingOverrides::default().with_quoted_z_spread(0.01))
+            build_test_bond(InstrumentPricingOverrides::default().with_quoted_z_spread(0.01))
                 .scenario_spread_shock_supported(),
             "z-quoted bonds compose additively and remain supported"
         );
         assert!(
-            !build_test_bond(PricingOverrides::default().with_quoted_ytm(0.05))
+            !build_test_bond(InstrumentPricingOverrides::default().with_quoted_ytm(0.05))
                 .scenario_spread_shock_supported(),
             "price-pinning quotes are unsupported"
         );
@@ -935,7 +955,7 @@ mod tests {
 
     #[test]
     fn market_quote_overrides_reject_mutually_exclusive_price_drivers() {
-        let overrides = PricingOverrides::default()
+        let overrides = InstrumentPricingOverrides::default()
             .with_quoted_clean_price(98.5)
             .with_quoted_ytm(0.05);
         assert!(
@@ -947,15 +967,15 @@ mod tests {
     #[test]
     fn market_quote_overrides_accept_single_price_driver() {
         for overrides in [
-            PricingOverrides::default().with_quoted_clean_price(98.5),
-            PricingOverrides::default().with_quoted_dirty_price(987_654.32),
-            PricingOverrides::default().with_quoted_ytm(0.05),
-            PricingOverrides::default().with_quoted_ytw(0.05),
-            PricingOverrides::default().with_quoted_z_spread(0.0125),
-            PricingOverrides::default().with_quoted_oas(0.0100),
-            PricingOverrides::default().with_quoted_discount_margin(0.008),
-            PricingOverrides::default().with_quoted_i_spread(0.004),
-            PricingOverrides::default().with_quoted_asw_market(0.005),
+            InstrumentPricingOverrides::default().with_quoted_clean_price(98.5),
+            InstrumentPricingOverrides::default().with_quoted_dirty_price(987_654.32),
+            InstrumentPricingOverrides::default().with_quoted_ytm(0.05),
+            InstrumentPricingOverrides::default().with_quoted_ytw(0.05),
+            InstrumentPricingOverrides::default().with_quoted_z_spread(0.0125),
+            InstrumentPricingOverrides::default().with_quoted_oas(0.0100),
+            InstrumentPricingOverrides::default().with_quoted_discount_margin(0.008),
+            InstrumentPricingOverrides::default().with_quoted_i_spread(0.004),
+            InstrumentPricingOverrides::default().with_quoted_asw_market(0.005),
         ] {
             assert!(overrides.validate().is_ok());
         }
@@ -966,12 +986,13 @@ mod tests {
         let market = flat_discount_market(0.04);
         let as_of = date!(2025 - 01 - 01);
 
-        let baseline = build_test_bond(PricingOverrides::default())
+        let baseline = build_test_bond(InstrumentPricingOverrides::default())
             .value(&market, as_of)
             .expect("baseline");
-        let shocked = build_test_bond(PricingOverrides::default().with_price_shock_pct(-0.10))
-            .value(&market, as_of)
-            .expect("shocked");
+        let mut shocked_bond = build_test_bond(InstrumentPricingOverrides::default());
+        shocked_bond.scenario_pricing_overrides =
+            ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+        let shocked = shocked_bond.value(&market, as_of).expect("shocked");
 
         let expected = baseline.amount() * 0.9;
         assert!(
@@ -989,12 +1010,22 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let market = flat_discount_market(0.04);
 
-        for overrides in [
-            PricingOverrides::default(),
-            PricingOverrides::default().with_quoted_clean_price(98.5),
-            PricingOverrides::default().with_price_shock_pct(-0.10),
+        for (overrides, scenario) in [
+            (
+                InstrumentPricingOverrides::default(),
+                ScenarioPricingOverrides::default(),
+            ),
+            (
+                InstrumentPricingOverrides::default().with_quoted_clean_price(98.5),
+                ScenarioPricingOverrides::default(),
+            ),
+            (
+                InstrumentPricingOverrides::default(),
+                ScenarioPricingOverrides::default().with_price_shock_pct(-0.10),
+            ),
         ] {
-            let bond = build_test_bond(overrides.clone());
+            let mut bond = build_test_bond(overrides.clone());
+            bond.scenario_pricing_overrides = scenario;
             let direct = bond.value(&market, as_of).expect("value").amount();
             let via_metrics = bond
                 .price_with_metrics(

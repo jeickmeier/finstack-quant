@@ -147,7 +147,7 @@ fn price_with_granularity(
     granularity: PoolGranularity,
 ) -> StochasticPricingResult {
     let mut sc = sc.clone();
-    sc.pricing_overrides
+    sc.instrument_pricing_overrides
         .model_config
         .structured_credit_pool_granularity = Some(granularity);
     price(&sc, num_paths)

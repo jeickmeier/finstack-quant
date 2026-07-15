@@ -48,7 +48,9 @@ fn build_swaption(as_of: Date) -> BermudanSwaption {
         bermudan_type:
             finstack_quant_valuations::instruments::rates::swaption::BermudanType::CoTerminal,
         calendar_id: None,
-        pricing_overrides: Default::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     }
 }

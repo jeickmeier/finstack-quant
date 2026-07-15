@@ -198,12 +198,15 @@ impl MetricCalculator for DiscountMarginCalculator {
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
 
         // Determine dirty market price in currency at quote_date
-        let dirty_ccy =
-            if let Some(clean_px) = bond.pricing_overrides.market_quotes.quoted_clean_price {
-                quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount())
-            } else {
-                context.base_value.amount()
-            };
+        let dirty_ccy = if let Some(clean_px) = bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price
+        {
+            quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount())
+        } else {
+            context.base_value.amount()
+        };
 
         // DM is only defined for floating-rate bonds. For fixed-rate bonds, return an error.
         // Callers should use YTM, Z-spread, or asset-swap spreads for fixed-rate instruments.

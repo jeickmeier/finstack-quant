@@ -257,14 +257,17 @@ impl MetricCalculator for ZSpreadCalculator {
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
 
         // Determine dirty market value in currency at quote_date
-        let target_value_ccy: f64 =
-            if let Some(clean_px) = bond.pricing_overrides.market_quotes.quoted_clean_price {
-                // Use accrued at quote_date for dirty price calculation
-                quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount())
-            } else {
-                // Fallback to base PV if no market quote
-                context.base_value.amount()
-            };
+        let target_value_ccy: f64 = if let Some(clean_px) = bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price
+        {
+            // Use accrued at quote_date for dirty price calculation
+            quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount())
+        } else {
+            // Fallback to base PV if no market quote
+            context.base_value.amount()
+        };
 
         // OPTIMIZATION: Pre-calculate cashflow times and base discount factors
         // to avoid repeated date logic and curve lookups inside the solver loop.

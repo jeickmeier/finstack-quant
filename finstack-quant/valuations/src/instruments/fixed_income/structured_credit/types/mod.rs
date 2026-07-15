@@ -341,7 +341,16 @@ pub struct StructuredCredit {
     /// Attributes for scenario selection.
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
 
     /// Attributes for scenario selection.
     pub attributes: Attributes,
@@ -534,7 +543,7 @@ impl StructuredCredit {
         as_of: Date,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
         let num_paths = self
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .mc_paths
             .unwrap_or(10_000);
@@ -556,14 +565,14 @@ impl StructuredCredit {
         pricing_mode: PricingMode,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
         let mut tree_config = self.build_scenario_tree_config(as_of)?;
-        if let Some(tree_steps) = self.pricing_overrides.model_config.tree_steps {
+        if let Some(tree_steps) = self.instrument_pricing_overrides.model_config.tree_steps {
             tree_config.num_periods = tree_steps.max(1);
         }
         let discount_curve = context.get_discount(self.discount_curve_id.as_str())?;
         let mut config = StochasticPricerConfig::new(as_of, discount_curve, tree_config)
             .with_pricing_mode(pricing_mode);
         if let Some(granularity) = self
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .structured_credit_pool_granularity
         {
@@ -998,17 +1007,7 @@ impl Instrument for StructuredCredit {
         }
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl StructuredCredit {

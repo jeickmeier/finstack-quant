@@ -3,7 +3,7 @@
 use super::bond_valuator::BondValuator;
 use super::tree_pricer::TreePricer;
 use crate::instruments::fixed_income::bond::types::{Bond, CallPut, CallPutSchedule};
-use crate::instruments::PricingOverrides;
+use crate::instruments::InstrumentPricingOverrides;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::interp::InterpStyle;
@@ -34,7 +34,9 @@ fn create_test_bond() -> Bond {
         )
         .discount_curve_id("USD-OIS".into())
         .credit_curve_id_opt(None)
-        .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(98.5))
+        .instrument_pricing_overrides(
+            InstrumentPricingOverrides::default().with_quoted_clean_price(98.5),
+        )
         .call_put_opt(None)
         .custom_cashflows_opt(None)
         .attributes(Default::default())

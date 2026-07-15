@@ -6,7 +6,7 @@ use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 #[allow(unused_imports)]
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -23,7 +23,8 @@ fn test_ytw_equals_ytm_for_non_callable_bond_from_price() {
     )
     .unwrap();
     // Market-quoted clean price (percent of par)
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(99.5);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(99.5);
 
     let curve =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
@@ -82,7 +83,8 @@ fn test_ytw_tracks_quoted_price_not_model_pv() {
     assert!(pv.is_finite());
 
     // Two different quoted clean prices with the same curves
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(95.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
     let result_low = bond
         .price_with_metrics(
             &market,
@@ -93,7 +95,8 @@ fn test_ytw_tracks_quoted_price_not_model_pv() {
         .unwrap();
     let ytw_low = *result_low.measures.get("ytw").unwrap();
 
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(105.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(105.0);
     let result_high = bond
         .price_with_metrics(
             &market,
@@ -147,7 +150,8 @@ fn test_ytw_off_cycle_call_uses_dirty_street_redemption() {
         }],
         puts: vec![],
     });
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(105.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(105.0);
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -221,7 +225,7 @@ fn test_ytw_floating_bond_matches_ytm_from_price() {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
     use finstack_quant_valuations::metrics::MetricId;
 
     let as_of = date!(2025 - 01 - 01);
@@ -258,7 +262,8 @@ fn test_ytw_floating_bond_matches_ytm_from_price() {
     // Use model PV to back out a clean price quote consistent with the curves.
     let pv = bond.value(&market, as_of).unwrap().amount();
     let clean_px = pv / notional.amount() * 100.0;
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_px);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
 
     let result = bond
         .price_with_metrics(
@@ -307,7 +312,7 @@ fn test_ytw_amortizing_bond_matches_ytm_from_price() {
         AmortizationSpec, CashflowSpec,
     };
     use finstack_quant_valuations::instruments::Attributes;
-    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
     use finstack_quant_valuations::metrics::MetricId;
 
     let as_of = date!(2025 - 01 - 01);
@@ -340,14 +345,14 @@ fn test_ytw_amortizing_bond_matches_ytm_from_price() {
         .maturity(maturity)
         .cashflow_spec(cashflow_spec)
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("amortizing bond construction should succeed in test");
 
     let pv = bond.value(&market, as_of).unwrap().amount();
     let clean_px = pv / notional.amount() * 100.0;
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_px);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
 
     let result = bond
         .price_with_metrics(
@@ -384,7 +389,7 @@ fn test_ytw_characterization_example_callable() {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::Instrument;
-    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
     use finstack_quant_valuations::metrics::MetricId;
     use time::macros::date;
 
@@ -392,7 +397,8 @@ fn test_ytw_characterization_example_callable() {
 
     let mut bond = Bond::example_callable().expect("example_callable should build");
     // Set a clean price quote at 102% of par (premium, triggers call analysis)
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(102.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(102.0);
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)

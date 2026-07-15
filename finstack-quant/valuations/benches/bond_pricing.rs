@@ -19,7 +19,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::tree::TreePricer;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 use std::hint::black_box;
 use time::Month;
@@ -91,7 +91,8 @@ fn bench_bond_ytm(c: &mut Criterion) {
     for tenor in [2, 5, 10, 30].iter() {
         let mut bond = create_test_bond(*tenor);
         // Set quoted price to require YTM solving
-        bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(95.0);
+        bond.instrument_pricing_overrides =
+            InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
 
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
@@ -168,7 +169,8 @@ fn bench_bond_yield_dv01(c: &mut Criterion) {
 
     for tenor in [2, 5, 10, 30].iter() {
         let mut bond = create_test_bond(*tenor);
-        bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(99.25);
+        bond.instrument_pricing_overrides =
+            InstrumentPricingOverrides::default().with_quoted_clean_price(99.25);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             tenor,
@@ -224,7 +226,8 @@ fn create_callable_bond(maturity_years: i32) -> Bond {
         }
     }
 
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(99.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
     bond
 }
 
@@ -243,7 +246,8 @@ fn create_floating_note(maturity_years: i32) -> Bond {
         "USD-OIS",
     )
     .expect("Bond::floating should succeed with valid parameters");
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.25);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.25);
     bond
 }
 
@@ -284,7 +288,7 @@ fn bench_tree_oas_solver(c: &mut Criterion) {
     for tenor in [5, 10, 30] {
         let bond = create_callable_bond(tenor);
         let clean = bond
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .quoted_clean_price
             .unwrap_or(99.0);
@@ -327,7 +331,7 @@ fn bench_tree_step_scaling(c: &mut Criterion) {
     // Use a 10Y callable bond for consistent comparison
     let bond = create_callable_bond(10);
     let clean = bond
-        .pricing_overrides
+        .instrument_pricing_overrides
         .market_quotes
         .quoted_clean_price
         .unwrap_or(99.0);
@@ -378,7 +382,8 @@ fn bench_spread_metrics(c: &mut Criterion) {
 
     let base_fixed = {
         let mut bond = create_test_bond(10);
-        bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(99.25);
+        bond.instrument_pricing_overrides =
+            InstrumentPricingOverrides::default().with_quoted_clean_price(99.25);
         bond
     };
 

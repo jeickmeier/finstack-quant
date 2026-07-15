@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -25,7 +25,8 @@ fn test_ytm_par_bond() {
         "USD-OIS",
     )
     .unwrap();
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
 
     let curve =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
@@ -66,7 +67,7 @@ fn test_ytm_floating_bond_is_finite_from_price() {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
     use finstack_quant_valuations::metrics::MetricId;
 
     let as_of = date!(2025 - 01 - 01);
@@ -105,7 +106,8 @@ fn test_ytm_floating_bond_is_finite_from_price() {
     // coupon date so that accrued is approximately zero).
     let pv = bond.value(&market, as_of).unwrap().amount();
     let clean_px = pv / notional.amount() * 100.0;
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_px);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
 
     let result = bond
         .price_with_metrics(
@@ -139,7 +141,7 @@ fn test_ytm_amortizing_bond_is_finite_from_price() {
         AmortizationSpec, CashflowSpec,
     };
     use finstack_quant_valuations::instruments::Attributes;
-    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
     use finstack_quant_valuations::metrics::MetricId;
 
     let as_of = date!(2025 - 01 - 01);
@@ -174,7 +176,6 @@ fn test_ytm_amortizing_bond_is_finite_from_price() {
         .maturity(maturity)
         .cashflow_spec(cashflow_spec)
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("amortizing bond construction should succeed in test");
@@ -182,7 +183,8 @@ fn test_ytm_amortizing_bond_is_finite_from_price() {
     // Infer a clean price from the model PV at as_of.
     let pv = bond.value(&market, as_of).unwrap().amount();
     let clean_px = pv / notional.amount() * 100.0;
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_px);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
 
     let result = bond
         .price_with_metrics(

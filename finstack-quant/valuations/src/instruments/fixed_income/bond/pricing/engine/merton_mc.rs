@@ -1582,7 +1582,7 @@ impl Pricer for SimpleBondMertonMcPricer {
             .curve_id(bond.discount_curve_id.as_str());
 
         let mc_override = bond
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .merton_mc_config
             .as_ref()
@@ -1726,7 +1726,7 @@ impl Pricer for SimpleBondMertonMcPricer {
             .curve_id(bond.discount_curve_id.as_str());
 
         let mc_override = bond
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .merton_mc_config
             .as_ref()
@@ -2513,15 +2513,15 @@ mod tests {
     fn merton_mc_config_roundtrips_via_pricing_overrides_json() {
         // Ensures the notebook path (instrument JSON with a flat
         // pricing_overrides.merton_mc_config key) can deserialize and be accepted.
-        use crate::instruments::PricingOverrides;
+        use crate::instruments::InstrumentPricingOverrides;
         let cfg = MertonMcConfig::new(test_merton())
             .num_paths(64)
             .seed(7)
             .pik_schedule(PikSchedule::Uniform(PikMode::Cash));
-        let mut ov = PricingOverrides::default();
+        let mut ov = InstrumentPricingOverrides::default();
         ov = ov.with_merton_mc(cfg);
         let json = serde_json::to_string(&ov).expect("ser");
-        let back: PricingOverrides = serde_json::from_str(&json).expect("de");
+        let back: InstrumentPricingOverrides = serde_json::from_str(&json).expect("de");
         assert!(back.model_config.merton_mc_config.is_some());
         // The inner config should roundtrip key fields
         let restored = &back
@@ -2553,7 +2553,7 @@ mod tests {
                 "barrier_crossing": "BrownianBridge"
             }
         });
-        let from_notebook: PricingOverrides =
+        let from_notebook: InstrumentPricingOverrides =
             serde_json::from_value(notebook_shape).expect("notebook merton_mc_config shape");
         let restored = &from_notebook
             .model_config

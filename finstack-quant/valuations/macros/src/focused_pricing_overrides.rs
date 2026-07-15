@@ -62,6 +62,7 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let metric_ident = required_field(metric_ident, METRIC_FIELD, &struct_name)?;
     let scenario_ident = required_field(scenario_ident, SCENARIO_FIELD, &struct_name)?;
     let try_from = parse_try_from(&input.attrs)?;
+    let skip_deserialize = has_pricing_flag(&input.attrs, "skip_deserialize");
     let deny_unknown_fields = has_serde_flag(&input.attrs, "deny_unknown_fields");
     let serde_container = deny_unknown_fields.then(|| quote!(#[serde(deny_unknown_fields)]));
 
@@ -117,6 +118,36 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         }
     };
 
+    let deserialize_impl = (!skip_deserialize).then(|| {
+        quote! {
+            impl<'de> serde::Deserialize<'de> for #struct_name {
+                fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+                where
+                    D: serde::Deserializer<'de>,
+                {
+                    #[derive(serde::Deserialize)]
+                    #[allow(dead_code)]
+                    #serde_container
+                    struct Shadow {
+                        #(
+                            #(#ordinary_serde_attrs)*
+                            #ordinary_idents: #ordinary_types,
+                        )*
+                        #[serde(
+                            default,
+                            deserialize_with =
+                                "crate::instruments::common_impl::parameters::deserialize_null_default"
+                        )]
+                        pricing_overrides:
+                            crate::instruments::pricing_overrides::PricingOverridesWire,
+                    }
+
+                    let shadow = <Shadow as serde::Deserialize>::deserialize(deserializer)?;
+                    #deserialize_target
+                }
+            }
+        }
+    });
     let schema_shadow = format_ident!("__{}FocusedPricingOverridesSchema", struct_name);
     Ok(quote! {
         impl serde::Serialize for #struct_name {
@@ -125,6 +156,7 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                 S: serde::Serializer,
             {
                 #[derive(serde::Serialize)]
+                #[allow(dead_code)]
                 #serde_container
                 struct Shadow<'a> {
                     #(
@@ -148,31 +180,7 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             }
         }
 
-        impl<'de> serde::Deserialize<'de> for #struct_name {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                #[derive(serde::Deserialize)]
-                #serde_container
-                struct Shadow {
-                    #(
-                        #(#ordinary_serde_attrs)*
-                        #ordinary_idents: #ordinary_types,
-                    )*
-                    #[serde(
-                        default,
-                        deserialize_with =
-                            "crate::instruments::common_impl::parameters::deserialize_null_default"
-                    )]
-                    pricing_overrides:
-                        crate::instruments::pricing_overrides::PricingOverridesWire,
-                }
-
-                let shadow = <Shadow as serde::Deserialize>::deserialize(deserializer)?;
-                #deserialize_target
-            }
-        }
+        #deserialize_impl
 
         impl schemars::JsonSchema for #struct_name {
             fn schema_name() -> std::borrow::Cow<'static, str> {
@@ -183,6 +191,7 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                 generator: &mut schemars::SchemaGenerator,
             ) -> schemars::Schema {
                 #[derive(schemars::JsonSchema)]
+                #[allow(dead_code)]
                 #serde_container
                 struct #schema_shadow {
                     #(
@@ -224,6 +233,8 @@ fn parse_try_from(attrs: &[syn::Attribute]) -> syn::Result<Option<Path>> {
                 let value: LitStr = meta.value()?.parse()?;
                 result = Some(value.parse()?);
                 Ok(())
+            } else if meta.path.is_ident("skip_deserialize") {
+                Ok(())
             } else {
                 Err(meta.error("unsupported pricing_overrides option"))
             }
@@ -239,6 +250,13 @@ fn parse_try_from(attrs: &[syn::Attribute]) -> syn::Result<Option<Path>> {
         })?;
     }
     Ok(result)
+}
+
+fn has_pricing_flag(attrs: &[syn::Attribute], flag: &str) -> bool {
+    attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("pricing_overrides"))
+        .any(|attr| attr.meta.to_token_stream().to_string().contains(flag))
 }
 
 fn has_serde_flag(attrs: &[syn::Attribute], flag: &str) -> bool {

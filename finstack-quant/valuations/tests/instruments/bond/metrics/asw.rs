@@ -13,7 +13,7 @@ use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
 use finstack_quant_valuations::instruments::fixed_income::bond::{
     AssetSwapMarketCalculator, AssetSwapParCalculator,
 };
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::{
     standard_registry, MetricCalculator, MetricContext, MetricId,
 };
@@ -54,8 +54,8 @@ fn test_asw_market_requires_accrued_when_clean_price_present() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = simple_fixed_bond(as_of);
     // Attach a clean price so the market ASW calculator will require Accrued.
-    bond.pricing_overrides = finstack_quant_valuations::instruments::PricingOverrides::default()
-        .with_quoted_clean_price(101.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(101.0);
 
     // Market with a simple discount curve
     let disc = simple_discount_curve("USD-OIS", as_of);
@@ -219,10 +219,12 @@ fn test_asw_par_tracks_coupon_minus_par_rate() {
 fn test_asw_market_tightens_when_price_rises() {
     let as_of = date!(2025 - 01 - 01);
     let mut rich_bond = simple_fixed_bond(as_of);
-    rich_bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(101.0);
+    rich_bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(101.0);
 
     let mut cheap_bond = simple_fixed_bond(as_of);
-    cheap_bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(99.0);
+    cheap_bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
 
     let disc = simple_discount_curve("USD-OIS", as_of);
     let market = MarketContext::new().insert(disc);
@@ -315,7 +317,8 @@ fn test_asw_market_metric_rejects_matured_schedule() {
         "USD-OIS",
     )
     .expect("bond");
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
 
     let disc = simple_discount_curve("USD-OIS", issue);
     let market = MarketContext::new().insert(disc);

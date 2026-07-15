@@ -295,7 +295,6 @@ fn test_bond_settlement_date_impact() {
         )
         .discount_curve_id("USD-OIS".into())
         .settlement_convention_opt(None)
-        .pricing_overrides(finstack_quant_valuations::instruments::PricingOverrides::default())
         .build()
         .unwrap();
 
@@ -320,7 +319,6 @@ fn test_bond_settlement_date_impact() {
                 ..Default::default()
             },
         ))
-        .pricing_overrides(finstack_quant_valuations::instruments::PricingOverrides::default())
         .build()
         .unwrap();
 
@@ -521,7 +519,6 @@ fn test_bond_different_day_counts() {
                     .expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(finstack_quant_valuations::instruments::PricingOverrides::default())
             .build()
             .unwrap();
 

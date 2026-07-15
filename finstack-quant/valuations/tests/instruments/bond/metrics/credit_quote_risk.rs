@@ -13,7 +13,9 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::{Instrument, PricingOptions, PricingOverrides};
+use finstack_quant_valuations::instruments::{
+    Instrument, InstrumentPricingOverrides, PricingOptions,
+};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -76,7 +78,8 @@ fn test_quoted_credit_bond_cs01_nonzero_and_matches_unquoted() {
 
     // Quoted at the model clean price → calibrated hazard shift ≈ 0 → risk ≈ unquoted.
     let mut quoted = build_credit_bond(as_of);
-    quoted.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(model_clean_pct);
+    quoted.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(model_clean_pct);
     let result = quoted
         .price_with_metrics(
             &market,
@@ -126,7 +129,8 @@ fn test_quoted_credit_bond_offmodel_recalibrates_hazard() {
 
     let cs01_at = |clean_pct: f64| -> f64 {
         let mut q = build_credit_bond(as_of);
-        q.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_pct);
+        q.instrument_pricing_overrides =
+            InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
         let r = q
             .price_with_metrics(&market, as_of, &[MetricId::Cs01], PricingOptions::default())
             .unwrap();

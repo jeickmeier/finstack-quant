@@ -26,7 +26,7 @@ use finstack_quant_valuations::instruments::rates::cms_option::CmsOption;
 use finstack_quant_valuations::instruments::rates::cms_swap::{CmsSwap, FundingLegSpec};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{IRSConvention, PayReceive};
-use finstack_quant_valuations::instruments::{OptionType, PricingOverrides};
+use finstack_quant_valuations::instruments::{InstrumentPricingOverrides, OptionType};
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
@@ -119,7 +119,9 @@ fn make_cms_option(as_of: Date, n_periods: usize, cms_tenor: f64) -> CmsOption {
         discount_curve_id: CurveId::new("USD-OIS"),
         forward_curve_id: CurveId::new("USD-LIBOR-3M"),
         vol_surface_id: CurveId::new("USD-CMS10Y-VOL"),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: InstrumentPricingOverrides::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     }
 }

@@ -14,7 +14,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     StochasticPrepaySpec, StochasticPricingResult, StructuredCredit, Tranche, TrancheCoupon,
     TrancheSeniority, TrancheStructure,
 };
-use finstack_quant_valuations::instruments::{InstrumentJson, PricingOverrides};
+use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::price_instrument_json;
 use finstack_quant_valuations::results::{ValuationDetails, ValuationResult};
@@ -124,8 +124,8 @@ fn structured_credit(floating_senior: bool) -> StructuredCredit {
     sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::deterministic(
         sc.credit_model.default_spec.clone(),
     ));
-    sc.pricing_overrides = PricingOverrides::default();
-    sc.pricing_overrides.model_config.mc_paths = Some(1);
+    sc.instrument_pricing_overrides = InstrumentPricingOverrides::default();
+    sc.instrument_pricing_overrides.model_config.mc_paths = Some(1);
     sc
 }
 
@@ -269,7 +269,7 @@ fn junior_expected_loss_comes_from_writedowns() {
 #[test]
 fn oversized_explicit_tree_errors_before_pricing() {
     let mut sc = structured_credit(false);
-    sc.pricing_overrides.model_config.tree_steps = Some(24);
+    sc.instrument_pricing_overrides.model_config.tree_steps = Some(24);
     let market = fixed_market();
 
     let err = sc

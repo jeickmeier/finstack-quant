@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
-use crate::instruments::PricingOverrides;
+use crate::instruments::InstrumentPricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -157,7 +157,7 @@ fn test_bond_serde_rejects_missing_issue_date_even_with_clean_price() {
     obj.remove("issue_date");
     obj.insert(
         "pricing_overrides".to_string(),
-        serde_json::to_value(PricingOverrides::default().with_quoted_clean_price(99.0))
+        serde_json::to_value(InstrumentPricingOverrides::default().with_quoted_clean_price(99.0))
             .expect("serialize pricing overrides"),
     );
     let err = serde_json::from_value::<Bond>(value).expect_err("expected error");
@@ -310,7 +310,7 @@ fn bond_price_merton_mc_rejects_amortizing() {
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::amortizing(base, amort))
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .pricing_overrides(crate::instruments::PricingOverrides::default())
+        .instrument_pricing_overrides(crate::instruments::InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("bond builds");
@@ -343,7 +343,7 @@ fn pricing_cashflows_discount_only() {
                 .expect("finite test coupon"),
         )
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .pricing_overrides(crate::instruments::PricingOverrides::default())
+        .instrument_pricing_overrides(crate::instruments::InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("Bond builder should succeed");
@@ -393,7 +393,7 @@ fn pricing_cashflows_with_hazard_curve() {
         )
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
-        .pricing_overrides(crate::instruments::PricingOverrides::default())
+        .instrument_pricing_overrides(crate::instruments::InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("Bond builder should succeed");
@@ -478,7 +478,7 @@ fn build_step_up_bond_schedule(
             .expect("finite test rate"),
         )
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(crate::instruments::PricingOverrides::default())
+        .instrument_pricing_overrides(crate::instruments::InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("Bond builder should succeed for step-up test");
@@ -520,7 +520,7 @@ fn step_up_no_steps_equals_fixed_rate() {
                 .expect("finite test coupon"),
         )
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(crate::instruments::PricingOverrides::default())
+        .instrument_pricing_overrides(crate::instruments::InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("Bond builder should succeed for fixed test");
@@ -695,7 +695,7 @@ fn step_up_serde_roundtrip() {
         .maturity(maturity)
         .cashflow_spec(spec)
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(crate::instruments::PricingOverrides::default())
+        .instrument_pricing_overrides(crate::instruments::InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("Bond builder should succeed");

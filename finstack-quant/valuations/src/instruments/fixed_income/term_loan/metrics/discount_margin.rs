@@ -91,7 +91,7 @@ impl MetricCalculator for DiscountMarginCalculator {
         // the DM would trivially be zero (model PV == target PV) and is not meaningful.
         if loan.call_schedule.is_some()
             && loan
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .market_quotes
                 .quoted_clean_price
                 .is_none()
@@ -103,7 +103,10 @@ impl MetricCalculator for DiscountMarginCalculator {
 
         // Target price: quoted clean price converted to a dirty settlement
         // amount (% of outstanding at settlement + accrued) if set, else base PV
-        let quoted_px = loan.pricing_overrides.market_quotes.quoted_clean_price;
+        let quoted_px = loan
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price;
         let target = if let Some(px) = quoted_px {
             let as_of = context.as_of;
             let schedule = super::irr_helpers::cached_full_schedule(context)?;

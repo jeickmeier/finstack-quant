@@ -19,7 +19,6 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
-use finstack_quant_valuations::instruments::PricingOverrides;
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -120,7 +119,6 @@ fn test_quarterly_coupon_frequency() {
                 .expect("finite test coupon"),
         )
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .build()
         .unwrap();
 
@@ -152,7 +150,6 @@ fn test_floating_rate_cashflows() {
             .expect("finite test rate"),
         )
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .pricing_overrides(PricingOverrides::default())
         .build()
         .unwrap();
 
@@ -185,7 +182,6 @@ fn test_amortizing_bond_linear() {
             },
         ))
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .build()
         .unwrap();
 
@@ -355,7 +351,6 @@ fn test_cashflows_with_short_front_stub() {
             },
         }))
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .build()
         .unwrap();
 
@@ -476,7 +471,6 @@ fn test_cashflow_schedule_floating() {
             .expect("finite test rate"),
         )
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .pricing_overrides(PricingOverrides::default())
         .build()
         .unwrap();
 
@@ -508,7 +502,6 @@ fn test_cashflows_day_count_conventions() {
                 CashflowSpec::fixed(0.05, Tenor::semi_annual(), dc).expect("finite test coupon"),
             )
             .discount_curve_id("USD-OIS".into())
-            .pricing_overrides(PricingOverrides::default())
             .build()
             .unwrap();
 
@@ -538,7 +531,6 @@ fn test_amortizing_full_redemption() {
             },
         ))
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .build()
         .unwrap();
 
@@ -580,7 +572,6 @@ fn test_actact_isma_daycount_context() {
             },
         }))
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .build()
         .unwrap();
 
@@ -669,7 +660,6 @@ fn test_bus252_daycount_with_calendar() {
             },
         }))
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .build()
         .unwrap();
 

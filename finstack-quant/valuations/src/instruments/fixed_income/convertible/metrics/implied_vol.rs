@@ -6,7 +6,7 @@
 //!
 //! # Dependencies
 //!
-//! Requires `quoted_clean_price` in `bond.pricing_overrides.market_quotes`.
+//! Requires `quoted_clean_price` in `bond.instrument_pricing_overrides.market_quotes`.
 //!
 //! # Units
 //!
@@ -35,7 +35,7 @@ impl MetricCalculator for ImpliedVolCalculator {
         }
 
         let quoted_clean = bond
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .quoted_clean_price
             .ok_or_else(|| {
@@ -136,7 +136,7 @@ mod tests {
     use crate::instruments::fixed_income::convertible::{
         AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
     };
-    use crate::instruments::PricingOverrides;
+    use crate::instruments::InstrumentPricingOverrides;
     use crate::metrics::{MetricCalculator, MetricContext};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -172,7 +172,7 @@ mod tests {
             },
         };
 
-        let mut overrides = PricingOverrides::default();
+        let mut overrides = InstrumentPricingOverrides::default();
         overrides.market_quotes.quoted_clean_price = Some(quoted_clean_pct);
 
         ConvertibleBond {
@@ -197,7 +197,9 @@ mod tests {
             soft_call_trigger: None,
             fixed_coupon: Some(fixed_coupon),
             floating_coupon: None,
-            pricing_overrides: overrides,
+            instrument_pricing_overrides: overrides,
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
         }
     }

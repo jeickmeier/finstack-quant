@@ -4,7 +4,7 @@ use super::*;
 use crate::cashflow::builder::{CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams};
 use crate::cashflow::traits::CashflowProvider;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
-use crate::instruments::PricingOverrides;
+use crate::instruments::InstrumentPricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -60,7 +60,9 @@ fn test_bond_with_custom_cashflows() {
     assert_eq!(bond.id.as_str(), "CUSTOM_STEPUP_BOND");
     assert_eq!(bond.discount_curve_id.as_str(), "USD-OIS");
     assert_eq!(
-        bond.pricing_overrides.market_quotes.quoted_clean_price,
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price,
         Some(98.5)
     );
     assert_eq!(bond.issue_date, issue);
@@ -135,7 +137,9 @@ fn test_bond_builder_with_custom_cashflows() {
         .cashflow_spec(CashflowSpec::default())
         .custom_cashflows_opt(Some(custom_schedule))
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(99.0))
+        .instrument_pricing_overrides(
+            InstrumentPricingOverrides::default().with_quoted_clean_price(99.0),
+        )
         .attributes(Attributes::new())
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
@@ -143,7 +147,9 @@ fn test_bond_builder_with_custom_cashflows() {
     assert_eq!(bond.id.as_str(), "PIK_TOGGLE_BOND");
     assert_eq!(bond.discount_curve_id.as_str(), "USD-OIS");
     assert_eq!(
-        bond.pricing_overrides.market_quotes.quoted_clean_price,
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price,
         Some(99.0)
     );
     assert!(bond.custom_cashflows.is_some());
@@ -167,7 +173,7 @@ fn test_bond_with_cashflows_method() {
         )
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .call_put_opt(None)
         .custom_cashflows_opt(None)
         .attributes(Attributes::new())
@@ -220,7 +226,7 @@ fn test_custom_cashflows_override_regular_generation() {
         )
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .call_put_opt(None)
         .custom_cashflows_opt(None)
         .attributes(Attributes::new())
@@ -443,7 +449,7 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
         .maturity(maturity)
         .cashflow_spec(cashflow_spec)
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("Amortizing bond construction should succeed in test");
@@ -606,7 +612,7 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
         .maturity(maturity)
         .cashflow_spec(cashflow_spec)
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
@@ -711,7 +717,7 @@ fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
         .maturity(maturity)
         .cashflow_spec(bullet_cashflow_spec)
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("Bullet bond construction should succeed in test");
@@ -741,7 +747,7 @@ fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
         .maturity(maturity)
         .cashflow_spec(amort_spec)
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("Amortizing bond construction should succeed in test");

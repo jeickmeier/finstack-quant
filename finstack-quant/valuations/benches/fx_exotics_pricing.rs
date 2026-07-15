@@ -32,7 +32,7 @@ use finstack_quant_valuations::instruments::fx::fx_touch_option::{
 use finstack_quant_valuations::instruments::fx::fx_variance_swap::FxVarianceSwap;
 use finstack_quant_valuations::instruments::fx::quanto_option::QuantoOption;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::{Attributes, OptionType, PricingOverrides};
+use finstack_quant_valuations::instruments::{Attributes, InstrumentPricingOverrides, OptionType};
 use std::hint::black_box;
 use std::sync::Arc;
 use time::Month;
@@ -201,7 +201,7 @@ fn make_barrier(as_of: Date, tenor_years: i32, barrier_type: BarrierType) -> FxB
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
         .vol_surface_id(CurveId::new("EURUSD-VOL"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .unwrap()
@@ -225,7 +225,7 @@ fn make_touch(as_of: Date, tenor_years: i32, touch_type: TouchType) -> FxTouchOp
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .vol_surface_id(CurveId::new("EURUSD-VOL"))
         .observed_touch_opt(None)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .unwrap()
@@ -247,7 +247,7 @@ fn make_digital(as_of: Date, tenor_years: i32, payout_type: DigitalPayoutType) -
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .vol_surface_id(CurveId::new("EURUSD-VOL"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .unwrap()
@@ -303,7 +303,7 @@ fn make_quanto(as_of: Date, tenor_years: i32) -> QuantoOption {
         .div_yield_id_opt(Some(CurveId::new("NKY-DIV")))
         .fx_rate_id_opt(Some("JPYUSD-SPOT".to_string()))
         .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .unwrap()

@@ -37,7 +37,6 @@ fn test_dv01_positive_for_asset() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -92,7 +91,6 @@ fn test_dv01_increases_with_maturity() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -116,7 +114,6 @@ fn test_dv01_increases_with_maturity() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();

@@ -36,7 +36,6 @@ fn test_par_loan_pricing() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -76,7 +75,6 @@ fn test_discount_pricing() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -117,7 +115,6 @@ fn test_premium_pricing() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();

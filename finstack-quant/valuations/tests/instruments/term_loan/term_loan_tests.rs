@@ -65,7 +65,6 @@ fn term_loan_fixed_with_draws_and_fees() {
             oid_policy: Some(OidPolicy::WithheldPct(100)), // 1% withheld OID on draws
         }))
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -128,7 +127,6 @@ fn term_loan_commitment_fee_step_downs() {
             oid_policy: None,
         }))
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -192,7 +190,6 @@ fn term_loan_commitment_fee_windowed_to_availability() {
             oid_policy: None,
         }))
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -251,7 +248,6 @@ fn term_loan_oid_eir_amortization_schedule() {
             oid_policy: Some(OidPolicy::WithheldPct(200)),
         }))
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .oid_eir_opt(Some(OidEirSpec::default()))
         .attributes(Default::default())
         .build()
@@ -322,7 +318,6 @@ fn term_loan_pik_toggle_and_cash_sweep() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(Some(cov))
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -365,7 +360,6 @@ fn term_loan_golden_pv_and_metrics() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .call_schedule_opt(None)
         .attributes(Default::default())
         .build()
@@ -448,7 +442,6 @@ fn term_loan_amortizing_outstanding_path() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .call_schedule_opt(None)
         .attributes(Default::default())
         .build()

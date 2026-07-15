@@ -16,7 +16,7 @@ use finstack_quant_core::types::CurveId;
 use rust_decimal::prelude::ToPrimitive;
 
 fn resolved_asw_forward_curve_id(bond: &Bond) -> Option<CurveId> {
-    bond.pricing_overrides
+    bond.instrument_pricing_overrides
         .model_config
         .asw_forward_curve_id
         .clone()
@@ -715,7 +715,9 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                 b.maturity,
                 b.cashflow_spec.day_count(),
                 b.notional.amount(),
-                b.pricing_overrides.market_quotes.quoted_clean_price,
+                b.instrument_pricing_overrides
+                    .market_quotes
+                    .quoted_clean_price,
                 b.custom_cashflows.is_some(),
                 coupon_rate,
                 resolved_asw_forward_curve_id(b),

@@ -46,7 +46,6 @@ fn test_fixed_coupon_cashflows() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -83,7 +82,6 @@ fn test_pik_interest_capitalization() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -124,7 +122,6 @@ fn test_over_amortization_is_capped() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -190,7 +187,6 @@ fn test_linear_amort_no_event_at_issue_date() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -261,7 +257,6 @@ fn test_percent_per_period_full_amort() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -312,7 +307,6 @@ fn test_percent_of_original_notional_flat_dollar() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -372,7 +366,6 @@ fn test_flat_vs_geometric_amort_differ() {
             .upfront_fee_opt(None)
             .ddtl_opt(None)
             .covenants_opt(None)
-            .pricing_overrides(Default::default())
             .attributes(Default::default())
             .build()
             .unwrap()
@@ -469,7 +462,6 @@ fn test_ddtl_partial_draw_amort_uses_funded_amount() {
             oid_policy: None,
         }))
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -541,7 +533,6 @@ fn test_commitment_fees_use_correct_kind() {
             oid_policy: None,
         }))
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();

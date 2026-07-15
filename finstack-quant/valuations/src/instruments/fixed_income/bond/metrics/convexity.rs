@@ -232,8 +232,9 @@ mod tests {
             "USD-OIS",
         )
         .expect("bond");
-        bond.pricing_overrides =
-            crate::instruments::PricingOverrides::default().with_quoted_clean_price(100.0);
+        bond.instrument_pricing_overrides =
+            crate::instruments::InstrumentPricingOverrides::default()
+                .with_quoted_clean_price(100.0);
 
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)

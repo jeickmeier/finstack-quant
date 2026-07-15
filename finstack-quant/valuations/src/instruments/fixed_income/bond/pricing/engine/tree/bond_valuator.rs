@@ -573,7 +573,7 @@ impl BondValuator {
         // consistent with HazardBondEngine and TreePricer::calculate_oas.
         let recovery_rate = Self::resolve_recovery_rate(&bond, market_context);
         let call_friction_cents = bond
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .call_friction_cents
             .unwrap_or(0.0);

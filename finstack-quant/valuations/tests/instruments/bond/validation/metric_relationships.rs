@@ -29,7 +29,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -95,7 +95,7 @@ fn test_yield_dv01_duration_price_relationship() {
     let maturity = date!(2029 - 01 - 01);
 
     // Use pricing override to ensure bond is at par (clean price = 100)
-    let pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
+    let pricing_overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
 
     let bond = Bond::builder()
         .id("DV01_REL".into())
@@ -107,7 +107,7 @@ fn test_yield_dv01_duration_price_relationship() {
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
-        .pricing_overrides(pricing_overrides)
+        .instrument_pricing_overrides(pricing_overrides)
         .call_put_opt(None)
         .custom_cashflows_opt(None)
         .attributes(Default::default())

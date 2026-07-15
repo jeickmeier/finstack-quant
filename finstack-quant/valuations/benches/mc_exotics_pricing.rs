@@ -1,7 +1,7 @@
 //! Monte Carlo exotic instrument pricing benchmarks.
 //!
 //! `AsianOption`'s `Instrument::value` uses Turnbull–Wakeman for arithmetic averages; the Asian group
-//! calls `AsianOption::npv_mc` so timings reflect Monte Carlo paths controlled by `PricingOverrides::with_mc_paths`.
+//! calls `AsianOption::npv_mc` so timings reflect Monte Carlo paths controlled by `InstrumentPricingOverrides::with_mc_paths`.
 //!
 //! `CliquetOption` uses an internal GBM MC engine with step count driven by the number of reset dates.
 
@@ -22,7 +22,7 @@ use finstack_quant_valuations::instruments::exotics::lookback_option::{
 };
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::{
-    AsianOption, AveragingMethod, Instrument, OptionType, PricingOverrides,
+    AsianOption, AveragingMethod, Instrument, InstrumentPricingOverrides, OptionType,
 };
 use std::hint::black_box;
 use time::Month;
@@ -85,7 +85,9 @@ fn asian_option(mc_paths: usize) -> AsianOption {
         discount_curve_id: "USD-OIS".into(),
         vol_surface_id: "SPOT_VOL".into(),
         div_yield_id: None,
-        pricing_overrides: PricingOverrides::default().with_mc_paths(mc_paths),
+        instrument_pricing_overrides: InstrumentPricingOverrides::default().with_mc_paths(mc_paths),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
         past_fixings: vec![],
     }
@@ -107,7 +109,7 @@ fn lookback_option(mc_paths: usize) -> LookbackOption {
         .vol_surface_id(CurveId::new("SPOT_VOL"))
         .div_yield_id_opt(Some(CurveId::new("SPOT_DIV")))
         .use_gobet_miri(true)
-        .pricing_overrides(PricingOverrides::default().with_mc_paths(mc_paths))
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default().with_mc_paths(mc_paths))
         .attributes(Attributes::new())
         .observed_max_opt(None)
         .build()
@@ -142,7 +144,9 @@ fn autocallable_note(mc_paths: usize) -> Autocallable {
         div_yield_id: Some(CurveId::new("SPOT_DIV")),
         initial_level: None,
         past_fixings: vec![],
-        pricing_overrides: PricingOverrides::default().with_mc_paths(mc_paths),
+        instrument_pricing_overrides: InstrumentPricingOverrides::default().with_mc_paths(mc_paths),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Attributes::new(),
     }
 }
@@ -214,7 +218,7 @@ fn make_cliquet(as_of: Date, n_resets: usize) -> CliquetOption {
         .spot_id("SPOT".into())
         .vol_surface_id(CurveId::new("SPOT_VOL"))
         .div_yield_id_opt(Some(CurveId::new("SPOT_DIV")))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .unwrap()

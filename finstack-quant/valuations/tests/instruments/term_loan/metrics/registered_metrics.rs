@@ -44,7 +44,6 @@ fn term_loan(upfront_fee: Option<Money>, callable: bool) -> TermLoan {
         .upfront_fee_opt(upfront_fee)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();

@@ -20,10 +20,14 @@ fn resolve_oas_decimal(bond: &Bond, context: &MetricContext) -> finstack_quant_c
     if let Some(oas) = context.computed.get(&MetricId::Oas) {
         return Ok(*oas);
     }
-    if let Some(oas) = bond.pricing_overrides.market_quotes.quoted_oas {
+    if let Some(oas) = bond.instrument_pricing_overrides.market_quotes.quoted_oas {
         return Ok(oas);
     }
-    if let Some(clean_price) = bond.pricing_overrides.market_quotes.quoted_clean_price {
+    if let Some(clean_price) = bond
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price
+    {
         let pricer = TreePricer::with_config(bond_tree_config(bond)?);
         return Ok(pricer.calculate_oas(
             bond,
@@ -42,7 +46,10 @@ fn holder_option_value_at_vol(
     volatility: f64,
 ) -> finstack_quant_core::Result<f64> {
     let mut bumped = bond.clone();
-    bumped.pricing_overrides.market_quotes.implied_volatility = Some(volatility);
+    bumped
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(volatility);
     let quote_date = settlement_date(&bumped, context.as_of)?;
     let price_with_options =
         price_from_oas(&bumped, context.curves.as_ref(), quote_date, oas_decimal)?;
@@ -63,7 +70,7 @@ impl MetricCalculator for BondVegaCalculator {
         let bump = defaults.vol_bump_pct;
         let base_vol = bond_tree_config(bond)?.volatility;
         let source_vol = bond
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .implied_volatility
             .filter(|source_vol| source_vol.is_finite() && *source_vol > 0.0);

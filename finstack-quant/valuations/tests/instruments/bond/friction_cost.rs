@@ -8,7 +8,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashMap;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::tree::BondValuator;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::pricing_overrides::PricingOverrides;
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::models::{
     short_rate_keys, ShortRateTree, ShortRateTreeConfig, TreeModel,
 };
@@ -86,7 +86,8 @@ fn call_friction_raises_callable_price_toward_straight() {
 
     // Callable with friction = 0
     let mut callable0 = callable_bond(as_of);
-    callable0.pricing_overrides = PricingOverrides::default().with_call_friction_cents(0.0);
+    callable0.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_call_friction_cents(0.0);
     let valuator0 = BondValuator::new(callable0, &market, as_of, time_to_maturity, steps).unwrap();
     let price0 = tree
         .price(vars.clone(), time_to_maturity, &market, &valuator0)
@@ -94,7 +95,8 @@ fn call_friction_raises_callable_price_toward_straight() {
 
     // Callable with friction = 200 cents (= 2.00 points)
     let mut callable200 = callable_bond(as_of);
-    callable200.pricing_overrides = PricingOverrides::default().with_call_friction_cents(200.0);
+    callable200.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_call_friction_cents(200.0);
     let valuator200 =
         BondValuator::new(callable200, &market, as_of, time_to_maturity, steps).unwrap();
     let price200 = tree

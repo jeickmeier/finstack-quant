@@ -67,7 +67,7 @@ fn term_loan(maturity: Date) -> TermLoan {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
+        .instrument_pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap()

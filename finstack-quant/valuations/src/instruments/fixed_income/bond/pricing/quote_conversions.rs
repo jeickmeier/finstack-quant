@@ -27,7 +27,7 @@ use rust_decimal::prelude::ToPrimitive;
 use std::sync::Arc;
 
 fn resolved_asw_forward_curve_id(bond: &Bond) -> Option<CurveId> {
-    bond.pricing_overrides
+    bond.instrument_pricing_overrides
         .model_config
         .asw_forward_curve_id
         .clone()
@@ -1189,7 +1189,7 @@ pub fn price_from_dm(
 /// pricing calls evaluate the model PV. Used by inversion helpers that need
 /// the raw model response even when the bond carries a quoted price override.
 pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
-    let quotes = &mut bond.pricing_overrides.market_quotes;
+    let quotes = &mut bond.instrument_pricing_overrides.market_quotes;
     quotes.quoted_clean_price = None;
     quotes.quoted_dirty_price_ccy = None;
     quotes.quoted_ytm = None;
@@ -1283,7 +1283,7 @@ pub fn compute_quotes(
     //    the per-variant inversion logic that used to live here.
     clear_price_driving_overrides(&mut bond_for_metrics);
     {
-        let quotes = &mut bond_for_metrics.pricing_overrides.market_quotes;
+        let quotes = &mut bond_for_metrics.instrument_pricing_overrides.market_quotes;
         match quote_input {
             BondQuoteInput::CleanPricePct(v) => quotes.quoted_clean_price = Some(v),
             BondQuoteInput::DirtyPriceCcy(v) => quotes.quoted_dirty_price_ccy = Some(v),
@@ -1308,7 +1308,7 @@ pub fn compute_quotes(
     // expected by the downstream metric calculators.)
     clear_price_driving_overrides(&mut bond_for_metrics);
     bond_for_metrics
-        .pricing_overrides
+        .instrument_pricing_overrides
         .market_quotes
         .quoted_clean_price = Some(clean_price_pct);
 
@@ -1403,7 +1403,7 @@ pub(crate) fn price_from_quote_overrides(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<Option<f64>> {
-    let quotes = &bond.pricing_overrides.market_quotes;
+    let quotes = &bond.instrument_pricing_overrides.market_quotes;
 
     // Fast path: no price-driving override is set.
     if quotes.quoted_dirty_price_ccy.is_none()

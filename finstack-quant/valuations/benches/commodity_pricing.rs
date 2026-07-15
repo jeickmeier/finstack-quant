@@ -29,7 +29,7 @@ use finstack_quant_valuations::instruments::exotics::asian_option::AveragingMeth
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{
-    Attributes, ExerciseStyle, OptionType, PayReceive, PricingOptions, PricingOverrides,
+    Attributes, ExerciseStyle, InstrumentPricingOverrides, OptionType, PayReceive, PricingOptions,
     SettlementType,
 };
 use finstack_quant_valuations::metrics::MetricId;
@@ -126,7 +126,7 @@ fn forward_contract(label: &str, maturity: Date) -> CommodityForward {
         .forward_curve_id(CurveId::new("WTI-FWD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(Attributes::default())
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .build()
         .expect("commodity forward for benchmark")
 }
@@ -145,7 +145,7 @@ fn commodity_swap_contract(label: &str, end: Date) -> CommoditySwap {
         .frequency(Tenor::new(1, TenorUnit::Months))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(Attributes::default())
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .build()
         .expect("commodity swap for benchmark")
 }
@@ -165,7 +165,7 @@ fn commodity_call_option(label: &str, expiry: Date) -> CommodityOption {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("WTI-VOL"))
         .day_count(DayCount::Act365F)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::default())
         .build()
         .expect("commodity option for benchmark")
@@ -300,7 +300,7 @@ fn bench_commodity_asian_option_obs_count(c: &mut Criterion) {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("CL-VOL"))
             .day_count(DayCount::Act365F)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::default())
             .build()
             .unwrap();
@@ -347,7 +347,7 @@ fn bench_commodity_asian_option_method(c: &mut Criterion) {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("CL-VOL"))
             .day_count(DayCount::Act365F)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::default())
             .build()
             .unwrap();
@@ -389,7 +389,7 @@ fn bench_commodity_spread_option_pv(c: &mut Criterion) {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .correlation(0.85)
             .day_count(DayCount::Act365F)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::default())
             .build()
             .unwrap();
@@ -440,7 +440,7 @@ fn bench_commodity_swaption_pv(c: &mut Criterion) {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("NG-VOL"))
             .day_count(DayCount::Act365F)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::default())
             .build()
             .unwrap();

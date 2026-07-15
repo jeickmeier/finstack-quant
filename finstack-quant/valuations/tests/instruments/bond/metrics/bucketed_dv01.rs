@@ -12,7 +12,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -59,7 +59,8 @@ fn build_plain_bond(as_of: time::Date) -> Bond {
 fn test_plain_bond_quoted_price_bucketed_dv01_nonzero() {
     let as_of = date!(2024 - 03 - 15);
     let mut bond = build_plain_bond(as_of);
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(99.5);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(99.5);
 
     let market = MarketContext::new().insert(build_multi_tenor_curve(as_of));
 

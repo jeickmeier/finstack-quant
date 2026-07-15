@@ -37,7 +37,6 @@ fn test_zero_coupon_loan() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -77,7 +76,6 @@ fn test_very_short_maturity() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -114,7 +112,6 @@ fn test_very_long_maturity() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -151,7 +148,6 @@ fn test_negative_rate_environment() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -194,7 +190,9 @@ fn ddtl_spec_template() -> TermLoanSpec {
         upfront_fee: None,
         ddtl: None,
         covenants: None,
-        pricing_overrides: Default::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         oid_eir: None,
         call_schedule: None,
         settlement_days: 2,

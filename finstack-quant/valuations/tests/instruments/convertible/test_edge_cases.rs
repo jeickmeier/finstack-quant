@@ -233,7 +233,9 @@ fn test_time_mapping_with_quarterly_coupons() {
         soft_call_trigger: None,
         fixed_coupon: Some(fixed_coupon),
         floating_coupon: None,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 

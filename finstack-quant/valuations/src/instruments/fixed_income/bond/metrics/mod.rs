@@ -110,7 +110,11 @@ pub(crate) fn quoted_workout_path(
         return Ok(None);
     }
 
-    let Some(clean_px) = bond.pricing_overrides.market_quotes.quoted_clean_price else {
+    let Some(clean_px) = bond
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price
+    else {
         return Ok(None);
     };
 

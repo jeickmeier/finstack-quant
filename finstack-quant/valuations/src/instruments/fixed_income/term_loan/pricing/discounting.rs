@@ -394,7 +394,7 @@ mod tests {
     use crate::cashflow::builder::specs::CouponType;
     use crate::cashflow::builder::FloatingRateSpec;
     use crate::instruments::fixed_income::term_loan::spec::AmortizationSpec;
-    use crate::instruments::pricing_overrides::PricingOverrides;
+    use crate::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -494,7 +494,7 @@ mod tests {
             .upfront_fee_opt(None)
             .ddtl_opt(None)
             .covenants_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .oid_eir_opt(None)
             .call_schedule_opt(None)
             .attributes(crate::instruments::common_impl::traits::Attributes::new())

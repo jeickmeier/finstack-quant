@@ -130,7 +130,7 @@ fn test_dm_solver_convergence_across_spread_regimes() {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let maturity_ig = date!(2027 - 01 - 01); // short IG
@@ -211,7 +211,8 @@ fn test_dm_solver_convergence_across_spread_regimes() {
         let clean_px = dirty_target / notional.amount() * 100.0;
 
         let mut bond = base_bond.clone();
-        bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_px);
+        bond.instrument_pricing_overrides =
+            InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
 
         // Run DM metric via the normal metrics pipeline.
         let result = bond
@@ -269,7 +270,7 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let notional = Money::new(1_000_000.0, Currency::USD);
@@ -309,7 +310,8 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
     let clean_px = dirty / notional.amount() * 100.0;
 
     let mut priced_bond = bond;
-    priced_bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_px);
+    priced_bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
 
     let result = priced_bond
         .price_with_metrics(

@@ -131,7 +131,7 @@ pub(crate) fn generate_cashflows(
             }
         }
     }
-    if let Some(ov) = &loan.pricing_overrides.term_loan {
+    if let Some(ov) = &loan.instrument_pricing_overrides.term_loan {
         for (dt, amt) in &ov.extra_cash_sweeps {
             if amt.amount() > 0.0 {
                 principal_events.push(PrincipalEvent {
@@ -337,7 +337,7 @@ pub(crate) fn generate_cashflows(
                     step_ups.push((step.date, Decimal::from(step.delta_bp)));
                 }
             }
-            if let Some(ov) = &loan.pricing_overrides.term_loan {
+            if let Some(ov) = &loan.instrument_pricing_overrides.term_loan {
                 for (dt, bp) in &ov.margin_add_bp_by_date {
                     step_ups.push((*dt, Decimal::from(*bp)));
                 }
@@ -400,7 +400,7 @@ pub(crate) fn generate_cashflows(
             }
         }
     }
-    if let Some(ov) = &loan.pricing_overrides.term_loan {
+    if let Some(ov) = &loan.instrument_pricing_overrides.term_loan {
         for (dt, en) in &ov.pik_toggle_by_date {
             if *en {
                 payment_steps.push((*dt, CouponType::PIK));
@@ -469,7 +469,7 @@ fn effective_draw_stop(loan: &TermLoan) -> Option<Date> {
         .as_ref()
         .and_then(|c| c.draw_stop_dates.iter().min().copied());
     let override_stop = loan
-        .pricing_overrides
+        .instrument_pricing_overrides
         .term_loan
         .as_ref()
         .and_then(|ov| ov.draw_stop_date);

@@ -2,7 +2,7 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::PricingOverrides;
+use crate::instruments::InstrumentPricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::money::Money;
@@ -148,7 +148,7 @@ impl Bond {
             )?)
             .discount_curve_id(discount_curve_id.into())
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .settlement_convention_opt(Some(BondSettlementConvention {
                 settlement_days: 2,
@@ -240,7 +240,7 @@ impl Bond {
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(discount_curve_id.into())
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .settlement_convention_opt(Some(BondSettlementConvention {
                 settlement_days: convention.settlement_days(),
@@ -333,7 +333,7 @@ impl Bond {
             ))
             .discount_curve_id(discount_curve_id.into())
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .settlement_convention_opt(None)
             .build()?;
@@ -396,7 +396,7 @@ impl Bond {
             )?)
             .discount_curve_id(discount_curve_id.into())
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .settlement_convention_opt(None)
             .build()?;
@@ -570,9 +570,9 @@ impl Bond {
         let cashflow_spec = CashflowSpec::fixed(0.0, inferred_freq, schedule.get_day_count())?;
 
         let pricing_overrides = if let Some(price) = quoted_clean {
-            PricingOverrides::default().with_quoted_clean_price(price)
+            InstrumentPricingOverrides::default().with_quoted_clean_price(price)
         } else {
-            PricingOverrides::default()
+            InstrumentPricingOverrides::default()
         };
         pricing_overrides.validate()?;
 
@@ -584,7 +584,7 @@ impl Bond {
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(discount_curve_id.into())
             .credit_curve_id_opt(None)
-            .pricing_overrides(pricing_overrides)
+            .instrument_pricing_overrides(pricing_overrides)
             .custom_cashflows_opt(Some(schedule))
             .attributes(Attributes::new())
             .settlement_convention_opt(None)
@@ -813,7 +813,7 @@ impl Bond {
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .settlement_convention_opt(Some(BondSettlementConvention {
                 settlement_days: 2,
@@ -869,7 +869,7 @@ impl Bond {
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .call_put_opt(Some(call_put))
             .attributes(Attributes::new())
             .settlement_convention_opt(Some(BondSettlementConvention {
@@ -923,7 +923,7 @@ impl Bond {
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .settlement_convention_opt(Some(BondSettlementConvention {
                 settlement_days: 2,

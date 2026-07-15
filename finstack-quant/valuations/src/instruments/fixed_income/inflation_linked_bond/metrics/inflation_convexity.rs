@@ -67,7 +67,7 @@ mod tests {
     use super::INFLATION_BUMP_BP;
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
-    use crate::instruments::{PricingOptions, PricingOverrides};
+    use crate::instruments::{InstrumentPricingOverrides, PricingOptions};
     use crate::metrics::MetricId;
     use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -166,7 +166,7 @@ mod tests {
         let mut bond = sample_bond();
         // Force a tiny non-zero base PV via a tiny notional.
         bond.notional = finstack_quant_core::money::Money::new(1e-12, bond.notional.currency());
-        bond.pricing_overrides = PricingOverrides::default();
+        bond.instrument_pricing_overrides = InstrumentPricingOverrides::default();
         let market = market(as_of);
 
         let base_pv = bond.value(&market, as_of).expect("base pv").amount();

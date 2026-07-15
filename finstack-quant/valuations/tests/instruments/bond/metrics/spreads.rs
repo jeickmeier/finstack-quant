@@ -10,7 +10,7 @@ use finstack_quant_valuations::instruments::fixed_income::bond::{
     Bond, BondSettlementConvention, CallPut, CallPutSchedule,
 };
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::sync::Arc;
 use time::macros::date;
@@ -27,7 +27,8 @@ fn test_z_spread_discount_bond() {
         "USD-OIS",
     )
     .unwrap();
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(95.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
 
     let curve =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
@@ -105,7 +106,7 @@ fn test_z_spread_reports_bond_compounding_spread() {
             flow.amount.amount() * (1.0 + base_rate + target_z).powf(-t)
         })
         .sum::<f64>();
-    bond.pricing_overrides = PricingOverrides::default()
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(100.0 * target_dirty / notional.amount());
 
     let result = bond
@@ -139,7 +140,8 @@ fn test_i_spread_uses_quote_date_for_settlement_based_curve() {
         "USD-OIS",
     )
     .unwrap();
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(99.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(quote_date)
@@ -182,7 +184,8 @@ fn test_asw_market_price_adjustment_has_correct_economic_sign() {
         .unwrap();
     let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
 
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(98.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(98.0);
     let discount_result = bond
         .price_with_metrics(
             &market,
@@ -198,7 +201,8 @@ fn test_asw_market_price_adjustment_has_correct_economic_sign() {
         discount_result.measures["asw_market"]
     );
 
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(102.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(102.0);
     let premium_result = bond
         .price_with_metrics(
             &market,
@@ -230,7 +234,7 @@ fn test_asw_market_uses_configured_forward_curve() {
         "USD-OIS",
     )
     .unwrap();
-    bond.pricing_overrides = PricingOverrides::default()
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(98.0)
         .with_asw_forward_curve_id("USD-SOFR-6M");
 
@@ -261,7 +265,9 @@ fn test_asw_market_uses_configured_forward_curve() {
         .expect("ASW with configured forward curve should compute")
         .measures["asw_market"];
 
-    bond.pricing_overrides.model_config.asw_forward_curve_id = None;
+    bond.instrument_pricing_overrides
+        .model_config
+        .asw_forward_curve_id = None;
     let discount_proxy = bond
         .price_with_metrics(
             &market_without_forward,
@@ -294,7 +300,8 @@ fn test_asw_market_falls_back_to_bond_forward_curve_id() {
     )
     .unwrap();
     bond.forward_curve_id = Some("USD-SOFR-6M".into());
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(98.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(98.0);
 
     let discount_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -328,7 +335,9 @@ fn test_asw_market_falls_back_to_bond_forward_curve_id() {
         .expect("ASW with bond forward curve fallback should compute")
         .measures["asw_market"];
 
-    bond.pricing_overrides.model_config.asw_forward_curve_id = Some("USD-SOFR-3M".into());
+    bond.instrument_pricing_overrides
+        .model_config
+        .asw_forward_curve_id = Some("USD-SOFR-3M".into());
     let explicit_override = bond
         .price_with_metrics(
             &market,
@@ -378,12 +387,12 @@ fn test_oas_metric_uses_bond_tree_pricing_overrides() {
     let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
 
     let mut low_vol_bond = base_bond.clone();
-    low_vol_bond.pricing_overrides = PricingOverrides::default()
+    low_vol_bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(99.0)
         .with_implied_vol(0.001);
 
     let mut high_vol_bond = base_bond;
-    high_vol_bond.pricing_overrides = PricingOverrides::default()
+    high_vol_bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(99.0)
         .with_implied_vol(0.05);
 
@@ -437,7 +446,7 @@ fn test_oas_metric_uses_tree_discount_curve_override() {
         }],
         puts: vec![],
     });
-    bond.pricing_overrides = PricingOverrides::default()
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(99.0)
         .with_implied_vol(0.01)
         .with_tree_discount_curve_id("USD-TREE");
@@ -466,7 +475,9 @@ fn test_oas_metric_uses_tree_discount_curve_override() {
         .expect("OAS with tree curve override should price")
         .measures["oas"];
 
-    bond.pricing_overrides.model_config.tree_discount_curve_id = None;
+    bond.instrument_pricing_overrides
+        .model_config
+        .tree_discount_curve_id = None;
     let without_override = bond
         .price_with_metrics(
             &market,
@@ -507,7 +518,7 @@ fn test_embedded_option_value_uses_solved_oas_and_holder_sign() {
         }],
         puts: vec![],
     });
-    bond.pricing_overrides = PricingOverrides::default()
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(103.0)
         .with_implied_vol(0.02);
 
@@ -574,7 +585,7 @@ fn test_embedded_option_value_uses_settlement_date_oas_pricing_basis() {
         }],
         puts: vec![],
     });
-    bond.pricing_overrides = serde_json::from_value(serde_json::json!({
+    bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "quoted_oas": quoted_oas,
         "implied_volatility": 0.20,
         "tree_steps": 80,
@@ -636,7 +647,7 @@ fn test_callable_bond_vega_is_registered_and_bumps_implied_volatility() {
         }],
         puts: vec![],
     });
-    bond.pricing_overrides = PricingOverrides::default()
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(103.0)
         .with_implied_vol(0.02);
 
@@ -690,7 +701,7 @@ fn test_callable_bond_oas_and_vega_use_explicit_bdt_tree_path() {
         }],
         puts: vec![],
     });
-    bond.pricing_overrides = serde_json::from_value(serde_json::json!({
+    bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "quoted_clean_price": 103.0,
         "implied_volatility": 0.20,
         "tree_steps": 40,
@@ -736,7 +747,7 @@ fn test_callable_bond_vega_is_invariant_to_vol_bump_size() {
         bump: f64,
     ) -> f64 {
         let mut bond = base_bond.clone();
-        bond.pricing_overrides = bond.pricing_overrides.with_vol_bump(bump);
+        bond.metric_pricing_overrides = bond.metric_pricing_overrides.with_vol_bump(bump);
         bond.price_with_metrics(
             market,
             as_of,
@@ -766,7 +777,7 @@ fn test_callable_bond_vega_is_invariant_to_vol_bump_size() {
         }],
         puts: vec![],
     });
-    bond.pricing_overrides = serde_json::from_value(serde_json::json!({
+    bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "quoted_clean_price": 103.0,
         "implied_volatility": 0.20,
         "implied_volatility": 0.20,
@@ -824,7 +835,7 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
         }],
         puts: vec![],
     });
-    bond.pricing_overrides = serde_json::from_value(serde_json::json!({
+    bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "implied_volatility": 0.20,
         "tree_steps": 80,
         "vol_model": "black",
@@ -850,7 +861,9 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
     )
     .expect("quote-date accrued");
     let quoted_clean_price = (dirty_at_quote - accrued_at_quote) / notional.amount() * 100.0;
-    bond.pricing_overrides.market_quotes.quoted_clean_price = Some(quoted_clean_price);
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(quoted_clean_price);
 
     let result = bond
         .price_with_metrics(
@@ -891,7 +904,7 @@ fn test_callable_bond_value_uses_same_bdt_tree_dispatch_as_oas_pricer() {
         }],
         puts: vec![],
     });
-    bond.pricing_overrides = serde_json::from_value(serde_json::json!({
+    bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "implied_volatility": 0.20,
         "tree_steps": 40,
         "vol_model": "black",
@@ -934,7 +947,8 @@ fn test_z_spread_missing_discount_curve_returns_error() {
         "USD-OIS",
     )
     .unwrap();
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(95.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
 
     // Market context with NO discount curves – any attempt to build a Z-spread PV should fail
     let market = finstack_quant_core::market_data::context::MarketContext::new();
@@ -1029,7 +1043,8 @@ fn test_z_spread_roundtrip_coupon_exactly_on_settlement_date() {
 
     // Quote the bond at a clean price that is off-par so the Z-spread is non-zero.
     let clean_pct = 98.5_f64;
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_pct);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
 
     // Forward path: solve Z-spread from the quoted clean price.
     let res = bond
@@ -1133,8 +1148,8 @@ fn test_ytm_roundtrip_settlement_lag_two_days() {
 
     // Feed the clean price back and re-solve YTM.
     let mut bond_with_price = bond;
-    bond_with_price.pricing_overrides =
-        PricingOverrides::default().with_quoted_clean_price(clean_pct);
+    bond_with_price.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
     let res = bond_with_price
         .price_with_metrics(
             &market,
@@ -1162,7 +1177,7 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let maturity_ig = date!(2028 - 01 - 01); // shorter IG
@@ -1246,7 +1261,8 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
         let clean_px = clean_ccy / notional.amount() * 100.0;
 
         let mut bond = base_bond.clone();
-        bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_px);
+        bond.instrument_pricing_overrides =
+            InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
 
         // Run Z-spread metric via the normal pipeline.
         let result = bond
@@ -1333,7 +1349,8 @@ fn test_z_spread_roundtrip_with_settlement_lag() {
 
     // Quote the bond off-par so the Z-spread is non-zero.
     let clean_pct = 97.25_f64;
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_pct);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
 
     // Forward path: solve Z-spread and read the settlement-anchored dirty price
     // (the metric `DirtyPrice` is exactly the ZSpreadCalculator's solve target:
@@ -1454,7 +1471,8 @@ fn test_z_spread_solver_non_positive_base_df_returns_err() {
 
     // Quote an astronomically high price (10× par): no physically valid spread
     // can match this — the solver must fail rather than return a meaningless z.
-    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(10_000.0_f64);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(10_000.0_f64);
 
     let result = bond.price_with_metrics(
         &market,

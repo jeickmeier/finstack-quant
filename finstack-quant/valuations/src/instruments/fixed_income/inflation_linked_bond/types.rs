@@ -254,9 +254,7 @@ impl InflationSource {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct InflationLinkedBond {
@@ -306,7 +304,16 @@ pub struct InflationLinkedBond {
     /// Additional attributes
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -344,7 +351,9 @@ impl InflationLinkedBond {
             discount_curve_id: CurveId::new("USD-TIPS"),
             inflation_index_id: CurveId::new("US-CPI"),
             quoted_clean: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }
@@ -375,7 +384,9 @@ impl InflationLinkedBond {
             discount_curve_id: discount_curve_id.into(),
             inflation_index_id: inflation_index_id.into(),
             quoted_clean: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }
@@ -458,7 +469,9 @@ impl InflationLinkedBond {
             discount_curve_id: discount_curve_id.into(),
             inflation_index_id: inflation_index_id.into(),
             quoted_clean: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }
@@ -550,7 +563,9 @@ impl InflationLinkedBond {
             discount_curve_id: discount_curve_id.into(),
             inflation_index_id: inflation_index_id.into(),
             quoted_clean: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }
@@ -622,7 +637,9 @@ impl InflationLinkedBond {
             discount_curve_id: discount_curve_id.into(),
             inflation_index_id: inflation_index_id.into(),
             quoted_clean: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }
@@ -1148,17 +1165,7 @@ impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond
         Some(self.issue_date)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
@@ -1326,7 +1333,9 @@ mod tests {
             discount_curve_id: CurveId::new("USD-NOM"),
             inflation_index_id: CurveId::new("US-CPI"),
             quoted_clean: Some(100.0), // par → real yield == coupon (4 % semi-annual)
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         };
 
@@ -1439,7 +1448,9 @@ mod tests {
             discount_curve_id: CurveId::new("USD-REAL"),
             inflation_index_id: CurveId::new("US-CPI"),
             quoted_clean: Some(100.0),
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         };
         let market = MarketContext::new()
@@ -1534,7 +1545,9 @@ mod tests {
             discount_curve_id: CurveId::new("USD-TIPS"),
             inflation_index_id: CurveId::new("US-CPI"),
             quoted_clean: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }

@@ -42,7 +42,6 @@ fn build_simple_term_loan(as_of: Date, maturity: Date) -> TermLoan {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .unwrap()
@@ -182,7 +181,6 @@ fn test_floating_rate_term_loan_yield_and_dm() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .expect("floating loan construction should succeed");

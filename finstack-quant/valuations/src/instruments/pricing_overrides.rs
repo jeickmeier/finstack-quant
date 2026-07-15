@@ -570,6 +570,65 @@ pub struct InstrumentPricingOverrides {
 }
 
 impl InstrumentPricingOverrides {
+    /// Create empty instrument-owned pricing inputs.
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// Set quoted clean price as a percentage of par.
+    pub fn with_quoted_clean_price(mut self, price_pct: f64) -> Self {
+        self.market_quotes.quoted_clean_price = Some(price_pct);
+        self
+    }
+
+    /// Set quoted dirty price in the instrument currency.
+    pub fn with_quoted_dirty_price(mut self, price_ccy: f64) -> Self {
+        self.market_quotes.quoted_dirty_price_ccy = Some(price_ccy);
+        self
+    }
+
+    /// Set quoted yield-to-maturity in decimal form.
+    pub fn with_quoted_ytm(mut self, ytm: f64) -> Self {
+        self.market_quotes.quoted_ytm = Some(ytm);
+        self
+    }
+
+    /// Set quoted yield-to-worst in decimal form.
+    pub fn with_quoted_ytw(mut self, ytw: f64) -> Self {
+        self.market_quotes.quoted_ytw = Some(ytw);
+        self
+    }
+
+    /// Set quoted Z-spread in decimal form.
+    pub fn with_quoted_z_spread(mut self, z_spread: f64) -> Self {
+        self.market_quotes.quoted_z_spread = Some(z_spread);
+        self
+    }
+
+    /// Set quoted OAS in decimal form.
+    pub fn with_quoted_oas(mut self, oas: f64) -> Self {
+        self.market_quotes.quoted_oas = Some(oas);
+        self
+    }
+
+    /// Set quoted discount margin in decimal form.
+    pub fn with_quoted_discount_margin(mut self, dm: f64) -> Self {
+        self.market_quotes.quoted_discount_margin = Some(dm);
+        self
+    }
+
+    /// Set quoted I-spread in decimal form.
+    pub fn with_quoted_i_spread(mut self, i_spread: f64) -> Self {
+        self.market_quotes.quoted_i_spread = Some(i_spread);
+        self
+    }
+
+    /// Set quoted asset-swap spread in decimal form.
+    pub fn with_quoted_asw_market(mut self, asw: f64) -> Self {
+        self.market_quotes.quoted_asw_market = Some(asw);
+        self
+    }
+
     /// Set implied volatility (flat σ across tenor and strike).
     pub fn with_implied_vol(mut self, vol: f64) -> Self {
         self.market_quotes.implied_volatility = Some(vol);
@@ -579,6 +638,45 @@ impl InstrumentPricingOverrides {
     /// Set the volatility-surface extrapolation policy.
     pub fn with_vol_surface_extrapolation(mut self, policy: VolSurfaceExtrapolation) -> Self {
         self.model_config.vol_surface_extrapolation = policy;
+        self
+    }
+
+    /// Set the number of time steps for tree-based pricing.
+    pub fn with_tree_steps(mut self, steps: usize) -> Self {
+        self.model_config.tree_steps = Some(steps);
+        self
+    }
+
+    /// Set the discount curve used by tree-based pricing.
+    pub fn with_tree_discount_curve_id(mut self, curve_id: impl Into<CurveId>) -> Self {
+        self.model_config.tree_discount_curve_id = Some(curve_id.into());
+        self
+    }
+
+    /// Set the forward curve used by asset-swap metrics.
+    pub fn with_asw_forward_curve_id(mut self, curve_id: impl Into<CurveId>) -> Self {
+        self.model_config.asw_forward_curve_id = Some(curve_id.into());
+        self
+    }
+
+    /// Set issuer/borrower call friction in cents per 100 of par.
+    pub fn with_call_friction_cents(mut self, cents: f64) -> Self {
+        self.model_config.call_friction_cents = Some(cents);
+        self
+    }
+
+    /// Set the Merton Monte Carlo configuration.
+    pub fn with_merton_mc(
+        mut self,
+        config: crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig,
+    ) -> Self {
+        self.model_config.merton_mc_config = Some(MertonMcOverride(config));
+        self
+    }
+
+    /// Set the path count for path-dependent Monte Carlo pricing.
+    pub fn with_mc_paths(mut self, paths: usize) -> Self {
+        self.model_config.mc_paths = Some(paths);
         self
     }
 
@@ -716,6 +814,18 @@ impl MetricPricingOverrides {
         self
     }
 
+    /// Set custom YTM bump size in decimal form. For one basis point, pass `1e-4`.
+    pub fn with_ytm_bump_decimal(mut self, bump: f64) -> Self {
+        self.bump_config.ytm_bump_decimal = Some(bump);
+        self
+    }
+
+    /// Enable or disable adaptive bump sizes for Greek calculations.
+    pub fn with_adaptive_bumps(mut self, enable: bool) -> Self {
+        self.bump_config.adaptive_bumps = enable;
+        self
+    }
+
     /// Set theta period for time decay calculations.
     pub fn with_theta_period(mut self, period: impl Into<String>) -> Self {
         self.theta_period = Some(period.into());
@@ -784,6 +894,29 @@ pub struct ScenarioPricingOverrides {
 }
 
 impl ScenarioPricingOverrides {
+    /// Apply a scenario price shock as a decimal percentage.
+    pub fn with_price_shock_pct(mut self, shock_pct: f64) -> Self {
+        self.scenario_price_shock_pct = Some(shock_pct);
+        self
+    }
+
+    /// Apply a scenario spread shock in basis points.
+    pub fn with_spread_shock_bp(mut self, shock_bp: f64) -> Self {
+        self.scenario_spread_shock_bp = Some(shock_bp);
+        self
+    }
+
+    /// Clear all scenario shocks.
+    pub fn clear_scenario_shocks(&mut self) {
+        self.scenario_price_shock_pct = None;
+        self.scenario_spread_shock_bp = None;
+    }
+
+    /// Return whether any scenario shock is configured.
+    pub fn has_scenario_shock(&self) -> bool {
+        self.scenario_price_shock_pct.is_some() || self.scenario_spread_shock_bp.is_some()
+    }
+
     /// Validate scenario shocks for finiteness.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         // Shocks may be negative (downside / tightening scenarios) but must be finite.

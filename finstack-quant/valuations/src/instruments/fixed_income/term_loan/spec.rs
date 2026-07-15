@@ -27,7 +27,7 @@
 //! use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;
 //! use finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;
 //! use finstack_quant_cashflows::builder::specs::CouponType;
-//! use finstack_quant_valuations::instruments::pricing_overrides::PricingOverrides;
+//! use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::*;
@@ -54,7 +54,9 @@
 //!     ddtl: None,
 //!     covenants: None,
 //!     credit_curve_id: None,
-//!     pricing_overrides: PricingOverrides::default(),
+//!     instrument_pricing_overrides: InstrumentPricingOverrides::default(),
+//!     metric_pricing_overrides: Default::default(),
+//!     scenario_pricing_overrides: Default::default(),
 //!     oid_eir: None,
 //!     call_schedule: None,
 //!     settlement_days: 2,
@@ -69,7 +71,6 @@
 //! - `super::cashflows` for cashflow generation (internal module)
 //! - term loan pricing module for valuation
 
-use crate::instruments::pricing_overrides::PricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
@@ -442,7 +443,7 @@ impl AmortizationSpec {
 /// # // Convert to runtime instrument via `try_into()` when needed.
 /// use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;
 /// use finstack_quant_valuations::instruments::fixed_income::term_loan::types::RateSpec;
-/// use finstack_quant_valuations::instruments::pricing_overrides::PricingOverrides;
+/// use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 /// use finstack_quant_cashflows::builder::specs::CouponType;
 /// use finstack_quant_cashflows::builder::FloatingRateSpec;
 /// use finstack_quant_core::money::Money;
@@ -492,7 +493,9 @@ impl AmortizationSpec {
 ///     ddtl: None,
 ///     covenants: None,
 ///     credit_curve_id: None,
-///     pricing_overrides: PricingOverrides::default(),
+///     instrument_pricing_overrides: InstrumentPricingOverrides::default(),
+///     metric_pricing_overrides: Default::default(),
+///     scenario_pricing_overrides: Default::default(),
 ///     oid_eir: None,
 ///     call_schedule: None,
 ///     settlement_days: 2,
@@ -553,7 +556,14 @@ pub struct TermLoanSpec {
     /// Optional covenant-driven events
     pub covenants: Option<TermLoanCovenantEvents>,
     /// Pricing overrides (yield, price, etc.)
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Optional EIR amortization settings for reporting schedules
     #[serde(default)]
     pub oid_eir: Option<OidEirSpec>,

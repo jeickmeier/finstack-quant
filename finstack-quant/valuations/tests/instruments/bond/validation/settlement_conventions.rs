@@ -17,7 +17,6 @@ use finstack_quant_valuations::instruments::fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, CashflowSpec,
 };
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOverrides;
 use time::Month;
 
 fn create_test_market(base_date: Date) -> MarketContext {
@@ -49,7 +48,6 @@ fn test_pv_anchored_at_as_of() {
                 .expect("finite test coupon"),
         )
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .settlement_convention_opt(Some(
             finstack_quant_valuations::instruments::fixed_income::bond::BondSettlementConvention {
                 settlement_days: 2,
@@ -106,7 +104,6 @@ fn test_callable_exercise_coupon_always_paid() {
                 .expect("finite test coupon"),
         )
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .call_put_opt(Some(call_schedule))
         .attributes(Default::default())
         .build()
@@ -123,7 +120,6 @@ fn test_callable_exercise_coupon_always_paid() {
                 .expect("finite test coupon"),
         )
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .call_put_opt(None)
         .attributes(Default::default())
         .build()
@@ -175,7 +171,6 @@ fn test_putable_bond_worth_more() {
                 .expect("finite test coupon"),
         )
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .call_put_opt(Some(put_schedule))
         .attributes(Default::default())
         .build()
@@ -192,7 +187,6 @@ fn test_putable_bond_worth_more() {
                 .expect("finite test coupon"),
         )
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .call_put_opt(None)
         .attributes(Default::default())
         .build()
@@ -234,7 +228,6 @@ fn test_bond_pricing_basic() {
                 .expect("finite test coupon"),
         )
         .discount_curve_id("USD-OIS".into())
-        .pricing_overrides(PricingOverrides::default())
         .attributes(Default::default())
         .build()
         .expect("Valid bond");

@@ -31,7 +31,6 @@ fn test_builder_fixed_rate_loan() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build();
 
@@ -81,7 +80,6 @@ fn test_builder_floating_rate_loan() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build();
 
@@ -115,7 +113,6 @@ fn test_builder_with_amortization() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build();
 
@@ -162,7 +159,6 @@ fn test_builder_with_callability() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build();
 
@@ -196,7 +192,6 @@ fn test_builder_validation_maturity_after_issue() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build();
 
@@ -225,7 +220,6 @@ fn test_pik_coupon_type() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
         .attributes(Default::default())
         .build();
 

@@ -90,7 +90,7 @@ impl Pricer for SimpleBondOasPricer {
             .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
 
         let clean_pct = bond
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .quoted_clean_price
             .ok_or_else(|| {

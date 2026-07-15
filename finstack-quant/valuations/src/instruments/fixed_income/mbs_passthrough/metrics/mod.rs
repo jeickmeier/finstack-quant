@@ -55,7 +55,7 @@ impl MetricCalculator for OasCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let mbs: &AgencyMbsPassthrough = context.instrument_as()?;
         let market_price = mbs
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .quoted_clean_price
             .ok_or_else(|| {
@@ -157,7 +157,9 @@ mod tests {
             .day_count(DayCount::Thirty360)
             .build()
             .expect("valid mbs");
-        mbs.pricing_overrides.market_quotes.quoted_clean_price = Some(quote);
+        mbs.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price = Some(quote);
 
         // Reference values computed directly.
         let static_zspread = calculate_static_zspread(&mbs, quote, &market, as_of)

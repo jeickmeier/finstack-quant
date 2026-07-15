@@ -4,7 +4,7 @@ use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -21,8 +21,8 @@ fn test_duration_zero_coupon() {
         "USD-OIS",
     )
     .unwrap();
-    bond.pricing_overrides = finstack_quant_valuations::instruments::PricingOverrides::default()
-        .with_quoted_clean_price(70.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(70.0);
 
     let curve =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
@@ -67,8 +67,8 @@ fn test_yield_duration_convexity_act_act_isma() {
     if let CashflowSpec::Fixed(spec) = &mut bond.cashflow_spec {
         spec.schedule.dc = DayCount::ActActIsma;
     }
-    bond.pricing_overrides = finstack_quant_valuations::instruments::PricingOverrides::default()
-        .with_quoted_clean_price(98.0);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(98.0);
 
     let curve = DiscountCurve::builder("GBP-OIS")
         .base_date(as_of)
@@ -201,7 +201,7 @@ fn test_convexity_matches_numerical_second_derivative() {
 }
 
 fn callable_risk_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
-    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
     let mut bond = Bond::fixed(
         "CALLABLE-RISK",
         Money::new(1_000_000.0, Currency::USD),
@@ -220,7 +220,7 @@ fn callable_risk_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
         }],
         puts: vec![],
     });
-    bond.pricing_overrides = PricingOverrides::default()
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(105.0)
         .with_implied_vol(0.01);
     bond
@@ -292,8 +292,8 @@ fn test_callable_quoted_bond_can_request_callable_oas_risk_basis() {
     let as_of = date!(2025 - 01 - 01);
     let bullet_basis = callable_risk_bond(as_of);
     let mut callable_basis = callable_risk_bond(as_of);
-    callable_basis.pricing_overrides = callable_basis
-        .pricing_overrides
+    callable_basis.metric_pricing_overrides = callable_basis
+        .metric_pricing_overrides
         .with_bond_risk_basis(BondRiskBasis::CallableOas);
     let market = callable_risk_market(as_of);
 
@@ -393,11 +393,11 @@ fn test_callable_no_quote_default_basis_dv01_is_yield_basis() {
 
 #[test]
 fn test_callable_workout_duration_uses_workout_yield_denominator() {
-    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let mut callable = callable_risk_bond(as_of);
-    callable.pricing_overrides = PricingOverrides::default()
+    callable.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(115.0)
         .with_implied_vol(0.01);
     let market = callable_risk_market(as_of);

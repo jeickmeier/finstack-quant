@@ -12,7 +12,9 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::{Instrument, PricingOptions, PricingOverrides};
+use finstack_quant_valuations::instruments::{
+    Instrument, InstrumentPricingOverrides, PricingOptions,
+};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -63,7 +65,8 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
     // Unquoted reference: callable + credit prices on the two-factor tree at OAS=0;
     // CS01 bumps the hazard and reprices through the same tree.
     let mut unquoted = build_callable_credit_bond(as_of);
-    unquoted.pricing_overrides = PricingOverrides::default().with_implied_vol(0.02);
+    unquoted.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_implied_vol(0.02);
     let base = unquoted
         .price_with_metrics(
             &market,
@@ -81,7 +84,7 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
 
     // Quoted at the model price → OAS calibration ≈ reproduces the quote.
     let mut quoted = build_callable_credit_bond(as_of);
-    quoted.pricing_overrides = PricingOverrides::default()
+    quoted.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(model_clean)
         .with_implied_vol(0.02);
     let result = quoted
