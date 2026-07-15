@@ -326,6 +326,11 @@ fn update_schema_file(name: &str, category: &str, mut generated_schema: Value) {
     if let Some(additional) = generated_schema.get("additionalProperties") {
         spec_schema.insert("additionalProperties".to_string(), additional.clone());
     }
+    for keyword in ["oneOf", "anyOf", "allOf", "not"] {
+        if let Some(composition) = generated_schema.get(keyword) {
+            spec_schema.insert(keyword.to_string(), composition.clone());
+        }
+    }
     let title = to_title(name);
 
     // Build the new properties.instrument value

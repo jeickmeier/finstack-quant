@@ -73,21 +73,22 @@ impl BermudanSwaptionLmmPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<LmmParams, PricingError> {
-        let swap_start_yf =
-            year_fraction(swaption.day_count, as_of, swaption.swap_start).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        let swap_start_yf = year_fraction(
+            swaption.get_day_count(),
+            as_of,
+            swaption.get_swap_start(),
+        )
+        .map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
         // Build the underlying tenor schedule with calendar-month arithmetic.
         // Incrementing a floating year fraction drifts on irregular months and
         // cannot represent non-month tenors faithfully.
-        let mut tenor_dates = vec![swaption.swap_start];
-        let mut current = swaption.swap_start;
-        while current < swaption.swap_end {
+        let mut tenor_dates = vec![swaption.get_swap_start()];
+        let mut current = swaption.get_swap_start();
+        while current < swaption.get_swap_end() {
             let next = swaption
-                .fixed_freq
+                .get_fixed_freq()
                 .add_to_date(current, None, BusinessDayConvention::Unadjusted)
                 .map_err(|e| {
                     PricingError::model_failure_with_context(
@@ -101,13 +102,13 @@ impl BermudanSwaptionLmmPricer {
                     PricingErrorContext::default(),
                 ));
             }
-            current = next.min(swaption.swap_end);
+            current = next.min(swaption.get_swap_end());
             tenor_dates.push(current);
         }
 
         let tenors: Vec<f64> = tenor_dates
             .iter()
-            .map(|&date| year_fraction(swaption.day_count, as_of, date))
+            .map(|&date| year_fraction(swaption.get_day_count(), as_of, date))
             .collect::<finstack_quant_core::Result<Vec<_>>>()
             .map_err(|e| {
                 PricingError::model_failure_with_context(
@@ -127,7 +128,7 @@ impl BermudanSwaptionLmmPricer {
         // Contractual accrual factors may differ from model-time differences.
         let accrual_factors: Vec<f64> = tenor_dates
             .windows(2)
-            .map(|dates| year_fraction(swaption.day_count, dates[0], dates[1]))
+            .map(|dates| year_fraction(swaption.get_day_count(), dates[0], dates[1]))
             .collect::<finstack_quant_core::Result<Vec<_>>>()
             .map_err(|e| {
                 PricingError::model_failure_with_context(
@@ -285,7 +286,7 @@ impl BermudanSwaptionLmmPricer {
         let first_exercise_yf = swaption
             .first_exercise()
             .and_then(|d| {
-                year_fraction(swaption.day_count, as_of, d)
+                year_fraction(swaption.get_day_count(), as_of, d)
                     .ok()
                     .filter(|t| t.is_finite() && *t > 0.0)
             })
@@ -415,7 +416,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
 
         // Get discount curve
         let disc = market
-            .get_discount(swaption.discount_curve_id.as_str())
+            .get_discount(swaption.get_discount_curve_id().as_str())
             .map_err(|e| {
                 PricingError::missing_market_data_with_context(
                     e.to_string(),
@@ -441,7 +442,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
         // Extract exercise times as year fractions
         let exercise_times = swaption
             .bermudan_schedule
-            .exercise_times(as_of, swaption.day_count)
+            .exercise_times(as_of, swaption.get_day_count())
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
@@ -468,7 +469,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
 
         // Terminal discount factor P(0, T_N) for the last tenor
         let df_terminal = disc
-            .df_between_dates(as_of, swaption.swap_end)
+            .df_between_dates(as_of, swaption.get_swap_end())
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
@@ -508,7 +509,7 @@ mod tests {
     use crate::calibration::targets::lmm::{rebonato_shape_factor, CoTerminalSlice};
     use crate::instruments::rates::swaption::types::BermudanSchedule;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, DayCount, Tenor};
+    use finstack_quant_core::dates::{Date, Tenor};
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
@@ -551,7 +552,7 @@ mod tests {
         let first_ex = Date::from_calendar_date(2028, Month::January, 17).expect("date");
         let schedule = BermudanSchedule::co_terminal(first_ex, swap_end, Tenor::semi_annual())
             .expect("schedule");
-        let mut b = BermudanSwaption::new_payer(
+        let b = BermudanSwaption::new_payer(
             "BERM-6NC2",
             Money::new(10_000_000.0, Currency::USD),
             0.03,
@@ -563,7 +564,6 @@ mod tests {
             "USD-SWPNVOL",
         )
         .expect("bermudan");
-        b.day_count = DayCount::Thirty360;
         let _ = as_of;
         b
     }
@@ -593,7 +593,7 @@ mod tests {
         as_of: Date,
     ) -> usize {
         let first_ex = swaption.first_exercise().expect("first exercise");
-        let ex_yf = year_fraction(swaption.day_count, as_of, first_ex).expect("yf");
+        let ex_yf = year_fraction(swaption.get_day_count(), as_of, first_ex).expect("yf");
         params.tenors[..params.num_forwards].partition_point(|&t| t < ex_yf)
     }
 

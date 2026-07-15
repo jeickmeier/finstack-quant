@@ -9,7 +9,7 @@ fn test_dv01_finite_and_reasonable() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     // Align forward and discount curve for rho vs dv01 comparison.
-    swaption.forward_curve_id = swaption.discount_curve_id.clone();
+    swaption.underlying_float_leg.forward_curve_id = swaption.get_discount_curve_id().clone();
     let market = create_flat_market(as_of, 0.05, 0.30);
 
     let result = swaption

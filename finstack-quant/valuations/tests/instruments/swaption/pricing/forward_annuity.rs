@@ -129,7 +129,7 @@ fn test_year_fraction_act360() {
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
 
     let yf = swaption
-        .day_count
+        .get_day_count()
         .year_fraction(as_of, expiry, DayCountContext::default())
         .unwrap();
 
@@ -252,7 +252,7 @@ fn test_zero_coupon_cash_annuity_matches_tenor_times_maturity_df() {
         .with_cash_settlement_method(CashSettlementMethod::ZeroCoupon);
 
     let tenor = swaption
-        .day_count
+        .get_day_count()
         .year_fraction(swap_start, swap_end, DayCountContext::default())
         .unwrap();
     let expected = tenor * disc.df_between_dates(as_of, swap_end).unwrap();
@@ -267,15 +267,15 @@ fn test_forward_swap_rate_single_curve_matches_payment_date_cashflows() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let market = create_flat_market(as_of, 0.05, 0.30);
     let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
-    swaption.forward_curve_id = swaption.discount_curve_id.clone();
+    swaption.underlying_float_leg.forward_curve_id = swaption.get_discount_curve_id().clone();
 
     let forward = swaption.forward_swap_rate(&market, as_of).unwrap();
     let expected = expected_single_curve_payment_date_forward(
         SingleCurveForwardSpec {
             start: swap_start,
             end: swap_end,
-            frequency: swaption.fixed_freq,
-            day_count: swaption.day_count,
+            frequency: swaption.get_fixed_freq(),
+            day_count: swaption.get_day_count(),
             stub: StubKind::None,
             payment_lag_days: 0,
         },
@@ -290,9 +290,9 @@ fn test_single_curve_forward_honors_explicit_fixed_leg_payment_cashflows() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let market = create_flat_market(as_of, 0.05, 0.30);
     let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
-    swaption.forward_curve_id = swaption.discount_curve_id.clone();
-    swaption.underlying_fixed_leg = Some(FixedLegSpec {
-        discount_curve_id: swaption.discount_curve_id.clone(),
+    swaption.underlying_float_leg.forward_curve_id = swaption.get_discount_curve_id().clone();
+    swaption.underlying_fixed_leg = FixedLegSpec {
+        discount_curve_id: swaption.get_discount_curve_id().clone(),
         rate: Decimal::ZERO,
         frequency: Tenor::annual(),
         day_count: DayCount::Act360,
@@ -305,7 +305,7 @@ fn test_single_curve_forward_honors_explicit_fixed_leg_payment_cashflows() {
         compounding_simple: true,
         payment_lag_days: 2,
         end_of_month: false,
-    });
+    };
 
     let expected = expected_single_curve_payment_date_forward(
         SingleCurveForwardSpec {

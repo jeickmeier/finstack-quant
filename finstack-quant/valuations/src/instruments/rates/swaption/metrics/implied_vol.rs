@@ -124,17 +124,13 @@ impl MetricCalculator for ImpliedVolCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::rates::swaption::{
-        SwaptionExercise, SwaptionSettlement, VolatilityModel,
-    };
-    use crate::instruments::OptionType;
+    use crate::instruments::rates::swaption::SwaptionParams;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
-    use rust_decimal::Decimal;
     use std::sync::Arc;
     use time::macros::date;
 
@@ -172,33 +168,24 @@ mod tests {
     }
 
     fn payer_swaption(strike: f64) -> Swaption {
-        Swaption {
-            id: "SWAPTION_IV_TEST".into(),
-            option_type: OptionType::Call,
-            notional: Money::new(1_000_000.0, Currency::USD),
-            strike: Decimal::try_from(strike).expect("valid decimal"),
-            expiry: date!(2025 - 01 - 01),
-            swap_start: date!(2025 - 01 - 01),
-            swap_end: date!(2030 - 01 - 01),
-            fixed_freq: Tenor::semi_annual(),
-            float_freq: Tenor::quarterly(),
-            day_count: DayCount::Thirty360,
-            exercise_style: SwaptionExercise::European,
-            settlement: SwaptionSettlement::Physical,
-            cash_settlement_method: Default::default(),
-            vol_model: VolatilityModel::Black,
-            discount_curve_id: "USD_OIS".into(),
-            forward_curve_id: "USD_LIBOR_3M".into(),
-            vol_surface_id: "USD_SWAPTION_VOL".into(),
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            calendar_id: None,
-            underlying_fixed_leg: None,
-            underlying_float_leg: None,
-            sabr_params: None,
-            attributes: Default::default(),
-        }
+        let params = SwaptionParams::payer(
+            Money::new(1_000_000.0, Currency::USD),
+            strike,
+            date!(2025 - 01 - 01),
+            date!(2025 - 01 - 01),
+            date!(2030 - 01 - 01),
+        )
+        .expect("valid swaption params")
+        .with_fixed_frequency(Tenor::semi_annual())
+        .with_float_frequency(Tenor::quarterly())
+        .with_day_count(DayCount::Thirty360);
+        Swaption::new_payer(
+            "SWAPTION_IV_TEST",
+            &params,
+            "USD_OIS",
+            "USD_LIBOR_3M",
+            "USD_SWAPTION_VOL",
+        )
     }
 
     fn context_with_target(target_pv: f64, strike: f64) -> MetricContext {

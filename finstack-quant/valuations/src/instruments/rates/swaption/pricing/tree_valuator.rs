@@ -97,7 +97,7 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
         discount_curve: &'a dyn Discounting,
         as_of: Date,
     ) -> Result<Self> {
-        if swaption.forward_curve_id != swaption.discount_curve_id {
+        if swaption.get_forward_curve_id() != swaption.get_discount_curve_id() {
             return Err(finstack_quant_core::Error::Validation(
                 "Bermudan tree pricing is currently single-curve only. \
                  Set forward_curve_id equal to discount_curve_id or use a multi-curve-capable engine."
@@ -130,12 +130,14 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
         let payment_times = swaption.payment_times(as_of)?;
 
         let ctx = finstack_quant_core::dates::DayCountContext::default();
-        let swap_start_time = swaption
-            .day_count
-            .year_fraction(as_of, swaption.swap_start, ctx)?;
-        let swap_end_time = swaption
-            .day_count
-            .year_fraction(as_of, swaption.swap_end, ctx)?;
+        let swap_start_time =
+            swaption
+                .get_day_count()
+                .year_fraction(as_of, swaption.get_swap_start(), ctx)?;
+        let swap_end_time =
+            swaption
+                .get_day_count()
+                .year_fraction(as_of, swaption.get_swap_end(), ctx)?;
         let strike = swaption.strike_f64()?;
 
         Ok(Self {
@@ -425,18 +427,14 @@ impl BermudanSwaptionPriceResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::parameters::OptionType;
     use crate::instruments::rates::swaption::{
-        BermudanSchedule, BermudanSwaption, BermudanType, CalibratedHullWhiteModel,
-        HullWhiteParams, SwaptionSettlement,
+        BermudanSchedule, BermudanSwaption, CalibratedHullWhiteModel, HullWhiteParams,
     };
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::dates::Tenor;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
-    use finstack_quant_core::types::{CurveId, InstrumentId};
-    use rust_decimal::Decimal;
     use time::Month;
 
     fn test_discount_curve() -> DiscountCurve {
@@ -460,33 +458,19 @@ mod tests {
         let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("Valid date");
         let first_exercise = Date::from_calendar_date(2026, Month::January, 1).expect("Valid date");
 
-        BermudanSwaption {
-            id: InstrumentId::new("TEST-BERM"),
-            option_type: OptionType::Call,
-            notional: Money::new(10_000_000.0, Currency::USD),
-            strike: Decimal::try_from(0.03).expect("valid decimal"), // 3%
+        BermudanSwaption::new_payer(
+            "TEST-BERM",
+            Money::new(10_000_000.0, Currency::USD),
+            0.03,
             swap_start,
             swap_end,
-            fixed_freq: Tenor::semi_annual(),
-            float_freq: Tenor::quarterly(),
-            day_count: DayCount::Thirty360,
-            settlement: SwaptionSettlement::Physical,
-            discount_curve_id: CurveId::new("USD-OIS"),
-            forward_curve_id: CurveId::new("USD-OIS"),
-            vol_surface_id: CurveId::new("USD-VOL"),
-            bermudan_schedule: BermudanSchedule::co_terminal(
-                first_exercise,
-                swap_end,
-                Tenor::semi_annual(),
-            )
-            .expect("valid Bermudan schedule"),
-            bermudan_type: BermudanType::CoTerminal,
-            calendar_id: None,
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            attributes: Default::default(),
-        }
+            BermudanSchedule::co_terminal(first_exercise, swap_end, Tenor::semi_annual())
+                .expect("valid Bermudan schedule"),
+            "USD-OIS",
+            "USD-OIS",
+            "USD-VOL",
+        )
+        .expect("valid Bermudan swaption")
     }
 
     #[test]

@@ -3,16 +3,15 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaptionTreeValuator;
 use finstack_quant_valuations::instruments::rates::swaption::{
-    BermudanSchedule, BermudanSwaption, BermudanType, CalibratedHullWhiteModel, HullWhiteParams,
-    SwaptionSettlement,
+    BermudanSchedule, BermudanSwaption, CalibratedHullWhiteModel, HullWhiteParams,
 };
 use finstack_quant_valuations::instruments::rates::swaption::{
     BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
@@ -45,33 +44,21 @@ fn test_bermudan_swaption(
     strike: f64,
     option_type: OptionType,
 ) -> BermudanSwaption {
-    BermudanSwaption {
-        id: InstrumentId::new("TEST-BERM"),
-        option_type,
-        notional: Money::new(10_000_000.0, Currency::USD),
-        strike: rust_decimal::Decimal::try_from(strike).expect("valid decimal"),
+    let mut swaption = BermudanSwaption::new_payer(
+        "TEST-BERM",
+        Money::new(10_000_000.0, Currency::USD),
+        strike,
         swap_start,
         swap_end,
-        fixed_freq: Tenor::semi_annual(),
-        float_freq: Tenor::quarterly(),
-        day_count: DayCount::Thirty360,
-        settlement: SwaptionSettlement::Physical,
-        discount_curve_id: CurveId::new("USD-OIS"),
-        forward_curve_id: CurveId::new("USD-OIS"),
-        vol_surface_id: CurveId::new("USD-VOL"),
-        bermudan_schedule: BermudanSchedule::co_terminal(
-            first_exercise,
-            swap_end,
-            Tenor::semi_annual(),
-        )
-        .expect("valid Bermudan schedule"),
-        bermudan_type: BermudanType::CoTerminal,
-        calendar_id: None,
-        instrument_pricing_overrides: Default::default(),
-        metric_pricing_overrides: Default::default(),
-        scenario_pricing_overrides: Default::default(),
-        attributes: Default::default(),
-    }
+        BermudanSchedule::co_terminal(first_exercise, swap_end, Tenor::semi_annual())
+            .expect("valid Bermudan schedule"),
+        "USD-OIS",
+        "USD-OIS",
+        "USD-VOL",
+    )
+    .expect("valid Bermudan swaption");
+    swaption.option_type = option_type;
+    swaption
 }
 
 #[test]
@@ -83,7 +70,7 @@ fn test_tree_valuator_rejects_mixed_curve_bermudan() {
 
     let mut swaption =
         test_bermudan_swaption(swap_start, swap_end, first_exercise, 0.03, OptionType::Call);
-    swaption.forward_curve_id = CurveId::new("USD-SOFR");
+    swaption.underlying_float_leg.forward_curve_id = CurveId::new("USD-SOFR");
 
     let curve = test_discount_curve();
     let ttm = swaption.time_to_maturity(as_of).expect("Valid ttm");
@@ -361,9 +348,9 @@ fn test_bermudan_to_european_conversion() {
     let european = bermudan.to_european().expect("Conversion should succeed");
 
     // Check European parameters match Bermudan
-    assert_eq!(european.strike, bermudan.strike);
+    assert_eq!(european.get_strike(), bermudan.get_strike());
     assert_eq!(european.notional.amount(), bermudan.notional.amount());
-    assert_eq!(european.swap_end, bermudan.swap_end);
+    assert_eq!(european.get_swap_end(), bermudan.get_swap_end());
 
     // European expiry should be the first Bermudan exercise date
     assert_eq!(european.expiry, first_exercise);

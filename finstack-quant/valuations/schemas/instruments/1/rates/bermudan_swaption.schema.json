@@ -45,6 +45,281 @@
         }
       ]
     },
+    "FixedLegSpec": {
+      "description": "Specification for fixed rate legs in interest rate swaps",
+      "properties": {
+        "bdc": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+          "default": "modified_following",
+          "description": "Business day convention for payment dates"
+        },
+        "calendar_id": {
+          "description": "Optional calendar for business day adjustments",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "compounding_simple": {
+          "description": "If true, use simple interest on accrual fraction",
+          "type": "boolean"
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count convention for accrual"
+        },
+        "discount_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve identifier for pricing"
+        },
+        "end": {
+          "description": "End date of the fixed leg",
+          "type": "string"
+        },
+        "end_of_month": {
+          "default": false,
+          "description": "End-of-month roll convention (default: false).\n\nWhen `true`, if the start date falls on the last business day of a month,\nall subsequent roll dates will also fall on the last business day of their\nrespective months. This matches QuantLib's `MakeOIS` default behavior.\n\n# Market Standard\n\nPer ISDA 2006 Definitions Section 4.18, the End-of-Month convention should\nbe applied when the effective date is the last business day of a month.\nMost professional systems (QuantLib, Bloomberg SWDF) default to `true`.",
+          "type": "boolean"
+        },
+        "frequency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Payment frequency"
+        },
+        "par_method": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ParRateMethod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional par-rate calculation method override"
+        },
+        "payment_lag_days": {
+          "default": 0,
+          "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "rate": {
+          "description": "Fixed rate (e.g., 0.05 for 5%)",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "start": {
+          "description": "Start date of the fixed leg",
+          "type": "string"
+        },
+        "stub": {
+          "$ref": "#/$defs/StubKind",
+          "default": "ShortFront",
+          "description": "Stub period handling rule"
+        }
+      },
+      "required": [
+        "discount_curve_id",
+        "rate",
+        "frequency",
+        "day_count",
+        "start",
+        "end",
+        "compounding_simple"
+      ],
+      "type": "object"
+    },
+    "FloatLegSpec": {
+      "description": "Specification for floating rate legs in interest rate swaps",
+      "properties": {
+        "bdc": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+          "default": "modified_following",
+          "description": "Business day convention for payment dates"
+        },
+        "calendar_id": {
+          "description": "Optional calendar for business day adjustments",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "compounding": {
+          "$ref": "#/$defs/FloatingLegCompounding",
+          "default": "Simple",
+          "description": "Compounding method for floating coupons.\n\nDetermines how floating rate coupons are calculated:\n- `Simple` (default): LIBOR-style simple interest\n- `CompoundedInArrears`: SOFR/SONIA-style daily compounding\n\n# Implementation Notes\n\nCompounded-in-arrears is implemented for IRS pricing in `instruments::irs` with\nsupport for lookback and observation shift conventions. For seasoned (already\nstarted) compounded swaps, pricing requires explicit fixings for observation\ndates prior to `as_of`."
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count convention for accrual"
+        },
+        "discount_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve identifier for pricing"
+        },
+        "end": {
+          "description": "End date of the floating leg",
+          "type": "string"
+        },
+        "end_of_month": {
+          "default": false,
+          "description": "End-of-month roll convention (default: false).\n\nWhen `true`, if the start date falls on the last business day of a month,\nall subsequent roll dates will also fall on the last business day of their\nrespective months. This matches QuantLib's `MakeOIS` default behavior.\n\n# Market Standard\n\nPer ISDA 2006 Definitions Section 4.18, the End-of-Month convention should\nbe applied when the effective date is the last business day of a month.\nMost professional systems (QuantLib, Bloomberg SWDF) default to `true`.",
+          "type": "boolean"
+        },
+        "fixing_calendar_id": {
+          "default": null,
+          "description": "Optional calendar for rate fixing (reset lag)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "forward_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Forward curve identifier for rate projections"
+        },
+        "frequency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Payment frequency"
+        },
+        "payment_lag_days": {
+          "default": 0,
+          "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "reset_lag_days": {
+          "description": "Reset lag in business days for floating rate fixing.\n\n- **0**: Spot reset (fixing on accrual start date).\n- **Positive** (e.g., 2): T-2 fixing (2 business days before accrual start).\n- **Negative** (e.g., -1): Sentinel meaning \"use convention default from\n  `ConventionRegistry`\".",
+          "format": "int32",
+          "type": "integer"
+        },
+        "spread_bp": {
+          "description": "Spread in basis points added to the forward rate",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "start": {
+          "description": "Start date of the floating leg",
+          "type": "string"
+        },
+        "stub": {
+          "$ref": "#/$defs/StubKind",
+          "default": "ShortFront",
+          "description": "Stub period handling rule"
+        }
+      },
+      "required": [
+        "discount_curve_id",
+        "forward_curve_id",
+        "spread_bp",
+        "frequency",
+        "day_count",
+        "reset_lag_days",
+        "start",
+        "end"
+      ],
+      "type": "object"
+    },
+    "FloatingLegCompounding": {
+      "description": "Method for calculating floating leg coupon payments.\n\nDifferent reference rates require different compounding conventions:\n- **Term rates (SOFR 3M, EURIBOR, historical LIBOR)**: Simple interest\n- **Overnight rates (SOFR, SONIA, €STR, TONA)**: Compounded in arrears\n\n# Market Standards\n\n## Simple (LIBOR-style)\n- **Formula**: `Coupon = Notional × (Forward_Rate + Spread) × DCF`\n- **Use for**: USD LIBOR, EUR EURIBOR, GBP LIBOR (historical)\n- **Standard**: ISDA 2006 Definitions\n\n## Compounded In Arrears (RFR-style)\n- **Formula**: `Coupon = Notional × [∏(1 + r_i × dcf_i) - 1]`\n- **Use for**: USD SOFR, GBP SONIA, EUR €STR, JPY TONA\n- **Standard**: ISDA 2021 Definitions\n- **Lookback**: Typically 2-5 business days before period end\n- **Observation shift**: Optional shift for operational convenience\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;\n\n// LIBOR-style swap (simple compounding)\nlet simple = FloatingLegCompounding::Simple;\nassert_eq!(simple, FloatingLegCompounding::default());\n\n// SOFR OIS swap: plain compounded in arrears (no lookback)\nlet sofr = FloatingLegCompounding::CompoundedInArrears {\n    lookback_days: 0,\n    observation_shift: None,\n};\nassert_eq!(sofr, FloatingLegCompounding::sofr());\n\n// SONIA FRN-style leg with the BoE 5-day lookback (explicit, not the OIS preset)\nlet sonia_frn = FloatingLegCompounding::CompoundedInArrears {\n    lookback_days: 5,\n    observation_shift: None,\n};\nassert_ne!(sonia_frn, FloatingLegCompounding::sonia());\n```\n\n# References\n\n- **ISDA 2021 Definitions**: Compounded RFR conventions\n- **ARRC** (Alternative Reference Rates Committee): SOFR conventions\n- **BoE** (Bank of England): SONIA conventions\n- **ECB**: €STR conventions\n\nIn the IRS instrument implementation, the RFR-style variant\n(`CompoundedInArrears`) is also used to classify swaps as OIS for\ndiscount-only float-leg pricing; see `InterestRateSwap::is_single_curve_ois` for details.",
+      "oneOf": [
+        {
+          "const": "Simple",
+          "description": "Simple interest compounding (term-rate style).\n\nCoupon = Notional × (Forward_Rate + Spread) × Day_Count_Fraction\n\nUse for:\n- Term SOFR / EURIBOR-style swaps with fixed-tenor indices\n- Legacy USD/EUR/GBP LIBOR swaps (for back-testing only)\n\nThis is the current default behavior for vanilla IRS and matches\nISDA 2006 term-rate conventions.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears (overnight RFR rates).\n\nCoupon = Notional × [∏(1 + r_i × dcf_i) - 1] where the product\nis taken over daily observations in the accrual period.\n\nUse for:\n- USD SOFR (Secured Overnight Financing Rate)\n- GBP SONIA (Sterling Overnight Index Average)\n- EUR €STR (Euro Short-Term Rate)\n- JPY TONA (Tokyo Overnight Average Rate)\n\n# Fields\n\n- `lookback_days`: Days to shift observation end date before period end (typically 2-5)\n- `observation_shift`: Optional additional shift for operational convenience\n\n# Market Conventions\n\n- **SOFR**: 2-day lookback (ARRC recommended)\n- **SONIA**: 5-day lookback (BoE recommended)\n- **€STR**: 2-day shift (ECB convention)\n- **TONA**: 2-day lag (JSCC convention)",
+          "properties": {
+            "CompoundedInArrears": {
+              "properties": {
+                "lookback_days": {
+                  "description": "Number of business days to shift observation dates back from the accrual\nperiod (lookback).  Typically 2–5 days depending on market convention.\n\nThe observation dates are shifted while the day-count-fraction (DCF)\nweights remain anchored to the **original** accrual period dates.\nThis is consistent with \"lookback without observation shift\" as\ndescribed in the ISDA 2021 Definitions and ARRC SOFR conventions.",
+                  "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "observation_shift": {
+                  "description": "Optional ISDA 2021 observation shift (in business days), as an\n**alternative** to a lookback.\n\nWhen set (non-zero), observation dates are shifted *backward* by\nthis many business days and the day-count-fraction weights are\nshifted with them — identical semantics to\n[`FloatingLegCompounding::CompoundedWithObservationShift`].\n\nCombining a non-zero `lookback_days` with a non-zero\n`observation_shift` is **rejected** at pricing time on every\npricing path: the two conventions are mutually exclusive, and the\nprevious behavior (the shift silently cancelling the lookback on\none path while erroring on the other) was a defect.",
+                  "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "lookback_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CompoundedInArrears"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with true ISDA 2021 observation shift.\n\nUnlike `CompoundedInArrears` (lookback semantics), this variant shifts\n**both** the observation dates AND the day-count-fraction (DCF) weights.\nThis matches ISDA 2021 Definitions Section 4.5(c).\n\n```text\nLookback:           DCF(d, d+1)           × rate(d - shift, d+1 - shift)\nObservation Shift:  DCF(d - shift, d+1 - shift) × rate(d - shift, d+1 - shift)\n```",
+          "properties": {
+            "CompoundedWithObservationShift": {
+              "properties": {
+                "shift_days": {
+                  "description": "Number of business days to shift both observation dates and DCF weights.",
+                  "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "shift_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CompoundedWithObservationShift"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThis freezes the last observed overnight rate for the final `cutoff_days`\nbusiness days of the accrual period. Bloomberg SWPM labels this\nconvention as \"Rate Cut-Off Days\".",
+          "properties": {
+            "CompoundedWithRateCutoff": {
+              "properties": {
+                "cutoff_days": {
+                  "description": "Number of business days before period end to freeze the overnight rate.",
+                  "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "cutoff_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CompoundedWithRateCutoff"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "OptionType": {
       "description": "Option type for pricing",
       "oneOf": [
@@ -56,6 +331,51 @@
         {
           "const": "put",
           "description": "Put option",
+          "type": "string"
+        }
+      ]
+    },
+    "ParRateMethod": {
+      "description": "Method for calculating par rates in swaps",
+      "oneOf": [
+        {
+          "const": "forward_based",
+          "description": "Use forward-curve based float PV over the schedule (market standard)",
+          "type": "string"
+        },
+        {
+          "const": "discount_ratio",
+          "description": "Use discount-curve ratio for bootstrapping",
+          "type": "string"
+        }
+      ]
+    },
+    "StubKind": {
+      "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = ScheduleBuilder::new(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
+      "oneOf": [
+        {
+          "const": "None",
+          "description": "No stub allowed: start/end must align exactly with the frequency,\notherwise schedule generation returns an error.",
+          "type": "string"
+        },
+        {
+          "const": "ShortFront",
+          "description": "Short stub period at the beginning of the schedule.",
+          "type": "string"
+        },
+        {
+          "const": "ShortBack",
+          "description": "Short stub period at the end of the schedule (final step truncated to maturity).",
+          "type": "string"
+        },
+        {
+          "const": "LongFront",
+          "description": "Long stub period at the beginning of the schedule.",
+          "type": "string"
+        },
+        {
+          "const": "LongBack",
+          "description": "Long stub period at the end of the schedule (merges final two periods).",
           "type": "string"
         }
       ]
@@ -88,19 +408,148 @@
       "properties": {
         "spec": {
           "additionalProperties": false,
+          "oneOf": [
+            {
+              "description": "Accepted legacy representation using the complete scalar underlier fields.",
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "underlying_fixed_leg"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "underlying_float_leg"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "strike",
+                "swap_start",
+                "swap_end",
+                "fixed_freq",
+                "float_freq",
+                "day_count",
+                "discount_curve_id",
+                "forward_curve_id"
+              ],
+              "title": "Legacy scalar underlier"
+            },
+            {
+              "description": "Canonical representation using complete fixed and floating legs.",
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "strike"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "swap_start"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "swap_end"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "fixed_freq"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "float_freq"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "day_count"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "discount_curve_id"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "forward_curve_id"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "underlying_fixed_leg",
+                "underlying_float_leg"
+              ],
+              "title": "Canonical leg underlier"
+            },
+            {
+              "anyOf": [
+                {
+                  "required": [
+                    "strike"
+                  ]
+                },
+                {
+                  "required": [
+                    "swap_start"
+                  ]
+                },
+                {
+                  "required": [
+                    "swap_end"
+                  ]
+                },
+                {
+                  "required": [
+                    "fixed_freq"
+                  ]
+                },
+                {
+                  "required": [
+                    "float_freq"
+                  ]
+                },
+                {
+                  "required": [
+                    "day_count"
+                  ]
+                },
+                {
+                  "required": [
+                    "discount_curve_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "forward_curve_id"
+                  ]
+                }
+              ],
+              "description": "Compatibility representation containing complete legs and matching legacy scalar fields.",
+              "required": [
+                "underlying_fixed_leg",
+                "underlying_float_leg"
+              ],
+              "title": "Mixed compatibility underlier"
+            }
+          ],
           "properties": {
             "attributes": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-              "default": {},
-              "description": "Attributes for scenario selection and grouping\nAttributes for scenario selection and tagging"
+              "default": {}
             },
             "bermudan_schedule": {
-              "$ref": "#/$defs/BermudanSchedule",
-              "description": "Bermudan exercise schedule"
+              "$ref": "#/$defs/BermudanSchedule"
             },
             "bermudan_type": {
-              "$ref": "#/$defs/BermudanType",
-              "description": "Co-terminal or non-co-terminal exercise"
+              "$ref": "#/$defs/BermudanType"
             },
             "calendar_id": {
               "anyOf": [
@@ -110,41 +559,66 @@
                 {
                   "type": "null"
                 }
-              ],
-              "default": null,
-              "description": "Holiday calendar ID for schedule generation.\n\nControls business day adjustment for the underlying swap schedule.\nWhen `None`, uses weekends-only calendar. For production use, set to\nthe appropriate currency calendar (e.g., `\"nyse\"` for USD)."
+              ]
             },
             "day_count": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-              "description": "Day count convention for fixed leg"
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "discount_curve_id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Discount curve ID for present value calculations"
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "fixed_freq": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-              "description": "Fixed leg payment frequency"
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "float_freq": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-              "description": "Floating leg payment frequency"
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "forward_curve_id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Forward curve ID for floating rate projections"
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Unique instrument identifier"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
             },
             "notional": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-              "description": "Notional amount of underlying swap"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
             },
             "option_type": {
-              "$ref": "#/$defs/OptionType",
-              "description": "Option type (payer = Call, receiver = Put)"
+              "$ref": "#/$defs/OptionType"
             },
             "pricing_overrides": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/pricing_overrides.schema.json",
@@ -168,47 +642,60 @@
                 "vol_bump_pct": null,
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
-              },
-              "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+              }
             },
             "settlement": {
-              "$ref": "#/$defs/SwaptionSettlement",
-              "description": "Settlement method (physical or cash)"
+              "$ref": "#/$defs/SwaptionSettlement"
             },
             "strike": {
-              "description": "Strike (fixed rate on underlying swap)",
               "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
               "type": [
                 "string",
-                "number"
+                "number",
+                "null"
               ]
             },
             "swap_end": {
-              "description": "Underlying swap end date (final payment)",
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "swap_start": {
-              "description": "Underlying swap start date (first accrual start)",
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "underlying_fixed_leg": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FixedLegSpec"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "underlying_float_leg": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FloatLegSpec"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "vol_surface_id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Volatility surface ID for calibration"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
             }
           },
           "required": [
             "id",
             "option_type",
             "notional",
-            "strike",
-            "swap_start",
-            "swap_end",
-            "fixed_freq",
-            "float_freq",
-            "day_count",
             "settlement",
-            "discount_curve_id",
-            "forward_curve_id",
             "vol_surface_id",
             "bermudan_schedule",
             "bermudan_type"

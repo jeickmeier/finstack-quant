@@ -99,10 +99,10 @@ fn test_swaption_cash_annuity_zero_forward_and_invalid_freq() {
     swaption.settlement = SwaptionSettlement::Cash;
 
     let expected = swaption
-        .day_count
+        .get_day_count()
         .year_fraction(
-            swaption.swap_start,
-            swaption.swap_end,
+            swaption.get_swap_start(),
+            swaption.get_swap_end(),
             DayCountContext::default(),
         )
         .unwrap();
@@ -119,7 +119,7 @@ fn test_resolve_volatility_priority_and_greek_inputs_expired() {
     let market = create_flat_market(as_of, 0.03, 0.2);
     let forward = swaption.forward_swap_rate(&market, as_of).unwrap();
     let t = swaption
-        .day_count
+        .get_day_count()
         .year_fraction(as_of, swaption.expiry, DayCountContext::default())
         .unwrap();
 
@@ -195,10 +195,7 @@ fn test_swaption_example_and_builder_helpers() {
         updated.cash_settlement_method,
         CashSettlementMethod::ZeroCoupon
     );
-    assert_eq!(
-        updated.calendar_id.as_ref().map(|id| id.as_str()),
-        Some("nyse")
-    );
+    assert_eq!(updated.get_calendar_id(), Some("nyse"));
 }
 
 #[test]
@@ -234,8 +231,8 @@ fn test_bermudan_swaption_schedule_and_conversion() {
 
     let euro = swaption.to_european().unwrap();
     assert_eq!(euro.expiry, first_ex);
-    assert_eq!(euro.swap_start, first_ex);
-    assert_eq!(euro.swap_end, swap_end);
+    assert_eq!(euro.get_swap_start(), first_ex);
+    assert_eq!(euro.get_swap_end(), swap_end);
     assert_eq!(euro.vol_model, VolatilityModel::Black);
 
     let market = create_flat_market(as_of, 0.03, 0.2);
@@ -290,6 +287,6 @@ fn test_bermudan_builder_helpers_and_time_accessors() {
     assert!(berm.time_to_first_exercise(as_of).unwrap() > 0.0);
     assert!(berm.time_to_maturity(as_of).unwrap() > berm.time_to_first_exercise(as_of).unwrap());
     assert_eq!(berm.settlement, SwaptionSettlement::Cash);
-    assert_eq!(berm.fixed_freq, Tenor::annual());
-    assert_eq!(berm.float_freq, Tenor::semi_annual());
+    assert_eq!(berm.get_fixed_freq(), Tenor::annual());
+    assert_eq!(berm.get_float_freq(), Tenor::semi_annual());
 }

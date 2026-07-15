@@ -175,16 +175,16 @@ impl MetricCalculator for BermudanDeltaCalculator {
         //   (b) separate "discount delta" and "forward delta" calculators
         //       with the tree reading forward rates from the forward curve.
         let curves_up = context.curves.bump([MarketBump::Curve {
-            id: swaption.discount_curve_id.clone(),
+            id: swaption.get_discount_curve_id().clone(),
             spec: BumpSpec::parallel_bp(bump_bp),
         }])?;
         let curves_dn = context.curves.bump([MarketBump::Curve {
-            id: swaption.discount_curve_id.clone(),
+            id: swaption.get_discount_curve_id().clone(),
             spec: BumpSpec::parallel_bp(-bump_bp),
         }])?;
 
-        let disc_up = curves_up.get_discount(swaption.discount_curve_id.as_str())?;
-        let disc_dn = curves_dn.get_discount(swaption.discount_curve_id.as_str())?;
+        let disc_up = curves_up.get_discount(swaption.get_discount_curve_id().as_str())?;
+        let disc_dn = curves_dn.get_discount(swaption.get_discount_curve_id().as_str())?;
 
         let price_up =
             self.price_bermudan(swaption, disc_up.as_ref(), context.as_of, self.sigma)?;
@@ -277,7 +277,7 @@ impl MetricCalculator for BermudanVegaCalculator {
 
         let disc = context
             .curves
-            .get_discount(swaption.discount_curve_id.as_str())?;
+            .get_discount(swaption.get_discount_curve_id().as_str())?;
 
         validate_hw_greek_params(self.kappa, self.sigma)?;
 
@@ -389,7 +389,7 @@ impl MetricCalculator for BermudanGammaCalculator {
 
         let disc = context
             .curves
-            .get_discount(swaption.discount_curve_id.as_str())?;
+            .get_discount(swaption.get_discount_curve_id().as_str())?;
         let ttm = swaption.time_to_maturity(context.as_of)?;
 
         if ttm <= 0.0 {
@@ -407,16 +407,16 @@ impl MetricCalculator for BermudanGammaCalculator {
         // Bump discount curve only -- see BermudanDeltaCalculator::calculate()
         // for documentation on single-factor HW tree limitations.
         let curves_up = context.curves.bump([MarketBump::Curve {
-            id: swaption.discount_curve_id.clone(),
+            id: swaption.get_discount_curve_id().clone(),
             spec: BumpSpec::parallel_bp(bump_bp),
         }])?;
         let curves_dn = context.curves.bump([MarketBump::Curve {
-            id: swaption.discount_curve_id.clone(),
+            id: swaption.get_discount_curve_id().clone(),
             spec: BumpSpec::parallel_bp(-bump_bp),
         }])?;
 
-        let disc_up = curves_up.get_discount(swaption.discount_curve_id.as_str())?;
-        let disc_dn = curves_dn.get_discount(swaption.discount_curve_id.as_str())?;
+        let disc_up = curves_up.get_discount(swaption.get_discount_curve_id().as_str())?;
+        let disc_dn = curves_dn.get_discount(swaption.get_discount_curve_id().as_str())?;
 
         let price_up =
             self.price_bermudan(swaption, disc_up.as_ref(), context.as_of, self.sigma)?;
@@ -524,7 +524,7 @@ impl MetricCalculator for ExerciseProbabilityCalculator {
 
         let disc = context
             .curves
-            .get_discount(swaption.discount_curve_id.as_str())?;
+            .get_discount(swaption.get_discount_curve_id().as_str())?;
         let ttm = swaption.time_to_maturity(context.as_of)?;
 
         if ttm <= 0.0 {
@@ -587,15 +587,13 @@ mod tests {
     fn test_exercise_probability_profile_from_valuator() {
         // Integration test: verify from_valuator uses actual tree probabilities
         use crate::instruments::rates::swaption::{
-            BermudanSchedule, BermudanSwaption, BermudanType, CalibratedHullWhiteModel,
-            HullWhiteParams, SwaptionSettlement,
+            BermudanSchedule, BermudanSwaption, CalibratedHullWhiteModel, HullWhiteParams,
         };
         use finstack_quant_core::currency::Currency;
-        use finstack_quant_core::dates::{DayCount, Tenor};
+        use finstack_quant_core::dates::Tenor;
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
         use finstack_quant_core::math::interp::InterpStyle;
         use finstack_quant_core::money::Money;
-        use finstack_quant_core::types::{CurveId, InstrumentId};
         use time::Month;
 
         // Create test discount curve
@@ -617,33 +615,19 @@ mod tests {
         let swap_end = Date::from_calendar_date(2028, Month::January, 1).expect("Valid date");
         let first_exercise = Date::from_calendar_date(2026, Month::January, 1).expect("Valid date");
 
-        let swaption = BermudanSwaption {
-            id: InstrumentId::new("TEST-BERM"),
-            option_type: crate::instruments::common_impl::parameters::OptionType::Call,
-            notional: Money::new(10_000_000.0, Currency::USD),
-            strike: rust_decimal::Decimal::try_from(0.03).expect("valid decimal"),
+        let swaption = BermudanSwaption::new_payer(
+            "TEST-BERM",
+            Money::new(10_000_000.0, Currency::USD),
+            0.03,
             swap_start,
             swap_end,
-            fixed_freq: Tenor::semi_annual(),
-            float_freq: Tenor::quarterly(),
-            day_count: DayCount::Thirty360,
-            settlement: SwaptionSettlement::Physical,
-            discount_curve_id: CurveId::new("USD-OIS"),
-            forward_curve_id: CurveId::new("USD-OIS"),
-            vol_surface_id: CurveId::new("USD-VOL"),
-            bermudan_schedule: BermudanSchedule::co_terminal(
-                first_exercise,
-                swap_end,
-                Tenor::semi_annual(),
-            )
-            .expect("valid Bermudan schedule"),
-            bermudan_type: BermudanType::CoTerminal,
-            calendar_id: None,
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            attributes: Default::default(),
-        };
+            BermudanSchedule::co_terminal(first_exercise, swap_end, Tenor::semi_annual())
+                .expect("valid Bermudan schedule"),
+            "USD-OIS",
+            "USD-OIS",
+            "USD-VOL",
+        )
+        .expect("valid Bermudan swaption");
 
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
         let ttm = swaption.time_to_maturity(as_of).expect("Valid ttm");

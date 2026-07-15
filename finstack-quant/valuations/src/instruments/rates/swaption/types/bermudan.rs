@@ -1,6 +1,7 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Attributes;
+use crate::instruments::rates::irs::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -15,7 +16,10 @@ use super::definitions::{
     BermudanSchedule, BermudanType, CashSettlementMethod, SwaptionExercise, SwaptionSettlement,
     VolatilityModel,
 };
-use super::swaption::Swaption;
+use super::swaption::{
+    normalize_underlier, underlier_wire_schema, vanilla_underlier, LegacySwaptionUnderlier,
+    Swaption, VanillaSwaptionUnderlier,
+};
 
 // ============================================================================
 // Bermudan Swaption Instrument
@@ -47,8 +51,7 @@ use super::swaption::Swaption;
 /// // Create a 10NC2 (10-year swap, callable after 2 years)
 /// let swaption = BermudanSwaption::example();
 /// ```
-#[derive(Debug, Clone, finstack_quant_valuations_macros::FocusedPricingOverrides)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone)]
 pub struct BermudanSwaption {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -56,53 +59,250 @@ pub struct BermudanSwaption {
     pub option_type: OptionType,
     /// Notional amount of underlying swap
     pub notional: Money,
-    /// Strike (fixed rate on underlying swap)
-    pub strike: Decimal,
-    /// Underlying swap start date (first accrual start)
-    #[schemars(with = "String")]
-    pub swap_start: Date,
-    /// Underlying swap end date (final payment)
-    #[schemars(with = "String")]
-    pub swap_end: Date,
-    /// Fixed leg payment frequency
-    pub fixed_freq: Tenor,
-    /// Floating leg payment frequency
-    pub float_freq: Tenor,
-    /// Day count convention for fixed leg
-    pub day_count: DayCount,
     /// Settlement method (physical or cash)
     pub settlement: SwaptionSettlement,
-    /// Discount curve ID for present value calculations
-    pub discount_curve_id: CurveId,
-    /// Forward curve ID for floating rate projections
-    pub forward_curve_id: CurveId,
     /// Volatility surface ID for calibration
     pub vol_surface_id: CurveId,
     /// Bermudan exercise schedule
     pub bermudan_schedule: BermudanSchedule,
     /// Co-terminal or non-co-terminal exercise
     pub bermudan_type: BermudanType,
-    /// Holiday calendar ID for schedule generation.
-    ///
-    /// Controls business day adjustment for the underlying swap schedule.
-    /// When `None`, uses weekends-only calendar. For production use, set to
-    /// the appropriate currency calendar (e.g., `"nyse"` for USD).
-    #[serde(default)]
-    pub calendar_id: Option<CalendarId>,
-    /// Pricing overrides (manual price, yield, spread)
-    #[serde(default)]
+    /// Complete fixed leg of the underlying swap.
+    pub underlying_fixed_leg: FixedLegSpec,
+    /// Complete floating leg of the underlying swap.
+    pub underlying_float_leg: FloatLegSpec,
     /// Instrument-owned pricing inputs.
     pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
-    #[serde(default)]
     pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
-    #[serde(default)]
     pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and grouping
-    #[serde(default)]
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
+}
+
+#[derive(Clone, Debug, finstack_quant_valuations_macros::FocusedPricingOverrides)]
+#[serde(deny_unknown_fields)]
+struct BermudanSwaptionWire {
+    id: InstrumentId,
+    option_type: OptionType,
+    notional: Money,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    strike: Option<Decimal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    swap_start: Option<Date>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    swap_end: Option<Date>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fixed_freq: Option<Tenor>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    float_freq: Option<Tenor>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    day_count: Option<DayCount>,
+    settlement: SwaptionSettlement,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    discount_curve_id: Option<CurveId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    forward_curve_id: Option<CurveId>,
+    vol_surface_id: CurveId,
+    bermudan_schedule: BermudanSchedule,
+    bermudan_type: BermudanType,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    calendar_id: Option<CalendarId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    underlying_fixed_leg: Option<FixedLegSpec>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    underlying_float_leg: Option<FloatLegSpec>,
+    instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
+    #[serde(default)]
+    attributes: Attributes,
+}
+
+impl TryFrom<BermudanSwaptionWire> for BermudanSwaption {
+    type Error = Error;
+
+    fn try_from(wire: BermudanSwaptionWire) -> Result<Self> {
+        let (underlying_fixed_leg, underlying_float_leg) = normalize_underlier(
+            wire.underlying_fixed_leg,
+            wire.underlying_float_leg,
+            LegacySwaptionUnderlier {
+                strike: wire.strike,
+                swap_start: wire.swap_start,
+                swap_end: wire.swap_end,
+                fixed_freq: wire.fixed_freq,
+                float_freq: wire.float_freq,
+                day_count: wire.day_count,
+                discount_curve_id: wire.discount_curve_id,
+                forward_curve_id: wire.forward_curve_id,
+                calendar_id: wire.calendar_id,
+            },
+        )?;
+        Ok(Self {
+            id: wire.id,
+            option_type: wire.option_type,
+            notional: wire.notional,
+            settlement: wire.settlement,
+            vol_surface_id: wire.vol_surface_id,
+            bermudan_schedule: wire.bermudan_schedule,
+            bermudan_type: wire.bermudan_type,
+            underlying_fixed_leg,
+            underlying_float_leg,
+            instrument_pricing_overrides: wire.instrument_pricing_overrides,
+            metric_pricing_overrides: wire.metric_pricing_overrides,
+            scenario_pricing_overrides: wire.scenario_pricing_overrides,
+            attributes: wire.attributes,
+        })
+    }
+}
+
+impl From<&BermudanSwaption> for BermudanSwaptionWire {
+    fn from(value: &BermudanSwaption) -> Self {
+        Self {
+            id: value.id.clone(),
+            option_type: value.option_type,
+            notional: value.notional,
+            strike: None,
+            swap_start: None,
+            swap_end: None,
+            fixed_freq: None,
+            float_freq: None,
+            day_count: None,
+            settlement: value.settlement,
+            discount_curve_id: None,
+            forward_curve_id: None,
+            vol_surface_id: value.vol_surface_id.clone(),
+            bermudan_schedule: value.bermudan_schedule.clone(),
+            bermudan_type: value.bermudan_type,
+            calendar_id: None,
+            underlying_fixed_leg: Some(value.underlying_fixed_leg.clone()),
+            underlying_float_leg: Some(value.underlying_float_leg.clone()),
+            instrument_pricing_overrides: value.instrument_pricing_overrides.clone(),
+            metric_pricing_overrides: value.metric_pricing_overrides.clone(),
+            scenario_pricing_overrides: value.scenario_pricing_overrides.clone(),
+            attributes: value.attributes.clone(),
+        }
+    }
+}
+
+impl serde::Serialize for BermudanSwaption {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serde::Serialize::serialize(&BermudanSwaptionWire::from(self), serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for BermudanSwaption {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = <BermudanSwaptionWire as serde::Deserialize>::deserialize(deserializer)?;
+        Self::try_from(wire).map_err(serde::de::Error::custom)
+    }
+}
+
+impl schemars::JsonSchema for BermudanSwaption {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("BermudanSwaption")
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        underlier_wire_schema(<BermudanSwaptionWire as schemars::JsonSchema>::json_schema(
+            generator,
+        ))
+    }
+}
+
+#[cfg(test)]
+mod wire_tests {
+    use super::*;
+    use crate::instruments::rates::irs::FloatingLegCompounding;
+    use serde_json::Value;
+
+    fn add_matching_legacy_underlier(value: &mut Value) {
+        let fixed = value["underlying_fixed_leg"].clone();
+        let float = value["underlying_float_leg"].clone();
+        let object = value.as_object_mut().expect("Bermudan JSON object");
+        object.insert("strike".to_string(), fixed["rate"].clone());
+        object.insert("swap_start".to_string(), fixed["start"].clone());
+        object.insert("swap_end".to_string(), fixed["end"].clone());
+        object.insert("fixed_freq".to_string(), fixed["frequency"].clone());
+        object.insert("float_freq".to_string(), float["frequency"].clone());
+        object.insert("day_count".to_string(), fixed["day_count"].clone());
+        object.insert(
+            "discount_curve_id".to_string(),
+            fixed["discount_curve_id"].clone(),
+        );
+        object.insert(
+            "forward_curve_id".to_string(),
+            float["forward_curve_id"].clone(),
+        );
+    }
+
+    #[test]
+    fn legacy_bermudan_input_serializes_as_canonical_legs() {
+        let canonical =
+            serde_json::to_value(BermudanSwaption::example()).expect("canonical Bermudan JSON");
+        let mut legacy = canonical.clone();
+        add_matching_legacy_underlier(&mut legacy);
+        let object = legacy.as_object_mut().expect("legacy Bermudan JSON object");
+        object.remove("underlying_fixed_leg");
+        object.remove("underlying_float_leg");
+
+        let normalized: BermudanSwaption =
+            serde_json::from_value(legacy).expect("legacy Bermudan input");
+        assert_eq!(
+            serde_json::to_value(normalized).expect("canonical Bermudan output"),
+            canonical
+        );
+    }
+
+    #[test]
+    fn to_european_preserves_complete_leg_conventions() {
+        let mut bermudan = BermudanSwaption::example();
+        bermudan.underlying_fixed_leg.frequency = Tenor::annual();
+        bermudan.underlying_fixed_leg.day_count = DayCount::Act365F;
+        bermudan.underlying_fixed_leg.bdc = BusinessDayConvention::Preceding;
+        bermudan.underlying_fixed_leg.calendar_id = Some("nyse".to_string());
+        bermudan.underlying_fixed_leg.stub = StubKind::ShortFront;
+        bermudan.underlying_fixed_leg.compounding_simple = false;
+        bermudan.underlying_fixed_leg.payment_lag_days = 2;
+        bermudan.underlying_fixed_leg.end_of_month = true;
+
+        bermudan.underlying_float_leg.frequency = Tenor::semi_annual();
+        bermudan.underlying_float_leg.day_count = DayCount::Act360;
+        bermudan.underlying_float_leg.bdc = BusinessDayConvention::Following;
+        bermudan.underlying_float_leg.calendar_id = Some("target".to_string());
+        bermudan.underlying_float_leg.fixing_calendar_id = Some("nyse".to_string());
+        bermudan.underlying_float_leg.stub = StubKind::LongBack;
+        bermudan.underlying_float_leg.reset_lag_days = 2;
+        bermudan.underlying_float_leg.compounding = FloatingLegCompounding::sofr();
+        bermudan.underlying_float_leg.payment_lag_days = 3;
+        bermudan.underlying_float_leg.end_of_month = true;
+
+        let first_exercise = bermudan.first_exercise().expect("first exercise");
+        let mut expected_fixed = bermudan.underlying_fixed_leg.clone();
+        expected_fixed.start = first_exercise;
+        let mut expected_float = bermudan.underlying_float_leg.clone();
+        expected_float.start = first_exercise;
+
+        let european = bermudan.to_european().expect("European conversion");
+        assert_eq!(european.expiry, first_exercise);
+        assert_eq!(
+            serde_json::to_value(european.underlying_fixed_leg).expect("fixed leg JSON"),
+            serde_json::to_value(expected_fixed).expect("expected fixed leg JSON")
+        );
+        assert_eq!(
+            serde_json::to_value(european.underlying_float_leg).expect("float leg JSON"),
+            serde_json::to_value(expected_float).expect("expected float leg JSON")
+        );
+    }
 }
 
 impl BermudanSwaption {
@@ -117,20 +317,25 @@ impl BermudanSwaption {
             Date::from_calendar_date(2037, time::Month::January, 17).expect("Valid example date");
         let first_exercise =
             Date::from_calendar_date(2029, time::Month::January, 17).expect("Valid example date");
+        let strike = Decimal::try_from(0.03).expect("valid decimal");
+        let (underlying_fixed_leg, underlying_float_leg) =
+            vanilla_underlier(VanillaSwaptionUnderlier {
+                strike,
+                swap_start,
+                swap_end,
+                fixed_freq: Tenor::semi_annual(),
+                float_freq: Tenor::quarterly(),
+                day_count: DayCount::Thirty360,
+                discount_curve_id: CurveId::new("USD-OIS"),
+                forward_curve_id: CurveId::new("USD-OIS"),
+                calendar_id: None,
+            });
 
         Self {
             id: InstrumentId::new("BERM-10NC2-USD"),
             option_type: OptionType::Call,
             notional: Money::new(10_000_000.0, Currency::USD),
-            strike: Decimal::try_from(0.03).expect("valid decimal"),
-            swap_start,
-            swap_end,
-            fixed_freq: Tenor::semi_annual(),
-            float_freq: Tenor::quarterly(),
-            day_count: DayCount::Thirty360,
             settlement: SwaptionSettlement::Physical,
-            discount_curve_id: CurveId::new("USD-OIS"),
-            forward_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: CurveId::new("USD-SWPNVOL"),
             bermudan_schedule: BermudanSchedule::co_terminal(
                 first_exercise,
@@ -139,7 +344,8 @@ impl BermudanSwaption {
             )
             .expect("valid Bermudan schedule"),
             bermudan_type: BermudanType::CoTerminal,
-            calendar_id: None,
+            underlying_fixed_leg,
+            underlying_float_leg,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -162,23 +368,29 @@ impl BermudanSwaption {
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
+        let strike = finstack_quant_core::decimal::f64_to_decimal(strike)?;
+        let (underlying_fixed_leg, underlying_float_leg) =
+            vanilla_underlier(VanillaSwaptionUnderlier {
+                strike,
+                swap_start,
+                swap_end,
+                fixed_freq: Tenor::semi_annual(),
+                float_freq: Tenor::quarterly(),
+                day_count: DayCount::Thirty360,
+                discount_curve_id: discount_curve_id.into(),
+                forward_curve_id: forward_curve_id.into(),
+                calendar_id: None,
+            });
         Ok(Self {
             id: id.into(),
             option_type: OptionType::Call,
             notional,
-            strike: finstack_quant_core::decimal::f64_to_decimal(strike)?,
-            swap_start,
-            swap_end,
-            fixed_freq: Tenor::semi_annual(),
-            float_freq: Tenor::quarterly(),
-            day_count: DayCount::Thirty360,
             settlement: SwaptionSettlement::Physical,
-            discount_curve_id: discount_curve_id.into(),
-            forward_curve_id: forward_curve_id.into(),
             vol_surface_id: vol_surface_id.into(),
             bermudan_schedule,
             bermudan_type: BermudanType::CoTerminal,
-            calendar_id: None,
+            underlying_fixed_leg,
+            underlying_float_leg,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -201,23 +413,29 @@ impl BermudanSwaption {
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
+        let strike = finstack_quant_core::decimal::f64_to_decimal(strike)?;
+        let (underlying_fixed_leg, underlying_float_leg) =
+            vanilla_underlier(VanillaSwaptionUnderlier {
+                strike,
+                swap_start,
+                swap_end,
+                fixed_freq: Tenor::semi_annual(),
+                float_freq: Tenor::quarterly(),
+                day_count: DayCount::Thirty360,
+                discount_curve_id: discount_curve_id.into(),
+                forward_curve_id: forward_curve_id.into(),
+                calendar_id: None,
+            });
         Ok(Self {
             id: id.into(),
             option_type: OptionType::Put,
             notional,
-            strike: finstack_quant_core::decimal::f64_to_decimal(strike)?,
-            swap_start,
-            swap_end,
-            fixed_freq: Tenor::semi_annual(),
-            float_freq: Tenor::quarterly(),
-            day_count: DayCount::Thirty360,
             settlement: SwaptionSettlement::Physical,
-            discount_curve_id: discount_curve_id.into(),
-            forward_curve_id: forward_curve_id.into(),
             vol_surface_id: vol_surface_id.into(),
             bermudan_schedule,
             bermudan_type: BermudanType::CoTerminal,
-            calendar_id: None,
+            underlying_fixed_leg,
+            underlying_float_leg,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -225,21 +443,67 @@ impl BermudanSwaption {
         })
     }
 
+    /// Fixed rate of the underlying swap.
+    pub fn get_strike(&self) -> Decimal {
+        self.underlying_fixed_leg.rate
+    }
+
+    /// Start date shared by both underlying legs.
+    pub fn get_swap_start(&self) -> Date {
+        self.underlying_fixed_leg.start
+    }
+
+    /// End date shared by both underlying legs.
+    pub fn get_swap_end(&self) -> Date {
+        self.underlying_fixed_leg.end
+    }
+
+    /// Fixed-leg payment frequency.
+    pub fn get_fixed_freq(&self) -> Tenor {
+        self.underlying_fixed_leg.frequency
+    }
+
+    /// Floating-leg payment frequency.
+    pub fn get_float_freq(&self) -> Tenor {
+        self.underlying_float_leg.frequency
+    }
+
+    /// Fixed-leg accrual convention.
+    pub fn get_day_count(&self) -> DayCount {
+        self.underlying_fixed_leg.day_count
+    }
+
+    /// Discount curve selected by the underlying legs.
+    pub fn get_discount_curve_id(&self) -> &CurveId {
+        &self.underlying_fixed_leg.discount_curve_id
+    }
+
+    /// Forward curve selected by the floating leg.
+    pub fn get_forward_curve_id(&self) -> &CurveId {
+        &self.underlying_float_leg.forward_curve_id
+    }
+
+    /// Schedule calendar selected by the fixed leg.
+    pub fn get_calendar_id(&self) -> Option<&str> {
+        self.underlying_fixed_leg.calendar_id.as_deref()
+    }
+
     /// Set fixed leg frequency.
     pub fn with_fixed_freq(mut self, freq: Tenor) -> Self {
-        self.fixed_freq = freq;
+        self.underlying_fixed_leg.frequency = freq;
         self
     }
 
     /// Set floating leg frequency.
     pub fn with_float_freq(mut self, freq: Tenor) -> Self {
-        self.float_freq = freq;
+        self.underlying_float_leg.frequency = freq;
         self
     }
 
     /// Set day count convention.
     pub fn with_day_count(mut self, dc: DayCount) -> Self {
-        self.day_count = dc;
+        self.underlying_fixed_leg.day_count = dc;
+        self.underlying_float_leg.day_count = dc;
         self
     }
 
@@ -257,13 +521,17 @@ impl BermudanSwaption {
 
     /// Set the holiday calendar for schedule generation.
     pub fn with_calendar(mut self, calendar_id: impl Into<CalendarId>) -> Self {
-        self.calendar_id = Some(calendar_id.into());
+        let calendar_id = calendar_id.into().to_string();
+        self.underlying_fixed_leg.calendar_id = Some(calendar_id.clone());
+        self.underlying_float_leg.calendar_id = Some(calendar_id.clone());
+        self.underlying_float_leg.fixing_calendar_id = Some(calendar_id);
         self
     }
 
     /// Resolve the effective calendar ID for schedule generation.
     fn effective_calendar_id(&self) -> &str {
-        self.calendar_id
+        self.underlying_fixed_leg
+            .calendar_id
             .as_deref()
             .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
     }
@@ -285,7 +553,7 @@ impl BermudanSwaption {
                 if as_of >= first {
                     return Ok(0.0);
                 }
-                self.day_count.year_fraction(
+                self.get_day_count().year_fraction(
                     as_of,
                     first,
                     finstack_quant_core::dates::DayCountContext::default(),
@@ -297,12 +565,12 @@ impl BermudanSwaption {
 
     /// Calculate time to swap maturity in years.
     pub fn time_to_maturity(&self, as_of: Date) -> Result<f64> {
-        if as_of >= self.swap_end {
+        if as_of >= self.get_swap_end() {
             return Ok(0.0);
         }
-        self.day_count.year_fraction(
+        self.get_day_count().year_fraction(
             as_of,
-            self.swap_end,
+            self.get_swap_end(),
             finstack_quant_core::dates::DayCountContext::default(),
         )
     }
@@ -311,7 +579,7 @@ impl BermudanSwaption {
     pub fn exercise_times(&self, as_of: Date) -> Result<Vec<f64>> {
         let times = self
             .bermudan_schedule
-            .exercise_times(as_of, self.day_count)?;
+            .exercise_times(as_of, self.get_day_count())?;
         if times.is_empty() {
             return Ok(times);
         }
@@ -324,14 +592,14 @@ impl BermudanSwaption {
     pub fn build_swap_schedule(&self, _as_of: Date) -> Result<(Vec<Date>, Vec<f64>)> {
         let periods = crate::cashflow::builder::periods::build_periods(
             crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: self.swap_start,
-                end: self.swap_end,
-                frequency: self.fixed_freq,
+                start: self.get_swap_start(),
+                end: self.get_swap_end(),
+                frequency: self.get_fixed_freq(),
                 stub: StubKind::None,
                 bdc: BusinessDayConvention::ModifiedFollowing, // Market standard per ISDA
                 calendar_id: self.effective_calendar_id(),
                 end_of_month: false,
-                day_count: self.day_count,
+                day_count: self.get_day_count(),
                 payment_lag_days: 0,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
@@ -356,12 +624,12 @@ impl BermudanSwaption {
         let ctx = finstack_quant_core::dates::DayCountContext::default();
         dates
             .iter()
-            .map(|&d| self.day_count.year_fraction(as_of, d, ctx))
+            .map(|&d| self.get_day_count().year_fraction(as_of, d, ctx))
             .collect()
     }
 
     pub(crate) fn strike_f64(&self) -> Result<f64> {
-        self.strike.to_f64().ok_or_else(|| {
+        self.get_strike().to_f64().ok_or_else(|| {
             Error::Validation("BermudanSwaption strike could not be converted to f64".into())
         })
     }
@@ -386,7 +654,7 @@ impl BermudanSwaption {
             rate_period_on_dates, relative_df_discounting,
         };
 
-        let disc = curves.get_discount(self.discount_curve_id.as_ref())?;
+        let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
         let annuity = self.remaining_annuity(disc.as_ref(), as_of, exercise_date)?;
 
         if annuity.abs() < 1e-10 {
@@ -394,19 +662,19 @@ impl BermudanSwaption {
         }
 
         // Single-curve optimization
-        if self.forward_curve_id == self.discount_curve_id {
+        if self.get_forward_curve_id() == self.get_discount_curve_id() {
             let df_start = relative_df_discounting(disc.as_ref(), as_of, exercise_date)?;
-            let df_end = relative_df_discounting(disc.as_ref(), as_of, self.swap_end)?;
+            let df_end = relative_df_discounting(disc.as_ref(), as_of, self.get_swap_end())?;
             return Ok((df_start - df_end) / annuity);
         }
 
-        let fwd = curves.get_forward(self.forward_curve_id.as_ref())?;
+        let fwd = curves.get_forward(self.get_forward_curve_id().as_ref())?;
         let fwd_dc = fwd.day_count();
         let periods = crate::cashflow::builder::periods::build_periods(
             crate::cashflow::builder::periods::BuildPeriodsParams {
                 start: exercise_date,
-                end: self.swap_end,
-                frequency: self.float_freq,
+                end: self.get_swap_end(),
+                frequency: self.get_float_freq(),
                 stub: StubKind::None,
                 bdc: BusinessDayConvention::ModifiedFollowing, // Market standard per ISDA
                 calendar_id: self.effective_calendar_id(),
@@ -465,28 +733,25 @@ impl BermudanSwaption {
         let first_ex = self
             .first_exercise()
             .ok_or_else(|| Error::Validation("No exercise dates".into()))?;
+        let mut underlying_fixed_leg = self.underlying_fixed_leg.clone();
+        underlying_fixed_leg.start = first_ex;
+        let mut underlying_float_leg = self.underlying_float_leg.clone();
+        underlying_float_leg.start = first_ex;
+        underlying_fixed_leg.validate()?;
+        underlying_float_leg.validate()?;
 
         Ok(Swaption {
             id: InstrumentId::new(format!("{}-EURO", self.id.as_str())),
             option_type: self.option_type,
             notional: self.notional,
-            strike: self.strike,
             expiry: first_ex,
-            swap_start: first_ex,
-            swap_end: self.swap_end,
-            fixed_freq: self.fixed_freq,
-            float_freq: self.float_freq,
-            day_count: self.day_count,
             exercise_style: SwaptionExercise::European,
             settlement: self.settlement,
             cash_settlement_method: CashSettlementMethod::default(),
             vol_model: VolatilityModel::Black,
-            discount_curve_id: self.discount_curve_id.clone(),
-            forward_curve_id: self.forward_curve_id.clone(),
             vol_surface_id: self.vol_surface_id.clone(),
-            calendar_id: self.calendar_id.clone(),
-            underlying_fixed_leg: None,
-            underlying_float_leg: None,
+            underlying_fixed_leg,
+            underlying_float_leg,
             instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
             metric_pricing_overrides: self.metric_pricing_overrides.clone(),
             scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
@@ -509,8 +774,8 @@ impl crate::instruments::common_impl::traits::Instrument for BermudanSwaption {
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
-        deps.add_discount_curve(self.discount_curve_id.clone());
-        deps.add_forward_curve(self.forward_curve_id.clone());
+        deps.add_discount_curve(self.get_discount_curve_id().clone());
+        deps.add_forward_curve(self.get_forward_curve_id().clone());
         deps.add_volatility_dependency(
             crate::instruments::common_impl::dependencies::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
@@ -533,7 +798,7 @@ impl crate::instruments::common_impl::traits::Instrument for BermudanSwaption {
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.swap_start)
+        Some(self.get_swap_start())
     }
 
     crate::impl_focused_pricing_overrides!();

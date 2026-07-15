@@ -282,7 +282,7 @@ impl BermudanSwaptionCheyetteRoughPricer {
         }
 
         let disc = market
-            .get_discount(swaption.discount_curve_id.as_str())
+            .get_discount(swaption.get_discount_curve_id().as_str())
             .map_err(|e| {
                 PricingError::missing_market_data_with_context(
                     e.to_string(),
@@ -317,8 +317,8 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let notional = swaption.notional.amount();
         let currency = swaption.notional.currency();
 
-        let swap_end_time =
-            year_fraction(swaption.day_count, as_of, swaption.swap_end).map_err(|e| {
+        let swap_end_time = year_fraction(swaption.get_day_count(), as_of, swaption.get_swap_end())
+            .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
                     PricingErrorContext::default(),
@@ -326,7 +326,7 @@ impl BermudanSwaptionCheyetteRoughPricer {
             })?;
 
         // Fixed leg period
-        let tenor_months = swaption.fixed_freq.months().unwrap_or(6) as f64;
+        let tenor_months = swaption.get_fixed_freq().months().unwrap_or(6) as f64;
         let period = tenor_months / 12.0;
 
         let as_of_curve_time = disc
@@ -346,7 +346,7 @@ impl BermudanSwaptionCheyetteRoughPricer {
         // Exercise times
         let exercise_times = swaption
             .bermudan_schedule
-            .exercise_times(as_of, swaption.day_count)
+            .exercise_times(as_of, swaption.get_day_count())
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
@@ -812,7 +812,7 @@ mod tests {
     use crate::instruments::rates::swaption::types::BermudanSchedule;
     use crate::pricer::Pricer;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, DayCount, Tenor};
+    use finstack_quant_core::dates::{Date, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::market_data::traits::{Discounting, TermStructure};
@@ -995,7 +995,7 @@ mod tests {
         let first_ex = Date::from_calendar_date(2027, Month::January, 17).expect("date");
         let schedule =
             BermudanSchedule::co_terminal(first_ex, swap_end, Tenor::annual()).expect("schedule");
-        let mut b = BermudanSwaption::new_payer(
+        let b = BermudanSwaption::new_payer(
             "BERM-CHEYETTE-TEST",
             Money::new(1_000_000.0, Currency::USD),
             0.03,
@@ -1007,7 +1007,6 @@ mod tests {
             "USD-SWPNVOL",
         )
         .expect("bermudan");
-        b.day_count = DayCount::Thirty360;
         let _ = as_of;
         b
     }

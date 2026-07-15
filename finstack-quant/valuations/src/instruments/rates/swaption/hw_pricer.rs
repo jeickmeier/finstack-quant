@@ -37,7 +37,7 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
-use finstack_quant_core::dates::{BusinessDayConvention, DayCountContext, StubKind};
+use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
@@ -131,8 +131,8 @@ impl SwaptionHullWhitePricer {
         // Time horizon is swap end (need the tree to cover the full swap)
         let ctx = DayCountContext::default();
         let swap_end_time = swaption
-            .day_count
-            .year_fraction(as_of, swaption.swap_end, ctx)
+            .underlying_day_count()
+            .year_fraction(as_of, swaption.get_swap_end(), ctx)
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
@@ -186,22 +186,23 @@ impl SwaptionHullWhitePricer {
         })?;
 
         // Build swap schedule for the underlying
-        let calendar_id = swaption
+        let fixed_leg = &swaption.underlying_fixed_leg;
+        let calendar_id = fixed_leg
             .calendar_id
             .as_deref()
             .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
 
         let periods = crate::cashflow::builder::periods::build_periods(
             crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: swaption.swap_start,
-                end: swaption.swap_end,
-                frequency: swaption.underlying_fixed_frequency(),
-                stub: StubKind::None,
-                bdc: BusinessDayConvention::ModifiedFollowing,
+                start: fixed_leg.start,
+                end: fixed_leg.end,
+                frequency: fixed_leg.frequency,
+                stub: fixed_leg.stub,
+                bdc: fixed_leg.bdc,
                 calendar_id,
-                end_of_month: false,
-                day_count: swaption.underlying_day_count(),
-                payment_lag_days: 0,
+                end_of_month: fixed_leg.end_of_month,
+                day_count: fixed_leg.day_count,
+                payment_lag_days: fixed_leg.payment_lag_days,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
             },
@@ -222,7 +223,7 @@ impl SwaptionHullWhitePricer {
         let mut accrual_fractions = Vec::with_capacity(periods.len());
         for period in periods {
             let t = swaption
-                .day_count
+                .underlying_day_count()
                 .year_fraction(as_of, period.payment_date, ctx)
                 .map_err(|e| {
                     PricingError::model_failure_with_context(
@@ -236,8 +237,8 @@ impl SwaptionHullWhitePricer {
         }
 
         let swap_start_time = swaption
-            .day_count
-            .year_fraction(as_of, swaption.swap_start, ctx)
+            .underlying_day_count()
+            .year_fraction(as_of, swaption.get_swap_start(), ctx)
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
@@ -373,9 +374,10 @@ mod tests {
         let as_of = date(2025, 1, 1);
         let mut swaption = Swaption::example();
         // example() uses an OIS discount curve; HW tree pricing is single-curve.
-        swaption.forward_curve_id = swaption.discount_curve_id.clone();
+        swaption.underlying_float_leg.forward_curve_id =
+            swaption.underlying_fixed_leg.discount_curve_id.clone();
         let market = MarketContext::new().insert(flat_discount_with_tenor(
-            swaption.discount_curve_id.as_str(),
+            swaption.get_discount_curve_id().as_str(),
             as_of,
             0.03,
             10.0,
@@ -395,9 +397,10 @@ mod tests {
     fn example_single_curve() -> (finstack_quant_core::dates::Date, Swaption, MarketContext) {
         let as_of = date(2025, 1, 1);
         let mut swaption = Swaption::example();
-        swaption.forward_curve_id = swaption.discount_curve_id.clone();
+        swaption.underlying_float_leg.forward_curve_id =
+            swaption.underlying_fixed_leg.discount_curve_id.clone();
         let market = MarketContext::new().insert(flat_discount_with_tenor(
-            swaption.discount_curve_id.as_str(),
+            swaption.get_discount_curve_id().as_str(),
             as_of,
             0.03,
             10.0,
@@ -419,7 +422,7 @@ mod tests {
             .value
             .amount();
 
-        let (kappa_key, sigma_key) = hw1f_scalar_keys(swaption.discount_curve_id.as_str());
+        let (kappa_key, sigma_key) = hw1f_scalar_keys(swaption.get_discount_curve_id().as_str());
         // Calibrated σ deliberately far from the default 0.01.
         let calibrated_market = default_market
             .insert_price(&kappa_key, MarketScalar::Unitless(0.10))
@@ -498,7 +501,7 @@ mod tests {
         use finstack_quant_core::market_data::scalars::MarketScalar;
 
         let (as_of, mut swaption, market) = example_single_curve();
-        let (kappa_key, sigma_key) = hw1f_scalar_keys(swaption.discount_curve_id.as_str());
+        let (kappa_key, sigma_key) = hw1f_scalar_keys(swaption.get_discount_curve_id().as_str());
         let market = market
             .insert_price(&kappa_key, MarketScalar::Unitless(0.10))
             .insert_price(&sigma_key, MarketScalar::Unitless(0.025));

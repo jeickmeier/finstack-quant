@@ -2282,20 +2282,148 @@
     },
     "BermudanSwaption": {
       "additionalProperties": false,
-      "description": "Bermudan swaption with multiple exercise dates.\n\nA Bermudan swaption gives the holder the right to enter into an interest rate\nswap at any of a set of predetermined exercise dates. This is the most common\ntype of exotic swaption in the market, used extensively for:\n\n- Callable bond hedging\n- Mortgage prepayment risk management\n- Structured product hedging\n\n# Pricing Methods\n\nBermudan swaptions require numerical methods for pricing:\n- **Hull-White Tree**: Industry standard, calibrated to swaption volatility\n- **LSMC**: Longstaff-Schwartz Monte Carlo for validation\n\n# Example\n\n```ignore\nuse finstack_quant_valuations::instruments::rates::swaption::{\n    BermudanSwaption, BermudanSchedule, BermudanType, SwaptionSettlement,\n};\n\n// Create a 10NC2 (10-year swap, callable after 2 years)\nlet swaption = BermudanSwaption::example();\n```",
+      "oneOf": [
+        {
+          "description": "Accepted legacy representation using the complete scalar underlier fields.",
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "underlying_fixed_leg"
+                ]
+              },
+              {
+                "required": [
+                  "underlying_float_leg"
+                ]
+              }
+            ]
+          },
+          "required": [
+            "strike",
+            "swap_start",
+            "swap_end",
+            "fixed_freq",
+            "float_freq",
+            "day_count",
+            "discount_curve_id",
+            "forward_curve_id"
+          ],
+          "title": "Legacy scalar underlier"
+        },
+        {
+          "description": "Canonical representation using complete fixed and floating legs.",
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "strike"
+                ]
+              },
+              {
+                "required": [
+                  "swap_start"
+                ]
+              },
+              {
+                "required": [
+                  "swap_end"
+                ]
+              },
+              {
+                "required": [
+                  "fixed_freq"
+                ]
+              },
+              {
+                "required": [
+                  "float_freq"
+                ]
+              },
+              {
+                "required": [
+                  "day_count"
+                ]
+              },
+              {
+                "required": [
+                  "discount_curve_id"
+                ]
+              },
+              {
+                "required": [
+                  "forward_curve_id"
+                ]
+              }
+            ]
+          },
+          "required": [
+            "underlying_fixed_leg",
+            "underlying_float_leg"
+          ],
+          "title": "Canonical leg underlier"
+        },
+        {
+          "anyOf": [
+            {
+              "required": [
+                "strike"
+              ]
+            },
+            {
+              "required": [
+                "swap_start"
+              ]
+            },
+            {
+              "required": [
+                "swap_end"
+              ]
+            },
+            {
+              "required": [
+                "fixed_freq"
+              ]
+            },
+            {
+              "required": [
+                "float_freq"
+              ]
+            },
+            {
+              "required": [
+                "day_count"
+              ]
+            },
+            {
+              "required": [
+                "discount_curve_id"
+              ]
+            },
+            {
+              "required": [
+                "forward_curve_id"
+              ]
+            }
+          ],
+          "description": "Compatibility representation containing complete legs and matching legacy scalar fields.",
+          "required": [
+            "underlying_fixed_leg",
+            "underlying_float_leg"
+          ],
+          "title": "Mixed compatibility underlier"
+        }
+      ],
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "default": {},
-          "description": "Attributes for scenario selection and grouping\nAttributes for scenario selection and tagging"
+          "default": {}
         },
         "bermudan_schedule": {
-          "$ref": "#/$defs/BermudanSchedule",
-          "description": "Bermudan exercise schedule"
+          "$ref": "#/$defs/BermudanSchedule"
         },
         "bermudan_type": {
-          "$ref": "#/$defs/BermudanType",
-          "description": "Co-terminal or non-co-terminal exercise"
+          "$ref": "#/$defs/BermudanType"
         },
         "calendar_id": {
           "anyOf": [
@@ -2305,41 +2433,66 @@
             {
               "type": "null"
             }
-          ],
-          "default": null,
-          "description": "Holiday calendar ID for schedule generation.\n\nControls business day adjustment for the underlying swap schedule.\nWhen `None`, uses weekends-only calendar. For production use, set to\nthe appropriate currency calendar (e.g., `\"nyse\"` for USD)."
+          ]
         },
         "day_count": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for fixed leg"
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "discount_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve ID for present value calculations"
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "fixed_freq": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Fixed leg payment frequency"
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "float_freq": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Floating leg payment frequency"
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "forward_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Forward curve ID for floating rate projections"
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
         },
         "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount of underlying swap"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
         },
         "option_type": {
-          "$ref": "#/$defs/OptionType",
-          "description": "Option type (payer = Call, receiver = Put)"
+          "$ref": "#/$defs/OptionType"
         },
         "pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/pricing_overrides.schema.json",
@@ -2363,47 +2516,60 @@
             "vol_bump_pct": null,
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
-          },
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          }
         },
         "settlement": {
-          "$ref": "#/$defs/SwaptionSettlement",
-          "description": "Settlement method (physical or cash)"
+          "$ref": "#/$defs/SwaptionSettlement"
         },
         "strike": {
-          "description": "Strike (fixed rate on underlying swap)",
           "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
-            "number"
+            "number",
+            "null"
           ]
         },
         "swap_end": {
-          "description": "Underlying swap end date (final payment)",
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "swap_start": {
-          "description": "Underlying swap start date (first accrual start)",
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "underlying_fixed_leg": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FixedLegSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "underlying_float_leg": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FloatLegSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "vol_surface_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Volatility surface ID for calibration"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
         }
       },
       "required": [
         "id",
         "option_type",
         "notional",
-        "strike",
-        "swap_start",
-        "swap_end",
-        "fixed_freq",
-        "float_freq",
-        "day_count",
         "settlement",
-        "discount_curve_id",
-        "forward_curve_id",
         "vol_surface_id",
         "bermudan_schedule",
         "bermudan_type"
@@ -17397,12 +17563,142 @@
     },
     "Swaption": {
       "additionalProperties": false,
-      "description": "Swaption instrument",
+      "oneOf": [
+        {
+          "description": "Accepted legacy representation using the complete scalar underlier fields.",
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "underlying_fixed_leg"
+                ]
+              },
+              {
+                "required": [
+                  "underlying_float_leg"
+                ]
+              }
+            ]
+          },
+          "required": [
+            "strike",
+            "swap_start",
+            "swap_end",
+            "fixed_freq",
+            "float_freq",
+            "day_count",
+            "discount_curve_id",
+            "forward_curve_id"
+          ],
+          "title": "Legacy scalar underlier"
+        },
+        {
+          "description": "Canonical representation using complete fixed and floating legs.",
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "strike"
+                ]
+              },
+              {
+                "required": [
+                  "swap_start"
+                ]
+              },
+              {
+                "required": [
+                  "swap_end"
+                ]
+              },
+              {
+                "required": [
+                  "fixed_freq"
+                ]
+              },
+              {
+                "required": [
+                  "float_freq"
+                ]
+              },
+              {
+                "required": [
+                  "day_count"
+                ]
+              },
+              {
+                "required": [
+                  "discount_curve_id"
+                ]
+              },
+              {
+                "required": [
+                  "forward_curve_id"
+                ]
+              }
+            ]
+          },
+          "required": [
+            "underlying_fixed_leg",
+            "underlying_float_leg"
+          ],
+          "title": "Canonical leg underlier"
+        },
+        {
+          "anyOf": [
+            {
+              "required": [
+                "strike"
+              ]
+            },
+            {
+              "required": [
+                "swap_start"
+              ]
+            },
+            {
+              "required": [
+                "swap_end"
+              ]
+            },
+            {
+              "required": [
+                "fixed_freq"
+              ]
+            },
+            {
+              "required": [
+                "float_freq"
+              ]
+            },
+            {
+              "required": [
+                "day_count"
+              ]
+            },
+            {
+              "required": [
+                "discount_curve_id"
+              ]
+            },
+            {
+              "required": [
+                "forward_curve_id"
+              ]
+            }
+          ],
+          "description": "Compatibility representation containing complete legs and matching legacy scalar fields.",
+          "required": [
+            "underlying_fixed_leg",
+            "underlying_float_leg"
+          ],
+          "title": "Mixed compatibility underlier"
+        }
+      ],
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "default": {},
-          "description": "Attributes for scenario selection and grouping"
+          "default": {}
         },
         "calendar_id": {
           "anyOf": [
@@ -17412,56 +17708,78 @@
             {
               "type": "null"
             }
-          ],
-          "default": null,
-          "description": "Holiday calendar ID for schedule generation.\n\nControls business day adjustment and payment date calculation for the\nunderlying swap schedule. When `None`, uses weekends-only calendar\n(no holiday adjustments). For production use, set to the appropriate\ncurrency calendar (e.g., `\"nyse\"` for USD, `\"target\"` for EUR).\n\n# Example\n\n```ignore\nlet swaption = Swaption::example()\n    .with_calendar(\"nyse\");\n```"
+          ]
         },
         "cash_settlement_method": {
           "$ref": "#/$defs/CashSettlementMethod",
-          "default": "isda_par_par",
-          "description": "Cash settlement annuity method (only used when settlement = Cash).\n\n- `ParYield` (default): Fast approximation using flat forward rate\n- `IsdaParPar`: Uses actual swap annuity from discount curve (ISDA compliant)\n- `ZeroCoupon`: Discounts to swap maturity (rarely used)"
+          "default": "isda_par_par"
         },
         "day_count": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention"
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "discount_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve ID for present value calculations"
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "exercise_style": {
           "$ref": "#/$defs/SwaptionExercise",
-          "default": "european",
-          "description": "Exercise style (European, Bermudan, American). Defaults to European."
+          "default": "european"
         },
         "expiry": {
-          "description": "Option expiry date",
           "format": "date",
           "type": "string"
         },
         "fixed_freq": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Fixed leg payment frequency"
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "float_freq": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Floating leg payment frequency"
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "forward_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Forward curve ID for floating rate projections"
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
         },
         "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount of underlying swap"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
         },
         "option_type": {
-          "$ref": "#/$defs/OptionType",
-          "description": "Option type (payer or receiver swaption)"
+          "$ref": "#/$defs/OptionType"
         },
         "pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/pricing_overrides.schema.json",
@@ -17485,8 +17803,7 @@
             "vol_bump_pct": null,
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
-          },
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          }
         },
         "sabr_params": {
           "anyOf": [
@@ -17496,28 +17813,30 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional SABR volatility model parameters"
+          ]
         },
         "settlement": {
-          "$ref": "#/$defs/SwaptionSettlement",
-          "description": "Settlement method (physical or cash)"
+          "$ref": "#/$defs/SwaptionSettlement"
         },
         "strike": {
-          "description": "Strike (fixed rate on underlying swap)",
           "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
-            "number"
+            "number",
+            "null"
           ]
         },
         "swap_end": {
-          "description": "Underlying swap end date",
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "swap_start": {
-          "description": "Underlying swap start date",
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "underlying_fixed_leg": {
           "anyOf": [
@@ -17527,8 +17846,7 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional full fixed-leg specification for the underlying swap.\n\nWhen omitted, the pricer derives a vanilla fixed leg from the legacy\nswaption fields (`fixed_freq`, `day_count`, dates, calendar, discount\ncurve). Use this for Bloomberg-style underliers that need explicit\npayment lag, stub, calendar, or day-count conventions."
+          ]
         },
         "underlying_float_leg": {
           "anyOf": [
@@ -17538,33 +17856,22 @@
             {
               "type": "null"
             }
-          ],
-          "description": "Optional full floating-leg specification for the underlying swap.\n\nWhen omitted, the pricer derives a simple term-rate floating leg from the\nlegacy swaption fields. Use this for compounded SOFR/SONIA underliers\nthat need reset calendars, payment lag, cutoff, or observation-shift\nconventions."
+          ]
         },
         "vol_model": {
           "$ref": "#/$defs/VolatilityModel2",
-          "default": "black",
-          "description": "Volatility model (Black or Normal)"
+          "default": "black"
         },
         "vol_surface_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Volatility surface ID for option pricing"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
         }
       },
       "required": [
         "id",
         "option_type",
         "notional",
-        "strike",
         "expiry",
-        "swap_start",
-        "swap_end",
-        "fixed_freq",
-        "float_freq",
-        "day_count",
         "settlement",
-        "discount_curve_id",
-        "forward_curve_id",
         "vol_surface_id"
       ],
       "type": "object"

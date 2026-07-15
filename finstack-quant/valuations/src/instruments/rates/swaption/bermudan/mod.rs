@@ -309,7 +309,7 @@ impl BermudanSwaptionPricer {
         let context_label = format!("BermudanSwaption {}", swaption.id);
         let overrides = hw1f_overrides_json(swaption);
         let req = Hw1fResolveRequest {
-            curve_id: swaption.discount_curve_id.as_str(),
+            curve_id: swaption.get_discount_curve_id().as_str(),
             flavor: Hw1fCalibrationFlavor::Swaption,
             overrides: overrides.as_ref(),
             surface: Some(Hw1fSurfaceCalibration::Swaption {
@@ -361,7 +361,7 @@ impl BermudanSwaptionPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
-        if swaption.forward_curve_id != swaption.discount_curve_id {
+        if swaption.get_forward_curve_id() != swaption.get_discount_curve_id() {
             return Err(PricingError::model_failure_with_context(
                 "Bermudan tree pricing is currently single-curve only. \
                  Set forward_curve_id equal to discount_curve_id or use a multi-curve-capable engine."
@@ -403,7 +403,7 @@ impl BermudanSwaptionPricer {
         // Get discount curve only after lifecycle checks so a post-exercise
         // valuation does not fail because an otherwise unused curve is absent.
         let disc = market
-            .get_discount(swaption.discount_curve_id.as_str())
+            .get_discount(swaption.get_discount_curve_id().as_str())
             .map_err(|e| {
                 PricingError::missing_market_data_with_context(
                     e.to_string(),
@@ -495,7 +495,7 @@ impl BermudanSwaptionPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
-        if swaption.forward_curve_id != swaption.discount_curve_id {
+        if swaption.get_forward_curve_id() != swaption.get_discount_curve_id() {
             return Err(PricingError::model_failure_with_context(
                 "Bermudan Hull-White pricing is currently single-curve only. \
                  Set forward_curve_id equal to discount_curve_id or use a multi-curve-capable engine."
@@ -530,7 +530,7 @@ impl BermudanSwaptionPricer {
         }
 
         let disc = market
-            .get_discount(swaption.discount_curve_id.as_str())
+            .get_discount(swaption.get_discount_curve_id().as_str())
             .map_err(|e| {
                 PricingError::missing_market_data_with_context(
                     e.to_string(),
@@ -568,7 +568,7 @@ impl BermudanSwaptionPricer {
         let ctx = finstack_quant_core::dates::DayCountContext::default();
         let payment_times: Vec<f64> = payment_dates
             .iter()
-            .map(|&d| swaption.day_count.year_fraction(as_of, d, ctx))
+            .map(|&d| swaption.get_day_count().year_fraction(as_of, d, ctx))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| {
                 PricingError::model_failure_with_context(
@@ -579,8 +579,8 @@ impl BermudanSwaptionPricer {
 
         // Create swap schedule for MC pricer
         let swap_start_time = swaption
-            .day_count
-            .year_fraction(as_of, swaption.swap_start, ctx)
+            .get_day_count()
+            .year_fraction(as_of, swaption.get_swap_start(), ctx)
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),

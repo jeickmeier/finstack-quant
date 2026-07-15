@@ -4,18 +4,15 @@
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::rates::swaption::{
     BermudanSchedule, BermudanSwaption, BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
 };
-use finstack_quant_valuations::instruments::OptionType;
 use finstack_quant_valuations::pricer::Pricer;
-use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
 
@@ -24,35 +21,19 @@ fn build_swaption(as_of: Date) -> BermudanSwaption {
     let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("Valid date");
     let first_exercise = Date::from_calendar_date(2026, Month::January, 1).expect("Valid date");
 
-    BermudanSwaption {
-        id: InstrumentId::new("BERM-LSMC-BENCH"),
-        option_type: OptionType::Call,
-        notional: Money::new(10_000_000.0, Currency::USD),
-        strike: Decimal::try_from(0.03).expect("valid literal"),
+    BermudanSwaption::new_payer(
+        "BERM-LSMC-BENCH",
+        Money::new(10_000_000.0, Currency::USD),
+        0.03,
         swap_start,
         swap_end,
-        fixed_freq: Tenor::semi_annual(),
-        float_freq: Tenor::quarterly(),
-        day_count: DayCount::Thirty360,
-        settlement:
-            finstack_quant_valuations::instruments::rates::swaption::SwaptionSettlement::Physical,
-        discount_curve_id: CurveId::new("USD-OIS"),
-        forward_curve_id: CurveId::new("USD-OIS"),
-        vol_surface_id: CurveId::new("USD-VOL"),
-        bermudan_schedule: BermudanSchedule::co_terminal(
-            first_exercise,
-            swap_end,
-            Tenor::semi_annual(),
-        )
-        .expect("valid Bermudan schedule"),
-        bermudan_type:
-            finstack_quant_valuations::instruments::rates::swaption::BermudanType::CoTerminal,
-        calendar_id: None,
-        instrument_pricing_overrides: Default::default(),
-        metric_pricing_overrides: Default::default(),
-        scenario_pricing_overrides: Default::default(),
-        attributes: Default::default(),
-    }
+        BermudanSchedule::co_terminal(first_exercise, swap_end, Tenor::semi_annual())
+            .expect("valid Bermudan schedule"),
+        "USD-OIS",
+        "USD-OIS",
+        "USD-VOL",
+    )
+    .expect("valid Bermudan swaption")
 }
 
 fn build_market(as_of: Date) -> MarketContext {

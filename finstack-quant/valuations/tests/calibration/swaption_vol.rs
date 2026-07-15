@@ -14,16 +14,14 @@ use finstack_quant_valuations::calibration::api::schema::{
 };
 use finstack_quant_valuations::calibration::CalibrationConfig;
 use finstack_quant_valuations::instruments::rates::swaption::{
-    Swaption, SwaptionExercise, SwaptionSettlement, VolatilityModel,
+    Swaption, SwaptionParams, VolatilityModel,
 };
-use finstack_quant_valuations::instruments::OptionType;
 use finstack_quant_valuations::market::conventions::ids::SwaptionConventionId;
 use finstack_quant_valuations::market::quotes::ids::QuoteId;
 use finstack_quant_valuations::market::quotes::market_quote::MarketQuote;
 
 use crate::finstack_quant_test_utils::calibration as cal_utils;
 use finstack_quant_valuations::market::quotes::vol::VolQuote;
-use rust_decimal::Decimal;
 use time::Month;
 
 use super::tolerances;
@@ -286,33 +284,20 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
     let result = engine::execute(&envelope).expect("execute");
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore context");
 
-    let swaption = Swaption {
-        id: "SWPT-1Yx5Y".into(),
-        option_type: OptionType::Call,
-        notional: Money::new(1_000_000.0, Currency::USD),
-        strike: Decimal::try_from(0.045).unwrap(),
-        expiry: Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-        swap_start: Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-        swap_end: Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-        fixed_freq: Tenor::semi_annual(),
-        float_freq: Tenor::quarterly(),
-        day_count: DayCount::Thirty360,
-        exercise_style: SwaptionExercise::European,
-        settlement: SwaptionSettlement::Physical,
-        cash_settlement_method: Default::default(),
-        vol_model: VolatilityModel::Normal,
-        discount_curve_id: "USD-OIS".into(),
-        forward_curve_id: "USD-SOFR-3M".into(),
-        vol_surface_id: "USD-SWPT".into(),
-        instrument_pricing_overrides: Default::default(),
-        metric_pricing_overrides: Default::default(),
-        scenario_pricing_overrides: Default::default(),
-        calendar_id: None,
-        underlying_fixed_leg: None,
-        underlying_float_leg: None,
-        sabr_params: None,
-        attributes: Default::default(),
-    };
+    let expiry = Date::from_calendar_date(2026, Month::January, 1).unwrap();
+    let params = SwaptionParams::payer(
+        Money::new(1_000_000.0, Currency::USD),
+        0.045,
+        expiry,
+        expiry,
+        Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+    )
+    .unwrap()
+    .with_fixed_frequency(Tenor::semi_annual())
+    .with_float_frequency(Tenor::quarterly())
+    .with_day_count(DayCount::Thirty360)
+    .with_vol_model(VolatilityModel::Normal);
+    let swaption = Swaption::new_payer("SWPT-1Yx5Y", &params, "USD-OIS", "USD-SOFR-3M", "USD-SWPT");
 
     // With VolCube calibration, the vol cube is stored separately from surfaces.
     // The SimpleSwaptionBlackPricer uses get_vol_provider which resolves the cube,
