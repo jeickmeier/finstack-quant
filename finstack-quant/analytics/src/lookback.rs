@@ -192,9 +192,7 @@ mod tests {
     }
 
     fn nyse() -> &'static dyn HolidayCalendar {
-        crate::dates::CalendarRegistry::global()
-            .resolve_str("nyse")
-            .expect("nyse calendar")
+        crate::dates::calendar_by_id("nyse").expect("nyse calendar")
     }
 
     #[test]

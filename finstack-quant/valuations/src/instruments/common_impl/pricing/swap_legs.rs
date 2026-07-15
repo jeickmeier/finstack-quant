@@ -13,7 +13,7 @@
 //! - Forward rate projection with floor/cap/gearing
 
 use crate::cashflow::builder::rate_helpers::FloatingRateParams;
-use finstack_quant_core::dates::{CalendarRegistry, HolidayCalendar};
+use finstack_quant_core::dates::{calendar_by_id, HolidayCalendar};
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Schedule};
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -237,7 +237,7 @@ pub fn add_payment_delay(date: Date, delay_days: i32, calendar_id: Option<&str>)
 
     if let Some(id) = calendar_id {
         // Calendar explicitly specified: require successful resolution and application
-        match CalendarRegistry::global().resolve_str(id) {
+        match calendar_by_id(id) {
             Some(cal) => date.add_business_days(delay_days, cal).map_err(|e| {
                 finstack_quant_core::Error::Validation(format!(
                     "Failed to add {} business days to {} using calendar '{}': {}",
@@ -272,7 +272,7 @@ fn resolve_overnight_calendar(
     calendar_id: Option<&str>,
 ) -> Result<Option<&'static dyn HolidayCalendar>> {
     match calendar_id {
-        Some(id) => match CalendarRegistry::global().resolve_str(id) {
+        Some(id) => match calendar_by_id(id) {
             Some(cal) => Ok(Some(cal)),
             None => Err(finstack_quant_core::Error::Validation(format!(
                 "Overnight-compounding calendar '{}' not found in registry; \
@@ -1256,7 +1256,7 @@ pub fn schedule_to_periods(
     }
 
     let cal = if let Some(id) = calendar_id {
-        Some(CalendarRegistry::global().resolve_str(id).ok_or_else(|| {
+        Some(calendar_by_id(id).ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "Reset calendar '{}' not found in registry; cannot apply reset lag.",
                 id

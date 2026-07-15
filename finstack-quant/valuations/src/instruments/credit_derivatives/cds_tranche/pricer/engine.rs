@@ -10,7 +10,7 @@ use crate::correlation::copula::{
     StudentTCopula,
 };
 use crate::instruments::credit_derivatives::cds_tranche::{CDSTranche, TrancheSide};
-use finstack_quant_core::dates::{CalendarRegistry, Date, DateExt, HolidayCalendar};
+use finstack_quant_core::dates::{calendar_by_id, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::{
@@ -533,7 +533,7 @@ impl CDSTranchePricer {
         let calendar: Option<&dyn HolidayCalendar> = tranche
             .calendar_id
             .as_deref()
-            .and_then(|id| CalendarRegistry::global().resolve_str(id));
+            .and_then(|id| calendar_by_id(id));
 
         if let Some(cal) = calendar {
             as_of.add_business_days(settlement_lag, cal)

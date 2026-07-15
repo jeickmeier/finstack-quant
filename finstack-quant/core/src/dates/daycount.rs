@@ -126,7 +126,7 @@ use time::{Date, Month};
 
 use crate::dates::date_extensions::BusinessDayIter;
 use crate::dates::tenor::TenorUnit;
-use crate::dates::{CalendarRegistry, HolidayCalendar, Tenor};
+use crate::dates::{available_calendars, calendar_by_id, HolidayCalendar, Tenor};
 use crate::error::InputError;
 
 /// Optional context for day-count year-fraction calculations.
@@ -188,7 +188,7 @@ impl<'a> std::fmt::Debug for DayCountContext<'a> {
 /// Serializable snapshot of [`DayCountContext`] state for persistence and interchange.
 ///
 /// This struct captures the optional context parameters (calendar, frequency, business-day basis)
-/// needed to reconstruct a [`DayCountContext`] at runtime using a [`CalendarRegistry`].
+/// needed to reconstruct a [`DayCountContext`] at runtime using the built-in calendar lookup.
 pub struct DayCountContextState {
     /// Optional calendar code (e.g. "target2").
     pub calendar_id: Option<String>,
@@ -211,19 +211,28 @@ pub struct DayCountContextState {
 }
 
 impl DayCountContextState {
-    /// Build a runtime [`DayCountContext`] using the provided calendar registry.
-    pub fn to_ctx<'a>(&self, registry: &'a CalendarRegistry<'a>) -> DayCountContext<'a> {
+    /// Build a runtime [`DayCountContext`] using the built-in calendar lookup.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `calendar_id` names an unknown calendar.
+    pub fn to_ctx(&self) -> crate::Result<DayCountContext<'static>> {
         let calendar = self
             .calendar_id
             .as_deref()
-            .and_then(|code| registry.resolve_str(code));
-        DayCountContext {
+            .map(|code| {
+                calendar_by_id(code).ok_or_else(|| {
+                    crate::Error::calendar_not_found_with_suggestions(code, available_calendars())
+                })
+            })
+            .transpose()?;
+        Ok(DayCountContext {
             calendar,
             frequency: self.frequency,
             bus_basis: self.bus_basis,
             coupon_period: self.coupon_period,
             end_is_termination_date: self.end_is_termination_date,
-        }
+        })
     }
 }
 
@@ -1926,8 +1935,7 @@ mod tests {
         let restored: DayCountContextState = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(restored.coupon_period, Some(coupon));
 
-        let registry = crate::dates::CalendarRegistry::global();
-        let restored_ctx = restored.to_ctx(registry);
+        let restored_ctx = restored.to_ctx().expect("calendar state hydrates");
         assert_eq!(restored_ctx.coupon_period, Some(coupon));
 
         // Serde-additive: payloads written before the field existed still
@@ -1936,6 +1944,23 @@ mod tests {
         let legacy_state: DayCountContextState =
             serde_json::from_str(legacy).expect("legacy payload deserializes");
         assert_eq!(legacy_state.coupon_period, None);
+    }
+
+    #[test]
+    fn daycount_context_state_rejects_unknown_calendar() {
+        let state = super::DayCountContextState {
+            calendar_id: Some("not_a_calendar".to_string()),
+            frequency: None,
+            bus_basis: None,
+            coupon_period: None,
+            end_is_termination_date: false,
+        };
+
+        let error = state
+            .to_ctx()
+            .err()
+            .expect("unknown persisted calendar must fail hydration");
+        assert!(error.to_string().contains("not_a_calendar"));
     }
 
     // -----------------------------------------------------------------------

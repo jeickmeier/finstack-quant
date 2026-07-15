@@ -5,8 +5,8 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, CalendarRegistry, DayCount, DayCountContextState, ScheduleBuilder,
-    ScheduleSpec, StubKind, Tenor, TenorUnit,
+    BusinessDayConvention, DayCount, DayCountContextState, ScheduleBuilder, ScheduleSpec, StubKind,
+    Tenor, TenorUnit,
 };
 use finstack_quant_core::explain::ExplainOpts;
 use finstack_quant_core::{Error, InputError};
@@ -61,8 +61,7 @@ fn daycount_ctx_state_roundtrip() {
         coupon_period: None,
         end_is_termination_date: false,
     };
-    let registry = CalendarRegistry::global();
-    let ctx = state.to_ctx(registry);
+    let ctx = state.to_ctx().expect("calendar state hydrates");
     let start = Date::from_calendar_date(2025, Month::January, 2).unwrap();
     let end = Date::from_calendar_date(2025, Month::February, 2).unwrap();
     let yf = DayCount::Bus252.year_fraction(start, end, ctx).unwrap();

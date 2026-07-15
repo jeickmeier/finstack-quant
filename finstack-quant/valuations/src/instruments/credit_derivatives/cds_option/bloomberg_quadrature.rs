@@ -59,7 +59,7 @@ use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::credit_derivatives::cds::pricer::CDSPricer;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use crate::instruments::credit_derivatives::cds_option::CDSOption;
-use finstack_quant_core::dates::{adjust, BusinessDayConvention, CalendarRegistry, Date, DateExt};
+use finstack_quant_core::dates::{adjust, calendar_by_id, BusinessDayConvention, Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::math::solver::BrentSolver;
@@ -762,14 +762,12 @@ pub fn index_option_front_end_protection_start(option: &CDSOption, as_of: Date) 
     }
 
     let calendar_id = option.underlying_convention.default_calendar();
-    let calendar = CalendarRegistry::global()
-        .resolve_str(calendar_id)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "missing CDS option calendar '{calendar_id}' for {:?}",
-                option.underlying_convention
-            ))
-        })?;
+    let calendar = calendar_by_id(calendar_id).ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "missing CDS option calendar '{calendar_id}' for {:?}",
+            option.underlying_convention
+        ))
+    })?;
     let trade_date = adjust(as_of, BusinessDayConvention::Following, calendar)?;
     trade_date.add_business_days(bloomberg_cdso::INDEX_OPTION_FEP_START_LAG_BD, calendar)
 }

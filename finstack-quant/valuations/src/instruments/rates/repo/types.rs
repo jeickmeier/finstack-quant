@@ -592,8 +592,7 @@ impl Repo {
     /// - `calendar_id` is not specified (required for repos)
     /// - `calendar_id` references an unknown calendar
     pub fn adjusted_dates(&self) -> Result<(Date, Date)> {
-        use finstack_quant_core::dates::calendar::calendar_by_id;
-        use finstack_quant_core::dates::CalendarRegistry;
+        use finstack_quant_core::dates::{available_calendars, calendar_by_id};
 
         let cal_id = self.calendar_id.as_ref().ok_or_else(|| {
             Error::Validation(
@@ -609,7 +608,7 @@ impl Repo {
                 id: format!(
                     "calendar_id:{} (available: {})",
                     cal_id,
-                    CalendarRegistry::global().available_ids().join(", ")
+                    available_calendars().join(", ")
                 ),
             })
         })?;

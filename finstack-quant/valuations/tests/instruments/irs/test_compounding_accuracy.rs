@@ -1,5 +1,5 @@
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::CalendarRegistry;
+use finstack_quant_core::dates::calendar_by_id;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -20,9 +20,7 @@ const OVERNIGHT_FORWARD_TENOR: f64 = 1.0 / 360.0;
 #[test]
 fn test_compounding_lookback_sensitivity() {
     let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let cal = CalendarRegistry::global()
-        .resolve_str("USNY")
-        .expect("USNY calendar");
+    let cal = calendar_by_id("USNY").expect("USNY calendar");
     // Use a spot-starting swap (T+2) so SOFR lookback does not require historical fixings
     // at valuation date `base`.
     let start = base.add_business_days(2, cal).unwrap();
@@ -288,9 +286,7 @@ fn test_payment_delay_sensitivity() {
 #[test]
 fn test_seasoned_compounded_swap_requires_fixings() {
     let start = Date::from_calendar_date(2025, Month::January, 2).unwrap();
-    let cal = CalendarRegistry::global()
-        .resolve_str("USNY")
-        .expect("USNY calendar");
+    let cal = calendar_by_id("USNY").expect("USNY calendar");
     let as_of = start.add_business_days(5, cal).unwrap();
 
     let disc = DiscountCurve::builder("DISC")
@@ -365,9 +361,7 @@ fn test_seasoned_compounded_swap_requires_fixings() {
 #[test]
 fn test_seasoned_compounded_swap_with_fixings_prices() {
     let start = Date::from_calendar_date(2025, Month::January, 2).unwrap();
-    let cal = CalendarRegistry::global()
-        .resolve_str("USNY")
-        .expect("USNY calendar");
+    let cal = calendar_by_id("USNY").expect("USNY calendar");
     let as_of = start.add_business_days(5, cal).unwrap();
 
     let disc = DiscountCurve::builder("DISC")
@@ -452,9 +446,7 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
 #[test]
 fn test_compounded_swap_with_spread_near_zero_rates() {
     let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let cal = CalendarRegistry::global()
-        .resolve_str("USNY")
-        .expect("USNY calendar");
+    let cal = calendar_by_id("USNY").expect("USNY calendar");
     let start = base.add_business_days(2, cal).unwrap();
 
     // Near-zero discount curve (0.1% rate)
@@ -549,9 +541,7 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
 #[test]
 fn test_compounded_swap_with_spread_negative_rates() {
     let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let cal = CalendarRegistry::global()
-        .resolve_str("USNY")
-        .expect("USNY calendar");
+    let cal = calendar_by_id("USNY").expect("USNY calendar");
     let start = base.add_business_days(2, cal).unwrap();
 
     // Negative rate discount curve (-0.5%)
@@ -653,9 +643,7 @@ fn test_observation_shift_before_curve_base_date() {
     // With a large observation shift, observations could be pushed to the curve base date
     let base = Date::from_calendar_date(2025, Month::January, 10).unwrap();
     let start = Date::from_calendar_date(2025, Month::January, 3).unwrap();
-    let cal = CalendarRegistry::global()
-        .resolve_str("USNY")
-        .expect("USNY calendar");
+    let cal = calendar_by_id("USNY").expect("USNY calendar");
 
     let disc = DiscountCurve::builder("DISC")
         .base_date(base)

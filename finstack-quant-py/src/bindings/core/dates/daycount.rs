@@ -4,7 +4,7 @@ use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::dates::utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
-    CalendarRegistry, DayCount, DayCountContext, DayCountContextState, Tenor, Thirty360Convention,
+    calendar_by_id, DayCount, DayCountContext, DayCountContextState, Tenor, Thirty360Convention,
 };
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
@@ -207,14 +207,13 @@ impl PyDayCountContext {
     /// Raises ``KeyError`` when ``calendar_id`` is set but cannot be resolved
     /// in the global calendar registry.
     fn to_rust_ctx(&self) -> PyResult<DayCountContext<'static>> {
-        let registry = CalendarRegistry::global();
-        let calendar =
-            match self.calendar_id.as_deref() {
-                Some(code) => Some(registry.resolve_str(code).ok_or_else(|| {
-                    PyKeyError::new_err(format!("unknown calendar id: {code:?}"))
-                })?),
-                None => None,
-            };
+        let calendar = match self.calendar_id.as_deref() {
+            Some(code) => Some(
+                calendar_by_id(code)
+                    .ok_or_else(|| PyKeyError::new_err(format!("unknown calendar id: {code:?}")))?,
+            ),
+            None => None,
+        };
         Ok(DayCountContext {
             calendar,
             frequency: self.frequency,

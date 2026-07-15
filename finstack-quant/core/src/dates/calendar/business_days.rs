@@ -375,14 +375,13 @@ pub(crate) fn adjust_with_limit<C: HolidayCalendar + ?Sized>(
 /// Identifiers are lowercase, stable market codes (e.g., `"gblo"`, `"target2"`).
 /// They are suitable for serialization and long-lived pipelines.
 ///
-/// Example using the registry:
+/// Example using the free resolution API:
 /// ```
-/// use finstack_quant_core::dates::CalendarRegistry;
+/// use finstack_quant_core::dates::{available_calendars, calendar_by_id};
 /// use finstack_quant_core::types::CalendarId;
-/// let regs = CalendarRegistry::global();
-/// let ids = regs.available_ids();
+/// let ids = available_calendars();
 /// let id = CalendarId::from(ids[0]);
-/// let maybe = regs.resolve(&id);
+/// let maybe = calendar_by_id(id.as_str());
 /// assert!(maybe.is_some());
 /// ```
 #[inline]

@@ -4,7 +4,7 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::OptionType;
-use finstack_quant_core::dates::{CalendarRegistry, Date, DateExt, DayCount, Tenor};
+use finstack_quant_core::dates::{calendar_by_id, Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 use rust_decimal::prelude::ToPrimitive;
@@ -117,14 +117,12 @@ impl CmsOption {
                 self.id
             ))
         })?;
-        let calendar = CalendarRegistry::global()
-            .resolve_str(&calendar_id)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "CMS option '{}' reference calendar '{}' is not registered",
-                    self.id, calendar_id
-                ))
-            })?;
+        let calendar = calendar_by_id(&calendar_id).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "CMS option '{}' reference calendar '{}' is not registered",
+                self.id, calendar_id
+            ))
+        })?;
         fixing_date.add_business_days(convention.reset_lag_days(), calendar)
     }
 

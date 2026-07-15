@@ -40,13 +40,12 @@
 //!
 //! ```rust
 //! use finstack_quant_core::dates::{adjust, BusinessDayConvention, HolidayCalendar};
-//! use finstack_quant_core::dates::CalendarRegistry;
+//! use finstack_quant_core::dates::calendar_by_id;
 //! use time::{Date, Month};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
 //! // Get New York Stock Exchange calendar
-//! let nyse = CalendarRegistry::global()
-//!     .resolve_str("nyse")
+//! let nyse = calendar_by_id("nyse")
 //!     .ok_or("NYSE calendar not found")?;
 //!
 //! // Check if a date is a business day
@@ -70,7 +69,7 @@
 //! # Architecture
 //!
 //! - `rule`: Rule-based holiday definitions (Easter, IMM, lunar calendars)
-//! - `registry`: Calendar registration and lookup system
+//! - generated free functions for calendar lookup and discovery
 //! - `business_days`: Business day adjustment and counting
 //! - `composite`: Multi-calendar union support
 //! - `generated`: Build-time generated year-range constants and shared date helpers
@@ -78,7 +77,7 @@
 //! # See Also
 //!
 //! - [`HolidayCalendar`] for the core trait
-//! - [`CalendarRegistry`] for calendar lookup by code
+//! - [`calendar_by_id`] for calendar lookup by code
 //! - [`available_calendars`] for discovery of supported calendar identifiers
 //! - `BusinessDayConvention` for adjustment conventions
 //! - `CompositeCalendar` for combining calendars
@@ -87,7 +86,6 @@ pub(crate) mod algo;
 pub(crate) mod business_days;
 pub(crate) mod composite;
 pub(crate) mod generated;
-pub(crate) mod registry;
 pub(crate) mod rule;
 pub(crate) mod types;
 
@@ -100,7 +98,6 @@ pub(crate) mod types;
 // implementation types available for callers that need them directly.
 pub use business_days::{adjust, available_calendars, BusinessDayConvention, HolidayCalendar};
 pub use composite::{CompositeCalendar, CompositeMode};
-pub use registry::CalendarRegistry;
 pub use rule::{Direction, Observed, Rule};
 pub use types::{Calendar, WeekendRule};
 
@@ -113,3 +110,29 @@ mod calendars_generated {
 }
 
 pub use calendars_generated::*;
+
+/// Shared calendar that treats only Saturdays and Sundays as non-business days.
+///
+/// This is the explicit fallback for APIs whose calendar identifier is optional.
+pub static WEEKENDS_ONLY: Calendar = Calendar::new("weekends_only", "Weekends Only", true, &[]);
+
+/// Resolve typed calendar identifiers strictly and preserve their input order.
+///
+/// # Errors
+///
+/// Returns an error naming the first unknown identifier. Unlike the removed
+/// registry helper, unknown identifiers are never silently dropped.
+pub fn calendars_by_ids(
+    ids: &[crate::types::CalendarId],
+) -> crate::Result<Vec<&'static dyn HolidayCalendar>> {
+    ids.iter()
+        .map(|id| {
+            calendar_by_id(id.as_str()).ok_or_else(|| {
+                crate::Error::calendar_not_found_with_suggestions(
+                    id.as_str(),
+                    available_calendars(),
+                )
+            })
+        })
+        .collect()
+}

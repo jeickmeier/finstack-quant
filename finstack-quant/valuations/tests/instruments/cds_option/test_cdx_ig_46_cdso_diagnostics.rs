@@ -32,7 +32,7 @@ use std::fs;
 use std::path::PathBuf;
 use time::macros::date;
 
-use finstack_quant_core::dates::{CalendarRegistry, DateExt};
+use finstack_quant_core::dates::{calendar_by_id, DateExt};
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::calibration::bumps::bump_hazard_shift;
@@ -899,9 +899,7 @@ fn diag_cdx_ig_46_risk_fep_split() {
             .expect("cash date")
             .add_business_days(
                 2,
-                CalendarRegistry::global()
-                    .resolve_str(option.underlying_convention.default_calendar())
-                    .expect("calendar"),
+                calendar_by_id(option.underlying_convention.default_calendar()).expect("calendar"),
             )
             .expect("cash plus two"),
     ] {

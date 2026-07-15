@@ -24,8 +24,7 @@ use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::OptionType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, CalendarRegistry, Date, DayCount, DayCountContext, ScheduleBuilder,
-    Tenor,
+    calendar_by_id, BusinessDayConvention, Date, DayCount, DayCountContext, ScheduleBuilder, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -210,14 +209,12 @@ impl CommoditySwaption {
             .stub_rule(finstack_quant_core::dates::StubKind::ShortBack);
 
         if let Some(ref cal_id) = self.calendar_id {
-            let cal = CalendarRegistry::global()
-                .resolve_str(cal_id)
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "CommoditySwaption '{}' references unknown calendar_id '{cal_id}'",
-                        self.id
-                    ))
-                })?;
+            let cal = calendar_by_id(cal_id).ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "CommoditySwaption '{}' references unknown calendar_id '{cal_id}'",
+                    self.id
+                ))
+            })?;
             builder = builder.adjust_with(self.bdc, cal);
         }
 
@@ -277,7 +274,7 @@ impl CommoditySwaption {
         let calendar = self
             .calendar_id
             .as_deref()
-            .and_then(|id| CalendarRegistry::global().resolve_str(id));
+            .and_then(|id| calendar_by_id(id));
         let is_business_day = |date: Date| -> bool {
             let wd = date.weekday();
             if wd == time::Weekday::Saturday || wd == time::Weekday::Sunday {

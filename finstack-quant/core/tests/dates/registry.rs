@@ -1,138 +1,81 @@
-//! Tests for calendar registry functionality
+//! Tests for free calendar resolution APIs.
 
 use finstack_quant_core::dates::calendar::{GBLO, NYSE, TARGET2};
-use finstack_quant_core::dates::{CalendarRegistry, CompositeCalendar, CompositeMode};
-use finstack_quant_core::dates::{Date, HolidayCalendar};
+use finstack_quant_core::dates::{
+    available_calendars, calendar_by_id, calendars_by_ids, CompositeCalendar, CompositeMode, Date,
+    HolidayCalendar,
+};
 use finstack_quant_core::types::CalendarId;
 use time::Month;
 
 fn make_date(y: i32, m: u8, d: u8) -> Date {
-    Date::from_calendar_date(y, Month::try_from(m).unwrap(), d).unwrap()
+    Date::from_calendar_date(y, Month::try_from(m).expect("valid month"), d).expect("valid date")
 }
 
 #[test]
-fn registry_resolves_all_built_in_calendars() {
-    let registry = CalendarRegistry::global();
-    let ids = registry.available_ids();
-
+fn resolves_all_built_in_calendars() {
+    let ids = available_calendars();
     assert!(!ids.is_empty());
-
-    // Test that all IDs resolve successfully
     for &id in ids {
-        let cal = registry.resolve_str(id);
-        assert!(cal.is_some(), "Calendar '{}' should resolve", id);
+        assert!(
+            calendar_by_id(id).is_some(),
+            "Calendar '{id}' should resolve"
+        );
     }
 }
 
 #[test]
-fn registry_resolve_str_is_case_insensitive() {
-    let registry = CalendarRegistry::global();
-
-    // Test lowercase
-    let lower = registry.resolve_str("gblo");
-    assert!(lower.is_some());
-
-    // Test uppercase (should still work due to to_lowercase in implementation)
-    let upper = registry.resolve_str("GBLO");
-    assert!(upper.is_some());
+fn resolution_is_case_insensitive_and_unknown_is_none() {
+    assert!(calendar_by_id("gblo").is_some());
+    assert!(calendar_by_id("GBLO").is_some());
+    assert!(calendar_by_id("nonexistent_calendar").is_none());
 }
 
 #[test]
-fn registry_resolve_returns_none_for_unknown() {
-    let registry = CalendarRegistry::global();
-    let unknown = registry.resolve_str("nonexistent_calendar");
-    assert!(unknown.is_none());
-}
-
-#[test]
-fn registry_resolve_with_calendar_id() {
-    let registry = CalendarRegistry::global();
-
+fn typed_id_resolves() {
     let id = CalendarId::from(TARGET2.id());
-    let cal = registry.resolve(&id);
-    assert!(cal.is_some());
-
-    // Verify the calendar works
-    let jan1 = make_date(2025, 1, 1);
-    assert!(cal.unwrap().is_holiday(jan1));
+    let cal = calendar_by_id(id.as_str()).expect("TARGET2 resolves");
+    assert!(cal.is_holiday(make_date(2025, 1, 1)));
 }
 
 #[test]
-fn registry_resolve_many_vec_builds_list() {
-    let registry = CalendarRegistry::global();
-
+fn strict_many_resolution_preserves_order_and_builds_composite() {
     let ids = [
-        CalendarId::from(TARGET2.id()),
         CalendarId::from(GBLO.id()),
+        CalendarId::from(TARGET2.id()),
         CalendarId::from(NYSE.id()),
     ];
-
-    let calendars = registry.resolve_many_vec(&ids);
-
+    let calendars = calendars_by_ids(&ids).expect("known calendars resolve");
     assert_eq!(calendars.len(), 3);
+    assert_eq!(calendars[0].metadata().expect("metadata").id, "gblo");
+    assert_eq!(calendars[1].metadata().expect("metadata").id, "target2");
+    assert_eq!(calendars[2].metadata().expect("metadata").id, "nyse");
 
-    // Verify each calendar is functional
-    let test_date = make_date(2025, 1, 1);
-    for cal in &calendars {
-        let _ = cal.is_holiday(test_date);
-    }
+    let composite = CompositeCalendar::with_mode(&calendars[..2], CompositeMode::Union);
+    assert!(composite.is_holiday(make_date(2025, 1, 1)));
+    assert!(composite.is_holiday(make_date(2025, 5, 26)));
 }
 
 #[test]
-fn registry_resolve_many_into_composite() {
-    let registry = CalendarRegistry::global();
-
-    let ids = [CalendarId::from(TARGET2.id()), CalendarId::from(GBLO.id())];
-
-    let calendars = registry.resolve_many_vec(&ids);
-    let composite = CompositeCalendar::with_mode(&calendars[..], CompositeMode::Union);
-
-    // Test that composite works
-    let jan1 = make_date(2025, 1, 1);
-    assert!(composite.is_holiday(jan1));
-
-    // Test UK-specific holiday
-    let may26 = make_date(2025, 5, 26); // Spring bank holiday
-    assert!(composite.is_holiday(may26));
-}
-
-#[test]
-fn registry_resolve_many_handles_unknown_ids() {
-    let registry = CalendarRegistry::global();
-
+fn strict_many_resolution_rejects_unknown_ids() {
     let ids = [
         CalendarId::from(TARGET2.id()),
         CalendarId::from("unknown_calendar"),
         CalendarId::from(GBLO.id()),
     ];
-
-    let calendars = registry.resolve_many_vec(&ids);
-
-    // Should only resolve the valid ones
-    assert_eq!(calendars.len(), 2);
+    let error = calendars_by_ids(&ids)
+        .err()
+        .expect("unknown calendar must fail the whole resolution");
+    assert!(error.to_string().contains("unknown_calendar"));
 }
 
 #[test]
-fn registry_available_ids_matches_all_ids() {
-    let registry = CalendarRegistry::global();
-    let ids = registry.available_ids();
-
-    // Should contain known calendars
+fn available_ids_contains_market_calendars() {
+    let ids = available_calendars();
     assert!(ids.contains(&"gblo"));
     assert!(ids.contains(&"target2"));
     assert!(ids.contains(&"nyse"));
     assert!(ids.contains(&"usny"));
-}
-
-#[test]
-fn registry_is_singleton() {
-    let reg1 = CalendarRegistry::global();
-    let reg2 = CalendarRegistry::global();
-
-    // Should be the same instance
-    let ptr1 = reg1 as *const CalendarRegistry;
-    let ptr2 = reg2 as *const CalendarRegistry;
-    assert_eq!(ptr1, ptr2);
 }
 
 #[test]
@@ -150,26 +93,4 @@ fn calendar_id_equality_and_hashing() {
     set.insert(id1);
     assert!(set.contains(&id2));
     assert!(!set.contains(&id3));
-}
-
-#[test]
-fn resolve_many_preserves_order() {
-    let registry = CalendarRegistry::global();
-
-    let ids = [
-        CalendarId::from(GBLO.id()),
-        CalendarId::from(TARGET2.id()),
-        CalendarId::from(NYSE.id()),
-    ];
-
-    let calendars = registry.resolve_many_vec(&ids);
-
-    // Verify order is preserved by checking metadata
-    let meta0 = calendars[0].metadata().unwrap();
-    let meta1 = calendars[1].metadata().unwrap();
-    let meta2 = calendars[2].metadata().unwrap();
-
-    assert_eq!(meta0.id, "gblo");
-    assert_eq!(meta1.id, "target2");
-    assert_eq!(meta2.id, "nyse");
 }

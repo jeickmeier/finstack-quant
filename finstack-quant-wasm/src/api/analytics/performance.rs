@@ -7,7 +7,7 @@
 
 use crate::utils::{date_to_iso, to_js_err};
 use finstack_quant_analytics as fa;
-use finstack_quant_core::dates::{CalendarRegistry, FiscalConfig, HolidayCalendar, PeriodKind};
+use finstack_quant_core::dates::{calendar_by_id, FiscalConfig, HolidayCalendar, PeriodKind};
 use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
 
@@ -47,8 +47,7 @@ fn make_fiscal_config(month: Option<u8>, day: Option<u8>) -> Result<FiscalConfig
 }
 
 fn resolve_fiscal_calendar(calendar_id: &str) -> Result<&'static dyn HolidayCalendar, JsValue> {
-    CalendarRegistry::global()
-        .resolve_str(calendar_id)
+    calendar_by_id(calendar_id)
         .ok_or_else(|| to_js_err(format!("calendar {calendar_id:?} not found")))
 }
 

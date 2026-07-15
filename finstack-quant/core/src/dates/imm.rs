@@ -340,9 +340,7 @@ const fn estimated_sifma_business_day_index(class: SifmaSettlementClass) -> u8 {
 }
 
 fn estimated_sifma_base_date(month: Month, year: i32, class: SifmaSettlementClass) -> Date {
-    use super::calendar::registry::CalendarRegistry;
-
-    let calendar = CalendarRegistry::global().resolve_str("sifma");
+    let calendar = super::calendar_by_id("sifma");
     let target = estimated_sifma_business_day_index(class);
     let mut date = Date::from_calendar_date(year, month, 1)
         .unwrap_or_else(|_| unreachable!("the first day of a Gregorian month is valid"));

@@ -15,7 +15,7 @@
 //! - `calendars`: Built-in regional calendar holiday tests
 //! - `adjustment`: Business day convention tests
 //! - `composite`: Composite calendar (union/intersection) tests
-//! - `registry`: CalendarRegistry lookup and resolution tests
+//! - `registry`: free calendar lookup and resolution tests
 //! - `generated`: Low-level bitset and helper tests
 //! - `daycount`: Day count convention tests
 //! - `schedule`: Schedule generation tests

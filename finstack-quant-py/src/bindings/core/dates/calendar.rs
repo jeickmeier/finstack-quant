@@ -3,7 +3,8 @@
 use crate::bindings::core::dates::utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
-    adjust, BusinessDayConvention, CalendarMetadata, CalendarRegistry, HolidayCalendar, WeekendRule,
+    adjust, available_calendars, calendar_by_id, BusinessDayConvention, CalendarMetadata,
+    HolidayCalendar, WeekendRule,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
@@ -195,8 +196,7 @@ impl PyHolidayCalendar {
     #[new]
     #[pyo3(text_signature = "(code)")]
     fn new(code: &str) -> PyResult<Self> {
-        let registry = CalendarRegistry::global();
-        if registry.resolve_str(code).is_none() {
+        if calendar_by_id(code).is_none() {
             return Err(pyo3::exceptions::PyKeyError::new_err(format!(
                 "unknown calendar code: {code:?}"
             )));
@@ -247,14 +247,9 @@ impl PyHolidayCalendar {
 impl PyHolidayCalendar {
     /// Resolve the inner calendar from the global registry.
     fn resolve(&self) -> PyResult<&'static dyn HolidayCalendar> {
-        CalendarRegistry::global()
-            .resolve_str(&self.code)
-            .ok_or_else(|| {
-                pyo3::exceptions::PyKeyError::new_err(format!(
-                    "calendar not found: {:?}",
-                    self.code
-                ))
-            })
+        calendar_by_id(&self.code).ok_or_else(|| {
+            pyo3::exceptions::PyKeyError::new_err(format!("calendar not found: {:?}", self.code))
+        })
     }
 }
 
@@ -279,11 +274,9 @@ fn py_adjust<'py>(
         if let Ok(cal) = calendar.extract::<PyRef<'_, PyHolidayCalendar>>() {
             cal.resolve()?
         } else if let Ok(code) = calendar.extract::<String>() {
-            CalendarRegistry::global()
-                .resolve_str(&code)
-                .ok_or_else(|| {
-                    pyo3::exceptions::PyKeyError::new_err(format!("unknown calendar: {code:?}"))
-                })?
+            calendar_by_id(&code).ok_or_else(|| {
+                pyo3::exceptions::PyKeyError::new_err(format!("unknown calendar: {code:?}"))
+            })?
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(
                 "expected HolidayCalendar or str calendar code",
@@ -298,8 +291,7 @@ fn py_adjust<'py>(
 #[pyfunction]
 #[pyo3(name = "available_calendars")]
 fn py_available_calendars() -> Vec<String> {
-    CalendarRegistry::global()
-        .available_ids()
+    available_calendars()
         .iter()
         .map(|s| s.to_string())
         .collect()

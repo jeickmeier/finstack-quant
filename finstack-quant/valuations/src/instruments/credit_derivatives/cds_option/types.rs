@@ -28,7 +28,7 @@ use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::{ExerciseStyle, OptionType, SettlementType};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{
-    adjust, BusinessDayConvention, CalendarRegistry, DateExt, HolidayCalendar,
+    adjust, calendar_by_id, BusinessDayConvention, DateExt, HolidayCalendar,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -469,14 +469,12 @@ impl CDSOption {
 
     fn standard_calendar(&self) -> finstack_quant_core::Result<&'static dyn HolidayCalendar> {
         let calendar_id = self.underlying_convention.default_calendar();
-        CalendarRegistry::global()
-            .resolve_str(calendar_id)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "missing CDS option calendar '{calendar_id}' for {:?}",
-                    self.underlying_convention
-                ))
-            })
+        calendar_by_id(calendar_id).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "missing CDS option calendar '{calendar_id}' for {:?}",
+                self.underlying_convention
+            ))
+        })
     }
 
     /// Bloomberg CDSO Δ — closed-form Black-76 N(d₁) on the displayed

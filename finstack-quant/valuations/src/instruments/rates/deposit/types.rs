@@ -14,7 +14,7 @@
 //! to properly compute settlement dates when building cashflow schedules.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::CalendarRegistry;
+use finstack_quant_core::dates::calendar_by_id;
 use finstack_quant_core::dates::{
     adjust, BusinessDayConvention, Date, DateExt, DayCount, HolidayCalendar,
 };
@@ -375,7 +375,7 @@ impl Deposit {
     /// The effective start date after all adjustments.
     pub fn effective_start_date(&self) -> finstack_quant_core::Result<Date> {
         let calendar: Option<&dyn HolidayCalendar> = match self.calendar_id.as_deref() {
-            Some(id) => Some(CalendarRegistry::global().resolve_str(id).ok_or_else(|| {
+            Some(id) => Some(calendar_by_id(id).ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
                     "Deposit '{}' references unknown calendar_id '{}'",
                     self.id, id
@@ -420,7 +420,7 @@ impl Deposit {
     /// The effective end date after all adjustments.
     pub fn effective_end_date(&self) -> finstack_quant_core::Result<Date> {
         let calendar: Option<&dyn HolidayCalendar> = match self.calendar_id.as_deref() {
-            Some(id) => Some(CalendarRegistry::global().resolve_str(id).ok_or_else(|| {
+            Some(id) => Some(calendar_by_id(id).ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
                     "Deposit '{}' references unknown calendar_id '{}'",
                     self.id, id

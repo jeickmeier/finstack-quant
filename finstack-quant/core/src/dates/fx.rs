@@ -39,15 +39,12 @@
 //! - FX settlement / spot-lag conventions: CLS settlement rules; see also
 //!   (FX spot lag finding)
 
-use crate::dates::calendar::registry::CalendarRegistry;
-use crate::dates::calendar::types::Calendar;
-use crate::dates::{adjust, BusinessDayConvention, CompositeCalendar, Date, HolidayCalendar};
+use crate::dates::{
+    adjust, available_calendars, calendar_by_id, BusinessDayConvention, CompositeCalendar, Date,
+    HolidayCalendar, WEEKENDS_ONLY,
+};
 use crate::{Error, Result};
 use time::Duration;
-
-fn weekends_only() -> Calendar {
-    Calendar::new("weekends_only", "Weekends Only", true, &[])
-}
 
 /// Resolve a calendar ID to a calendar reference.
 ///
@@ -70,49 +67,21 @@ fn weekends_only() -> Calendar {
 /// let err = resolve_calendar(Some("unknown_cal"));
 /// assert!(err.is_err());
 /// ```
-pub fn resolve_calendar(cal_id: Option<&str>) -> Result<CalendarWrapper> {
+pub fn resolve_calendar(cal_id: Option<&str>) -> Result<&'static dyn HolidayCalendar> {
     if let Some(id) = cal_id {
-        if let Some(resolved) = CalendarRegistry::global().resolve_str(id) {
-            return Ok(CalendarWrapper::Borrowed(resolved));
+        if let Some(resolved) = calendar_by_id(id) {
+            return Ok(resolved);
         }
 
         // Error instead of silent fallback
-        let available = CalendarRegistry::global().available_ids();
-        return Err(Error::calendar_not_found_with_suggestions(id, available));
+        return Err(Error::calendar_not_found_with_suggestions(
+            id,
+            available_calendars(),
+        ));
     }
 
     // Only use weekends_only if explicitly None (not as fallback)
-    Ok(CalendarWrapper::Owned(weekends_only()))
-}
-
-/// Wrapper for calendar references that can be either borrowed (from registry)
-/// or owned (e.g., constructed weekends-only calendar).
-pub enum CalendarWrapper {
-    /// A static reference to a calendar from the global registry
-    Borrowed(&'static dyn HolidayCalendar),
-    /// An owned calendar instance
-    Owned(Calendar),
-}
-
-impl std::fmt::Debug for CalendarWrapper {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CalendarWrapper::Borrowed(_) => write!(f, "CalendarWrapper::Borrowed(<calendar>)"),
-            CalendarWrapper::Owned(cal) => {
-                f.debug_tuple("CalendarWrapper::Owned").field(cal).finish()
-            }
-        }
-    }
-}
-
-impl CalendarWrapper {
-    /// Get a reference to the underlying holiday calendar.
-    pub fn as_holiday_calendar(&self) -> &dyn HolidayCalendar {
-        match self {
-            CalendarWrapper::Borrowed(c) => *c,
-            CalendarWrapper::Owned(c) => c,
-        }
-    }
+    Ok(&WEEKENDS_ONLY)
 }
 
 fn with_joint_calendar<R>(
@@ -144,11 +113,9 @@ pub fn adjust_joint_calendar(
     let base_cal = resolve_calendar(base_cal_id)?;
     let quote_cal = resolve_calendar(quote_cal_id)?;
 
-    with_joint_calendar(
-        base_cal.as_holiday_calendar(),
-        quote_cal.as_holiday_calendar(),
-        |joint_calendar| adjust(date, bdc, joint_calendar),
-    )
+    with_joint_calendar(base_cal, quote_cal, |joint_calendar| {
+        adjust(date, bdc, joint_calendar)
+    })
 }
 
 fn advance_business_days(
@@ -247,11 +214,9 @@ pub fn add_joint_business_days(
     };
 
     advance_business_days(start, n_days, |date| {
-        base_cal.as_holiday_calendar().is_business_day(date)
-            && quote_cal.as_holiday_calendar().is_business_day(date)
-            && settlement_cal
-                .as_ref()
-                .is_none_or(|calendar| calendar.as_holiday_calendar().is_business_day(date))
+        base_cal.is_business_day(date)
+            && quote_cal.is_business_day(date)
+            && settlement_cal.is_none_or(|calendar| calendar.is_business_day(date))
     })
 }
 
@@ -327,16 +292,14 @@ pub fn fx_spot_date(
 
     // Intermediate days are gated by each currency's own calendar EXCEPT USD.
     let intermediate_good = |d: Date| {
-        (base_is_usd || base_cal.as_holiday_calendar().is_business_day(d))
-            && (quote_is_usd || quote_cal.as_holiday_calendar().is_business_day(d))
+        (base_is_usd || base_cal.is_business_day(d))
+            && (quote_is_usd || quote_cal.is_business_day(d))
     };
     // The final value date must be good on ALL calendars (incl. USD).
     let final_good = |d: Date| {
-        base_cal.as_holiday_calendar().is_business_day(d)
-            && quote_cal.as_holiday_calendar().is_business_day(d)
-            && usd_cal
-                .as_ref()
-                .is_none_or(|c| c.as_holiday_calendar().is_business_day(d))
+        base_cal.is_business_day(d)
+            && quote_cal.is_business_day(d)
+            && usd_cal.is_none_or(|c| c.is_business_day(d))
     };
 
     let max_iters: u32 = (spot_lag_days.saturating_mul(10).saturating_add(25)).max(1000);
@@ -400,8 +363,8 @@ pub fn fx_spot_date(
 /// }
 /// ```
 pub struct ResolvedCalendarPair {
-    base: CalendarWrapper,
-    quote: CalendarWrapper,
+    base: &'static dyn HolidayCalendar,
+    quote: &'static dyn HolidayCalendar,
 }
 
 impl ResolvedCalendarPair {
@@ -419,8 +382,7 @@ impl ResolvedCalendarPair {
     /// Check if a date is a business day on both calendars.
     #[inline]
     pub fn is_joint_business_day(&self, date: Date) -> bool {
-        self.base.as_holiday_calendar().is_business_day(date)
-            && self.quote.as_holiday_calendar().is_business_day(date)
+        self.base.is_business_day(date) && self.quote.is_business_day(date)
     }
 
     /// Add N business days using pre-resolved calendars.
@@ -454,11 +416,9 @@ impl ResolvedCalendarPair {
     ///
     /// The adjusted date that is a business day on both calendars.
     pub fn adjust_joint_calendar(&self, date: Date, bdc: BusinessDayConvention) -> Result<Date> {
-        with_joint_calendar(
-            self.base.as_holiday_calendar(),
-            self.quote.as_holiday_calendar(),
-            |joint_calendar| adjust(date, bdc, joint_calendar),
-        )
+        with_joint_calendar(self.base, self.quote, |joint_calendar| {
+            adjust(date, bdc, joint_calendar)
+        })
     }
 }
 
@@ -607,7 +567,7 @@ mod tests {
 
         assert!(result.is_err(), "Unknown calendar ID should error");
 
-        let err = result.unwrap_err();
+        let err = result.err().expect("unknown calendar must error");
         assert!(
             matches!(err, Error::Input(ref e) if matches!(
                 e,
@@ -633,15 +593,15 @@ mod tests {
         let monday = create_date(2024, Month::January, 15).unwrap();
 
         assert!(
-            !cal.as_holiday_calendar().is_business_day(saturday),
+            !cal.is_business_day(saturday),
             "Saturday should not be business day"
         );
         assert!(
-            !cal.as_holiday_calendar().is_business_day(sunday),
+            !cal.is_business_day(sunday),
             "Sunday should not be business day"
         );
         assert!(
-            cal.as_holiday_calendar().is_business_day(monday),
+            cal.is_business_day(monday),
             "Monday should be business day (no holidays)"
         );
     }
@@ -694,8 +654,8 @@ mod tests {
     #[test]
     fn test_adjust_joint_calendar_uses_union_calendar_modified_following() {
         let pair = ResolvedCalendarPair {
-            base: CalendarWrapper::Borrowed(&JAN_29_HOLIDAY),
-            quote: CalendarWrapper::Borrowed(&JAN_30_AND_31_HOLIDAYS),
+            base: &JAN_29_HOLIDAY,
+            quote: &JAN_30_AND_31_HOLIDAYS,
         };
 
         let date = create_date(2025, Month::January, 29).unwrap();

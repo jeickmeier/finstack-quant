@@ -93,6 +93,7 @@ pub use calendar::business_days::{
 
 // The canonical public discovery helper
 pub use calendar::business_days::available_calendars;
+pub use calendar::{calendar_by_id, calendars_by_ids, WEEKENDS_ONLY};
 
 mod schedule_gen;
 mod schedule_iter;
@@ -118,8 +119,6 @@ pub use imm::{
 };
 
 pub mod calendar;
-pub use calendar::registry::CalendarRegistry;
-
 // Calendar rule system is intentionally public, but only via the `dates` facade.
 pub use calendar::rule::{Direction, Observed, Rule};
 

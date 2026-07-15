@@ -4,7 +4,7 @@
 //! public `finstack_quant_core::dates` API (without relying on internal bitset helpers).
 
 use finstack_quant_core::dates::calendar::{SSE, TARGET2, USNY};
-use finstack_quant_core::dates::{CalendarRegistry, Date, HolidayCalendar};
+use finstack_quant_core::dates::{calendar_by_id, Date, HolidayCalendar};
 use time::Month;
 
 fn make_date(y: i32, m: u8, d: u8) -> Date {
@@ -155,12 +155,8 @@ fn sifma_cme_respect_effective_year_for_new_holidays() {
 }
 
 #[test]
-fn calendar_registry_resolves_generated_calendars() {
-    let registry = CalendarRegistry::global();
-
-    let target2 = registry
-        .resolve_str("target2")
-        .expect("TARGET2 should be resolvable");
+fn calendar_resolver_resolves_generated_calendars() {
+    let target2 = calendar_by_id("target2").expect("TARGET2 should be resolvable");
 
     let jan1 = make_date(2025, 1, 1);
     assert!(target2.is_holiday(jan1));

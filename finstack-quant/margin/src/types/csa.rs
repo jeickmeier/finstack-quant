@@ -255,10 +255,7 @@ impl CsaSpec {
                 "CSA id must not be empty".into(),
             ));
         }
-        if finstack_quant_core::dates::CalendarRegistry::global()
-            .resolve_str(&self.calendar_id)
-            .is_none()
-        {
+        if finstack_quant_core::dates::calendar_by_id(&self.calendar_id).is_none() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CSA '{}' calendar '{}' is not registered",
                 self.id, self.calendar_id

@@ -572,8 +572,7 @@ fn test_time_and_settlement_helpers_match_curve_and_calendar_conventions() {
     let monday =
         Date::from_calendar_date(2025, time::Month::January, 6).expect("valid Monday date");
     assert_eq!(
-        settlement_date(friday, 1, Some(nyse.as_holiday_calendar()), 252.0)
-            .expect("calendar settlement"),
+        settlement_date(friday, 1, Some(nyse), 252.0).expect("calendar settlement"),
         monday,
         "calendar-aware settlement should advance by business days"
     );

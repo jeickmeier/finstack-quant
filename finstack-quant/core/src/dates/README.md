@@ -32,7 +32,7 @@ Everything is accessible via `finstack_quant_core::dates`:
     - Day‑count types: `DayCount`, `DayCountContext`, `DayCountContextState`, `Thirty360Convention`
     - Calendars and business days:
       - `HolidayCalendar`, `BusinessDayConvention`, `adjust`, `available_calendars`
-      - `CompositeCalendar`, `CalendarRegistry`
+      - `CompositeCalendar`, `calendar_by_id`, `calendars_by_ids`
     - Schedule types: `Tenor`, `Schedule`, `ScheduleBuilder`, `ScheduleSpec`, `StubKind`
     - Tenor and IMM helpers: `Tenor`, `TenorUnit`, `next_imm`, `next_cds_date`, `third_wednesday`, etc.
     - FX helpers: joint-calendar adjustments and spot roll helpers (`fx::*`)
@@ -53,7 +53,7 @@ Everything is accessible via `finstack_quant_core::dates`:
     - `generated.rs` + `algo.rs`: build‑time compiled bitsets for 1970–2150 and shared helpers
     - `composite.rs`: `CompositeCalendar` for unions of calendars
     - `types.rs`: metadata types (`CalendarMetadata`, IDs, etc.)
-    - `registry.rs`: `CalendarRegistry` and global registry, calendar lookup by ID
+    - Generated `calendar_by_id` lookup plus strict `calendars_by_ids` resolution
 - **`daycount.rs`**
   - Industry‑standard day‑count conventions:
     - `DayCount` enum with variants:
@@ -166,16 +166,14 @@ Business‑day adjustments use:
 - `adjust(date, convention, &cal) -> Result<Date>`
 - `available_calendars() -> impl Iterator<Item = &str>` for discovery
 
-Lookup is done via `CalendarRegistry`:
+Lookup is done via the free resolution API:
 
 ```rust
-use finstack_quant_core::dates::{Date, BusinessDayConvention, adjust};
-use finstack_quant_core::dates::CalendarRegistry;
+use finstack_quant_core::dates::{calendar_by_id, Date, BusinessDayConvention, adjust};
 use time::Month;
 
 let base = Date::from_calendar_date(2025, Month::December, 25)?;
-let nyse = CalendarRegistry::global()
-    .resolve_str("nyse")
+let nyse = calendar_by_id("nyse")
     .ok_or("missing NYSE calendar")?;
 
 let adj = adjust(base, BusinessDayConvention::Following, nyse)?;
@@ -203,7 +201,8 @@ Context carries:
 - `frequency: Option<Tenor>` for `ActActIsma`
 - `bus_basis: Option<u16>` for custom `Bus/N` denominators
 
-`DayCountContextState` is a serde DTO that can be serialized (e.g. to JSON) and re‑hydrated using a `CalendarRegistry`.
+`DayCountContextState` is a serde DTO that can be serialized (e.g. to JSON) and
+strictly re-hydrated with `state.to_ctx()` using the built-in calendar lookup.
 
 ### `Tenor`, `ScheduleBuilder`, and `Schedule`
 
@@ -216,14 +215,12 @@ Context carries:
 Schedules are built via `ScheduleBuilder`:
 
 ```rust
-use finstack_quant_core::dates::{ScheduleBuilder, Tenor, BusinessDayConvention};
-use finstack_quant_core::dates::CalendarRegistry;
+use finstack_quant_core::dates::{calendar_by_id, ScheduleBuilder, Tenor, BusinessDayConvention};
 use time::{Date, Month};
 
 let start = Date::from_calendar_date(2025, Month::January, 15)?;
 let end = Date::from_calendar_date(2025, Month::December, 15)?;
-let nyse = CalendarRegistry::global()
-    .resolve_str("nyse")
+let nyse = calendar_by_id("nyse")
     .ok_or("nyse not found")?;
 
 let schedule = ScheduleBuilder::new(start, end)?

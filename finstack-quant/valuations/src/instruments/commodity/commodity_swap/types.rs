@@ -12,7 +12,7 @@ use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, CalendarRegistry, Date, Tenor};
+use finstack_quant_core::dates::{calendar_by_id, BusinessDayConvention, Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
@@ -297,7 +297,7 @@ impl CommoditySwap {
 
         // Resolve holiday calendar if available (Item 8: integrate holiday calendars)
         let calendar = match self.calendar_id.as_deref() {
-            Some(id) => Some(CalendarRegistry::global().resolve_str(id).ok_or_else(|| {
+            Some(id) => Some(calendar_by_id(id).ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
                     "CommoditySwap '{}' references unknown calendar_id '{id}'",
                     self.id

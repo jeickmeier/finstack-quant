@@ -245,11 +245,8 @@ impl AttributionSpec {
                 .get_meta("calendar")
                 .or_else(|| instrument.attributes().get_meta("calendar_id"))
                 .unwrap_or("usny");
-            let calendar = finstack_quant_core::dates::CalendarRegistry::global()
-                .resolve_str(cal_code)
-                .or_else(|| {
-                    finstack_quant_core::dates::CalendarRegistry::global().resolve_str("usny")
-                });
+            let calendar = finstack_quant_core::dates::calendar_by_id(cal_code)
+                .or_else(|| finstack_quant_core::dates::calendar_by_id("usny"));
             let _day_count = instrument
                 .attributes()
                 .get_meta("day_count")

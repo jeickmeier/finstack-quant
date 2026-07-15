@@ -6,7 +6,7 @@ use finstack_quant_core::dates::calendar::{
     CME as Cme, CNBE as Cnbe, DEFR as Defr, GBLO as Gblo, HKEX as Hkex, HKHK as Hkhk, NYSE as Nyse,
     SGSI as Sgsi, SIFMA as Sifma, SSE as Sse, TARGET2 as Target2, USNY as Usny,
 };
-use finstack_quant_core::dates::{CalendarRegistry, Date, HolidayCalendar};
+use finstack_quant_core::dates::{Date, HolidayCalendar};
 use std::collections::HashSet;
 
 fn holiday_set(cal: &dyn HolidayCalendar, year: i32) -> HashSet<Date> {
@@ -373,8 +373,8 @@ fn test_calendar_by_id_lookup() {
         let cal = calendar_by_id(id);
         assert!(cal.is_some(), "Calendar '{}' should be found", id);
 
-        let typed = CalendarRegistry::global().resolve_str(id);
-        assert!(typed.is_some(), "Registry should find '{}'", id);
+        let typed = calendar_by_id(id);
+        assert!(typed.is_some(), "Free resolver should find '{}'", id);
 
         let mid_week_date = make_date(2025, 6, 18);
         let _ = cal.unwrap().is_holiday(mid_week_date);

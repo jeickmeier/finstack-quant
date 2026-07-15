@@ -5,7 +5,7 @@ use crate::bindings::core::dates::utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
 use crate::errors::analytics_to_py as core_to_py;
 use finstack_quant_analytics as fa;
-use finstack_quant_core::dates::{CalendarRegistry, FiscalConfig, HolidayCalendar, PeriodKind};
+use finstack_quant_core::dates::{calendar_by_id, FiscalConfig, HolidayCalendar, PeriodKind};
 use numpy::PyArray1;
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyTypeError;
@@ -43,16 +43,14 @@ fn make_fiscal_config(month: Option<u8>, day: Option<u8>) -> PyResult<FiscalConf
 }
 
 fn resolve_fiscal_calendar(calendar_id: &str) -> PyResult<&'static dyn HolidayCalendar> {
-    CalendarRegistry::global()
-        .resolve_str(calendar_id)
-        .ok_or_else(|| {
-            core_to_py(
-                finstack_quant_core::Error::calendar_not_found_with_suggestions(
-                    calendar_id.to_string(),
-                    finstack_quant_core::dates::available_calendars(),
-                ),
-            )
-        })
+    calendar_by_id(calendar_id).ok_or_else(|| {
+        core_to_py(
+            finstack_quant_core::Error::calendar_not_found_with_suggestions(
+                calendar_id.to_string(),
+                finstack_quant_core::dates::available_calendars(),
+            ),
+        )
+    })
 }
 
 /// Parse a frequency string into a [`PeriodKind`].
@@ -850,7 +848,7 @@ impl PyPerformance {
     /// (``fiscal_year_start_month`` / ``fiscal_year_start_day``) adjusted to
     /// the next business day on ``calendar``. The default calendar is
     /// ``"nyse"``; pass the calendar matching your market (any id registered
-    /// in the core ``CalendarRegistry``) for non-US panels.
+    /// in the core ``calendar_by_id``) for non-US panels.
     #[pyo3(signature = (ref_date, fiscal_year_start_month = None, fiscal_year_start_day = None, calendar = "nyse"))]
     fn lookback_returns(
         &self,

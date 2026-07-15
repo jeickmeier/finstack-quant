@@ -382,7 +382,7 @@ impl Swaption {
     /// Set the holiday calendar for schedule generation.
     ///
     /// # Arguments
-    /// * `calendar_id` - Calendar ID registered in `CalendarRegistry`
+    /// * `calendar_id` - Calendar ID registered in `calendar_by_id`
     ///   (e.g., `"nyse"` for USD, `"target"` for EUR)
     pub fn with_calendar(mut self, calendar_id: impl Into<CalendarId>) -> Self {
         self.calendar_id = Some(calendar_id.into());

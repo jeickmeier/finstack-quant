@@ -5,13 +5,11 @@
 
 use finstack_quant_analytics::Performance;
 use finstack_quant_core::dates::{
-    CalendarRegistry, Date, FiscalConfig, HolidayCalendar, Month, PeriodKind,
+    calendar_by_id, Date, FiscalConfig, HolidayCalendar, Month, PeriodKind,
 };
 
 fn nyse() -> &'static dyn HolidayCalendar {
-    CalendarRegistry::global()
-        .resolve_str("nyse")
-        .expect("nyse calendar")
+    calendar_by_id("nyse").expect("nyse calendar")
 }
 
 fn calendar_days(start: Date, n: usize) -> Vec<Date> {

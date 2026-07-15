@@ -4,7 +4,7 @@
 //! threshold, MTA, and rounding rules.
 
 use crate::types::{CsaSpec, MarginCall, MarginTenor};
-use finstack_quant_core::dates::{adjust, BusinessDayConvention, CalendarRegistry, Date, DateExt};
+use finstack_quant_core::dates::{adjust, calendar_by_id, BusinessDayConvention, Date, DateExt};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use tracing::{debug, warn};
@@ -92,14 +92,12 @@ pub struct VmCalculator {
 
 impl VmCalculator {
     fn calendar_for_csa(&self) -> Result<&'static dyn finstack_quant_core::dates::HolidayCalendar> {
-        CalendarRegistry::global()
-            .resolve_str(&self.csa.calendar_id)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "CSA '{}' calendar '{}' is not registered",
-                    self.csa.id, self.csa.calendar_id
-                ))
-            })
+        calendar_by_id(&self.csa.calendar_id).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "CSA '{}' calendar '{}' is not registered",
+                self.csa.id, self.csa.calendar_id
+            ))
+        })
     }
 
     fn add_business_days(&self, date: Date, days: i32) -> Result<Date> {

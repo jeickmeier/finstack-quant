@@ -591,7 +591,7 @@ mod tests {
     }
 
     /// Tests that compounded OIS pricing fails when fixing_calendar_id is specified but not
-    /// found in the CalendarRegistry.
+    /// found in the calendar_by_id.
     ///
     /// This validates the fix for the silent fallback to weekday stepping issue identified
     /// in the quant code review. For RFR compounding (SOFR, ESTR), incorrect calendar

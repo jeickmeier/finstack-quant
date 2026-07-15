@@ -2,8 +2,9 @@
 
 use crate::utils::to_js_err;
 use finstack_quant_core::dates::{
-    adjust as core_adjust, BusinessDayConvention, CalendarRegistry, DayCount as RustDayCount,
-    DayCountContext as RustDayCountContext, Tenor as RustTenor,
+    adjust as core_adjust, available_calendars as core_available_calendars, calendar_by_id,
+    BusinessDayConvention, DayCount as RustDayCount, DayCountContext as RustDayCountContext,
+    Tenor as RustTenor,
 };
 use wasm_bindgen::prelude::*;
 
@@ -26,13 +27,11 @@ impl DayCountContext {
     /// Resolve to a runtime context.
     ///
     /// Errors when `calendar_code` is set but unknown to the global calendar
-    /// registry, instead of silently dropping the calendar.
+    /// lookup, instead of silently dropping the calendar.
     fn to_rust_ctx(&self) -> Result<RustDayCountContext<'static>, JsValue> {
-        let registry = CalendarRegistry::global();
         let calendar = match self.calendar_code.as_deref() {
             Some(code) => Some(
-                registry
-                    .resolve_str(code)
+                calendar_by_id(code)
                     .ok_or_else(|| JsValue::from_str(&format!("unknown calendar id: {code:?}")))?,
             ),
             None => None,
@@ -454,9 +453,7 @@ pub fn adjust(epoch_days: i32, convention: &str, calendar_code: &str) -> Result<
     let bdc: BusinessDayConvention = convention
         .parse()
         .map_err(|e: String| JsValue::from_str(&e))?;
-    let registry = CalendarRegistry::global();
-    let cal = registry
-        .resolve_str(calendar_code)
+    let cal = calendar_by_id(calendar_code)
         .ok_or_else(|| JsValue::from_str(&format!("unknown calendar: {calendar_code}")))?;
     let adjusted = core_adjust(date, bdc, cal).map_err(to_js_err)?;
     Ok(finstack_quant_core::dates::days_since_epoch(adjusted))
@@ -465,8 +462,7 @@ pub fn adjust(epoch_days: i32, convention: &str, calendar_code: &str) -> Result<
 /// Return the list of available calendar codes.
 #[wasm_bindgen(js_name = availableCalendars)]
 pub fn available_calendars() -> Vec<String> {
-    CalendarRegistry::global()
-        .available_ids()
+    core_available_calendars()
         .iter()
         .map(|s| s.to_string())
         .collect()

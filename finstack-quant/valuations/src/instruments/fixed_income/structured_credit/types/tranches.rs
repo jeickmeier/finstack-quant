@@ -199,8 +199,7 @@ impl TrancheCoupon {
                 } else {
                     calendar_id
                 };
-                let calendar = finstack_quant_core::dates::CalendarRegistry::global()
-                    .resolve_str(canonical_calendar_id)
+                let calendar = finstack_quant_core::dates::calendar_by_id(canonical_calendar_id)
                     .ok_or_else(|| {
                         finstack_quant_core::Error::Validation(format!(
                             "structured-credit tranche fixing calendar '{}' is not registered",
