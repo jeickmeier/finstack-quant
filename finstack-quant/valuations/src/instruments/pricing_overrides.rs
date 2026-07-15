@@ -580,11 +580,7 @@ impl InstrumentPricingOverrides {
 
 impl From<&PricingOverrides> for InstrumentPricingOverrides {
     fn from(pricing_overrides: &PricingOverrides) -> Self {
-        Self {
-            market_quotes: pricing_overrides.market_quotes.clone(),
-            model_config: pricing_overrides.model_config.clone(),
-            term_loan: pricing_overrides.term_loan.clone(),
-        }
+        pricing_overrides.instrument.clone()
     }
 }
 
@@ -796,7 +792,89 @@ impl From<&PricingOverrides> for ScenarioPricingOverrides {
 }
 
 // ---------------------------------------------------------------------------
-// Main struct: PricingOverrides (composed from focused sub-structs)
+// Stable wire representation
+// ---------------------------------------------------------------------------
+
+/// Stable legacy wire representation used while runtime storage is split by owner.
+///
+/// Serialization stays flat. Deserialization additionally accepts focused
+/// nested objects named `instrument`, `metrics`, or `scenario` (and their
+/// explicit `*_pricing_overrides` aliases), merging them over flat fields.
+#[derive(Debug, Clone, Default, serde::Serialize, schemars::JsonSchema)]
+#[serde(default)]
+pub(crate) struct PricingOverridesWire {
+    #[serde(flatten)]
+    pub(crate) instrument: InstrumentPricingOverrides,
+    #[serde(flatten)]
+    pub(crate) metrics: MetricPricingOverrides,
+    #[serde(flatten)]
+    pub(crate) scenario: ScenarioPricingOverrides,
+}
+
+impl<'de> serde::Deserialize<'de> for PricingOverridesWire {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut value = serde_json::Value::deserialize(deserializer)?;
+        let object = value
+            .as_object_mut()
+            .ok_or_else(|| serde::de::Error::custom("pricing overrides must be a JSON object"))?;
+        if object.contains_key("tree_volatility") {
+            return Err(serde::de::Error::custom(
+                "`tree_volatility` was removed; use `implied_volatility`",
+            ));
+        }
+
+        for key in [
+            "instrument",
+            "instrument_pricing_overrides",
+            "metrics",
+            "metric_pricing_overrides",
+            "scenario",
+            "scenario_pricing_overrides",
+        ] {
+            let Some(nested) = object.remove(key) else {
+                continue;
+            };
+            if nested.is_null() {
+                continue;
+            }
+            let nested = nested.as_object().ok_or_else(|| {
+                serde::de::Error::custom(format!("`{key}` must be a JSON object"))
+            })?;
+            for (field, value) in nested {
+                object.insert(field.clone(), value.clone());
+            }
+        }
+        if object.contains_key("tree_volatility") {
+            return Err(serde::de::Error::custom(
+                "`tree_volatility` was removed; use `implied_volatility`",
+            ));
+        }
+
+        #[derive(Default, serde::Deserialize)]
+        #[serde(default)]
+        struct FlatWire {
+            #[serde(flatten)]
+            instrument: InstrumentPricingOverrides,
+            #[serde(flatten)]
+            metrics: MetricPricingOverrides,
+            #[serde(flatten)]
+            scenario: ScenarioPricingOverrides,
+        }
+
+        let flat = FlatWire::deserialize(value).map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            instrument: flat.instrument,
+            metrics: flat.metrics,
+            scenario: flat.scenario,
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Temporary full-bag compatibility type
 // ---------------------------------------------------------------------------
 
 /// Optional parameters that override model pricing with market quotes.
@@ -814,21 +892,15 @@ impl From<&PricingOverrides> for ScenarioPricingOverrides {
 #[derive(Debug, Clone, Default, serde::Serialize, schemars::JsonSchema)]
 #[serde(default)]
 pub struct PricingOverrides {
-    /// Market-quoted values (prices, implied vol, spreads).
+    /// Instrument-owned pricing inputs.
     #[serde(flatten)]
-    pub market_quotes: MarketQuoteOverrides,
+    pub instrument: InstrumentPricingOverrides,
     /// Metric-time controls (bumps, theta horizon, deterministic MC seeds).
     #[serde(flatten)]
     pub metrics: MetricPricingOverrides,
-    /// Model selection and tree pricing parameters.
-    #[serde(flatten)]
-    pub model_config: ModelConfig,
     /// Scenario-only price and spread adjustments.
     #[serde(flatten)]
     pub scenario: ScenarioPricingOverrides,
-    /// Term loan specific overrides
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub term_loan: Option<TermLoanOverrides>,
 }
 
 impl<'de> serde::Deserialize<'de> for PricingOverrides {
@@ -836,39 +908,41 @@ impl<'de> serde::Deserialize<'de> for PricingOverrides {
     where
         D: serde::Deserializer<'de>,
     {
-        let value = serde_json::Value::deserialize(deserializer)?;
-        if value
-            .as_object()
-            .is_some_and(|object| object.contains_key("tree_volatility"))
-        {
-            return Err(serde::de::Error::custom(
-                "`tree_volatility` was removed; use `implied_volatility`",
-            ));
-        }
+        PricingOverridesWire::deserialize(deserializer).map(Self::from)
+    }
+}
 
-        #[derive(Default, serde::Deserialize)]
-        #[serde(default)]
-        struct PricingOverridesHelper {
-            #[serde(flatten)]
-            market_quotes: MarketQuoteOverrides,
-            #[serde(flatten)]
-            metrics: MetricPricingOverrides,
-            #[serde(flatten)]
-            model_config: ModelConfig,
-            #[serde(flatten)]
-            scenario: ScenarioPricingOverrides,
-            term_loan: Option<TermLoanOverrides>,
+impl From<PricingOverridesWire> for PricingOverrides {
+    fn from(wire: PricingOverridesWire) -> Self {
+        Self {
+            instrument: wire.instrument,
+            metrics: wire.metrics,
+            scenario: wire.scenario,
         }
+    }
+}
 
-        let helper =
-            PricingOverridesHelper::deserialize(value).map_err(serde::de::Error::custom)?;
-        Ok(Self {
-            market_quotes: helper.market_quotes,
-            metrics: helper.metrics,
-            model_config: helper.model_config,
-            scenario: helper.scenario,
-            term_loan: helper.term_loan,
-        })
+impl From<&PricingOverrides> for PricingOverridesWire {
+    fn from(overrides: &PricingOverrides) -> Self {
+        Self {
+            instrument: overrides.instrument.clone(),
+            metrics: overrides.metrics.clone(),
+            scenario: overrides.scenario.clone(),
+        }
+    }
+}
+
+impl std::ops::Deref for PricingOverrides {
+    type Target = InstrumentPricingOverrides;
+
+    fn deref(&self) -> &Self::Target {
+        &self.instrument
+    }
+}
+
+impl std::ops::DerefMut for PricingOverrides {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.instrument
     }
 }
 
@@ -1177,6 +1251,15 @@ mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
 
+    #[derive(Debug, Clone, finstack_quant_valuations_macros::FocusedPricingOverrides)]
+    #[serde(deny_unknown_fields)]
+    struct FocusedWireFixture {
+        id: String,
+        instrument_pricing_overrides: InstrumentPricingOverrides,
+        metric_pricing_overrides: MetricPricingOverrides,
+        scenario_pricing_overrides: ScenarioPricingOverrides,
+    }
+
     #[test]
     fn validate_accepts_default_and_positive_values() {
         let po = PricingOverrides::default()
@@ -1269,6 +1352,134 @@ mod tests {
     }
 
     #[test]
+    fn serde_accepts_focused_nested_fields_and_serializes_flat() {
+        let json = r#"{
+            "instrument": {
+                "quoted_clean_price": 99.5,
+                "hw1f_mean_reversion": 0.03,
+                "hw1f_sigma_schedule": {
+                    "times": [0.0, 1.0],
+                    "values": [0.01, 0.012]
+                }
+            },
+            "metrics": {
+                "rate_bump_bp": 2.0,
+                "theta_period": "1W"
+            },
+            "scenario": {
+                "scenario_price_shock_pct": -0.05
+            }
+        }"#;
+
+        let po: PricingOverrides =
+            serde_json::from_str(json).expect("deserialize focused nested fields");
+        assert_eq!(po.market_quotes.quoted_clean_price, Some(99.5));
+        assert_eq!(po.model_config.hw1f_mean_reversion, Some(0.03));
+        let schedule = po
+            .model_config
+            .hw1f_sigma_schedule
+            .as_ref()
+            .expect("HW1F schedule");
+        assert_eq!(schedule.times(), &[0.0, 1.0]);
+        assert_eq!(schedule.values(), &[0.01, 0.012]);
+        assert_eq!(po.metrics.bump_config.rate_bump_bp, Some(2.0));
+        assert_eq!(po.metrics.theta_period.as_deref(), Some("1W"));
+        assert_eq!(po.scenario.scenario_price_shock_pct, Some(-0.05));
+
+        let serialized = serde_json::to_value(&po).expect("serialize flat fields");
+        let object = serialized.as_object().expect("pricing overrides object");
+        assert!(!object.contains_key("instrument"));
+        assert!(!object.contains_key("metrics"));
+        assert!(!object.contains_key("scenario"));
+        assert_eq!(
+            object.get("quoted_clean_price"),
+            Some(&serde_json::json!(99.5))
+        );
+        assert_eq!(object.get("rate_bump_bp"), Some(&serde_json::json!(2.0)));
+        assert_eq!(
+            object.get("scenario_price_shock_pct"),
+            Some(&serde_json::json!(-0.05))
+        );
+    }
+
+    #[test]
+    fn focused_instrument_derive_preserves_legacy_property() {
+        let fixture = FocusedWireFixture {
+            id: "fixture".to_string(),
+            instrument_pricing_overrides: InstrumentPricingOverrides {
+                market_quotes: MarketQuoteOverrides {
+                    quoted_clean_price: Some(99.5),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            metric_pricing_overrides: MetricPricingOverrides::default().with_theta_period("1W"),
+            scenario_pricing_overrides: ScenarioPricingOverrides {
+                scenario_price_shock_pct: Some(-0.05),
+                ..Default::default()
+            },
+        };
+
+        let value = serde_json::to_value(&fixture).expect("serialize focused fixture");
+        let object = value.as_object().expect("fixture object");
+        let wire = object
+            .get("pricing_overrides")
+            .and_then(serde_json::Value::as_object)
+            .expect("legacy pricing_overrides property");
+        assert_eq!(
+            wire.get("quoted_clean_price"),
+            Some(&serde_json::json!(99.5))
+        );
+        assert_eq!(wire.get("theta_period"), Some(&serde_json::json!("1W")));
+        assert_eq!(
+            wire.get("scenario_price_shock_pct"),
+            Some(&serde_json::json!(-0.05))
+        );
+
+        let roundtrip: FocusedWireFixture =
+            serde_json::from_value(value).expect("deserialize focused fixture");
+        assert_eq!(roundtrip.id, "fixture");
+        assert_eq!(
+            roundtrip
+                .instrument_pricing_overrides
+                .market_quotes
+                .quoted_clean_price,
+            Some(99.5)
+        );
+        assert_eq!(
+            roundtrip.metric_pricing_overrides.theta_period.as_deref(),
+            Some("1W")
+        );
+        assert_eq!(
+            roundtrip
+                .scenario_pricing_overrides
+                .scenario_price_shock_pct,
+            Some(-0.05)
+        );
+
+        let schema = schemars::schema_for!(FocusedWireFixture);
+        let schema_value = serde_json::to_value(schema).expect("serialize schema");
+        assert!(schema_value.to_string().contains("pricing_overrides"));
+    }
+
+    #[test]
+    fn serde_nested_fields_override_flat_fields() {
+        let json = r#"{
+            "quoted_clean_price": 98.0,
+            "rate_bump_bp": 1.0,
+            "scenario_price_shock_pct": -0.01,
+            "instrument_pricing_overrides": {"quoted_clean_price": 101.0},
+            "metric_pricing_overrides": {"rate_bump_bp": 3.0},
+            "scenario_pricing_overrides": {"scenario_price_shock_pct": -0.08}
+        }"#;
+
+        let po: PricingOverrides = serde_json::from_str(json).expect("deserialize mixed fields");
+        assert_eq!(po.market_quotes.quoted_clean_price, Some(101.0));
+        assert_eq!(po.metrics.bump_config.rate_bump_bp, Some(3.0));
+        assert_eq!(po.scenario.scenario_price_shock_pct, Some(-0.08));
+    }
+
+    #[test]
     fn serde_deserializes_var_config_override() {
         let json = r#"{
             "var_config": {
@@ -1296,6 +1507,14 @@ mod tests {
         assert!(
             err.to_string().contains("tree_volatility"),
             "error should name removed field, got {err}"
+        );
+
+        let err =
+            serde_json::from_str::<PricingOverrides>(r#"{"instrument":{"tree_volatility":0.15}}"#)
+                .expect_err("nested tree_volatility was removed; use implied_volatility");
+        assert!(
+            err.to_string().contains("tree_volatility"),
+            "error should name nested removed field, got {err}"
         );
     }
 

@@ -25,7 +25,7 @@ where
     I: crate::instruments::common_impl::traits::Instrument + ?Sized,
 {
     instrument
-        .scenario_overrides()
+        .get_scenario_pricing_overrides()
         .map_or(base_value, |overrides| overrides.apply_to_value(base_value))
 }
 
@@ -303,7 +303,7 @@ pub fn resolve_mc_paths(
 #[inline]
 pub fn merged_path_config(
     base: &finstack_quant_monte_carlo::pricer::path_dependent::PathDependentPricerConfig,
-    overrides: &crate::instruments::PricingOverrides,
+    overrides: &crate::instruments::InstrumentPricingOverrides,
 ) -> finstack_quant_core::Result<
     finstack_quant_monte_carlo::pricer::path_dependent::PathDependentPricerConfig,
 > {
@@ -425,17 +425,9 @@ pub(crate) fn build_with_metrics_dyn(
     context.set_pricer_dispatch(pricing_model, pricer_registry);
 
     // Preserve only the subsets consumed by the metric layer.
-    context.set_instrument_overrides(
-        instrument
-            .pricing_overrides()
-            .map(crate::instruments::InstrumentPricingOverrides::from),
-    );
-    context.set_metric_overrides(
-        instrument
-            .pricing_overrides()
-            .map(crate::instruments::MetricPricingOverrides::from),
-    );
-    context.set_scenario_overrides(instrument.scenario_overrides().cloned());
+    context.set_instrument_overrides(instrument.get_instrument_pricing_overrides().cloned());
+    context.set_metric_overrides(instrument.get_metric_pricing_overrides().cloned());
+    context.set_scenario_overrides(instrument.get_scenario_pricing_overrides().cloned());
 
     // Allow instruments to pre-seed the metric context with cached data (e.g., pre-computed
     // cashflows) to avoid redundant computation during metric calculation.

@@ -799,17 +799,9 @@ fn compute_taylor_sensitivities(
         base_value,
         MetricContext::default_config(),
     );
-    context.set_instrument_overrides(
-        instrument
-            .pricing_overrides()
-            .map(crate::instruments::InstrumentPricingOverrides::from),
-    );
-    context.set_metric_overrides(
-        instrument
-            .pricing_overrides()
-            .map(crate::instruments::MetricPricingOverrides::from),
-    );
-    context.set_scenario_overrides(instrument.scenario_overrides().cloned());
+    context.set_instrument_overrides(instrument.get_instrument_pricing_overrides().cloned());
+    context.set_metric_overrides(instrument.get_metric_pricing_overrides().cloned());
+    context.set_scenario_overrides(instrument.get_scenario_pricing_overrides().cloned());
     context.set_pricer_dispatch(pricing_model, pricer_registry);
 
     let candidate_metrics = [

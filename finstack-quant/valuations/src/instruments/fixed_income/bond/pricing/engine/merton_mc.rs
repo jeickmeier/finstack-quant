@@ -2524,7 +2524,12 @@ mod tests {
         let back: PricingOverrides = serde_json::from_str(&json).expect("de");
         assert!(back.model_config.merton_mc_config.is_some());
         // The inner config should roundtrip key fields
-        let restored = &back.model_config.merton_mc_config.unwrap().0;
+        let restored = &back
+            .model_config
+            .merton_mc_config
+            .as_ref()
+            .expect("merton_mc_config should be populated")
+            .0;
         assert_eq!(restored.num_paths, 64);
         assert_eq!(restored.seed, 7);
 
@@ -2553,6 +2558,7 @@ mod tests {
         let restored = &from_notebook
             .model_config
             .merton_mc_config
+            .as_ref()
             .expect("merton_mc_config should be populated")
             .0;
         assert_eq!(restored.num_paths, 2000);

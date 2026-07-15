@@ -152,8 +152,11 @@ fn test_dm_callable_with_quoted_price_succeeds() {
         }],
     };
     let overrides = PricingOverrides {
-        market_quotes: MarketQuoteOverrides {
-            quoted_clean_price: Some(99.0),
+        instrument: finstack_quant_valuations::instruments::InstrumentPricingOverrides {
+            market_quotes: MarketQuoteOverrides {
+                quoted_clean_price: Some(99.0),
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()

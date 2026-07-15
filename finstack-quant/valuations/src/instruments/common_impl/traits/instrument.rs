@@ -367,6 +367,57 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         None
     }
 
+    /// Get instrument-owned pricing inputs.
+    ///
+    /// During the B14-B17 migration the default is a view into the temporary
+    /// full compatibility bag. Focused-storage instruments override this
+    /// accessor directly.
+    fn get_instrument_pricing_overrides(
+        &self,
+    ) -> Option<&crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
+        self.pricing_overrides()
+            .map(|overrides| &overrides.instrument)
+    }
+
+    /// Get mutable instrument-owned pricing inputs.
+    fn get_instrument_pricing_overrides_mut(
+        &mut self,
+    ) -> Option<&mut crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
+        self.pricing_overrides_mut()
+            .map(|overrides| &mut overrides.instrument)
+    }
+
+    /// Get metric-only pricing controls.
+    fn get_metric_pricing_overrides(
+        &self,
+    ) -> Option<&crate::instruments::pricing_overrides::MetricPricingOverrides> {
+        self.pricing_overrides().map(|overrides| &overrides.metrics)
+    }
+
+    /// Get mutable metric-only pricing controls.
+    fn get_metric_pricing_overrides_mut(
+        &mut self,
+    ) -> Option<&mut crate::instruments::pricing_overrides::MetricPricingOverrides> {
+        self.pricing_overrides_mut()
+            .map(|overrides| &mut overrides.metrics)
+    }
+
+    /// Get scenario-only pricing adjustments.
+    fn get_scenario_pricing_overrides(
+        &self,
+    ) -> Option<&crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
+        self.pricing_overrides()
+            .map(|overrides| &overrides.scenario)
+    }
+
+    /// Get mutable scenario-only pricing adjustments.
+    fn get_scenario_pricing_overrides_mut(
+        &mut self,
+    ) -> Option<&mut crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
+        self.pricing_overrides_mut()
+            .map(|overrides| &mut overrides.scenario)
+    }
+
     /// Get mutable reference to scenario-only pricing adjustments.
     ///
     /// # Returns
@@ -393,8 +444,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     fn scenario_overrides_mut(
         &mut self,
     ) -> Option<&mut crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
-        self.pricing_overrides_mut()
-            .map(|overrides| &mut overrides.scenario)
+        self.get_scenario_pricing_overrides_mut()
     }
 
     /// Get immutable reference to scenario-only pricing adjustments.
@@ -406,8 +456,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     fn scenario_overrides(
         &self,
     ) -> Option<&crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
-        self.pricing_overrides()
-            .map(|overrides| &overrides.scenario)
+        self.get_scenario_pricing_overrides()
     }
 
     /// Whether this instrument's pricer consumes
@@ -509,9 +558,13 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// deserialized payload to a host language.
     fn validate_for_pricing(&self) -> finstack_quant_core::Result<()> {
         self.validate_invariants()?;
-        if let Some(overrides) = self.pricing_overrides() {
+        if let Some(overrides) = self.get_instrument_pricing_overrides() {
             overrides.validate()?;
-        } else if let Some(overrides) = self.scenario_overrides() {
+        }
+        if let Some(overrides) = self.get_metric_pricing_overrides() {
+            overrides.validate()?;
+        }
+        if let Some(overrides) = self.get_scenario_pricing_overrides() {
             overrides.validate()?;
         }
         Ok(())

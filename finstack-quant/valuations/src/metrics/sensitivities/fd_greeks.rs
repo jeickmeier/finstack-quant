@@ -180,12 +180,18 @@ fn ensure_finite(value: f64, metric_name: &str) -> finstack_quant_core::Result<f
 
 fn clone_with_crn_seed<I>(instrument: &I) -> I
 where
-    I: Clone + HasPricingOverrides,
+    I: Clone + Instrument + HasPricingOverrides,
 {
     let mut seeded = instrument.clone();
-    <I as HasPricingOverrides>::pricing_overrides_mut(&mut seeded)
-        .metrics
-        .mc_seed_scenario = Some(CRN_SEED_SCENARIO.to_string());
+    if let Some(overrides) = seeded.get_metric_pricing_overrides_mut() {
+        overrides.mc_seed_scenario = Some(CRN_SEED_SCENARIO.to_string());
+    } else {
+        // Temporary B14-B17 compatibility fallback for implementations that
+        // have not yet moved from the full override bag.
+        <I as HasPricingOverrides>::pricing_overrides_mut(&mut seeded)
+            .metrics
+            .mc_seed_scenario = Some(CRN_SEED_SCENARIO.to_string());
+    }
     seeded
 }
 
