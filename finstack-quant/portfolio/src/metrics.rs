@@ -23,6 +23,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::{HashMap, HashSet};
+use finstack_quant_valuations::metrics::MetricId;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
@@ -116,6 +117,24 @@ impl PortfolioMetrics {
     pub fn get_total(&self, metric_id: &str) -> Option<f64> {
         self.aggregated.get(metric_id).map(|m| m.total)
     }
+
+    /// Return decoded components and aggregate payloads for a composite metric.
+    ///
+    /// Entries retain the deterministic insertion order of [`Self::aggregated`].
+    /// The scalar aggregate stored directly under `base` is excluded. Malformed
+    /// legacy escape markers remain literal, and decoded-coordinate collisions
+    /// fall back to literal wire components so all aggregate entries survive.
+    pub fn metric_series(&self, base: &MetricId) -> Vec<(Vec<String>, &AggregatedMetric)> {
+        let metric_ids: Vec<MetricId> = self.aggregated.keys().map(MetricId::custom).collect();
+        let components = MetricId::decode_series_components(base, &metric_ids);
+        self.aggregated
+            .values()
+            .zip(components)
+            .filter_map(|(aggregate, components)| {
+                components.map(|components| (components, aggregate))
+            })
+            .collect()
+    }
 }
 
 /// A metric value that was excluded from portfolio aggregation because it was
@@ -196,8 +215,8 @@ pub(crate) fn is_summable(metric_id: &str) -> bool {
         return true;
     }
 
-    // Handle composite keys produced by `MetricContext::default_composite_key`,
-    // which uses the pattern `base::label[::sub_label...]`.
+    // Handle composite keys produced by `MetricId::composite`, which uses the
+    // pattern `base::label[::sub_label...]`.
     if let Some((base, _rest)) = metric_id.split_once("::") {
         return SUMMABLE_SET.contains(base);
     }
@@ -499,6 +518,73 @@ mod tests {
         assert!(is_summable("bucketed_dv01::2y"));
         assert!(is_summable("bucketed_cs01::AAA::5y"));
         assert!(!is_summable("unknown::2y"));
+    }
+
+    #[test]
+    fn portfolio_metric_series_decodes_components_in_aggregate_order() {
+        let mut aggregated = IndexMap::new();
+        for (metric_id, total) in [
+            ("bucketed_dv01", -3.0),
+            ("bucketed_dv01::USD_x2dOIS::10y", -1.0),
+            ("bucketed_cs01::ACME", 8.0),
+            ("bucketed_dv01::EUR_x2fUSD::_empty", -2.0),
+        ] {
+            aggregated.insert(
+                metric_id.to_string(),
+                AggregatedMetric {
+                    metric_id: metric_id.to_string(),
+                    total,
+                    by_entity: IndexMap::new(),
+                },
+            );
+        }
+        let metrics = PortfolioMetrics {
+            aggregated,
+            ..Default::default()
+        };
+
+        let series = metrics.metric_series(&MetricId::BucketedDv01);
+        assert_eq!(series.len(), 2);
+        assert_eq!(series[0].0, vec!["USD-OIS", "10y"]);
+        assert_eq!(series[0].1.total, -1.0);
+        assert_eq!(series[1].0, vec!["EUR/USD", ""]);
+        assert_eq!(series[1].1.total, -2.0);
+    }
+
+    #[test]
+    fn portfolio_metric_series_preserves_legacy_collision_entries() {
+        let mut aggregated = IndexMap::new();
+        for (metric_id, total) in [
+            ("bucketed_dv01::curve-ray", -1.0),
+            ("bucketed_dv01::curve_x2dray", -2.0),
+            ("bucketed_dv01::curve_xray", -3.0),
+        ] {
+            aggregated.insert(
+                metric_id.to_string(),
+                AggregatedMetric {
+                    metric_id: metric_id.to_string(),
+                    total,
+                    by_entity: IndexMap::new(),
+                },
+            );
+        }
+        let metrics = PortfolioMetrics {
+            aggregated,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            metrics
+                .metric_series(&MetricId::BucketedDv01)
+                .into_iter()
+                .map(|(components, metric)| (components, metric.total))
+                .collect::<Vec<_>>(),
+            vec![
+                (vec!["curve-ray".to_string()], -1.0),
+                (vec!["curve_x2dray".to_string()], -2.0),
+                (vec!["curve_xray".to_string()], -3.0),
+            ]
+        );
     }
 
     #[test]

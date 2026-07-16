@@ -20,10 +20,13 @@ from finstack_quant.finstack_quant import monte_carlo as _mc
 
 MoneyEstimate = _mc.MoneyEstimate
 Estimate = _mc.Estimate
+GbmPathSummary = _mc.GbmPathSummary
 
 TimeGrid = _mc.TimeGrid
 
 McEngine = _mc.McEngine
+simulate_gbm_paths = _mc.simulate_gbm_paths
+heston_satisfies_feller = _mc.heston_satisfies_feller
 
 EuropeanPricer = _mc.EuropeanPricer
 PathDependentPricer = _mc.PathDependentPricer
@@ -53,6 +56,7 @@ if _key not in sys.modules:
 __all__: list[str] = [
     "Estimate",
     "EuropeanPricer",
+    "GbmPathSummary",
     "LsmcPricer",
     "McEngine",
     "MoneyEstimate",
@@ -64,8 +68,10 @@ __all__: list[str] = [
     "finite_diff_delta_crn",
     "finite_diff_gamma",
     "finite_diff_gamma_crn",
+    "heston_satisfies_feller",
     "price_european_call",
     "price_european_put",
     "price_heston_call",
     "price_heston_put",
+    "simulate_gbm_paths",
 ]

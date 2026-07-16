@@ -3,6 +3,7 @@
 mod lgd;
 mod migration;
 mod pd;
+mod recovery_waterfall;
 mod scoring;
 
 use pyo3::prelude::*;
@@ -27,8 +28,12 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     pd::register(py, &m)?;
     lgd::register(py, &m)?;
     migration::register(py, &m)?;
+    recovery_waterfall::register(py, &m)?;
 
-    let all = PyList::new(py, ["scoring", "pd", "lgd", "migration"])?;
+    let all = PyList::new(
+        py,
+        ["scoring", "pd", "lgd", "migration", "recovery_waterfall"],
+    )?;
     m.setattr("__all__", all)?;
     crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
 

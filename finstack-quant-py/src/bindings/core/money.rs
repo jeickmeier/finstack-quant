@@ -51,7 +51,7 @@ fn extract_money(obj: &Bound<'_, PyAny>) -> PyResult<Money> {
 
 /// Convert a Python ``decimal.Decimal`` into a `rust_decimal::Decimal` without
 /// going through `f64`.
-fn decimal_from_py(obj: &Bound<'_, PyAny>) -> PyResult<rust_decimal::Decimal> {
+pub(crate) fn decimal_from_py(obj: &Bound<'_, PyAny>) -> PyResult<rust_decimal::Decimal> {
     if !is_python_decimal(obj)? {
         return Err(PyTypeError::new_err("expected decimal.Decimal"));
     }
@@ -66,7 +66,7 @@ fn decimal_from_py(obj: &Bound<'_, PyAny>) -> PyResult<rust_decimal::Decimal> {
 /// `type(obj).__name__`, so `MyDecimal(Decimal)` subclasses and any third-party
 /// `Decimal`-named classes are distinguished correctly. The import resolves
 /// through a cached `decimal.Decimal` type after the first call.
-fn is_python_decimal(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
+pub(crate) fn is_python_decimal(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
     let py = obj.py();
     obj.is_instance(decimal_type(py)?)
 }
@@ -75,7 +75,7 @@ fn is_python_decimal(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
 /// `decimal.Decimal`. `Decimal` inputs (including subclasses) preserve full
 /// precision; numeric inputs follow IEEE 754 semantics and later ``amount``
 /// accessors expose an ``f64`` view.
-fn money_from_amount(obj: &Bound<'_, PyAny>, ccy: Currency) -> PyResult<Money> {
+pub(crate) fn money_from_amount(obj: &Bound<'_, PyAny>, ccy: Currency) -> PyResult<Money> {
     if obj.is_instance_of::<PyFloat>() || obj.is_instance_of::<PyInt>() {
         let amount: f64 = obj.extract().map_err(|_| {
             PyTypeError::new_err("Money amount must be float, int, or decimal.Decimal")

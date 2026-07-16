@@ -20,20 +20,24 @@ Example::
 from __future__ import annotations
 
 import datetime
+from decimal import Decimal
 from typing import Optional, Union
 
 from finstack_quant.core.currency import Currency
+from finstack_quant.core.money import Money
 from finstack_quant.core.market_data import arbitrage as arbitrage
 from finstack_quant.core.market_data import context as context
 from finstack_quant.core.market_data import curves as curves
 from finstack_quant.core.market_data import dtsm as dtsm
 from finstack_quant.core.market_data import fx as fx
+from finstack_quant.core.market_data import scalars as scalars
 
 __all__ = [
     # submodules
     "curves",
     "fx",
     "context",
+    "scalars",
     "dtsm",
     "arbitrage",
     # curves
@@ -52,6 +56,8 @@ __all__ = [
     "FxConversionPolicy",
     "FxRateResult",
     "FxMatrix",
+    "ScalarTimeSeries",
+    "InflationIndex",
     # context
     "MarketContext",
 ]
@@ -143,6 +149,15 @@ class DiscountCurve:
         ValueError
             If the curve cannot be built.
         """
+        ...
+
+    @staticmethod
+    def flat(
+        id: str,
+        base_date: datetime.date,
+        continuous_rate: float,
+    ) -> DiscountCurve:
+        """Construct a flat continuously-compounded discount curve."""
         ...
 
     def df(self, t: float) -> float:
@@ -1276,6 +1291,64 @@ class FxMatrix:
     def __repr__(self) -> str: ...
 
 # ---------------------------------------------------------------------------
+# Scalar time series
+# ---------------------------------------------------------------------------
+
+class ScalarTimeSeries:
+    """Date-indexed scalar market observations with Rust-owned interpolation.
+
+    Decimal observations are accepted only when exactly representable by the
+    underlying float storage.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        observations: list[tuple[datetime.date, float | int | Decimal]],
+        currency: Currency | str | None = None,
+        interpolation: str | None = None,
+    ) -> None: ...
+    @property
+    def id(self) -> str: ...
+    @property
+    def currency(self) -> Currency | None: ...
+    @property
+    def interpolation(self) -> str: ...
+    @property
+    def observations(self) -> list[tuple[datetime.date, float]]: ...
+    def value_on(self, date: datetime.date) -> float: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> ScalarTimeSeries: ...
+    def __len__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
+class InflationIndex:
+    """Inflation index observations with Rust-owned interpolation and validation."""
+
+    def __init__(
+        self,
+        id: str,
+        observations: list[tuple[datetime.date, float | int]],
+        currency: Currency | str,
+        interpolation: str | None = None,
+    ) -> None: ...
+    @property
+    def id(self) -> str: ...
+    @property
+    def currency(self) -> Currency: ...
+    @property
+    def interpolation(self) -> str: ...
+    @property
+    def observations(self) -> list[tuple[datetime.date, float]]: ...
+    def value_on(self, date: datetime.date) -> float: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> InflationIndex: ...
+    def __len__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
+# ---------------------------------------------------------------------------
 # Market context
 # ---------------------------------------------------------------------------
 
@@ -1303,6 +1376,7 @@ class MarketContext:
             HazardCurve,
             InflationCurve,
             PriceCurve,
+            BaseCorrelationCurve,
             VolSurface,
             FxDeltaVolSurface,
             VolCube,
@@ -1313,12 +1387,13 @@ class MarketContext:
 
         Accepts any curve type: :class:`DiscountCurve`, :class:`ForwardCurve`,
         :class:`HazardCurve`, :class:`InflationCurve`, :class:`PriceCurve`,
-        :class:`VolSurface`, :class:`FxDeltaVolSurface`, :class:`VolCube`,
-        or :class:`VolatilityIndexCurve`.
+        :class:`BaseCorrelationCurve`, :class:`VolSurface`,
+        :class:`FxDeltaVolSurface`, :class:`VolCube`, or
+        :class:`VolatilityIndexCurve`.
 
         Parameters
         ----------
-        curve : DiscountCurve | ForwardCurve | HazardCurve | InflationCurve | PriceCurve | VolSurface | FxDeltaVolSurface | VolCube | VolatilityIndexCurve
+        curve : DiscountCurve | ForwardCurve | HazardCurve | InflationCurve | PriceCurve | BaseCorrelationCurve | VolSurface | FxDeltaVolSurface | VolCube | VolatilityIndexCurve
             The curve to insert.
 
         Returns
@@ -1346,8 +1421,8 @@ class MarketContext:
     def insert_price(
         self,
         id: str,
-        value: float,
-        currency: str | None = None,
+        value: float | int | Decimal,
+        currency: Currency | str | None = None,
     ) -> None:
         """Insert a scalar market price into the context.
 
@@ -1355,9 +1430,11 @@ class MarketContext:
         ----------
         id : str
             Market scalar identifier.
-        value : float
-            Unitless scalar value or monetary amount.
-        currency : str | None, optional
+        value : float | int | Decimal
+            Unitless scalar value or monetary amount. Decimal monetary amounts
+            preserve full precision; unitless Decimal values must be exactly
+            representable as float.
+        currency : Currency | str | None, optional
             Currency for monetary prices. If omitted, stores a unitless scalar.
         """
         ...
@@ -1372,6 +1449,14 @@ class MarketContext:
         data : CreditIndexData
             Credit index data bundle.
         """
+        ...
+
+    def insert_series(self, series: ScalarTimeSeries) -> None:
+        """Insert a scalar time series into the context."""
+        ...
+
+    def insert_inflation_index(self, index: InflationIndex) -> None:
+        """Insert an inflation index into the context."""
         ...
 
     def get_discount(self, id: str) -> DiscountCurve:
@@ -1431,6 +1516,10 @@ class MarketContext:
         """
         ...
 
+    def get_base_correlation(self, id: str) -> BaseCorrelationCurve:
+        """Retrieve a base-correlation curve by identifier."""
+        ...
+
     def get_inflation_curve(self, id: str) -> InflationCurve:
         """Retrieve an inflation curve by identifier.
 
@@ -1467,6 +1556,18 @@ class MarketContext:
         KeyError
             If no price curve with this *id* exists.
         """
+        ...
+
+    def get_price(self, id: str) -> float | Money:
+        """Retrieve a unitless scalar or currency-tagged price."""
+        ...
+
+    def get_series(self, id: str) -> ScalarTimeSeries:
+        """Retrieve a scalar time series by identifier."""
+        ...
+
+    def get_inflation_index(self, id: str) -> InflationIndex:
+        """Retrieve an inflation index by identifier."""
         ...
 
     def get_surface(self, id: str) -> VolSurface:
@@ -1543,6 +1644,10 @@ class MarketContext:
         KeyError
             If no vol-index curve with this *id* exists.
         """
+        ...
+
+    def get_credit_index(self, id: str) -> CreditIndexData:
+        """Retrieve credit-index data by identifier."""
         ...
 
     @property

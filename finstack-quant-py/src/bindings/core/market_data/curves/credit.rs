@@ -24,6 +24,13 @@ pub struct PyBaseCorrelationCurve {
     pub(crate) inner: Arc<BaseCorrelationCurve>,
 }
 
+impl PyBaseCorrelationCurve {
+    /// Build from an existing shared Rust curve.
+    pub(crate) fn from_inner(inner: Arc<BaseCorrelationCurve>) -> Self {
+        Self { inner }
+    }
+}
+
 #[pymethods]
 impl PyBaseCorrelationCurve {
     /// Construct a base-correlation curve from `(detachment_pct, correlation)` knots.
@@ -71,6 +78,13 @@ impl PyBaseCorrelationCurve {
 pub struct PyCreditIndexData {
     /// Rust credit index bundle.
     pub(crate) inner: CreditIndexData,
+}
+
+impl PyCreditIndexData {
+    /// Build from an existing Rust credit-index bundle.
+    pub(crate) fn from_inner(inner: CreditIndexData) -> Self {
+        Self { inner }
+    }
 }
 
 #[pymethods]

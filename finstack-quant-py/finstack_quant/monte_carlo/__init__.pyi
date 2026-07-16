@@ -16,6 +16,7 @@ from finstack_quant.core.money import Money
 __all__ = [
     "Estimate",
     "EuropeanPricer",
+    "GbmPathSummary",
     "LsmcPricer",
     "McEngine",
     "MoneyEstimate",
@@ -27,10 +28,12 @@ __all__ = [
     "finite_diff_delta_crn",
     "finite_diff_gamma",
     "finite_diff_gamma_crn",
+    "heston_satisfies_feller",
     "price_european_call",
     "price_european_put",
     "price_heston_call",
     "price_heston_put",
+    "simulate_gbm_paths",
 ]
 
 class MoneyEstimate:
@@ -585,6 +588,18 @@ class TimeGrid:
         """
         ...
 
+class GbmPathSummary:
+    """Compact captured GBM spot paths."""
+
+    @property
+    def num_paths(self) -> int: ...
+    @property
+    def num_simulated_paths(self) -> int: ...
+    @property
+    def times(self) -> list[float]: ...
+    @property
+    def paths(self) -> list[list[float]]: ...
+
 class McEngine:
     """Full Monte Carlo engine bound to a :class:`TimeGrid`.
 
@@ -601,19 +616,26 @@ class McEngine:
         time_grid: TimeGrid,
         seed: int | None = None,
         use_parallel: bool | None = None,
+        antithetic: bool | None = None,
     ) -> None:
         """Create a Monte Carlo engine.
 
         Parameters
         ----------
         num_paths : int
-            Number of paths to simulate.
+            Number of independent estimators. Without antithetic pairing this
+            is also the simulated-path count; with pairing, each estimator uses
+            two simulated paths.
         time_grid : TimeGrid
             Discretisation grid for path generation.
         seed : int, optional
             RNG seed. Defaults to the registry default (``42``).
         use_parallel : bool, optional
             Enable parallel path generation. Defaults to ``False``.
+        antithetic : bool, optional
+            Enable antithetic pairing. This preserves ``num_paths`` as the
+            estimator count and simulates ``2 * num_paths`` paths. Antithetic
+            pairing is incompatible with path capture.
 
         Examples
         --------
@@ -700,6 +722,29 @@ class McEngine:
         500
         """
         ...
+
+def simulate_gbm_paths(
+    spot: float,
+    rate: float,
+    div_yield: float,
+    vol: float,
+    expiry: float,
+    num_steps: int,
+    num_paths: int,
+    seed: int | None = None,
+    antithetic: bool = False,
+) -> GbmPathSummary:
+    """Simulate compact GBM spot paths through Rust path capture.
+
+    ``num_paths`` is the estimator and simulated-path count because captured
+    paths do not support antithetic pairing. Passing ``antithetic=True`` raises
+    ``ValueError``.
+    """
+    ...
+
+def heston_satisfies_feller(kappa: float, theta: float, vol_of_vol: float) -> bool:
+    """Validate Heston parameters and test the strict Feller condition."""
+    ...
 
 class EuropeanPricer:
     """European-option Monte Carlo pricer under GBM (exact time-stepping).

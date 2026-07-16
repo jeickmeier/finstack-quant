@@ -32,6 +32,7 @@ _submodules = {
     "credit.pd": credit.pd,
     "credit.lgd": credit.lgd,
     "credit.migration": credit.migration,
+    "credit.recovery_waterfall": credit.recovery_waterfall,
     "rating_scales": rating_scales,
 }
 

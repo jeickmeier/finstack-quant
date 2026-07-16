@@ -37,8 +37,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         [
             "MoneyEstimate",
             "Estimate",
+            "GbmPathSummary",
             "TimeGrid",
             "McEngine",
+            "simulate_gbm_paths",
+            "heston_satisfies_feller",
             "EuropeanPricer",
             "PathDependentPricer",
             "LsmcPricer",

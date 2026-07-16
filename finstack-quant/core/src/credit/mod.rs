@@ -8,6 +8,8 @@
 //!   (Altman, Ohlson, Zmijewski).
 //! - [`pd`][crate::credit::pd]: PD calibration, term structures, and master
 //!   scale mapping.
+//! - [`recovery_waterfall`][crate::credit::recovery_waterfall]: absolute-priority
+//!   allocation of a distributable estate across restructuring claims.
 
 /// Loss Given Default: seniority recovery distributions, workout LGD,
 /// downturn adjustments, and EAD computation.
@@ -15,5 +17,6 @@ pub mod lgd;
 
 pub mod migration;
 pub mod pd;
+pub mod recovery_waterfall;
 pub mod registry;
 pub mod scoring;

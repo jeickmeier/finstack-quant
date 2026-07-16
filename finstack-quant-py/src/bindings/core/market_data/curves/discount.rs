@@ -99,6 +99,17 @@ impl PyDiscountCurve {
         })
     }
 
+    /// Construct a flat continuously-compounded discount curve.
+    #[staticmethod]
+    #[pyo3(text_signature = "(id, base_date, continuous_rate)")]
+    fn flat(id: &str, base_date: &Bound<'_, PyAny>, continuous_rate: f64) -> PyResult<Self> {
+        let curve =
+            DiscountCurve::flat(id, py_to_date(base_date)?, continuous_rate).map_err(core_to_py)?;
+        Ok(Self {
+            inner: Arc::new(curve),
+        })
+    }
+
     /// Discount factor at year fraction `t`.
     #[pyo3(text_signature = "(self, t)")]
     fn df(&self, t: f64) -> f64 {

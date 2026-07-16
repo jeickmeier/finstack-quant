@@ -312,6 +312,42 @@ fn default_day_count() -> DayCount {
 }
 
 impl DiscountCurve {
+    /// Construct a flat continuously-compounded discount curve.
+    ///
+    /// The curve uses the minimal two-knot representation
+    /// `(0, 1)` and `(1, exp(-rate))`, log-linear interpolation, and
+    /// flat-forward extrapolation. This preserves `DF(t) = exp(-rate * t)`
+    /// for every non-negative maturity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `continuous_rate` is non-finite or its one-year
+    /// discount factor cannot be represented as a finite positive value.
+    pub fn flat(id: impl AsRef<str>, base_date: Date, continuous_rate: f64) -> crate::Result<Self> {
+        if !continuous_rate.is_finite() {
+            return Err(crate::Error::Validation(
+                "DiscountCurve: flat continuous rate must be finite".to_string(),
+            ));
+        }
+        let one_year_df = (-continuous_rate).exp();
+        if !one_year_df.is_finite() || one_year_df <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "DiscountCurve: flat continuous rate {continuous_rate} produces an invalid discount factor"
+            )));
+        }
+
+        Self::builder(id.as_ref())
+            .base_date(base_date)
+            .knots([(0.0, 1.0), (1.0, one_year_df)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .validation(ValidationMode::Raw {
+                allow_non_monotonic: continuous_rate < 0.0,
+                forward_floor: None,
+            })
+            .build()
+    }
+
     /// Unique identifier of the curve.
     #[inline]
     pub fn id(&self) -> &CurveId {
@@ -1756,6 +1792,22 @@ fn validate_forward_rates(knots: &[f64], dfs: &[f64], min_rate: f64) -> crate::R
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn flat_curve_uses_continuous_rate_at_all_maturities() {
+        let base =
+            Date::from_calendar_date(2025, time::Month::January, 2).expect("valid base date");
+
+        let curve = DiscountCurve::flat("USD-OIS", base, 0.04).expect("flat discount curve");
+
+        assert_eq!(curve.len(), 2);
+        assert_eq!(curve.interp_style(), InterpStyle::LogLinear);
+        assert_eq!(curve.extrapolation(), ExtrapolationPolicy::FlatForward);
+        for t in [0.0_f64, 0.25, 1.0, 5.0, 30.0] {
+            assert!((curve.df(t) - (-0.04 * t).exp()).abs() < 1e-12);
+        }
+        assert!((curve.forward(2.0, 9.0).expect("flat forward") - 0.04).abs() < 1e-12);
+    }
 
     #[test]
     fn legacy_rate_calibration_metadata_defaults_recipe_safely() {

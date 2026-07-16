@@ -3,12 +3,81 @@
 Bindings for ``finstack_quant_core::credit``. Each submodule mirrors the Rust
 module of the same name and is registered at runtime in ``sys.modules``
 so that ``from finstack_quant.core.credit import scoring`` (or ``pd``, ``lgd``,
-``migration``) works transparently.
+``migration``, ``recovery_waterfall``) works transparently.
 """
 
 from __future__ import annotations
 
-__all__ = ["scoring", "pd", "lgd", "migration"]
+__all__ = ["scoring", "pd", "lgd", "migration", "recovery_waterfall"]
+
+class recovery_waterfall:
+    """Absolute-priority recovery allocation with estate-inclusive collateral."""
+
+    class RecoveryClaim:
+        def __init__(
+            self,
+            id: str,
+            seniority: str,
+            priority: int,
+            principal: float,
+            accrued: float = 0.0,
+            penalties: float = 0.0,
+            collateral: tuple[float, float] | None = None,
+        ) -> None: ...
+        @property
+        def id(self) -> str: ...
+        @property
+        def seniority(self) -> str: ...
+        @property
+        def priority(self) -> int: ...
+        @property
+        def principal(self) -> float: ...
+        @property
+        def accrued(self) -> float: ...
+        @property
+        def penalties(self) -> float: ...
+        @property
+        def collateral_value(self) -> float | None: ...
+        @property
+        def collateral_haircut(self) -> float: ...
+        @property
+        def total_claim(self) -> float: ...
+
+    class RecoveryAllocation:
+        @property
+        def id(self) -> str: ...
+        @property
+        def seniority(self) -> str: ...
+        @property
+        def priority(self) -> int: ...
+        @property
+        def total_claim(self) -> float: ...
+        @property
+        def collateral_recovery(self) -> float: ...
+        @property
+        def general_recovery(self) -> float: ...
+        @property
+        def total_recovery(self) -> float: ...
+        @property
+        def recovery_rate(self) -> float: ...
+        @property
+        def deficiency(self) -> float: ...
+
+    class RecoveryWaterfallResult:
+        @property
+        def total_distributed(self) -> float: ...
+        @property
+        def undistributed_estate(self) -> float: ...
+        @property
+        def apr_satisfied(self) -> bool: ...
+        @property
+        def allocations(self) -> list[recovery_waterfall.RecoveryAllocation]: ...
+
+    @staticmethod
+    def allocate_recovery(
+        estate_value: float,
+        claims: list[recovery_waterfall.RecoveryClaim],
+    ) -> recovery_waterfall.RecoveryWaterfallResult: ...
 
 class scoring:
     """Academic credit scoring: Altman Z-Score family, Ohlson O-Score, Zmijewski."""

@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
-use pyo3::types::PyModule;
+use pyo3::types::{PyDict, PyModule};
 
 use crate::errors::{display_to_py, portfolio_to_py};
 
@@ -251,6 +251,63 @@ impl PyPortfolioResult {
 }
 
 // ---------------------------------------------------------------------------
+// PyPortfolioMetrics
+// ---------------------------------------------------------------------------
+
+type PyMetricSeriesEntry = (Vec<String>, f64, Py<PyDict>);
+
+/// Python wrapper around Rust-aggregated portfolio metrics.
+#[pyclass(
+    name = "PortfolioMetrics",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone)]
+pub struct PyPortfolioMetrics {
+    inner: finstack_quant_portfolio::metrics::PortfolioMetrics,
+}
+
+#[pymethods]
+impl PyPortfolioMetrics {
+    /// Parse aggregate portfolio metrics from canonical JSON.
+    #[staticmethod]
+    fn from_json(metrics_json: &str) -> PyResult<Self> {
+        let inner = serde_json::from_str(metrics_json).map_err(display_to_py)?;
+        Ok(Self { inner })
+    }
+
+    /// Serialize aggregate portfolio metrics to canonical JSON.
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(display_to_py)
+    }
+
+    /// Return decoded components, total, and ordered entity breakdown by base metric.
+    fn metric_series(&self, py: Python<'_>, base: &str) -> PyResult<Vec<PyMetricSeriesEntry>> {
+        let base = finstack_quant_valuations::metrics::MetricId::custom(base);
+        self.inner
+            .metric_series(&base)
+            .into_iter()
+            .map(|(components, aggregate)| {
+                let by_entity = PyDict::new(py);
+                for (entity, value) in &aggregate.by_entity {
+                    by_entity.set_item(entity.to_string(), value)?;
+                }
+                Ok((components, aggregate.total, by_entity.unbind()))
+            })
+            .collect()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "PortfolioMetrics(aggregated={}, positions={})",
+            self.inner.aggregated.len(),
+            self.inner.by_position.len(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // PyPortfolioCashflows
 // ---------------------------------------------------------------------------
 
@@ -373,6 +430,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPortfolio>()?;
     m.add_class::<PyPortfolioValuation>()?;
     m.add_class::<PyPortfolioResult>()?;
+    m.add_class::<PyPortfolioMetrics>()?;
     m.add_class::<PyPortfolioCashflows>()?;
     Ok(())
 }

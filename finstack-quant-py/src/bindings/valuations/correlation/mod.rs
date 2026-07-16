@@ -8,9 +8,11 @@ use crate::errors::{core_to_py, display_to_py, value_error};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 
+use finstack_quant_valuations::correlation::CreditExposure;
 use finstack_quant_valuations::correlation::{
     self as corr, Copula, CopulaSpec, CorrelatedBernoulli, LatentFactorKind, LatentFactorSpec,
-    LatentMultiFactor, LatentSingleFactor, LatentTwoFactor, RecoveryModel, RecoverySpec,
+    LatentMultiFactor, LatentSingleFactor, LatentTwoFactor, PortfolioLossConfig,
+    PortfolioLossResult, RecoveryModel, RecoverySpec,
 };
 
 // ---------------------------------------------------------------------------
@@ -834,6 +836,191 @@ impl PyCorrelatedBernoulli {
 }
 
 // ---------------------------------------------------------------------------
+// Portfolio credit-loss simulation
+// ---------------------------------------------------------------------------
+
+/// One name in a finite credit portfolio.
+#[pyclass(
+    name = "CreditExposure",
+    module = "finstack_quant.valuations.correlation",
+    frozen,
+    from_py_object
+)]
+#[derive(Clone, Debug)]
+pub struct PyCreditExposure {
+    inner: CreditExposure,
+}
+
+#[pymethods]
+impl PyCreditExposure {
+    #[new]
+    #[pyo3(text_signature = "(id, notional, default_probability, lgd, factor_loadings)")]
+    fn new(
+        id: String,
+        notional: f64,
+        default_probability: f64,
+        lgd: f64,
+        factor_loadings: Vec<f64>,
+    ) -> Self {
+        Self {
+            inner: CreditExposure {
+                id,
+                notional,
+                default_probability,
+                lgd,
+                factor_loadings,
+            },
+        }
+    }
+
+    #[getter]
+    fn id(&self) -> String {
+        self.inner.id.clone()
+    }
+
+    #[getter]
+    fn notional(&self) -> f64 {
+        self.inner.notional
+    }
+
+    #[getter]
+    fn default_probability(&self) -> f64 {
+        self.inner.default_probability
+    }
+
+    #[getter]
+    fn lgd(&self) -> f64 {
+        self.inner.lgd
+    }
+
+    #[getter]
+    fn factor_loadings(&self) -> Vec<f64> {
+        self.inner.factor_loadings.clone()
+    }
+
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(|error| value_error(error.to_string()))
+    }
+}
+
+/// Settings for deterministic portfolio credit-loss simulation.
+///
+/// ``num_paths`` must be between 1 and
+/// ``MAX_PORTFOLIO_LOSS_PATHS`` (inclusive).
+#[pyclass(
+    name = "PortfolioLossConfig",
+    module = "finstack_quant.valuations.correlation",
+    frozen,
+    from_py_object
+)]
+#[derive(Clone, Debug)]
+pub struct PyPortfolioLossConfig {
+    inner: PortfolioLossConfig,
+}
+
+#[pymethods]
+impl PyPortfolioLossConfig {
+    #[new]
+    #[pyo3(text_signature = "(num_paths, seed, confidence, copula)")]
+    fn new(num_paths: usize, seed: u64, confidence: f64, copula: PyCopulaSpec) -> Self {
+        Self {
+            inner: PortfolioLossConfig {
+                num_paths,
+                seed,
+                confidence,
+                copula: copula.inner,
+            },
+        }
+    }
+
+    #[getter]
+    fn num_paths(&self) -> usize {
+        self.inner.num_paths
+    }
+
+    #[getter]
+    fn seed(&self) -> u64 {
+        self.inner.seed
+    }
+
+    #[getter]
+    fn confidence(&self) -> f64 {
+        self.inner.confidence
+    }
+
+    #[getter]
+    fn copula(&self) -> PyCopulaSpec {
+        PyCopulaSpec::from_inner(self.inner.copula.clone())
+    }
+
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(|error| value_error(error.to_string()))
+    }
+}
+
+/// Simulated loss distribution and loss-positive VaR/expected shortfall.
+#[pyclass(
+    name = "PortfolioLossResult",
+    module = "finstack_quant.valuations.correlation",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone, Debug)]
+pub struct PyPortfolioLossResult {
+    inner: PortfolioLossResult,
+}
+
+#[pymethods]
+impl PyPortfolioLossResult {
+    #[getter]
+    fn losses(&self) -> Vec<f64> {
+        self.inner.losses.clone()
+    }
+
+    #[getter]
+    fn expected_loss(&self) -> f64 {
+        self.inner.expected_loss
+    }
+
+    #[getter]
+    fn var(&self) -> f64 {
+        self.inner.var
+    }
+
+    #[getter]
+    fn expected_shortfall(&self) -> f64 {
+        self.inner.expected_shortfall
+    }
+
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(|error| value_error(error.to_string()))
+    }
+}
+
+/// Simulate a finite portfolio's loss-positive credit-loss distribution.
+#[pyfunction]
+#[pyo3(signature = (exposures, config, recovery=None))]
+fn simulate_portfolio_loss(
+    py: Python<'_>,
+    exposures: Vec<PyCreditExposure>,
+    config: PyPortfolioLossConfig,
+    recovery: Option<PyRecoverySpec>,
+) -> PyResult<PyPortfolioLossResult> {
+    let exposures = exposures
+        .into_iter()
+        .map(|exposure| exposure.inner)
+        .collect::<Vec<_>>();
+    py.detach(|| match recovery {
+        Some(recovery) => {
+            corr::simulate_portfolio_loss_with_recovery(&exposures, &config.inner, &recovery.inner)
+        }
+        None => corr::simulate_portfolio_loss(&exposures, &config.inner),
+    })
+    .map(|inner| PyPortfolioLossResult { inner })
+    .map_err(display_to_py)
+}
+
+// ---------------------------------------------------------------------------
 // Module-level functions
 // ---------------------------------------------------------------------------
 
@@ -965,11 +1152,16 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLatentTwoFactor>()?;
     m.add_class::<PyLatentMultiFactor>()?;
     m.add_class::<PyCorrelatedBernoulli>()?;
+    m.add_class::<PyCreditExposure>()?;
+    m.add_class::<PyPortfolioLossConfig>()?;
+    m.add_class::<PyPortfolioLossResult>()?;
+    m.add("MAX_PORTFOLIO_LOSS_PATHS", corr::MAX_PORTFOLIO_LOSS_PATHS)?;
     m.add_function(wrap_pyfunction!(correlation_bounds, &m)?)?;
     m.add_function(wrap_pyfunction!(joint_probabilities, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_correlation_matrix, &m)?)?;
     m.add_function(wrap_pyfunction!(nearest_correlation, &m)?)?;
     m.add_function(wrap_pyfunction!(cholesky_decompose, &m)?)?;
+    m.add_function(wrap_pyfunction!(simulate_portfolio_loss, &m)?)?;
 
     let all = PyList::new(
         py,
@@ -984,11 +1176,16 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "LatentTwoFactor",
             "LatentMultiFactor",
             "CorrelatedBernoulli",
+            "CreditExposure",
+            "MAX_PORTFOLIO_LOSS_PATHS",
+            "PortfolioLossConfig",
+            "PortfolioLossResult",
             "correlation_bounds",
             "joint_probabilities",
             "validate_correlation_matrix",
             "nearest_correlation",
             "cholesky_decompose",
+            "simulate_portfolio_loss",
         ],
     )?;
     m.setattr("__all__", all)?;

@@ -61,7 +61,9 @@ FinstackOptimizationError = _portfolio.FinstackOptimizationError
 Portfolio = _portfolio.Portfolio
 PortfolioValuation = _portfolio.PortfolioValuation
 PortfolioResult = _portfolio.PortfolioResult
+PortfolioMetrics = _portfolio.PortfolioMetrics
 PortfolioCashflows = _portfolio.PortfolioCashflows
+PortfolioAttribution = _portfolio.PortfolioAttribution
 
 parse_portfolio_spec = _portfolio.parse_portfolio_spec
 build_portfolio_from_spec = _portfolio.build_portfolio_from_spec
@@ -71,6 +73,7 @@ aggregate_metrics = _portfolio.aggregate_metrics
 value_portfolio = _portfolio.value_portfolio
 aggregate_full_cashflows = _portfolio.aggregate_full_cashflows
 apply_scenario_and_revalue = _portfolio.apply_scenario_and_revalue
+attribute_portfolio_pnl = _portfolio.attribute_portfolio_pnl
 allocate_weights = _portfolio.allocate_weights
 validate_allocation_json = _portfolio.validate_allocation_json
 optimize_portfolio = _portfolio.optimize_portfolio
@@ -171,8 +174,10 @@ __all__: list[str] = [
     "OptimizationStatus",
     "PerPositionMetric",
     "Portfolio",
+    "PortfolioAttribution",
     "PortfolioCashflows",
     "PortfolioError",
+    "PortfolioMetrics",
     "PortfolioOptimizationResult",
     "PortfolioOptimizationSpec",
     "PortfolioResult",
@@ -207,6 +212,7 @@ __all__: list[str] = [
     "almgren_chriss_impact",
     "amihud_illiquidity",
     "apply_scenario_and_revalue",
+    "attribute_portfolio_pnl",
     "brinson_fachler",
     "build_credit_vol_report",
     "build_portfolio_from_spec",

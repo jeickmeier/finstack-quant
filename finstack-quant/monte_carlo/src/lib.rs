@@ -111,6 +111,7 @@
 mod captured_path_stats;
 pub mod discretization;
 pub mod estimate;
+mod gbm_paths;
 mod indexed_spot_table;
 pub mod online_stats;
 pub mod paths;
@@ -134,6 +135,7 @@ pub mod variance_reduction;
 #[cfg(test)]
 mod mc_process_params_serialization;
 
+pub use gbm_paths::{simulate_gbm_paths, GbmPathConfig, GbmPathSummary};
 pub use traits::{
     state_keys, Discretization, PathState, Payoff, ProportionalDiffusion, RandomStream, StateKey,
     StochasticProcess,
@@ -146,6 +148,7 @@ pub use traits::{
 pub mod prelude {
     // --- Core traits and infrastructure ---
     pub use super::estimate::Estimate;
+    pub use super::gbm_paths::{simulate_gbm_paths, GbmPathConfig, GbmPathSummary};
     pub use super::online_stats::{required_samples, OnlineCovariance, OnlineStats};
     pub use super::paths::{
         CashflowType, PathDataset, PathPoint, PathSamplingMethod, ProcessParams, SimulatedPath,
@@ -218,4 +221,32 @@ pub mod prelude {
 
     // --- Variance reduction ---
     pub use super::variance_reduction::control_variate::{black_scholes_call, black_scholes_put};
+}
+
+#[cfg(test)]
+mod gbm_path_summary_tests {
+    use super::{simulate_gbm_paths, GbmPathConfig};
+
+    #[test]
+    fn gbm_path_summary_is_deterministic_and_shaped() {
+        let config = GbmPathConfig::new(100.0, 0.05, 0.01, 0.2, 1.0, 4, 3).with_seed(42);
+        let first = simulate_gbm_paths(&config).expect("GBM paths should simulate");
+        let second = simulate_gbm_paths(&config).expect("same GBM paths should simulate");
+
+        assert_eq!(first, second);
+        assert_eq!(first.num_paths, 3);
+        assert_eq!(first.num_simulated_paths, 3);
+        assert_eq!(first.times.len(), 5);
+        assert_eq!(first.paths.len(), 3);
+        assert!(first.paths.iter().all(|path| path.len() == 5));
+        assert!(first.paths.iter().all(|path| path[0] == 100.0));
+    }
+
+    #[test]
+    fn gbm_path_capture_rejects_antithetic_pairing() {
+        let config = GbmPathConfig::new(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3).with_antithetic(true);
+        let error =
+            simulate_gbm_paths(&config).expect_err("path capture and antithetic must be rejected");
+        assert!(error.to_string().contains("antithetic"));
+    }
 }

@@ -31,6 +31,11 @@ impl TimeSeriesStorage {
         if observations.is_empty() {
             return Err(crate::Error::Input(InputError::TooFewPoints));
         }
+        if observations.iter().any(|(_, value)| !value.is_finite()) {
+            return Err(crate::Error::Validation(
+                "time-series observation values must be finite".to_string(),
+            ));
+        }
 
         // Sort by date ascending
         observations.sort_by_key(|(date, _)| *date);

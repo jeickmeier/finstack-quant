@@ -150,6 +150,16 @@ impl DiscountCurve {
         })
     }
 
+    /// Construct a flat continuously-compounded discount curve.
+    #[wasm_bindgen(js_name = flat)]
+    pub fn flat(id: &str, base_date: &str, continuous_rate: f64) -> Result<DiscountCurve, JsValue> {
+        let curve = RustDiscountCurve::flat(id, parse_iso_date(base_date)?, continuous_rate)
+            .map_err(to_js_err)?;
+        Ok(Self {
+            inner: Arc::new(curve),
+        })
+    }
+
     /// Discount factor at year fraction `t`.
     pub fn df(&self, t: f64) -> f64 {
         self.inner.df(t)
@@ -869,6 +879,17 @@ mod tests {
         assert!(curve.zero(1.0) > 0.0);
         let f = curve.forward(0.5, 1.0).expect("forward rate");
         assert!(f > 0.0);
+    }
+
+    #[test]
+    fn discount_curve_flat_uses_continuous_compounding() {
+        let curve =
+            DiscountCurve::flat("USD-OIS", "2024-01-15", 0.04).expect("flat discount curve");
+
+        for t in [0.0_f64, 0.25, 1.0, 5.0, 30.0] {
+            assert!((curve.df(t) - (-0.04 * t).exp()).abs() < 1e-12);
+        }
+        assert!((curve.forward(2.0, 9.0).expect("flat forward") - 0.04).abs() < 1e-12);
     }
 
     #[test]

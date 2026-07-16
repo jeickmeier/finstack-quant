@@ -61,6 +61,15 @@ fn scalar_time_series_rejects_pre_history_lookups() {
 }
 
 #[test]
+fn scalar_time_series_rejects_non_finite_observations() {
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let error = ScalarTimeSeries::new("INVALID", vec![(jan(10), value)], None)
+            .expect_err("non-finite observations must be rejected");
+        assert!(error.to_string().contains("finite"));
+    }
+}
+
+#[test]
 fn inflation_index_rejects_pre_history_lookups() {
     let index = InflationIndex::new(
         "US-CPI",

@@ -10,8 +10,11 @@ formatting; no financial calculation.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import math
 from typing import Any
+
+from finstack_quant.portfolio import PortfolioMetrics
 
 from . import charts, format as fmt, tables
 from .document import KPI, Section, TearSheet
@@ -122,11 +125,8 @@ def _section_sensitivities(metrics: dict[str, Any] | None, theme: Theme) -> Sect
     )
 
 
-def _bucket_chart(agg: dict[str, Any], prefix: str, theme: Theme) -> str | None:
-    items = []
-    for key, a in agg.items():
-        if key.startswith(prefix) and key.count("::") >= 2:
-            items.append((key.split("::")[-1], a.get("total")))
+def _bucket_chart(metrics: PortfolioMetrics, base: str, theme: Theme) -> str | None:
+    items = [(components[-1], total) for components, total, _ in metrics.metric_series(base) if components]
     if not items:
         return None
     items.sort(key=lambda kv: _tenor_years(kv[0]))
@@ -134,9 +134,9 @@ def _bucket_chart(agg: dict[str, Any], prefix: str, theme: Theme) -> str | None:
 
 
 def _section_buckets(metrics: dict[str, Any] | None, theme: Theme) -> Section | None:
-    agg = (metrics or {}).get("aggregated") or {}
-    dv = _bucket_chart(agg, "bucketed_dv01::", theme)
-    cs = _bucket_chart(agg, "bucketed_cs01::", theme)
+    typed = PortfolioMetrics.from_json(json.dumps(metrics or {"aggregated": {}, "by_position": {}}))
+    dv = _bucket_chart(typed, "bucketed_dv01", theme)
+    cs = _bucket_chart(typed, "bucketed_cs01", theme)
     parts = []
     if dv is not None:
         parts.append(f'<div><p class="sub">Bucketed DV01 by tenor</p>{dv}</div>')

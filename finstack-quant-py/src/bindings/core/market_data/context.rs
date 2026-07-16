@@ -1,23 +1,25 @@
 //! Python bindings for [`finstack_quant_core::market_data::context::MarketContext`].
 
-use std::str::FromStr;
 use std::sync::Arc;
 
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::money::Money;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
+use pyo3::IntoPyObjectExt;
 
+use crate::bindings::core::currency::extract_currency;
+use crate::bindings::core::money::{money_from_amount, PyMoney};
 use crate::errors::core_to_py;
 
 use super::curves::{
-    PyCreditIndexData, PyDiscountCurve, PyForwardCurve, PyFxDeltaVolSurface, PyHazardCurve,
-    PyInflationCurve, PyPriceCurve, PyVolCube, PyVolSurface, PyVolatilityIndexCurve,
+    PyBaseCorrelationCurve, PyCreditIndexData, PyDiscountCurve, PyForwardCurve,
+    PyFxDeltaVolSurface, PyHazardCurve, PyInflationCurve, PyPriceCurve, PyVolCube, PyVolSurface,
+    PyVolatilityIndexCurve,
 };
 use super::fx::PyFxMatrix;
+use super::scalars::{extract_exact_f64, PyInflationIndex, PyScalarTimeSeries};
 
 // ---------------------------------------------------------------------------
 // PyMarketContext
@@ -58,8 +60,9 @@ impl PyMarketContext {
     /// Insert a curve into the context (fluent, returns ``self``).
     ///
     /// Accepts any curve type: ``DiscountCurve``, ``ForwardCurve``,
-    /// ``HazardCurve``, ``InflationCurve``, ``PriceCurve``, ``VolSurface``,
-    /// ``FxDeltaVolSurface``, ``VolCube``, or ``VolatilityIndexCurve``.
+    /// ``HazardCurve``, ``InflationCurve``, ``PriceCurve``,
+    /// ``BaseCorrelationCurve``, ``VolSurface``, ``FxDeltaVolSurface``,
+    /// ``VolCube``, or ``VolatilityIndexCurve``.
     #[pyo3(text_signature = "(self, curve)")]
     fn insert<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -85,6 +88,10 @@ impl PyMarketContext {
             slf.inner = std::mem::take(&mut slf.inner).insert(Arc::clone(&pc.inner));
             return Ok(slf);
         }
+        if let Ok(bc) = curve.extract::<PyRef<'_, PyBaseCorrelationCurve>>() {
+            slf.inner = std::mem::take(&mut slf.inner).insert(Arc::clone(&bc.inner));
+            return Ok(slf);
+        }
         if let Ok(vs) = curve.extract::<PyRef<'_, PyVolSurface>>() {
             slf.inner = std::mem::take(&mut slf.inner).insert_surface(Arc::clone(&vs.inner));
             return Ok(slf);
@@ -103,7 +110,7 @@ impl PyMarketContext {
             return Ok(slf);
         }
         Err(PyTypeError::new_err(
-            "insert() expects a DiscountCurve, ForwardCurve, HazardCurve, InflationCurve, PriceCurve, VolSurface, FxDeltaVolSurface, VolCube, or VolatilityIndexCurve",
+            "insert() expects a DiscountCurve, ForwardCurve, HazardCurve, InflationCurve, PriceCurve, BaseCorrelationCurve, VolSurface, FxDeltaVolSurface, VolCube, or VolatilityIndexCurve",
         ))
     }
 
@@ -116,16 +123,22 @@ impl PyMarketContext {
     /// Insert a scalar market price into the context.
     ///
     /// If ``currency`` is provided, the scalar is stored as a monetary price;
-    /// otherwise it is stored as a unitless value.
+    /// otherwise it is stored as a unitless value. Monetary ``Decimal`` values
+    /// preserve their full precision. Unitless ``Decimal`` values must
+    /// round-trip through ``f64`` exactly. ``currency`` accepts a ``Currency``
+    /// wrapper or an ISO code string.
     #[pyo3(signature = (id, value, currency=None), text_signature = "(self, id, value, currency=None)")]
-    fn insert_price(&mut self, id: &str, value: f64, currency: Option<&str>) -> PyResult<()> {
+    fn insert_price(
+        &mut self,
+        id: &str,
+        value: &Bound<'_, PyAny>,
+        currency: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<()> {
         let scalar = if let Some(raw_currency) = currency {
-            let currency = Currency::from_str(raw_currency).map_err(|err| {
-                crate::errors::value_error(format!("invalid currency '{raw_currency}': {err}"))
-            })?;
-            MarketScalar::Price(Money::try_new(value, currency).map_err(core_to_py)?)
+            let currency = extract_currency(raw_currency)?;
+            MarketScalar::Price(money_from_amount(value, currency)?)
         } else {
-            MarketScalar::Unitless(value)
+            MarketScalar::Unitless(extract_exact_f64(value, "price value")?)
         };
         self.inner = std::mem::take(&mut self.inner).insert_price(id, scalar);
         Ok(())
@@ -135,6 +148,19 @@ impl PyMarketContext {
     #[pyo3(text_signature = "(self, id, data)")]
     fn insert_credit_index(&mut self, id: &str, data: &PyCreditIndexData) {
         self.inner = std::mem::take(&mut self.inner).insert_credit_index(id, data.inner.clone());
+    }
+
+    /// Insert a scalar time series into the context.
+    #[pyo3(text_signature = "(self, series)")]
+    fn insert_series(&mut self, series: &PyScalarTimeSeries) {
+        self.inner = std::mem::take(&mut self.inner).insert_series(series.inner.clone());
+    }
+
+    /// Insert an inflation index into the context.
+    #[pyo3(text_signature = "(self, index)")]
+    fn insert_inflation_index(&mut self, index: &PyInflationIndex) {
+        self.inner = std::mem::take(&mut self.inner)
+            .insert_inflation_index(&index.inner.id, index.inner.clone());
     }
 
     /// Retrieve a discount curve by identifier.
@@ -164,6 +190,13 @@ impl PyMarketContext {
         Ok(PyHazardCurve::from_inner(arc))
     }
 
+    /// Retrieve a base-correlation curve by identifier.
+    #[pyo3(text_signature = "(self, id)")]
+    fn get_base_correlation(&self, id: &str) -> PyResult<PyBaseCorrelationCurve> {
+        let arc = self.inner.get_base_correlation(id).map_err(core_to_py)?;
+        Ok(PyBaseCorrelationCurve::from_inner(arc))
+    }
+
     /// Retrieve an inflation curve by identifier.
     ///
     /// Raises ``KeyError`` if the curve does not exist, ``ValueError`` if it is not an inflation curve.
@@ -180,6 +213,32 @@ impl PyMarketContext {
     fn get_price_curve(&self, id: &str) -> PyResult<PyPriceCurve> {
         let arc = self.inner.get_price_curve(id).map_err(core_to_py)?;
         Ok(PyPriceCurve::from_inner(arc))
+    }
+
+    /// Retrieve a scalar market price by identifier.
+    #[pyo3(text_signature = "(self, id)")]
+    fn get_price(&self, py: Python<'_>, id: &str) -> PyResult<Py<PyAny>> {
+        match self.inner.get_price(id).map_err(core_to_py)? {
+            MarketScalar::Unitless(value) => value.into_py_any(py),
+            MarketScalar::Price(money) => Ok(Py::new(py, PyMoney::from_inner(*money))?.into_any()),
+        }
+    }
+
+    /// Retrieve a scalar time series by identifier.
+    #[pyo3(text_signature = "(self, id)")]
+    fn get_series(&self, id: &str) -> PyResult<PyScalarTimeSeries> {
+        self.inner
+            .get_series(id)
+            .cloned()
+            .map(PyScalarTimeSeries::from_inner)
+            .map_err(core_to_py)
+    }
+
+    /// Retrieve an inflation index by identifier.
+    #[pyo3(text_signature = "(self, id)")]
+    fn get_inflation_index(&self, id: &str) -> PyResult<PyInflationIndex> {
+        let arc = self.inner.get_inflation_index(id).map_err(core_to_py)?;
+        Ok(PyInflationIndex::from_inner((*arc).clone()))
     }
 
     /// Retrieve a vol surface by identifier.
@@ -220,6 +279,13 @@ impl PyMarketContext {
     fn get_vol_index_curve(&self, id: &str) -> PyResult<PyVolatilityIndexCurve> {
         let arc = self.inner.get_vol_index_curve(id).map_err(core_to_py)?;
         Ok(PyVolatilityIndexCurve::from_inner(arc))
+    }
+
+    /// Retrieve credit-index data by identifier.
+    #[pyo3(text_signature = "(self, id)")]
+    fn get_credit_index(&self, id: &str) -> PyResult<PyCreditIndexData> {
+        let arc = self.inner.get_credit_index(id).map_err(core_to_py)?;
+        Ok(PyCreditIndexData::from_inner((*arc).clone()))
     }
 
     /// Access the FX matrix (returns ``None`` if not set).

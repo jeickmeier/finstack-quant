@@ -63,6 +63,16 @@ impl PyValuationResult {
         self.inner.metric_str(key)
     }
 
+    /// Return decoded component vectors and values for a composite base metric.
+    ///
+    /// Results preserve the underlying ``measures`` insertion order. Legacy
+    /// malformed escapes remain literal, and decoded-coordinate collisions
+    /// fall back to literal wire components so every value remains visible.
+    fn metric_series(&self, base: &str) -> Vec<(Vec<String>, f64)> {
+        let base = finstack_quant_valuations::metrics::MetricId::custom(base);
+        self.inner.metric_series(&base)
+    }
+
     fn metric_keys(&self) -> Vec<String> {
         self.inner.measures.keys().map(|k| k.to_string()).collect()
     }

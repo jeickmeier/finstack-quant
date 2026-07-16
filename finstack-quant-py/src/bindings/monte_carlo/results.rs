@@ -4,6 +4,53 @@ use crate::bindings::core::money::PyMoney;
 use finstack_quant_monte_carlo::results::MoneyEstimate;
 use pyo3::prelude::*;
 
+/// Compact captured GBM paths for plotting and diagnostics.
+#[pyclass(name = "GbmPathSummary", module = "finstack_quant.monte_carlo", frozen)]
+pub struct PyGbmPathSummary {
+    inner: finstack_quant_monte_carlo::GbmPathSummary,
+}
+
+impl PyGbmPathSummary {
+    pub(super) fn from_inner(inner: finstack_quant_monte_carlo::GbmPathSummary) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyGbmPathSummary {
+    /// Number of independent path estimators.
+    #[getter]
+    fn num_paths(&self) -> usize {
+        self.inner.num_paths
+    }
+
+    /// Total number of simulated sample paths.
+    #[getter]
+    fn num_simulated_paths(&self) -> usize {
+        self.inner.num_simulated_paths
+    }
+
+    /// Shared path times in year fractions, including time zero.
+    #[getter]
+    fn times(&self) -> Vec<f64> {
+        self.inner.times.clone()
+    }
+
+    /// Captured spot paths in deterministic path-id order.
+    #[getter]
+    fn paths(&self) -> Vec<Vec<f64>> {
+        self.inner.paths.clone()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "GbmPathSummary(paths={}, points={})",
+            self.inner.paths.len(),
+            self.inner.times.len()
+        )
+    }
+}
+
 /// Monte Carlo pricing result with discounted statistics.
 #[pyclass(name = "MoneyEstimate", module = "finstack_quant.monte_carlo", frozen)]
 pub struct PyMoneyEstimate {
@@ -204,6 +251,7 @@ impl PyEstimate {
 }
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyGbmPathSummary>()?;
     m.add_class::<PyMoneyEstimate>()?;
     m.add_class::<PyEstimate>()?;
     Ok(())

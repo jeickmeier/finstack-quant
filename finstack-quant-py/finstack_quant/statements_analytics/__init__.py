@@ -6,8 +6,22 @@ Bindings for the ``finstack-quant-statements-analytics`` Rust crate.
 
 from __future__ import annotations
 
+import contextlib
+
 from finstack_quant.finstack_quant import statements_analytics as _sa
 
+with contextlib.suppress(NameError):
+    del annotations
+
+SensitivityConfig = _sa.SensitivityConfig
+VarianceConfig = _sa.VarianceConfig
+ScenarioSet = _sa.ScenarioSet
+MonteCarloConfig = _sa.MonteCarloConfig
+SensitivityResult = _sa.SensitivityResult
+VarianceRow = _sa.VarianceRow
+VarianceReport = _sa.VarianceReport
+ScenarioResultSet = _sa.ScenarioResultSet
+MonteCarloResults = _sa.MonteCarloResults
 run_sensitivity = _sa.run_sensitivity
 generate_tornado_entries = _sa.generate_tornado_entries
 run_variance = _sa.run_variance
@@ -98,14 +112,23 @@ __all__: list[str] = [
     "LeaseSpec",
     "ManagementFeeBase",
     "ManagementFeeSpec",
+    "MonteCarloConfig",
+    "MonteCarloResults",
     "PropertyTemplateNodes",
     "RenewalSpec",
     "RentRollOutputNodes",
     "RentStepSpec",
+    "ScenarioResultSet",
+    "ScenarioSet",
     "ScorecardConfig",
     "ScorecardMetric",
     "ScorecardReport",
+    "SensitivityConfig",
+    "SensitivityResult",
     "SimpleLeaseSpec",
+    "VarianceConfig",
+    "VarianceReport",
+    "VarianceRow",
     "add_ncf_buildup",
     "add_noi_buildup",
     "add_property_operating_statement",

@@ -16,6 +16,24 @@ from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError
 import nbformat
 
+NOTEBOOKS_DIR = Path(__file__).resolve().parent
+
+
+def _configure_pythonpath() -> None:
+    """Expose the Python package, repository, and shared notebook helpers."""
+    repo_root = NOTEBOOKS_DIR.parents[2]
+    extra_paths = [
+        str(NOTEBOOKS_DIR),
+        str(repo_root / "finstack-quant-py"),
+        str(repo_root),
+    ]
+    existing = os.environ.get("PYTHONPATH", "")
+    pieces = [path for path in existing.split(os.pathsep) if path]
+    for path in reversed(extra_paths):
+        if path not in pieces:
+            pieces.insert(0, path)
+    os.environ["PYTHONPATH"] = os.pathsep.join(pieces)
+
 
 def find_notebooks(base_dir: Path, subdirectory: str | None = None) -> list[Path]:
     """Find all Jupyter notebooks under *base_dir*, optionally filtered to *subdirectory*."""
@@ -26,10 +44,9 @@ def find_notebooks(base_dir: Path, subdirectory: str | None = None) -> list[Path
     return [nb for nb in notebooks if ".ipynb_checkpoints" not in str(nb)]
 
 
-def run_notebook(
-    notebook_path: Path, timeout: int
-) -> tuple[bool, str, float]:
+def run_notebook(notebook_path: Path, timeout: int) -> tuple[bool, str, float]:
     """Run a single notebook; return (success, message, elapsed_seconds)."""
+    _configure_pythonpath()
     start = time.time()
     try:
         with open(notebook_path, encoding="utf-8") as f:
@@ -50,15 +67,20 @@ def run_notebook(
     except CellExecutionError as e:
         elapsed = time.time() - start
         lines = str(e).split("\n")
-        for i, line in enumerate(lines):
+        for i in range(len(lines) - 1, -1, -1):
+            line = lines[i]
             if "Error" in line or "Exception" in line:
                 start_idx = max(0, i - 2)
                 end_idx = min(len(lines), i + 5)
                 return False, "\n".join(lines[start_idx:end_idx]), elapsed
         return False, "\n".join(lines[-5:]), elapsed
 
-    except TimeoutError:
-        return False, f"Timed out (>{timeout}s)", time.time() - start
+    except TimeoutError as exc:
+        detail = str(exc).strip()
+        message = f"Timed out (>{timeout}s)"
+        if detail:
+            message = f"{message}\n{detail}"
+        return False, message, time.time() - start
 
     except Exception as e:
         return False, f"{type(e).__name__}: {e}", time.time() - start
@@ -80,18 +102,9 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    # One-time PYTHONPATH for nbclient/kernel subprocesses (import finstack_quant from workspace).
-    repo_root = Path(__file__).resolve().parents[3]
-    finstack_py_root = repo_root / "finstack-quant-py"
-    extra_paths = [str(finstack_py_root), str(repo_root)]
-    existing = os.environ.get("PYTHONPATH", "")
-    pieces = [p for p in existing.split(os.pathsep) if p]
-    for p in extra_paths:
-        if p not in pieces:
-            pieces.insert(0, p)
-    os.environ["PYTHONPATH"] = os.pathsep.join(pieces)
+    _configure_pythonpath()
 
-    base_dir = Path(__file__).parent
+    base_dir = NOTEBOOKS_DIR
     notebooks = find_notebooks(base_dir, args.directory)
 
     if not notebooks:
@@ -151,8 +164,7 @@ def main() -> int:
         print("\n" + "=" * 60)
         print("DETAILED OUTPUT")
         print("=" * 60)
-        for nb_path in results:
-            ok, msg, elapsed = results[nb_path]
+        for nb_path, (ok, msg, elapsed) in results.items():
             status = "PASS" if ok else "FAIL"
             print(f"\n{status} {nb_path.relative_to(base_dir)} ({_fmt(elapsed)}):")
             print("-" * 40)

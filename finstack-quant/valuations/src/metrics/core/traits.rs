@@ -513,7 +513,7 @@ impl MetricContext {
             series.into_iter().map(|(k, v)| (k.into(), v)).collect();
 
         for (label, value) in &collected {
-            let key = Self::default_composite_key(&base_metric_id, &[label.as_str()]);
+            let key = MetricId::composite(&base_metric_id, &[label.as_str()]);
             self.computed.insert(key, *value);
         }
 
@@ -544,10 +544,8 @@ impl MetricContext {
         }
         for (r_idx, r_label) in matrix.rows.iter().enumerate() {
             for (c_idx, c_label) in matrix.cols.iter().enumerate() {
-                let key = Self::default_composite_key(
-                    &base_metric_id,
-                    &[r_label.as_str(), c_label.as_str()],
-                );
+                let key =
+                    MetricId::composite(&base_metric_id, &[r_label.as_str(), c_label.as_str()]);
                 self.computed.insert(key, matrix.values[r_idx][c_idx]);
             }
         }
@@ -564,29 +562,6 @@ impl MetricContext {
     pub fn get_matrix2d(&self, id: &MetricId) -> Option<&Structured2D> {
         self.computed_matrix.get(id)
     }
-
-    /// Builds a default composite key like `base::p1[::p2[::p3]]...`.
-    fn default_composite_key(base: &MetricId, parts: &[&str]) -> MetricId {
-        let mut key = String::with_capacity(base.as_str().len() + parts.len() * 8);
-        key.push_str(base.as_str());
-
-        for p in parts {
-            key.push_str("::");
-            if p.is_empty() {
-                key.push_str("_empty");
-                continue;
-            }
-            for byte in p.as_bytes() {
-                if byte.is_ascii_alphanumeric() {
-                    key.push(char::from(*byte));
-                } else {
-                    use std::fmt::Write as _;
-                    let _ = write!(&mut key, "_x{byte:02x}");
-                }
-            }
-        }
-        MetricId::custom(key)
-    }
 }
 
 #[cfg(test)]
@@ -595,9 +570,8 @@ mod tests {
 
     #[test]
     fn default_composite_key_preserves_distinct_non_alphanumeric_labels() {
-        let hyphen = MetricContext::default_composite_key(&MetricId::BucketedDv01, &["USD-OIS"]);
-        let underscore =
-            MetricContext::default_composite_key(&MetricId::BucketedDv01, &["USD_OIS"]);
+        let hyphen = MetricId::composite(&MetricId::BucketedDv01, &["USD-OIS"]);
+        let underscore = MetricId::composite(&MetricId::BucketedDv01, &["USD_OIS"]);
 
         assert_ne!(hyphen, underscore);
         assert_eq!(hyphen.as_str(), "bucketed_dv01::USD_x2dOIS");

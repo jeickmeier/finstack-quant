@@ -39,6 +39,110 @@ impl MetricId {
         MetricId(Cow::Owned(id.into()))
     }
 
+    /// Build a flattened composite metric key from a base ID and components.
+    ///
+    /// The wire format is `base::component[::component...]`. Component bytes
+    /// outside ASCII alphanumerics are escaped as `_xHH`; the empty component
+    /// is encoded as `_empty`. This is the canonical codec used by structured
+    /// metric producers and preserves the existing serialized key format.
+    pub fn composite(base: &MetricId, components: &[&str]) -> Self {
+        let mut key = String::with_capacity(base.as_str().len() + components.len() * 8);
+        key.push_str(base.as_str());
+
+        for component in components {
+            key.push_str("::");
+            if component.is_empty() {
+                key.push_str("_empty");
+                continue;
+            }
+            for byte in component.as_bytes() {
+                if byte.is_ascii_alphanumeric() {
+                    key.push(char::from(*byte));
+                } else {
+                    use std::fmt::Write as _;
+                    let _ = write!(&mut key, "_x{byte:02x}");
+                }
+            }
+        }
+        Self::custom(key)
+    }
+
+    /// Decode this metric's components when it is a composite of `base`.
+    ///
+    /// Returns `None` for the scalar base metric or a different base.
+    /// Canonical `_xHH` and `_empty` encodings are decoded. A component with a
+    /// malformed escape marker or an escape sequence that does not produce
+    /// valid UTF-8 is returned literally so legacy persisted keys are never
+    /// omitted.
+    ///
+    /// A valid-looking `_xHH` substring is fundamentally ambiguous because the
+    /// historical wire format has no explicit whole-component marker. Use
+    /// [`Self::decode_series_components`] when decoding multiple keys; it
+    /// resolves decoded-coordinate collisions without dropping entries.
+    pub fn decode_components(&self, base: &MetricId) -> Option<Vec<String>> {
+        let suffix = self
+            .as_str()
+            .strip_prefix(base.as_str())?
+            .strip_prefix("::")?;
+
+        Some(suffix.split("::").map(decode_component).collect())
+    }
+
+    /// Decode a sequence of composite metric keys without losing collisions.
+    ///
+    /// The returned vector is aligned one-for-one with `metrics`; scalar and
+    /// non-matching keys produce `None`. Unambiguous keys use
+    /// [`Self::decode_components`]. If two or more distinct wire keys resolve
+    /// to the same component vector, every entry in that collision group uses
+    /// its literal wire components instead. Collision detection repeats to a
+    /// fixed point because a literal fallback can collide with another key's
+    /// decoded coordinates. This preserves all values and their insertion
+    /// order without rewriting persisted keys or inventing a new wire marker.
+    pub fn decode_series_components<'a>(
+        base: &MetricId,
+        metrics: impl IntoIterator<Item = &'a MetricId>,
+    ) -> Vec<Option<Vec<String>>> {
+        let parsed: Vec<Option<(Vec<String>, Vec<String>)>> = metrics
+            .into_iter()
+            .map(|metric| {
+                let suffix = metric
+                    .as_str()
+                    .strip_prefix(base.as_str())?
+                    .strip_prefix("::")?;
+                let literal = suffix.split("::").map(str::to_string).collect();
+                let decoded = metric.decode_components(base)?;
+                Some((literal, decoded))
+            })
+            .collect();
+
+        let mut resolved: Vec<Option<Vec<String>>> = parsed
+            .iter()
+            .map(|entry| entry.as_ref().map(|(_, decoded)| decoded.clone()))
+            .collect();
+
+        loop {
+            let mut counts: HashMap<Vec<String>, usize> = HashMap::default();
+            for components in resolved.iter().flatten() {
+                *counts.entry(components.clone()).or_default() += 1;
+            }
+
+            let mut changed = false;
+            for (entry, components) in parsed.iter().zip(&mut resolved) {
+                let (Some((literal, _)), Some(current)) = (entry, components) else {
+                    continue;
+                };
+                if counts.get(current).copied().unwrap_or_default() > 1 && current != literal {
+                    current.clone_from(literal);
+                    changed = true;
+                }
+            }
+
+            if !changed {
+                return resolved;
+            }
+        }
+    }
+
     /// Converts to string representation for compatibility.
     ///
     /// Returns a lowercase, snake_case string that can be used for
@@ -1466,6 +1570,42 @@ impl MetricId {
     ];
 }
 
+fn decode_component(component: &str) -> String {
+    if component == "_empty" {
+        return String::new();
+    }
+
+    let bytes = component.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if index + 3 < bytes.len() && bytes[index] == b'_' && bytes[index + 1] == b'x' {
+            let (Some(high), Some(low)) =
+                (decode_hex(bytes[index + 2]), decode_hex(bytes[index + 3]))
+            else {
+                return component.to_string();
+            };
+            decoded.push((high << 4) | low);
+            index += 4;
+        } else if bytes[index] == b'_' && index + 1 < bytes.len() && bytes[index + 1] == b'x' {
+            return component.to_string();
+        } else {
+            decoded.push(bytes[index]);
+            index += 1;
+        }
+    }
+    String::from_utf8(decoded).unwrap_or_else(|_| component.to_string())
+}
+
+const fn decode_hex(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
 // ============================================================================
 // Metric Groups
 // ============================================================================
@@ -1878,5 +2018,57 @@ mod tests {
         for (group, metrics) in grouped {
             assert!(!metrics.is_empty(), "group {:?} has no metrics", group);
         }
+    }
+
+    #[test]
+    fn composite_codec_round_trips_utf8_empty_and_reserved_components() {
+        let key = MetricId::composite(&MetricId::BucketedDv01, &["USD-OIS", "10_y", "", "Δ"]);
+
+        assert_eq!(
+            key.as_str(),
+            "bucketed_dv01::USD_x2dOIS::10_x5fy::_empty::_xce_x94"
+        );
+        assert_eq!(
+            key.decode_components(&MetricId::BucketedDv01),
+            Some(vec![
+                "USD-OIS".to_string(),
+                "10_y".to_string(),
+                String::new(),
+                "Δ".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    fn composite_codec_matches_only_the_exact_base_identifier() {
+        let key = MetricId::composite(&MetricId::BucketedDv01, &["USD-OIS", "10y"]);
+
+        assert_eq!(key.decode_components(&MetricId::Dv01), None);
+        assert_eq!(
+            MetricId::BucketedDv01.decode_components(&MetricId::BucketedDv01),
+            None
+        );
+    }
+
+    #[test]
+    fn composite_codec_preserves_legacy_and_malformed_escape_markers_literally() {
+        for component in ["curve_xray", "curve_x", "curve_xg1", "curve_x2"] {
+            let key = MetricId::custom(format!("bucketed_dv01::{component}"));
+            assert_eq!(
+                key.decode_components(&MetricId::BucketedDv01),
+                Some(vec![component.to_string()])
+            );
+        }
+    }
+
+    #[test]
+    fn composite_codec_decodes_a_genuine_escaped_delimiter_component() {
+        let key = MetricId::composite(&MetricId::BucketedDv01, &["USD::OIS"]);
+
+        assert_eq!(key.as_str(), "bucketed_dv01::USD_x3a_x3aOIS");
+        assert_eq!(
+            key.decode_components(&MetricId::BucketedDv01),
+            Some(vec!["USD::OIS".to_string()])
+        );
     }
 }

@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.money import Money
 from finstack_quant.factor_model.credit import CreditFactorModel
 
 __all__ = [
@@ -14,8 +15,10 @@ __all__ = [
     "FinstackOptimizationError",
     "FinstackValuationError",
     "Portfolio",
+    "PortfolioAttribution",
     "PortfolioCashflows",
     "PortfolioError",
+    "PortfolioMetrics",
     "PortfolioResult",
     "PortfolioValuation",
     "aggregate_full_cashflows",
@@ -23,6 +26,7 @@ __all__ = [
     "almgren_chriss_impact",
     "amihud_illiquidity",
     "apply_scenario_and_revalue",
+    "attribute_portfolio_pnl",
     "allocate_weights",
     "brinson_fachler",
     "build_credit_vol_report",
@@ -180,6 +184,51 @@ class Portfolio:
         str
         """
         ...
+
+class PortfolioAttribution:
+    """Rust-computed portfolio P&L attribution in portfolio base currency."""
+
+    def to_json(self) -> str:
+        """Serialize the complete canonical attribution payload."""
+        ...
+
+    def by_position_json(self) -> str:
+        """Serialize nested attribution in Rust ``IndexMap`` position order."""
+        ...
+
+    def reconciliation_check(self, tolerance: float) -> dict[str, float | bool]:
+        """Reconcile aggregate factor P&L to total P&L."""
+        ...
+
+    @property
+    def total_pnl(self) -> Money: ...
+    @property
+    def carry(self) -> Money: ...
+    @property
+    def rates_curves_pnl(self) -> Money: ...
+    @property
+    def credit_curves_pnl(self) -> Money: ...
+    @property
+    def inflation_curves_pnl(self) -> Money: ...
+    @property
+    def correlations_pnl(self) -> Money: ...
+    @property
+    def fx_pnl(self) -> Money: ...
+    @property
+    def fx_translation_pnl(self) -> Money: ...
+    @property
+    def cross_factor_pnl(self) -> Money: ...
+    @property
+    def vol_pnl(self) -> Money: ...
+    @property
+    def model_params_pnl(self) -> Money: ...
+    @property
+    def market_scalars_pnl(self) -> Money: ...
+    @property
+    def residual(self) -> Money: ...
+    @property
+    def result_invalid(self) -> bool: ...
+    def __repr__(self) -> str: ...
 
 class PortfolioValuation:
     """Typed wrapper around a ``PortfolioValuation`` result.
@@ -379,6 +428,32 @@ class PortfolioResult:
         """
         ...
 
+class PortfolioMetrics:
+    """Typed wrapper around Rust-aggregated portfolio metrics."""
+
+    @staticmethod
+    def from_json(metrics_json: str) -> PortfolioMetrics:
+        """Deserialize canonical ``PortfolioMetrics`` JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize canonical ``PortfolioMetrics`` JSON."""
+        ...
+
+    def metric_series(
+        self,
+        base: str,
+    ) -> list[tuple[list[str], float, dict[str, float]]]:
+        """Return decoded components, total, and entity values in wire order.
+
+        Entity mappings preserve Rust ``IndexMap`` insertion order. Malformed
+        legacy escapes remain literal; decoded coordinate collisions use
+        literal wire components so no aggregate entry is lost.
+        """
+        ...
+
+    def __repr__(self) -> str: ...
+
 def parse_portfolio_spec(json_str: str) -> str:
     """Parse and canonicalize a ``PortfolioSpec`` from JSON."""
     ...
@@ -450,6 +525,18 @@ def apply_scenario_and_revalue(
 
     Returns ``(valuation_json, report_json)``.
     """
+    ...
+
+def attribute_portfolio_pnl(
+    portfolio: Portfolio | str,
+    market_t0: MarketContext | str,
+    market_t1: MarketContext | str,
+    as_of_t0: str,
+    as_of_t1: str,
+    method: str | dict[str, Any],
+    config: dict[str, Any] | str | None = None,
+) -> PortfolioAttribution:
+    """Attribute portfolio P&L with Rust-owned aggregation and FX translation."""
     ...
 
 def allocate_weights(spec_json: str) -> str:

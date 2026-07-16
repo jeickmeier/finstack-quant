@@ -1,7 +1,7 @@
 //! McEngine binding (configured via `PyTimeGrid`) plus module-level
 //! convenience pricing functions.
 
-use super::results::PyMoneyEstimate;
+use super::results::{PyGbmPathSummary, PyMoneyEstimate};
 use super::time_grid::PyTimeGrid;
 use crate::bindings::core::currency::extract_currency;
 use crate::errors::core_to_py;
@@ -30,22 +30,24 @@ pub struct PyMcEngine {
 impl PyMcEngine {
     /// Build an engine from a time grid configuration.
     ///
-    /// European call/put pricing runs through the GBM `EuropeanPricer`, whose
-    /// simulation vocabulary is `num_paths`, `seed`, and `use_parallel`;
-    /// antithetic variates are not part of that path, so no antithetic knob is
-    /// exposed here.
+    /// ``num_paths`` is the number of independent estimators. With antithetic
+    /// pairing enabled, the engine simulates twice that many sample paths.
     #[new]
-    #[pyo3(signature = (num_paths, time_grid, seed=None, use_parallel=None))]
+    #[pyo3(signature = (num_paths, time_grid, seed=None, use_parallel=None, antithetic=None))]
     fn new(
         num_paths: usize,
         time_grid: &PyTimeGrid,
         seed: Option<u64>,
         use_parallel: Option<bool>,
+        antithetic: Option<bool>,
     ) -> PyResult<Self> {
         let defaults = &py_mc_defaults()?.engine;
         let seed = seed.unwrap_or(defaults.seed);
         let use_parallel = use_parallel.unwrap_or(defaults.use_parallel);
-        let config = McEngineConfig::new(num_paths, time_grid.inner.clone()).parallel(use_parallel);
+        let antithetic = antithetic.unwrap_or(defaults.antithetic);
+        let config = McEngineConfig::new(num_paths, time_grid.inner.clone())
+            .parallel(use_parallel)
+            .antithetic(antithetic);
         Ok(Self {
             inner: McEngine::new(config),
             seed,
@@ -128,6 +130,43 @@ impl PyMcEngine {
 // ---------------------------------------------------------------------------
 // Module-level convenience functions
 // ---------------------------------------------------------------------------
+
+/// Simulate a compact set of GBM spot paths through Rust path capture.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (spot, rate, div_yield, vol, expiry, num_steps, num_paths, seed=None, antithetic=false))]
+fn simulate_gbm_paths(
+    py: Python<'_>,
+    spot: f64,
+    rate: f64,
+    div_yield: f64,
+    vol: f64,
+    expiry: f64,
+    num_steps: usize,
+    num_paths: usize,
+    seed: Option<u64>,
+    antithetic: bool,
+) -> PyResult<PyGbmPathSummary> {
+    let seed = seed.unwrap_or(py_mc_defaults()?.engine.seed);
+    let config = finstack_quant_monte_carlo::GbmPathConfig::new(
+        spot, rate, div_yield, vol, expiry, num_steps, num_paths,
+    )
+    .with_seed(seed)
+    .with_antithetic(antithetic);
+    py.detach(move || finstack_quant_monte_carlo::simulate_gbm_paths(&config))
+        .map(PyGbmPathSummary::from_inner)
+        .map_err(core_to_py)
+}
+
+/// Validate Heston parameters and test the strict Feller condition.
+#[pyfunction]
+fn heston_satisfies_feller(kappa: f64, theta: f64, vol_of_vol: f64) -> PyResult<bool> {
+    finstack_quant_core::math::volatility::heston::HestonParams::new(
+        theta, kappa, theta, vol_of_vol, 0.0,
+    )
+    .map(|params| params.satisfies_feller_condition())
+    .map_err(core_to_py)
+}
 
 #[allow(clippy::too_many_arguments)]
 fn price_european_gbm(
@@ -377,6 +416,8 @@ fn price_heston_put(
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMcEngine>()?;
+    m.add_function(wrap_pyfunction!(simulate_gbm_paths, m)?)?;
+    m.add_function(wrap_pyfunction!(heston_satisfies_feller, m)?)?;
     m.add_function(wrap_pyfunction!(price_european_call, m)?)?;
     m.add_function(wrap_pyfunction!(price_european_put, m)?)?;
     m.add_function(wrap_pyfunction!(price_heston_call, m)?)?;

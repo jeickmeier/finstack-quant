@@ -6,8 +6,13 @@ import pytest
 
 from finstack_quant.monte_carlo import (
     EuropeanPricer,
+    GbmPathSummary,
+    McEngine,
+    TimeGrid,
+    heston_satisfies_feller,
     price_european_call,
     price_european_put,
+    simulate_gbm_paths,
 )
 
 
@@ -159,3 +164,51 @@ class TestPriceEuropeanPutFunction:
             seed=42,
         )
         assert result.mean.amount > 0.0
+
+
+def test_mc_engine_antithetic_preserves_estimator_and_simulation_counts() -> None:
+    engine = McEngine(
+        num_paths=128,
+        time_grid=TimeGrid(t_max=1.0, num_steps=8),
+        seed=42,
+        use_parallel=False,
+        antithetic=True,
+    )
+    result = engine.price_european_call(100.0, 100.0, 0.05, 0.0, 0.2)
+    assert result.num_paths == 128
+    assert result.num_simulated_paths == 256
+
+
+def test_simulate_gbm_paths_is_typed_deterministic_and_shaped() -> None:
+    first = simulate_gbm_paths(
+        spot=100.0,
+        rate=0.05,
+        div_yield=0.01,
+        vol=0.2,
+        expiry=1.0,
+        num_steps=4,
+        num_paths=3,
+        seed=42,
+    )
+    second = simulate_gbm_paths(100.0, 0.05, 0.01, 0.2, 1.0, 4, 3, 42)
+    assert isinstance(first, GbmPathSummary)
+    assert first.times == second.times
+    assert first.paths == second.paths
+    assert first.num_paths == 3
+    assert first.num_simulated_paths == 3
+    assert len(first.times) == 5
+    assert len(first.paths) == 3
+    assert all(len(path) == 5 for path in first.paths)
+    assert all(path[0] == pytest.approx(100.0) for path in first.paths)
+
+
+def test_simulate_gbm_paths_rejects_capture_with_antithetic() -> None:
+    with pytest.raises(ValueError, match="antithetic"):
+        simulate_gbm_paths(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3, 42, antithetic=True)
+
+
+def test_heston_feller_delegates_validation_and_strict_condition() -> None:
+    assert heston_satisfies_feller(2.0, 0.04, 0.3)
+    assert not heston_satisfies_feller(1.0, 0.045, 0.3)
+    with pytest.raises(ValueError, match="kappa"):
+        heston_satisfies_feller(0.0, 0.04, 0.3)

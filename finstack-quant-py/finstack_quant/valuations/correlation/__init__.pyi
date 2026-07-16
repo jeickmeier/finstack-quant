@@ -8,8 +8,12 @@ from __future__ import annotations
 from typing import Sequence
 
 __all__ = [
+    "MAX_PORTFOLIO_LOSS_PATHS",
     "CopulaSpec",
     "Copula",
+    "CreditExposure",
+    "PortfolioLossConfig",
+    "PortfolioLossResult",
     "RecoverySpec",
     "RecoveryModel",
     "LatentFactorSpec",
@@ -23,7 +27,10 @@ __all__ = [
     "validate_correlation_matrix",
     "nearest_correlation",
     "cholesky_decompose",
+    "simulate_portfolio_loss",
 ]
+
+MAX_PORTFOLIO_LOSS_PATHS: int
 
 class CopulaSpec:
     """Copula model specification for configuration and deferred construction.
@@ -237,6 +244,65 @@ class Copula:
             If the copula is not a Random Factor Loading copula.
         """
         ...
+
+class CreditExposure:
+    """One name in a finite credit portfolio."""
+
+    def __init__(
+        self,
+        id: str,
+        notional: float,
+        default_probability: float,
+        lgd: float,
+        factor_loadings: Sequence[float],
+    ) -> None: ...
+    @property
+    def id(self) -> str: ...
+    @property
+    def notional(self) -> float: ...
+    @property
+    def default_probability(self) -> float: ...
+    @property
+    def lgd(self) -> float: ...
+    @property
+    def factor_loadings(self) -> list[float]: ...
+    def to_json(self) -> str: ...
+
+class PortfolioLossConfig:
+    """Settings for deterministic portfolio credit-loss simulation.
+
+    ``num_paths`` must be in ``[1, MAX_PORTFOLIO_LOSS_PATHS]``.
+    """
+
+    def __init__(
+        self,
+        num_paths: int,
+        seed: int,
+        confidence: float,
+        copula: CopulaSpec,
+    ) -> None: ...
+    @property
+    def num_paths(self) -> int: ...
+    @property
+    def seed(self) -> int: ...
+    @property
+    def confidence(self) -> float: ...
+    @property
+    def copula(self) -> CopulaSpec: ...
+    def to_json(self) -> str: ...
+
+class PortfolioLossResult:
+    """Loss distribution and loss-positive VaR/expected shortfall."""
+
+    @property
+    def losses(self) -> list[float]: ...
+    @property
+    def expected_loss(self) -> float: ...
+    @property
+    def var(self) -> float: ...
+    @property
+    def expected_shortfall(self) -> float: ...
+    def to_json(self) -> str: ...
 
 class RecoverySpec:
     """Recovery model specification for configuration and deferred construction.
@@ -836,6 +902,20 @@ class CorrelatedBernoulli:
             If ``u`` is not finite and in ``[0, 1]``.
         """
         ...
+
+def simulate_portfolio_loss(
+    exposures: Sequence[CreditExposure],
+    config: PortfolioLossConfig,
+    recovery: RecoverySpec | None = None,
+) -> PortfolioLossResult:
+    """Simulate finite-pool losses with deterministic path-indexed RNG streams.
+
+    Losses are positive amounts. VaR is the nearest-rank empirical quantile at
+    ``config.confidence``; expected shortfall includes the VaR observation and
+    every worse path. If ``recovery`` is provided, its conditional LGD replaces
+    each exposure's constant LGD and exactly one systematic factor is required.
+    """
+    ...
 
 def correlation_bounds(p1: float, p2: float) -> tuple[float, float]:
     """Fréchet-Hoeffding correlation bounds for two Bernoulli marginals.

@@ -681,7 +681,10 @@ def test_core_market_data_public_matches_contract() -> None:
     assert _pyi_all_names(root_stub) == expected
 
 
-@pytest.mark.parametrize("submodule_name", ["curves", "fx", "context", "dtsm", "arbitrage"])
+@pytest.mark.parametrize(
+    "submodule_name",
+    ["curves", "fx", "context", "scalars", "dtsm", "arbitrage"],
+)
 def test_core_market_data_submodule_stubs_match_runtime(submodule_name: str) -> None:
     """Each runtime market-data submodule must have an exact stub ``__all__``."""
     package = "finstack_quant.core.market_data"
@@ -689,6 +692,16 @@ def test_core_market_data_submodule_stubs_match_runtime(submodule_name: str) -> 
     stub = CONTRACT_PATH.parent / "finstack_quant" / "core" / "market_data" / f"{submodule_name}.pyi"
     assert stub.exists(), f"missing stub for {package}.{submodule_name}"
     assert _pyi_all_names(stub) == module.__all__
+
+
+def test_core_market_data_scalars_exports_are_explicit() -> None:
+    """The scalars submodule exports its canonical types at both package levels."""
+    root = importlib.import_module("finstack_quant.core.market_data")
+    scalars = importlib.import_module("finstack_quant.core.market_data.scalars")
+
+    assert scalars.__all__ == ["ScalarTimeSeries", "InflationIndex"]
+    assert root.ScalarTimeSeries is scalars.ScalarTimeSeries
+    assert root.InflationIndex is scalars.InflationIndex
 
 
 def test_valuations_correlation_public_matches_contract() -> None:

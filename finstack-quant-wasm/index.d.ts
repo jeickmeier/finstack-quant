@@ -248,6 +248,8 @@ export interface DiscountCurveConstructor {
     validationMode?: DiscountCurveValidationMode,
     forwardFloor?: number | null
   ): DiscountCurve;
+  /** Construct a flat continuously-compounded discount curve. */
+  flat(id: string, baseDate: string, continuousRate: number): DiscountCurve;
 }
 
 export interface ForwardCurve extends WasmOwned {

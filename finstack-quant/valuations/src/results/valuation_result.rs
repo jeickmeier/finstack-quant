@@ -518,6 +518,27 @@ impl ValuationResult {
         self.measures.get(id).copied()
     }
 
+    /// Return structured components and values for a composite base metric.
+    ///
+    /// Scalar entries stored directly under `base` are excluded. Matching
+    /// composite entries retain the insertion order of the [`IndexMap`] in
+    /// [`Self::measures`], which is also their deterministic serde wire order.
+    /// Components are decoded with the canonical [`MetricId`] composite-key
+    /// codec. Malformed legacy escape markers remain literal. When distinct
+    /// wire keys would decode to duplicate coordinates, all members of that
+    /// collision group retain their literal wire components so no value is
+    /// omitted or deduplicated.
+    pub fn metric_series(&self, base: &MetricId) -> Vec<(Vec<String>, f64)> {
+        let components = MetricId::decode_series_components(base, self.measures.keys());
+        self.measures
+            .iter()
+            .zip(components)
+            .filter_map(|((_, value), components)| {
+                components.map(|components| (components, *value))
+            })
+            .collect()
+    }
+
     /// Retrieve a metric by [`MetricId`], returning a `Validation` error if
     /// the metric is not present.
     ///
@@ -775,6 +796,84 @@ mod tests {
         assert_eq!(result.metric(MetricId::Dv01), Some(12.5));
         assert_eq!(result.get_measure(&MetricId::Dv01).ok(), Some(12.5));
         assert!(result.get_measure(&MetricId::Cs01).is_err());
+    }
+
+    #[test]
+    fn metric_series_decodes_components_in_measure_insertion_order() {
+        let mut measures = IndexMap::new();
+        measures.insert(MetricId::BucketedDv01, -3.0);
+        measures.insert(
+            MetricId::composite(&MetricId::BucketedDv01, &["USD-OIS", "10y"]),
+            -1.0,
+        );
+        measures.insert(MetricId::composite(&MetricId::Cs01, &["ACME"]), 8.0);
+        measures.insert(
+            MetricId::composite(&MetricId::BucketedDv01, &["EUR/USD", ""]),
+            -2.0,
+        );
+
+        let result = ValuationResult::stamped(
+            "SERIES",
+            date!(2025 - 01 - 02),
+            Money::new(1.0, Currency::USD),
+        )
+        .with_measures(measures);
+
+        assert_eq!(
+            result.metric_series(&MetricId::BucketedDv01),
+            vec![
+                (vec!["USD-OIS".to_string(), "10y".to_string()], -1.0),
+                (vec!["EUR/USD".to_string(), String::new()], -2.0),
+            ]
+        );
+    }
+
+    #[test]
+    fn metric_series_preserves_all_legacy_and_escaped_collision_entries() {
+        let mut measures = IndexMap::new();
+        measures.insert(MetricId::custom("bucketed_dv01::curve-ray"), -1.0);
+        measures.insert(MetricId::custom("bucketed_dv01::curve_x2dray"), -2.0);
+        measures.insert(MetricId::custom("bucketed_dv01::curve_xray"), -3.0);
+
+        let result = ValuationResult::stamped(
+            "LEGACY-SERIES",
+            date!(2025 - 01 - 02),
+            Money::new(1.0, Currency::USD),
+        )
+        .with_measures(measures);
+
+        assert_eq!(
+            result.metric_series(&MetricId::BucketedDv01),
+            vec![
+                (vec!["curve-ray".to_string()], -1.0),
+                (vec!["curve_x2dray".to_string()], -2.0),
+                (vec!["curve_xray".to_string()], -3.0),
+            ]
+        );
+    }
+
+    #[test]
+    fn metric_series_resolves_transitive_legacy_escape_collisions() {
+        let mut measures = IndexMap::new();
+        measures.insert(MetricId::custom("bucketed_dv01::curve-ray"), -1.0);
+        measures.insert(MetricId::custom("bucketed_dv01::curve_x2dray"), -2.0);
+        measures.insert(MetricId::custom("bucketed_dv01::curve_x5fx2dray"), -3.0);
+
+        let result = ValuationResult::stamped(
+            "TRANSITIVE-LEGACY-SERIES",
+            date!(2025 - 01 - 02),
+            Money::new(1.0, Currency::USD),
+        )
+        .with_measures(measures);
+
+        assert_eq!(
+            result.metric_series(&MetricId::BucketedDv01),
+            vec![
+                (vec!["curve-ray".to_string()], -1.0),
+                (vec!["curve_x2dray".to_string()], -2.0),
+                (vec!["curve_x5fx2dray".to_string()], -3.0),
+            ]
+        );
     }
 
     #[test]

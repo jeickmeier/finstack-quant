@@ -6,6 +6,7 @@
 //! that build the runtime portfolio internally.
 
 mod allocation;
+mod attribution;
 mod brinson;
 mod factor_model;
 mod json_bridge;
@@ -51,6 +52,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     types::register(py, &m)?;
     spec::register(py, &m)?;
     pipeline::register(py, &m)?;
+    attribution::register(py, &m)?;
     optimization::register(py, &m)?;
     optimization_spec::register(py, &m)?;
     allocation::register(py, &m)?;
@@ -70,7 +72,9 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "Portfolio",
         "PortfolioValuation",
         "PortfolioResult",
+        "PortfolioMetrics",
         "PortfolioCashflows",
+        "PortfolioAttribution",
         "parse_portfolio_spec",
         "build_portfolio_from_spec",
         "portfolio_result_total_value",
@@ -79,6 +83,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "value_portfolio",
         "aggregate_full_cashflows",
         "apply_scenario_and_revalue",
+        "attribute_portfolio_pnl",
         "allocate_weights",
         "optimize_portfolio",
         "replay_portfolio",

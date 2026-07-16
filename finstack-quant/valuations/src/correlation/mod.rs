@@ -46,6 +46,7 @@
 
 pub mod copula;
 pub mod factor_model;
+pub mod portfolio_loss;
 pub mod recovery;
 
 // Re-export commonly used types
@@ -62,5 +63,9 @@ pub use finstack_quant_analytics::correlation::{
 };
 pub use finstack_quant_core::math::probability::{
     correlation_bounds, joint_probabilities, CorrelatedBernoulli,
+};
+pub use portfolio_loss::{
+    simulate_portfolio_loss, simulate_portfolio_loss_serial, simulate_portfolio_loss_with_recovery,
+    CreditExposure, PortfolioLossConfig, PortfolioLossResult, MAX_PORTFOLIO_LOSS_PATHS,
 };
 pub use recovery::{ConstantRecovery, CorrelatedRecovery, RecoveryModel, RecoverySpec};

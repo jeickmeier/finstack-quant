@@ -5,11 +5,12 @@ pub mod context;
 pub mod curves;
 pub mod dtsm;
 pub mod fx;
+pub mod scalars;
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-const ROOT_SUBMODULES: &[&str] = &["curves", "fx", "context", "dtsm", "arbitrage"];
+const ROOT_SUBMODULES: &[&str] = &["curves", "fx", "context", "scalars", "dtsm", "arbitrage"];
 
 /// Promote an explicit export list from a submodule onto the parent module.
 fn promote_exports(
@@ -42,17 +43,20 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     curves::register(py, &m)?;
     fx::register(py, &m)?;
+    scalars::register(py, &m)?;
     context::register(py, &m)?;
     dtsm::register(py, &m)?;
     arbitrage::register(py, &m)?;
 
     promote_exports(&m, "curves", curves::EXPORTS)?;
     promote_exports(&m, "fx", fx::EXPORTS)?;
+    promote_exports(&m, "scalars", scalars::EXPORTS)?;
     promote_exports(&m, "context", context::EXPORTS)?;
 
     let mut all_names = ROOT_SUBMODULES.to_vec();
     all_names.extend_from_slice(curves::EXPORTS);
     all_names.extend_from_slice(fx::EXPORTS);
+    all_names.extend_from_slice(scalars::EXPORTS);
     all_names.extend_from_slice(context::EXPORTS);
 
     let all = PyList::new(py, &all_names)?;

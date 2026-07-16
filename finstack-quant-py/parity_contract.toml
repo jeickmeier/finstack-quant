@@ -30,7 +30,7 @@ status = "exists"  # Python package already present
 [crates.core.modules]
 cashflow      = { python = "finstack_quant.core.cashflow",      status = "missing", note = "Core cashflow APIs are not yet materialized as a dedicated Python submodule" }
 config        = { python = "finstack_quant.core.config",        status = "exists" }
-credit        = { python = "finstack_quant.core.credit",        status = "exists", note = "Includes scoring, pd, lgd, and migration submodules." }
+credit        = { python = "finstack_quant.core.credit",        status = "exists", note = "Includes scoring, pd, lgd, migration, and recovery_waterfall submodules." }
 currency      = { python = "finstack_quant.core.currency",      status = "exists" }
 dates         = { python = "finstack_quant.core.dates",         status = "exists" }
 error         = { python = "finstack_quant.core.error",         status = "missing" }
@@ -53,6 +53,7 @@ public = [
     "curves",
     "fx",
     "context",
+    "scalars",
     "dtsm",
     "arbitrage",
     "BaseCorrelationCurve",
@@ -69,6 +70,8 @@ public = [
     "FxConversionPolicy",
     "FxRateResult",
     "FxMatrix",
+    "ScalarTimeSeries",
+    "InflationIndex",
     "MarketContext",
 ]
 
@@ -112,16 +115,25 @@ public = [
 [crates.core.module_symbols.market_data]
 python_package = "finstack_quant.core.market_data"
 public = [
-    "curves", "fx", "context", "dtsm", "arbitrage",
+    "curves", "fx", "context", "scalars", "dtsm", "arbitrage",
     "BaseCorrelationCurve", "CreditIndexData", "DiscountCurve", "ForwardCurve",
     "FxDeltaVolSurface", "HazardCurve", "InflationCurve", "PriceCurve", "VolSurface",
     "VolCube", "VolatilityIndexCurve", "FxConversionPolicy", "FxRateResult", "FxMatrix",
-    "MarketContext",
+    "ScalarTimeSeries", "InflationIndex", "MarketContext",
 ]
 
 [crates.core.module_symbols.credit]
 python_package = "finstack_quant.core.credit"
-public = ["scoring", "pd", "lgd", "migration"]
+public = ["scoring", "pd", "lgd", "migration", "recovery_waterfall"]
+
+[crates.core.credit_recovery_waterfall]
+python_package = "finstack_quant.core.credit.recovery_waterfall"
+public = [
+    "RecoveryAllocation",
+    "RecoveryClaim",
+    "RecoveryWaterfallResult",
+    "allocate_recovery",
+]
 
 # Member-level pinning for Python credit-migration diagnostics. Keys follow
 # the established "ClassName.canonical_member" member-contract shape; values
@@ -334,6 +346,7 @@ status = "exists"
 [crates.monte_carlo.modules]
 engine             = { python = "finstack_quant.monte_carlo", status = "flattened", note = "McEngine and pricing helpers exposed flat on finstack_quant.monte_carlo" }
 estimate           = { python = "finstack_quant.monte_carlo", status = "flattened", note = "Estimate exposed flat on finstack_quant.monte_carlo" }
+gbm_paths          = { python = "finstack_quant.monte_carlo", status = "flattened", note = "Compact GbmPathSummary and simulate_gbm_paths exposed flat; generic process/path graph remains Rust-only" }
 greeks             = { python = "finstack_quant.monte_carlo", status = "flattened", note = "finite_diff_delta/_crn and finite_diff_gamma/_crn exposed flat on finstack_quant.monte_carlo" }
 pricer             = { python = "finstack_quant.monte_carlo", status = "flattened", note = "European, path-dependent, and LSMC pricers exposed flat on finstack_quant.monte_carlo" }
 results            = { python = "finstack_quant.monte_carlo", status = "flattened", note = "MoneyEstimate exposed flat on finstack_quant.monte_carlo" }
@@ -344,6 +357,7 @@ variance_reduction = { python = "finstack_quant.monte_carlo", status = "flattene
 public = [
     "Estimate",
     "EuropeanPricer",
+    "GbmPathSummary",
     "LsmcPricer",
     "McEngine",
     "MoneyEstimate",
@@ -355,10 +369,12 @@ public = [
     "finite_diff_delta_crn",
     "finite_diff_gamma",
     "finite_diff_gamma_crn",
+    "heston_satisfies_feller",
     "price_european_call",
     "price_european_put",
     "price_heston_call",
     "price_heston_put",
+    "simulate_gbm_paths",
 ]
 
 # ---------------------------------------------------------------------------
@@ -426,20 +442,25 @@ public = [
 [crates.valuations.correlation]
 python_package = "finstack_quant.valuations.correlation"
 public = [
+    "MAX_PORTFOLIO_LOSS_PATHS",
     "Copula",
     "CopulaSpec",
     "CorrelatedBernoulli",
+    "CreditExposure",
     "LatentFactorKind",
     "LatentFactorSpec",
     "LatentMultiFactor",
     "LatentSingleFactor",
     "LatentTwoFactor",
+    "PortfolioLossConfig",
+    "PortfolioLossResult",
     "RecoveryModel",
     "RecoverySpec",
     "cholesky_decompose",
     "correlation_bounds",
     "joint_probabilities",
     "nearest_correlation",
+    "simulate_portfolio_loss",
     "validate_correlation_matrix",
 ]
 
@@ -563,6 +584,80 @@ comps                       = { python = "finstack_quant.statements_analytics", 
 extensions                  = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "Credit-scorecard and corkscrew extensions exposed flat on finstack_quant.statements_analytics (ScorecardMetric/Config/Report, CreditScorecardExtension, AccountType, CorkscrewAccount/Config/Report, CorkscrewExtension, validate_scorecard_config)" }
 templates                   = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "Vintage, roll-forward, and real-estate templates exposed flat on finstack_quant.statements_analytics (add_vintage_buildup, add_roll_forward, add_noi_buildup, add_ncf_buildup, add_rent_roll, add_rent_roll_rental_revenue, add_property_operating_statement, plus LeaseSpec/SimpleLeaseSpec/RentStepSpec/FreeRentWindowSpec/RenewalSpec/LeaseGrowthConvention/RentRollOutputNodes/ManagementFeeBase/ManagementFeeSpec/PropertyTemplateNodes)" }
 
+[crates.statements_analytics.symbols]
+public = [
+    "AccountType",
+    "CorkscrewAccount",
+    "CorkscrewConfig",
+    "CorkscrewExtension",
+    "CorkscrewReport",
+    "CreditScorecardExtension",
+    "DependencyTracer",
+    "Exposure",
+    "FreeRentWindowSpec",
+    "LeaseGrowthConvention",
+    "LeaseSpec",
+    "ManagementFeeBase",
+    "ManagementFeeSpec",
+    "MonteCarloConfig",
+    "MonteCarloResults",
+    "PropertyTemplateNodes",
+    "RenewalSpec",
+    "RentRollOutputNodes",
+    "RentStepSpec",
+    "ScorecardConfig",
+    "ScorecardMetric",
+    "ScorecardReport",
+    "ScenarioResultSet",
+    "ScenarioSet",
+    "SensitivityConfig",
+    "SensitivityResult",
+    "SimpleLeaseSpec",
+    "VarianceConfig",
+    "VarianceReport",
+    "VarianceRow",
+    "add_ncf_buildup",
+    "add_noi_buildup",
+    "add_property_operating_statement",
+    "add_rent_roll",
+    "add_rent_roll_rental_revenue",
+    "add_roll_forward",
+    "add_roll_forward_with_opening",
+    "add_vintage_buildup",
+    "all_dependencies",
+    "backtest_forecast",
+    "classify_stage",
+    "compute_ecl",
+    "compute_ecl_weighted",
+    "compute_multiple",
+    "credit_assessment",
+    "credit_assessment_report",
+    "dependents",
+    "direct_dependencies",
+    "evaluate_dcf",
+    "evaluate_scenario_set",
+    "explain_formula",
+    "explain_formula_text",
+    "generate_tornado_entries",
+    "goal_seek",
+    "peer_stats",
+    "percentile_rank",
+    "pl_summary_report",
+    "regression_fair_value",
+    "render_check_report_html",
+    "render_check_report_text",
+    "run_checks",
+    "run_corporate_analysis",
+    "run_credit_underwriting_checks",
+    "run_monte_carlo",
+    "run_sensitivity",
+    "run_three_statement_checks",
+    "run_variance",
+    "score_relative_value",
+    "validate_scorecard_config",
+    "z_score",
+]
+
 # WASM statements subset
 #
 # Python exposes typed wrappers (ModelBuilder, Evaluator, StatementResult,
@@ -608,11 +703,11 @@ symbols = [
 # ---------------------------------------------------------------------------
 # WASM statements_analytics subset
 #
-# WASM exposes the JSON analysis surface plus comps helpers through
-# `exports/statements_analytics.js` with camelCase facade names. Python
-# additionally exposes typed extension/template wrappers (scorecards,
-# corkscrew, ECL, real-estate templates) that are intentionally not bound
-# for WASM.
+# WASM intentionally keeps the JSON analysis surface plus comps helpers through
+# `exports/statements_analytics.js` with camelCase facade names. Python exposes
+# typed analysis config/result wrappers and typed extension/template wrappers;
+# this host-language difference is intentional and the WASM JSON API remains
+# unchanged.
 # ---------------------------------------------------------------------------
 [wasm_statements_analytics_subset]
 rust_module_root = "../finstack-quant-wasm/src/api/statements_analytics/"
@@ -796,8 +891,10 @@ public = [
   "OptimizationStatus",
   "PerPositionMetric",
   "Portfolio",
+  "PortfolioAttribution",
   "PortfolioCashflows",
   "PortfolioError",
+  "PortfolioMetrics",
   "PortfolioOptimizationResult",
   "PortfolioOptimizationSpec",
   "PortfolioResult",
@@ -832,6 +929,7 @@ public = [
   "almgren_chriss_impact",
   "amihud_illiquidity",
   "apply_scenario_and_revalue",
+  "attribute_portfolio_pnl",
   "brinson_fachler",
   "build_credit_vol_report",
   "build_portfolio_from_spec",
@@ -1018,7 +1116,7 @@ modules = [
 ]
 # ForwardCurve is part of the agreed market_data subset. Member names are
 # explicit so Rust/Python snake_case additions are mirrored in WASM camelCase.
-discount_curve_members = ["id", "baseDate", "df", "zero", "forward"]
+discount_curve_members = ["id", "baseDate", "flat", "df", "zero", "forward"]
 discount_curve_optional_constructor_args = [
     "interp", "extrapolation", "dayCount", "validationMode", "forwardFloor",
 ]
@@ -1096,6 +1194,7 @@ python_only_market_data = [
     "curves",
     "fx",
     "context",
+    "scalars",
     "dtsm",
     "arbitrage",
     "BaseCorrelationCurve",
@@ -1105,6 +1204,8 @@ python_only_market_data = [
     "PriceCurve",
     "VolSurface",
     "VolatilityIndexCurve",
+    "ScalarTimeSeries",
+    "InflationIndex",
     "MarketContext",
 ]
 

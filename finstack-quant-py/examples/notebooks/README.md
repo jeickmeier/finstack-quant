@@ -15,7 +15,8 @@ portfolio/scenario workflows, advanced quant methods, and reporting.
 Interactive use:
 
 ```bash
-uv run jupyter lab
+PYTHONPATH=finstack-quant-py/examples/notebooks uv run jupyter lab \
+  finstack-quant-py/examples/notebooks
 ```
 
 Batch execution from the repository root:
@@ -60,6 +61,22 @@ specs = json.loads(Path("data/example_specs.json").read_text())
 
 Keep one representative spec visible in the notebook when the JSON shape is part
 of the lesson; move bulk catalogs and repeated payloads into data files.
+
+Reusable examples live in the example-only `_shared` package (it is deliberately
+outside the public `finstack_quant` API):
+
+- `_shared.paths` provides stable repository, package, notebook, and fixture
+  paths.
+- `_shared.market.build_demo_market()` returns the canonical typed market,
+  including SOFR historical fixings used by floating-rate examples.
+- `_shared.fixtures` loads independent copies of named instrument and portfolio
+  payloads from versioned `_shared/data/v1/` catalogs.
+- `_shared.instrument_fixtures` contains the larger, parameterized instrument
+  factories used by the multi-asset scale lab.
+
+Import shared examples with `from _shared import ...`. New fixture schemas must
+use a new version directory rather than silently changing an existing wire
+contract.
 
 ## Level 1 -- Foundations (`01_foundations/`)
 

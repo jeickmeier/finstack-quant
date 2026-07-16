@@ -15,6 +15,7 @@ mod templates_common;
 mod templates_real_estate;
 mod templates_roll_forward;
 mod templates_vintage;
+mod typed;
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -28,6 +29,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
 
     analysis::register(py, &m)?;
+    typed::register(py, &m)?;
     ecl::register(py, &m)?;
     comps::register(py, &m)?;
     scorecards::register(py, &m)?;
@@ -39,6 +41,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(
         py,
         [
+            "SensitivityConfig",
+            "VarianceConfig",
+            "ScenarioSet",
+            "MonteCarloConfig",
+            "SensitivityResult",
+            "VarianceRow",
+            "VarianceReport",
+            "ScenarioResultSet",
+            "MonteCarloResults",
             "run_sensitivity",
             "generate_tornado_entries",
             "run_variance",

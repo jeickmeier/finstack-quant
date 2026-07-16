@@ -13,6 +13,10 @@ pub(crate) type PathResult = (IndexMap<String, IndexMap<PeriodId, f64>>, Vec<Eva
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+fn default_percentiles() -> Vec<f64> {
+    vec![0.05, 0.5, 0.95]
+}
+
 /// Configuration for Monte Carlo evaluation of a statement model.
 ///
 /// # Choosing the number of paths
@@ -43,7 +47,7 @@ pub struct MonteCarloConfig {
     /// Base random seed used to derive per-path seeds.
     pub seed: u64,
     /// Percentiles to compute in the closed interval [0, 1].
-    #[serde(default)]
+    #[serde(default = "default_percentiles")]
     pub percentiles: Vec<f64>,
     /// Whether to include the long-format path table in serialized results.
     #[serde(default)]
@@ -56,7 +60,7 @@ impl MonteCarloConfig {
         Self {
             n_paths,
             seed,
-            percentiles: vec![0.05, 0.5, 0.95],
+            percentiles: default_percentiles(),
             include_path_data: false,
         }
     }
@@ -185,7 +189,7 @@ impl MonteCarloResults {
 
 fn normalize_percentiles(raw: &[f64]) -> Result<Vec<f64>> {
     if raw.is_empty() {
-        return Ok(vec![0.05, 0.5, 0.95]);
+        return Ok(default_percentiles());
     }
 
     // Reject out-of-range values instead of silently clamping: a user writing
@@ -572,6 +576,16 @@ mod tests {
     fn monte_carlo_config_rejects_unknown_fields() {
         let json = r#"{"n_paths": 10, "seed": 7, "bogus_field": true}"#;
         assert!(serde_json::from_str::<MonteCarloConfig>(json).is_err());
+    }
+
+    #[test]
+    fn monte_carlo_config_serde_uses_constructor_defaults() {
+        let config: MonteCarloConfig =
+            serde_json::from_str(r#"{"n_paths": 10, "seed": 7}"#).expect("valid config");
+
+        assert_eq!(config.percentiles, vec![0.05, 0.5, 0.95]);
+        assert!(!config.include_path_data);
+        assert_eq!(config.percentiles, MonteCarloConfig::new(10, 7).percentiles);
     }
 
     #[test]

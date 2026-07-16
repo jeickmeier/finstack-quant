@@ -71,6 +71,19 @@ def test_run_notebook_reports_failure(module: ModuleType, tmp_path: Path) -> Non
     assert elapsed >= 0
 
 
+def test_run_notebook_exposes_shared_helpers(module: ModuleType, tmp_path: Path) -> None:
+    """Notebook kernels should be able to import the example-only shared package."""
+    notebook = tmp_path / "shared_helpers.ipynb"
+    _write_notebook(
+        notebook,
+        "from _shared import DEMO_AS_OF\nassert DEMO_AS_OF.isoformat() == '2025-01-15'",
+    )
+
+    ok, message, _elapsed = module.run_notebook(notebook, timeout=30)
+
+    assert ok is True, message
+
+
 def test_vol_surfaces_notebook_runs_successfully(module: ModuleType) -> None:
     """The volatility surfaces notebook should execute end-to-end."""
     notebook = NOTEBOOKS_DIR / "01_foundations" / "market_data" / "vol_surfaces.ipynb"

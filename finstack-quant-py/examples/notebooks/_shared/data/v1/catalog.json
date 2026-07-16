@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "instruments": {
+    "usd_fixed_bond": {
+      "type": "bond",
+      "spec": {
+        "id": "DEMO-BOND",
+        "notional": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "issue_date": "2024-01-15",
+        "maturity": "2030-01-15",
+        "discount_curve_id": "USD-OIS",
+        "accrual_method": "Linear",
+        "settlement_days": 2,
+        "ex_coupon_days": 0,
+        "cashflow_spec": {
+          "Fixed": {
+            "coupon_type": "Cash",
+            "freq": {
+              "count": 6,
+              "unit": "months"
+            },
+            "dc": "Thirty360",
+            "bdc": "following",
+            "calendar_id": "weekends_only",
+            "end_of_month": false,
+            "payment_lag_days": 0,
+            "rate": "0.05",
+            "stub": "None"
+          }
+        },
+        "call_put": null,
+        "credit_curve_id": null,
+        "attributes": {
+          "tags": [
+            "demo"
+          ],
+          "meta": {}
+        },
+        "pricing_overrides": {}
+      }
+    },
+    "usd_equity": {
+      "type": "equity",
+      "spec": {
+        "id": "DEMO-AAPL",
+        "ticker": "AAPL",
+        "currency": "USD",
+        "shares": 100.0,
+        "price_quote": null,
+        "price_id": "AAPL-SPOT",
+        "div_yield_id": "AAPL-DIV",
+        "discount_curve_id": "USD-OIS",
+        "attributes": {
+          "tags": [
+            "demo"
+          ],
+          "meta": {}
+        }
+      }
+    }
+  },
+  "portfolios": {
+    "two_asset_demo": {
+      "id": "DEMO-PORTFOLIO",
+      "as_of": "2025-01-15",
+      "base_ccy": "USD",
+      "entities": {
+        "DEMO-FUND": {
+          "id": "DEMO-FUND"
+        }
+      },
+      "positions": [
+        {
+          "position_id": "DEMO-BOND-POSITION",
+          "entity_id": "DEMO-FUND",
+          "instrument_fixture": "usd_fixed_bond",
+          "quantity": 1.0,
+          "unit": "units"
+        },
+        {
+          "position_id": "DEMO-EQUITY-POSITION",
+          "entity_id": "DEMO-FUND",
+          "instrument_fixture": "usd_equity",
+          "quantity": 1.0,
+          "unit": "units"
+        }
+      ]
+    }
+  }
+}

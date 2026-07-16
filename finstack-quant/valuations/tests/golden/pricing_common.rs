@@ -98,6 +98,9 @@ pub(crate) fn run_pricing_fixture(
 mod tests {
     use super::*;
     use crate::golden::schema::SCHEMA_VERSION;
+    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
     fn pricing_fixture(market: serde_json::Value) -> GoldenFixture {
         let json = serde_json::json!({
@@ -150,6 +153,58 @@ mod tests {
         })
     }
 
+    fn structured_credit_fixture() -> GoldenFixture {
+        serde_json::from_str(include_str!(
+            "data/pricing/regression_goldens/structured_credit/abs_credit_card_senior.json"
+        ))
+        .expect("parse structured-credit golden fixture")
+    }
+
+    fn price_fixture_npv(
+        fixture: &GoldenFixture,
+        market: &MarketContext,
+        instrument_json: &str,
+    ) -> f64 {
+        let pricing = fixture.pricing().expect("pricing body");
+        let result = price_instrument_json_with_metrics_and_history(
+            instrument_json,
+            market,
+            &fixture.metadata.valuation_date,
+            &pricing.model,
+            &[],
+            None,
+            None,
+        )
+        .expect("structured-credit fixture should price");
+        result.value.amount()
+    }
+
+    fn direct_parallel_dv01(
+        fixture: &GoldenFixture,
+        market: &MarketContext,
+        instrument_json: &str,
+        curve_ids: &[CurveId],
+    ) -> f64 {
+        let bumped_market = |direction| {
+            market
+                .bump(curve_ids.iter().cloned().map(|id| MarketBump::Curve {
+                    id,
+                    spec: BumpSpec::parallel_bp(direction),
+                }))
+                .expect("declared curve should support a parallel bump")
+        };
+        let up = price_fixture_npv(fixture, &bumped_market(1.0), instrument_json);
+        let down = price_fixture_npv(fixture, &bumped_market(-1.0), instrument_json);
+        (up - down) / 2.0
+    }
+
+    fn assert_close(actual: f64, expected: f64, tolerance: f64) {
+        assert!(
+            (actual - expected).abs() < tolerance,
+            "expected {expected:.15}, got {actual:.15}"
+        );
+    }
+
     #[test]
     fn requested_metrics_derives_from_expected_and_excludes_npv() {
         let json = serde_json::json!({
@@ -194,5 +249,89 @@ mod tests {
         );
         let pricing = fixture.pricing().expect("pricing body");
         resolve_market(&pricing.market).expect("envelope resolves through engine::execute");
+    }
+
+    #[test]
+    fn structured_credit_dependencies_preserve_curve_roles_and_fixing_ids() {
+        let fixture = structured_credit_fixture();
+        let pricing = fixture.pricing().expect("pricing body");
+        let instrument: InstrumentJson = serde_json::from_value(pricing.instrument.clone())
+            .expect("parse structured-credit instrument");
+        let InstrumentJson::StructuredCredit(instrument) = instrument else {
+            panic!("fixture should contain structured credit");
+        };
+
+        let dependencies = instrument
+            .market_dependencies()
+            .expect("collect structured-credit dependencies");
+        let discount_curves: Vec<_> = dependencies
+            .curves
+            .discount_curves
+            .iter()
+            .map(|id| id.as_str())
+            .collect();
+        let forward_curves: Vec<_> = dependencies
+            .curves
+            .forward_curves
+            .iter()
+            .map(|id| id.as_str())
+            .collect();
+
+        assert_eq!(discount_curves, ["USD-SOFR-DISC"]);
+        assert_eq!(forward_curves, ["SOFR-3M"]);
+        assert!(dependencies.curves.credit_curves.is_empty());
+        assert!(dependencies.curves.inflation_curves.is_empty());
+        assert_eq!(dependencies.series_ids, ["FIXING:SOFR-3M"]);
+        assert!(dependencies.spot_ids.is_empty());
+        assert!(dependencies.volatility_dependencies.is_empty());
+        assert!(dependencies.fx_pairs.is_empty());
+    }
+
+    #[test]
+    #[ignore = "slow: covered by mise goldens-test or mise rust-test-slow"]
+    fn structured_credit_dv01_matches_declared_curve_repricing() {
+        let fixture = structured_credit_fixture();
+        let pricing = fixture.pricing().expect("pricing body");
+        let market = resolve_market(&pricing.market).expect("resolve fixture market");
+        let instrument_json =
+            serde_json::to_string(&pricing.instrument).expect("serialize instrument");
+
+        let discount = direct_parallel_dv01(
+            &fixture,
+            &market,
+            &instrument_json,
+            &[CurveId::new("USD-SOFR-DISC")],
+        );
+        let sofr_3m = direct_parallel_dv01(
+            &fixture,
+            &market,
+            &instrument_json,
+            &[CurveId::new("SOFR-3M")],
+        );
+        let combined = direct_parallel_dv01(
+            &fixture,
+            &market,
+            &instrument_json,
+            &[CurveId::new("USD-SOFR-DISC"), CurveId::new("SOFR-3M")],
+        );
+
+        let registry_result = price_instrument_json_with_metrics_and_history(
+            &instrument_json,
+            &market,
+            &fixture.metadata.valuation_date,
+            &pricing.model,
+            &["dv01".to_string()],
+            None,
+            None,
+        )
+        .expect("registry DV01 should price");
+        let registry_dv01 = registry_result.measures["dv01"];
+
+        assert_close(discount, -3_043.885_803_190_06, 1e-6);
+        assert_close(sofr_3m, 2836.106479169801, 1e-6);
+        assert_close(combined, -207.779270004481, 1e-6);
+        assert_close(combined, registry_dv01, 1e-8);
+        assert!((combined - (discount + sofr_3m)).abs() < 1e-3);
+        assert!((combined - discount).abs() > 2_000.0);
     }
 }

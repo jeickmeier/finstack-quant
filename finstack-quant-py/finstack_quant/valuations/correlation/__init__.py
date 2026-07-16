@@ -21,26 +21,36 @@ LatentSingleFactor = _corr.LatentSingleFactor
 LatentTwoFactor = _corr.LatentTwoFactor
 LatentMultiFactor = _corr.LatentMultiFactor
 CorrelatedBernoulli = _corr.CorrelatedBernoulli
+CreditExposure = _corr.CreditExposure
+MAX_PORTFOLIO_LOSS_PATHS = _corr.MAX_PORTFOLIO_LOSS_PATHS
+PortfolioLossConfig = _corr.PortfolioLossConfig
+PortfolioLossResult = _corr.PortfolioLossResult
 correlation_bounds = _corr.correlation_bounds
 joint_probabilities = _corr.joint_probabilities
 validate_correlation_matrix = _corr.validate_correlation_matrix
 nearest_correlation = _corr.nearest_correlation
 cholesky_decompose = _corr.cholesky_decompose
+simulate_portfolio_loss = _corr.simulate_portfolio_loss
 
 __all__: list[str] = [
+    "MAX_PORTFOLIO_LOSS_PATHS",
     "Copula",
     "CopulaSpec",
     "CorrelatedBernoulli",
+    "CreditExposure",
     "LatentFactorKind",
     "LatentFactorSpec",
     "LatentMultiFactor",
     "LatentSingleFactor",
     "LatentTwoFactor",
+    "PortfolioLossConfig",
+    "PortfolioLossResult",
     "RecoveryModel",
     "RecoverySpec",
     "cholesky_decompose",
     "correlation_bounds",
     "joint_probabilities",
     "nearest_correlation",
+    "simulate_portfolio_loss",
     "validate_correlation_matrix",
 ]

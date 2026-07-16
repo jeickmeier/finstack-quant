@@ -5,6 +5,7 @@ underlying Rust implementation.
 """
 
 from datetime import date
+from decimal import Decimal
 from inspect import signature
 import json
 import math
@@ -25,11 +26,16 @@ from finstack_quant.core.dates import (
     sifma_settlement_date_for_class,
 )
 from finstack_quant.core.market_data import (
+    BaseCorrelationCurve,
+    CreditIndexData,
     DiscountCurve,
     ForwardCurve,
     FxConversionPolicy,
     FxMatrix,
+    HazardCurve,
+    InflationIndex,
     MarketContext,
+    ScalarTimeSeries,
 )
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Bps, CreditRating, Percentage, Rate
@@ -377,6 +383,13 @@ class TestDiscountCurveParity:
         state = json.loads(context.to_json())
         assert state["curves"][0]["day_count"] == "Act365F"
 
+    def test_flat_uses_continuous_compounding(self) -> None:
+        curve = DiscountCurve.flat("USD-OIS", date(2024, 1, 1), 0.04)
+
+        for t in [0.0, 0.25, 1.0, 5.0, 30.0]:
+            assert curve.df(t) == pytest.approx(math.exp(-0.04 * t), abs=1e-12)
+        assert curve.forward(2.0, 9.0) == pytest.approx(0.04, abs=1e-12)
+
     def test_negative_rate_validation_mode_accepts_increasing_discount_factors(self) -> None:
         knots = [(0.0, 1.0), (1.0, 1.002), (2.0, 1.004)]
         with pytest.raises(ValueError, match="non-increasing"):
@@ -587,6 +600,19 @@ class TestFxMatrixParity:
         with pytest.raises(KeyError, match="FX"):
             fx.rate(eur, usd, date(2024, 1, 3), FxConversionPolicy.CASHFLOW_DATE)
 
+    def test_explicit_quote_survives_market_context_json_roundtrip(self) -> None:
+        fx = FxMatrix()
+        eur, usd = Currency("EUR"), Currency("USD")
+        fx.set_quote(eur, usd, 1.10)
+
+        context = MarketContext()
+        context.insert_fx(fx)
+        restored = MarketContext.from_json(context.to_json())
+
+        result = restored.fx.rate(eur, usd, date(2024, 1, 2), FxConversionPolicy.CASHFLOW_DATE)
+        assert result.rate == pytest.approx(1.10)
+        assert result.triangulated is False
+
 
 class TestMarketContextParity:
     """Market context insert / retrieve matches Rust."""
@@ -618,14 +644,175 @@ class TestMarketContextParity:
         retrieved = mc.get_forward("USD-SOFR")
         assert retrieved.id == "USD-SOFR"
 
+    def test_insert_and_get_base_correlation(self) -> None:
+        mc = MarketContext()
+        curve = BaseCorrelationCurve("CDX-IG-CORR", [(3.0, 0.20), (10.0, 0.45)])
+
+        mc.insert(curve)
+
+        retrieved = mc.get_base_correlation("CDX-IG-CORR")
+        assert retrieved.id == "CDX-IG-CORR"
+        assert retrieved.correlation(3.0) == pytest.approx(0.20)
+
+    def test_insert_and_get_credit_index(self) -> None:
+        hazard = HazardCurve(
+            "CDX-IG-HAZARD",
+            date(2024, 1, 1),
+            [(0.0, 0.01), (5.0, 0.015)],
+        )
+        correlation = BaseCorrelationCurve("CDX-IG-CORR", [(3.0, 0.20), (10.0, 0.45)])
+        index = CreditIndexData(125, 0.40, hazard, correlation)
+        mc = MarketContext()
+
+        mc.insert_credit_index("CDX-IG", index)
+
+        retrieved = mc.get_credit_index("CDX-IG")
+        assert retrieved.num_constituents == 125
+        assert retrieved.recovery_rate == pytest.approx(0.40)
+
+    def test_insert_and_get_price_preserves_scalar_kind(self) -> None:
+        mc = MarketContext()
+        mc.insert_price("EQUITY-SPOT", 185.25, "USD")
+        mc.insert_price("DIVIDEND-YIELD", 0.005)
+
+        spot = mc.get_price("EQUITY-SPOT")
+        assert isinstance(spot, Money)
+        assert spot.amount == pytest.approx(185.25)
+        assert spot.currency == Currency("USD")
+        assert mc.get_price("DIVIDEND-YIELD") == pytest.approx(0.005)
+
+    @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+    def test_insert_price_rejects_non_finite_values(self, value: float) -> None:
+        mc = MarketContext()
+
+        with pytest.raises(ValueError, match="finite"):
+            mc.insert_price("INVALID", value)
+
+        with pytest.raises(ValueError, match="finite"):
+            mc.insert_price("INVALID-MONEY", value, Currency("USD"))
+
+        with pytest.raises(KeyError):
+            mc.get_price("INVALID")
+        with pytest.raises(KeyError):
+            mc.get_price("INVALID-MONEY")
+
+    def test_insert_price_preserves_decimal_money_and_accepts_currency_wrapper(self) -> None:
+        mc = MarketContext()
+
+        mc.insert_price("EQUITY-SPOT", Decimal("185.2500000000000000001"), Currency("USD"))
+
+        restored = MarketContext.from_json(mc.to_json())
+        spot = restored.get_price("EQUITY-SPOT")
+        assert isinstance(spot, Money)
+        assert spot.amount_decimal == Decimal("185.2500000000000000001")
+        assert spot.currency == Currency("USD")
+
+    def test_unitless_price_accepts_only_exactly_representable_decimal(self) -> None:
+        mc = MarketContext()
+        mc.insert_price("EXACT", Decimal("0.5"))
+        assert mc.get_price("EXACT") == 0.5
+
+        with pytest.raises(ValueError, match="exactly representable"):
+            mc.insert_price("INEXACT", Decimal("0.1"))
+
+    def test_insert_and_get_scalar_time_series(self) -> None:
+        observations = [(date(2024, 1, 1), 100.0), (date(2024, 1, 3), 104.0)]
+        series = ScalarTimeSeries(
+            "EQUITY-HISTORY",
+            observations,
+            currency="USD",
+            interpolation="linear",
+        )
+        mc = MarketContext()
+
+        mc.insert_series(series)
+        retrieved = mc.get_series("EQUITY-HISTORY")
+
+        assert retrieved.id == "EQUITY-HISTORY"
+        assert retrieved.currency == Currency("USD")
+        assert retrieved.interpolation == "linear"
+        assert retrieved.observations == observations
+        assert retrieved.value_on(date(2024, 1, 2)) == pytest.approx(102.0)
+
+    @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+    def test_scalar_time_series_rejects_non_finite_observations(self, value: float) -> None:
+        with pytest.raises(ValueError, match="finite"):
+            ScalarTimeSeries("INVALID", [(date(2024, 1, 1), value)])
+
+    def test_scalar_time_series_decimal_values_require_exact_f64_roundtrip(self) -> None:
+        series = ScalarTimeSeries(
+            "EXACT",
+            [(date(2024, 1, 1), Decimal("100.25"))],
+            currency=Currency("USD"),
+        )
+        assert series.observations == [(date(2024, 1, 1), 100.25)]
+        assert series.currency == Currency("USD")
+
+        with pytest.raises(ValueError, match="exactly representable"):
+            ScalarTimeSeries(
+                "INEXACT",
+                [(date(2024, 1, 1), Decimal("0.1"))],
+            )
+
+    def test_scalar_time_series_json_roundtrip(self) -> None:
+        series = ScalarTimeSeries(
+            "EQUITY-HISTORY",
+            [(date(2024, 1, 1), 100.0), (date(2024, 1, 3), 104.0)],
+            interpolation="linear",
+        )
+
+        restored = ScalarTimeSeries.from_json(series.to_json())
+
+        assert restored.id == series.id
+        assert restored.observations == series.observations
+        assert restored.interpolation == series.interpolation
+
+    def test_inflation_index_typed_context_and_json_roundtrip(self) -> None:
+        observations = [(date(2024, 1, 1), 300.0), (date(2024, 2, 1), 301.5)]
+        index = InflationIndex("US-CPI", observations, Currency("USD"), interpolation="linear")
+        mc = MarketContext()
+
+        mc.insert_inflation_index(index)
+        restored_context = MarketContext.from_json(mc.to_json())
+        restored = restored_context.get_inflation_index("US-CPI")
+        restored_directly = InflationIndex.from_json(index.to_json())
+
+        assert restored.id == "US-CPI"
+        assert restored.currency == Currency("USD")
+        assert restored.interpolation == "linear"
+        assert restored.observations == observations
+        assert restored.value_on(date(2024, 1, 16)) == pytest.approx(300.7258064516129)
+        assert len(restored) == 2
+        assert restored_directly.to_json() == index.to_json()
+
+    @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+    def test_inflation_index_rejects_non_finite_observations(self, value: float) -> None:
+        with pytest.raises(ValueError, match="finite"):
+            InflationIndex("INVALID", [(date(2024, 1, 1), value)], "USD")
+
+    def test_inflation_index_rejects_duplicate_observation_dates(self) -> None:
+        with pytest.raises(ValueError, match="strictly increasing"):
+            InflationIndex(
+                "INVALID",
+                [(date(2024, 1, 1), 300.0), (date(2024, 1, 1), 301.0)],
+                "USD",
+            )
+
     def test_getter_surface(self) -> None:
         """MarketContext exposes the canonical getter names (no legacy aliases)."""
         mc = MarketContext()
         for name in [
+            "get_base_correlation",
+            "get_credit_index",
             "get_discount",
             "get_forward",
             "get_hazard",
+            "get_inflation_index",
+            "get_price",
+            "get_series",
             "insert",
+            "insert_inflation_index",
+            "insert_series",
             "fx",
         ]:
             assert hasattr(mc, name), f"missing {name}"

@@ -109,6 +109,7 @@ use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Error;
@@ -899,26 +900,20 @@ impl Instrument for StructuredCredit {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
 
+        // Representative lines are descriptive aggregates; pricing reads the assets directly.
         for index_id in self
             .pool
             .assets
             .iter()
             .filter_map(|asset| asset.index_id.as_deref())
-            .chain(
-                self.pool
-                    .rep_lines
-                    .iter()
-                    .flatten()
-                    .filter_map(|line| line.index_id.as_deref()),
-            )
         {
             deps.add_forward_curve(index_id);
-            deps.add_series_id(index_id);
+            deps.add_series_id(fixing_series_id(index_id));
         }
         for tranche in &self.tranches.tranches {
             if let TrancheCoupon::Floating(spec) = &tranche.coupon {
                 deps.add_forward_curve(spec.index_id.clone());
-                deps.add_series_id(spec.index_id.as_str());
+                deps.add_series_id(fixing_series_id(spec.index_id.as_str()));
             }
         }
         Ok(deps)

@@ -8,6 +8,15 @@ from finstack_quant.statements import FinancialModelSpec, StatementResult
 from finstack_quant.core.market_data import MarketContext
 
 __all__ = [
+    "SensitivityConfig",
+    "VarianceConfig",
+    "ScenarioSet",
+    "MonteCarloConfig",
+    "SensitivityResult",
+    "VarianceRow",
+    "VarianceReport",
+    "ScenarioResultSet",
+    "MonteCarloResults",
     "run_sensitivity",
     "generate_tornado_entries",
     "run_variance",
@@ -76,30 +85,158 @@ __all__ = [
     "add_property_operating_statement",
 ]
 
-def run_sensitivity(model: FinancialModelSpec | str, config_json: str) -> str:
+class SensitivityConfig:
+    def __init__(
+        self,
+        mode: str,
+        parameters: list[tuple[str, str, float, list[float]]] = ...,
+        target_metrics: list[str] = ...,
+    ) -> None: ...
+    @staticmethod
+    def from_json(json: str) -> SensitivityConfig: ...
+    def to_json(self) -> str: ...
+    @property
+    def mode(self) -> str: ...
+    @property
+    def target_metrics(self) -> list[str]: ...
+    @property
+    def parameter_count(self) -> int: ...
+
+class VarianceConfig:
+    def __init__(
+        self,
+        baseline_label: str,
+        comparison_label: str,
+        metrics: list[str],
+        periods: list[str],
+    ) -> None: ...
+    @staticmethod
+    def from_json(json: str) -> VarianceConfig: ...
+    def to_json(self) -> str: ...
+    @property
+    def baseline_label(self) -> str: ...
+    @property
+    def comparison_label(self) -> str: ...
+    @property
+    def metrics(self) -> list[str]: ...
+    @property
+    def periods(self) -> list[str]: ...
+
+class ScenarioSet:
+    def __init__(
+        self,
+        scenarios: dict[str, dict[str, float]],
+        parents: dict[str, str] | None = ...,
+        model_ids: dict[str, str] | None = ...,
+    ) -> None: ...
+    @staticmethod
+    def from_json(json: str) -> ScenarioSet: ...
+    def to_json(self) -> str: ...
+    @property
+    def names(self) -> list[str]: ...
+
+class MonteCarloConfig:
+    def __init__(
+        self,
+        n_paths: int,
+        seed: int,
+        percentiles: list[float] | None = ...,
+        include_path_data: bool = ...,
+    ) -> None: ...
+    @staticmethod
+    def from_json(json: str) -> MonteCarloConfig: ...
+    def to_json(self) -> str: ...
+    @property
+    def n_paths(self) -> int: ...
+    @property
+    def seed(self) -> int: ...
+    @property
+    def percentiles(self) -> list[float]: ...
+    @property
+    def include_path_data(self) -> bool: ...
+
+class SensitivityResult:
+    @staticmethod
+    def from_json(json: str) -> SensitivityResult: ...
+    def to_json(self) -> str: ...
+    def __len__(self) -> int: ...
+    @property
+    def target_metrics(self) -> list[str]: ...
+    def get_parameter_value(self, scenario_index: int, parameter: str) -> float | None: ...
+    def get_value(self, scenario_index: int, node_id: str, period: str) -> float | None: ...
+
+class VarianceRow:
+    @property
+    def period(self) -> str: ...
+    @property
+    def metric(self) -> str: ...
+    @property
+    def baseline(self) -> float: ...
+    @property
+    def comparison(self) -> float: ...
+    @property
+    def abs_var(self) -> float: ...
+    @property
+    def pct_var(self) -> float | None: ...
+
+class VarianceReport:
+    @staticmethod
+    def from_json(json: str) -> VarianceReport: ...
+    def to_json(self) -> str: ...
+    @property
+    def baseline_label(self) -> str: ...
+    @property
+    def comparison_label(self) -> str: ...
+    @property
+    def rows(self) -> list[VarianceRow]: ...
+
+class ScenarioResultSet:
+    @staticmethod
+    def from_json(json: str) -> ScenarioResultSet: ...
+    def to_json(self) -> str: ...
+    @property
+    def names(self) -> list[str]: ...
+    def get(self, name: str) -> StatementResult | None: ...
+
+class MonteCarloResults:
+    @staticmethod
+    def from_json(json: str) -> MonteCarloResults: ...
+    def to_json(self) -> str: ...
+    @property
+    def n_paths(self) -> int: ...
+    @property
+    def percentiles(self) -> list[float]: ...
+    @property
+    def forecast_periods(self) -> list[str]: ...
+    def get_percentile_series(self, metric: str, percentile: float) -> dict[str, float] | None: ...
+
+def run_sensitivity(
+    model: FinancialModelSpec | str,
+    config: SensitivityConfig | str,
+) -> SensitivityResult:
     """Run sensitivity analysis on a financial model.
 
     Parameters
     ----------
     model : FinancialModelSpec or str
         ``FinancialModelSpec`` object or JSON string.
-    config_json : str
-        JSON-serialized ``SensitivityConfig``.
+    config : SensitivityConfig or str
+        Typed configuration or JSON string.
 
     Returns
     -------
-    str
-        JSON-serialized ``SensitivityResult``.
+    SensitivityResult
+        Typed sensitivity result.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import run_sensitivity
-    >>> out = run_sensitivity(model_json, config_json)  # doctest: +SKIP
+    >>> out = run_sensitivity(model, config)  # doctest: +SKIP
     """
     ...
 
 def generate_tornado_entries(
-    result_json: str,
+    result: SensitivityResult | str,
     metric_node: str,
     period: str | None = None,
 ) -> str:
@@ -107,8 +244,8 @@ def generate_tornado_entries(
 
     Parameters
     ----------
-    result_json : str
-        JSON-serialized ``SensitivityResult``.
+    result : SensitivityResult or str
+        Typed sensitivity result or JSON string.
     metric_node : str
         Node ID to extract tornado entries for.
     period : str or None
@@ -129,8 +266,8 @@ def generate_tornado_entries(
 def run_variance(
     base: StatementResult | str,
     comparison: StatementResult | str,
-    config_json: str,
-) -> str:
+    config: VarianceConfig | str,
+) -> VarianceReport:
     """Run variance analysis comparing two statement results.
 
     Parameters
@@ -139,62 +276,68 @@ def run_variance(
         Baseline ``StatementResult`` object or JSON string.
     comparison : StatementResult or str
         Comparison ``StatementResult`` object or JSON string.
-    config_json : str
-        JSON-serialized ``VarianceConfig``.
+    config : VarianceConfig or str
+        Typed configuration or JSON string.
 
     Returns
     -------
-    str
-        JSON-serialized variance report.
+    VarianceReport
+        Typed variance report.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import run_variance
-    >>> report_json = run_variance(base_json, cmp_json, cfg_json)  # doctest: +SKIP
+    >>> report = run_variance(base, comparison, config)  # doctest: +SKIP
     """
     ...
 
-def evaluate_scenario_set(model: FinancialModelSpec | str, scenario_set_json: str) -> str:
+def evaluate_scenario_set(
+    model: FinancialModelSpec | str,
+    scenario_set: ScenarioSet | str,
+) -> ScenarioResultSet:
     """Evaluate every scenario in a scenario set against a model.
 
     Parameters
     ----------
     model : FinancialModelSpec or str
         ``FinancialModelSpec`` object or JSON string.
-    scenario_set_json : str
-        JSON-serialized ``ScenarioSet``.
+    scenario_set : ScenarioSet or str
+        Typed scenario set or JSON string.
 
     Returns
     -------
-    str
-        JSON object mapping scenario name to ``StatementResult`` JSON.
+    ScenarioResultSet
+        Typed mapping from scenario names to statement results.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import evaluate_scenario_set
-    >>> results_map_json = evaluate_scenario_set(model_json, set_json)  # doctest: +SKIP
+    >>> results = evaluate_scenario_set(model, scenario_set)  # doctest: +SKIP
     """
     ...
 
-def run_monte_carlo(model: FinancialModelSpec | str, config_json: str) -> str:
+def run_monte_carlo(
+    model: FinancialModelSpec | str,
+    config: MonteCarloConfig | str,
+) -> MonteCarloResults:
     """Run Monte Carlo simulation on a financial model.
 
     Parameters
     ----------
     model : FinancialModelSpec or str
         ``FinancialModelSpec`` object or JSON string.
-    config_json : str
-        JSON-serialized ``MonteCarloConfig`` (``n_paths``, ``seed``, optional ``percentiles`` and ``include_path_data``).
+    config : MonteCarloConfig or str
+        Typed configuration or JSON string.
 
     Returns
     -------
-    str
-        JSON-serialized ``MonteCarloResults``.
+    MonteCarloResults
+        Typed Monte Carlo results.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import run_monte_carlo
-    >>> mc_json = run_monte_carlo(model_json, mc_cfg_json)  # doctest: +SKIP
+    >>> results = run_monte_carlo(model, config)  # doctest: +SKIP
     """
     ...
 

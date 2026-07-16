@@ -206,6 +206,10 @@ fn discount_curve_dts_exposes_canonical_validation_and_forward_names() {
     assert!(constructor.contains("validationMode?: DiscountCurveValidationMode"));
     assert!(constructor.contains("forwardFloor?: number | null"));
     assert!(contains_ignoring_ws(constructor, "knots: NumericArray"));
+    assert!(contains_signature(
+        constructor,
+        "flat(id: string, baseDate: string, continuousRate: number): DiscountCurve;"
+    ));
     assert!(dts.contains(
         "export type DiscountCurveValidationMode = 'market_standard' | 'negative_rate_friendly';"
     ));

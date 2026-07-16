@@ -10,10 +10,59 @@
 //! a parsed object.
 
 use crate::bindings::extract::{extract_market_opt, extract_model_ref, extract_results_ref};
+use crate::bindings::statements_analytics::typed::{
+    PyMonteCarloConfig, PyMonteCarloResults, PyScenarioResultSet, PyScenarioSet,
+    PySensitivityConfig, PySensitivityResult, PyVarianceConfig, PyVarianceReport,
+};
 use crate::errors::display_to_py;
 use finstack_quant_statements_analytics::analysis::CorporateValuationResult;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+
+fn extract_sensitivity_config(
+    value: &Bound<'_, PyAny>,
+) -> PyResult<finstack_quant_statements_analytics::analysis::SensitivityConfig> {
+    if let Ok(config) = value.extract::<PyRef<'_, PySensitivityConfig>>() {
+        return Ok(config.inner.clone());
+    }
+    serde_json::from_str(value.extract::<&str>()?).map_err(display_to_py)
+}
+
+fn extract_sensitivity_result(
+    value: &Bound<'_, PyAny>,
+) -> PyResult<finstack_quant_statements_analytics::analysis::SensitivityResult> {
+    if let Ok(result) = value.extract::<PyRef<'_, PySensitivityResult>>() {
+        return Ok(result.inner.clone());
+    }
+    serde_json::from_str(value.extract::<&str>()?).map_err(display_to_py)
+}
+
+fn extract_variance_config(
+    value: &Bound<'_, PyAny>,
+) -> PyResult<finstack_quant_statements_analytics::analysis::VarianceConfig> {
+    if let Ok(config) = value.extract::<PyRef<'_, PyVarianceConfig>>() {
+        return Ok(config.inner.clone());
+    }
+    serde_json::from_str(value.extract::<&str>()?).map_err(display_to_py)
+}
+
+fn extract_scenario_set(
+    value: &Bound<'_, PyAny>,
+) -> PyResult<finstack_quant_statements_analytics::analysis::ScenarioSet> {
+    if let Ok(scenario_set) = value.extract::<PyRef<'_, PyScenarioSet>>() {
+        return Ok(scenario_set.inner.clone());
+    }
+    serde_json::from_str(value.extract::<&str>()?).map_err(display_to_py)
+}
+
+fn extract_monte_carlo_config(
+    value: &Bound<'_, PyAny>,
+) -> PyResult<finstack_quant_statements::evaluator::MonteCarloConfig> {
+    if let Ok(config) = value.extract::<PyRef<'_, PyMonteCarloConfig>>() {
+        return Ok(config.inner.clone());
+    }
+    serde_json::from_str(value.extract::<&str>()?).map_err(display_to_py)
+}
 
 fn dcf_equity_result_dict<'py>(
     py: Python<'py>,
@@ -43,36 +92,35 @@ fn dcf_equity_result_dict<'py>(
 /// ----------
 /// model : FinancialModelSpec | str
 ///     A ``FinancialModelSpec`` object or a JSON string.
-/// config_json : str
-///     JSON-serialized ``SensitivityConfig``.
+/// config : SensitivityConfig | str
+///     A typed configuration or its JSON serialization.
 ///
 /// Returns
 /// -------
-/// str
-///     JSON-serialized ``SensitivityResult``.
+/// SensitivityResult
+///     Typed sensitivity result with JSON serialization support.
 #[pyfunction]
 fn run_sensitivity(
     py: Python<'_>,
     model: &Bound<'_, PyAny>,
-    config_json: &str,
-) -> PyResult<String> {
+    config: &Bound<'_, PyAny>,
+) -> PyResult<PySensitivityResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let config: finstack_quant_statements_analytics::analysis::SensitivityConfig =
-        serde_json::from_str(config_json).map_err(display_to_py)?;
+    let config = extract_sensitivity_config(config)?;
     py.detach(move || {
         let analyzer =
             finstack_quant_statements_analytics::analysis::SensitivityAnalyzer::new(&model);
-        let result = analyzer.run(&config).map_err(display_to_py)?;
-        serde_json::to_string(&result).map_err(display_to_py)
+        let inner = analyzer.run(&config).map_err(display_to_py)?;
+        Ok(PySensitivityResult { inner })
     })
 }
 
-/// Generate tornado chart entries for a sensitivity result (JSON in/out).
+/// Generate tornado chart entries for a sensitivity result.
 ///
 /// Parameters
 /// ----------
-/// result_json : str
-///     JSON-serialized ``SensitivityResult``.
+/// result : SensitivityResult | str
+///     A typed sensitivity result or its JSON serialization.
 /// metric_node : str
 ///     Node to extract tornado entries for.
 /// period : str | None
@@ -83,14 +131,13 @@ fn run_sensitivity(
 /// str
 ///     JSON-serialized list of ``TornadoEntry``.
 #[pyfunction]
-#[pyo3(signature = (result_json, metric_node, period=None))]
+#[pyo3(signature = (result, metric_node, period=None))]
 fn generate_tornado_entries(
-    result_json: &str,
+    result: &Bound<'_, PyAny>,
     metric_node: &str,
     period: Option<&str>,
 ) -> PyResult<String> {
-    let result: finstack_quant_statements_analytics::analysis::SensitivityResult =
-        serde_json::from_str(result_json).map_err(display_to_py)?;
+    let result = extract_sensitivity_result(result)?;
     let period_id: Option<finstack_quant_core::dates::PeriodId> = period
         .map(|p| p.parse().map_err(display_to_py))
         .transpose()?;
@@ -114,26 +161,25 @@ fn generate_tornado_entries(
 ///     A ``StatementResult`` object or a JSON string.
 /// comparison : StatementResult | str
 ///     A ``StatementResult`` object or a JSON string.
-/// config_json : str
-///     JSON-serialized ``VarianceConfig``.
+/// config : VarianceConfig | str
+///     A typed configuration or its JSON serialization.
 #[pyfunction]
 fn run_variance(
     py: Python<'_>,
     base: &Bound<'_, PyAny>,
     comparison: &Bound<'_, PyAny>,
-    config_json: &str,
-) -> PyResult<String> {
+    config: &Bound<'_, PyAny>,
+) -> PyResult<PyVarianceReport> {
     let base = extract_results_ref(base)?.into_owned();
     let comparison = extract_results_ref(comparison)?.into_owned();
-    let config: finstack_quant_statements_analytics::analysis::VarianceConfig =
-        serde_json::from_str(config_json).map_err(display_to_py)?;
+    let config = extract_variance_config(config)?;
     py.detach(move || {
         let analyzer = finstack_quant_statements_analytics::analysis::VarianceAnalyzer::new(
             &base,
             &comparison,
         );
-        let report = analyzer.compute(&config).map_err(display_to_py)?;
-        serde_json::to_string(&report).map_err(display_to_py)
+        let inner = analyzer.compute(&config).map_err(display_to_py)?;
+        Ok(PyVarianceReport { inner })
     })
 }
 
@@ -147,29 +193,24 @@ fn run_variance(
 /// ----------
 /// model : FinancialModelSpec | str
 ///     A ``FinancialModelSpec`` object or a JSON string.
-/// scenario_set_json : str
-///     JSON-serialized ``ScenarioSet``.
+/// scenario_set : ScenarioSet | str
+///     A typed scenario set or its JSON serialization.
 ///
 /// Returns
 /// -------
-/// str
-///     JSON object mapping scenario name to its ``StatementResult`` JSON.
+/// ScenarioResultSet
+///     Typed mapping of scenario names to statement results.
 #[pyfunction]
 fn evaluate_scenario_set(
     py: Python<'_>,
     model: &Bound<'_, PyAny>,
-    scenario_set_json: &str,
-) -> PyResult<String> {
+    scenario_set: &Bound<'_, PyAny>,
+) -> PyResult<PyScenarioResultSet> {
     let model = extract_model_ref(model)?.into_owned();
-    let scenario_set: finstack_quant_statements_analytics::analysis::ScenarioSet =
-        serde_json::from_str(scenario_set_json).map_err(display_to_py)?;
+    let scenario_set = extract_scenario_set(scenario_set)?;
     py.detach(move || {
-        let results = scenario_set.evaluate_all(&model).map_err(display_to_py)?;
-        let map: indexmap::IndexMap<
-            &String,
-            &finstack_quant_statements::evaluator::StatementResult,
-        > = results.scenarios.iter().collect();
-        serde_json::to_string(&map).map_err(display_to_py)
+        let inner = scenario_set.evaluate_all(&model).map_err(display_to_py)?;
+        Ok(PyScenarioResultSet { inner })
     })
 }
 
@@ -177,35 +218,34 @@ fn evaluate_scenario_set(
 // Monte Carlo
 // ---------------------------------------------------------------------------
 
-/// Run Monte Carlo simulation on a financial model (JSON in/out).
+/// Run Monte Carlo simulation on a financial model.
 ///
 /// Parameters
 /// ----------
-/// model_json : str
-///     JSON-serialized ``FinancialModelSpec``.
-/// config_json : str
-///     JSON-serialized ``MonteCarloConfig`` with ``n_paths``, ``seed``,
+/// model : FinancialModelSpec | str
+///     A typed model or its JSON serialization.
+/// config : MonteCarloConfig | str
+///     Typed configuration or JSON with ``n_paths``, ``seed``,
 ///     optional ``percentiles``, and optional ``include_path_data``.
 ///
 /// Returns
 /// -------
-/// str
-///     JSON-serialized ``MonteCarloResults``.
+/// MonteCarloResults
+///     Typed Monte Carlo results with JSON serialization support.
 #[pyfunction]
 fn run_monte_carlo(
     py: Python<'_>,
     model: &Bound<'_, PyAny>,
-    config_json: &str,
-) -> PyResult<String> {
+    config: &Bound<'_, PyAny>,
+) -> PyResult<PyMonteCarloResults> {
     let model = extract_model_ref(model)?.into_owned();
-    let config: finstack_quant_statements::evaluator::MonteCarloConfig =
-        serde_json::from_str(config_json).map_err(display_to_py)?;
+    let config = extract_monte_carlo_config(config)?;
     py.detach(move || {
         let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
-        let results = evaluator
+        let inner = evaluator
             .evaluate_monte_carlo(&model, &config)
             .map_err(display_to_py)?;
-        serde_json::to_string(&results).map_err(display_to_py)
+        Ok(PyMonteCarloResults { inner })
     })
 }
 

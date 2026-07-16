@@ -224,6 +224,17 @@ class ValuationResult:
         """
         ...
 
+    def metric_series(self, base: str) -> list[tuple[list[str], float]]:
+        """Return decoded components and values for a composite base metric.
+
+        Entries retain the deterministic insertion order of the serialized
+        ``measures`` map. The scalar aggregate stored directly under ``base``
+        is excluded. Malformed legacy escapes remain literal; decoded
+        coordinate collisions fall back to literal wire components so no
+        entries are dropped or deduplicated.
+        """
+        ...
+
     def metric_keys(self) -> list[str]:
         """List metric keys present on this result.
 
