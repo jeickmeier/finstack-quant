@@ -16,7 +16,7 @@ class scoring:
     class AltmanPdCalibration:
         """Explicit versioned Altman score-to-PD heuristics."""
 
-        HEURISTIC_V1: AltmanPdCalibration
+        HEURISTIC_V1: scoring.AltmanPdCalibration
 
     @staticmethod
     def altman_z_score(
