@@ -21,15 +21,19 @@ The default pricing method uses static replication via digital call spreads:
 
 ### Monte Carlo
 
-Monte Carlo pricing is used when `mc_seed_scenario` is set in pricing overrides:
+Monte Carlo pricing is used only when the caller explicitly selects
+`ModelKey::MonteCarloGBM`. The `mc_seed_scenario` pricing override controls the
+deterministic random stream after Monte Carlo has been selected; it never
+selects the pricing model:
 
 - GBM simulation with discrete observations
 - Accrual fraction = proportion of fixes within [lower, upper]
 - Supports complex path-dependent features
 - Optional quanto drift adjustment
+- Deterministic scenario-specific random streams via `mc_seed_scenario`
 
 Both methods apply:
-- Discount factor from observation dates to payment date
+- Payment-date cash flow discounted back to the valuation date
 - Historical fixing data for mid-life valuations
 - Effective bounds based on `BoundsType`
 
