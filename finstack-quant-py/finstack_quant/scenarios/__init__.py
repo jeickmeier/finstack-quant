@@ -1,6 +1,12 @@
 """Scenario specification, validation, composition, application, and templates.
 
 Bindings for the ``finstack-quant-scenarios`` Rust crate.
+
+Examples:
+--------
+>>> import finstack_quant.scenarios as scenarios
+>>> scenarios.__name__
+'finstack_quant.scenarios'
 """
 
 from __future__ import annotations

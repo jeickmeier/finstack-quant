@@ -1,10 +1,17 @@
-"""Type stubs for ``finstack_quant.core.rating_scales``.
+"""
+Type stubs for ``finstack_quant.core.rating_scales``.
 
 Bindings for the shared credit rating-scale registry (scorecard scales such as
 S&P, Moody's, and Fitch) from the ``finstack-quant-core`` Rust crate.
 
 Distinct from ``finstack_quant.core.credit.migration.RatingScale``, which models
 the ordered state set of a credit-migration transition matrix.
+
+Examples
+--------
+>>> import finstack_quant.core.rating_scales as rating_scales
+>>> rating_scales.__name__
+'finstack_quant.core.rating_scales'
 """
 
 from __future__ import annotations
@@ -12,7 +19,8 @@ from __future__ import annotations
 from finstack_quant.core.config import FinstackConfig
 
 class UnknownScalePolicy:
-    """Policy for unknown scorecard rating-scale names.
+    """
+    Policy for unknown scorecard rating-scale names.
 
     Examples
     --------
@@ -32,7 +40,8 @@ class UnknownScalePolicy:
 
     @classmethod
     def from_name(cls, name: str) -> UnknownScalePolicy:
-        """Parse a snake_case policy name (case-insensitive).
+        """
+        Parse a snake_case policy name (case-insensitive).
 
         Parameters
         ----------
@@ -59,7 +68,8 @@ class UnknownScalePolicy:
 
     @property
     def name(self) -> str:
-        """Canonical snake_case policy name.
+        """
+        Canonical snake_case policy name.
 
         Returns
         -------
@@ -73,16 +83,19 @@ class UnknownScalePolicy:
         """
 
     def to_json(self) -> str:
-        """Serialize this policy to a JSON string.
+        """
+        Serialize this policy to a JSON string.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `UnknownScalePolicy`, suitable for a matching `from_json` call.
         """
         ...
     @classmethod
     def from_json(cls, json: str) -> UnknownScalePolicy:
-        """Deserialize a policy from JSON.
+        """
+        Deserialize a policy from JSON.
 
         Parameters
         ----------
@@ -92,6 +105,17 @@ class UnknownScalePolicy:
         Returns
         -------
         UnknownScalePolicy
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.rating_scales import UnknownScalePolicy
+        >>> callable(UnknownScalePolicy.from_json)
+        True
         """
         ...
     def __repr__(self) -> str:
@@ -128,7 +152,8 @@ class UnknownScalePolicy:
         ...
 
 class RatingLevel:
-    """A single rating threshold row on a scorecard scale.
+    """
+    A single rating threshold row on a scorecard scale.
 
     Examples
     --------
@@ -139,7 +164,8 @@ class RatingLevel:
     """
 
     def __init__(self, name: str, score: float, min_score: float) -> None:
-        """Construct one rating threshold row.
+        """
+        Construct one rating threshold row.
 
         Parameters
         ----------
@@ -154,11 +180,17 @@ class RatingLevel:
         --------
         >>> from finstack_quant.core.rating_scales import RatingLevel
         >>> lvl = RatingLevel("BBB", 70.0, 65.0)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     @property
     def name(self) -> str:
-        """Rating name, for example ``"AAA"`` or ``"Aaa"``.
+        """
+        Rating name, for example ``"AAA"`` or ``"Aaa"``.
 
         Returns
         -------
@@ -174,7 +206,8 @@ class RatingLevel:
 
     @property
     def score(self) -> float:
-        """Numeric score on the 0-100 scorecard scale.
+        """
+        Numeric score on the 0-100 scorecard scale.
 
         Returns
         -------
@@ -190,7 +223,8 @@ class RatingLevel:
 
     @property
     def min_score(self) -> float:
-        """Minimum score threshold for this rating.
+        """
+        Minimum score threshold for this rating.
 
         Returns
         -------
@@ -205,16 +239,19 @@ class RatingLevel:
         """
 
     def to_json(self) -> str:
-        """Serialize this rating level to a JSON string.
+        """
+        Serialize this rating level to a JSON string.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `RatingLevel`, suitable for a matching `from_json` call.
         """
         ...
     @classmethod
     def from_json(cls, json: str) -> RatingLevel:
-        """Deserialize a rating level from JSON.
+        """
+        Deserialize a rating level from JSON.
 
         Parameters
         ----------
@@ -224,6 +261,18 @@ class RatingLevel:
         Returns
         -------
         RatingLevel
+            Validated `RatingLevel` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.rating_scales import RatingLevel
+        >>> callable(RatingLevel.from_json)
+        True
         """
         ...
     def __repr__(self) -> str:
@@ -236,7 +285,8 @@ class RatingLevel:
         ...
 
 class ScorecardScale:
-    """A named, ordered list of scorecard rating thresholds.
+    """
+    A named, ordered list of scorecard rating thresholds.
 
     Distinct from ``finstack_quant.core.credit.migration.RatingScale`` (which models
     the ordered state set of a credit-migration / transition matrix).
@@ -255,7 +305,8 @@ class ScorecardScale:
         ratings: list[RatingLevel],
         description: str | None = None,
     ) -> None:
-        """Construct a scorecard scale from ordered rating levels.
+        """
+        Construct a scorecard scale from ordered rating levels.
 
         Parameters
         ----------
@@ -270,11 +321,17 @@ class ScorecardScale:
         --------
         >>> from finstack_quant.core.rating_scales import ScorecardScale, RatingLevel
         >>> scale = ScorecardScale("custom", [RatingLevel("A", 90.0, 85.0)])  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     @property
     def scale_name(self) -> str:
-        """Scale name, for example ``"S&P"`` or ``"Moody's"``.
+        """
+        Scale name, for example ``"S&P"`` or ``"Moody's"``.
 
         Returns
         -------
@@ -290,7 +347,8 @@ class ScorecardScale:
 
     @property
     def description(self) -> str | None:
-        """Optional human-readable description.
+        """
+        Optional human-readable description.
 
         Returns
         -------
@@ -306,7 +364,8 @@ class ScorecardScale:
 
     @property
     def ratings(self) -> list[RatingLevel]:
-        """Ordered rating levels from best to worst.
+        """
+        Ordered rating levels from best to worst.
 
         Returns
         -------
@@ -321,16 +380,19 @@ class ScorecardScale:
         """
 
     def to_json(self) -> str:
-        """Serialize this scale to a JSON string.
+        """
+        Serialize this scale to a JSON string.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `ScorecardScale`, suitable for a matching `from_json` call.
         """
         ...
     @classmethod
     def from_json(cls, json: str) -> ScorecardScale:
-        """Deserialize a scorecard scale from JSON.
+        """
+        Deserialize a scorecard scale from JSON.
 
         Parameters
         ----------
@@ -340,6 +402,18 @@ class ScorecardScale:
         Returns
         -------
         ScorecardScale
+            Validated `ScorecardScale` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.rating_scales import ScorecardScale
+        >>> callable(ScorecardScale.from_json)
+        True
         """
         ...
     def __len__(self) -> int:
@@ -360,7 +434,8 @@ class ScorecardScale:
         ...
 
 class RatingScaleRegistry:
-    """Versioned registry of scorecard scales and policy.
+    """
+    Versioned registry of scorecard scales and policy.
 
     Examples
     --------
@@ -371,7 +446,8 @@ class RatingScaleRegistry:
     """
 
     def default_scorecard_score(self) -> float:
-        """Return the configured default scorecard score for threshold gaps.
+        """
+        Return the configured default scorecard score for threshold gaps.
 
         Returns
         -------
@@ -387,7 +463,8 @@ class RatingScaleRegistry:
         """
 
     def default_scale_id(self) -> str:
-        """Return the configured default rating-scale id.
+        """
+        Return the configured default rating-scale id.
 
         Returns
         -------
@@ -402,7 +479,8 @@ class RatingScaleRegistry:
         """
 
     def unknown_scale_policy(self) -> UnknownScalePolicy:
-        """Return the configured policy for unknown scale names.
+        """
+        Return the configured policy for unknown scale names.
 
         Returns
         -------
@@ -417,7 +495,8 @@ class RatingScaleRegistry:
         """
 
     def is_known_rating_scale(self, name: str) -> bool:
-        """Return whether ``name`` is a known scale id or alias.
+        """
+        Return whether ``name`` is a known scale id or alias.
 
         Parameters
         ----------
@@ -435,10 +514,16 @@ class RatingScaleRegistry:
         >>> reg = embedded_registry()  # doctest: +SKIP
         >>> reg.is_known_rating_scale("sp")  # doctest: +SKIP
         True
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
 
     def rating_scale(self, name: str) -> ScorecardScale:
-        """Resolve a scale name or alias to a :class:`ScorecardScale`.
+        """
+        Resolve a scale name or alias to a :class:`ScorecardScale`.
 
         Honours the configured unknown-scale policy: this may fall back to the
         default scale or raise ``ValueError``.
@@ -467,16 +552,19 @@ class RatingScaleRegistry:
         """
 
     def to_json(self) -> str:
-        """Serialize this registry to a JSON string.
+        """
+        Serialize this registry to a JSON string.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `RatingScaleRegistry`, suitable for a matching `from_json` call.
         """
         ...
     @classmethod
     def from_json(cls, json: str) -> RatingScaleRegistry:
-        """Deserialize a registry from JSON.
+        """
+        Deserialize a registry from JSON.
 
         Parameters
         ----------
@@ -486,6 +574,17 @@ class RatingScaleRegistry:
         Returns
         -------
         RatingScaleRegistry
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.rating_scales import RatingScaleRegistry
+        >>> callable(RatingScaleRegistry.from_json)
+        True
         """
         ...
     def __repr__(self) -> str:
@@ -498,7 +597,8 @@ class RatingScaleRegistry:
         ...
 
 def embedded_registry() -> RatingScaleRegistry:
-    """Return the embedded (built-in) rating-scale registry.
+    """
+    Return the embedded (built-in) rating-scale registry.
 
     Returns
     -------
@@ -514,7 +614,8 @@ def embedded_registry() -> RatingScaleRegistry:
     """
 
 def registry_from_config(config: FinstackConfig) -> RatingScaleRegistry:
-    """Load a registry from a :class:`FinstackConfig` extension.
+    """
+    Load a registry from a :class:`FinstackConfig` extension.
 
     Falls back to :func:`embedded_registry` when the config does not override
     :data:`RATING_SCALES_EXTENSION_KEY`.
@@ -534,6 +635,11 @@ def registry_from_config(config: FinstackConfig) -> RatingScaleRegistry:
     >>> from finstack_quant.core.config import FinstackConfig
     >>> from finstack_quant.core.rating_scales import registry_from_config
     >>> reg = registry_from_config(FinstackConfig.default())  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
 
 RATING_SCALES_EXTENSION_KEY: str

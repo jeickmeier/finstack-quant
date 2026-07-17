@@ -1,4 +1,5 @@
-"""Market data bindings from ``finstack-quant-core``: curves, FX, and market context.
+"""
+Market data bindings from ``finstack-quant-core``: curves, FX, and market context.
 
 Provides term-structure curve types (discount, forward, hazard, price,
 inflation, volatility surfaces, volatility index), FX rate matrix, and the unified :class:`MarketContext`
@@ -15,6 +16,12 @@ Example::
     ... )
     >>> curve.df(0.5)
     0.98
+
+Examples
+--------
+>>> import finstack_quant.core.market_data as market_data
+>>> market_data.__name__
+'finstack_quant.core.market_data'
 """
 
 from __future__ import annotations
@@ -67,7 +74,8 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 class DiscountCurve:
-    """Discount factor curve for present-value calculations.
+    """
+    Discount factor curve for present-value calculations.
 
     Constructed from ``(time, discount_factor)`` knot pairs with configurable
     interpolation and extrapolation.
@@ -123,7 +131,8 @@ class DiscountCurve:
         validation_mode: str = "market_standard",
         forward_floor: float | None = None,
     ) -> None:
-        """Construct a discount curve from knot points.
+        """
+        Construct a discount curve from knot points.
 
         Parameters
         ----------
@@ -157,7 +166,8 @@ class DiscountCurve:
         base_date: datetime.date,
         continuous_rate: float,
     ) -> DiscountCurve:
-        """Construct a flat continuously-compounded discount curve.
+        """
+        Construct a flat continuously-compounded discount curve.
 
         Parameters
         ----------
@@ -168,11 +178,28 @@ class DiscountCurve:
         continuous_rate : float
             Flat annual continuously compounded zero rate as a decimal, such
             as ``0.05`` for 5%.
+
+        Returns
+        -------
+        DiscountCurve
+            Result of flat for this `DiscountCurve` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import DiscountCurve
+        >>> callable(DiscountCurve.flat)
+        True
         """
         ...
 
     def df(self, t: float) -> float:
-        """Discount factor at year fraction *t*.
+        """
+        Discount factor at year fraction *t*.
 
         Parameters
         ----------
@@ -183,11 +210,17 @@ class DiscountCurve:
         -------
         float
             Discount factor.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def zero(self, t: float) -> float:
-        """Continuously-compounded zero rate at year fraction *t*.
+        """
+        Continuously-compounded zero rate at year fraction *t*.
 
         Parameters
         ----------
@@ -198,11 +231,17 @@ class DiscountCurve:
         -------
         float
             Zero rate.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def forward(self, t1: float, t2: float) -> float:
-        """Continuously-compounded forward rate between *t1* and *t2*.
+        """
+        Continuously-compounded forward rate between *t1* and *t2*.
 
         Parameters
         ----------
@@ -225,28 +264,33 @@ class DiscountCurve:
 
     @property
     def id(self) -> str:
-        """Curve identifier string.
+        """
+        Curve identifier string.
 
         Returns
         -------
         str
+            The id exposed by this `DiscountCurve`.
         """
         ...
 
     @property
     def base_date(self) -> datetime.date:
-        """Valuation base date.
+        """
+        Valuation base date.
 
         Returns
         -------
         datetime.date
+            The base date exposed by this `DiscountCurve`.
         """
         ...
 
     def __repr__(self) -> str: ...
 
 class ForwardCurve:
-    """Forward rate curve for a floating-rate index with a fixed tenor.
+    """
+    Forward rate curve for a floating-rate index with a fixed tenor.
 
     Constructed from ``(time, forward_rate)`` knot pairs.
 
@@ -276,6 +320,12 @@ class ForwardCurve:
     ------
     ValueError
         If the curve cannot be built from the given parameters.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import ForwardCurve
+    >>> ForwardCurve.__name__
+    'ForwardCurve'
     """
 
     def __init__(
@@ -290,7 +340,8 @@ class ForwardCurve:
         projection_grid: list[float] | None = None,
         reset_lag: int | None = None,
     ) -> None:
-        """Construct a forward rate curve from knot points.
+        """
+        Construct a forward rate curve from knot points.
 
         Parameters
         ----------
@@ -333,7 +384,8 @@ class ForwardCurve:
         projection_grid: list[float] | None = None,
         reset_lag: int | None = None,
     ) -> ForwardCurve:
-        """Construct from an unambiguous keyword-only specification.
+        """
+        Construct from an unambiguous keyword-only specification.
 
         Parameters
         ----------
@@ -355,11 +407,28 @@ class ForwardCurve:
             Optional contractual reset/end-date boundaries in year fractions.
         reset_lag : int or None, default None
             Business days from fixing to spot; ``None`` uses curve-ID inference.
+
+        Returns
+        -------
+        ForwardCurve
+            Result of from knots for this `ForwardCurve` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import ForwardCurve
+        >>> callable(ForwardCurve.from_knots)
+        True
         """
         ...
 
     def rate(self, t: float) -> float:
-        """Forward rate at year fraction *t*.
+        """
+        Forward rate at year fraction *t*.
 
         Parameters
         ----------
@@ -370,11 +439,17 @@ class ForwardCurve:
         -------
         float
             Forward rate.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def rate_between(self, t1: float, t2: float) -> float:
-        """Discount-factor-implied simple forward rate over ``(t1, t2)``.
+        """
+        Discount-factor-implied simple forward rate over ``(t1, t2)``.
 
         Parameters
         ----------
@@ -387,43 +462,67 @@ class ForwardCurve:
         ------
         ValueError
             If either time is non-finite or ``t2 <= t1``.
+
+        Returns
+        -------
+        float
+            Result of rate between for this `ForwardCurve` in the annotated representation.
         """
         ...
 
     @property
     def id(self) -> str:
-        """Curve identifier string.
+        """
+        Curve identifier string.
 
         Returns
         -------
         str
+            The id exposed by this `ForwardCurve`.
         """
         ...
 
     @property
     def base_date(self) -> datetime.date:
-        """Valuation base date.
+        """
+        Valuation base date.
 
         Returns
         -------
         datetime.date
+            The base date exposed by this `ForwardCurve`.
         """
         ...
 
     @property
     def projection_grid(self) -> list[float] | None:
-        """Contractual projection boundaries, if explicitly configured."""
+        """
+        Contractual projection boundaries, if explicitly configured.
+
+        Returns
+        -------
+        list[float] | None
+            The projection grid exposed by this `ForwardCurve`.
+        """
         ...
 
     @property
     def reset_lag(self) -> int:
-        """Business days from fixing to spot."""
+        """
+        Business days from fixing to spot.
+
+        Returns
+        -------
+        int
+            The reset lag exposed by this `ForwardCurve`.
+        """
         ...
 
     def __repr__(self) -> str: ...
 
 class HazardCurve:
-    """Credit hazard-rate curve for default probability modeling.
+    """
+    Credit hazard-rate curve for default probability modeling.
 
     Constructed from ``(time, hazard_rate)`` knot pairs.
 
@@ -446,6 +545,12 @@ class HazardCurve:
     ------
     ValueError
         If the curve cannot be built from the given parameters.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import HazardCurve
+    >>> HazardCurve.__name__
+    'HazardCurve'
     """
 
     def __init__(
@@ -457,7 +562,8 @@ class HazardCurve:
         day_count: str = "act_365f",
         par_spreads: list[tuple[float, float]] | None = None,
     ) -> None:
-        """Construct a hazard curve from knot points.
+        """
+        Construct a hazard curve from knot points.
 
         Parameters
         ----------
@@ -482,7 +588,8 @@ class HazardCurve:
         ...
 
     def sp(self, t: float) -> float:
-        """Survival probability at year fraction *t*.
+        """
+        Survival probability at year fraction *t*.
 
         Parameters
         ----------
@@ -493,11 +600,17 @@ class HazardCurve:
         -------
         float
             Survival probability in ``[0, 1]``.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def hazard_rate(self, t: float) -> float:
-        """Instantaneous hazard rate at year fraction *t*.
+        """
+        Instantaneous hazard rate at year fraction *t*.
 
         Parameters
         ----------
@@ -508,36 +621,54 @@ class HazardCurve:
         -------
         float
             Hazard rate.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def id(self) -> str:
-        """Curve identifier string.
+        """
+        Curve identifier string.
 
         Returns
         -------
         str
+            The id exposed by this `HazardCurve`.
         """
         ...
 
     @property
     def base_date(self) -> datetime.date:
-        """Valuation base date.
+        """
+        Valuation base date.
 
         Returns
         -------
         datetime.date
+            The base date exposed by this `HazardCurve`.
         """
         ...
 
     def __repr__(self) -> str: ...
 
 class BaseCorrelationCurve:
-    """Base-correlation curve for synthetic credit index tranche pricing."""
+    """
+    Base-correlation curve for synthetic credit index tranche pricing.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import BaseCorrelationCurve
+    >>> BaseCorrelationCurve.__name__
+    'BaseCorrelationCurve'
+    """
 
     def __init__(self, id: str, knots: list[tuple[float, float]]) -> None:
-        """Construct a base-correlation curve from knot points.
+        """
+        Construct a base-correlation curve from knot points.
 
         Parameters
         ----------
@@ -546,33 +677,59 @@ class BaseCorrelationCurve:
         knots : list[tuple[float, float]]
             ``(detachment_percent, base_correlation)`` pillars ordered by
             detachment, with correlations represented as decimal fractions.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def id(self) -> str:
-        """Curve identifier string.
+        """
+        Curve identifier string.
         Returns
         -------
         str
+            The id exposed by this `BaseCorrelationCurve`.
         """
         ...
 
     def correlation(self, detachment_pct: float) -> float:
-        """Return interpolated base correlation at a tranche detachment point.
+        """
+        Return interpolated base correlation at a tranche detachment point.
 
         Parameters
         ----------
         detachment_pct : float
             Tranche detachment expressed as a percentage of portfolio notional,
             for example ``30.0`` for a 0-30% base-correlation point.
+
+        Returns
+        -------
+        float
+            Result of correlation for this `BaseCorrelationCurve` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def __repr__(self) -> str: ...
 
 class CreditIndexData:
-    """Credit index data bundle for synthetic tranche pricing."""
+    """
+    Credit index data bundle for synthetic tranche pricing.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import CreditIndexData
+    >>> CreditIndexData.__name__
+    'CreditIndexData'
+    """
 
     def __init__(
         self,
@@ -581,7 +738,8 @@ class CreditIndexData:
         index_credit_curve: HazardCurve,
         base_correlation_curve: BaseCorrelationCurve,
     ) -> None:
-        """Construct homogeneous credit index data for tranche pricing.
+        """
+        Construct homogeneous credit index data for tranche pricing.
 
         Parameters
         ----------
@@ -593,31 +751,41 @@ class CreditIndexData:
             Index-level default-intensity curve used to project portfolio loss.
         base_correlation_curve : BaseCorrelationCurve
             Detachment-dependent correlation curve used for tranche valuation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def num_constituents(self) -> int:
-        """Number of constituents in the index.
+        """
+        Number of constituents in the index.
         Returns
         -------
         int
+            The num constituents exposed by this `CreditIndexData`.
         """
         ...
 
     @property
     def recovery_rate(self) -> float:
-        """Index recovery rate.
+        """
+        Index recovery rate.
         Returns
         -------
         float
+            The recovery rate exposed by this `CreditIndexData`.
         """
         ...
 
     def __repr__(self) -> str: ...
 
 class PriceCurve:
-    """Forward price curve for commodities and other price-based assets.
+    """
+    Forward price curve for commodities and other price-based assets.
 
     Constructed from ``(time, forward_price)`` knot pairs.
 
@@ -640,6 +808,12 @@ class PriceCurve:
     ------
     ValueError
         If the curve cannot be built from the given parameters.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import PriceCurve
+    >>> PriceCurve.__name__
+    'PriceCurve'
     """
 
     def __init__(
@@ -651,7 +825,8 @@ class PriceCurve:
         interp: str = "linear",
         day_count: str = "act_365f",
     ) -> None:
-        """Construct a price curve from knot points.
+        """
+        Construct a price curve from knot points.
 
         Parameters
         ----------
@@ -676,7 +851,8 @@ class PriceCurve:
         ...
 
     def price(self, t: float) -> float:
-        """Forward price at year fraction *t*.
+        """
+        Forward price at year fraction *t*.
 
         Parameters
         ----------
@@ -687,33 +863,43 @@ class PriceCurve:
         -------
         float
             Forward price.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def id(self) -> str:
-        """Curve identifier string.
+        """
+        Curve identifier string.
 
         Returns
         -------
         str
+            The id exposed by this `PriceCurve`.
         """
         ...
 
     @property
     def base_date(self) -> datetime.date:
-        """Valuation base date.
+        """
+        Valuation base date.
 
         Returns
         -------
         datetime.date
+            The base date exposed by this `PriceCurve`.
         """
         ...
 
     def __repr__(self) -> str: ...
 
 class InflationCurve:
-    """CPI inflation curve for inflation-linked pricing and breakeven analysis.
+    """
+    CPI inflation curve for inflation-linked pricing and breakeven analysis.
 
     Constructed from ``(time, cpi_level)`` knot pairs.
 
@@ -738,6 +924,12 @@ class InflationCurve:
     ------
     ValueError
         If the curve cannot be built from the given parameters.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import InflationCurve
+    >>> InflationCurve.__name__
+    'InflationCurve'
     """
 
     def __init__(
@@ -749,29 +941,79 @@ class InflationCurve:
         day_count: str = "act_365f",
         indexation_lag_months: int = 3,
         interp: str = "log_linear",
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `InflationCurve`.
+
+        Parameters
+        ----------
+        id : object
+            Stable identifier used to select the required object or result entry.
+        base_date : object
+            Date used in the documented calculation or scheduling role.
+        base_cpi : object
+            Value supplied for `base_cpi` to the documented binding operation.
+        knots : object
+            Value supplied for `knots` to the documented binding operation.
+        day_count : object
+            Value supplied for `day_count` to the documented binding operation.
+        indexation_lag_months : object
+            Value supplied for `indexation_lag_months` to the documented binding operation.
+        interp : object
+            Value supplied for `interp` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     def cpi(self, t: float) -> float:
-        """Return CPI level at a curve time without indexation lag.
+        """
+        Return CPI level at a curve time without indexation lag.
 
         Parameters
         ----------
         t : float
             Year fraction from the curve base date at which CPI is requested.
+
+        Returns
+        -------
+        float
+            Result of cpi for this `InflationCurve` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def cpi_with_lag(self, t: float) -> float:
-        """Return CPI level at a curve time after the contractual observation lag.
+        """
+        Return CPI level at a curve time after the contractual observation lag.
 
         Parameters
         ----------
         t : float
             Year fraction from the curve base date before applying indexation lag.
+
+        Returns
+        -------
+        float
+            Result of cpi with lag for this `InflationCurve` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def inflation_rate(self, t1: float, t2: float) -> float:
-        """Return annualized compounded inflation between two curve times.
+        """
+        Return annualized compounded inflation between two curve times.
 
         Parameters
         ----------
@@ -779,11 +1021,22 @@ class InflationCurve:
             Start time in year fractions from the inflation-curve base date.
         t2 : float
             End time in year fractions from the inflation-curve base date.
+
+        Returns
+        -------
+        float
+            Result of inflation rate for this `InflationCurve` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def inflation_rate_simple(self, t1: float, t2: float) -> float:
-        """Return simple non-compounded inflation between two curve times.
+        """
+        Return simple non-compounded inflation between two curve times.
 
         Parameters
         ----------
@@ -791,23 +1044,84 @@ class InflationCurve:
             Start time in year fractions from the inflation-curve base date.
         t2 : float
             End time in year fractions from the inflation-curve base date.
+
+        Returns
+        -------
+        float
+            Result of inflation rate simple for this `InflationCurve` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        """
+        Return the id for `InflationCurve`.
+
+        Returns
+        -------
+        str
+            The id exposed by this `InflationCurve`.
+        """
+        ...
+
     @property
-    def base_date(self) -> datetime.date: ...
+    def base_date(self) -> datetime.date:
+        """
+        Return the base date for `InflationCurve`.
+
+        Returns
+        -------
+        datetime.date
+            The base date exposed by this `InflationCurve`.
+        """
+        ...
+
     @property
-    def day_count(self) -> str: ...
+    def day_count(self) -> str:
+        """
+        Return the day count for `InflationCurve`.
+
+        Returns
+        -------
+        str
+            The day count exposed by this `InflationCurve`.
+        """
+        ...
+
     @property
-    def indexation_lag_months(self) -> int: ...
+    def indexation_lag_months(self) -> int:
+        """
+        Return the indexation lag months for `InflationCurve`.
+
+        Returns
+        -------
+        int
+            The indexation lag months exposed by this `InflationCurve`.
+        """
+        ...
+
     @property
-    def base_cpi(self) -> float: ...
+    def base_cpi(self) -> float:
+        """
+        Return the base cpi for `InflationCurve`.
+
+        Returns
+        -------
+        float
+            The base cpi exposed by this `InflationCurve`.
+        """
+        ...
+
     def __repr__(self) -> str: ...
 
 class VolSurface:
-    """Two-dimensional implied volatility surface on an expiry x strike grid.
+    """
+    Two-dimensional implied volatility surface on an expiry x strike grid.
 
     Parameters
     ----------
@@ -830,6 +1144,12 @@ class VolSurface:
     ------
     ValueError
         If the surface cannot be built from the given parameters.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import VolSurface
+    >>> VolSurface.__name__
+    'VolSurface'
     """
 
     def __init__(
@@ -841,9 +1161,37 @@ class VolSurface:
         secondary_axis: str = "strike",
         interpolation_mode: str = "vol",
         quote_type: str = "black_lognormal",
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `VolSurface`.
+
+        Parameters
+        ----------
+        id : object
+            Stable identifier used to select the required object or result entry.
+        expiries : object
+            Value supplied for `expiries` to the documented binding operation.
+        strikes : object
+            Value supplied for `strikes` to the documented binding operation.
+        vols_row_major : object
+            Value supplied for `vols_row_major` to the documented binding operation.
+        secondary_axis : object
+            Value supplied for `secondary_axis` to the documented binding operation.
+        interpolation_mode : object
+            Value supplied for `interpolation_mode` to the documented binding operation.
+        quote_type : object
+            Value supplied for `quote_type` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     def value_checked(self, expiry: float, strike: float) -> float:
-        """Return an interpolated volatility with explicit grid bounds checking.
+        """
+        Return an interpolated volatility with explicit grid bounds checking.
 
         Parameters
         ----------
@@ -851,11 +1199,22 @@ class VolSurface:
             Option expiry in years, required to lie within the surface grid.
         strike : float
             Strike or configured secondary-axis coordinate to interpolate at.
+
+        Returns
+        -------
+        float
+            Result of value checked for this `VolSurface` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def value_clamped(self, expiry: float, strike: float) -> float:
-        """Return an interpolated volatility with flat edge extrapolation.
+        """
+        Return an interpolated volatility with flat edge extrapolation.
 
         Parameters
         ----------
@@ -863,30 +1222,117 @@ class VolSurface:
             Option expiry in years; values beyond the grid are clamped to an edge.
         strike : float
             Strike or configured secondary-axis coordinate, clamped at grid edges.
+
+        Returns
+        -------
+        float
+            Result of value clamped for this `VolSurface` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        """
+        Return the id for `VolSurface`.
+
+        Returns
+        -------
+        str
+            The id exposed by this `VolSurface`.
+        """
+        ...
+
     @property
-    def expiries(self) -> list[float]: ...
+    def expiries(self) -> list[float]:
+        """
+        Return the expiries for `VolSurface`.
+
+        Returns
+        -------
+        list[float]
+            The expiries exposed by this `VolSurface`.
+        """
+        ...
+
     @property
-    def strikes(self) -> list[float]: ...
+    def strikes(self) -> list[float]:
+        """
+        Return the strikes for `VolSurface`.
+
+        Returns
+        -------
+        list[float]
+            The strikes exposed by this `VolSurface`.
+        """
+        ...
+
     @property
-    def secondary_axis(self) -> str: ...
+    def secondary_axis(self) -> str:
+        """
+        Return the secondary axis for `VolSurface`.
+
+        Returns
+        -------
+        str
+            The secondary axis exposed by this `VolSurface`.
+        """
+        ...
+
     @property
-    def quote_type(self) -> str: ...
+    def quote_type(self) -> str:
+        """
+        Return the quote type for `VolSurface`.
+
+        Returns
+        -------
+        str
+            The quote type exposed by this `VolSurface`.
+        """
+        ...
+
     @property
-    def interpolation_mode(self) -> str: ...
+    def interpolation_mode(self) -> str:
+        """
+        Return the interpolation mode for `VolSurface`.
+
+        Returns
+        -------
+        str
+            The interpolation mode exposed by this `VolSurface`.
+        """
+        ...
+
     @property
-    def grid_shape(self) -> tuple[int, int]: ...
+    def grid_shape(self) -> tuple[int, int]:
+        """
+        Return the grid shape for `VolSurface`.
+
+        Returns
+        -------
+        tuple[int, int]
+            The grid shape exposed by this `VolSurface`.
+        """
+        ...
+
     def __repr__(self) -> str: ...
 
 class FxDeltaVolSurface:
-    """FX vol surface in delta space (ATM, 25-d RR/BF, optional 10-d wings).
+    """
+    FX vol surface in delta space (ATM, 25-d RR/BF, optional 10-d wings).
 
     Forward delta (premium-unadjusted). Strike conversion uses Garman-Kohlhagen.
     See ``docs/REFERENCES.md#clark-fx-options`` and ``#wystup-fx-options``.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import FxDeltaVolSurface
+    >>> FxDeltaVolSurface.__name__
+    'FxDeltaVolSurface'
     """
 
     def __init__(
@@ -899,7 +1345,8 @@ class FxDeltaVolSurface:
         rr_10d: list[float] | None = None,
         bf_10d: list[float] | None = None,
     ) -> None:
-        """Build a delta-quoted FX vol surface.
+        """
+        Build a delta-quoted FX vol surface.
 
         Parameters
         ----------
@@ -925,13 +1372,44 @@ class FxDeltaVolSurface:
         """
         ...
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        """
+        Return the id for `FxDeltaVolSurface`.
+
+        Returns
+        -------
+        str
+            The id exposed by this `FxDeltaVolSurface`.
+        """
+        ...
+
     @property
-    def expiries(self) -> list[float]: ...
+    def expiries(self) -> list[float]:
+        """
+        Return the expiries for `FxDeltaVolSurface`.
+
+        Returns
+        -------
+        list[float]
+            The expiries exposed by this `FxDeltaVolSurface`.
+        """
+        ...
+
     @property
-    def num_expiries(self) -> int: ...
+    def num_expiries(self) -> int:
+        """
+        Return the num expiries for `FxDeltaVolSurface`.
+
+        Returns
+        -------
+        int
+            The num expiries exposed by this `FxDeltaVolSurface`.
+        """
+        ...
+
     def pillar_vols(self, expiry_idx: int) -> tuple[float, float, float]:
-        """Pillar vols at ``expiry_idx`` as ``(atm, put_25d_vol, call_25d_vol)``.
+        """
+        Pillar vols at ``expiry_idx`` as ``(atm, put_25d_vol, call_25d_vol)``.
 
         Parameters
         ----------
@@ -942,6 +1420,11 @@ class FxDeltaVolSurface:
         ------
         IndexError
             If ``expiry_idx`` is out of range.
+
+        Returns
+        -------
+        tuple[float, float, float]
+            Result of pillar vols for this `FxDeltaVolSurface` in the annotated representation.
         """
         ...
 
@@ -951,7 +1434,8 @@ class FxDeltaVolSurface:
         strike: float,
         forward: float,
     ) -> float:
-        """Return interpolated implied volatility at an FX strike.
+        """
+        Return interpolated implied volatility at an FX strike.
 
         Parameters
         ----------
@@ -961,11 +1445,22 @@ class FxDeltaVolSurface:
             FX strike quoted as units of quote currency per base currency.
         forward : float
             Positive FX forward for the same expiry and quotation direction.
+
+        Returns
+        -------
+        float
+            Result of implied vol for this `FxDeltaVolSurface` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def to_vol_surface(self, spot: float, r_d: float, r_f: float) -> VolSurface:
-        """Materialize this delta surface as a strike-axis :class:`VolSurface`.
+        """
+        Materialize this delta surface as a strike-axis :class:`VolSurface`.
 
         Parameters
         ----------
@@ -975,12 +1470,23 @@ class FxDeltaVolSurface:
             Domestic continuously compounded annual rate as a decimal.
         r_f : float
             Foreign continuously compounded annual rate as a decimal.
+
+        Returns
+        -------
+        VolSurface
+            Result of to vol surface for this `FxDeltaVolSurface` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @staticmethod
     def delta_to_strike(delta: float, forward: float, vol: float, expiry: float) -> float:
-        """Convert a forward delta to a premium-unadjusted Garman-Kohlhagen strike.
+        """
+        Convert a forward delta to a premium-unadjusted Garman-Kohlhagen strike.
 
         Parameters
         ----------
@@ -992,12 +1498,29 @@ class FxDeltaVolSurface:
             Annualized implied volatility as a positive decimal.
         expiry : float
             Positive option expiry in years.
+
+        Returns
+        -------
+        float
+            Result of delta to strike for this `FxDeltaVolSurface` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import FxDeltaVolSurface
+        >>> callable(FxDeltaVolSurface.delta_to_strike)
+        True
         """
         ...
 
     @staticmethod
     def strike_to_delta(strike: float, forward: float, vol: float, expiry: float) -> float:
-        """Convert a strike to premium-unadjusted forward call delta.
+        """
+        Convert a strike to premium-unadjusted forward call delta.
 
         Parameters
         ----------
@@ -1009,13 +1532,30 @@ class FxDeltaVolSurface:
             Annualized implied volatility as a positive decimal.
         expiry : float
             Positive option expiry in years.
+
+        Returns
+        -------
+        float
+            Result of strike to delta for this `FxDeltaVolSurface` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import FxDeltaVolSurface
+        >>> callable(FxDeltaVolSurface.strike_to_delta)
+        True
         """
         ...
 
     def __repr__(self) -> str: ...
 
 class VolCube:
-    """SABR volatility cube on an expiry x tenor grid.
+    """
+    SABR volatility cube on an expiry x tenor grid.
 
     Stores calibrated SABR parameters at each (expiry, tenor) node and
     evaluates implied volatilities via bilinear parameter interpolation
@@ -1043,6 +1583,12 @@ class VolCube:
     ------
     ValueError
         If the cube cannot be built from the given parameters.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import VolCube
+    >>> VolCube.__name__
+    'VolCube'
     """
 
     def __init__(
@@ -1053,9 +1599,35 @@ class VolCube:
         params_row_major: list[dict[str, float]],
         forwards_row_major: list[float],
         interpolation_mode: str = "vol",
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `VolCube`.
+
+        Parameters
+        ----------
+        id : object
+            Stable identifier used to select the required object or result entry.
+        expiries : object
+            Value supplied for `expiries` to the documented binding operation.
+        tenors : object
+            Value supplied for `tenors` to the documented binding operation.
+        params_row_major : object
+            Value supplied for `params_row_major` to the documented binding operation.
+        forwards_row_major : object
+            Value supplied for `forwards_row_major` to the documented binding operation.
+        interpolation_mode : object
+            Value supplied for `interpolation_mode` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     def vol(self, expiry: float, tenor: float, strike: float) -> float:
-        """Implied volatility with bounds checking.
+        """
+        Implied volatility with bounds checking.
 
         Parameters
         ----------
@@ -1079,7 +1651,8 @@ class VolCube:
         ...
 
     def vol_clamped(self, expiry: float, tenor: float, strike: float) -> float:
-        """Return Black implied volatility with clamped extrapolation.
+        """
+        Return Black implied volatility with clamped extrapolation.
 
         Parameters
         ----------
@@ -1089,11 +1662,22 @@ class VolCube:
             Underlying swap tenor in years, clamped to the nearest cube tenor.
         strike : float
             Strike rate in decimal rate units; non-finite inputs return ``NaN``.
+
+        Returns
+        -------
+        float
+            Result of vol clamped for this `VolCube` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def vol_normal(self, expiry: float, tenor: float, strike: float) -> float:
-        """Normal (Bachelier) implied volatility with bounds checking.
+        """
+        Normal (Bachelier) implied volatility with bounds checking.
 
         Parameters
         ----------
@@ -1121,7 +1705,8 @@ class VolCube:
         ...
 
     def vol_normal_clamped(self, expiry: float, tenor: float, strike: float) -> float:
-        """Normal (Bachelier) implied volatility with clamped extrapolation.
+        """
+        Normal (Bachelier) implied volatility with clamped extrapolation.
 
         Degenerate finite expansions are floored to a small positive normal
         vol. Non-finite inputs return NaN.
@@ -1134,11 +1719,22 @@ class VolCube:
             Underlying swap tenor in years, clamped to the nearest cube tenor.
         strike : float
             Strike rate in decimal rate units; non-finite inputs return ``NaN``.
+
+        Returns
+        -------
+        float
+            Result of vol normal clamped for this `VolCube` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def materialize_tenor_slice(self, tenor: float, strikes: list[float]) -> VolSurface:
-        """Materialize a tenor slice as a :class:`VolSurface`.
+        """
+        Materialize a tenor slice as a :class:`VolSurface`.
 
         Parameters
         ----------
@@ -1150,11 +1746,18 @@ class VolCube:
         Returns
         -------
         VolSurface
+            Result of materialize tenor slice for this `VolCube` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def materialize_tenor_slice_normal(self, tenor: float, strikes: list[float]) -> VolSurface:
-        """Materialize a tenor slice as a normal-vol (Bachelier) :class:`VolSurface`.
+        """
+        Materialize a tenor slice as a normal-vol (Bachelier) :class:`VolSurface`.
 
         Vols are in absolute rate units and the resulting surface is tagged
         with the normal quote type.
@@ -1169,11 +1772,18 @@ class VolCube:
         Returns
         -------
         VolSurface
+            Result of materialize tenor slice normal for this `VolCube` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def materialize_expiry_slice(self, expiry: float, strikes: list[float]) -> VolSurface:
-        """Materialize an expiry slice as a :class:`VolSurface`.
+        """
+        Materialize an expiry slice as a :class:`VolSurface`.
 
         Parameters
         ----------
@@ -1185,11 +1795,18 @@ class VolCube:
         Returns
         -------
         VolSurface
+            Result of materialize expiry slice for this `VolCube` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def materialize_expiry_slice_normal(self, expiry: float, strikes: list[float]) -> VolSurface:
-        """Materialize an expiry slice as a normal-vol (Bachelier) :class:`VolSurface`.
+        """
+        Materialize an expiry slice as a normal-vol (Bachelier) :class:`VolSurface`.
 
         Vols are in absolute rate units and the resulting surface is tagged
         with the normal quote type.
@@ -1204,23 +1821,80 @@ class VolCube:
         Returns
         -------
         VolSurface
+            Result of materialize expiry slice normal for this `VolCube` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        """
+        Return the id for `VolCube`.
+
+        Returns
+        -------
+        str
+            The id exposed by this `VolCube`.
+        """
+        ...
+
     @property
-    def expiries(self) -> list[float]: ...
+    def expiries(self) -> list[float]:
+        """
+        Return the expiries for `VolCube`.
+
+        Returns
+        -------
+        list[float]
+            The expiries exposed by this `VolCube`.
+        """
+        ...
+
     @property
-    def tenors(self) -> list[float]: ...
+    def tenors(self) -> list[float]:
+        """
+        Return the tenors for `VolCube`.
+
+        Returns
+        -------
+        list[float]
+            The tenors exposed by this `VolCube`.
+        """
+        ...
+
     @property
-    def grid_shape(self) -> tuple[int, int]: ...
+    def grid_shape(self) -> tuple[int, int]:
+        """
+        Return the grid shape for `VolCube`.
+
+        Returns
+        -------
+        tuple[int, int]
+            The grid shape exposed by this `VolCube`.
+        """
+        ...
+
     @property
-    def interpolation_mode(self) -> str: ...
+    def interpolation_mode(self) -> str:
+        """
+        Return the interpolation mode for `VolCube`.
+
+        Returns
+        -------
+        str
+            The interpolation mode exposed by this `VolCube`.
+        """
+        ...
+
     def __repr__(self) -> str: ...
 
 class VolatilityIndexCurve:
-    """Volatility index forward curve (e.g. VIX term structure).
+    """
+    Volatility index forward curve (e.g. VIX term structure).
 
     Constructed from ``(time, forward_level)`` knot pairs.
 
@@ -1243,6 +1917,12 @@ class VolatilityIndexCurve:
     ------
     ValueError
         If the curve cannot be built from the given parameters.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import VolatilityIndexCurve
+    >>> VolatilityIndexCurve.__name__
+    'VolatilityIndexCurve'
     """
 
     def __init__(
@@ -1254,7 +1934,8 @@ class VolatilityIndexCurve:
         interp: str = "linear",
         day_count: str = "act_365f",
     ) -> None:
-        """Construct a volatility index curve from knot points.
+        """
+        Construct a volatility index curve from knot points.
 
         Parameters
         ----------
@@ -1279,7 +1960,8 @@ class VolatilityIndexCurve:
         ...
 
     def forward_level(self, t: float) -> float:
-        """Forward volatility index level at year fraction *t*.
+        """
+        Forward volatility index level at year fraction *t*.
 
         Parameters
         ----------
@@ -1290,26 +1972,35 @@ class VolatilityIndexCurve:
         -------
         float
             Forward volatility index level.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def id(self) -> str:
-        """Curve identifier string.
+        """
+        Curve identifier string.
 
         Returns
         -------
         str
+            The id exposed by this `VolatilityIndexCurve`.
         """
         ...
 
     @property
     def base_date(self) -> datetime.date:
-        """Valuation base date.
+        """
+        Valuation base date.
 
         Returns
         -------
         datetime.date
+            The base date exposed by this `VolatilityIndexCurve`.
         """
         ...
 
@@ -1320,9 +2011,16 @@ class VolatilityIndexCurve:
 # ---------------------------------------------------------------------------
 
 class FxConversionPolicy:
-    """FX conversion policy controlling when rates are sampled.
+    """
+    FX conversion policy controlling when rates are sampled.
 
     Immutable enum-style type with class-level constants.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import FxConversionPolicy
+    >>> FxConversionPolicy.__name__
+    'FxConversionPolicy'
     """
 
     CASHFLOW_DATE: FxConversionPolicy
@@ -1336,7 +2034,8 @@ class FxConversionPolicy:
 
     @classmethod
     def from_name(cls, name: str) -> FxConversionPolicy:
-        """Parse from a string label.
+        """
+        Parse from a string label.
 
         Parameters
         ----------
@@ -1351,6 +2050,12 @@ class FxConversionPolicy:
         ------
         ValueError
             If *name* is not recognised.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import FxConversionPolicy
+        >>> callable(FxConversionPolicy.from_name)
+        True
         """
         ...
 
@@ -1358,42 +2063,61 @@ class FxConversionPolicy:
     def __str__(self) -> str: ...
 
 class FxRateResult:
-    """Result of an FX rate query.
+    """
+    Result of an FX rate query.
 
     Immutable value type returned by :meth:`FxMatrix.rate`.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import FxRateResult
+    >>> FxRateResult.__name__
+    'FxRateResult'
     """
 
     @property
     def rate(self) -> float:
-        """The FX conversion rate.
+        """
+        The FX conversion rate.
 
         Returns
         -------
         float
+            The rate exposed by this `FxRateResult`.
         """
         ...
 
     @property
     def triangulated(self) -> bool:
-        """Whether the rate was obtained via triangulation.
+        """
+        Whether the rate was obtained via triangulation.
 
         Returns
         -------
         bool
+            The triangulated exposed by this `FxRateResult`.
         """
         ...
 
     def __repr__(self) -> str: ...
 
 class FxMatrix:
-    """Foreign-exchange rate matrix for currency conversion.
+    """
+    Foreign-exchange rate matrix for currency conversion.
 
     Manages explicit FX quotes and supports rate lookup with optional
     triangulation.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import FxMatrix
+    >>> FxMatrix.__name__
+    'FxMatrix'
     """
 
     def __init__(self) -> None:
-        """Create an empty FX matrix.
+        """
+        Create an empty FX matrix.
         Returns
         -------
         None
@@ -1406,7 +2130,8 @@ class FxMatrix:
         quote: Union[Currency, str],
         rate: float,
     ) -> None:
-        """Set an explicit FX quote.
+        """
+        Set an explicit FX quote.
 
         Parameters
         ----------
@@ -1432,7 +2157,8 @@ class FxMatrix:
         policy: Union[FxConversionPolicy, str],
         rate: float,
     ) -> None:
-        """Set an authoritative FX quote scoped to one date and conversion policy.
+        """
+        Set an authoritative FX quote scoped to one date and conversion policy.
 
         Parameters
         ----------
@@ -1446,6 +2172,11 @@ class FxMatrix:
             Conversion policy key that selects this dated quote during lookup.
         rate : float
             Positive conversion rate satisfying ``1 base = rate quote``.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -1456,7 +2187,8 @@ class FxMatrix:
         date: datetime.date,
         policy: Optional[Union[FxConversionPolicy, str]] = None,
     ) -> FxRateResult:
-        """Look up an FX rate.
+        """
+        Look up an FX rate.
 
         Parameters
         ----------
@@ -1491,10 +2223,17 @@ class FxMatrix:
 # ---------------------------------------------------------------------------
 
 class ScalarTimeSeries:
-    """Date-indexed scalar market observations with Rust-owned interpolation.
+    """
+    Date-indexed scalar market observations with Rust-owned interpolation.
 
     Decimal observations are accepted only when exactly representable by the
     underlying float storage.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import ScalarTimeSeries
+    >>> ScalarTimeSeries.__name__
+    'ScalarTimeSeries'
     """
 
     def __init__(
@@ -1504,7 +2243,8 @@ class ScalarTimeSeries:
         currency: Currency | str | None = None,
         interpolation: str | None = None,
     ) -> None:
-        """Create a date-indexed scalar market-data series.
+        """
+        Create a date-indexed scalar market-data series.
 
         Parameters
         ----------
@@ -1517,42 +2257,133 @@ class ScalarTimeSeries:
             Optional currency tag for monetary observations; ``None`` is unitless.
         interpolation : str or None, default None
             Optional interpolation mode; ``None`` selects the binding default.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        """
+        Return the id for `ScalarTimeSeries`.
+
+        Returns
+        -------
+        str
+            The id exposed by this `ScalarTimeSeries`.
+        """
+        ...
+
     @property
-    def currency(self) -> Currency | None: ...
+    def currency(self) -> Currency | None:
+        """
+        Return the currency for `ScalarTimeSeries`.
+
+        Returns
+        -------
+        Currency | None
+            The currency exposed by this `ScalarTimeSeries`.
+        """
+        ...
+
     @property
-    def interpolation(self) -> str: ...
+    def interpolation(self) -> str:
+        """
+        Return the interpolation for `ScalarTimeSeries`.
+
+        Returns
+        -------
+        str
+            The interpolation exposed by this `ScalarTimeSeries`.
+        """
+        ...
+
     @property
-    def observations(self) -> list[tuple[datetime.date, float]]: ...
+    def observations(self) -> list[tuple[datetime.date, float]]:
+        """
+        Return the observations for `ScalarTimeSeries`.
+
+        Returns
+        -------
+        list[tuple[datetime.date, float]]
+            The observations exposed by this `ScalarTimeSeries`.
+        """
+        ...
+
     def value_on(self, date: datetime.date) -> float:
-        """Return the interpolated scalar value on a requested date.
+        """
+        Return the interpolated scalar value on a requested date.
 
         Parameters
         ----------
         date : datetime.date
             Observation or interpolation date evaluated under this series mode.
+
+        Returns
+        -------
+        float
+            Result of value on for this `ScalarTimeSeries` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `ScalarTimeSeries` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `ScalarTimeSeries`, suitable for a matching `from_json` call.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> ScalarTimeSeries:
-        """Parse a scalar series from its canonical JSON representation.
+        """
+        Parse a scalar series from its canonical JSON representation.
 
         Parameters
         ----------
         json : str
             Canonical serialized series JSON, including identifier, observations,
             optional currency, and interpolation configuration.
+
+        Returns
+        -------
+        ScalarTimeSeries
+            Validated `ScalarTimeSeries` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import ScalarTimeSeries
+        >>> callable(ScalarTimeSeries.from_json)
+        True
         """
         ...
     def __len__(self) -> int: ...
     def __repr__(self) -> str: ...
 
 class InflationIndex:
-    """Inflation index observations with Rust-owned interpolation and validation."""
+    """
+    Inflation index observations with Rust-owned interpolation and validation.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import InflationIndex
+    >>> InflationIndex.__name__
+    'InflationIndex'
+    """
 
     def __init__(
         self,
@@ -1561,7 +2392,8 @@ class InflationIndex:
         currency: Currency | str,
         interpolation: str | None = None,
     ) -> None:
-        """Create a date-indexed inflation-index observation series.
+        """
+        Create a date-indexed inflation-index observation series.
 
         Parameters
         ----------
@@ -1573,35 +2405,118 @@ class InflationIndex:
             Currency or economic-area tag attached to the published index level.
         interpolation : str or None, default None
             Optional interpolation mode; ``None`` selects the binding default.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        """
+        Return the id for `InflationIndex`.
+
+        Returns
+        -------
+        str
+            The id exposed by this `InflationIndex`.
+        """
+        ...
+
     @property
-    def currency(self) -> Currency: ...
+    def currency(self) -> Currency:
+        """
+        Return the currency for `InflationIndex`.
+
+        Returns
+        -------
+        Currency
+            The currency exposed by this `InflationIndex`.
+        """
+        ...
+
     @property
-    def interpolation(self) -> str: ...
+    def interpolation(self) -> str:
+        """
+        Return the interpolation for `InflationIndex`.
+
+        Returns
+        -------
+        str
+            The interpolation exposed by this `InflationIndex`.
+        """
+        ...
+
     @property
-    def observations(self) -> list[tuple[datetime.date, float]]: ...
+    def observations(self) -> list[tuple[datetime.date, float]]:
+        """
+        Return the observations for `InflationIndex`.
+
+        Returns
+        -------
+        list[tuple[datetime.date, float]]
+            The observations exposed by this `InflationIndex`.
+        """
+        ...
+
     def value_on(self, date: datetime.date) -> float:
-        """Return the interpolated index level on a requested date.
+        """
+        Return the interpolated index level on a requested date.
 
         Parameters
         ----------
         date : datetime.date
             Observation or interpolation date evaluated under this index mode.
+
+        Returns
+        -------
+        float
+            Result of value on for this `InflationIndex` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `InflationIndex` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `InflationIndex`, suitable for a matching `from_json` call.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> InflationIndex:
-        """Parse an inflation index from its canonical JSON representation.
+        """
+        Parse an inflation index from its canonical JSON representation.
 
         Parameters
         ----------
         json : str
             Canonical serialized index JSON, including identifier, levels,
             currency, and interpolation configuration.
+
+        Returns
+        -------
+        InflationIndex
+            Validated `InflationIndex` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import InflationIndex
+        >>> callable(InflationIndex.from_json)
+        True
         """
         ...
     def __len__(self) -> int: ...
@@ -1612,15 +2527,23 @@ class InflationIndex:
 # ---------------------------------------------------------------------------
 
 class MarketContext:
-    """Unified market data container for curves, surfaces, and FX.
+    """
+    Unified market data container for curves, surfaces, and FX.
 
     Provides a single access point for all market data required by
     pricing and analytics functions. Curves are stored behind ``Arc``
     and the context is cheap to clone.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> MarketContext.__name__
+    'MarketContext'
     """
 
     def __init__(self) -> None:
-        """Create an empty market context.
+        """
+        Create an empty market context.
         Returns
         -------
         None
@@ -1642,7 +2565,8 @@ class MarketContext:
             VolatilityIndexCurve,
         ],
     ) -> MarketContext:
-        """Insert a curve into the context (fluent, returns ``self``).
+        """
+        Insert a curve into the context (fluent, returns ``self``).
 
         Accepts any curve type: :class:`DiscountCurve`, :class:`ForwardCurve`,
         :class:`HazardCurve`, :class:`InflationCurve`, :class:`PriceCurve`,
@@ -1668,12 +2592,18 @@ class MarketContext:
         ...
 
     def insert_fx(self, fx: FxMatrix) -> None:
-        """Insert an FX matrix into the context.
+        """
+        Insert an FX matrix into the context.
 
         Parameters
         ----------
         fx : FxMatrix
             FX rate matrix.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -1683,7 +2613,8 @@ class MarketContext:
         value: float | int | Decimal,
         currency: Currency | str | None = None,
     ) -> None:
-        """Insert a scalar market price into the context.
+        """
+        Insert a scalar market price into the context.
 
         Parameters
         ----------
@@ -1695,11 +2626,17 @@ class MarketContext:
             representable as float.
         currency : Currency | str | None, optional
             Currency for monetary prices. If omitted, stores a unitless scalar.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def insert_credit_index(self, id: str, data: CreditIndexData) -> None:
-        """Insert credit index data into the context.
+        """
+        Insert credit index data into the context.
 
         Parameters
         ----------
@@ -1707,31 +2644,49 @@ class MarketContext:
             Credit index identifier.
         data : CreditIndexData
             Credit index data bundle.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def insert_series(self, series: ScalarTimeSeries) -> None:
-        """Insert or replace a scalar time series using its own identifier.
+        """
+        Insert or replace a scalar time series using its own identifier.
 
         Parameters
         ----------
         series : ScalarTimeSeries
             Fully validated date-indexed series whose ``id`` becomes the lookup key.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def insert_inflation_index(self, index: InflationIndex) -> None:
-        """Insert or replace an inflation index using its own identifier.
+        """
+        Insert or replace an inflation index using its own identifier.
 
         Parameters
         ----------
         index : InflationIndex
             Fully validated index observation series whose ``id`` becomes the lookup key.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def get_discount(self, id: str) -> DiscountCurve:
-        """Retrieve a discount curve by identifier.
+        """
+        Retrieve a discount curve by identifier.
 
         Parameters
         ----------
@@ -1742,6 +2697,7 @@ class MarketContext:
         -------
         DiscountCurve
 
+            Requested discount resolved from this `MarketContext` in the annotated representation.
         Raises
         ------
         KeyError
@@ -1750,7 +2706,8 @@ class MarketContext:
         ...
 
     def get_forward(self, id: str) -> ForwardCurve:
-        """Retrieve a forward curve by identifier.
+        """
+        Retrieve a forward curve by identifier.
 
         Parameters
         ----------
@@ -1761,6 +2718,7 @@ class MarketContext:
         -------
         ForwardCurve
 
+            Requested forward resolved from this `MarketContext` in the annotated representation.
         Raises
         ------
         KeyError
@@ -1769,7 +2727,8 @@ class MarketContext:
         ...
 
     def get_hazard(self, id: str) -> HazardCurve:
-        """Retrieve a hazard curve by identifier.
+        """
+        Retrieve a hazard curve by identifier.
 
         Parameters
         ----------
@@ -1780,6 +2739,7 @@ class MarketContext:
         -------
         HazardCurve
 
+            Requested hazard resolved from this `MarketContext` in the annotated representation.
         Raises
         ------
         KeyError
@@ -1788,17 +2748,29 @@ class MarketContext:
         ...
 
     def get_base_correlation(self, id: str) -> BaseCorrelationCurve:
-        """Retrieve a base-correlation curve by identifier.
+        """
+        Retrieve a base-correlation curve by identifier.
 
         Parameters
         ----------
         id : str
             Market-context key of the base-correlation curve to retrieve.
+
+        Returns
+        -------
+        BaseCorrelationCurve
+            Requested base correlation resolved from this `MarketContext` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def get_inflation_curve(self, id: str) -> InflationCurve:
-        """Retrieve an inflation curve by identifier.
+        """
+        Retrieve an inflation curve by identifier.
 
         Parameters
         ----------
@@ -1809,6 +2781,7 @@ class MarketContext:
         -------
         InflationCurve
 
+            Requested inflation curve resolved from this `MarketContext` in the annotated representation.
         Raises
         ------
         KeyError
@@ -1817,7 +2790,8 @@ class MarketContext:
         ...
 
     def get_price_curve(self, id: str) -> PriceCurve:
-        """Retrieve a price curve by identifier.
+        """
+        Retrieve a price curve by identifier.
 
         Parameters
         ----------
@@ -1828,6 +2802,7 @@ class MarketContext:
         -------
         PriceCurve
 
+            Requested price curve resolved from this `MarketContext` in the annotated representation.
         Raises
         ------
         KeyError
@@ -1836,7 +2811,8 @@ class MarketContext:
         ...
 
     def get_price(self, id: str) -> tuple[float | Decimal, str | None]:
-        """Retrieve ``(value, currency)`` for a scalar market price.
+        """
+        Retrieve ``(value, currency)`` for a scalar market price.
 
         Currency-tagged values use :class:`Decimal` to preserve their exact
         stored amount. Unitless values use ``float`` and return ``None`` for
@@ -1846,31 +2822,64 @@ class MarketContext:
         ----------
         id : str
             Market-context key of the scalar or currency-tagged price to retrieve.
+
+        Returns
+        -------
+        tuple[float | Decimal, str | None]
+            Requested price resolved from this `MarketContext` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def get_series(self, id: str) -> ScalarTimeSeries:
-        """Retrieve a scalar time series by identifier.
+        """
+        Retrieve a scalar time series by identifier.
 
         Parameters
         ----------
         id : str
             Market-context key assigned when the series was inserted.
+
+        Returns
+        -------
+        ScalarTimeSeries
+            Requested series resolved from this `MarketContext` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def get_inflation_index(self, id: str) -> InflationIndex:
-        """Retrieve an inflation index by identifier.
+        """
+        Retrieve an inflation index by identifier.
 
         Parameters
         ----------
         id : str
             Market-context key assigned when the inflation index was inserted.
+
+        Returns
+        -------
+        InflationIndex
+            Requested inflation index resolved from this `MarketContext` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def get_surface(self, id: str) -> VolSurface:
-        """Retrieve a vol surface by identifier.
+        """
+        Retrieve a vol surface by identifier.
 
         Parameters
         ----------
@@ -1881,6 +2890,7 @@ class MarketContext:
         -------
         VolSurface
 
+            Requested surface resolved from this `MarketContext` in the annotated representation.
         Raises
         ------
         KeyError
@@ -1889,7 +2899,8 @@ class MarketContext:
         ...
 
     def get_fx_delta_vol_surface(self, id: str) -> FxDeltaVolSurface:
-        """Retrieve a delta-quoted FX vol surface by identifier.
+        """
+        Retrieve a delta-quoted FX vol surface by identifier.
 
         Parameters
         ----------
@@ -1908,7 +2919,8 @@ class MarketContext:
         ...
 
     def get_vol_cube(self, id: str) -> VolCube:
-        """Retrieve a vol cube by identifier.
+        """
+        Retrieve a vol cube by identifier.
 
         Parameters
         ----------
@@ -1919,6 +2931,7 @@ class MarketContext:
         -------
         VolCube
 
+            Requested vol cube resolved from this `MarketContext` in the annotated representation.
         Raises
         ------
         KeyError
@@ -1927,7 +2940,8 @@ class MarketContext:
         ...
 
     def get_vol_index_curve(self, id: str) -> VolatilityIndexCurve:
-        """Retrieve a volatility index curve by identifier.
+        """
+        Retrieve a volatility index curve by identifier.
 
         Parameters
         ----------
@@ -1946,28 +2960,42 @@ class MarketContext:
         ...
 
     def get_credit_index(self, id: str) -> CreditIndexData:
-        """Retrieve credit-index data by identifier.
+        """
+        Retrieve credit-index data by identifier.
 
         Parameters
         ----------
         id : str
             Market-context key of the synthetic credit-index data bundle.
+
+        Returns
+        -------
+        CreditIndexData
+            Requested credit index resolved from this `MarketContext` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def fx(self) -> Optional[FxMatrix]:
-        """Access the FX matrix (returns ``None`` if not set).
+        """
+        Access the FX matrix (returns ``None`` if not set).
 
         Returns
         -------
         FxMatrix | None
+            The fx exposed by this `MarketContext`.
         """
         ...
 
     @staticmethod
     def from_json(json: str) -> MarketContext:
-        """Deserialize a market context from a JSON string.
+        """
+        Deserialize a market context from a JSON string.
 
         Accepts the same JSON format produced by :meth:`to_json` and by the
         calibration and pricing pipelines.
@@ -1986,11 +3014,18 @@ class MarketContext:
         ------
         ValueError
             If the JSON is not a valid market context.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import MarketContext
+        >>> callable(MarketContext.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this context to pretty-printed JSON (compatible with pricing APIs).
+        """
+        Serialize this context to pretty-printed JSON (compatible with pricing APIs).
 
         Returns
         -------

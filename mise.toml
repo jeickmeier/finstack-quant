@@ -229,7 +229,7 @@ run = [
 ]
 
 [tasks.python-doc]
-description = "Enforce substantive Python binding input documentation"
+description = "Enforce complete Python IntelliSense documentation"
 run = "uv run --no-sync python scripts/check_python_api_input_docs.py"
 
 [tasks.python-typecheck]

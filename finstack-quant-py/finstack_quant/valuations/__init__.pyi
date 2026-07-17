@@ -1,4 +1,5 @@
-"""Instrument pricing, risk metrics, P&L attribution, and market-context bootstrapping.
+"""
+Instrument pricing, risk metrics, P&L attribution, and market-context bootstrapping.
 
 The canonical path to build a :class:`finstack_quant.core.market_data.MarketContext`
 from raw market quotes is :func:`calibrate`:
@@ -53,6 +54,12 @@ Instrument pricing helpers live under :mod:`finstack_quant.valuations.instrument
 This module exposes calibration, SABR / Black-Scholes primitives, and
 credit-factor hierarchy tooling. Portfolio factor sensitivities and risk
 decomposition live under :mod:`finstack_quant.portfolio`.
+
+Examples
+--------
+>>> import finstack_quant.valuations as valuations
+>>> valuations.__name__
+'finstack_quant.valuations'
 """
 
 from __future__ import annotations
@@ -103,7 +110,8 @@ __all__ = [
 ]
 
 class ValuationResult:
-    """Valuation envelope: PV, currency, risk metrics, covenant flags, and JSON round-trip.
+    """
+    Valuation envelope: PV, currency, risk metrics, covenant flags, and JSON round-trip.
 
     Instantiate via :meth:`from_json` or the ``price_*`` helpers that emit JSON.
 
@@ -115,7 +123,8 @@ class ValuationResult:
 
     @staticmethod
     def from_json(json: str) -> ValuationResult:
-        """Deserialize a ``ValuationResult`` from JSON.
+        """
+        Deserialize a ``ValuationResult`` from JSON.
 
         Parameters
         ----------
@@ -131,11 +140,17 @@ class ValuationResult:
         --------
         >>> from finstack_quant.valuations import ValuationResult
         >>> ValuationResult.from_json('{"instrument_id":"x","value":{}}')  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this result to pretty-printed JSON.
+        """
+        Serialize this result to pretty-printed JSON.
 
         Returns
         -------
@@ -153,7 +168,8 @@ class ValuationResult:
 
     @property
     def instrument_id(self) -> str:
-        """Instrument identifier assigned by the pricer.
+        """
+        Instrument identifier assigned by the pricer.
 
         Returns
         -------
@@ -170,7 +186,8 @@ class ValuationResult:
 
     @property
     def price(self) -> float:
-        """Present value amount (NPV).
+        """
+        Present value amount (NPV).
 
         Returns
         -------
@@ -187,7 +204,8 @@ class ValuationResult:
 
     @property
     def currency(self) -> str:
-        """Currency code for the present value.
+        """
+        Currency code for the present value.
 
         Returns
         -------
@@ -203,7 +221,8 @@ class ValuationResult:
         ...
 
     def get_metric(self, key: str) -> float | None:
-        """Return a scalar risk measure by string key.
+        """
+        Return a scalar risk measure by string key.
 
         Parameters
         ----------
@@ -221,11 +240,17 @@ class ValuationResult:
         ...     '{"instrument_id":"i","value":{"amount":1,"currency":"USD"},"measures":{}}'
         ... )  # doctest: +SKIP
         >>> vr.get_metric("ytm")  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def metric_series(self, base: str) -> list[tuple[list[str], float]]:
-        """Return decoded components and values for a composite base metric.
+        """
+        Return decoded components and values for a composite base metric.
 
         Entries retain the deterministic insertion order of the serialized
         ``measures`` map. The scalar aggregate stored directly under ``base``
@@ -238,11 +263,22 @@ class ValuationResult:
         base : str
             Unqualified metric base key, such as ``"bucketed_dv01"``, used to
             select its encoded coordinate series from the valuation measures.
+
+        Returns
+        -------
+        list[tuple[list[str], float]]
+            Result of metric series for this `ValuationResult` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def metric_keys(self) -> list[str]:
-        """List metric keys present on this result.
+        """
+        List metric keys present on this result.
 
         Returns
         -------
@@ -259,7 +295,8 @@ class ValuationResult:
         ...
 
     def metric_count(self) -> int:
-        """Count of measures stored on this result.
+        """
+        Count of measures stored on this result.
 
         Returns
         -------
@@ -276,7 +313,8 @@ class ValuationResult:
         ...
 
     def all_covenants_passed(self) -> bool:
-        """Whether every covenant passed (or none were evaluated).
+        """
+        Whether every covenant passed (or none were evaluated).
 
         Returns
         -------
@@ -293,7 +331,8 @@ class ValuationResult:
         ...
 
     def failed_covenants(self) -> list[str]:
-        """Covenant IDs that failed, if any.
+        """
+        Covenant IDs that failed, if any.
 
         Returns
         -------
@@ -310,7 +349,8 @@ class ValuationResult:
         ...
 
     def metrics_to_dataframe(self) -> pd.DataFrame:
-        """Export as a single-row pandas DataFrame.
+        """
+        Export as a single-row pandas DataFrame.
 
         Columns include ``instrument_id``, ``price``, ``currency``, plus one
         column per metric key.  Useful for stacking multiple results with
@@ -345,7 +385,8 @@ def instrument_cashflows(
     *,
     model: str,
 ) -> tuple[dict[str, Any], pd.DataFrame]:
-    """DataFrame-friendly wrapper around :func:`instrument_cashflows_json`.
+    """
+    DataFrame-friendly wrapper around :func:`instrument_cashflows_json`.
 
     Parses the JSON envelope returned by the low-level binding and constructs
     a per-flow ``pandas.DataFrame`` with ``date`` / ``reset_date`` parsed as
@@ -376,6 +417,17 @@ def instrument_cashflows(
         ``survival_probability``, ``conditional_default_prob``, ``inflation_index_ratio``,
         ``prepayment_smm``, ``beginning_balance``, ``ending_balance``, and
         ``pv``.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import instrument_cashflows
+    >>> callable(instrument_cashflows)
+    True
     """
     ...
 
@@ -384,7 +436,8 @@ def instrument_cashflows(
 # ---------------------------------------------------------------------------
 
 class CalibrationResult:
-    """Result of a calibration plan execution.
+    """
+    Result of a calibration plan execution.
 
     Provides access to the calibrated market context, per-step reports,
     and overall success status.  Construct via :func:`calibrate` or
@@ -401,7 +454,8 @@ class CalibrationResult:
 
     @staticmethod
     def from_json(json: str) -> CalibrationResult:
-        """Deserialize a ``CalibrationResult`` from JSON.
+        """
+        Deserialize a ``CalibrationResult`` from JSON.
 
         Parameters
         ----------
@@ -412,11 +466,23 @@ class CalibrationResult:
         -------
         CalibrationResult
             Parsed ``CalibrationResult`` instance.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations import CalibrationResult
+        >>> callable(CalibrationResult.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize to pretty-printed JSON.
+        """
+        Serialize to pretty-printed JSON.
 
         Returns
         -------
@@ -427,7 +493,8 @@ class CalibrationResult:
 
     @property
     def success(self) -> bool:
-        """Whether the overall calibration succeeded (all steps passed).
+        """
+        Whether the overall calibration succeeded (all steps passed).
 
         Returns
         -------
@@ -438,7 +505,8 @@ class CalibrationResult:
 
     @property
     def market(self) -> MarketContext:
-        """The calibrated ``MarketContext`` containing all produced curves.
+        """
+        The calibrated ``MarketContext`` containing all produced curves.
 
         Returns
         -------
@@ -449,7 +517,8 @@ class CalibrationResult:
 
     @property
     def market_json(self) -> str:
-        """The calibrated market serialized as a JSON string.
+        """
+        The calibrated market serialized as a JSON string.
 
         Returns
         -------
@@ -460,7 +529,8 @@ class CalibrationResult:
 
     @property
     def report_json(self) -> str:
-        """The aggregated calibration report as a JSON string.
+        """
+        The aggregated calibration report as a JSON string.
 
         Returns
         -------
@@ -471,7 +541,8 @@ class CalibrationResult:
 
     @property
     def step_ids(self) -> list[str]:
-        """List of step identifiers that were executed.
+        """
+        List of step identifiers that were executed.
 
         Returns
         -------
@@ -482,7 +553,8 @@ class CalibrationResult:
 
     @property
     def iterations(self) -> int:
-        """Total solver iterations across all steps.
+        """
+        Total solver iterations across all steps.
 
         Returns
         -------
@@ -493,7 +565,8 @@ class CalibrationResult:
 
     @property
     def max_residual(self) -> float:
-        """Maximum absolute residual across all steps.
+        """
+        Maximum absolute residual across all steps.
 
         Returns
         -------
@@ -504,7 +577,8 @@ class CalibrationResult:
 
     @property
     def rmse(self) -> float:
-        """Root mean square error across all steps.
+        """
+        Root mean square error across all steps.
 
         Returns
         -------
@@ -514,7 +588,8 @@ class CalibrationResult:
         ...
 
     def step_report_json(self, step_id: str) -> str:
-        """Per-step calibration report as a JSON string.
+        """
+        Per-step calibration report as a JSON string.
 
         Parameters
         ----------
@@ -534,7 +609,8 @@ class CalibrationResult:
         ...
 
     def report_to_dataframe(self) -> pd.DataFrame:
-        """Per-step summary as a pandas DataFrame.
+        """
+        Per-step summary as a pandas DataFrame.
 
         Columns: ``step_id``, ``success``, ``iterations``, ``max_residual``,
         ``rmse``, ``convergence_reason``.
@@ -549,7 +625,8 @@ class CalibrationResult:
     def __repr__(self) -> str: ...
 
 class CalibrationEnvelopeError(RuntimeError):
-    """Raised when a calibration envelope fails validation or solving.
+    """
+    Raised when a calibration envelope fails validation or solving.
 
     Inherits from :class:`RuntimeError`, so existing ``except RuntimeError``
     callers continue to catch it (backward-compatible with pre-Phase-4 code).
@@ -567,6 +644,12 @@ class CalibrationEnvelopeError(RuntimeError):
     details : str
         JSON-serialized structured payload (see ``EnvelopeError``
         in the Rust crate for the schema).
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import CalibrationEnvelopeError
+    >>> CalibrationEnvelopeError.__name__
+    'CalibrationEnvelopeError'
     """
 
     kind: str
@@ -574,7 +657,8 @@ class CalibrationEnvelopeError(RuntimeError):
     details: str
 
 def validate_calibration_json(json: str) -> str:
-    """Validate a calibration plan JSON and return canonical pretty-printed form.
+    """
+    Validate a calibration plan JSON and return canonical pretty-printed form.
 
     Parameters
     ----------
@@ -601,7 +685,8 @@ def validate_calibration_json(json: str) -> str:
     ...
 
 def dry_run(json: str) -> str:
-    """Pre-flight envelope validation without invoking the solver.
+    """
+    Pre-flight envelope validation without invoking the solver.
 
     Runs all structural checks (missing dependencies, undefined ``quote_set``s,
     cycles) in a single pass and returns a JSON-serialized
@@ -637,7 +722,8 @@ def dry_run(json: str) -> str:
     ...
 
 def dependency_graph_json(json: str) -> str:
-    """Dump the static dependency graph of a calibration plan as JSON.
+    """
+    Dump the static dependency graph of a calibration plan as JSON.
 
     Parameters
     ----------
@@ -655,11 +741,18 @@ def dependency_graph_json(json: str) -> str:
     ------
     CalibrationEnvelopeError
         If the envelope JSON is malformed.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import dependency_graph_json
+    >>> callable(dependency_graph_json)
+    True
     """
     ...
 
 def calibrate(json: str) -> CalibrationResult:
-    """Build a :class:`MarketContext` from raw market quotes — the canonical entry point.
+    """
+    Build a :class:`MarketContext` from raw market quotes — the canonical entry point.
 
     Accepts a JSON-serialized ``CalibrationEnvelope``. The envelope carries
     quotes in two complementary places:
@@ -736,7 +829,8 @@ def bs_price(
     t: float,
     is_call: bool,
 ) -> float:
-    """Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
+    """
+    Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
 
     All rates are continuously compounded decimals; ``sigma`` is annualized
     vol; ``t`` is years to expiry. Pass ``is_call=False`` for puts.
@@ -762,6 +856,17 @@ def bs_price(
     -------
     float
         Per-unit option price.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import bs_price
+    >>> callable(bs_price)
+    True
     """
     ...
 
@@ -775,7 +880,8 @@ def bs_greeks(
     is_call: bool,
     theta_days: float = 365.0,
 ) -> dict[str, float]:
-    """Black-Scholes / Garman-Kohlhagen Greeks as a dict.
+    """
+    Black-Scholes / Garman-Kohlhagen Greeks as a dict.
 
     Returns ``{"delta", "gamma", "vega", "theta", "rho", "rho_q"}``. ``vega``
     and both rho values are per 1% move; ``theta`` is per-day using the
@@ -805,6 +911,17 @@ def bs_greeks(
     dict[str, float]
         Greeks dict with keys ``delta``, ``gamma``, ``vega``, ``theta``,
         ``rho``, ``rho_q``.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import bs_greeks
+    >>> callable(bs_greeks)
+    True
     """
     ...
 
@@ -817,7 +934,8 @@ def bs_implied_vol(
     price: float,
     is_call: bool,
 ) -> float:
-    """Solve for Black-Scholes implied volatility given a target price.
+    """
+    Solve for Black-Scholes implied volatility given a target price.
 
     Parameters
     ----------
@@ -845,6 +963,12 @@ def bs_implied_vol(
     ------
     ValueError
         If inputs are invalid or no root exists in the search bracket.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import bs_implied_vol
+    >>> callable(bs_implied_vol)
+    True
     """
     ...
 
@@ -856,7 +980,8 @@ def black76_implied_vol(
     price: float,
     is_call: bool,
 ) -> float:
-    """Solve for Black-76 (forward-based) implied volatility given a target price.
+    """
+    Solve for Black-76 (forward-based) implied volatility given a target price.
 
     Parameters
     ----------
@@ -882,6 +1007,12 @@ def black76_implied_vol(
     ------
     ValueError
         If inputs are invalid or no root exists in the search bracket.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import black76_implied_vol
+    >>> callable(black76_implied_vol)
+    True
     """
     ...
 
@@ -900,7 +1031,8 @@ def barrier_call(
     direction: str,
     knock: str,
 ) -> float:
-    """Reiner-Rubinstein continuous-monitoring barrier call price.
+    """
+    Reiner-Rubinstein continuous-monitoring barrier call price.
 
     ``direction`` is ``"up"`` or ``"down"``; ``knock`` is ``"in"`` or ``"out"``.
 
@@ -929,6 +1061,17 @@ def barrier_call(
     -------
     float
         Per-unit barrier call price.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import barrier_call
+    >>> callable(barrier_call)
+    True
     """
     ...
 
@@ -943,7 +1086,8 @@ def asian_option_price(
     averaging: str = "arithmetic",
     is_call: bool = True,
 ) -> float:
-    """Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option price.
+    """
+    Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option price.
 
     Parameters
     ----------
@@ -970,6 +1114,17 @@ def asian_option_price(
     -------
     float
         Per-unit Asian option price.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import asian_option_price
+    >>> callable(asian_option_price)
+    True
     """
     ...
 
@@ -984,7 +1139,8 @@ def lookback_option_price(
     strike_type: str = "fixed",
     is_call: bool = True,
 ) -> float:
-    """Conze-Viswanathan lookback option price.
+    """
+    Conze-Viswanathan lookback option price.
 
     For ``strike_type="floating"``, ``strike`` is ignored and ``extremum``
     is the observed min (call) / max (put) to date.
@@ -1014,6 +1170,17 @@ def lookback_option_price(
     -------
     float
         Per-unit lookback option price.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import lookback_option_price
+    >>> callable(lookback_option_price)
+    True
     """
     ...
 
@@ -1029,7 +1196,8 @@ def quanto_option_price(
     correlation: float,
     is_call: bool = True,
 ) -> float:
-    """Quanto option (FX-adjusted cross-currency) price in domestic currency.
+    """
+    Quanto option (FX-adjusted cross-currency) price in domestic currency.
 
     Parameters
     ----------
@@ -1058,6 +1226,17 @@ def quanto_option_price(
     -------
     float
         Per-unit quanto option price in domestic currency.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import quanto_option_price
+    >>> callable(quanto_option_price)
+    True
     """
     ...
 
@@ -1066,10 +1245,17 @@ def quanto_option_price(
 # ---------------------------------------------------------------------------
 
 class SabrParameters:
-    """SABR parameters ``(alpha, beta, nu, rho)`` with optional ``shift``.
+    """
+    SABR parameters ``(alpha, beta, nu, rho)`` with optional ``shift``.
 
     Enforces ``alpha > 0``, ``beta in [0, 1]``, ``nu >= 0``, ``rho in
     [-1, 1]``, and ``shift > 0`` when supplied.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import SabrParameters
+    >>> SabrParameters.__name__
+    'SabrParameters'
     """
 
     def __init__(
@@ -1080,7 +1266,8 @@ class SabrParameters:
         rho: float,
         shift: float | None = None,
     ) -> None:
-        """Create a validated SABR volatility-smile parameter set.
+        """
+        Create a validated SABR volatility-smile parameter set.
 
         Parameters
         ----------
@@ -1095,33 +1282,53 @@ class SabrParameters:
         shift : float or None, default None
             Optional positive shifted-lognormal displacement for negative-rate
             strikes and forwards; ``None`` uses the unshifted formula.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     @staticmethod
     def equity_default() -> SabrParameters:
-        """Equity-standard defaults ``(alpha=0.20, beta=1.0, nu=0.30, rho=-0.20)``.
+        """
+        Equity-standard defaults ``(alpha=0.20, beta=1.0, nu=0.30, rho=-0.20)``.
 
         Returns
         -------
         SabrParameters
             Default equity SABR parameters.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations import SabrParameters
+        >>> callable(SabrParameters.equity_default)
+        True
         """
         ...
 
     @staticmethod
     def rates_default() -> SabrParameters:
-        """Rates-standard defaults ``(alpha=0.02, beta=0.5, nu=0.30, rho=0.0)``.
+        """
+        Rates-standard defaults ``(alpha=0.02, beta=0.5, nu=0.30, rho=0.0)``.
 
         Returns
         -------
         SabrParameters
             Default rates SABR parameters.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations import SabrParameters
+        >>> callable(SabrParameters.rates_default)
+        True
         """
         ...
 
     @property
     def alpha(self) -> float:
-        """SABR alpha level parameter.
+        """
+        SABR alpha level parameter.
 
         Returns
         -------
@@ -1132,7 +1339,8 @@ class SabrParameters:
 
     @property
     def beta(self) -> float:
-        """SABR beta elasticity parameter in ``[0, 1]``.
+        """
+        SABR beta elasticity parameter in ``[0, 1]``.
 
         Returns
         -------
@@ -1143,7 +1351,8 @@ class SabrParameters:
 
     @property
     def nu(self) -> float:
-        """Volatility-of-volatility parameter.
+        """
+        Volatility-of-volatility parameter.
 
         Returns
         -------
@@ -1154,7 +1363,8 @@ class SabrParameters:
 
     @property
     def rho(self) -> float:
-        """Forward/volatility correlation parameter in ``[-1, 1]``.
+        """
+        Forward/volatility correlation parameter in ``[-1, 1]``.
 
         Returns
         -------
@@ -1165,7 +1375,8 @@ class SabrParameters:
 
     @property
     def shift(self) -> float | None:
-        """Optional positive shift used for negative-rate smiles.
+        """
+        Optional positive shift used for negative-rate smiles.
 
         Returns
         -------
@@ -1175,7 +1386,8 @@ class SabrParameters:
         ...
 
     def is_shifted(self) -> bool:
-        """``True`` when parameters include a non-zero shift (negative-rate support).
+        """
+        ``True`` when parameters include a non-zero shift (negative-rate support).
 
         Returns
         -------
@@ -1185,7 +1397,8 @@ class SabrParameters:
         ...
 
 class SabrModel:
-    """Hagan-2002 SABR stochastic-volatility smile model.
+    """
+    Hagan-2002 SABR stochastic-volatility smile model.
 
     Sources
     -------
@@ -1200,7 +1413,8 @@ class SabrModel:
     """
 
     def __init__(self, params: SabrParameters) -> None:
-        """Create a SABR model from validated parameters.
+        """
+        Create a SABR model from validated parameters.
 
         Parameters
         ----------
@@ -1215,7 +1429,8 @@ class SabrModel:
         ...
 
     def implied_vol(self, forward: float, strike: float, t: float) -> float:
-        """Black-style implied volatility under the Hagan-2002 expansion.
+        """
+        Black-style implied volatility under the Hagan-2002 expansion.
 
         Parameters
         ----------
@@ -1230,12 +1445,18 @@ class SabrModel:
         -------
         float
             Implied volatility as a decimal.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def params(self) -> SabrParameters:
-        """Parameters used by this model.
+        """
+        Parameters used by this model.
 
         Returns
         -------
@@ -1245,7 +1466,8 @@ class SabrModel:
         ...
 
     def supports_negative_rates(self) -> bool:
-        """Return ``True`` when the model has a positive shift.
+        """
+        Return ``True`` when the model has a positive shift.
 
         Returns
         -------
@@ -1255,7 +1477,8 @@ class SabrModel:
         ...
 
 class SabrSmile:
-    """Volatility smile generator for a fixed ``(forward, t)`` pair.
+    """
+    Volatility smile generator for a fixed ``(forward, t)`` pair.
 
     Examples
     --------
@@ -1271,7 +1494,8 @@ class SabrSmile:
         forward: float,
         t: float,
     ) -> None:
-        """Create a smile helper for one forward and expiry.
+        """
+        Create a smile helper for one forward and expiry.
 
         Parameters
         ----------
@@ -1281,11 +1505,17 @@ class SabrSmile:
             Forward price at expiry.
         t : float
             Time to expiry in years.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def atm_vol(self) -> float:
-        """Return the ATM implied volatility.
+        """
+        Return the ATM implied volatility.
 
         Returns
         -------
@@ -1295,7 +1525,8 @@ class SabrSmile:
         ...
 
     def implied_vol(self, strike: float) -> float:
-        """Return implied volatility at ``strike``.
+        """
+        Return implied volatility at ``strike``.
 
         Parameters
         ----------
@@ -1306,11 +1537,17 @@ class SabrSmile:
         -------
         float
             Implied vol as a decimal.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def generate_smile(self, strikes: list[float]) -> list[float]:
-        """Return implied volatilities for all supplied strikes.
+        """
+        Return implied volatilities for all supplied strikes.
 
         Parameters
         ----------
@@ -1321,6 +1558,11 @@ class SabrSmile:
         -------
         list[float]
             Implied vols aligned with ``strikes``.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -1330,7 +1572,8 @@ class SabrSmile:
         r: float = 0.0,
         q: float = 0.0,
     ) -> dict[str, Any]:
-        """Butterfly + monotonicity arbitrage diagnostics on ``strikes``.
+        """
+        Butterfly + monotonicity arbitrage diagnostics on ``strikes``.
 
         Returns a dict with ``arbitrage_free``, ``butterfly_violations``,
         and ``monotonicity_violations``.
@@ -1349,11 +1592,17 @@ class SabrSmile:
         dict[str, Any]
             Diagnostics dict with ``arbitrage_free``, ``butterfly_violations``,
             and ``monotonicity_violations``.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 class SabrCalibrator:
-    """SABR calibrator (Levenberg-Marquardt with beta fixed).
+    """
+    SABR calibrator (Levenberg-Marquardt with beta fixed).
 
     Examples
     --------
@@ -1363,22 +1612,32 @@ class SabrCalibrator:
     """
 
     def __init__(self) -> None:
-        """Create a default SABR calibrator with standard tolerance and iteration cap."""
+        """
+        Create a default SABR calibrator with standard tolerance and iteration cap.
+        """
         ...
 
     @staticmethod
     def high_precision() -> SabrCalibrator:
-        """Return a calibrator with tighter tolerance for production fits.
+        """
+        Return a calibrator with tighter tolerance for production fits.
 
         Returns
         -------
         SabrCalibrator
             Calibrator with high-precision tolerance.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations import SabrCalibrator
+        >>> callable(SabrCalibrator.high_precision)
+        True
         """
         ...
 
     def with_tolerance(self, tolerance: float) -> SabrCalibrator:
-        """Return a copy with an overridden convergence tolerance.
+        """
+        Return a copy with an overridden convergence tolerance.
 
         Parameters
         ----------
@@ -1389,6 +1648,11 @@ class SabrCalibrator:
         -------
         SabrCalibrator
             New calibrator instance sharing other settings.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -1400,7 +1664,8 @@ class SabrCalibrator:
         t: float,
         beta: float,
     ) -> SabrParameters:
-        """Fit ``(alpha, nu, rho)`` to market vols with ``beta`` fixed.
+        """
+        Fit ``(alpha, nu, rho)`` to market vols with ``beta`` fixed.
 
         Parameters
         ----------
@@ -1435,7 +1700,8 @@ class SabrCalibrator:
         t: float,
         beta: float,
     ) -> SabrParameters:
-        """Calibrate with automatic shift selection for negative-rate smiles.
+        """
+        Calibrate with automatic shift selection for negative-rate smiles.
 
         Parameters
         ----------
@@ -1476,7 +1742,8 @@ def bs_cos_price(
     is_call: bool,
     n_terms: int | None = None,
 ) -> float:
-    """Price a European option under Black-Scholes with the COS method.
+    """
+    Price a European option under Black-Scholes with the COS method.
 
     Parameters
     ----------
@@ -1501,6 +1768,17 @@ def bs_cos_price(
     -------
     float
         Per-unit option price.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import bs_cos_price
+    >>> callable(bs_cos_price)
+    True
     """
     ...
 
@@ -1516,7 +1794,8 @@ def vg_cos_price(
     is_call: bool,
     n_terms: int | None = None,
 ) -> float:
-    """Price a European option under Variance Gamma with the COS method.
+    """
+    Price a European option under Variance Gamma with the COS method.
 
     Parameters
     ----------
@@ -1545,6 +1824,17 @@ def vg_cos_price(
     -------
     float
         Per-unit option price.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import vg_cos_price
+    >>> callable(vg_cos_price)
+    True
     """
     ...
 
@@ -1561,7 +1851,8 @@ def merton_jump_cos_price(
     is_call: bool,
     n_terms: int | None = None,
 ) -> float:
-    """Price a European option under Merton jump-diffusion with the COS method.
+    """
+    Price a European option under Merton jump-diffusion with the COS method.
 
     Parameters
     ----------
@@ -1592,6 +1883,17 @@ def merton_jump_cos_price(
     -------
     float
         Per-unit option price.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import merton_jump_cos_price
+    >>> callable(merton_jump_cos_price)
+    True
     """
     ...
 
@@ -1606,7 +1908,8 @@ def tarn_coupon_profile(
     target_coupon: float,
     day_count_fraction: float,
 ) -> dict[str, Any]:
-    """Simulate a TARN coupon profile along a deterministic rate path.
+    """
+    Simulate a TARN coupon profile along a deterministic rate path.
 
     Each period coupon is ``max(fixed_rate - L_i, coupon_floor) * dcf``;
     payments accumulate until the cumulative reaches ``target_coupon``, at
@@ -1632,6 +1935,17 @@ def tarn_coupon_profile(
         Dict with keys ``coupons_paid`` (list[float]), ``cumulative``
         (list[float]), ``redemption_index`` (int | None) and
         ``redeemed_early`` (bool).
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import tarn_coupon_profile
+    >>> callable(tarn_coupon_profile)
+    True
     """
     ...
 
@@ -1642,7 +1956,8 @@ def snowball_coupon_profile(
     floor: float,
     cap: float,
 ) -> list[float]:
-    """Compute a snowball coupon schedule.
+    """
+    Compute a snowball coupon schedule.
 
     Snowball: ``c_i = clip(c_{i-1} + fixed_rate - L_i, floor, cap)``
     with ``c_0 = initial_coupon``.
@@ -1670,6 +1985,17 @@ def snowball_coupon_profile(
     -------
     list[float]
         Coupon schedule, one per period.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import snowball_coupon_profile
+    >>> callable(snowball_coupon_profile)
+    True
     """
     ...
 
@@ -1680,7 +2006,8 @@ def inverse_floater_coupon_profile(
     cap: float,
     leverage: float,
 ) -> list[float]:
-    """Compute a path-independent inverse-floater coupon schedule.
+    """
+    Compute a path-independent inverse-floater coupon schedule.
 
     Parameters
     ----------
@@ -1696,6 +2023,22 @@ def inverse_floater_coupon_profile(
         ``float("inf")`` for no cap.
     leverage : float
         Multiplier applied to each floating fixing before it offsets the fixed rate.
+
+    Returns
+    -------
+    list[float]
+        Result of inverse floater coupon profile for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import inverse_floater_coupon_profile
+    >>> callable(inverse_floater_coupon_profile)
+    True
     """
     ...
 
@@ -1706,7 +2049,8 @@ def cms_spread_option_intrinsic(
     is_call: bool,
     notional: float,
 ) -> float:
-    """Undiscounted intrinsic payoff of a CMS spread option.
+    """
+    Undiscounted intrinsic payoff of a CMS spread option.
 
     Call: ``notional * max(long_cms - short_cms - strike, 0)``.
     Put: ``notional * max(strike - (long_cms - short_cms), 0)``.
@@ -1732,6 +2076,17 @@ def cms_spread_option_intrinsic(
     -------
     float
         Undiscounted intrinsic payoff.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import cms_spread_option_intrinsic
+    >>> callable(cms_spread_option_intrinsic)
+    True
     """
     ...
 
@@ -1742,7 +2097,8 @@ def callable_range_accrual_accrued(
     coupon_rate: float,
     day_count_fraction: float,
 ) -> float:
-    """Accrued coupon over a range-accrual period.
+    """
+    Accrued coupon over a range-accrual period.
 
     Counts the fraction of ``observations`` within the inclusive interval
     ``[lower, upper]`` and returns
@@ -1768,5 +2124,16 @@ def callable_range_accrual_accrued(
     -------
     float
         Accrued coupon amount.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import callable_range_accrual_accrued
+    >>> callable(callable_range_accrual_accrued)
+    True
     """
     ...

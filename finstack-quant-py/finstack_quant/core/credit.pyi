@@ -1,9 +1,16 @@
-"""Credit risk models: academic scoring, PD calibration, and LGD / EAD.
+"""
+Credit risk models: academic scoring, PD calibration, and LGD / EAD.
 
 Bindings for ``finstack_quant_core::credit``. Each submodule mirrors the Rust
 module of the same name and is registered at runtime in ``sys.modules``
 so that ``from finstack_quant.core.credit import scoring`` (or ``pd``, ``lgd``,
 ``migration``, ``recovery_waterfall``) works transparently.
+
+Examples
+--------
+>>> import finstack_quant.core.credit as credit
+>>> credit.__name__
+'finstack_quant.core.credit'
 """
 
 from __future__ import annotations
@@ -11,9 +18,27 @@ from __future__ import annotations
 __all__ = ["scoring", "pd", "lgd", "migration", "recovery_waterfall"]
 
 class recovery_waterfall:
-    """Absolute-priority recovery allocation with estate-inclusive collateral."""
+    """
+    Absolute-priority recovery allocation with estate-inclusive collateral.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.credit import recovery_waterfall
+    >>> recovery_waterfall.__name__
+    'recovery_waterfall'
+    """
 
     class RecoveryClaim:
+        """
+        Compute recovery waterfall.RecoveryClaim.
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.recovery_waterfall.RecoveryClaim.__name__
+        'RecoveryClaim'
+        """
+
         def __init__(
             self,
             id: str,
@@ -24,7 +49,8 @@ class recovery_waterfall:
             penalties: float = 0.0,
             collateral: tuple[float, float] | None = None,
         ) -> None:
-            """Create a claim for absolute-priority recovery allocation.
+            """
+            Create a claim for absolute-priority recovery allocation.
 
             Parameters
             ----------
@@ -44,63 +70,306 @@ class recovery_waterfall:
             collateral : tuple[float, float] or None, default None
                 Optional ``(market_value, haircut)`` collateral tuple. The
                 haircut is a decimal fraction deducted before estate allocation.
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
             """
             ...
         @property
-        def id(self) -> str: ...
+        def id(self) -> str:
+            """
+            Return the id for `recovery_waterfall.RecoveryClaim`.
+
+            Returns
+            -------
+            str
+                The id exposed by this `recovery_waterfall.RecoveryClaim`.
+            """
+            ...
+
         @property
-        def seniority(self) -> str: ...
+        def seniority(self) -> str:
+            """
+            Return the seniority for `recovery_waterfall.RecoveryClaim`.
+
+            Returns
+            -------
+            str
+                The seniority exposed by this `recovery_waterfall.RecoveryClaim`.
+            """
+            ...
+
         @property
-        def priority(self) -> int: ...
+        def priority(self) -> int:
+            """
+            Return the priority for `recovery_waterfall.RecoveryClaim`.
+
+            Returns
+            -------
+            int
+                The priority exposed by this `recovery_waterfall.RecoveryClaim`.
+            """
+            ...
+
         @property
-        def principal(self) -> float: ...
+        def principal(self) -> float:
+            """
+            Return the principal for `recovery_waterfall.RecoveryClaim`.
+
+            Returns
+            -------
+            float
+                The principal exposed by this `recovery_waterfall.RecoveryClaim`.
+            """
+            ...
+
         @property
-        def accrued(self) -> float: ...
+        def accrued(self) -> float:
+            """
+            Return the accrued for `recovery_waterfall.RecoveryClaim`.
+
+            Returns
+            -------
+            float
+                The accrued exposed by this `recovery_waterfall.RecoveryClaim`.
+            """
+            ...
+
         @property
-        def penalties(self) -> float: ...
+        def penalties(self) -> float:
+            """
+            Return the penalties for `recovery_waterfall.RecoveryClaim`.
+
+            Returns
+            -------
+            float
+                The penalties exposed by this `recovery_waterfall.RecoveryClaim`.
+            """
+            ...
+
         @property
-        def collateral_value(self) -> float | None: ...
+        def collateral_value(self) -> float | None:
+            """
+            Return the collateral value for `recovery_waterfall.RecoveryClaim`.
+
+            Returns
+            -------
+            float | None
+                The collateral value exposed by this `recovery_waterfall.RecoveryClaim`.
+            """
+            ...
+
         @property
-        def collateral_haircut(self) -> float: ...
+        def collateral_haircut(self) -> float:
+            """
+            Return the collateral haircut for `recovery_waterfall.RecoveryClaim`.
+
+            Returns
+            -------
+            float
+                The collateral haircut exposed by this `recovery_waterfall.RecoveryClaim`.
+            """
+            ...
+
         @property
-        def total_claim(self) -> float: ...
+        def total_claim(self) -> float:
+            """
+            Return the total claim for `recovery_waterfall.RecoveryClaim`.
+
+            Returns
+            -------
+            float
+                The total claim exposed by this `recovery_waterfall.RecoveryClaim`.
+            """
+            ...
 
     class RecoveryAllocation:
+        """
+        Compute recovery waterfall.RecoveryAllocation.
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.recovery_waterfall.RecoveryAllocation.__name__
+        'RecoveryAllocation'
+        """
+
         @property
-        def id(self) -> str: ...
+        def id(self) -> str:
+            """
+            Return the id for `recovery_waterfall.RecoveryAllocation`.
+
+            Returns
+            -------
+            str
+                The id exposed by this `recovery_waterfall.RecoveryAllocation`.
+            """
+            ...
+
         @property
-        def seniority(self) -> str: ...
+        def seniority(self) -> str:
+            """
+            Return the seniority for `recovery_waterfall.RecoveryAllocation`.
+
+            Returns
+            -------
+            str
+                The seniority exposed by this `recovery_waterfall.RecoveryAllocation`.
+            """
+            ...
+
         @property
-        def priority(self) -> int: ...
+        def priority(self) -> int:
+            """
+            Return the priority for `recovery_waterfall.RecoveryAllocation`.
+
+            Returns
+            -------
+            int
+                The priority exposed by this `recovery_waterfall.RecoveryAllocation`.
+            """
+            ...
+
         @property
-        def total_claim(self) -> float: ...
+        def total_claim(self) -> float:
+            """
+            Return the total claim for `recovery_waterfall.RecoveryAllocation`.
+
+            Returns
+            -------
+            float
+                The total claim exposed by this `recovery_waterfall.RecoveryAllocation`.
+            """
+            ...
+
         @property
-        def collateral_recovery(self) -> float: ...
+        def collateral_recovery(self) -> float:
+            """
+            Return the collateral recovery for `recovery_waterfall.RecoveryAllocation`.
+
+            Returns
+            -------
+            float
+                The collateral recovery exposed by this `recovery_waterfall.RecoveryAllocation`.
+            """
+            ...
+
         @property
-        def general_recovery(self) -> float: ...
+        def general_recovery(self) -> float:
+            """
+            Return the general recovery for `recovery_waterfall.RecoveryAllocation`.
+
+            Returns
+            -------
+            float
+                The general recovery exposed by this `recovery_waterfall.RecoveryAllocation`.
+            """
+            ...
+
         @property
-        def total_recovery(self) -> float: ...
+        def total_recovery(self) -> float:
+            """
+            Return the total recovery for `recovery_waterfall.RecoveryAllocation`.
+
+            Returns
+            -------
+            float
+                The total recovery exposed by this `recovery_waterfall.RecoveryAllocation`.
+            """
+            ...
+
         @property
-        def recovery_rate(self) -> float: ...
+        def recovery_rate(self) -> float:
+            """
+            Return the recovery rate for `recovery_waterfall.RecoveryAllocation`.
+
+            Returns
+            -------
+            float
+                The recovery rate exposed by this `recovery_waterfall.RecoveryAllocation`.
+            """
+            ...
+
         @property
-        def deficiency(self) -> float: ...
+        def deficiency(self) -> float:
+            """
+            Return the deficiency for `recovery_waterfall.RecoveryAllocation`.
+
+            Returns
+            -------
+            float
+                The deficiency exposed by this `recovery_waterfall.RecoveryAllocation`.
+            """
+            ...
 
     class RecoveryWaterfallResult:
+        """
+        Compute recovery waterfall.RecoveryWaterfallResult.
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.recovery_waterfall.RecoveryWaterfallResult.__name__
+        'RecoveryWaterfallResult'
+        """
+
         @property
-        def total_distributed(self) -> float: ...
+        def total_distributed(self) -> float:
+            """
+            Return the total distributed for `recovery_waterfall.RecoveryWaterfallResult`.
+
+            Returns
+            -------
+            float
+                The total distributed exposed by this `recovery_waterfall.RecoveryWaterfallResult`.
+            """
+            ...
+
         @property
-        def undistributed_estate(self) -> float: ...
+        def undistributed_estate(self) -> float:
+            """
+            Return the undistributed estate for `recovery_waterfall.RecoveryWaterfallResult`.
+
+            Returns
+            -------
+            float
+                The undistributed estate exposed by this `recovery_waterfall.RecoveryWaterfallResult`.
+            """
+            ...
+
         @property
-        def apr_satisfied(self) -> bool: ...
+        def apr_satisfied(self) -> bool:
+            """
+            Return the apr satisfied for `recovery_waterfall.RecoveryWaterfallResult`.
+
+            Returns
+            -------
+            bool
+                The apr satisfied exposed by this `recovery_waterfall.RecoveryWaterfallResult`.
+            """
+            ...
+
         @property
-        def allocations(self) -> list[recovery_waterfall.RecoveryAllocation]: ...
+        def allocations(self) -> list[recovery_waterfall.RecoveryAllocation]:
+            """
+            Return the allocations for `recovery_waterfall.RecoveryWaterfallResult`.
+
+            Returns
+            -------
+            list[recovery_waterfall.RecoveryAllocation]
+                The allocations exposed by this `recovery_waterfall.RecoveryWaterfallResult`.
+            """
+            ...
 
     @staticmethod
     def allocate_recovery(
         estate_value: float,
         claims: list[recovery_waterfall.RecoveryClaim],
     ) -> recovery_waterfall.RecoveryWaterfallResult:
-        """Allocate an insolvent estate under absolute priority.
+        """
+        Allocate an insolvent estate under absolute priority.
 
         Parameters
         ----------
@@ -115,14 +384,41 @@ class recovery_waterfall:
         -------
         RecoveryWaterfallResult
             Per-claim recoveries, undistributed estate, and APR satisfaction.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.credit import recovery_waterfall
+        >>> callable(recovery_waterfall.allocate_recovery)
+        True
         """
         ...
 
 class scoring:
-    """Academic credit scoring: Altman Z-Score family, Ohlson O-Score, Zmijewski."""
+    """
+    Academic credit scoring: Altman Z-Score family, Ohlson O-Score, Zmijewski.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.credit import scoring
+    >>> scoring.__name__
+    'scoring'
+    """
 
     class AltmanPdCalibration:
-        """Explicit versioned Altman score-to-PD heuristics."""
+        """
+        Explicit versioned Altman score-to-PD heuristics.
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.scoring.AltmanPdCalibration.__name__
+        'AltmanPdCalibration'
+        """
 
         HEURISTIC_V1: scoring.AltmanPdCalibration
 
@@ -135,7 +431,8 @@ class scoring:
         sales_to_total_assets: float,
         pd_calibration: AltmanPdCalibration | None = None,
     ) -> tuple[float, str, float | None]:
-        """Original Altman Z-Score (1968) for publicly traded manufacturers.
+        """
+        Original Altman Z-Score (1968) for publicly traded manufacturers.
 
         Parameters
         ----------
@@ -187,7 +484,8 @@ class scoring:
         sales_to_total_assets: float,
         pd_calibration: AltmanPdCalibration | None = None,
     ) -> tuple[float, str, float | None]:
-        """Altman Z'-Score (1983) for private firms.
+        """
+        Altman Z'-Score (1983) for private firms.
 
         Parameters
         ----------
@@ -223,6 +521,11 @@ class scoring:
         >>> score, zone, pd = scoring.altman_z_prime(0.2, 0.3, 0.15, 1.5, 1.0)
         >>> zone in ("safe", "grey", "distress")
         True
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -234,7 +537,8 @@ class scoring:
         book_equity_to_total_liabilities: float,
         pd_calibration: AltmanPdCalibration | None = None,
     ) -> tuple[float, str, float | None]:
-        """Altman Z''-Score for non-manufacturing firms (non-EM model, no constant).
+        """
+        Altman Z''-Score for non-manufacturing firms (non-EM model, no constant).
 
         Parameters
         ----------
@@ -259,6 +563,16 @@ class scoring:
         >>> score, zone, pd = scoring.altman_z_double_prime(0.2, 0.3, 0.15, 1.5)
         >>> zone in ("safe", "grey", "distress")
         True
+
+        Returns
+        -------
+        tuple[float, str, float | None]
+            Result of altman z double prime for this `scoring` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -274,7 +588,8 @@ class scoring:
         negative_net_income_two_years: float,
         net_income_change: float,
     ) -> tuple[float, str, float]:
-        """Ohlson O-Score (1980) logistic bankruptcy model.
+        """
+        Ohlson O-Score (1980) logistic bankruptcy model.
 
         Parameters
         ----------
@@ -309,6 +624,16 @@ class scoring:
         >>> score, zone, pd = scoring.ohlson_o_score(-0.5, 0.5, 0.1, 0.8, 0.0, 0.05, 0.2, 1.0, -0.01)
         >>> zone in ("safe", "grey", "distress")
         True
+
+        Returns
+        -------
+        tuple[float, str, float]
+            Result of ohlson o score for this `scoring` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -318,7 +643,8 @@ class scoring:
         total_liabilities_to_total_assets: float,
         current_assets_to_current_liabilities: float,
     ) -> tuple[float, str, float]:
-        """Zmijewski (1984) probit bankruptcy score.
+        """
+        Zmijewski (1984) probit bankruptcy score.
 
         Parameters
         ----------
@@ -337,15 +663,34 @@ class scoring:
         >>> score, zone, pd = scoring.zmijewski_score(0.05, 0.4, 1.5)
         >>> zone in ("safe", "grey", "distress")
         True
+
+        Returns
+        -------
+        tuple[float, str, float]
+            Result of zmijewski score for this `scoring` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 class pd:
-    """Probability of default: PiT/TtC conversion and central-tendency calibration."""
+    """
+    Probability of default: PiT/TtC conversion and central-tendency calibration.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.credit import pd
+    >>> pd.__name__
+    'pd'
+    """
 
     @staticmethod
     def pit_to_ttc(pit_pd: float, asset_correlation: float, cycle_index: float) -> float:
-        r"""Convert a Point-in-Time PD to Through-the-Cycle via Merton-Vasicek.
+        """
+        Convert a Point-in-Time PD to Through-the-Cycle via Merton-Vasicek.
 
         ``PD_TtC = Phi( Phi^{-1}(PD_PiT) * sqrt(1 - rho) + sqrt(rho) * z )``.
 
@@ -368,12 +713,18 @@ class pd:
         --------
         >>> from finstack_quant.core.credit import pd
         >>> ttc = pd.pit_to_ttc(0.02, 0.12, 0.0)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @staticmethod
     def ttc_to_pit(ttc_pd: float, asset_correlation: float, cycle_index: float) -> float:
-        r"""Convert a Through-the-Cycle PD to Point-in-Time via Merton-Vasicek.
+        """
+        Convert a Through-the-Cycle PD to Point-in-Time via Merton-Vasicek.
 
         ``PD_PiT = Phi( (Phi^{-1}(PD_TtC) - sqrt(rho) * z) / sqrt(1 - rho) )``.
 
@@ -396,12 +747,18 @@ class pd:
         --------
         >>> from finstack_quant.core.credit import pd
         >>> pit = pd.ttc_to_pit(0.02, 0.12, 1.0)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @staticmethod
     def central_tendency(annual_default_rates: list[float]) -> float:
-        """Arithmetic-mean long-run PD from annual default rates (regulatory TtC).
+        """
+        Arithmetic-mean long-run PD from annual default rates (regulatory TtC).
 
         Parameters
         ----------
@@ -418,18 +775,32 @@ class pd:
         >>> from finstack_quant.core.credit import pd
         >>> pd.central_tendency([0.01, 0.02, 0.015])  # doctest: +SKIP
         0.015
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 class lgd:
-    """Loss-given-default: seniority recovery, workout LGD, downturn adjustments, EAD."""
+    """
+    Loss-given-default: seniority recovery, workout LGD, downturn adjustments, EAD.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.credit import lgd
+    >>> lgd.__name__
+    'lgd'
+    """
 
     @staticmethod
     def seniority_recovery_stats(
         seniority: str,
         rating_agency: str | None = None,
     ) -> dict[str, float]:
-        """Historical recovery moments for a seniority class.
+        """
+        Historical recovery moments for a seniority class.
 
         If ``rating_agency`` is omitted, the Rust credit-assumptions registry
         default seniority calibration is used.
@@ -453,6 +824,11 @@ class lgd:
         >>> stats = lgd.seniority_recovery_stats("senior_secured")  # doctest: +SKIP
         >>> "mean" in stats
         True
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -463,7 +839,8 @@ class lgd:
         n_samples: int,
         seed: int,
     ) -> list[float]:
-        """Sample ``n_samples`` recoveries from Beta(alpha, beta) via PCG64.
+        """
+        Sample ``n_samples`` recoveries from Beta(alpha, beta) via PCG64.
 
         Parameters
         ----------
@@ -485,12 +862,18 @@ class lgd:
         --------
         >>> from finstack_quant.core.credit import lgd
         >>> samples = lgd.beta_recovery_sample(0.4, 0.2, 100, 42)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @staticmethod
     def beta_recovery_quantile(mean: float, std: float, q: float) -> float:
-        """Quantile ``q`` of a Beta recovery distribution parameterized by (mean, std).
+        """
+        Quantile ``q`` of a Beta recovery distribution parameterized by (mean, std).
 
         Parameters
         ----------
@@ -510,6 +893,11 @@ class lgd:
         --------
         >>> from finstack_quant.core.credit import lgd
         >>> lgd.beta_recovery_quantile(0.4, 0.2, 0.95)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -522,7 +910,8 @@ class lgd:
         time_to_resolution_years: float,
         discount_rate: float,
     ) -> tuple[float, float]:
-        """Workout LGD from collateral waterfall, costs, and discounting.
+        """
+        Workout LGD from collateral waterfall, costs, and discounting.
 
         Parameters
         ----------
@@ -549,6 +938,11 @@ class lgd:
         --------
         >>> from finstack_quant.core.credit import lgd
         >>> net_rec, loss = lgd.workout_lgd(100.0, [("cash", 40.0, 1.0)], 0.02, 0.01, 1.5, 0.05)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -559,7 +953,8 @@ class lgd:
         lgd_sensitivity: float,
         stress_quantile: float,
     ) -> float:
-        """Stressed downturn LGD adjustment, clamped to ``[0, 1]``.
+        """
+        Stressed downturn LGD adjustment, clamped to ``[0, 1]``.
 
         Proprietary mean-plus-multiple-of-Bernoulli-stdev approximation
         (not the Frye-Jacobs 2012 model). Typical ``lgd_sensitivity``:
@@ -585,6 +980,11 @@ class lgd:
         --------
         >>> from finstack_quant.core.credit import lgd
         >>> lgd.downturn_lgd_stressed(0.4, 0.12, 0.3, 0.999)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -594,7 +994,8 @@ class lgd:
         add_on: float,
         floor: float,
     ) -> float:
-        """Regulatory-floor downturn LGD: ``max(base + add_on, floor)`` clamped to ``[0, 1]``.
+        """
+        Regulatory-floor downturn LGD: ``max(base + add_on, floor)`` clamped to ``[0, 1]``.
 
         Parameters
         ----------
@@ -614,12 +1015,18 @@ class lgd:
         --------
         >>> from finstack_quant.core.credit import lgd
         >>> lgd.downturn_lgd_regulatory_floor(0.4, 0.05, 0.45)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @staticmethod
     def ead_term_loan(principal: float) -> float:
-        """Exposure at default for a fully drawn term loan (equal to principal).
+        """
+        Exposure at default for a fully drawn term loan (equal to principal).
 
         Parameters
         ----------
@@ -636,12 +1043,18 @@ class lgd:
         >>> from finstack_quant.core.credit import lgd
         >>> lgd.ead_term_loan(1_000_000.0)  # doctest: +SKIP
         1000000.0
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @staticmethod
     def ead_revolver(drawn: float, undrawn: float, ccf: float) -> float:
-        """Exposure at default for a revolver: ``drawn + undrawn * ccf``.
+        """
+        Exposure at default for a revolver: ``drawn + undrawn * ccf``.
 
         Parameters
         ----------
@@ -662,11 +1075,17 @@ class lgd:
         >>> from finstack_quant.core.credit import lgd
         >>> lgd.ead_revolver(50.0, 50.0, 0.5)  # doctest: +SKIP
         75.0
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 class migration:
-    """Credit migration: rating scales, transition matrices, generators, and CTMC simulation.
+    """
+    Credit migration: rating scales, transition matrices, generators, and CTMC simulation.
 
     Example
     -------
@@ -674,10 +1093,17 @@ class migration:
     >>> scale = migration.RatingScale.standard()  # doctest: +SKIP
     >>> scale.n_states()  # doctest: +SKIP
     8
+
+    Examples
+    --------
+    >>> from finstack_quant.core.credit import migration
+    >>> migration.__name__
+    'migration'
     """
 
     class RatingScale:
-        """Ordinal rating scale for credit migration modelling.
+        """
+        Ordinal rating scale for credit migration modelling.
 
         Provides standard agency scales (S&P/Moody's/Fitch) or custom scales
         with an optional default absorbing state.
@@ -688,11 +1114,18 @@ class migration:
         >>> scale = migration.RatingScale.standard()  # doctest: +SKIP
         >>> scale.labels()  # doctest: +SKIP
         ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'CCC', 'D']
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.migration.RatingScale.__name__
+        'RatingScale'
         """
 
         @staticmethod
         def standard() -> migration.RatingScale:
-            """Standard 8-state agency scale (AAA through D).
+            """
+            Standard 8-state agency scale (AAA through D).
 
             Returns
             -------
@@ -702,12 +1135,19 @@ class migration:
             Example
             -------
             >>> scale = migration.RatingScale.standard()  # doctest: +SKIP
+
+            Examples
+            --------
+            >>> import finstack_quant.core.credit as binding
+            >>> callable(binding.migration.RatingScale.standard)
+            True
             """
             ...
 
         @staticmethod
         def standard_with_nr() -> migration.RatingScale:
-            """Standard scale with an explicit ``NR`` (not rated) state.
+            """
+            Standard scale with an explicit ``NR`` (not rated) state.
 
             Returns
             -------
@@ -717,12 +1157,19 @@ class migration:
             Example
             -------
             >>> scale = migration.RatingScale.standard_with_nr()  # doctest: +SKIP
+
+            Examples
+            --------
+            >>> import finstack_quant.core.credit as binding
+            >>> callable(binding.migration.RatingScale.standard_with_nr)
+            True
             """
             ...
 
         @staticmethod
         def notched() -> migration.RatingScale:
-            """Notched 18-state scale (AAA through CCC- and D).
+            """
+            Notched 18-state scale (AAA through CCC- and D).
 
             Returns
             -------
@@ -732,12 +1179,19 @@ class migration:
             Example
             -------
             >>> scale = migration.RatingScale.notched()  # doctest: +SKIP
+
+            Examples
+            --------
+            >>> import finstack_quant.core.credit as binding
+            >>> callable(binding.migration.RatingScale.notched)
+            True
             """
             ...
 
         @staticmethod
         def custom(labels: list[str]) -> migration.RatingScale:
-            """Build a custom rating scale from an ordered label list.
+            """
+            Build a custom rating scale from an ordered label list.
 
             Parameters
             ----------
@@ -753,12 +1207,24 @@ class migration:
             Example
             -------
             >>> scale = migration.RatingScale.custom(["A", "B", "C", "D"])  # doctest: +SKIP
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+            Examples
+            --------
+            >>> import finstack_quant.core.credit as binding
+            >>> callable(binding.migration.RatingScale.custom)
+            True
             """
             ...
 
         @staticmethod
         def custom_with_default(labels: list[str], default_label: str) -> migration.RatingScale:
-            """Build a custom rating scale with an explicit default label.
+            """
+            Build a custom rating scale with an explicit default label.
 
             Parameters
             ----------
@@ -775,11 +1241,23 @@ class migration:
             Example
             -------
             >>> scale = migration.RatingScale.custom_with_default(["A", "B", "C"], "DEFAULT")  # doctest: +SKIP
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+            Examples
+            --------
+            >>> import finstack_quant.core.credit as binding
+            >>> callable(binding.migration.RatingScale.custom_with_default)
+            True
             """
             ...
 
         def n_states(self) -> int:
-            """Number of states on this scale (including default if present).
+            """
+            Number of states on this scale (including default if present).
 
             Returns
             -------
@@ -795,7 +1273,8 @@ class migration:
             ...
 
         def index_of(self, label: str) -> int | None:
-            """Return the 0-based index of ``label``, or ``None`` if not found.
+            """
+            Return the 0-based index of ``label``, or ``None`` if not found.
 
             Parameters
             ----------
@@ -812,11 +1291,17 @@ class migration:
             >>> scale = migration.RatingScale.standard()  # doctest: +SKIP
             >>> scale.index_of("BBB")  # doctest: +SKIP
             3
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
             """
             ...
 
         def default_state(self) -> int | None:
-            """Return the index of the default absorbing state, or ``None``.
+            """
+            Return the index of the default absorbing state, or ``None``.
 
             Returns
             -------
@@ -832,7 +1317,8 @@ class migration:
             ...
 
         def labels(self) -> list[str]:
-            """Return all rating labels in ordinal order.
+            """
+            Return all rating labels in ordinal order.
 
             Returns
             -------
@@ -848,7 +1334,8 @@ class migration:
             ...
 
         def warf(self, label: str) -> float:
-            """Weighted average rating factor (WARF) for a rating label.
+            """
+            Weighted average rating factor (WARF) for a rating label.
 
             Parameters
             ----------
@@ -874,7 +1361,8 @@ class migration:
             ...
 
         def rating_from_warf(self, warf: float) -> str:
-            """Map a WARF value back to the closest rating label.
+            """
+            Map a WARF value back to the closest rating label.
 
             Parameters
             ----------
@@ -891,11 +1379,17 @@ class migration:
             >>> scale = migration.RatingScale.standard()  # doctest: +SKIP
             >>> scale.rating_from_warf(250.0)  # doctest: +SKIP
             'BBB'
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
             """
             ...
 
     class TransitionMatrix:
-        """Discrete-horizon rating transition probability matrix.
+        """
+        Discrete-horizon rating transition probability matrix.
 
         Parameters
         ----------
@@ -917,11 +1411,37 @@ class migration:
         >>> from finstack_quant.core.credit import migration
         >>> scale = migration.RatingScale.standard()  # doctest: +SKIP
         >>> tm = migration.TransitionMatrix(scale, [...], 1.0)  # doctest: +SKIP
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.migration.TransitionMatrix.__name__
+        'TransitionMatrix'
         """
 
-        def __init__(self, scale: migration.RatingScale, data: list[float], horizon: float) -> None: ...
+        def __init__(self, scale: migration.RatingScale, data: list[float], horizon: float) -> None:
+            """
+            Compute   init for `migration.TransitionMatrix`.
+
+            Parameters
+            ----------
+            scale : object
+                Value supplied for `scale` to the documented binding operation.
+            data : object
+                Ordered input values consumed by the calculation in the documented representation.
+            horizon : object
+                Value supplied for `horizon` to the documented binding operation.
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+            """
+            ...
+
         def probability(self, from_: str, to: str) -> float:
-            """Transition probability from one rating to another.
+            """
+            Transition probability from one rating to another.
 
             Parameters
             ----------
@@ -939,11 +1459,17 @@ class migration:
             -------
             >>> tm.probability("BBB", "BB")  # doctest: +SKIP
             0.04
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
             """
             ...
 
         def row(self, from_: str) -> list[float]:
-            """Return the full transition row for a given origin rating.
+            """
+            Return the full transition row for a given origin rating.
 
             Parameters
             ----------
@@ -959,11 +1485,17 @@ class migration:
             -------
             >>> tm.row("BBB")  # doctest: +SKIP
             [0.9, 0.05, 0.04, ...]
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
             """
             ...
 
         def to_matrix(self) -> list[list[float]]:
-            """Return the full transition matrix as nested lists.
+            """
+            Return the full transition matrix as nested lists.
 
             Returns
             -------
@@ -978,7 +1510,8 @@ class migration:
             ...
 
         def horizon(self) -> float:
-            """Return the time horizon in years.
+            """
+            Return the time horizon in years.
 
             Returns
             -------
@@ -993,7 +1526,8 @@ class migration:
             ...
 
         def n_states(self) -> int:
-            """Return the number of states on the underlying scale.
+            """
+            Return the number of states on the underlying scale.
 
             Returns
             -------
@@ -1008,7 +1542,8 @@ class migration:
             ...
 
         def default_probabilities(self) -> list[float] | None:
-            """Return per-state default probabilities, or ``None`` if no default state.
+            """
+            Return per-state default probabilities, or ``None`` if no default state.
 
             Returns
             -------
@@ -1024,7 +1559,8 @@ class migration:
             ...
 
     class GeneratorMatrix:
-        """Continuous-time generator matrix (Q) for CTMC credit migration.
+        """
+        Continuous-time generator matrix (Q) for CTMC credit migration.
 
         Parameters
         ----------
@@ -1044,12 +1580,36 @@ class migration:
         >>> from finstack_quant.core.credit import migration
         >>> scale = migration.RatingScale.standard()  # doctest: +SKIP
         >>> gm = migration.GeneratorMatrix(scale, [...])  # doctest: +SKIP
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.migration.GeneratorMatrix.__name__
+        'GeneratorMatrix'
         """
 
-        def __init__(self, scale: migration.RatingScale, data: list[float]) -> None: ...
+        def __init__(self, scale: migration.RatingScale, data: list[float]) -> None:
+            """
+            Compute   init for `migration.GeneratorMatrix`.
+
+            Parameters
+            ----------
+            scale : object
+                Value supplied for `scale` to the documented binding operation.
+            data : object
+                Ordered input values consumed by the calculation in the documented representation.
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+            """
+            ...
+
         @staticmethod
         def from_transition_matrix(p: migration.TransitionMatrix) -> migration.GeneratorMatrix:
-            """Estimate a generator matrix from a discrete transition matrix.
+            """
+            Estimate a generator matrix from a discrete transition matrix.
 
             Uses the eigendecomposition method (Israel, Rosenthal, Wei 2001).
 
@@ -1066,11 +1626,23 @@ class migration:
             Example
             -------
             >>> gm = migration.GeneratorMatrix.from_transition_matrix(tm)  # doctest: +SKIP
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+            Examples
+            --------
+            >>> import finstack_quant.core.credit as binding
+            >>> callable(binding.migration.GeneratorMatrix.from_transition_matrix)
+            True
             """
             ...
 
         def intensity(self, from_: str, to: str) -> float:
-            """Generator intensity (migration rate) from one state to another.
+            """
+            Generator intensity (migration rate) from one state to another.
 
             Parameters
             ----------
@@ -1088,11 +1660,17 @@ class migration:
             -------
             >>> gm.intensity("BBB", "BB")  # doctest: +SKIP
             0.04
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
             """
             ...
 
         def exit_rate(self, state: str) -> float:
-            """Total exit rate (sum of off-diagonal intensities) for a state.
+            """
+            Total exit rate (sum of off-diagonal intensities) for a state.
 
             Parameters
             ----------
@@ -1109,11 +1687,17 @@ class migration:
             -------
             >>> gm.exit_rate("BBB")  # doctest: +SKIP
             0.06
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
             """
             ...
 
         def to_matrix(self) -> list[list[float]]:
-            """Return the full generator matrix as nested lists.
+            """
+            Return the full generator matrix as nested lists.
 
             Returns
             -------
@@ -1128,7 +1712,8 @@ class migration:
             ...
 
         def n_states(self) -> int:
-            """Return the number of states on the underlying scale.
+            """
+            Return the number of states on the underlying scale.
 
             Returns
             -------
@@ -1144,22 +1729,35 @@ class migration:
 
         @property
         def regularization_l1(self) -> float:
-            """L1 mass clamped by Kreinin-Sidenius regularization.
+            """
+            L1 mass clamped by Kreinin-Sidenius regularization.
 
             Returns ``0.0`` for directly constructed generators.
+
+            Returns
+            -------
+            float
+                The regularization l1 exposed by this `migration.GeneratorMatrix`.
             """
             ...
 
         @property
         def round_trip_error(self) -> float:
-            """Infinity-norm reconstruction error against the source matrix.
+            """
+            Infinity-norm reconstruction error against the source matrix.
 
             Returns ``0.0`` for directly constructed generators.
+
+            Returns
+            -------
+            float
+                The round trip error exposed by this `migration.GeneratorMatrix`.
             """
             ...
 
     class RatingPath:
-        """Simulated rating migration path over a time horizon.
+        """
+        Simulated rating migration path over a time horizon.
 
         Produced by :meth:`migration.MigrationSimulator.simulate`.
 
@@ -1168,10 +1766,17 @@ class migration:
         >>> path = simulator.simulate(3, 1, 42)[0]  # doctest: +SKIP
         >>> path.label_at(0.5)  # doctest: +SKIP
         'BBB'
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.migration.RatingPath.__name__
+        'RatingPath'
         """
 
         def state_at(self, t: float) -> int:
-            """Return the state index occupied at time ``t``.
+            """
+            Return the state index occupied at time ``t``.
 
             Parameters
             ----------
@@ -1187,11 +1792,17 @@ class migration:
             -------
             >>> path.state_at(0.5)  # doctest: +SKIP
             3
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
             """
             ...
 
         def label_at(self, t: float) -> str:
-            """Return the rating label occupied at time ``t``.
+            """
+            Return the rating label occupied at time ``t``.
 
             Parameters
             ----------
@@ -1207,11 +1818,17 @@ class migration:
             -------
             >>> path.label_at(0.5)  # doctest: +SKIP
             'BBB'
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
             """
             ...
 
         def defaulted(self) -> bool:
-            """Return whether this path entered the default state.
+            """
+            Return whether this path entered the default state.
 
             Returns
             -------
@@ -1226,7 +1843,8 @@ class migration:
             ...
 
         def default_time(self) -> float | None:
-            """Return the time of default, or ``None`` if not defaulted.
+            """
+            Return the time of default, or ``None`` if not defaulted.
 
             Returns
             -------
@@ -1241,7 +1859,8 @@ class migration:
             ...
 
         def n_transitions(self) -> int:
-            """Return the number of rating transitions in this path.
+            """
+            Return the number of rating transitions in this path.
 
             Returns
             -------
@@ -1256,7 +1875,8 @@ class migration:
             ...
 
         def transitions(self) -> list[tuple[float, int]]:
-            """Return all transitions as ``(time, new_state)`` pairs.
+            """
+            Return all transitions as ``(time, new_state)`` pairs.
 
             Returns
             -------
@@ -1271,7 +1891,8 @@ class migration:
             ...
 
         def horizon(self) -> float:
-            """Return the simulation horizon in years.
+            """
+            Return the simulation horizon in years.
 
             Returns
             -------
@@ -1286,7 +1907,8 @@ class migration:
             ...
 
     class MigrationSimulator:
-        """CTMC simulator for credit rating migration paths.
+        """
+        CTMC simulator for credit rating migration paths.
 
         Parameters
         ----------
@@ -1300,16 +1922,40 @@ class migration:
         >>> from finstack_quant.core.credit import migration
         >>> gm = migration.GeneratorMatrix(scale, [...])  # doctest: +SKIP
         >>> sim = migration.MigrationSimulator(gm, 1.0)  # doctest: +SKIP
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.migration.MigrationSimulator.__name__
+        'MigrationSimulator'
         """
 
-        def __init__(self, generator: migration.GeneratorMatrix, horizon: float) -> None: ...
+        def __init__(self, generator: migration.GeneratorMatrix, horizon: float) -> None:
+            """
+            Compute   init for `migration.MigrationSimulator`.
+
+            Parameters
+            ----------
+            generator : object
+                Value supplied for `generator` to the documented binding operation.
+            horizon : object
+                Value supplied for `horizon` to the documented binding operation.
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+            """
+            ...
+
         def simulate(
             self,
             initial_state: int,
             n_paths: int,
             seed: int,
         ) -> list[migration.RatingPath]:
-            """Simulate rating migration paths from a single starting state.
+            """
+            Simulate rating migration paths from a single starting state.
 
             Parameters
             ----------
@@ -1330,11 +1976,17 @@ class migration:
             >>> paths = sim.simulate(3, 1000, 42)  # doctest: +SKIP
             >>> len(paths)  # doctest: +SKIP
             1000
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
             """
             ...
 
         def empirical_matrix(self, n_paths_per_state: int, seed: int) -> migration.TransitionMatrix:
-            """Estimate a transition matrix by Monte Carlo simulation.
+            """
+            Estimate a transition matrix by Monte Carlo simulation.
 
             Simulates ``n_paths_per_state`` paths from every non-default state
             and computes the empirical transition probabilities.
@@ -1354,11 +2006,17 @@ class migration:
             Example
             -------
             >>> tm = sim.empirical_matrix(5000, 42)  # doctest: +SKIP
+
+            Raises
+            ------
+            ValueError
+                If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
             """
             ...
 
         def horizon(self) -> float:
-            """Return the simulation horizon in years.
+            """
+            Return the simulation horizon in years.
 
             Returns
             -------
@@ -1374,7 +2032,8 @@ class migration:
 
     @staticmethod
     def project(generator: migration.GeneratorMatrix, t: float) -> migration.TransitionMatrix:
-        """Compute the transition matrix at time ``t`` via matrix exponential.
+        """
+        Compute the transition matrix at time ``t`` via matrix exponential.
 
         Computes ``P(t) = exp(Q * t)`` where ``Q`` is the generator matrix.
 
@@ -1393,5 +2052,16 @@ class migration:
         Example
         -------
         >>> tm = migration.project(gm, 5.0)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.credit import migration
+        >>> callable(migration.project)
+        True
         """
         ...

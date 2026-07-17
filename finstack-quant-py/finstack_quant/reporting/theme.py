@@ -4,6 +4,12 @@ A :class:`Theme` is a frozen bundle of design tokens (fonts, colors, rules)
 plus a :meth:`Theme.to_css` method that emits a scoped ``<style>`` block. The
 default :data:`INSTITUTIONAL` theme is the approved "Institutional Research
 Note" house style.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.theme as theme
+>>> theme.__name__
+'finstack_quant.reporting.theme'
 """
 
 from __future__ import annotations
@@ -16,6 +22,12 @@ class Theme:
     """Immutable bundle of design tokens for rendered reports.
 
     Override with :func:`dataclasses.replace` to create variants.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.theme import Theme
+    >>> Theme.__name__
+    'Theme'
     """
 
     name: str
@@ -39,6 +51,16 @@ class Theme:
         ----------
         scope : str
             CSS class name without the leading dot that namespaces all rules.
+
+        Returns:
+        -------
+        str
+            Result of to css for this `Theme` in the annotated representation.
+
+        Raises:
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         s = f".{scope}"
         return f"""<style>

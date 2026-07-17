@@ -155,7 +155,9 @@ jobs:
           cache_save: false
 
       - name: Build and verify documentation
-        run: mise run rust-doc
+        run: |
+          mise run rust-doc
+          mise run python-doc
 
   # ============================================
   # Test Python — maturin build + pytest

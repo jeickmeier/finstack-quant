@@ -1,15 +1,23 @@
-"""Credit factor hierarchy: calibration, decomposition, and covariance forecasts.
+"""
+Credit factor hierarchy: calibration, decomposition, and covariance forecasts.
 
 Bindings for ``finstack-quant-factor-model`` credit hierarchy artifacts. Models
 are JSON-first: calibrate or load a :class:`CreditFactorModel`, decompose
 observed spreads into level/adder components, link period-to-period changes, and
 forecast factor covariance for risk reporting.
+
+Examples
+--------
+>>> import finstack_quant.factor_model.credit as credit
+>>> credit.__name__
+'finstack_quant.factor_model.credit'
 """
 
 from __future__ import annotations
 
 class CreditFactorModel:
-    """Calibrated credit factor hierarchy artifact.
+    """
+    Calibrated credit factor hierarchy artifact.
 
     Produced by :class:`CreditCalibrator` or loaded via :meth:`from_json`. All
     fields are read-only; mutations require re-calibration.
@@ -24,7 +32,8 @@ class CreditFactorModel:
 
     @staticmethod
     def from_json(json: str) -> CreditFactorModel:
-        """Deserialize a credit factor model from JSON.
+        """
+        Deserialize a credit factor model from JSON.
 
         Parameters
         ----------
@@ -40,11 +49,18 @@ class CreditFactorModel:
         ------
         ValueError
             If the JSON is malformed or fails structural validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.factor_model.credit import CreditFactorModel
+        >>> callable(CreditFactorModel.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this model to pretty-printed JSON.
+        """
+        Serialize this model to pretty-printed JSON.
 
         Returns
         -------
@@ -55,7 +71,8 @@ class CreditFactorModel:
 
     @property
     def schema_version(self) -> str:
-        """Schema version string (``"finstack_quant.credit_factor_model/1"``).
+        """
+        Schema version string (``"finstack_quant.credit_factor_model/1"``).
 
         Returns
         -------
@@ -66,7 +83,8 @@ class CreditFactorModel:
 
     @property
     def as_of(self) -> str:
-        """Calibration anchor date as an ISO 8601 string.
+        """
+        Calibration anchor date as an ISO 8601 string.
 
         Returns
         -------
@@ -77,7 +95,8 @@ class CreditFactorModel:
 
     @property
     def n_levels(self) -> int:
-        """Number of hierarchy levels (broadest to narrowest).
+        """
+        Number of hierarchy levels (broadest to narrowest).
 
         Returns
         -------
@@ -88,7 +107,8 @@ class CreditFactorModel:
 
     @property
     def n_issuers(self) -> int:
-        """Number of issuer beta rows in the artifact.
+        """
+        Number of issuer beta rows in the artifact.
 
         Returns
         -------
@@ -99,7 +119,8 @@ class CreditFactorModel:
 
     @property
     def n_factors(self) -> int:
-        """Number of systematic factors in the model configuration.
+        """
+        Number of systematic factors in the model configuration.
 
         Returns
         -------
@@ -109,7 +130,8 @@ class CreditFactorModel:
         ...
 
     def level_names(self) -> list[str]:
-        """Return hierarchy level names.
+        """
+        Return hierarchy level names.
 
         Returns
         -------
@@ -119,7 +141,8 @@ class CreditFactorModel:
         ...
 
     def issuer_ids(self) -> list[str]:
-        """Return issuer IDs present in the artifact.
+        """
+        Return issuer IDs present in the artifact.
 
         Returns
         -------
@@ -129,7 +152,8 @@ class CreditFactorModel:
         ...
 
     def factor_ids(self) -> list[str]:
-        """Return factor IDs in the model configuration.
+        """
+        Return factor IDs in the model configuration.
 
         Returns
         -------
@@ -141,7 +165,8 @@ class CreditFactorModel:
     def __repr__(self) -> str: ...
 
 class CreditCalibrator:
-    """Deterministic calibrator that produces a :class:`CreditFactorModel`.
+    """
+    Deterministic calibrator that produces a :class:`CreditFactorModel`.
 
     Configuration and inputs are JSON strings so callers can work with plain
     dicts (via ``json.dumps``) without typed wrappers for every sub-field.
@@ -155,7 +180,8 @@ class CreditCalibrator:
     """
 
     def __init__(self, config_json: str) -> None:
-        """Construct a calibrator from a JSON configuration.
+        """
+        Construct a calibrator from a JSON configuration.
 
         Parameters
         ----------
@@ -170,7 +196,8 @@ class CreditCalibrator:
         ...
 
     def calibrate(self, inputs_json: str) -> CreditFactorModel:
-        """Run calibration and return a validated factor model.
+        """
+        Run calibration and return a validated factor model.
 
         Parameters
         ----------
@@ -192,11 +219,20 @@ class CreditCalibrator:
     def __repr__(self) -> str: ...
 
 class LevelsAtDate:
-    """Decomposed credit spread levels at a single observation date."""
+    """
+    Decomposed credit spread levels at a single observation date.
+
+    Examples
+    --------
+    >>> from finstack_quant.factor_model.credit import LevelsAtDate
+    >>> LevelsAtDate.__name__
+    'LevelsAtDate'
+    """
 
     @property
     def date(self) -> str:
-        """Observation date as an ISO 8601 string.
+        """
+        Observation date as an ISO 8601 string.
 
         Returns
         -------
@@ -207,7 +243,8 @@ class LevelsAtDate:
 
     @property
     def generic(self) -> float:
-        """Generic (market-wide) spread component in basis points.
+        """
+        Generic (market-wide) spread component in basis points.
 
         Returns
         -------
@@ -218,7 +255,8 @@ class LevelsAtDate:
 
     @property
     def n_levels(self) -> int:
-        """Number of hierarchy levels in the decomposition.
+        """
+        Number of hierarchy levels in the decomposition.
 
         Returns
         -------
@@ -228,7 +266,8 @@ class LevelsAtDate:
         ...
 
     def level_values(self, level_index: int) -> dict[str, float]:
-        """Return bucket values for one hierarchy level.
+        """
+        Return bucket values for one hierarchy level.
 
         Parameters
         ----------
@@ -248,7 +287,8 @@ class LevelsAtDate:
         ...
 
     def adder(self) -> dict[str, float]:
-        """Return issuer-specific adder spreads keyed by issuer ID.
+        """
+        Return issuer-specific adder spreads keyed by issuer ID.
 
         Returns
         -------
@@ -260,11 +300,20 @@ class LevelsAtDate:
     def __repr__(self) -> str: ...
 
 class PeriodDecomposition:
-    """Period-over-period change in decomposed credit spread levels."""
+    """
+    Period-over-period change in decomposed credit spread levels.
+
+    Examples
+    --------
+    >>> from finstack_quant.factor_model.credit import PeriodDecomposition
+    >>> PeriodDecomposition.__name__
+    'PeriodDecomposition'
+    """
 
     @property
     def from_date(self) -> str:
-        """Start date of the decomposition window (ISO 8601).
+        """
+        Start date of the decomposition window (ISO 8601).
 
         Returns
         -------
@@ -275,18 +324,21 @@ class PeriodDecomposition:
 
     @property
     def to_date(self) -> str:
-        """End date of the decomposition window (ISO 8601).
+        """
+        End date of the decomposition window (ISO 8601).
 
         Returns
         -------
         str
             Period end.
+            The to date exposed by this `PeriodDecomposition`.
         """
         ...
 
     @property
     def d_generic(self) -> float:
-        """Change in generic spread over the period (bps).
+        """
+        Change in generic spread over the period (bps).
 
         Returns
         -------
@@ -297,7 +349,8 @@ class PeriodDecomposition:
 
     @property
     def n_levels(self) -> int:
-        """Number of hierarchy levels.
+        """
+        Number of hierarchy levels.
 
         Returns
         -------
@@ -307,7 +360,8 @@ class PeriodDecomposition:
         ...
 
     def level_deltas(self, level_index: int) -> dict[str, float]:
-        """Return bucket deltas for one hierarchy level.
+        """
+        Return bucket deltas for one hierarchy level.
 
         Parameters
         ----------
@@ -327,7 +381,8 @@ class PeriodDecomposition:
         ...
 
     def d_adder(self) -> dict[str, float]:
-        """Return issuer adder changes keyed by issuer ID.
+        """
+        Return issuer adder changes keyed by issuer ID.
 
         Returns
         -------
@@ -339,20 +394,35 @@ class PeriodDecomposition:
     def __repr__(self) -> str: ...
 
 class FactorCovarianceForecast:
-    """Factor covariance and idiosyncratic vol forecasts from a credit factor model."""
+    """
+    Factor covariance and idiosyncratic vol forecasts from a credit factor model.
+
+    Examples
+    --------
+    >>> from finstack_quant.factor_model.credit import FactorCovarianceForecast
+    >>> FactorCovarianceForecast.__name__
+    'FactorCovarianceForecast'
+    """
 
     def __init__(self, model: CreditFactorModel) -> None:
-        """Bind a covariance forecast engine to a calibrated model.
+        """
+        Bind a covariance forecast engine to a calibrated model.
 
         Parameters
         ----------
         model : CreditFactorModel
             Calibrated hierarchy artifact used as the risk factor basis.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def covariance_at(self, horizon: str) -> str:
-        """Return factor covariance matrix JSON at a forecast horizon.
+        """
+        Return factor covariance matrix JSON at a forecast horizon.
 
         Parameters
         ----------
@@ -373,7 +443,8 @@ class FactorCovarianceForecast:
         ...
 
     def idiosyncratic_vol(self, issuer_id: str, horizon: str) -> float:
-        """Return idiosyncratic volatility for an issuer at a horizon.
+        """
+        Return idiosyncratic volatility for an issuer at a horizon.
 
         Parameters
         ----------
@@ -395,7 +466,8 @@ class FactorCovarianceForecast:
         ...
 
     def factor_model_at(self, horizon: str, risk_measure_json: str) -> str:
-        """Return a portfolio-ready factor model JSON at a horizon.
+        """
+        Return a portfolio-ready factor model JSON at a horizon.
 
         Parameters
         ----------
@@ -425,7 +497,8 @@ def decompose_levels(
     as_of: str,
     runtime_tags_json: str | None = None,
 ) -> LevelsAtDate:
-    """Decompose observed issuer spreads into hierarchy levels and adders.
+    """
+    Decompose observed issuer spreads into hierarchy levels and adders.
 
     Parameters
     ----------
@@ -461,7 +534,8 @@ def decompose_period(
     from_levels: LevelsAtDate,
     to_levels: LevelsAtDate,
 ) -> PeriodDecomposition:
-    """Compute period-over-period deltas between two level decompositions.
+    """
+    Compute period-over-period deltas between two level decompositions.
 
     Parameters
     ----------

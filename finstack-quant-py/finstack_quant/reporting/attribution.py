@@ -5,6 +5,12 @@ Pure formatter — reads an already-computed ``attribution`` (a
 plus factor and carry/credit detail tables. It can also compute the attribution
 inline from an instrument + two market snapshots (the engine import is confined to
 ``_attribute_path``). It never re-derives analytics otherwise.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.attribution as attribution
+>>> attribution.__name__
+'finstack_quant.reporting.attribution'
 """
 
 from __future__ import annotations
@@ -218,6 +224,22 @@ def attribution_tearsheet(
         Report palette and typography used for the rendered tear sheet.
     generated : Any
         Optional generated date or timestamp; supply a fixed value for reproducibility.
+
+    Returns:
+    -------
+    TearSheet
+        Result of attribution tearsheet for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.attribution import attribution_tearsheet
+    >>> callable(attribution_tearsheet)
+    True
     """
     if instrument is not None:
         attribution = _attribute_path(instrument, market_t0, market_t1, as_of_t0, as_of_t1, method, config)

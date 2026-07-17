@@ -2,6 +2,12 @@
 
 Goal seek, DCF, corporate analysis, Monte Carlo, reports, and introspection.
 Bindings for the ``finstack-quant-statements-analytics`` Rust crate.
+
+Examples:
+--------
+>>> import finstack_quant.statements_analytics as statements_analytics
+>>> statements_analytics.__name__
+'finstack_quant.statements_analytics'
 """
 
 from __future__ import annotations

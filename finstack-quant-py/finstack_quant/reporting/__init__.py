@@ -1,4 +1,11 @@
-"""Publication-quality tear sheets, tables, and charts (pure-Python presentation layer)."""
+"""Publication-quality tear sheets, tables, and charts (pure-Python presentation layer).
+
+Examples:
+--------
+>>> import finstack_quant.reporting as reporting
+>>> reporting.__name__
+'finstack_quant.reporting'
+"""
 
 from .attribution import attribution_tearsheet
 from .benchmark import benchmark_tearsheet

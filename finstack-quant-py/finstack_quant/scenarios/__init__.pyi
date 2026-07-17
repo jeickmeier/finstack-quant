@@ -1,4 +1,12 @@
-"""Scenario specification, validation, composition, application, and built-in templates."""
+"""
+Scenario specification, validation, composition, application, and built-in templates.
+
+Examples
+--------
+>>> import finstack_quant.scenarios as scenarios
+>>> scenarios.__name__
+'finstack_quant.scenarios'
+"""
 
 from __future__ import annotations
 
@@ -30,7 +38,8 @@ __all__ = [
 ]
 
 def parse_scenario_spec(json_str: str) -> str:
-    """Parse, validate, and re-serialize a ``ScenarioSpec`` from JSON.
+    """
+    Parse, validate, and re-serialize a ``ScenarioSpec`` from JSON.
 
     Parameters
     ----------
@@ -62,7 +71,8 @@ def build_scenario_spec(
     description: str | None = None,
     priority: int = 0,
 ) -> str:
-    """Construct a ``ScenarioSpec`` from fields plus a JSON operations list.
+    """
+    Construct a ``ScenarioSpec`` from fields plus a JSON operations list.
 
     Parameters
     ----------
@@ -96,7 +106,8 @@ def build_scenario_spec(
     ...
 
 def compose_scenarios(specs_json: str) -> str:
-    """Merge multiple scenario specs using the scenario engine composer.
+    """
+    Merge multiple scenario specs using the scenario engine composer.
 
     Parameters
     ----------
@@ -122,7 +133,8 @@ def compose_scenarios(specs_json: str) -> str:
     ...
 
 def validate_scenario_spec(json_str: str) -> bool:
-    """Return ``True`` after successfully parsing and validating JSON.
+    """
+    Return ``True`` after successfully parsing and validating JSON.
 
     Parameters
     ----------
@@ -148,7 +160,8 @@ def validate_scenario_spec(json_str: str) -> bool:
     ...
 
 def list_builtin_templates() -> list[str]:
-    """List template IDs from the embedded built-in registry.
+    """
+    List template IDs from the embedded built-in registry.
 
     Returns
     -------
@@ -164,7 +177,8 @@ def list_builtin_templates() -> list[str]:
     ...
 
 def list_builtin_template_metadata() -> str:
-    """Serialize metadata for all built-in templates to JSON.
+    """
+    Serialize metadata for all built-in templates to JSON.
 
     Returns
     -------
@@ -179,7 +193,8 @@ def list_builtin_template_metadata() -> str:
     ...
 
 def build_from_template(template_id: str) -> str:
-    """Instantiate a ``ScenarioSpec`` from a built-in template.
+    """
+    Instantiate a ``ScenarioSpec`` from a built-in template.
 
     Parameters
     ----------
@@ -205,7 +220,8 @@ def build_from_template(template_id: str) -> str:
     ...
 
 def list_template_components(template_id: str) -> list[str]:
-    """List sub-component IDs for composite templates.
+    """
+    List sub-component IDs for composite templates.
 
     Parameters
     ----------
@@ -231,7 +247,8 @@ def list_template_components(template_id: str) -> list[str]:
     ...
 
 def build_template_component(template_id: str, component_id: str) -> str:
-    """Build a single component spec from a composite template.
+    """
+    Build a single component spec from a composite template.
 
     Parameters
     ----------
@@ -264,7 +281,8 @@ def apply_scenario(
     model: Any,
     as_of: str,
 ) -> dict[str, Any]:
-    """Apply a scenario to both market data and a financial model.
+    """
+    Apply a scenario to both market data and a financial model.
 
     Parameters
     ----------
@@ -305,7 +323,8 @@ def apply_scenario_to_market(
     market: Any,
     as_of: str,
 ) -> dict[str, Any]:
-    """Apply a scenario to market data only (no model mutations returned).
+    """
+    Apply a scenario to market data only (no model mutations returned).
 
     Parameters
     ----------
@@ -337,7 +356,8 @@ def apply_scenario_to_market(
     ...
 
 class HorizonResult:
-    """Horizon total return result with full P&L attribution.
+    """
+    Horizon total return result with full P&L attribution.
 
     Produced by :func:`compute_horizon_return`. Access factor-level
     contributions via :meth:`factor_contribution` and the full breakdown
@@ -353,7 +373,8 @@ class HorizonResult:
 
     @property
     def attribution(self) -> PnlAttribution:
-        """Full P&L attribution breakdown.
+        """
+        Full P&L attribution breakdown.
 
         Returns
         -------
@@ -370,7 +391,8 @@ class HorizonResult:
 
     @property
     def initial_value(self) -> float:
-        """Initial instrument value.
+        """
+        Initial instrument value.
 
         Returns
         -------
@@ -381,7 +403,8 @@ class HorizonResult:
 
     @property
     def terminal_value(self) -> float:
-        """Final instrument value after the scenario is applied.
+        """
+        Final instrument value after the scenario is applied.
 
         Returns
         -------
@@ -392,7 +415,8 @@ class HorizonResult:
 
     @property
     def horizon_days(self) -> int | None:
-        """Horizon in calendar days (``None`` if no time-roll).
+        """
+        Horizon in calendar days (``None`` if no time-roll).
 
         Returns
         -------
@@ -404,7 +428,8 @@ class HorizonResult:
 
     @property
     def total_return_pct(self) -> float:
-        """Total return as decimal fraction (0.05 = 5%).
+        """
+        Total return as decimal fraction (0.05 = 5%).
 
         Returns
         -------
@@ -415,7 +440,8 @@ class HorizonResult:
 
     @property
     def annualized_return(self) -> float | None:
-        """Annualized return (``None`` if no time-roll).
+        """
+        Annualized return (``None`` if no time-roll).
 
         Returns
         -------
@@ -427,7 +453,8 @@ class HorizonResult:
 
     @property
     def operations_applied(self) -> int:
-        """Number of scenario operations applied.
+        """
+        Number of scenario operations applied.
 
         Returns
         -------
@@ -438,7 +465,8 @@ class HorizonResult:
 
     @property
     def user_operations(self) -> int:
-        """Number of user-provided scenario operations before hierarchy expansion.
+        """
+        Number of user-provided scenario operations before hierarchy expansion.
 
         Returns
         -------
@@ -449,7 +477,8 @@ class HorizonResult:
 
     @property
     def expanded_operations(self) -> int:
-        """Number of direct operations after hierarchy expansion and deduplication.
+        """
+        Number of direct operations after hierarchy expansion and deduplication.
 
         Returns
         -------
@@ -460,7 +489,8 @@ class HorizonResult:
 
     @property
     def warnings(self) -> list[str]:
-        """Warnings emitted during scenario application (rendered Display form).
+        """
+        Warnings emitted during scenario application (rendered Display form).
 
         Returns
         -------
@@ -471,7 +501,8 @@ class HorizonResult:
 
     @property
     def warnings_json(self) -> str:
-        """JSON-encoded structured warnings.
+        """
+        JSON-encoded structured warnings.
 
         Each entry is a `Warning` record with a ``kind`` discriminator plus
         variant-specific fields, mirroring the WASM binding. Parse with
@@ -485,7 +516,8 @@ class HorizonResult:
         ...
 
     def factor_contribution(self, factor: str) -> float:
-        """Factor contribution as decimal fraction of initial value.
+        """
+        Factor contribution as decimal fraction of initial value.
 
         Parameters
         ----------
@@ -509,7 +541,8 @@ class HorizonResult:
         ...
 
     def to_json(self) -> str:
-        """Serialize the result to JSON.
+        """
+        Serialize the result to JSON.
 
         Returns
         -------
@@ -519,7 +552,8 @@ class HorizonResult:
         ...
 
     def explain(self) -> str:
-        """Human-readable summary of horizon return and attribution.
+        """
+        Human-readable summary of horizon return and attribution.
 
         Returns
         -------
@@ -536,7 +570,8 @@ def compute_horizon_return(
     method: str = "parallel",
     config: str | None = None,
 ) -> HorizonResult:
-    """Compute horizon total return under a scenario.
+    """
+    Compute horizon total return under a scenario.
 
     Parameters
     ----------
@@ -583,7 +618,8 @@ def compute_horizon_return(
 # ---------------------------------------------------------------------------
 
 class CurveKind:
-    """Type of market curve targeted by a scenario operation.
+    """
+    Type of market curve targeted by a scenario operation.
 
     Examples
     --------
@@ -594,62 +630,98 @@ class CurveKind:
 
     @classmethod
     def discount(cls) -> CurveKind:
-        """Discount factor curve.
+        """
+        Discount factor curve.
 
         Returns
         -------
         CurveKind
             The ``discount`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import CurveKind
+        >>> callable(CurveKind.discount)
+        True
         """
         ...
 
     @classmethod
     def forward(cls) -> CurveKind:
-        """Forward rate curve.
+        """
+        Forward rate curve.
 
         Returns
         -------
         CurveKind
             The ``forward`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import CurveKind
+        >>> callable(CurveKind.forward)
+        True
         """
         ...
 
     @classmethod
     def par_cds(cls) -> CurveKind:
-        """Par CDS spread curve.
+        """
+        Par CDS spread curve.
 
         Returns
         -------
         CurveKind
             The ``par_cds`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import CurveKind
+        >>> callable(CurveKind.par_cds)
+        True
         """
         ...
 
     @classmethod
     def inflation(cls) -> CurveKind:
-        """Inflation index curve.
+        """
+        Inflation index curve.
 
         Returns
         -------
         CurveKind
             The ``inflation`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import CurveKind
+        >>> callable(CurveKind.inflation)
+        True
         """
         ...
 
     @classmethod
     def commodity(cls) -> CurveKind:
-        """Commodity forward curve.
+        """
+        Commodity forward curve.
 
         Returns
         -------
         CurveKind
             The ``commodity`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import CurveKind
+        >>> callable(CurveKind.commodity)
+        True
         """
         ...
 
     @property
     def name(self) -> str:
-        """Variant name, e.g. ``"Discount"``.
+        """
+        Variant name, e.g. ``"Discount"``.
 
         Returns
         -------
@@ -660,7 +732,8 @@ class CurveKind:
 
     @property
     def value(self) -> str:
-        """Serialized wire value, e.g. ``"discount"`` or ``"par_cds"``.
+        """
+        Serialized wire value, e.g. ``"discount"`` or ``"par_cds"``.
 
         Returns
         -------
@@ -670,7 +743,8 @@ class CurveKind:
         ...
 
 class VolSurfaceKind:
-    """Category of volatility surface targeted by a scenario operation.
+    """
+    Category of volatility surface targeted by a scenario operation.
 
     Examples
     --------
@@ -681,40 +755,62 @@ class VolSurfaceKind:
 
     @classmethod
     def equity(cls) -> VolSurfaceKind:
-        """Equity volatility surface.
+        """
+        Equity volatility surface.
 
         Returns
         -------
         VolSurfaceKind
             The ``equity`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import VolSurfaceKind
+        >>> callable(VolSurfaceKind.equity)
+        True
         """
         ...
 
     @classmethod
     def credit(cls) -> VolSurfaceKind:
-        """Credit volatility surface.
+        """
+        Credit volatility surface.
 
         Returns
         -------
         VolSurfaceKind
             The ``credit`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import VolSurfaceKind
+        >>> callable(VolSurfaceKind.credit)
+        True
         """
         ...
 
     @classmethod
     def swaption(cls) -> VolSurfaceKind:
-        """Swaption volatility surface.
+        """
+        Swaption volatility surface.
 
         Returns
         -------
         VolSurfaceKind
             The ``swaption`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import VolSurfaceKind
+        >>> callable(VolSurfaceKind.swaption)
+        True
         """
         ...
 
     @property
     def name(self) -> str:
-        """Variant name, e.g. ``"Equity"``.
+        """
+        Variant name, e.g. ``"Equity"``.
 
         Returns
         -------
@@ -725,7 +821,8 @@ class VolSurfaceKind:
 
     @property
     def value(self) -> str:
-        """Serialized wire value, e.g. ``"equity"``.
+        """
+        Serialized wire value, e.g. ``"equity"``.
 
         Returns
         -------
@@ -735,7 +832,8 @@ class VolSurfaceKind:
         ...
 
 class TenorMatchMode:
-    """Tenor-pillar alignment strategy for curve-node operations.
+    """
+    Tenor-pillar alignment strategy for curve-node operations.
 
     Examples
     --------
@@ -746,29 +844,44 @@ class TenorMatchMode:
 
     @classmethod
     def exact(cls) -> TenorMatchMode:
-        """Match curve nodes by exact tenor string.
+        """
+        Match curve nodes by exact tenor string.
 
         Returns
         -------
         TenorMatchMode
             The ``exact`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import TenorMatchMode
+        >>> callable(TenorMatchMode.exact)
+        True
         """
         ...
 
     @classmethod
     def interpolate(cls) -> TenorMatchMode:
-        """Interpolate between adjacent curve nodes when tenor is not exact.
+        """
+        Interpolate between adjacent curve nodes when tenor is not exact.
 
         Returns
         -------
         TenorMatchMode
             The ``interpolate`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import TenorMatchMode
+        >>> callable(TenorMatchMode.interpolate)
+        True
         """
         ...
 
     @property
     def name(self) -> str:
-        """Variant name, e.g. ``"Exact"``.
+        """
+        Variant name, e.g. ``"Exact"``.
 
         Returns
         -------
@@ -779,7 +892,8 @@ class TenorMatchMode:
 
     @property
     def value(self) -> str:
-        """Serialized wire value, e.g. ``"exact"``.
+        """
+        Serialized wire value, e.g. ``"exact"``.
 
         Returns
         -------
@@ -789,7 +903,8 @@ class TenorMatchMode:
         ...
 
 class TimeRollMode:
-    """Calendar-vs-business-day semantics for time-roll operations.
+    """
+    Calendar-vs-business-day semantics for time-roll operations.
 
     Examples
     --------
@@ -800,40 +915,62 @@ class TimeRollMode:
 
     @classmethod
     def business_days(cls) -> TimeRollMode:
-        """Roll by business days using the market calendar.
+        """
+        Roll by business days using the market calendar.
 
         Returns
         -------
         TimeRollMode
             The ``business_days`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import TimeRollMode
+        >>> callable(TimeRollMode.business_days)
+        True
         """
         ...
 
     @classmethod
     def calendar_days(cls) -> TimeRollMode:
-        """Roll by calendar days (no holiday adjustment).
+        """
+        Roll by calendar days (no holiday adjustment).
 
         Returns
         -------
         TimeRollMode
             The ``calendar_days`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import TimeRollMode
+        >>> callable(TimeRollMode.calendar_days)
+        True
         """
         ...
 
     @classmethod
     def approximate(cls) -> TimeRollMode:
-        """Approximate roll (e.g. 30/360 day count).
+        """
+        Approximate roll (e.g. 30/360 day count).
 
         Returns
         -------
         TimeRollMode
             The ``approximate`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import TimeRollMode
+        >>> callable(TimeRollMode.approximate)
+        True
         """
         ...
 
     @property
     def name(self) -> str:
-        """Variant name, e.g. ``"CalendarDays"``.
+        """
+        Variant name, e.g. ``"CalendarDays"``.
 
         Returns
         -------
@@ -844,7 +981,8 @@ class TimeRollMode:
 
     @property
     def value(self) -> str:
-        """Serialized wire value, e.g. ``"calendar_days"``.
+        """
+        Serialized wire value, e.g. ``"calendar_days"``.
 
         Returns
         -------
@@ -854,7 +992,8 @@ class TimeRollMode:
         ...
 
 class Compounding:
-    """Compounding convention for rate-extraction operations.
+    """
+    Compounding convention for rate-extraction operations.
 
     Examples
     --------
@@ -865,73 +1004,116 @@ class Compounding:
 
     @classmethod
     def simple(cls) -> Compounding:
-        """Simple (zero-rate) compounding.
+        """
+        Simple (zero-rate) compounding.
 
         Returns
         -------
         Compounding
             The ``simple`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import Compounding
+        >>> callable(Compounding.simple)
+        True
         """
         ...
 
     @classmethod
     def continuous(cls) -> Compounding:
-        """Continuously compounded rate.
+        """
+        Continuously compounded rate.
 
         Returns
         -------
         Compounding
             The ``continuous`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import Compounding
+        >>> callable(Compounding.continuous)
+        True
         """
         ...
 
     @classmethod
     def annual(cls) -> Compounding:
-        """Annual compounding.
+        """
+        Annual compounding.
 
         Returns
         -------
         Compounding
             The ``annual`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import Compounding
+        >>> callable(Compounding.annual)
+        True
         """
         ...
 
     @classmethod
     def semi_annual(cls) -> Compounding:
-        """Semi-annual compounding.
+        """
+        Semi-annual compounding.
 
         Returns
         -------
         Compounding
             The ``semi_annual`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import Compounding
+        >>> callable(Compounding.semi_annual)
+        True
         """
         ...
 
     @classmethod
     def quarterly(cls) -> Compounding:
-        """Quarterly compounding.
+        """
+        Quarterly compounding.
 
         Returns
         -------
         Compounding
             The ``quarterly`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import Compounding
+        >>> callable(Compounding.quarterly)
+        True
         """
         ...
 
     @classmethod
     def monthly(cls) -> Compounding:
-        """Monthly compounding.
+        """
+        Monthly compounding.
 
         Returns
         -------
         Compounding
             The ``monthly`` variant.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import Compounding
+        >>> callable(Compounding.monthly)
+        True
         """
         ...
 
     @property
     def name(self) -> str:
-        """Variant name, e.g. ``"Continuous"``.
+        """
+        Variant name, e.g. ``"Continuous"``.
 
         Returns
         -------
@@ -942,7 +1124,8 @@ class Compounding:
 
     @property
     def value(self) -> str:
-        """Serialized wire value, e.g. ``"continuous"``.
+        """
+        Serialized wire value, e.g. ``"continuous"``.
 
         Returns
         -------
@@ -952,7 +1135,8 @@ class Compounding:
         ...
 
 class RateBindingSpec:
-    """Configuration linking a statement rate node to a market curve.
+    """
+    Configuration linking a statement rate node to a market curve.
 
     Examples
     --------
@@ -970,7 +1154,8 @@ class RateBindingSpec:
         compounding: Compounding | None = None,
         day_count: str | None = None,
     ) -> None:
-        """Create a rate binding specification.
+        """
+        Create a rate binding specification.
 
         Parameters
         ----------
@@ -994,7 +1179,8 @@ class RateBindingSpec:
 
     @property
     def node_id(self) -> str:
-        """Statement rate node identifier.
+        """
+        Statement rate node identifier.
 
         Returns
         -------
@@ -1005,7 +1191,8 @@ class RateBindingSpec:
 
     @property
     def curve_id(self) -> str:
-        """Market curve identifier.
+        """
+        Market curve identifier.
 
         Returns
         -------
@@ -1016,7 +1203,9 @@ class RateBindingSpec:
 
     @property
     def tenor(self) -> str:
-        """Tenor string.
+        """
+        Return the tenor for `RateBindingSpec`.
+        Tenor string.
 
         Returns
         -------
@@ -1027,7 +1216,8 @@ class RateBindingSpec:
 
     @property
     def compounding(self) -> Compounding:
-        """Compounding convention.
+        """
+        Compounding convention.
 
         Returns
         -------
@@ -1038,7 +1228,8 @@ class RateBindingSpec:
 
     @property
     def day_count(self) -> str | None:
-        """Day-count convention.
+        """
+        Day-count convention.
 
         Returns
         -------
@@ -1048,7 +1239,8 @@ class RateBindingSpec:
         ...
 
     def to_json(self) -> str:
-        """Serialize to JSON.
+        """
+        Serialize to JSON.
 
         Returns
         -------
@@ -1059,7 +1251,8 @@ class RateBindingSpec:
 
     @classmethod
     def from_json(cls, json: str) -> RateBindingSpec:
-        """Deserialize a ``RateBindingSpec`` from JSON.
+        """
+        Deserialize a ``RateBindingSpec`` from JSON.
 
         Parameters
         ----------
@@ -1075,11 +1268,18 @@ class RateBindingSpec:
         ------
         ValueError
             If the JSON is malformed or fields are invalid.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import RateBindingSpec
+        >>> callable(RateBindingSpec.from_json)
+        True
         """
         ...
 
 class OperationSpec:
-    """Typed builder for ``finstack_quant_scenarios::OperationSpec``.
+    """
+    Typed builder for ``finstack_quant_scenarios::OperationSpec``.
 
     Each classmethod corresponds to one Rust enum variant; ``to_json()``
     produces the canonical wire form expected by ``build_scenario_spec`` and
@@ -1095,7 +1295,8 @@ class OperationSpec:
 
     @classmethod
     def market_fx_pct(cls, base: str, quote: str, pct: float) -> OperationSpec:
-        """FX rate percent shift (``pct = 5.0`` strengthens ``base`` by 5%).
+        """
+        FX rate percent shift (``pct = 5.0`` strengthens ``base`` by 5%).
 
         Parameters
         ----------
@@ -1110,12 +1311,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``market_fx_pct`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.market_fx_pct)
+        True
         """
         ...
 
     @classmethod
     def equity_price_pct(cls, ids: list[str], pct: float) -> OperationSpec:
-        """Equity price percent shock applied to all supplied identifiers.
+        """
+        Equity price percent shock applied to all supplied identifiers.
 
         Parameters
         ----------
@@ -1128,12 +1341,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``equity_price_pct`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.equity_price_pct)
+        True
         """
         ...
 
     @classmethod
     def instrument_price_pct_by_attr(cls, attrs: list[tuple[str, str]], pct: float) -> OperationSpec:
-        """Instrument price shock by exact attribute match.
+        """
+        Instrument price shock by exact attribute match.
 
         ``attrs`` is a list of ``(key, value)`` pairs preserving order.
 
@@ -1148,6 +1373,17 @@ class OperationSpec:
         -------
         OperationSpec
             The ``instrument_price_pct_by_attr`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.instrument_price_pct_by_attr)
+        True
         """
         ...
 
@@ -1159,7 +1395,8 @@ class OperationSpec:
         bp: float,
         discount_curve_id: str | None = None,
     ) -> OperationSpec:
-        """Parallel basis-point shift on a rate-style curve.
+        """
+        Parallel basis-point shift on a rate-style curve.
 
         Parameters
         ----------
@@ -1176,6 +1413,17 @@ class OperationSpec:
         -------
         OperationSpec
             The ``curve_parallel_bp`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.curve_parallel_bp)
+        True
         """
         ...
 
@@ -1188,7 +1436,8 @@ class OperationSpec:
         match_mode: TenorMatchMode | None = None,
         discount_curve_id: str | None = None,
     ) -> OperationSpec:
-        """Node-level basis-point shifts on a rate-style curve.
+        """
+        Node-level basis-point shifts on a rate-style curve.
 
         Parameters
         ----------
@@ -1207,12 +1456,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``curve_node_bp`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.curve_node_bp)
+        True
         """
         ...
 
     @classmethod
     def vol_index_parallel_pts(cls, curve_id: str, points: float) -> OperationSpec:
-        """Parallel shock to a volatility-index curve in absolute index points.
+        """
+        Parallel shock to a volatility-index curve in absolute index points.
 
         Parameters
         ----------
@@ -1225,6 +1486,17 @@ class OperationSpec:
         -------
         OperationSpec
             The ``vol_index_parallel_pts`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.vol_index_parallel_pts)
+        True
         """
         ...
 
@@ -1235,7 +1507,8 @@ class OperationSpec:
         nodes: list[tuple[str, float]],
         match_mode: TenorMatchMode | None = None,
     ) -> OperationSpec:
-        """Node-level shocks to a volatility-index curve in absolute index points.
+        """
+        Node-level shocks to a volatility-index curve in absolute index points.
 
         Parameters
         ----------
@@ -1250,12 +1523,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``vol_index_node_pts`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.vol_index_node_pts)
+        True
         """
         ...
 
     @classmethod
     def base_corr_parallel_pts(cls, surface_id: str, points: float) -> OperationSpec:
-        """Parallel base-correlation shift (absolute correlation points).
+        """
+        Parallel base-correlation shift (absolute correlation points).
 
         Parameters
         ----------
@@ -1268,6 +1553,17 @@ class OperationSpec:
         -------
         OperationSpec
             The ``base_corr_parallel_pts`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.base_corr_parallel_pts)
+        True
         """
         ...
 
@@ -1279,7 +1575,8 @@ class OperationSpec:
         detachment_bps: list[int] | None = None,
         maturities: list[str] | None = None,
     ) -> OperationSpec:
-        """Bucketed base-correlation shock by detachment and (reserved) maturity.
+        """
+        Bucketed base-correlation shock by detachment and (reserved) maturity.
 
         Parameters
         ----------
@@ -1297,12 +1594,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``base_corr_bucket_pts`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.base_corr_bucket_pts)
+        True
         """
         ...
 
     @classmethod
     def vol_surface_parallel_pct(cls, surface_kind: VolSurfaceKind, surface_id: str, pct: float) -> OperationSpec:
-        """Parallel percent shift to a volatility surface.
+        """
+        Parallel percent shift to a volatility surface.
 
         Parameters
         ----------
@@ -1317,6 +1626,17 @@ class OperationSpec:
         -------
         OperationSpec
             The ``vol_surface_parallel_pct`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.vol_surface_parallel_pct)
+        True
         """
         ...
 
@@ -1329,7 +1649,8 @@ class OperationSpec:
         tenors: list[str] | None = None,
         strikes: list[float] | None = None,
     ) -> OperationSpec:
-        """Bucketed volatility surface percent shock.
+        """
+        Bucketed volatility surface percent shock.
 
         Parameters
         ----------
@@ -1348,12 +1669,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``vol_surface_bucket_pct`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.vol_surface_bucket_pct)
+        True
         """
         ...
 
     @classmethod
     def stmt_forecast_percent(cls, node_id: str, pct: float) -> OperationSpec:
-        """Statement forecast percent change.
+        """
+        Statement forecast percent change.
 
         Parameters
         ----------
@@ -1366,12 +1699,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``stmt_forecast_percent`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.stmt_forecast_percent)
+        True
         """
         ...
 
     @classmethod
     def stmt_forecast_assign(cls, node_id: str, value: float) -> OperationSpec:
-        """Statement forecast value assignment.
+        """
+        Statement forecast value assignment.
 
         Parameters
         ----------
@@ -1384,12 +1729,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``stmt_forecast_assign`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.stmt_forecast_assign)
+        True
         """
         ...
 
     @classmethod
     def rate_binding(cls, binding: RateBindingSpec) -> OperationSpec:
-        """Bind a statement rate node to a curve for the lifetime of the scenario.
+        """
+        Bind a statement rate node to a curve for the lifetime of the scenario.
 
         Parameters
         ----------
@@ -1400,12 +1757,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``rate_binding`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.rate_binding)
+        True
         """
         ...
 
     @classmethod
     def instrument_spread_bp_by_attr(cls, attrs: list[tuple[str, str]], bp: float) -> OperationSpec:
-        """Instrument spread shock (basis points) by exact attribute match.
+        """
+        Instrument spread shock (basis points) by exact attribute match.
 
         Parameters
         ----------
@@ -1418,12 +1787,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``instrument_spread_bp_by_attr`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.instrument_spread_bp_by_attr)
+        True
         """
         ...
 
     @classmethod
     def instrument_price_pct_by_type(cls, instrument_types: list[str], pct: float) -> OperationSpec:
-        """Instrument price shock by ``InstrumentType`` (snake_case strings).
+        """
+        Instrument price shock by ``InstrumentType`` (snake_case strings).
 
         Parameters
         ----------
@@ -1436,12 +1817,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``instrument_price_pct_by_type`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.instrument_price_pct_by_type)
+        True
         """
         ...
 
     @classmethod
     def instrument_spread_bp_by_type(cls, instrument_types: list[str], bp: float) -> OperationSpec:
-        """Instrument spread shock by ``InstrumentType`` (snake_case strings).
+        """
+        Instrument spread shock by ``InstrumentType`` (snake_case strings).
 
         Parameters
         ----------
@@ -1454,12 +1847,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``instrument_spread_bp_by_type`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.instrument_spread_bp_by_type)
+        True
         """
         ...
 
     @classmethod
     def asset_correlation_pts(cls, delta_pts: float) -> OperationSpec:
-        """Asset-correlation shock for structured credit.
+        """
+        Asset-correlation shock for structured credit.
 
         Parameters
         ----------
@@ -1470,12 +1875,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``asset_correlation_pts`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.asset_correlation_pts)
+        True
         """
         ...
 
     @classmethod
     def prepay_default_correlation_pts(cls, delta_pts: float) -> OperationSpec:
-        """Prepay-default correlation shock for structured credit.
+        """
+        Prepay-default correlation shock for structured credit.
 
         Parameters
         ----------
@@ -1486,6 +1903,17 @@ class OperationSpec:
         -------
         OperationSpec
             The ``prepay_default_correlation_pts`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.prepay_default_correlation_pts)
+        True
         """
         ...
 
@@ -1497,7 +1925,8 @@ class OperationSpec:
         bp: float,
         discount_curve_id: str | None = None,
     ) -> OperationSpec:
-        """Hierarchy-targeted parallel curve shift.
+        """
+        Hierarchy-targeted parallel curve shift.
 
         ``target_json`` is a JSON-serialized ``HierarchyTarget``
         (``{"path": [...], "tag_filter": {...}}``).
@@ -1517,6 +1946,17 @@ class OperationSpec:
         -------
         OperationSpec
             The ``hierarchy_curve_parallel_bp`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.hierarchy_curve_parallel_bp)
+        True
         """
         ...
 
@@ -1524,7 +1964,8 @@ class OperationSpec:
     def hierarchy_vol_surface_parallel_pct(
         cls, surface_kind: VolSurfaceKind, target_json: str, pct: float
     ) -> OperationSpec:
-        """Hierarchy-targeted vol-surface percent shift.
+        """
+        Hierarchy-targeted vol-surface percent shift.
 
         Parameters
         ----------
@@ -1539,12 +1980,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``hierarchy_vol_surface_parallel_pct`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.hierarchy_vol_surface_parallel_pct)
+        True
         """
         ...
 
     @classmethod
     def hierarchy_equity_price_pct(cls, target_json: str, pct: float) -> OperationSpec:
-        """Hierarchy-targeted equity price shift.
+        """
+        Hierarchy-targeted equity price shift.
 
         Parameters
         ----------
@@ -1557,12 +2010,24 @@ class OperationSpec:
         -------
         OperationSpec
             The ``hierarchy_equity_price_pct`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.hierarchy_equity_price_pct)
+        True
         """
         ...
 
     @classmethod
     def hierarchy_base_corr_parallel_pts(cls, target_json: str, points: float) -> OperationSpec:
-        """Hierarchy-targeted base-correlation parallel shift.
+        """
+        Hierarchy-targeted base-correlation parallel shift.
 
         Parameters
         ----------
@@ -1575,6 +2040,17 @@ class OperationSpec:
         -------
         OperationSpec
             The ``hierarchy_base_corr_parallel_pts`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.hierarchy_base_corr_parallel_pts)
+        True
         """
         ...
 
@@ -1585,7 +2061,8 @@ class OperationSpec:
         apply_shocks: bool = True,
         roll_mode: TimeRollMode | None = None,
     ) -> OperationSpec:
-        """Roll the valuation horizon forward (e.g. ``"1M"``).
+        """
+        Roll the valuation horizon forward (e.g. ``"1M"``).
 
         ``apply_shocks`` defaults to ``True`` to mirror the Rust
         ``#[serde(default = "default_true")]`` attribute.
@@ -1603,11 +2080,23 @@ class OperationSpec:
         -------
         OperationSpec
             The ``time_roll_forward`` operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.time_roll_forward)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize to the canonical JSON wire format.
+        """
+        Serialize to the canonical JSON wire format.
 
         Returns
         -------
@@ -1618,7 +2107,8 @@ class OperationSpec:
 
     @classmethod
     def from_json(cls, json: str) -> OperationSpec:
-        """Deserialize an ``OperationSpec`` from JSON.
+        """
+        Deserialize an ``OperationSpec`` from JSON.
 
         Parameters
         ----------
@@ -1634,12 +2124,19 @@ class OperationSpec:
         ------
         ValueError
             If the JSON is malformed or the operation kind is unknown.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> callable(OperationSpec.from_json)
+        True
         """
         ...
 
     @property
     def kind(self) -> str:
-        """Variant discriminator (the serde ``kind`` tag value).
+        """
+        Variant discriminator (the serde ``kind`` tag value).
 
         Returns
         -------

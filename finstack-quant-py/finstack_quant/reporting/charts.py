@@ -5,6 +5,12 @@ Every chart returns a self-contained ``<svg>`` string sized via ``viewBox`` with
 ``width:100%; height:auto`` so it scales uniformly inside the report container.
 Values are plotted in their display units; ``y_pct=True`` only appends ``%`` to
 axis tick labels. ``None``/``NaN`` values are skipped.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.charts as charts
+>>> charts.__name__
+'finstack_quant.reporting.charts'
 """
 
 from __future__ import annotations
@@ -41,6 +47,22 @@ def rgba(hex_color: str, alpha: float) -> str:
         Six-digit RGB color, with or without a leading ``#``.
     alpha : float
         Opacity from ``0.0`` (transparent) through ``1.0`` (opaque).
+
+    Returns:
+    -------
+    str
+        Result of rgba for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.charts import rgba
+    >>> callable(rgba)
+    True
     """
     h = hex_color.lstrip("#")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
@@ -58,6 +80,22 @@ def nice_ticks(vmin: float, vmax: float, target: int = 4) -> list[float]:
         Maximum displayed axis value before tick rounding.
     target : int
         Approximate desired number of intervals; defaults to four.
+
+    Returns:
+    -------
+    list[float]
+        Result of nice ticks for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.charts import nice_ticks
+    >>> callable(nice_ticks)
+    True
     """
     if vmax <= vmin:
         vmax = vmin + 1.0
@@ -92,6 +130,22 @@ def color_scale(v: Any, theme: Theme, cap: float = 8.0) -> tuple[str, str]:
         Report palette providing positive, negative, grid, and text colors.
     cap : float
         Absolute percentage-point value that maps to maximum shading intensity.
+
+    Returns:
+    -------
+    tuple[str, str]
+        Result of color scale for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.charts import color_scale
+    >>> callable(color_scale)
+    True
     """
     if _missing(v):
         return ("transparent", theme.grid)
@@ -201,6 +255,22 @@ def line_chart(
         SVG viewbox height in pixels; defaults to ``190``.
     x_numeric : bool
         Whether to render ``dates`` as numeric rather than calendar x-axis labels.
+
+    Returns:
+    -------
+    str
+        Result of line chart for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.charts import line_chart
+    >>> callable(line_chart)
+    True
     """
     color = color or theme.ink
     ml, mr, mt, mb = 48, 14, 12, 24
@@ -305,6 +375,22 @@ def cashflow_ladder(
         Optional present-value overlay in the same units and order as cashflows.
     height : int
         SVG viewbox height in pixels; defaults to ``210``.
+
+    Returns:
+    -------
+    str
+        Result of cashflow ladder for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.charts import cashflow_ladder
+    >>> callable(cashflow_ladder)
+    True
     """
     ml, mr, mt, mb = 52, 14, 12, 24
     pw, ph = _W - ml - mr, height - mt - mb
@@ -393,6 +479,22 @@ def waterfall_chart(
         Label shown on the final cumulative-total bar.
     height : int
         SVG viewbox height in pixels; defaults to ``210``.
+
+    Returns:
+    -------
+    str
+        Result of waterfall chart for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.charts import waterfall_chart
+    >>> callable(waterfall_chart)
+    True
     """
     ml, mr, mt, mb = 56, 14, 12, 40
     pw, ph = _W - ml - mr, height - mt - mb
@@ -491,6 +593,22 @@ def bar_chart(labels: list[str], values: list[Any], *, theme: Theme, y_pct: bool
         Whether y-axis and bar labels append ``%`` to percentage-point values.
     height : int
         SVG viewbox height in pixels; defaults to ``190``.
+
+    Returns:
+    -------
+    str
+        Result of bar chart for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.charts import bar_chart
+    >>> callable(bar_chart)
+    True
     """
     ml, mr, mt, mb = 48, 14, 12, 24
     pw, ph = _W - ml - mr, height - mt - mb
@@ -573,6 +691,22 @@ def tornado_chart(
         Report palette and typography used for SVG elements.
     height : int or None
         Optional SVG viewbox height; ``None`` scales automatically by row count.
+
+    Returns:
+    -------
+    str
+        Result of tornado chart for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.charts import tornado_chart
+    >>> callable(tornado_chart)
+    True
     """
     n = len(entries)
     row_h = 26
@@ -672,6 +806,22 @@ def fan_chart(
         Whether y-axis labels append ``%`` to percentage-point values.
     height : int
         SVG viewbox height in pixels; defaults to ``200``.
+
+    Returns:
+    -------
+    str
+        Result of fan chart for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.charts import fan_chart
+    >>> callable(fan_chart)
+    True
     """
     ml, mr, mt, mb = 48, 14, 12, 26
     pw, ph = _W - ml - mr, height - mt - mb

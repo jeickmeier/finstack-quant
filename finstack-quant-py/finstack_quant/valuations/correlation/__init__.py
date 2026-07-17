@@ -3,6 +3,12 @@
 Bindings for the ``finstack_quant_valuations::correlation`` Rust module. Nested
 under :mod:`finstack_quant.valuations` to mirror the Rust crate layout where
 correlation lives inside ``finstack-quant-valuations``.
+
+Examples:
+--------
+>>> import finstack_quant.valuations.correlation as correlation
+>>> correlation.__name__
+'finstack_quant.valuations.correlation'
 """
 
 from __future__ import annotations

@@ -4,6 +4,12 @@
 Pure presentation — reads pre-computed ``*_var_decomposition`` /
 ``*_es_decomposition`` / ``evaluate_risk_budget`` results and lays them out.
 Risk shares come from the engine's ``pct_contribution``; no calculation here.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.portfolio_risk as portfolio_risk
+>>> portfolio_risk.__name__
+'finstack_quant.reporting.portfolio_risk'
 """
 
 from __future__ import annotations
@@ -136,6 +142,17 @@ def portfolio_risk_tearsheet(
         If ``sections`` contains an unknown section name.
     TypeError
         If ``decomposition`` is neither a dict nor a JSON string.
+
+    Returns:
+    -------
+    TearSheet
+        Result of portfolio risk tearsheet for the binding in the annotated representation.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.portfolio_risk import portfolio_risk_tearsheet
+    >>> callable(portfolio_risk_tearsheet)
+    True
     """
     wanted = sections if sections is not None else ALL_SECTIONS
     unknown = set(wanted) - set(ALL_SECTIONS)

@@ -5,6 +5,12 @@ Pure presentation — reads pre-computed node values (including margin/growth
 formula nodes) and lays them out. No financial calculation; the only value
 transform is display-unit scaling for variance percentages, matching the
 ``performance.py`` idiom.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.statement as statement
+>>> statement.__name__
+'finstack_quant.reporting.statement'
 """
 
 from __future__ import annotations
@@ -106,6 +112,17 @@ def statement_tearsheet(
 
     Raises:
         ValueError: If ``sections`` contains an unknown section name.
+
+    Returns:
+    -------
+    TearSheet
+        Result of statement tearsheet for the binding in the annotated representation.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.statement import statement_tearsheet
+    >>> callable(statement_tearsheet)
+    True
     """
     wanted = sections if sections is not None else ALL_SECTIONS
     unknown = set(wanted) - set(ALL_SECTIONS)

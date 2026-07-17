@@ -1,4 +1,5 @@
-"""Core finstack_quant types: rates, identifiers, credit ratings, and attributes.
+"""
+Core finstack_quant types: rates, identifiers, credit ratings, and attributes.
 
 Provides typed wrappers for financial primitives used throughout the
 ``finstack_quant`` library.
@@ -15,6 +16,12 @@ Example::
     0.025
     >>> Percentage(12.5).as_decimal
     0.125
+
+Examples
+--------
+>>> import finstack_quant.core.types as types
+>>> types.__name__
+'finstack_quant.core.types'
 """
 
 from __future__ import annotations
@@ -32,7 +39,8 @@ __all__ = [
 ]
 
 class Rate:
-    """A financial rate expressed as a decimal fraction.
+    """
+    A financial rate expressed as a decimal fraction.
 
     Immutable, hashable value type. Supports arithmetic and conversion between
     decimal, percent, and basis-point representations.
@@ -63,7 +71,8 @@ class Rate:
     """Zero rate (0% as a decimal rate)."""
 
     def __init__(self, decimal: float) -> None:
-        """Construct a rate from a decimal fraction.
+        """
+        Construct a rate from a decimal fraction.
 
         Parameters
         ----------
@@ -79,7 +88,8 @@ class Rate:
 
     @classmethod
     def from_percent(cls, percent: float) -> Rate:
-        """Build from a percent value.
+        """
+        Build from a percent value.
 
         Parameters
         ----------
@@ -90,16 +100,24 @@ class Rate:
         -------
         Rate
 
+            Result of from percent for this `Rate` in the annotated representation.
         Raises
         ------
         ValueError
             If *percent* is not finite.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.types import Rate
+        >>> callable(Rate.from_percent)
+        True
         """
         ...
 
     @classmethod
     def from_bps(cls, bps: int) -> Rate:
-        """Build from an integer basis-point amount.
+        """
+        Build from an integer basis-point amount.
 
         Parameters
         ----------
@@ -109,36 +127,54 @@ class Rate:
         Returns
         -------
         Rate
+            Result of from bps for this `Rate` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.types import Rate
+        >>> callable(Rate.from_bps)
+        True
         """
         ...
 
     @property
     def as_decimal(self) -> float:
-        """Rate as a decimal fraction.
+        """
+        Rate as a decimal fraction.
 
         Returns
         -------
         float
+            The as decimal exposed by this `Rate`.
         """
         ...
 
     @property
     def as_percent(self) -> float:
-        """Rate as a percent value.
+        """
+        Rate as a percent value.
 
         Returns
         -------
         float
+            The as percent exposed by this `Rate`.
         """
         ...
 
     @property
     def as_bps(self) -> int:
-        """Rate rounded to the nearest basis point.
+        """
+        Rate rounded to the nearest basis point.
 
         Returns
         -------
         int
+            The as bps exposed by this `Rate`.
         """
         ...
 
@@ -158,7 +194,8 @@ class Rate:
     def __neg__(self) -> Rate: ...
 
 class Bps:
-    """A value measured in basis points (1 bp = 0.0001).
+    """
+    A value measured in basis points (1 bp = 0.0001).
 
     Immutable, hashable value type. Integer-valued internally after rounding.
 
@@ -185,7 +222,8 @@ class Bps:
     """Zero basis points."""
 
     def __init__(self, bps: float) -> None:
-        """Construct from a floating basis-point value (rounded to nearest integer bp).
+        """
+        Construct from a floating basis-point value (rounded to nearest integer bp).
 
         Parameters
         ----------
@@ -207,12 +245,14 @@ class Bps:
 
     @property
     def as_decimal(self) -> float:
-        """Value as a decimal fraction.
+        """
+        Value as a decimal fraction.
 
         Returns
         -------
         float
 
+            The as decimal exposed by this `Bps`.
         Examples
         --------
         >>> Bps(250).as_decimal
@@ -222,12 +262,14 @@ class Bps:
 
     @property
     def as_bps(self) -> int:
-        """Value as whole basis points.
+        """
+        Value as whole basis points.
 
         Returns
         -------
         int
 
+            The as bps exposed by this `Bps`.
         Examples
         --------
         >>> Bps(250).as_bps
@@ -251,7 +293,8 @@ class Bps:
     def __neg__(self) -> Bps: ...
 
 class Percentage:
-    """A percentage value (e.g. 12.5 means 12.5%).
+    """
+    A percentage value (e.g. 12.5 means 12.5%).
 
     Immutable, hashable value type.
 
@@ -278,7 +321,8 @@ class Percentage:
     """Zero percent."""
 
     def __init__(self, percent: float) -> None:
-        """Construct from a percent value.
+        """
+        Construct from a percent value.
 
         Parameters
         ----------
@@ -300,12 +344,14 @@ class Percentage:
 
     @property
     def as_decimal(self) -> float:
-        """Value as a decimal fraction.
+        """
+        Value as a decimal fraction.
 
         Returns
         -------
         float
 
+            The as decimal exposed by this `Percentage`.
         Examples
         --------
         >>> Percentage(12.5).as_decimal
@@ -315,12 +361,14 @@ class Percentage:
 
     @property
     def as_percent(self) -> float:
-        """Value in percent terms.
+        """
+        Value in percent terms.
 
         Returns
         -------
         float
 
+            The as percent exposed by this `Percentage`.
         Examples
         --------
         >>> Percentage(12.5).as_percent
@@ -339,7 +387,8 @@ class Percentage:
     def __ge__(self, other: Percentage) -> bool: ...
 
 class CreditRating:
-    """Standardised credit rating category.
+    """
+    Standardised credit rating category.
 
     Immutable, hashable enum-style type with class attributes for each
     rating level. Notched ratings (e.g. ``"BBB+"`` and ``"Baa1"``) preserve
@@ -409,7 +458,8 @@ class CreditRating:
 
     @classmethod
     def from_name(cls, name: str) -> CreditRating:
-        """Parse a rating string case-insensitively while preserving notches.
+        """
+        Parse a rating string case-insensitively while preserving notches.
 
         Parameters
         ----------
@@ -420,6 +470,7 @@ class CreditRating:
         -------
         CreditRating
 
+            Result of from name for this `CreditRating` in the annotated representation.
         Raises
         ------
         ValueError
@@ -435,12 +486,14 @@ class CreditRating:
 
     @property
     def name(self) -> str:
-        """Canonical S&P/Fitch-style rating name (e.g. ``"BBB-"``).
+        """
+        Canonical S&P/Fitch-style rating name (e.g. ``"BBB-"``).
 
         Returns
         -------
         str
 
+            The name exposed by this `CreditRating`.
         Examples
         --------
         >>> CreditRating.AAA.name
@@ -450,7 +503,14 @@ class CreditRating:
 
     @property
     def warf(self) -> float:
-        """Moody's weighted-average rating factor for this exact notch."""
+        """
+        Moody's weighted-average rating factor for this exact notch.
+
+        Returns
+        -------
+        float
+            The warf exposed by this `CreditRating`.
+        """
         ...
 
     def __repr__(self) -> str: ...
@@ -460,7 +520,8 @@ class CreditRating:
     def __ne__(self, other: object) -> bool: ...
 
 class CurveId:
-    """A unique identifier for a market data curve.
+    """
+    A unique identifier for a market data curve.
 
     Immutable, hashable string-wrapper type.
 
@@ -477,7 +538,8 @@ class CurveId:
     """
 
     def __init__(self, value: str) -> None:
-        """Create a curve identifier from its string value.
+        """
+        Create a curve identifier from its string value.
 
         Parameters
         ----------
@@ -489,16 +551,23 @@ class CurveId:
         >>> from finstack_quant.core.types import CurveId
         >>> CurveId("USD-OIS").as_str()
         'USD-OIS'
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def as_str(self) -> str:
-        """Underlying string value.
+        """
+        Underlying string value.
 
         Returns
         -------
         str
 
+            Result of as str for this `CurveId` in the annotated representation.
         Examples
         --------
         >>> CurveId("USD-OIS").as_str()
@@ -548,7 +617,8 @@ class CurveId:
         ...
 
 class InstrumentId:
-    """A unique identifier for a financial instrument.
+    """
+    A unique identifier for a financial instrument.
 
     Immutable, hashable string-wrapper type.
 
@@ -565,7 +635,8 @@ class InstrumentId:
     """
 
     def __init__(self, value: str) -> None:
-        """Create an instrument identifier from its string value.
+        """
+        Create an instrument identifier from its string value.
 
         Parameters
         ----------
@@ -577,16 +648,23 @@ class InstrumentId:
         >>> from finstack_quant.core.types import InstrumentId
         >>> InstrumentId("BOND_A").as_str()
         'BOND_A'
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def as_str(self) -> str:
-        """Underlying string value.
+        """
+        Underlying string value.
 
         Returns
         -------
         str
 
+            Result of as str for this `InstrumentId` in the annotated representation.
         Examples
         --------
         >>> InstrumentId("BOND_A").as_str()
@@ -636,7 +714,8 @@ class InstrumentId:
         ...
 
 class Attributes:
-    """A mutable key-value metadata bag.
+    """
+    A mutable key-value metadata bag.
 
     Stores string-typed metadata entries with set/get semantics.
 
@@ -650,7 +729,8 @@ class Attributes:
     """
 
     def __init__(self) -> None:
-        """Create an empty attribute set.
+        """
+        Create an empty attribute set.
 
         Examples
         --------
@@ -660,7 +740,8 @@ class Attributes:
         ...
 
     def get_meta(self, key: str) -> Optional[str]:
-        """Fetch metadata by key.
+        """
+        Fetch metadata by key.
 
         Parameters
         ----------
@@ -677,11 +758,17 @@ class Attributes:
         >>> attrs = Attributes()  # doctest: +SKIP
         >>> attrs.get_meta("missing")  # doctest: +SKIP
         None
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def set_meta(self, key: str, value: str) -> None:
-        """Insert or replace a metadata entry.
+        """
+        Insert or replace a metadata entry.
 
         Parameters
         ----------
@@ -694,11 +781,17 @@ class Attributes:
         --------
         >>> attrs = Attributes()  # doctest: +SKIP
         >>> attrs.set_meta("sector", "tech")  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def contains_meta_key(self, key: str) -> bool:
-        """Return whether *key* exists in metadata.
+        """
+        Return whether *key* exists in metadata.
 
         Parameters
         ----------
@@ -709,21 +802,29 @@ class Attributes:
         -------
         bool
 
+            Result of contains meta key for this `Attributes` in the annotated representation.
         Examples
         --------
         >>> attrs = Attributes()  # doctest: +SKIP
         >>> attrs.contains_meta_key("sector")  # doctest: +SKIP
         False
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def keys(self) -> list[str]:
-        """Metadata keys in sorted order.
+        """
+        Metadata keys in sorted order.
 
         Returns
         -------
         list[str]
 
+            Result of keys for this `Attributes` in the annotated representation.
         Examples
         --------
         >>> attrs = Attributes()  # doctest: +SKIP

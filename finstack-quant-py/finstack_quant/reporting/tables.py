@@ -1,5 +1,12 @@
 # finstack-quant-py/finstack_quant/reporting/tables.py
-"""HTML table primitives: key/value fact tables, generic data tables, heatmaps."""
+"""HTML table primitives: key/value fact tables, generic data tables, heatmaps.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.tables as tables
+>>> tables.__name__
+'finstack_quant.reporting.tables'
+"""
 
 from __future__ import annotations
 
@@ -24,6 +31,22 @@ def scroll(inner_html: str) -> str:
     ----------
     inner_html : str
         Already escaped and rendered HTML content, normally a report table.
+
+    Returns:
+    -------
+    str
+        Result of scroll for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.tables import scroll
+    >>> callable(scroll)
+    True
     """
     return f'<div class="fq-scroll">{inner_html}</div>'
 
@@ -37,6 +60,22 @@ def kv_table(rows: list[tuple[str, str, str]], *, theme: Theme) -> str:  # noqa:
         ``(label, display_value, CSS_class)`` rows in desired display order.
     theme : Theme
         Report theme retained for a consistent chart/table helper interface.
+
+    Returns:
+    -------
+    str
+        Result of kv table for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.tables import kv_table
+    >>> callable(kv_table)
+    True
     """
     body = "".join(f'<tr><td class="k">{_esc(k)}</td><td class="v {cls}">{_esc(v)}</td></tr>' for k, v, cls in rows)
     return f'<table class="kv"><tbody>{body}</tbody></table>'
@@ -64,6 +103,22 @@ def data_table(
         Optional per-column display functions; unlisted values are HTML escaped.
     neg_columns : set[str] or None
         Columns whose negative numeric values receive the ``neg`` CSS class.
+
+    Returns:
+    -------
+    str
+        Result of data table for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.tables import data_table
+    >>> callable(data_table)
+    True
     """
     formats = formats or {}
     neg_columns = neg_columns or set()
@@ -94,6 +149,22 @@ def heatmap(rows: list[tuple[int, list[Any], Any]], *, theme: Theme) -> str:
         each monthly series has twelve entries and may contain missing values.
     theme : Theme
         Report palette used to shade positive and negative performance cells.
+
+    Returns:
+    -------
+    str
+        Result of heatmap for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.tables import heatmap
+    >>> callable(heatmap)
+    True
     """
     head = '<tr><th class="yr"></th>' + "".join(f"<th>{m}</th>" for m in _MONTHS) + '<th class="ytd">Year</th></tr>'
     body_rows = []

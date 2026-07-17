@@ -1,9 +1,16 @@
-"""P&L attribution: decompose portfolio P&L into risk-factor contributions.
+"""
+P&L attribution: decompose portfolio P&L into risk-factor contributions.
 
 Bindings for ``finstack_quant_core::attribution``. Provides the
 :class:`PnlAttribution` result type and the :func:`attribute_pnl` /
 :func:`attribute_return_contribution` entry points, along with validation
 helpers and default metric / waterfall ordering utilities.
+
+Examples
+--------
+>>> import finstack_quant.attribution as attribution
+>>> attribution.__name__
+'finstack_quant.attribution'
 """
 
 from __future__ import annotations
@@ -28,7 +35,8 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 class PnlAttribution:
-    """P&L attribution result decomposing total P&L into risk factor contributions.
+    """
+    P&L attribution result decomposing total P&L into risk factor contributions.
 
     Factors include carry, rates curves, credit curves, inflation, correlations,
     FX, volatility, cross-factor interactions, model parameters, market scalars,
@@ -44,7 +52,8 @@ class PnlAttribution:
 
     @staticmethod
     def from_json(json: str) -> PnlAttribution:
-        """Deserialize a ``PnlAttribution`` from JSON.
+        """
+        Deserialize a ``PnlAttribution`` from JSON.
 
         Parameters
         ----------
@@ -61,11 +70,17 @@ class PnlAttribution:
         --------
         >>> from finstack_quant.attribution import PnlAttribution
         >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize to compact JSON.
+        """
+        Serialize to compact JSON.
 
         Returns
         -------
@@ -80,7 +95,8 @@ class PnlAttribution:
         ...
 
     def to_dict(self) -> dict[str, object]:
-        """Export the canonical serde-shaped attribution payload as a dict.
+        """
+        Export the canonical serde-shaped attribution payload as a dict.
 
         Returns
         -------
@@ -98,7 +114,8 @@ class PnlAttribution:
 
     @property
     def total_pnl(self) -> float:
-        """Total P&L amount (val_t1 − val_t0 + intra-period coupon income).
+        """
+        Total P&L amount (val_t1 − val_t0 + intra-period coupon income).
 
         For methods that follow the total-return convention (parallel,
         waterfall, Taylor), ``total_pnl`` includes coupon income received in
@@ -113,7 +130,8 @@ class PnlAttribution:
 
     @property
     def mark_to_market_pnl(self) -> float | None:
-        """Raw mark-to-market P&L: ``val_t1 − val_t0`` with no cashflow adjustment.
+        """
+        Raw mark-to-market P&L: ``val_t1 − val_t0`` with no cashflow adjustment.
 
         When the attribution method added coupon income to ``total_pnl`` (the
         standard total-return convention), this field still reports the raw
@@ -130,7 +148,8 @@ class PnlAttribution:
 
     @property
     def carry(self) -> float:
-        """Carry (theta + accruals) P&L amount.
+        """
+        Carry (theta + accruals) P&L amount.
 
         Returns
         -------
@@ -141,7 +160,8 @@ class PnlAttribution:
 
     @property
     def rates_curves_pnl(self) -> float:
-        """Interest rate curves P&L amount.
+        """
+        Interest rate curves P&L amount.
 
         Returns
         -------
@@ -153,7 +173,8 @@ class PnlAttribution:
 
     @property
     def credit_curves_pnl(self) -> float:
-        """Credit hazard curves P&L amount.
+        """
+        Credit hazard curves P&L amount.
 
         Returns
         -------
@@ -166,7 +187,8 @@ class PnlAttribution:
 
     @property
     def inflation_curves_pnl(self) -> float:
-        """Inflation curves P&L amount.
+        """
+        Inflation curves P&L amount.
 
         Returns
         -------
@@ -177,7 +199,8 @@ class PnlAttribution:
 
     @property
     def correlations_pnl(self) -> float:
-        """Base correlation curves P&L amount.
+        """
+        Base correlation curves P&L amount.
 
         Returns
         -------
@@ -188,7 +211,8 @@ class PnlAttribution:
 
     @property
     def fx_pnl(self) -> float:
-        """FX rate changes P&L amount.
+        """
+        FX rate changes P&L amount.
 
         Pricing-impact FX P&L for cross-currency instruments. For pure
         single-currency instruments this is zero.
@@ -202,7 +226,8 @@ class PnlAttribution:
 
     @property
     def fx_translation_pnl(self) -> float:
-        """FX translation P&L amount.
+        """
+        FX translation P&L amount.
 
         Reporting-currency FX P&L when ``AttributionConfig.target_ccy`` was
         supplied and differs from native. Equals
@@ -217,7 +242,8 @@ class PnlAttribution:
 
     @property
     def vol_pnl(self) -> float:
-        """Implied volatility changes P&L amount.
+        """
+        Implied volatility changes P&L amount.
 
         Returns
         -------
@@ -228,7 +254,8 @@ class PnlAttribution:
 
     @property
     def cross_factor_pnl(self) -> float:
-        """Cross-factor interaction P&L amount.
+        """
+        Cross-factor interaction P&L amount.
 
         Returns
         -------
@@ -239,7 +266,8 @@ class PnlAttribution:
 
     @property
     def model_params_pnl(self) -> float:
-        """Model parameters P&L amount.
+        """
+        Model parameters P&L amount.
 
         Returns
         -------
@@ -250,7 +278,8 @@ class PnlAttribution:
 
     @property
     def market_scalars_pnl(self) -> float:
-        """Market scalars P&L amount.
+        """
+        Market scalars P&L amount.
 
         Returns
         -------
@@ -261,7 +290,8 @@ class PnlAttribution:
 
     @property
     def residual(self) -> float:
-        """Residual (unexplained) P&L amount.
+        """
+        Residual (unexplained) P&L amount.
 
         Returns
         -------
@@ -273,91 +303,109 @@ class PnlAttribution:
 
     @property
     def currency(self) -> str:
-        """Currency code for all P&L amounts.
+        """
+        Currency code for all P&L amounts.
 
         Returns
         -------
         str
+            The currency exposed by this `PnlAttribution`.
         """
         ...
 
     @property
     def instrument_id(self) -> str:
-        """Instrument identifier.
+        """
+        Instrument identifier.
 
         Returns
         -------
         str
+            The instrument id exposed by this `PnlAttribution`.
         """
         ...
 
     @property
     def method(self) -> str:
-        """Attribution method name (Parallel, Waterfall, MetricsBased, Taylor).
+        """
+        Attribution method name (Parallel, Waterfall, MetricsBased, Taylor).
 
         Returns
         -------
         str
+            The method exposed by this `PnlAttribution`.
         """
         ...
 
     @property
     def t0(self) -> str:
-        """Start date (T₀) as ISO string.
+        """
+        Start date (T₀) as ISO string.
 
         Returns
         -------
         str
+            The t0 exposed by this `PnlAttribution`.
         """
         ...
 
     @property
     def t1(self) -> str:
-        """End date (T₁) as ISO string.
+        """
+        End date (T₁) as ISO string.
 
         Returns
         -------
         str
+            The t1 exposed by this `PnlAttribution`.
         """
         ...
 
     @property
     def num_repricings(self) -> int:
-        """Number of repricings performed.
+        """
+        Number of repricings performed.
 
         Returns
         -------
         int
+            The num repricings exposed by this `PnlAttribution`.
         """
         ...
 
     @property
     def residual_pct(self) -> float:
-        """Residual as percentage of total P&L.
+        """
+        Residual as percentage of total P&L.
 
         Returns
         -------
         float
+            The residual pct exposed by this `PnlAttribution`.
         """
         ...
 
     @property
     def notes(self) -> list[str]:
-        """Diagnostic notes and warnings.
+        """
+        Diagnostic notes and warnings.
 
         Returns
         -------
         list[str]
+            The notes exposed by this `PnlAttribution`.
         """
         ...
 
     @property
     def result_invalid(self) -> bool:
-        """True when attribution was flagged invalid and residual checks should fail.
+        """
+        True when attribution was flagged invalid and residual checks should fail.
 
         Returns
         -------
         bool
+            The result invalid exposed by this `PnlAttribution`.
         """
         ...
 
@@ -366,7 +414,8 @@ class PnlAttribution:
         pct_tolerance: float | None = None,
         abs_tolerance: float | None = None,
     ) -> bool:
-        """Check if residual is within tolerance.
+        """
+        Check if residual is within tolerance.
 
         Parameters
         ----------
@@ -387,16 +436,23 @@ class PnlAttribution:
         >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
         >>> attr.residual_within_tolerance(pct_tolerance=0.1)  # doctest: +SKIP
         True
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def residual_within_meta_tolerance(self) -> bool:
-        """Check residual using the attribution's stored method-specific tolerances.
+        """
+        Check residual using the attribution's stored method-specific tolerances.
 
         Returns
         -------
         bool
 
+            Result of residual within meta tolerance for this `PnlAttribution` in the annotated representation.
         Examples
         --------
         >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
@@ -406,7 +462,8 @@ class PnlAttribution:
         ...
 
     def validate_currencies(self) -> None:
-        """Validate that every factor's currency matches ``total_pnl.currency``.
+        """
+        Validate that every factor's currency matches ``total_pnl.currency``.
 
         Useful before building a DataFrame or summing across instruments.
 
@@ -423,7 +480,8 @@ class PnlAttribution:
         ...
 
     def explain(self) -> str:
-        """Human-readable tree explanation (non-zero factors only).
+        """
+        Human-readable tree explanation (non-zero factors only).
 
         Returns
         -------
@@ -438,7 +496,8 @@ class PnlAttribution:
         ...
 
     def explain_verbose(self) -> str:
-        """Verbose tree explanation including zero-valued factors.
+        """
+        Verbose tree explanation including zero-valued factors.
 
         Returns
         -------
@@ -453,7 +512,8 @@ class PnlAttribution:
         ...
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Export attribution as a single-row pandas DataFrame.
+        """
+        Export attribution as a single-row pandas DataFrame.
 
         Columns include ``instrument_id``, ``method``, ``t0``, ``t1``,
         ``currency``, ``total_pnl``, ``mark_to_market_pnl`` (nullable), all
@@ -473,7 +533,8 @@ class PnlAttribution:
         ...
 
     def to_long_dataframe(self) -> pd.DataFrame:
-        """Export every populated detail breakdown as one long-format DataFrame.
+        """
+        Export every populated detail breakdown as one long-format DataFrame.
 
         Columns:
             kind: dotted-path identifier (e.g. ``"rates.by_curve"``,
@@ -513,7 +574,8 @@ class PnlAttribution:
         ...
 
     def to_carry_detail_dataframe(self) -> pd.DataFrame:
-        """Export the carry decomposition as a typed long DataFrame.
+        """
+        Export the carry decomposition as a typed long DataFrame.
 
         Columns are the same as :meth:`to_long_dataframe` but the kind values
         are limited to the ``"carry.*"`` family — useful when you only want the
@@ -536,7 +598,8 @@ class PnlAttribution:
         ...
 
     def to_credit_factor_dataframe(self) -> pd.DataFrame:
-        """Export the credit-factor hierarchy decomposition as a typed long DataFrame.
+        """
+        Export the credit-factor hierarchy decomposition as a typed long DataFrame.
 
         Columns are the same as :meth:`to_long_dataframe`; rows are limited to
         the ``"credit_factor.*"`` family. Includes generic, per-level, adder,
@@ -577,7 +640,8 @@ def attribute_pnl(
     config: dict[str, Any] | None = None,
     full_cross_attribution: bool | None = None,
 ) -> str:
-    """Run P&L attribution for a single instrument.
+    """
+    Run P&L attribution for a single instrument.
 
     This is the main entry point. Accepts the instrument, two market
     snapshots, valuation dates, and a method descriptor and returns the
@@ -617,11 +681,17 @@ def attribute_pnl(
     >>> attr_json = attribute_pnl(inst, mkt_t0, mkt_t1, "2025-01-15", "2025-01-16", "Parallel")
     >>> attr = PnlAttribution.from_json(attr_json)  # doctest: +SKIP
     >>> print(attr.explain())  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def attribute_pnl_from_spec(spec_json: str) -> str:
-    """Run attribution from a full JSON ``AttributionEnvelope``.
+    """
+    Run attribution from a full JSON ``AttributionEnvelope``.
 
     Power-user variant for full envelope round-trip workflows.
     Most users should prefer :func:`attribute_pnl`.
@@ -639,11 +709,17 @@ def attribute_pnl_from_spec(spec_json: str) -> str:
     Examples
     --------
     >>> result = attribute_pnl_from_spec(spec_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def attribute_return_contribution(spec_json: str) -> str:
-    """Compute single-period return contribution attribution.
+    """
+    Compute single-period return contribution attribution.
 
     Parameters
     ----------
@@ -658,11 +734,17 @@ def attribute_return_contribution(spec_json: str) -> str:
     Examples
     --------
     >>> result = attribute_return_contribution(spec_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def validate_attribution_json(json: str) -> str:
-    """Validate an attribution specification JSON.
+    """
+    Validate an attribution specification JSON.
 
     Deserializes against the ``AttributionEnvelope`` schema and returns
     the canonical (re-serialized) JSON.
@@ -680,11 +762,17 @@ def validate_attribution_json(json: str) -> str:
     Examples
     --------
     >>> canonical = validate_attribution_json(spec_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def validate_return_contribution_json(spec_json: str) -> None:
-    """Validate a return contribution specification JSON.
+    """
+    Validate a return contribution specification JSON.
 
     Parameters
     ----------
@@ -694,11 +782,17 @@ def validate_return_contribution_json(spec_json: str) -> None:
     Examples
     --------
     >>> validate_return_contribution_json(spec_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def default_waterfall_order() -> list[str]:
-    """Return the default waterfall factor ordering.
+    """
+    Return the default waterfall factor ordering.
 
     Returns
     -------
@@ -714,7 +808,8 @@ def default_waterfall_order() -> list[str]:
     ...
 
 def default_attribution_metrics() -> list[str]:
-    """Return the default metric IDs used by metrics-based attribution.
+    """
+    Return the default metric IDs used by metrics-based attribution.
 
     Returns
     -------

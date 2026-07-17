@@ -155,6 +155,12 @@ that delegate to Rust. A complete stub documents:
 - raised exceptions and when they occur,
 - behavioral notes: supported `op`/`method` strings, missing-data handling,
   defaults, and any divergence from the Rust API.
+- a runnable doctest at module level and for every public class, classmethod,
+  and free function. Class examples may cover routine instance accessors.
+
+Name the concrete public exception types from the binding error-conversion
+contract and state the condition that raises each type. Do not use generic
+"raises an error" language.
 
 Match the docstring flavor already used in the module (NumPy `Parameters`
 sections or Google `Args:` sections); do not mix flavors within one module.

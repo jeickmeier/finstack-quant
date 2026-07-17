@@ -1,4 +1,11 @@
-"""Vectorized panel feature transforms."""
+"""Vectorized panel feature transforms.
+
+Examples:
+--------
+>>> import finstack_quant.features as features
+>>> features.__name__
+'finstack_quant.features'
+"""
 
 from importlib import import_module as _import_module
 

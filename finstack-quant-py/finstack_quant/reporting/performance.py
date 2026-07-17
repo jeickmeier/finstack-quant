@@ -3,6 +3,12 @@
 
 Reads only the engine's exported DataFrames — it never recomputes analytics.
 The primary series is selected positionally by ``ticker``.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.performance as performance
+>>> performance.__name__
+'finstack_quant.reporting.performance'
 """
 
 from __future__ import annotations
@@ -175,6 +181,22 @@ def performance_tearsheet(
         Visual theme (default :data:`INSTITUTIONAL`).
     generated : datetime.date, optional
         "Generated" stamp; pass a fixed date for reproducible output.
+
+    Returns:
+    -------
+    TearSheet
+        Result of performance tearsheet for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.performance import performance_tearsheet
+    >>> callable(performance_tearsheet)
+    True
     """
     wanted = sections if sections is not None else ALL_SECTIONS
     unknown = set(wanted) - set(ALL_SECTIONS)

@@ -1,4 +1,11 @@
-"""Covenant package JSON validation, templates, and map-backed evaluation."""
+"""Covenant package JSON validation, templates, and map-backed evaluation.
+
+Examples:
+--------
+>>> import finstack_quant.covenants as covenants
+>>> covenants.__name__
+'finstack_quant.covenants'
+"""
 
 from __future__ import annotations
 

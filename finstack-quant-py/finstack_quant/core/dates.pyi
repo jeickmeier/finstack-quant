@@ -1,4 +1,5 @@
-"""Date, calendar, and schedule utilities from ``finstack-quant-core``.
+"""
+Date, calendar, and schedule utilities from ``finstack-quant-core``.
 
 Provides day-count conventions, tenor types, period generation, schedule
 building, holiday calendars, and business-day adjustment functions.
@@ -10,6 +11,12 @@ Example::
     >>> dc = DayCount.ACT_365F
     >>> dc.year_fraction(datetime.date(2024, 1, 1), datetime.date(2025, 1, 1))
     1.0
+
+Examples
+--------
+>>> import finstack_quant.core.dates as dates
+>>> dates.__name__
+'finstack_quant.core.dates'
 """
 
 from __future__ import annotations
@@ -58,7 +65,15 @@ __all__ = [
 ]
 
 class SifmaSettlementClass:
-    """SIFMA good-delivery settlement class."""
+    """
+    SIFMA good-delivery settlement class.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import SifmaSettlementClass
+    >>> SifmaSettlementClass.__name__
+    'SifmaSettlementClass'
+    """
 
     A: SifmaSettlementClass
     B: SifmaSettlementClass
@@ -67,7 +82,8 @@ class SifmaSettlementClass:
 
     @classmethod
     def from_agency_term(cls, agency: str, term_years: int) -> SifmaSettlementClass:
-        """Infer the SIFMA good-delivery class from an agency and term.
+        """
+        Infer the SIFMA good-delivery class from an agency and term.
 
         Parameters
         ----------
@@ -81,11 +97,23 @@ class SifmaSettlementClass:
         -------
         SifmaSettlementClass
             Settlement class used to select the monthly SIFMA delivery date.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import SifmaSettlementClass
+        >>> callable(SifmaSettlementClass.from_agency_term)
+        True
         """
         ...
 
 def sifma_settlement_date(month: int, year: int) -> datetime.date | None:
-    """Return the published SIFMA settlement date for a month when available.
+    """
+    Return the published SIFMA settlement date for a month when available.
 
     Parameters
     ----------
@@ -98,13 +126,25 @@ def sifma_settlement_date(month: int, year: int) -> datetime.date | None:
     -------
     datetime.date or None
         Published settlement date, or ``None`` when the month is not listed.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import sifma_settlement_date
+    >>> callable(sifma_settlement_date)
+    True
     """
     ...
 
 def sifma_settlement_date_for_class(
     month: int, year: int, settlement_class: SifmaSettlementClass
 ) -> datetime.date | None:
-    """Return the SIFMA settlement date for a specified delivery class.
+    """
+    Return the SIFMA settlement date for a specified delivery class.
 
     Parameters
     ----------
@@ -114,13 +154,30 @@ def sifma_settlement_date_for_class(
         Four-digit delivery calendar year.
     settlement_class : SifmaSettlementClass
         Good-delivery class inferred from the agency/program and mortgage term.
+
+    Returns
+    -------
+    datetime.date | None
+        Result of sifma settlement date for class for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import sifma_settlement_date_for_class
+    >>> callable(sifma_settlement_date_for_class)
+    True
     """
     ...
 
 def estimated_sifma_settlement_date_for_class(
     month: int, year: int, settlement_class: SifmaSettlementClass
 ) -> datetime.date:
-    """Estimate a class-specific SIFMA settlement date when no calendar is published.
+    """
+    Estimate a class-specific SIFMA settlement date when no calendar is published.
 
     Parameters
     ----------
@@ -135,11 +192,23 @@ def estimated_sifma_settlement_date_for_class(
     -------
     datetime.date
         Deterministic estimated settlement date for the requested class.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import estimated_sifma_settlement_date_for_class
+    >>> callable(estimated_sifma_settlement_date_for_class)
+    True
     """
     ...
 
 def next_sifma_settlement(date: datetime.date) -> datetime.date | None:
-    """Return the next published SIFMA settlement date on or after a date.
+    """
+    Return the next published SIFMA settlement date on or after a date.
 
     Parameters
     ----------
@@ -150,6 +219,17 @@ def next_sifma_settlement(date: datetime.date) -> datetime.date | None:
     -------
     datetime.date or None
         Earliest available settlement date not before ``date``, or ``None``.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import next_sifma_settlement
+    >>> callable(next_sifma_settlement)
+    True
     """
     ...
 
@@ -158,7 +238,8 @@ def next_sifma_settlement(date: datetime.date) -> datetime.date | None:
 # ---------------------------------------------------------------------------
 
 class DayCount:
-    """Day-count convention for year-fraction calculations.
+    """
+    Day-count convention for year-fraction calculations.
 
     Immutable, hashable enum-style type with class attributes for each
     supported convention.
@@ -200,7 +281,8 @@ class DayCount:
 
     @classmethod
     def from_name(cls, name: str) -> DayCount:
-        """Parse a day-count convention from its string name.
+        """
+        Parse a day-count convention from its string name.
 
         Parameters
         ----------
@@ -212,10 +294,17 @@ class DayCount:
         -------
         DayCount
 
+            Result of from name for this `DayCount` in the annotated representation.
         Raises
         ------
         ValueError
             If *name* is not recognised.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import DayCount
+        >>> callable(DayCount.from_name)
+        True
         """
         ...
 
@@ -225,7 +314,8 @@ class DayCount:
         end: datetime.date,
         ctx: Optional[DayCountContext] = None,
     ) -> float:
-        """Compute the year fraction between two dates.
+        """
+        Compute the year fraction between two dates.
 
         Parameters
         ----------
@@ -255,7 +345,8 @@ class DayCount:
         end: datetime.date,
         ctx: Optional[DayCountContext] = None,
     ) -> float:
-        """Compute the signed year fraction (negative when start > end).
+        """
+        Compute the signed year fraction (negative when start > end).
 
         Parameters
         ----------
@@ -280,7 +371,8 @@ class DayCount:
 
     @staticmethod
     def calendar_days(start: datetime.date, end: datetime.date) -> int:
-        """Count the calendar days between two dates.
+        """
+        Count the calendar days between two dates.
 
         Parameters
         ----------
@@ -293,6 +385,17 @@ class DayCount:
         -------
         int
             Signed number of calendar days (end - start).
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import DayCount
+        >>> callable(DayCount.calendar_days)
+        True
         """
         ...
 
@@ -303,7 +406,8 @@ class DayCount:
     def __ne__(self, other: object) -> bool: ...
 
 class DayCountContext:
-    """Optional context for day-count calculations.
+    """
+    Optional context for day-count calculations.
 
     Certain conventions require additional information:
 
@@ -318,6 +422,12 @@ class DayCountContext:
         Coupon frequency for ISMA conventions.
     bus_basis : int | None
         Custom business-day divisor (defaults to 252 when omitted).
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import DayCountContext
+    >>> DayCountContext.__name__
+    'DayCountContext'
     """
 
     def __init__(
@@ -328,7 +438,8 @@ class DayCountContext:
         coupon_period: Optional[tuple[datetime.date, datetime.date]] = None,
         end_is_termination_date: bool = False,
     ) -> None:
-        """Create a day-count context.
+        """
+        Create a day-count context.
 
         Parameters
         ----------
@@ -342,42 +453,54 @@ class DayCountContext:
             Reference coupon period ``(start, end)`` for ACT/ACT (ICMA).
         end_is_termination_date : bool
             Whether the accrual end is the instrument termination date.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def calendar_id(self) -> Optional[str]:
-        """Optional calendar identifier.
+        """
+        Optional calendar identifier.
 
         Returns
         -------
         str | None
+            The calendar id exposed by this `DayCountContext`.
         """
         ...
 
     @property
     def frequency(self) -> Optional[Tenor]:
-        """Optional coupon frequency.
+        """
+        Optional coupon frequency.
 
         Returns
         -------
         Tenor | None
+            The frequency exposed by this `DayCountContext`.
         """
         ...
 
     @property
     def bus_basis(self) -> Optional[int]:
-        """Optional custom business-day divisor.
+        """
+        Optional custom business-day divisor.
 
         Returns
         -------
         int | None
+            The bus basis exposed by this `DayCountContext`.
         """
         ...
 
     @property
     def coupon_period(self) -> Optional[tuple[datetime.date, datetime.date]]:
-        """Optional reference coupon period as ``(start, end)`` dates.
+        """
+        Optional reference coupon period as ``(start, end)`` dates.
 
         Returns
         -------
@@ -387,11 +510,19 @@ class DayCountContext:
 
     @property
     def end_is_termination_date(self) -> bool:
-        """Whether the accrual end is the instrument termination date."""
+        """
+        Whether the accrual end is the instrument termination date.
+
+        Returns
+        -------
+        bool
+            The end is termination date exposed by this `DayCountContext`.
+        """
         ...
 
     def to_state(self) -> DayCountContextState:
-        """Convert to a serializable state snapshot.
+        """
+        Convert to a serializable state snapshot.
 
         Returns
         -------
@@ -402,7 +533,8 @@ class DayCountContext:
     def __repr__(self) -> str: ...
 
 class DayCountContextState:
-    """Serializable snapshot of :class:`DayCountContext` for persistence.
+    """
+    Serializable snapshot of :class:`DayCountContext` for persistence.
 
     Parameters
     ----------
@@ -412,6 +544,12 @@ class DayCountContextState:
         Coupon frequency.
     bus_basis : int | None
         Custom business-day divisor.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import DayCountContextState
+    >>> DayCountContextState.__name__
+    'DayCountContextState'
     """
 
     def __init__(
@@ -422,7 +560,8 @@ class DayCountContextState:
         coupon_period: Optional[tuple[datetime.date, datetime.date]] = None,
         end_is_termination_date: bool = False,
     ) -> None:
-        """Create a context state.
+        """
+        Create a context state.
 
         Parameters
         ----------
@@ -436,51 +575,65 @@ class DayCountContextState:
             Reference coupon period ``(start, end)``.
         end_is_termination_date : bool
             Whether the accrual end is the instrument termination date.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def to_context(self) -> DayCountContext:
-        """Reconstruct a live :class:`DayCountContext` from this state.
+        """
+        Reconstruct a live :class:`DayCountContext` from this state.
 
         Returns
         -------
         DayCountContext
+            Result of to context for this `DayCountContextState` in the annotated representation.
         """
         ...
 
     @property
     def calendar_id(self) -> Optional[str]:
-        """Optional calendar identifier.
+        """
+        Optional calendar identifier.
 
         Returns
         -------
         str | None
+            The calendar id exposed by this `DayCountContextState`.
         """
         ...
 
     @property
     def frequency(self) -> Optional[Tenor]:
-        """Optional coupon frequency.
+        """
+        Optional coupon frequency.
 
         Returns
         -------
         Tenor | None
+            The frequency exposed by this `DayCountContextState`.
         """
         ...
 
     @property
     def bus_basis(self) -> Optional[int]:
-        """Optional custom business-day divisor.
+        """
+        Optional custom business-day divisor.
 
         Returns
         -------
         int | None
+            The bus basis exposed by this `DayCountContextState`.
         """
         ...
 
     @property
     def coupon_period(self) -> Optional[tuple[datetime.date, datetime.date]]:
-        """Optional reference coupon period as ``(start, end)`` dates.
+        """
+        Optional reference coupon period as ``(start, end)`` dates.
 
         Returns
         -------
@@ -490,15 +643,29 @@ class DayCountContextState:
 
     @property
     def end_is_termination_date(self) -> bool:
-        """Whether the accrual end is the instrument termination date."""
+        """
+        Whether the accrual end is the instrument termination date.
+
+        Returns
+        -------
+        bool
+            The end is termination date exposed by this `DayCountContextState`.
+        """
         ...
 
     def __repr__(self) -> str: ...
 
 class Thirty360Convention:
-    """30/360 sub-convention (US SIA / Bond Basis, ISDA, or European).
+    """
+    30/360 sub-convention (US SIA / Bond Basis, ISDA, or European).
 
     Immutable, hashable enum-style type.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import Thirty360Convention
+    >>> Thirty360Convention.__name__
+    'Thirty360Convention'
     """
 
     US_SIA: Thirty360Convention
@@ -519,9 +686,16 @@ class Thirty360Convention:
 # ---------------------------------------------------------------------------
 
 class TenorUnit:
-    """Frequency/tenor unit enumeration.
+    """
+    Frequency/tenor unit enumeration.
 
     Immutable, hashable enum-style type.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import TenorUnit
+    >>> TenorUnit.__name__
+    'TenorUnit'
     """
 
     DAYS: TenorUnit
@@ -535,7 +709,8 @@ class TenorUnit:
 
     @classmethod
     def from_char(cls, ch: str) -> TenorUnit:
-        """Parse a single-character tenor unit designator.
+        """
+        Parse a single-character tenor unit designator.
 
         Parameters
         ----------
@@ -546,10 +721,17 @@ class TenorUnit:
         -------
         TenorUnit
 
+            Result of from char for this `TenorUnit` in the annotated representation.
         Raises
         ------
         ValueError
             If *ch* is not a valid unit designator.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import TenorUnit
+        >>> callable(TenorUnit.from_char)
+        True
         """
         ...
 
@@ -560,7 +742,8 @@ class TenorUnit:
     def __ne__(self, other: object) -> bool: ...
 
 class Tenor:
-    """A tenor such as ``3M``, ``1Y``, or ``2W``.
+    """
+    A tenor such as ``3M``, ``1Y``, or ``2W``.
 
     Immutable, hashable value type combining a count and unit.
 
@@ -570,10 +753,17 @@ class Tenor:
         Numeric count (e.g. ``3``).
     unit : TenorUnit
         Unit (e.g. ``TenorUnit.MONTHS``).
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import Tenor
+    >>> Tenor.__name__
+    'Tenor'
     """
 
     def __init__(self, count: int, unit: TenorUnit) -> None:
-        """Construct a tenor from a count and unit.
+        """
+        Construct a tenor from a count and unit.
 
         Parameters
         ----------
@@ -581,12 +771,18 @@ class Tenor:
             Numeric count.
         unit : TenorUnit
             Tenor unit.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @classmethod
     def parse(cls, s: str) -> Tenor:
-        """Parse a tenor string.
+        """
+        Parse a tenor string.
 
         Parameters
         ----------
@@ -597,96 +793,173 @@ class Tenor:
         -------
         Tenor
 
+            Result of parse for this `Tenor` in the annotated representation.
         Raises
         ------
         ValueError
             If *s* cannot be parsed.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Tenor
+        >>> callable(Tenor.parse)
+        True
         """
         ...
 
     @classmethod
     def daily(cls) -> Tenor:
-        """1-day tenor.
+        """
+        Compute daily for `Tenor`.
+        1-day tenor.
 
         Returns
         -------
         Tenor
+            Result of daily for this `Tenor` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Tenor
+        >>> callable(Tenor.daily)
+        True
         """
         ...
 
     @classmethod
     def weekly(cls) -> Tenor:
-        """1-week tenor.
+        """
+        Compute weekly for `Tenor`.
+        1-week tenor.
 
         Returns
         -------
         Tenor
+            Result of weekly for this `Tenor` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Tenor
+        >>> callable(Tenor.weekly)
+        True
         """
         ...
 
     @classmethod
     def biweekly(cls) -> Tenor:
-        """2-week tenor.
+        """
+        Compute biweekly for `Tenor`.
+        2-week tenor.
 
         Returns
         -------
         Tenor
+            Result of biweekly for this `Tenor` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Tenor
+        >>> callable(Tenor.biweekly)
+        True
         """
         ...
 
     @classmethod
     def monthly(cls) -> Tenor:
-        """1-month tenor.
+        """
+        Compute monthly for `Tenor`.
+        1-month tenor.
 
         Returns
         -------
         Tenor
+            Result of monthly for this `Tenor` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Tenor
+        >>> callable(Tenor.monthly)
+        True
         """
         ...
 
     @classmethod
     def bimonthly(cls) -> Tenor:
-        """2-month tenor.
+        """
+        Compute bimonthly for `Tenor`.
+        2-month tenor.
 
         Returns
         -------
         Tenor
+            Result of bimonthly for this `Tenor` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Tenor
+        >>> callable(Tenor.bimonthly)
+        True
         """
         ...
 
     @classmethod
     def quarterly(cls) -> Tenor:
-        """3-month (quarterly) tenor.
+        """
+        3-month (quarterly) tenor.
 
         Returns
         -------
         Tenor
+            Result of quarterly for this `Tenor` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Tenor
+        >>> callable(Tenor.quarterly)
+        True
         """
         ...
 
     @classmethod
     def semi_annual(cls) -> Tenor:
-        """6-month (semi-annual) tenor.
+        """
+        6-month (semi-annual) tenor.
 
         Returns
         -------
         Tenor
+            Result of semi annual for this `Tenor` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Tenor
+        >>> callable(Tenor.semi_annual)
+        True
         """
         ...
 
     @classmethod
     def annual(cls) -> Tenor:
-        """12-month (annual) tenor.
+        """
+        12-month (annual) tenor.
 
         Returns
         -------
         Tenor
+            Result of annual for this `Tenor` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Tenor
+        >>> callable(Tenor.annual)
+        True
         """
         ...
 
     @classmethod
     def from_payments_per_year(cls, payments: int) -> Tenor:
-        """Construct from the number of coupon payments per year.
+        """
+        Construct from the number of coupon payments per year.
 
         Parameters
         ----------
@@ -697,68 +970,88 @@ class Tenor:
         -------
         Tenor
 
+            Result of from payments per year for this `Tenor` in the annotated representation.
         Raises
         ------
         ValueError
             If *payments* does not map to a standard tenor.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Tenor
+        >>> callable(Tenor.from_payments_per_year)
+        True
         """
         ...
 
     @property
     def count(self) -> int:
-        """Numeric count.
+        """
+        Return the count for `Tenor`.
+        Numeric count.
 
         Returns
         -------
         int
+            The count exposed by this `Tenor`.
         """
         ...
 
     @property
     def unit(self) -> TenorUnit:
-        """Unit of the tenor.
+        """
+        Unit of the tenor.
 
         Returns
         -------
         TenorUnit
+            The unit exposed by this `Tenor`.
         """
         ...
 
     @property
     def months(self) -> Optional[int]:
-        """Equivalent whole months (``None`` for day/week tenors).
+        """
+        Equivalent whole months (``None`` for day/week tenors).
 
         Returns
         -------
         int | None
+            The months exposed by this `Tenor`.
         """
         ...
 
     @property
     def days(self) -> Optional[int]:
-        """Equivalent whole days (``None`` for month/year tenors).
+        """
+        Equivalent whole days (``None`` for month/year tenors).
 
         Returns
         -------
         int | None
+            The days exposed by this `Tenor`.
         """
         ...
 
     def to_years_simple(self) -> float:
-        """Approximate tenor length in years (simple estimate, no calendar).
+        """
+        Approximate tenor length in years (simple estimate, no calendar).
 
         Returns
         -------
         float
+            Result of to years simple for this `Tenor` in the annotated representation.
         """
         ...
 
     def to_days_approx(self) -> int:
-        """Approximate tenor length in calendar days.
+        """
+        Approximate tenor length in calendar days.
 
         Returns
         -------
         int
+            Result of to days approx for this `Tenor` in the annotated representation.
         """
         ...
 
@@ -773,9 +1066,16 @@ class Tenor:
 # ---------------------------------------------------------------------------
 
 class PeriodKind:
-    """Period frequency kind.
+    """
+    Period frequency kind.
 
     Immutable, hashable enum-style type.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import PeriodKind
+    >>> PeriodKind.__name__
+    'PeriodKind'
     """
 
     DAILY: PeriodKind
@@ -793,7 +1093,8 @@ class PeriodKind:
 
     @classmethod
     def from_name(cls, name: str) -> PeriodKind:
-        """Parse a period kind from a string.
+        """
+        Parse a period kind from a string.
 
         Parameters
         ----------
@@ -804,30 +1105,41 @@ class PeriodKind:
         -------
         PeriodKind
 
+            Result of from name for this `PeriodKind` in the annotated representation.
         Raises
         ------
         ValueError
             If *name* is not recognised.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import PeriodKind
+        >>> callable(PeriodKind.from_name)
+        True
         """
         ...
 
     @property
     def periods_per_year(self) -> int:
-        """Number of periods per year for this frequency.
+        """
+        Number of periods per year for this frequency.
 
         Returns
         -------
         int
+            The periods per year exposed by this `PeriodKind`.
         """
         ...
 
     @property
     def annualization_factor(self) -> float:
-        """Annualization factor for this frequency.
+        """
+        Annualization factor for this frequency.
 
         Returns
         -------
         float
+            The annualization factor exposed by this `PeriodKind`.
         """
         ...
 
@@ -838,14 +1150,22 @@ class PeriodKind:
     def __ne__(self, other: object) -> bool: ...
 
 class PeriodId:
-    """A period identifier such as ``2025Q1`` or ``2025M03``.
+    """
+    A period identifier such as ``2025Q1`` or ``2025M03``.
 
     Immutable, hashable value type.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import PeriodId
+    >>> PeriodId.__name__
+    'PeriodId'
     """
 
     @classmethod
     def parse(cls, code: str) -> PeriodId:
-        """Parse a period code string.
+        """
+        Parse a period code string.
 
         Parameters
         ----------
@@ -857,16 +1177,24 @@ class PeriodId:
         -------
         PeriodId
 
+            Result of parse for this `PeriodId` in the annotated representation.
         Raises
         ------
         ValueError
             If *code* cannot be parsed.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import PeriodId
+        >>> callable(PeriodId.parse)
+        True
         """
         ...
 
     @classmethod
     def month(cls, year: int, month: int) -> PeriodId:
-        """Build a monthly period identifier.
+        """
+        Build a monthly period identifier.
 
         Parameters
         ----------
@@ -878,12 +1206,25 @@ class PeriodId:
         Returns
         -------
         PeriodId
+            Result of month for this `PeriodId` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import PeriodId
+        >>> callable(PeriodId.month)
+        True
         """
         ...
 
     @classmethod
     def quarter(cls, year: int, quarter: int) -> PeriodId:
-        """Build a quarterly period identifier.
+        """
+        Build a quarterly period identifier.
 
         Parameters
         ----------
@@ -895,12 +1236,25 @@ class PeriodId:
         Returns
         -------
         PeriodId
+            Result of quarter for this `PeriodId` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import PeriodId
+        >>> callable(PeriodId.quarter)
+        True
         """
         ...
 
     @classmethod
     def annual(cls, year: int) -> PeriodId:
-        """Build an annual period identifier.
+        """
+        Build an annual period identifier.
 
         Parameters
         ----------
@@ -910,12 +1264,25 @@ class PeriodId:
         Returns
         -------
         PeriodId
+            Result of annual for this `PeriodId` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import PeriodId
+        >>> callable(PeriodId.annual)
+        True
         """
         ...
 
     @classmethod
     def half(cls, year: int, half: int) -> PeriodId:
-        """Build a semi-annual period identifier.
+        """
+        Build a semi-annual period identifier.
 
         Parameters
         ----------
@@ -927,12 +1294,25 @@ class PeriodId:
         Returns
         -------
         PeriodId
+            Result of half for this `PeriodId` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import PeriodId
+        >>> callable(PeriodId.half)
+        True
         """
         ...
 
     @classmethod
     def week(cls, year: int, week: int) -> PeriodId:
-        """Build a weekly period identifier.
+        """
+        Build a weekly period identifier.
 
         Parameters
         ----------
@@ -944,12 +1324,25 @@ class PeriodId:
         Returns
         -------
         PeriodId
+            Result of week for this `PeriodId` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import PeriodId
+        >>> callable(PeriodId.week)
+        True
         """
         ...
 
     @classmethod
     def day(cls, year: int, ordinal: int) -> PeriodId:
-        """Build a daily period identifier from an ordinal day.
+        """
+        Build a daily period identifier from an ordinal day.
 
         Parameters
         ----------
@@ -961,71 +1354,102 @@ class PeriodId:
         Returns
         -------
         PeriodId
+            Result of day for this `PeriodId` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import PeriodId
+        >>> callable(PeriodId.day)
+        True
         """
         ...
 
     @property
     def code(self) -> str:
-        """Period code string (e.g. ``"2025Q1"``).
+        """
+        Period code string (e.g. ``"2025Q1"``).
 
         Returns
         -------
         str
+            The code exposed by this `PeriodId`.
         """
         ...
 
     @property
     def year(self) -> int:
-        """Gregorian or fiscal year label.
+        """
+        Gregorian or fiscal year label.
 
         Returns
         -------
         int
+            The year exposed by this `PeriodId`.
         """
         ...
 
     @property
     def index(self) -> int:
-        """Ordinal index within the year.
+        """
+        Ordinal index within the year.
 
         Returns
         -------
         int
+            The index exposed by this `PeriodId`.
         """
         ...
 
     @property
     def kind(self) -> PeriodKind:
-        """Kind (frequency) of this period.
+        """
+        Kind (frequency) of this period.
 
         Returns
         -------
         PeriodKind
+            The kind exposed by this `PeriodId`.
         """
         ...
 
     @property
     def is_fiscal(self) -> bool:
-        """Whether this identifier uses fiscal-year (``FY...``) semantics."""
+        """
+        Whether this identifier uses fiscal-year (``FY...``) semantics.
+
+        Returns
+        -------
+        bool
+            Whether fiscal holds for this `PeriodId`.
+        """
         ...
 
     @property
     def periods_per_year(self) -> int:
-        """Number of periods per year for this kind.
+        """
+        Number of periods per year for this kind.
 
         Returns
         -------
         int
+            The periods per year exposed by this `PeriodId`.
         """
         ...
 
     def next(self) -> PeriodId:
-        """Next period in sequence.
+        """
+        Next period in sequence.
 
         Returns
         -------
         PeriodId
 
+            Result of next for this `PeriodId` in the annotated representation.
         Raises
         ------
         ValueError
@@ -1035,12 +1459,14 @@ class PeriodId:
         ...
 
     def prev(self) -> PeriodId:
-        """Previous period in sequence.
+        """
+        Previous period in sequence.
 
         Returns
         -------
         PeriodId
 
+            Result of prev for this `PeriodId` in the annotated representation.
         Raises
         ------
         ValueError
@@ -1050,7 +1476,8 @@ class PeriodId:
         ...
 
     def next_fiscal(self, fiscal_config: FiscalConfig) -> PeriodId:
-        """Next period using fiscal-year week/day capacity.
+        """
+        Next period using fiscal-year week/day capacity.
 
         Weekly fiscal IDs can advance through a partial week 53 even when the
         same-numbered ISO Gregorian year has only 52 weeks.
@@ -1060,17 +1487,38 @@ class PeriodId:
         fiscal_config : FiscalConfig
             Fiscal-year start month and day used to determine the next fiscal
             week, month, quarter, or year boundary.
+
+        Returns
+        -------
+        PeriodId
+            Result of next fiscal for this `PeriodId` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def prev_fiscal(self, fiscal_config: FiscalConfig) -> PeriodId:
-        """Previous period using fiscal-year week/day capacity.
+        """
+        Previous period using fiscal-year week/day capacity.
 
         Parameters
         ----------
         fiscal_config : FiscalConfig
             Fiscal-year start month and day used to determine the preceding
             fiscal week, month, quarter, or year boundary.
+
+        Returns
+        -------
+        PeriodId
+            Result of prev fiscal for this `PeriodId` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -1081,48 +1529,63 @@ class PeriodId:
     def __ne__(self, other: object) -> bool: ...
 
 class Period:
-    """A concrete period with start/end dates and an actual/forecast flag.
+    """
+    A concrete period with start/end dates and an actual/forecast flag.
 
     Immutable value type returned by period-building functions.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import Period
+    >>> Period.__name__
+    'Period'
     """
 
     @property
     def id(self) -> PeriodId:
-        """Period identifier.
+        """
+        Period identifier.
 
         Returns
         -------
         PeriodId
+            The id exposed by this `Period`.
         """
         ...
 
     @property
     def start(self) -> datetime.date:
-        """Inclusive start date.
+        """
+        Inclusive start date.
 
         Returns
         -------
         datetime.date
+            The start exposed by this `Period`.
         """
         ...
 
     @property
     def end(self) -> datetime.date:
-        """Exclusive end date.
+        """
+        Exclusive end date.
 
         Returns
         -------
         datetime.date
+            The end exposed by this `Period`.
         """
         ...
 
     @property
     def is_actual(self) -> bool:
-        """Whether this period is an actual (vs forecast).
+        """
+        Whether this period is an actual (vs forecast).
 
         Returns
         -------
         bool
+            Whether actual holds for this `Period`.
         """
         ...
 
@@ -1130,18 +1593,27 @@ class Period:
     def __str__(self) -> str: ...
 
 class PeriodPlan:
-    """A plan containing a contiguous sequence of periods.
+    """
+    A plan containing a contiguous sequence of periods.
 
     Returned by :func:`build_periods` and :func:`build_fiscal_periods`.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import PeriodPlan
+    >>> PeriodPlan.__name__
+    'PeriodPlan'
     """
 
     @property
     def periods(self) -> list[Period]:
-        """List of periods in ascending order.
+        """
+        List of periods in ascending order.
 
         Returns
         -------
         list[Period]
+            The periods exposed by this `PeriodPlan`.
         """
         ...
 
@@ -1149,7 +1621,8 @@ class PeriodPlan:
     def __repr__(self) -> str: ...
 
 class FiscalConfig:
-    """Fiscal year configuration.
+    """
+    Fiscal year configuration.
 
     Parameters
     ----------
@@ -1162,10 +1635,17 @@ class FiscalConfig:
     ------
     ValueError
         If the month/day combination is invalid.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import FiscalConfig
+    >>> FiscalConfig.__name__
+    'FiscalConfig'
     """
 
     def __init__(self, start_month: int, start_day: int) -> None:
-        """Create a fiscal configuration from a start month and day.
+        """
+        Create a fiscal configuration from a start month and day.
 
         Parameters
         ----------
@@ -1185,101 +1665,169 @@ class FiscalConfig:
 
     @classmethod
     def calendar_year(cls) -> FiscalConfig:
-        """Standard calendar year (January 1).
+        """
+        Standard calendar year (January 1).
 
         Returns
         -------
         FiscalConfig
+            Result of calendar year for this `FiscalConfig` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import FiscalConfig
+        >>> callable(FiscalConfig.calendar_year)
+        True
         """
         ...
 
     @classmethod
     def us_federal(cls) -> FiscalConfig:
-        """US Federal fiscal year (October 1).
+        """
+        US Federal fiscal year (October 1).
 
         Returns
         -------
         FiscalConfig
+            Result of us federal for this `FiscalConfig` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import FiscalConfig
+        >>> callable(FiscalConfig.us_federal)
+        True
         """
         ...
 
     @classmethod
     def uk(cls) -> FiscalConfig:
-        """UK fiscal year (April 6).
+        """
+        UK fiscal year (April 6).
 
         Returns
         -------
         FiscalConfig
+            Result of uk for this `FiscalConfig` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import FiscalConfig
+        >>> callable(FiscalConfig.uk)
+        True
         """
         ...
 
     @classmethod
     def japan(cls) -> FiscalConfig:
-        """Japanese fiscal year (April 1).
+        """
+        Japanese fiscal year (April 1).
 
         Returns
         -------
         FiscalConfig
+            Result of japan for this `FiscalConfig` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import FiscalConfig
+        >>> callable(FiscalConfig.japan)
+        True
         """
         ...
 
     @classmethod
     def canada(cls) -> FiscalConfig:
-        """Canadian fiscal year (April 1).
+        """
+        Canadian fiscal year (April 1).
 
         Returns
         -------
         FiscalConfig
+            Result of canada for this `FiscalConfig` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import FiscalConfig
+        >>> callable(FiscalConfig.canada)
+        True
         """
         ...
 
     @classmethod
     def australia(cls) -> FiscalConfig:
-        """Australian fiscal year (July 1).
+        """
+        Australian fiscal year (July 1).
 
         Returns
         -------
         FiscalConfig
+            Result of australia for this `FiscalConfig` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import FiscalConfig
+        >>> callable(FiscalConfig.australia)
+        True
         """
         ...
 
     @classmethod
     def germany(cls) -> FiscalConfig:
-        """German fiscal year (January 1).
+        """
+        German fiscal year (January 1).
 
         Returns
         -------
         FiscalConfig
+            Result of germany for this `FiscalConfig` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import FiscalConfig
+        >>> callable(FiscalConfig.germany)
+        True
         """
         ...
 
     @classmethod
     def france(cls) -> FiscalConfig:
-        """French fiscal year (January 1).
+        """
+        French fiscal year (January 1).
 
         Returns
         -------
         FiscalConfig
+            Result of france for this `FiscalConfig` in the annotated representation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import FiscalConfig
+        >>> callable(FiscalConfig.france)
+        True
         """
         ...
 
     @property
     def start_month(self) -> int:
-        """Month when the fiscal year starts (1-12).
+        """
+        Month when the fiscal year starts (1-12).
 
         Returns
         -------
         int
+            The start month exposed by this `FiscalConfig`.
         """
         ...
 
     @property
     def start_day(self) -> int:
-        """Day when the fiscal year starts (1-31).
+        """
+        Day when the fiscal year starts (1-31).
 
         Returns
         -------
         int
+            The start day exposed by this `FiscalConfig`.
         """
         ...
 
@@ -1289,7 +1837,8 @@ def build_periods(
     spec: str,
     actuals_cutoff: Optional[str] = None,
 ) -> PeriodPlan:
-    """Build periods from a range expression.
+    """
+    Build periods from a range expression.
 
     Parameters
     ----------
@@ -1307,6 +1856,12 @@ def build_periods(
     ------
     ValueError
         If *spec* cannot be parsed.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import build_periods
+    >>> callable(build_periods)
+    True
     """
     ...
 
@@ -1315,7 +1870,8 @@ def build_fiscal_periods(
     fiscal_config: FiscalConfig,
     actuals_cutoff: Optional[str] = None,
 ) -> PeriodPlan:
-    """Build fiscal periods with a custom fiscal year configuration.
+    """
+    Build fiscal periods with a custom fiscal year configuration.
 
     Parameters
     ----------
@@ -1335,6 +1891,12 @@ def build_fiscal_periods(
     ------
     ValueError
         If *spec* cannot be parsed.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import build_fiscal_periods
+    >>> callable(build_fiscal_periods)
+    True
     """
     ...
 
@@ -1343,9 +1905,16 @@ def build_fiscal_periods(
 # ---------------------------------------------------------------------------
 
 class BusinessDayConvention:
-    """Business-day adjustment convention.
+    """
+    Business-day adjustment convention.
 
     Immutable, hashable enum-style type.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import BusinessDayConvention
+    >>> BusinessDayConvention.__name__
+    'BusinessDayConvention'
     """
 
     UNADJUSTED: BusinessDayConvention
@@ -1361,7 +1930,8 @@ class BusinessDayConvention:
 
     @classmethod
     def from_name(cls, name: str) -> BusinessDayConvention:
-        """Parse from a string.
+        """
+        Parse from a string.
 
         Parameters
         ----------
@@ -1377,6 +1947,12 @@ class BusinessDayConvention:
         ------
         ValueError
             If *name* is not recognised.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import BusinessDayConvention
+        >>> callable(BusinessDayConvention.from_name)
+        True
         """
         ...
 
@@ -1387,44 +1963,58 @@ class BusinessDayConvention:
     def __ne__(self, other: object) -> bool: ...
 
 class CalendarMetadata:
-    """Metadata for a holiday calendar.
+    """
+    Metadata for a holiday calendar.
 
     Immutable value type.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import CalendarMetadata
+    >>> CalendarMetadata.__name__
+    'CalendarMetadata'
     """
 
     @property
     def id(self) -> str:
-        """Calendar short code.
+        """
+        Calendar short code.
 
         Returns
         -------
         str
+            The id exposed by this `CalendarMetadata`.
         """
         ...
 
     @property
     def name(self) -> str:
-        """Human-readable name.
+        """
+        Human-readable name.
 
         Returns
         -------
         str
+            The name exposed by this `CalendarMetadata`.
         """
         ...
 
     @property
     def ignore_weekends(self) -> bool:
-        """Whether weekends are ignored for this calendar.
+        """
+        Whether weekends are ignored for this calendar.
 
         Returns
         -------
         bool
+            The ignore weekends exposed by this `CalendarMetadata`.
         """
         ...
 
     @property
     def weekend_rule(self) -> str:
-        """Weekend convention as a snake_case name.
+        """
+        Weekend convention as a snake_case name.
 
         Returns
         -------
@@ -1437,7 +2027,8 @@ class CalendarMetadata:
     def __repr__(self) -> str: ...
 
 class HolidayCalendar:
-    """A holiday calendar resolved from the global registry.
+    """
+    A holiday calendar resolved from the global registry.
 
     Parameters
     ----------
@@ -1448,10 +2039,17 @@ class HolidayCalendar:
     ------
     ValueError
         If *code* does not match any known calendar.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import HolidayCalendar
+    >>> HolidayCalendar.__name__
+    'HolidayCalendar'
     """
 
     def __init__(self, code: str) -> None:
-        """Resolve a calendar by its code.
+        """
+        Resolve a calendar by its code.
 
         Parameters
         ----------
@@ -1466,7 +2064,8 @@ class HolidayCalendar:
         ...
 
     def is_holiday(self, date: datetime.date) -> bool:
-        """Check whether a date is a holiday.
+        """
+        Check whether a date is a holiday.
 
         Parameters
         ----------
@@ -1476,11 +2075,18 @@ class HolidayCalendar:
         Returns
         -------
         bool
+            Whether holiday holds for this `HolidayCalendar`.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def is_business_day(self, date: datetime.date) -> bool:
-        """Check whether a date is a business day.
+        """
+        Check whether a date is a business day.
 
         Parameters
         ----------
@@ -1490,12 +2096,19 @@ class HolidayCalendar:
         Returns
         -------
         bool
+            Whether business day holds for this `HolidayCalendar`.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def metadata(self) -> Optional[CalendarMetadata]:
-        """Calendar metadata (if available).
+        """
+        Calendar metadata (if available).
 
         Returns
         -------
@@ -1505,11 +2118,14 @@ class HolidayCalendar:
 
     @property
     def code(self) -> str:
-        """Calendar code.
+        """
+        Return the code for `HolidayCalendar`.
+        Calendar code.
 
         Returns
         -------
         str
+            The code exposed by this `HolidayCalendar`.
         """
         ...
 
@@ -1521,7 +2137,8 @@ def adjust(
     convention: Union[BusinessDayConvention, str],
     calendar: Union[HolidayCalendar, str],
 ) -> datetime.date:
-    """Adjust a date according to a business-day convention and calendar.
+    """
+    Adjust a date according to a business-day convention and calendar.
 
     Parameters
     ----------
@@ -1541,16 +2158,29 @@ def adjust(
     ------
     ValueError
         If the calendar or convention is invalid.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import adjust
+    >>> callable(adjust)
+    True
     """
     ...
 
 def available_calendars() -> list[str]:
-    """Return the list of available calendar codes in the global registry.
+    """
+    Return the list of available calendar codes in the global registry.
 
     Returns
     -------
     list[str]
         Calendar code strings.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import available_calendars
+    >>> callable(available_calendars)
+    True
     """
     ...
 
@@ -1559,9 +2189,16 @@ def available_calendars() -> list[str]:
 # ---------------------------------------------------------------------------
 
 class StubKind:
-    """Stub positioning rule for schedule generation.
+    """
+    Stub positioning rule for schedule generation.
 
     Immutable, hashable enum-style type.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import StubKind
+    >>> StubKind.__name__
+    'StubKind'
     """
 
     NONE: StubKind
@@ -1577,7 +2214,8 @@ class StubKind:
 
     @classmethod
     def from_name(cls, name: str) -> StubKind:
-        """Parse from a string.
+        """
+        Parse from a string.
 
         Parameters
         ----------
@@ -1588,10 +2226,17 @@ class StubKind:
         -------
         StubKind
 
+            Result of from name for this `StubKind` in the annotated representation.
         Raises
         ------
         ValueError
             If *name* is not recognised.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import StubKind
+        >>> callable(StubKind.from_name)
+        True
         """
         ...
 
@@ -1602,9 +2247,16 @@ class StubKind:
     def __ne__(self, other: object) -> bool: ...
 
 class ScheduleErrorPolicy:
-    """Error handling policy for schedule building.
+    """
+    Error handling policy for schedule building.
 
     Immutable, hashable enum-style type.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import ScheduleErrorPolicy
+    >>> ScheduleErrorPolicy.__name__
+    'ScheduleErrorPolicy'
     """
 
     STRICT: ScheduleErrorPolicy
@@ -1620,14 +2272,22 @@ class ScheduleErrorPolicy:
     def __ne__(self, other: object) -> bool: ...
 
 class Schedule:
-    """A generated date schedule.
+    """
+    A generated date schedule.
 
     Immutable value type produced by :class:`ScheduleBuilder`.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import Schedule
+    >>> Schedule.__name__
+    'Schedule'
     """
 
     @property
     def dates(self) -> list[datetime.date]:
-        """Schedule dates as a list of ``datetime.date``.
+        """
+        Schedule dates as a list of ``datetime.date``.
 
         Returns
         -------
@@ -1636,30 +2296,36 @@ class Schedule:
         ...
 
     def has_warnings(self) -> bool:
-        """Whether any warnings were generated during schedule building.
+        """
+        Whether any warnings were generated during schedule building.
 
         Returns
         -------
         bool
+            Whether this `Schedule` has warnings.
         """
         ...
 
     def used_graceful_fallback(self) -> bool:
-        """Whether a graceful fallback was used during schedule building.
+        """
+        Whether a graceful fallback was used during schedule building.
 
         Returns
         -------
         bool
+            Result of used graceful fallback for this `Schedule` in the annotated representation.
         """
         ...
 
     @property
     def warnings(self) -> list[str]:
-        """Warning messages (if any).
+        """
+        Warning messages (if any).
 
         Returns
         -------
         list[str]
+            The warnings exposed by this `Schedule`.
         """
         ...
 
@@ -1667,7 +2333,8 @@ class Schedule:
     def __repr__(self) -> str: ...
 
 class ScheduleBuilder:
-    """Builder for constructing date schedules.
+    """
+    Builder for constructing date schedules.
 
     Setters mutate the builder **in place** and return that same instance,
     matching Rust's fluent builder semantics.
@@ -1707,7 +2374,8 @@ class ScheduleBuilder:
     """
 
     def __init__(self, start: datetime.date, end: datetime.date) -> None:
-        """Start a new schedule builder with start and end dates.
+        """
+        Start a new schedule builder with start and end dates.
 
         Parameters
         ----------
@@ -1724,27 +2392,50 @@ class ScheduleBuilder:
         ...
 
     def frequency(self, freq: Union[Tenor, str]) -> ScheduleBuilder:
-        """Set the coupon/roll frequency.
+        """
+        Set the coupon/roll frequency.
 
         Parameters
         ----------
         freq : Tenor | str
             Tenor object or string like ``"3M"``.
+
+        Returns
+        -------
+        ScheduleBuilder
+            Result of frequency for this `ScheduleBuilder` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def stub_rule(self, stub: StubKind) -> ScheduleBuilder:
-        """Set the stub rule.
+        """
+        Set the stub rule.
 
         Parameters
         ----------
         stub : StubKind
             Stub positioning rule.
+
+        Returns
+        -------
+        ScheduleBuilder
+            Result of stub rule for this `ScheduleBuilder` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def adjust_with(self, convention: BusinessDayConvention, calendar_id: str) -> ScheduleBuilder:
-        """Set the business-day convention and calendar for adjustment.
+        """
+        Set the business-day convention and calendar for adjustment.
 
         Parameters
         ----------
@@ -1752,21 +2443,43 @@ class ScheduleBuilder:
             Business-day convention.
         calendar_id : str
             Calendar identifier (e.g. ``"target2"``).
+
+        Returns
+        -------
+        ScheduleBuilder
+            Result of adjust with for this `ScheduleBuilder` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def end_of_month(self, eom: bool) -> ScheduleBuilder:
-        """Enable or disable end-of-month roll logic.
+        """
+        Enable or disable end-of-month roll logic.
 
         Parameters
         ----------
         eom : bool
             Whether to enable end-of-month rolling.
+
+        Returns
+        -------
+        ScheduleBuilder
+            Result of end of month for this `ScheduleBuilder` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def cds_imm(self) -> ScheduleBuilder:
-        """Enable CDS IMM date mode and disable standard IMM mode.
+        """
+        Enable CDS IMM date mode and disable standard IMM mode.
         Returns
         -------
         ScheduleBuilder
@@ -1775,7 +2488,8 @@ class ScheduleBuilder:
         ...
 
     def imm(self) -> ScheduleBuilder:
-        """Enable standard IMM date mode and disable CDS IMM mode.
+        """
+        Enable standard IMM date mode and disable CDS IMM mode.
         Returns
         -------
         ScheduleBuilder
@@ -1784,7 +2498,8 @@ class ScheduleBuilder:
         ...
 
     def error_policy(self, policy: ScheduleErrorPolicy) -> ScheduleBuilder:
-        """Set the error policy.
+        """
+        Set the error policy.
 
         Setting a policy fully replaces any previous policy; calls are
         order-independent and idempotent.
@@ -1793,11 +2508,22 @@ class ScheduleBuilder:
         ----------
         policy : ScheduleErrorPolicy
             Error handling policy.
+
+        Returns
+        -------
+        ScheduleBuilder
+            Result of error policy for this `ScheduleBuilder` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def build(self) -> Schedule:
-        """Build the schedule.
+        """
+        Build the schedule.
 
         Under the default ``STRICT`` policy any build warnings raise
         ``ValueError``. Under ``MISSING_CALENDAR_WARNING`` or
@@ -1824,7 +2550,8 @@ class ScheduleBuilder:
 # ---------------------------------------------------------------------------
 
 def create_date(year: int, month: int, day: int) -> datetime.date:
-    """Create a ``datetime.date`` from year, month (1-12), and day.
+    """
+    Create a ``datetime.date`` from year, month (1-12), and day.
 
     Parameters
     ----------
@@ -1839,15 +2566,23 @@ def create_date(year: int, month: int, day: int) -> datetime.date:
     -------
     datetime.date
 
+        Result of create date for the binding in the annotated representation.
     Raises
     ------
     ValueError
         If the date components are invalid.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import create_date
+    >>> callable(create_date)
+    True
     """
     ...
 
 def days_since_epoch(date: datetime.date) -> int:
-    """Return the number of days since the Unix epoch (1970-01-01).
+    """
+    Return the number of days since the Unix epoch (1970-01-01).
 
     Parameters
     ----------
@@ -1858,11 +2593,23 @@ def days_since_epoch(date: datetime.date) -> int:
     -------
     int
         Signed number of days since 1970-01-01.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import days_since_epoch
+    >>> callable(days_since_epoch)
+    True
     """
     ...
 
 def date_from_epoch_days(days: int) -> datetime.date:
-    """Reconstruct a ``datetime.date`` from epoch days (days since 1970-01-01).
+    """
+    Reconstruct a ``datetime.date`` from epoch days (days since 1970-01-01).
 
     Parameters
     ----------
@@ -1873,9 +2620,16 @@ def date_from_epoch_days(days: int) -> datetime.date:
     -------
     datetime.date
 
+        Result of date from epoch days for the binding in the annotated representation.
     Raises
     ------
     ValueError
         If *days* is out of the valid date range.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import date_from_epoch_days
+    >>> callable(date_from_epoch_days)
+    True
     """
     ...

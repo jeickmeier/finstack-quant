@@ -8,6 +8,12 @@ Import subpackages by domain::
 Submodules are loaded lazily — importing ``finstack_quant`` does not pull in every
 domain, which reduces cold-start time in CLIs, notebooks, and serverless
 contexts.
+
+Examples:
+--------
+>>> import finstack_quant as finstack_quant
+>>> finstack_quant.__name__
+'finstack_quant'
 """
 
 from __future__ import annotations

@@ -6,6 +6,12 @@ EV→equity bridge, UFCF projection, sensitivity tornado, and a forecast summary
 Pure presentation — reads the ``evaluate_dcf`` result dict, statement nodes, and
 a caller-supplied tornado-entries list. The only value transform is negating net
 debt for the bridge's downward step (a display-direction sign).
+
+Examples:
+--------
+>>> import finstack_quant.reporting.dcf as dcf
+>>> dcf.__name__
+'finstack_quant.reporting.dcf'
 """
 
 from __future__ import annotations
@@ -122,6 +128,17 @@ def dcf_tearsheet(
         If ``sections`` contains an unknown section name.
     TypeError
         If ``valuation`` is neither a dict nor a JSON string.
+
+    Returns:
+    -------
+    TearSheet
+        Result of dcf tearsheet for the binding in the annotated representation.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.dcf import dcf_tearsheet
+    >>> callable(dcf_tearsheet)
+    True
     """
     wanted = sections if sections is not None else ALL_SECTIONS
     unknown = set(wanted) - set(ALL_SECTIONS)
