@@ -15,6 +15,30 @@ use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
 use finstack_quant_statements::types::AmountOrScalar;
 use pyo3::prelude::*;
 
+/// Validate a formula the same way `ModelBuilder::compute` / `formula` do,
+/// without consuming the builder.
+///
+/// The Rust builder methods consume `self` and return `Err` on an invalid
+/// formula, so calling them and mapping the error still leaves the Python
+/// wrapper's `inner` as `None`, bricking every later call. Running the identical
+/// checks first — reserved-prefix node id, non-empty formula, and
+/// `parse_and_compile` — lets a typo fail without destroying accumulated state.
+fn validate_compute_args(node_id: &str, formula: &str) -> PyResult<()> {
+    finstack_quant_statements::builder::validate_node_id(node_id).map_err(statements_to_py)?;
+    if formula.trim().is_empty() {
+        return Err(crate::errors::value_error("Formula cannot be empty"));
+    }
+    finstack_quant_statements::dsl::parse_and_compile(formula).map_err(statements_to_py)?;
+    Ok(())
+}
+
+/// Validate a period range the same way `ModelBuilder::periods` does, without
+/// consuming the builder (see [`validate_compute_args`]).
+fn validate_periods_args(range: &str, actuals_until: Option<&str>) -> PyResult<()> {
+    finstack_quant_core::dates::build_periods(range, actuals_until).map_err(core_to_py)?;
+    Ok(())
+}
+
 /// Builder for financial models (type-state collapsed for Python).
 ///
 /// Usage::
@@ -131,6 +155,13 @@ impl PyMixedNodeBuilder {
 
     /// Set the fallback formula.
     fn formula(&mut self, formula: &str) -> PyResult<()> {
+        // Validate before `take()` so a bad formula does not consume the
+        // mixed-node builder and brick the chain. `MixedNodeBuilder::formula`
+        // validates via the same `parse_and_compile`.
+        if formula.trim().is_empty() {
+            return Err(crate::errors::value_error("Formula cannot be empty"));
+        }
+        finstack_quant_statements::dsl::parse_and_compile(formula).map_err(statements_to_py)?;
         let builder = self.take()?;
         self.inner = Some(builder.formula(formula).map_err(statements_to_py)?);
         Ok(())
@@ -182,6 +213,9 @@ impl PyModelBuilder {
     ///     Optional cutoff for actual values.
     #[pyo3(signature = (range, actuals_until=None), text_signature = "($self, range, actuals_until=None)")]
     fn periods(&mut self, range: &str, actuals_until: Option<&str>) -> PyResult<()> {
+        // Validate before `take_any()` so a bad range does not brick the builder
+        // (see `validate_periods_args`).
+        validate_periods_args(range, actuals_until)?;
         let state = self.take_any()?;
         match state {
             BuilderState::NeedPeriods(b) => {
@@ -263,6 +297,13 @@ impl PyModelBuilder {
     ///     DSL formula expression (e.g. ``"revenue - cogs"``).
     #[pyo3(text_signature = "($self, node_id, formula)")]
     fn compute(&mut self, node_id: &str, formula: &str) -> PyResult<()> {
+        // Validate BEFORE `take_ready()` so a bad formula does not permanently
+        // consume the in-progress builder. `ModelBuilder::compute` consumes
+        // `self` and returns `Err` on an invalid formula, which would otherwise
+        // leave `inner = None` and brick every subsequent call with a
+        // misleading "consumed by build()" error. These are the exact checks
+        // `compute` runs internally, so behaviour is unchanged on success.
+        validate_compute_args(node_id, formula)?;
         let state = self.take_ready()?;
         let ready = state.compute(node_id, formula).map_err(statements_to_py)?;
         self.inner = Some(BuilderState::Ready(ready));

@@ -27,7 +27,15 @@ const RESERVED_DSL_IDENTIFIERS: &[&str] = &["if", "and", "or", "not", "true", "f
 /// `__` prefix is reserved for other internal use, and identifiers that
 /// collide with a DSL keyword or built-in function (see
 /// [`RESERVED_DSL_IDENTIFIERS`]) would shadow the language primitive.
-pub(crate) fn validate_node_id(node_id: &str) -> Result<()> {
+///
+/// Exposed so binding layers can pre-validate a node id without consuming a
+/// (move-based) builder — mirroring the check `compute` runs internally.
+///
+/// # Errors
+///
+/// Returns an error if `node_id` uses a reserved prefix or collides with a DSL
+/// keyword.
+pub fn validate_node_id(node_id: &str) -> Result<()> {
     if node_id.contains("__cs__") {
         return Err(Error::build(format!(
             "Node ID '{}' contains reserved prefix '__cs__'. \

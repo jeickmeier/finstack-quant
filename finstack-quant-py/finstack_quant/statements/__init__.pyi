@@ -8,7 +8,6 @@ normalization helpers.
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
 
 import pandas as pd
 
@@ -465,15 +464,16 @@ class NumericMode:
 
     @staticmethod
     def decimal() -> NumericMode:
-        """Use decimal arithmetic for evaluation.
+        """Reserved decimal-arithmetic mode.
 
-        Slower than ``float64`` but avoids floating-point rounding error;
-        prefer for currency-sensitive calculations.
+        This variant exists so saved result metadata can evolve, but statement
+        evaluation always runs in ``float64``; selecting it does not change the
+        arithmetic today.
 
         Returns
         -------
         NumericMode
-            Decimal arithmetic mode.
+            Decimal arithmetic mode (reserved).
         """
         ...
 
@@ -497,9 +497,16 @@ class FinancialModelSpec:
     Example
     -------
     >>> from finstack_quant.statements import FinancialModelSpec
-    >>> spec = FinancialModelSpec.from_json('{"id":"x","periods":[],"nodes":{}}')
+    >>> doc = (
+    ...     '{"id":"x","periods":[{"id":"2025Q1","start":"2025-01-01",'
+    ...     '"end":"2025-04-01","is_actual":false}],"nodes":{}}'
+    ... )
+    >>> spec = FinancialModelSpec.from_json(doc)
     >>> spec.id
     'x'
+
+    A model must have at least one period; ``"periods":[]`` raises
+    ``ValueError``.
     """
 
     @staticmethod
@@ -523,13 +530,15 @@ class FinancialModelSpec:
 
         Example
         -------
-        >>> FinancialModelSpec.from_json('{"id":"m","periods":[],"nodes":{}}').node_count
+        >>> FinancialModelSpec.from_json(
+        ...     '{"id":"m","periods":[{"id":"2025Q1","start":"2025-01-01","end":"2025-04-01","is_actual":false}],"nodes":{}}'
+        ... ).node_count
         0
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this specification to pretty-printed JSON.
+        """Serialize this specification to compact JSON.
 
         Returns
         -------
@@ -543,7 +552,9 @@ class FinancialModelSpec:
 
         Example
         -------
-        >>> m = FinancialModelSpec.from_json('{"id":"m","periods":[],"nodes":{}}')
+        >>> m = FinancialModelSpec.from_json(
+        ...     '{"id":"m","periods":[{"id":"2025Q1","start":"2025-01-01","end":"2025-04-01","is_actual":false}],"nodes":{}}'
+        ... )
         >>> '"id"' in m.to_json()
         True
         """
@@ -586,7 +597,9 @@ class FinancialModelSpec:
 
         Example
         -------
-        >>> FinancialModelSpec.from_json('{"id":"m","periods":[],"nodes":{}}').node_ids()
+        >>> FinancialModelSpec.from_json(
+        ...     '{"id":"m","periods":[{"id":"2025Q1","start":"2025-01-01","end":"2025-04-01","is_actual":false}],"nodes":{}}'
+        ... ).node_ids()
         []
         """
         ...
@@ -606,7 +619,9 @@ class FinancialModelSpec:
 
         Example
         -------
-        >>> FinancialModelSpec.from_json('{"id":"m","periods":[],"nodes":{}}').has_node("x")
+        >>> FinancialModelSpec.from_json(
+        ...     '{"id":"m","periods":[{"id":"2025Q1","start":"2025-01-01","end":"2025-04-01","is_actual":false}],"nodes":{}}'
+        ... ).has_node("x")
         False
         """
         ...
@@ -1003,7 +1018,8 @@ class ModelBuilder:
         Parameters
         ----------
         currency:
-            A :class:`Currency` instance or ISO-4217 code string.
+            A :class:`Currency` instance. A bare ISO-4217 string is not
+            accepted; construct ``Currency("USD")`` first.
 
         Example
         -------
@@ -1317,7 +1333,7 @@ class StatementResult:
         ...
 
     def to_json(self) -> str:
-        """Serialize these results to pretty-printed JSON.
+        """Serialize these results to compact JSON.
 
         Returns
         -------
@@ -1816,9 +1832,9 @@ class CheckSuiteSpec:
     """A serializable suite specification describing which checks to run.
 
     Load from JSON (e.g. a team-wide check policy file) and inspect its
-    composition (``builtin_count`` / ``formula_count``). Note: running a suite
-    is not yet exposed through the Python bindings; this type is currently for
-    loading and inspecting a policy definition only.
+    composition (``builtin_check_count`` / ``formula_check_count``). Note:
+    running a suite is not yet exposed through the Python bindings; this type is
+    currently for loading and inspecting a policy definition only.
 
     Example
     -------
