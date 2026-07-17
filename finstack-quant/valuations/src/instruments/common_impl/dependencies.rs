@@ -172,7 +172,12 @@ impl Eq for VolatilityDependency {}
 pub struct MarketDependencies {
     /// Curve dependencies grouped by type.
     pub curves: InstrumentCurves,
-    /// Spot identifiers (equity, FX spot IDs, commodity spot IDs).
+    /// Scalar market-value identifiers resolved through `MarketContext::get_price`.
+    ///
+    /// This includes tradable spots and non-price unitless scalars such as
+    /// continuous dividend yields. The historical field name is retained for
+    /// source compatibility; [`Self::series_ids`] is reserved for
+    /// `MarketContext::get_series` dependencies.
     pub spot_ids: Vec<String>,
     /// Typed volatility dependencies in deterministic insertion order.
     pub volatility_dependencies: Vec<VolatilityDependency>,

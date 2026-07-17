@@ -274,7 +274,6 @@ fn evolution_params_trinomial_rejects_negative_probabilities() {
 /// switch to strict comparisons would surface immediately.
 #[test]
 fn barrier_touch_convention_is_non_strict_at_exact_level() {
-    // Build a SpecKnockOut spec; we only test the touch predicate, not pricing.
     let up = BarrierSpec {
         up_level: Some(105.0),
         down_level: None,
@@ -288,32 +287,22 @@ fn barrier_touch_convention_is_non_strict_at_exact_level() {
         style: BarrierStyle::KnockOut,
     };
 
-    // Mirror the `barrier_touch` closure in `recombining.rs`. Keep this in
-    // lock-step with the production code: any change there must be reflected
-    // here, otherwise the convention will silently drift.
-    let touch_up = |spot: f64, spec: &BarrierSpec| -> bool {
-        spec.up_level.map(|lvl| spot >= lvl).unwrap_or(false)
-    };
-    let touch_down = |spot: f64, spec: &BarrierSpec| -> bool {
-        spec.down_level.map(|lvl| spot <= lvl).unwrap_or(false)
-    };
+    let touch_up = |spot: f64| super::recombining::evaluate_barrier_touch(Some(&up), spot).0;
+    let touch_down = |spot: f64| super::recombining::evaluate_barrier_touch(Some(&down), spot).1;
 
     // Exact-level: must touch (non-strict).
-    assert!(touch_up(105.0, &up), "spot == up_level must trigger touch");
-    assert!(
-        touch_down(95.0, &down),
-        "spot == down_level must trigger touch"
-    );
+    assert!(touch_up(105.0), "spot == up_level must trigger touch");
+    assert!(touch_down(95.0), "spot == down_level must trigger touch");
     // Just inside (no touch).
     assert!(
-        !touch_up(104.99, &up),
+        !touch_up(104.99),
         "spot strictly below up_level must not touch"
     );
     assert!(
-        !touch_down(95.01, &down),
+        !touch_down(95.01),
         "spot strictly above down_level must not touch"
     );
     // Beyond the level: still touched.
-    assert!(touch_up(106.0, &up));
-    assert!(touch_down(94.0, &down));
+    assert!(touch_up(106.0));
+    assert!(touch_down(94.0));
 }

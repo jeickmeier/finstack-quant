@@ -30,8 +30,8 @@
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::types::{CurveId, InstrumentId};
 //! use finstack_quant_core::dates::Date;
-//! use finstack_quant_valuations::instruments::fixed_income::bond_future::{BondFuture, DeliverableBond, Position};
-//! use finstack_quant_valuations::instruments::Instrument;
+//! use finstack_quant_valuations::instruments::fixed_income::bond_future::{BondFuture, DeliverableBond};
+//! use finstack_quant_valuations::instruments::{Instrument, Position};
 //! use finstack_quant_valuations::metrics::MetricId;
 //! use time::Month;
 //!

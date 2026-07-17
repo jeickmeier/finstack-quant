@@ -354,6 +354,70 @@ fn test_prepayment01_default01_nonzero_for_curve_specs() {
 }
 
 #[test]
+fn test_scenario_price_shock_scales_structured_credit_pv_and_dollar_risk_once() {
+    use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
+    use finstack_quant_valuations::instruments::ScenarioPricingOverrides;
+
+    let mut baseline = StructuredCredit::new_abs(
+        "TEST_ABS_SCENARIO_RISK",
+        create_simple_pool(),
+        create_simple_tranches(),
+        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
+        maturity_date(),
+        "USD-OIS",
+    )
+    .with_payment_calendar("nyse");
+    baseline.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.06);
+    baseline.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
+    baseline.credit_model.recovery_spec.rate = 0.40;
+
+    let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
+    let metrics = [
+        MetricId::Prepayment01,
+        MetricId::Default01,
+        MetricId::Recovery01,
+        MetricId::Severity01,
+    ];
+    let baseline_result = baseline
+        .price_with_metrics(
+            &market,
+            test_date(),
+            &metrics,
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("baseline structured-credit metrics");
+
+    let mut shocked = baseline;
+    shocked.scenario_pricing_overrides =
+        ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+    let shocked_result = shocked
+        .price_with_metrics(
+            &market,
+            test_date(),
+            &metrics,
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("shocked structured-credit metrics");
+
+    assert!((shocked_result.value.amount() - baseline_result.value.amount() * 0.90).abs() < 1e-8);
+    for metric in metrics {
+        let baseline_measure = baseline_result.measures[metric.as_str()];
+        let shocked_measure = shocked_result.measures[metric.as_str()];
+        assert!(
+            baseline_measure.abs() > 1e-8,
+            "{} baseline should be materially non-zero",
+            metric.as_str()
+        );
+        assert!(
+            (shocked_measure - baseline_measure * 0.90).abs()
+                <= 1e-10 * baseline_measure.abs().max(1.0),
+            "{} should scale with the scenario-adjusted PV lifecycle: baseline={baseline_measure}, shocked={shocked_measure}",
+            metric.as_str()
+        );
+    }
+}
+
+#[test]
 fn test_structured_credit_registry_exposes_clo_warf() {
     let sc = StructuredCredit::new_clo(
         "TEST_CLO_WARF",

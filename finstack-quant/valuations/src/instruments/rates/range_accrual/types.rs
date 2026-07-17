@@ -432,7 +432,7 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
             );
         }
         if let Some(dividend_yield) = &self.div_yield_id {
-            deps.add_series_id(dividend_yield.as_str());
+            deps.add_spot_id(dividend_yield.as_str());
         }
         Ok(deps)
     }
@@ -451,13 +451,6 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
     }
 
     crate::impl_focused_pricing_overrides!();
-}
-
-// Declare canonical market dependencies for the DV01 calculator.
-impl crate::metrics::HasPricingOverrides for RangeAccrual {
-    fn metric_pricing_overrides_mut(&mut self) -> &mut crate::instruments::MetricPricingOverrides {
-        &mut self.metric_pricing_overrides
-    }
 }
 
 impl crate::metrics::HasExpiry for RangeAccrual {
@@ -527,6 +520,9 @@ mod audit_regression_tests {
             vec![Some(range.lower_bound), Some(range.upper_bound)]
         );
         assert_eq!(deps.unique_vol_surface_ids(), vec![range.vol_surface_id]);
-        assert_eq!(deps.spot_ids, vec![range.spot_id.as_str().to_string()]);
+        let mut expected_spots = vec![range.spot_id.as_str().to_string()];
+        expected_spots.extend(range.div_yield_id.iter().map(|id| id.as_str().to_string()));
+        assert_eq!(deps.spot_ids, expected_spots);
+        assert!(deps.series_ids.is_empty());
     }
 }

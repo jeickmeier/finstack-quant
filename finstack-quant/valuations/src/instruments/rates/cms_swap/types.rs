@@ -660,6 +660,22 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSwap {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                None,
+                None,
+            ),
+        );
+        for strike in [self.cms_cap, self.cms_floor].into_iter().flatten() {
+            deps.add_volatility_dependency(
+                crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                    self.vol_surface_id.clone(),
+                    None,
+                    Some(strike),
+                ),
+            );
+        }
         deps.add_series_id(
             finstack_quant_core::market_data::fixings::cms_fixing_series_id(
                 self.forward_curve_id.as_str(),
@@ -733,6 +749,28 @@ mod tests {
     use finstack_quant_core::market_data::fixings::{cms_fixing_series_id, fixing_series_id};
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use test_utils::{date, flat_discount_with_tenor, flat_forward_with_tenor, flat_vol_surface};
+
+    #[test]
+    fn market_dependencies_retain_surface_and_every_optional_strike() {
+        let mut swap = CmsSwap::example();
+        swap.cms_cap = Some(0.06);
+        swap.cms_floor = Some(0.01);
+
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&swap).expect("dependencies");
+        assert_eq!(
+            deps.volatility_dependencies
+                .iter()
+                .map(|dependency| (dependency.surface_id.clone(), dependency.reference_strike,))
+                .collect::<Vec<_>>(),
+            vec![
+                (swap.vol_surface_id.clone(), None),
+                (swap.vol_surface_id.clone(), Some(0.06)),
+                (swap.vol_surface_id.clone(), Some(0.01)),
+            ]
+        );
+        assert_eq!(deps.unique_vol_surface_ids(), vec![swap.vol_surface_id]);
+    }
 
     #[test]
     fn cms_swap_cashflow_provider_emits_signed_modeled_flows() {

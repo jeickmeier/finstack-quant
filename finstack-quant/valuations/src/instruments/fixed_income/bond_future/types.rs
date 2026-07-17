@@ -13,7 +13,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
 // Re-export the canonical position type from the historical module path.
-pub use crate::instruments::Position;
+use crate::instruments::Position;
 
 /// Day-count basis used to annualize implied repo rates.
 #[derive(
@@ -344,8 +344,9 @@ impl BondFutureSpecs {
 ///
 /// ```ignore
 /// use finstack_quant_valuations::instruments::fixed_income::bond_future::{
-///     BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond, Position,
+///     BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond,
 /// };
+/// use finstack_quant_valuations::instruments::Position;
 /// use finstack_quant_core::money::Money;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
@@ -668,8 +669,9 @@ impl BondFuture {
     /// use finstack_quant_core::types::{CurveId, InstrumentId};
     /// use finstack_quant_valuations::instruments::Bond;
     /// use finstack_quant_valuations::instruments::fixed_income::bond_future::{
-    ///     BondFuture, BondFutureSpecs, DeliverableBond, Position,
+    ///     BondFuture, BondFutureSpecs, DeliverableBond,
     /// };
+    /// use finstack_quant_valuations::instruments::Position;
     /// use time::macros::date;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -807,8 +809,9 @@ impl BondFuture {
     ///
     /// ```ignore
     /// use finstack_quant_valuations::instruments::fixed_income::bond_future::{
-    ///     BondFuture, BondFutureSpecs, DeliverableBond, Position,
+    ///     BondFuture, BondFutureSpecs, DeliverableBond,
     /// };
+    /// use finstack_quant_valuations::instruments::Position;
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -922,8 +925,9 @@ impl BondFuture {
     ///
     /// ```ignore
     /// use finstack_quant_valuations::instruments::fixed_income::bond_future::{
-    ///     BondFuture, BondFutureSpecs, DeliverableBond, Position,
+    ///     BondFuture, BondFutureSpecs, DeliverableBond,
     /// };
+    /// use finstack_quant_valuations::instruments::Position;
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -1117,8 +1121,9 @@ impl BondFuture {
     ///
     /// ```ignore
     /// use finstack_quant_valuations::instruments::fixed_income::bond_future::{
-    ///     BondFuture, BondFutureSpecs, DeliverableBond, Position,
+    ///     BondFuture, BondFutureSpecs, DeliverableBond,
     /// };
+    /// use finstack_quant_valuations::instruments::Position;
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -1231,8 +1236,9 @@ impl BondFutureBuilder {
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::{CurveId, InstrumentId};
     /// use finstack_quant_valuations::instruments::fixed_income::bond_future::{
-    ///     BondFuture, BondFutureSpecs, DeliverableBond, Position,
+    ///     BondFuture, BondFutureSpecs, DeliverableBond,
     /// };
+    /// use finstack_quant_valuations::instruments::Position;
     /// use time::macros::date;
     ///
     /// # fn main() -> finstack_quant_core::Result<()> {

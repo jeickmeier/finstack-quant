@@ -1,9 +1,8 @@
 //! Private metric enrichment for registry-dispatched valuation results.
 
+use super::registry::attach_metric_measures;
 use super::{ModelKey, PricerRegistry, PricingError, PricingErrorContext};
-use crate::instruments::common_impl::helpers::{
-    apply_scenario_value, build_with_metrics_dyn, MetricBuildOptions,
-};
+use crate::instruments::common_impl::helpers::{compute_metrics_dyn, MetricBuildOptions};
 use crate::instruments::Instrument;
 use crate::metrics::risk::MarketHistory;
 use crate::metrics::MetricId;
@@ -37,13 +36,13 @@ pub(super) fn enrich(
         cfg,
         market_history,
         pricer_registry,
-        base_result,
+        mut base_result,
     } = request;
     let err_ctx = PricingErrorContext::from_instrument(instrument).model(model);
     let metric_registry = pricer_registry.metric_registry_override();
 
     if model == ModelKey::Discounting || !instrument.has_custom_metrics_equivalent() {
-        let mut enriched = build_with_metrics_dyn(
+        let metric_measures = compute_metrics_dyn(
             Arc::from(instrument.clone_box()),
             market,
             as_of,
@@ -60,11 +59,8 @@ pub(super) fn enrich(
         .map_err(|error| {
             PricingError::model_failure_with_context(error.to_string(), err_ctx.clone())
         })?;
-
-        for (key, value) in base_result.measures {
-            enriched.measures.insert(key, value);
-        }
-        return Ok(enriched);
+        attach_metric_measures(&mut base_result, metric_measures);
+        return Ok(base_result);
     }
 
     let (spread_metrics, risk_metrics): (Vec<_>, Vec<_>) = metrics
@@ -72,11 +68,10 @@ pub(super) fn enrich(
         .cloned()
         .partition(|metric| MetricId::SPREAD_EQUIVALENT_METRICS.contains(metric));
 
-    let mut result = if spread_metrics.is_empty() {
-        let value = apply_scenario_value(instrument, base_result.value);
-        ValuationResult::stamped_with_meta(instrument.id(), as_of, value, base_result.meta.clone())
+    let mut metric_measures = if spread_metrics.is_empty() {
+        indexmap::IndexMap::new()
     } else {
-        build_with_metrics_dyn(
+        compute_metrics_dyn(
             Arc::from(instrument.metrics_equivalent()),
             Arc::clone(&market),
             as_of,
@@ -95,7 +90,7 @@ pub(super) fn enrich(
     };
 
     if !risk_metrics.is_empty() {
-        let risk_result = build_with_metrics_dyn(
+        let risk_measures = compute_metrics_dyn(
             Arc::from(instrument.clone_box()),
             market,
             as_of,
@@ -112,13 +107,11 @@ pub(super) fn enrich(
         .map_err(|error| {
             PricingError::model_failure_with_context(error.to_string(), err_ctx.clone())
         })?;
-        for (key, value) in risk_result.measures {
-            result.measures.insert(key, value);
+        for (key, value) in risk_measures {
+            metric_measures.insert(key, value);
         }
     }
 
-    for (key, value) in base_result.measures {
-        result.measures.insert(key, value);
-    }
-    Ok(result)
+    attach_metric_measures(&mut base_result, metric_measures);
+    Ok(base_result)
 }

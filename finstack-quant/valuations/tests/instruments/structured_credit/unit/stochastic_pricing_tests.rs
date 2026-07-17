@@ -3,13 +3,17 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::PricingMode;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, CorrelationStructure, DealType, PoolAsset, StochasticDefaultSpec,
-    StochasticPrepaySpec, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
-    TrancheStructure,
+    calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
+    calculate_tranche_oas, generate_cashflows, generate_tranche_cashflows, run_simulation,
+    scenario_table, AssetPool, CorrelationStructure, DealType, OasConfig, PoolAsset, PricingMode,
+    ScenarioGrid, StochasticDefaultSpec, StochasticPrepaySpec, StructuredCredit, Tranche,
+    TrancheCoupon, TrancheSeniority, TrancheStructure,
+};
+use finstack_quant_valuations::instruments::{
+    Instrument, PricingOptions, ScenarioPricingOverrides,
 };
 use time::Month;
 
@@ -55,6 +59,14 @@ fn discount_curve(base_date: Date) -> DiscountCurve {
         .knots(vec![(0.0, 1.0), (5.0, 0.95)])
         .build()
         .expect("discount curve")
+}
+
+fn forward_curve(base_date: Date) -> ForwardCurve {
+    ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        .base_date(base_date)
+        .knots([(0.0, 0.03), (10.0, 0.03)])
+        .build()
+        .expect("forward curve")
 }
 
 fn build_sc(id: &str, pool_balance: f64) -> StructuredCredit {
@@ -252,11 +264,227 @@ fn price_with_metrics_standalone_returns_base_value_when_no_metrics_or_hedges() 
     let result = sc
         .price_with_metrics_standalone(&market, closing_date(), &[])
         .expect("standalone pricing");
+    let canonical = sc
+        .price_with_metrics(&market, closing_date(), &[], PricingOptions::default())
+        .expect("canonical pricing");
 
     assert_eq!(result.instrument_id, "ABS-STANDALONE");
     assert!(result.value.amount().is_finite());
     assert_eq!(result.value.currency(), Currency::USD);
     assert!(result.measures.is_empty());
+    assert_eq!(result.value, canonical.value);
+    assert_eq!(result.as_of, canonical.as_of);
+    assert_eq!(result.measures, canonical.measures);
+}
+
+#[test]
+fn standalone_pricing_applies_scenario_price_shock_once() {
+    let mut sc = build_sc("ABS-STANDALONE-SCENARIO", 1_000_000.0);
+    let market = MarketContext::new().insert(discount_curve(closing_date()));
+    let baseline = sc
+        .price_with_metrics_standalone(&market, closing_date(), &[])
+        .expect("baseline standalone pricing")
+        .value
+        .amount();
+    sc.scenario_pricing_overrides = ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+
+    let shocked = sc
+        .price_with_metrics_standalone(&market, closing_date(), &[])
+        .expect("shocked standalone pricing")
+        .value
+        .amount();
+
+    assert!((shocked - baseline * 0.9).abs() < 1e-6);
+}
+
+#[test]
+fn tranche_and_stochastic_pricing_apply_scenario_price_shock_once() {
+    let market = MarketContext::new().insert(discount_curve(closing_date()));
+    let baseline = build_sc("ABS-SPECIALIZED-SCENARIO", 1_000_000.0);
+    let baseline_tranche = baseline
+        .value_tranche("SENIOR", &market, closing_date())
+        .expect("baseline tranche value")
+        .amount();
+    let baseline_stochastic = baseline
+        .price_stochastic_with_mode(
+            &market,
+            closing_date(),
+            PricingMode::MonteCarlo {
+                num_paths: 8,
+                antithetic: true,
+            },
+        )
+        .expect("baseline stochastic value");
+
+    let mut shocked = baseline;
+    shocked.scenario_pricing_overrides =
+        ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+    let shocked_tranche = shocked
+        .value_tranche("SENIOR", &market, closing_date())
+        .expect("shocked tranche value")
+        .amount();
+    let shocked_stochastic = shocked
+        .price_stochastic_with_mode(
+            &market,
+            closing_date(),
+            PricingMode::MonteCarlo {
+                num_paths: 8,
+                antithetic: true,
+            },
+        )
+        .expect("shocked stochastic value");
+
+    assert!((shocked_tranche - baseline_tranche * 0.90).abs() < 1e-8);
+    assert!(
+        (shocked_stochastic.npv.amount() - baseline_stochastic.npv.amount() * 0.90).abs() < 1e-8
+    );
+    assert!((shocked_stochastic.clean_price - baseline_stochastic.clean_price * 0.90).abs() < 1e-8);
+    for (baseline_tranche, shocked_tranche) in baseline_stochastic
+        .tranche_results
+        .iter()
+        .zip(&shocked_stochastic.tranche_results)
+    {
+        assert!((shocked_tranche.npv.amount() - baseline_tranche.npv.amount() * 0.90).abs() < 1e-8);
+    }
+}
+
+#[test]
+fn structured_credit_pricing_conveniences_validate_before_market_access() {
+    let mut sc = build_sc("ABS-INVALID", 1_000_000.0);
+    sc.cleanup_call_pct = Some(-0.5);
+    let market = MarketContext::new();
+
+    let grid = ScenarioGrid {
+        cprs: vec![0.05],
+        cdrs: vec![0.01],
+        severities: vec![0.40],
+        recovery_lag: None,
+    };
+    let errors = [
+        run_simulation(&sc, &market, closing_date())
+            .expect_err("invalid simulation")
+            .to_string(),
+        generate_cashflows(&sc, &market, closing_date())
+            .expect_err("invalid aggregate cashflows")
+            .to_string(),
+        generate_tranche_cashflows(&sc, "missing", &market, closing_date())
+            .expect_err("invalid tranche cashflows")
+            .to_string(),
+        sc.get_tranche_cashflows("missing", &market, closing_date())
+            .expect_err("invalid tranche helper")
+            .to_string(),
+        sc.value_tranche("missing", &market, closing_date())
+            .expect_err("invalid tranche value")
+            .to_string(),
+        sc.value_tranche_with_metrics("missing", &market, closing_date(), &[])
+            .expect_err("invalid tranche metrics value")
+            .to_string(),
+        calculate_tranche_metrics(&sc, "missing", &market, closing_date(), None)
+            .expect_err("invalid tranche metrics")
+            .to_string(),
+        calculate_tranche_breakeven_cdr(&sc, "missing", &market, closing_date())
+            .expect_err("invalid breakeven cdr")
+            .to_string(),
+        calculate_tranche_discount_margin(
+            &sc,
+            "missing",
+            &market,
+            closing_date(),
+            Money::new(1.0, Currency::USD),
+        )
+        .expect_err("invalid discount margin")
+        .to_string(),
+        calculate_tranche_oas(
+            &sc,
+            "missing",
+            99.0,
+            &market,
+            closing_date(),
+            &OasConfig::default(),
+        )
+        .expect_err("invalid oas")
+        .to_string(),
+        scenario_table(&sc, "missing", &market, closing_date(), &grid)
+            .expect_err("invalid scenario table")
+            .to_string(),
+        sc.hedge_npv(&market, closing_date())
+            .expect_err("invalid hedge pricing")
+            .to_string(),
+        sc.price_with_hedges(&market, closing_date())
+            .expect_err("invalid hedged pricing")
+            .to_string(),
+        sc.price_with_metrics_standalone(&market, closing_date(), &[])
+            .expect_err("invalid metric pricing")
+            .to_string(),
+        sc.price_stochastic(&market, closing_date())
+            .expect_err("invalid stochastic pricing")
+            .to_string(),
+        sc.price_stochastic_with_mode(
+            &market,
+            closing_date(),
+            PricingMode::MonteCarlo {
+                num_paths: 8,
+                antithetic: true,
+            },
+        )
+        .expect_err("invalid explicit stochastic pricing")
+        .to_string(),
+    ];
+
+    for message in errors {
+        assert!(
+            message.contains("cleanup_call_pct"),
+            "unexpected error ordering: {message}"
+        );
+    }
+}
+
+#[test]
+fn hedge_pricing_validates_nested_swap_before_market_access() {
+    let mut swap =
+        finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example_standard()
+            .expect("example hedge swap");
+    swap.fixed.end = swap.fixed.start;
+    swap.float.end = swap.float.start;
+    let sc = build_sc("ABS-INVALID-HEDGE", 1_000_000.0).with_hedge_swap(swap);
+
+    let err = sc
+        .hedge_npv(&MarketContext::new(), closing_date())
+        .expect_err("invalid nested hedge must fail before missing curves");
+    let message = err.to_string();
+    assert!(
+        message.contains("end") || message.contains("start") || message.contains("date"),
+        "unexpected nested hedge validation error: {message}"
+    );
+    assert!(!message.contains("Curve not found"));
+}
+
+#[test]
+fn hedge_pricing_applies_nested_swap_scenario_once() {
+    let swap =
+        finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example_standard()
+            .expect("example hedge swap");
+    let as_of = Date::from_calendar_date(2023, Month::December, 20).expect("date");
+    let market = MarketContext::new()
+        .insert(discount_curve(as_of))
+        .insert(forward_curve(as_of));
+    let baseline = build_sc("ABS-HEDGE-SCENARIO", 1_000_000.0)
+        .with_hedge_swap(swap.clone())
+        .hedge_npv(&market, as_of)
+        .expect("baseline hedge npv")
+        .amount();
+
+    let mut shocked_swap = swap;
+    shocked_swap.scenario_pricing_overrides =
+        ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+    let shocked = build_sc("ABS-HEDGE-SCENARIO", 1_000_000.0)
+        .with_hedge_swap(shocked_swap)
+        .hedge_npv(&market, as_of)
+        .expect("shocked hedge npv")
+        .amount();
+
+    assert!(baseline.abs() > 1.0);
+    assert!((shocked - baseline * 0.90).abs() <= 1e-10 * baseline.abs().max(1.0));
 }
 
 #[test]

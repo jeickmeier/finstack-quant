@@ -380,6 +380,9 @@ impl crate::instruments::common_impl::traits::Instrument for Equity {
         for spot_id in self.price_id_candidates() {
             deps.add_spot_id(spot_id);
         }
+        for dividend_yield_id in self.dividend_yield_id_candidates() {
+            deps.add_spot_id(dividend_yield_id);
+        }
         Ok(deps)
     }
 
@@ -447,6 +450,21 @@ mod tests {
         assert_eq!(equity.currency, Currency::USD);
         assert_eq!(equity.effective_shares(), 100.0);
         assert_eq!(equity.price_quote, Some(150.0));
+    }
+
+    #[test]
+    fn market_dependencies_cover_price_and_dividend_scalar_candidates() {
+        let equity = Equity::example();
+        let price_candidates = equity.price_id_candidates();
+        let dividend_candidates = equity.dividend_yield_id_candidates();
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&equity).expect("dependencies");
+
+        assert!(price_candidates
+            .iter()
+            .chain(&dividend_candidates)
+            .all(|id| deps.spot_ids.contains(id)));
+        assert!(deps.series_ids.is_empty());
     }
 
     #[test]

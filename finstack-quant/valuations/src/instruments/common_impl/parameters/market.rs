@@ -87,9 +87,6 @@ pub enum SettlementType {
     Cash,
 }
 
-/// Backward-compatible path for the canonical position type.
-pub use crate::instruments::Position;
-
 impl std::fmt::Display for SettlementType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

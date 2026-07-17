@@ -155,11 +155,20 @@ fn bump_market_for_target(
             crate::metrics::bump_discount_curve_parallel(context.curves.as_ref(), &curve_id, delta)
         }
         BreakevenTarget::ImpliedVol => {
-            let vol_surface_id = context
+            let vol_surface_ids = context
                 .instrument
                 .market_dependencies()
                 .ok()
-                .and_then(|d| d.unique_vol_surface_ids().into_iter().next())
+                .map(|dependencies| {
+                    dependencies
+                        .unique_vol_surface_ids()
+                        .into_iter()
+                        .filter(|surface_id| {
+                            context.curves.get_surface(surface_id.as_str()).is_ok()
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .filter(|surface_ids| !surface_ids.is_empty())
                 .ok_or_else(|| finstack_quant_core::InputError::NotFound {
                     id: "iterative_breakeven: no vol surface found for instrument".into(),
                 })?;
@@ -170,9 +179,9 @@ fn bump_market_for_target(
             // 1/100th of a vol point per unit, making the iterative implied-vol
             // breakeven ~100x the Linear value.)
             let bump_abs = delta * 0.01;
-            crate::metrics::bump_surface_vol_absolute(
+            crate::metrics::core::finite_difference::bump_surfaces_vol_absolute(
                 context.curves.as_ref(),
-                vol_surface_id.as_str(),
+                &vol_surface_ids,
                 bump_abs,
             )
         }

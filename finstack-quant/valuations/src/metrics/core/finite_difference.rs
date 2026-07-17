@@ -38,6 +38,49 @@ pub(crate) mod bump_sizes {
 /// `(bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL)²`.
 pub(crate) const VOL_POINTS_PER_ABSOLUTE_VOL: f64 = 100.0;
 
+/// Apply the same absolute parallel bump to each unique volatility surface.
+///
+/// The returned tokens restore the scratch context in reverse application
+/// order. If any surface bump fails, already-applied bumps are reverted before
+/// the error is returned.
+pub(crate) fn apply_parallel_surface_bumps_in_place(
+    context: &mut finstack_quant_core::market_data::context::MarketContext,
+    surface_ids: &[finstack_quant_core::types::CurveId],
+    bump_abs: f64,
+) -> finstack_quant_core::Result<Vec<finstack_quant_core::market_data::context::ContextScratchBump>>
+{
+    use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits};
+
+    let spec = BumpSpec {
+        mode: BumpMode::Additive,
+        units: BumpUnits::Fraction,
+        value: bump_abs,
+        bump_type: BumpType::Parallel,
+    };
+    let mut tokens = Vec::with_capacity(surface_ids.len());
+    for surface_id in surface_ids {
+        match context.apply_surface_bump_in_place(surface_id.as_str(), spec) {
+            Ok(token) => tokens.push(token),
+            Err(error) => {
+                revert_scratch_bumps(context, tokens)?;
+                return Err(error);
+            }
+        }
+    }
+    Ok(tokens)
+}
+
+/// Restore a sequence of scratch bumps in reverse application order.
+pub(crate) fn revert_scratch_bumps(
+    context: &mut finstack_quant_core::market_data::context::MarketContext,
+    tokens: Vec<finstack_quant_core::market_data::context::ContextScratchBump>,
+) -> finstack_quant_core::Result<()> {
+    for token in tokens.into_iter().rev() {
+        context.revert_scratch_bump(token)?;
+    }
+    Ok(())
+}
+
 /// Minimum width tolerated when normalizing a finite difference.
 const MIN_FINITE_DIFF_WIDTH: f64 = 1e-12;
 
@@ -316,10 +359,22 @@ pub fn bump_surface_vol_absolute(
     vol_surface_id: &str,
     bump_abs: f64,
 ) -> finstack_quant_core::Result<finstack_quant_core::market_data::context::MarketContext> {
+    bump_surfaces_vol_absolute(
+        context,
+        std::slice::from_ref(&finstack_quant_core::types::CurveId::from(vol_surface_id)),
+        bump_abs,
+    )
+}
+
+/// Apply the same absolute parallel volatility bump to several surfaces.
+pub(crate) fn bump_surfaces_vol_absolute(
+    context: &finstack_quant_core::market_data::context::MarketContext,
+    vol_surface_ids: &[finstack_quant_core::types::CurveId],
+    bump_abs: f64,
+) -> finstack_quant_core::Result<finstack_quant_core::market_data::context::MarketContext> {
     use finstack_quant_core::market_data::bumps::{
         BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
     };
-    use finstack_quant_core::types::CurveId;
 
     if !bump_abs.is_finite() {
         return Err(finstack_quant_core::InputError::Invalid.into());
@@ -328,15 +383,15 @@ pub fn bump_surface_vol_absolute(
         return Ok(context.clone());
     }
 
-    context.bump([MarketBump::Curve {
-        id: CurveId::from(vol_surface_id),
+    context.bump(vol_surface_ids.iter().cloned().map(|id| MarketBump::Curve {
+        id,
         spec: BumpSpec {
             mode: BumpMode::Additive,
             units: BumpUnits::Fraction,
             value: bump_abs,
             bump_type: BumpType::Parallel,
         },
-    }])
+    }))
 }
 
 /// Compute a mixed partial derivative using central differences for two

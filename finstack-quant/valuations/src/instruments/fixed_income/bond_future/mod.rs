@@ -14,9 +14,9 @@
 //!
 //! ```ignore
 //! use finstack_quant_valuations::instruments::fixed_income::bond_future::{
-//!     BondFuture, BondFutureSpecs, DeliverableBond, Position,
+//!     BondFuture, BondFutureSpecs, DeliverableBond,
 //! };
-//! use finstack_quant_valuations::instruments::Attributes;
+//! use finstack_quant_valuations::instruments::{Attributes, Position};
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::types::{InstrumentId, CurveId};
@@ -47,8 +47,9 @@ pub(crate) mod pricer;
 pub(crate) mod types;
 
 // Re-export commonly used types
+pub use crate::instruments::Position;
 pub use pricer::BondFuturePricer;
-pub use types::{BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond, Position};
+pub use types::{BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond};
 
 #[cfg(test)]
 mod tests {

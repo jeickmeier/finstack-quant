@@ -237,8 +237,7 @@ impl AgencyTba {
     /// Effective settlement class (explicit or inferred from agency + term).
     pub fn effective_settlement_class(&self) -> SifmaSettlementClass {
         self.settlement_class.unwrap_or_else(|| {
-            let agency_str = format!("{:?}", self.agency);
-            SifmaSettlementClass::from_agency_term(&agency_str, self.term.years())
+            SifmaSettlementClass::from_agency_term(self.agency.as_str(), self.term.years())
         })
     }
 
@@ -317,6 +316,13 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyTba {
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
+        if let Some(pool) = &self.assumed_pool {
+            deps.merge(
+                crate::instruments::common_impl::traits::Instrument::market_dependencies(
+                    pool.as_ref(),
+                )?,
+            );
+        }
         Ok(deps)
     }
 
@@ -353,11 +359,38 @@ mod tests {
     }
 
     #[test]
-    fn test_tba_identifier() {
-        let tba = AgencyTba::example().expect("AgencyTba example is valid");
-        let id = tba.tba_identifier();
-        assert!(id.contains("FN30"));
-        assert!(id.contains("4.0"));
+    fn market_dependencies_merge_the_explicit_assumed_pool() {
+        let mut tba = AgencyTba::example().expect("example TBA");
+        let mut pool = AgencyMbsPassthrough::example().expect("example pool");
+        pool.discount_curve_id = CurveId::new("USD-MBS-DISC");
+        let pool_discount_curve_id = pool.discount_curve_id.clone();
+        tba.assumed_pool = Some(Box::new(pool));
+
+        let deps = crate::instruments::Instrument::market_dependencies(&tba).expect("dependencies");
+        assert_eq!(
+            deps.curves.discount_curves.as_slice(),
+            &[tba.discount_curve_id, pool_discount_curve_id]
+        );
+    }
+
+    #[test]
+    fn agency_conventions_drive_tba_class_and_identifier() {
+        let cases = [
+            (AgencyProgram::Fnma, "FN30", SifmaSettlementClass::A),
+            (AgencyProgram::Fhlmc, "FH30", SifmaSettlementClass::A),
+            (AgencyProgram::GnmaI, "GN30", SifmaSettlementClass::C),
+            (AgencyProgram::GnmaII, "GN30", SifmaSettlementClass::C),
+        ];
+
+        for (agency, identifier_prefix, settlement_class) in cases {
+            let mut tba = AgencyTba::example().expect("AgencyTba example is valid");
+            tba.agency = agency;
+            let identifier = tba.tba_identifier();
+
+            assert!(identifier.starts_with(identifier_prefix));
+            assert!(identifier.contains("4.0"));
+            assert_eq!(tba.effective_settlement_class(), settlement_class);
+        }
     }
 
     #[test]

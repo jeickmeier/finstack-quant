@@ -14,6 +14,7 @@
 
 use std::cell::Cell;
 
+use crate::instruments::fixed_income::convertible::market_inputs::volatility_candidate_ids;
 use crate::instruments::fixed_income::convertible::pricer::{
     calculate_accrued_interest, price_convertible_bond, ConvertibleTreeType,
 };
@@ -59,15 +60,7 @@ impl MetricCalculator for ImpliedVolCalculator {
             )
         })?;
 
-        // Resolve the volatility ID using the same candidate logic as the pricer
-        let mut vol_candidates: Vec<String> = Vec::new();
-        if let Some(id) = bond.attributes.get_meta("vol_surface_id") {
-            vol_candidates.push(id.to_string());
-        }
-        vol_candidates.push(format!("{}-VOL", underlying_id));
-        if let Some(stripped) = underlying_id.strip_suffix("-SPOT") {
-            vol_candidates.push(format!("{}-VOL", stripped));
-        }
+        let vol_candidates = volatility_candidate_ids(bond)?;
 
         let vol_id = vol_candidates
             .iter()

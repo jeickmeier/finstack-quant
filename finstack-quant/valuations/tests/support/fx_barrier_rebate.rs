@@ -6,20 +6,19 @@ mod test_utils {
     ));
 }
 
+use crate::instruments::exotics::barrier_option::BarrierType;
+use crate::instruments::fx::fx_barrier_option::FxBarrierOption;
+use crate::instruments::{Attributes, Instrument, OptionType};
 use crate::models::closed_form::barrier::{
     barrier_rebate_continuous, BarrierParams, BarrierType as AnalyticalBarrierType,
 };
-use crate::instruments::exotics::barrier_option::BarrierType;
-use crate::instruments::fx::fx_barrier_option::FxBarrierOption;
-use crate::instruments::{Attributes, Instrument};
-use crate::instruments::{OptionType};
-use test_utils::{date, flat_discount_with_tenor, flat_vol_surface};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use test_utils::{date, flat_discount_with_tenor, flat_vol_surface};
 
 #[test]
 fn test_fx_barrier_rebate_added_to_closed_form_price() {
@@ -80,7 +79,7 @@ fn test_fx_barrier_rebate_added_to_closed_form_price() {
 
     let params = BarrierParams::new(spot, barrier, barrier, t, r_dom, r_for, sigma);
     let expected_rebate =
-        barrier_rebate_continuous(&params, rebate.amount(), AnalyticalBarrierType::UpOut)
+        barrier_rebate_continuous(&params, rebate.amount(), AnalyticalBarrierType::UpAndOut)
             * base_option.notional.amount();
 
     let rebate_delta = rebate_pv.amount() - base_pv.amount();

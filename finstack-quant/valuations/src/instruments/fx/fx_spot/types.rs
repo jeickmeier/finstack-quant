@@ -532,14 +532,6 @@ impl crate::instruments::common_impl::traits::Instrument for FxSpot {
         )
     }
 
-    fn value_raw(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        Ok(self.value(market, as_of)?.amount())
-    }
-
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
         None
     }

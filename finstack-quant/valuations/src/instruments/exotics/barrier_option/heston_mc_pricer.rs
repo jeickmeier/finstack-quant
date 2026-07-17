@@ -80,11 +80,7 @@ impl BarrierOptionHestonMcPricer {
             0.0
         };
         if inst.observed_barrier_breached == Some(true)
-            && matches!(
-                inst.barrier_type,
-                crate::instruments::exotics::barrier_option::types::BarrierType::UpAndOut
-                    | crate::instruments::exotics::barrier_option::types::BarrierType::DownAndOut
-            )
+            && inst.barrier_type.is_knock_out()
             && inst.rebate_timing == crate::models::closed_form::barrier::RebateTiming::AtHit
         {
             return Ok((Money::new(0.0, inst.notional.currency()), 0.0));
@@ -222,8 +218,6 @@ fn price_expired_barrier(
     inst: &BarrierOption,
     curves: &MarketContext,
 ) -> finstack_quant_core::Result<Money> {
-    use crate::instruments::exotics::barrier_option::types::BarrierType;
-
     let spot_scalar = curves.get_price(&inst.spot_id)?;
     let spot = match spot_scalar {
         finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
@@ -232,10 +226,7 @@ fn price_expired_barrier(
 
     let ccy = inst.notional.currency();
     let notional = inst.notional.amount();
-    let is_knock_out = matches!(
-        inst.barrier_type,
-        BarrierType::UpAndOut | BarrierType::DownAndOut
-    );
+    let is_knock_out = inst.barrier_type.is_knock_out();
 
     let barrier_breached = inst.observed_barrier_breached.ok_or_else(|| {
         finstack_quant_core::Error::Validation(

@@ -242,23 +242,12 @@ use crate::models::closed_form::barrier::{
     BarrierType as AnalyticalBarrierType,
 };
 
-#[inline]
-fn barrier_is_knock_in(
-    bt: crate::instruments::exotics::barrier_option::types::BarrierType,
-) -> bool {
-    matches!(
-        bt,
-        crate::instruments::exotics::barrier_option::types::BarrierType::UpAndIn
-            | crate::instruments::exotics::barrier_option::types::BarrierType::DownAndIn
-    )
-}
-
 fn expired_barrier_value_per_unit(
     inst: &FxBarrierOption,
     spot: f64,
 ) -> finstack_quant_core::Result<f64> {
     let strike = inst.strike;
-    let is_knock_in = barrier_is_knock_in(inst.barrier_type);
+    let is_knock_in = inst.barrier_type.is_knock_in();
     let barrier_hit = inst.observed_barrier_breached.ok_or_else(|| {
         finstack_quant_core::Error::Validation(
             "Expired FX barrier option requires `observed_barrier_breached` to determine realized payoff"
@@ -304,7 +293,7 @@ fn seasoned_breached_value_per_unit(
     t: f64,
     discount_factor: f64,
 ) -> f64 {
-    if barrier_is_knock_in(inst.barrier_type) {
+    if inst.barrier_type.is_knock_in() {
         crate::models::closed_form::vanilla::bs_price(
             spot,
             inst.strike,

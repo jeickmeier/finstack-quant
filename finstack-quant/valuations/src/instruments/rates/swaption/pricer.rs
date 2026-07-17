@@ -67,7 +67,7 @@ impl Pricer for SimpleSwaptionBlackPricer {
                 )
             })?;
             let disc = market
-                .get_discount(swaption.underlying_discount_curve_id().as_ref())
+                .get_discount(swaption.get_discount_curve_id().as_ref())
                 .map_err(|e| {
                     PricingError::missing_market_data_with_context(
                         e.to_string(),
@@ -157,7 +157,7 @@ impl Pricer for SimpleSwaptionBlackPricer {
                     })?
                 }
             }
-            _ => swaption.value(market, as_of).map_err(|e| {
+            _ => swaption.base_value(market, as_of).map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
                     PricingErrorContext::default(),
@@ -166,5 +166,68 @@ impl Pricer for SimpleSwaptionBlackPricer {
         };
 
         Ok(ValuationResult::stamped(swaption.id(), as_of, pv))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    mod test_utils {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/support/test_utils.rs"
+        ));
+    }
+
+    use super::*;
+    use crate::instruments::{
+        Instrument, InstrumentPricingOverrides, PricingOptions, ScenarioPricingOverrides,
+    };
+    use test_utils::{date, flat_discount_with_tenor};
+
+    #[test]
+    fn discounting_registry_applies_swaption_scenario_once_for_pv_and_raw() {
+        let as_of = date(2025, 1, 1);
+        let mut baseline = Swaption::example();
+        baseline.instrument_pricing_overrides =
+            InstrumentPricingOverrides::default().with_implied_vol(0.20);
+        let market = MarketContext::new().insert(flat_discount_with_tenor(
+            baseline.get_discount_curve_id().as_str(),
+            as_of,
+            0.03,
+            10.0,
+        ));
+        let registry = crate::pricer::standard_registry();
+
+        let baseline_result = baseline
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default().with_model(ModelKey::Discounting),
+            )
+            .expect("baseline swaption registry price");
+        let baseline_raw = registry
+            .price_raw(&baseline, ModelKey::Discounting, &market, as_of)
+            .expect("baseline swaption registry raw price");
+
+        let mut shocked = baseline;
+        shocked.scenario_pricing_overrides =
+            ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+        let shocked_result = shocked
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default().with_model(ModelKey::Discounting),
+            )
+            .expect("shocked swaption registry price");
+        let shocked_raw = registry
+            .price_raw(&shocked, ModelKey::Discounting, &market, as_of)
+            .expect("shocked swaption registry raw price");
+
+        let expected_pv = baseline_result.value.amount() * 0.90;
+        let expected_raw = baseline_raw * 0.90;
+        assert!((shocked_result.value.amount() - expected_pv).abs() < 1e-8);
+        assert!((shocked_raw - expected_raw).abs() < 1e-8);
     }
 }

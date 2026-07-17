@@ -805,7 +805,9 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
         }
         if let BaseRateSpec::Floating(spec) = &self.base_rate_spec {
             deps.add_forward_curve(spec.index_id.clone());
-            deps.add_series_id(spec.index_id.as_str());
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                spec.index_id.as_str(),
+            ));
         }
         Ok(deps)
     }
@@ -908,5 +910,24 @@ impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
         Ok(path_schedule
             .schedule
             .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+    }
+}
+
+#[cfg(test)]
+mod dependency_tests {
+    use super::*;
+
+    #[test]
+    fn floating_revolver_uses_the_canonical_fixing_series_id() {
+        let facility = RevolvingCredit::example().expect("floating example");
+        let BaseRateSpec::Floating(spec) = &facility.base_rate_spec else {
+            unreachable!("example must use a floating base rate");
+        };
+        let expected =
+            finstack_quant_core::market_data::fixings::fixing_series_id(spec.index_id.as_str());
+
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&facility).expect("dependencies");
+        assert_eq!(deps.series_ids, vec![expected]);
     }
 }

@@ -1083,7 +1083,7 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
         ))
     }
 
-    fn value_raw(
+    fn base_value_raw(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,

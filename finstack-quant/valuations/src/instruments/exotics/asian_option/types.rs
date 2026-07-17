@@ -308,7 +308,7 @@ impl crate::instruments::common_impl::traits::Instrument for AsianOption {
             ),
         );
         if let Some(dividend_yield) = &self.div_yield_id {
-            deps.add_series_id(dividend_yield.as_str());
+            deps.add_spot_id(dividend_yield.as_str());
         }
         Ok(deps)
     }
@@ -359,6 +359,18 @@ mod tests {
     use super::*;
     use finstack_quant_core::dates::Date;
     use time::Month;
+
+    #[test]
+    fn dividend_yield_dependency_is_a_market_scalar() {
+        let dividend_id = CurveId::new("SPX-DIV");
+        let mut option = AsianOption::example().expect("example");
+        option.div_yield_id = Some(dividend_id.clone());
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&option).expect("dependencies");
+
+        assert!(deps.spot_ids.contains(&dividend_id.as_str().to_string()));
+        assert!(deps.series_ids.is_empty());
+    }
 
     #[test]
     fn test_accumulated_state() {

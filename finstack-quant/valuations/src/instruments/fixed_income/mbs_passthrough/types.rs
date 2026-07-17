@@ -501,45 +501,50 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_agency_program_payment_delays() {
-        assert_eq!(AgencyProgram::Fnma.payment_lag_days(), 55);
-        assert_eq!(AgencyProgram::Fhlmc.payment_lag_days(), 55);
-        assert_eq!(AgencyProgram::GnmaI.payment_lag_days(), 14);
-        assert_eq!(AgencyProgram::GnmaII.payment_lag_days(), 50);
-    }
+    fn agency_convention_vector_is_stable() {
+        let cases = [
+            (
+                AgencyProgram::Fnma,
+                "FNMA",
+                55,
+                false,
+                Date::from_calendar_date(2024, Month::February, 25).expect("valid date"),
+            ),
+            (
+                AgencyProgram::Fhlmc,
+                "FHLMC",
+                55,
+                false,
+                Date::from_calendar_date(2024, Month::February, 25).expect("valid date"),
+            ),
+            (
+                AgencyProgram::GnmaI,
+                "GNMA_I",
+                14,
+                true,
+                Date::from_calendar_date(2024, Month::January, 15).expect("valid date"),
+            ),
+            (
+                AgencyProgram::GnmaII,
+                "GNMA_II",
+                50,
+                true,
+                Date::from_calendar_date(2024, Month::February, 20).expect("valid date"),
+            ),
+        ];
 
-    #[test]
-    fn test_payment_date_for_period_fnma() {
-        let pay = AgencyProgram::Fnma
-            .payment_date_for_period(2024, Month::January)
-            .expect("valid payment date");
-        assert_eq!(pay.month(), Month::February);
-        assert_eq!(pay.day(), 25);
-
-        let pay_dec = AgencyProgram::Fnma
-            .payment_date_for_period(2024, Month::December)
-            .expect("valid payment date");
-        assert_eq!(pay_dec.year(), 2025);
-        assert_eq!(pay_dec.month(), Month::January);
-        assert_eq!(pay_dec.day(), 25);
-    }
-
-    #[test]
-    fn test_payment_date_for_period_gnma_i() {
-        let pay = AgencyProgram::GnmaI
-            .payment_date_for_period(2024, Month::March)
-            .expect("valid payment date");
-        assert_eq!(pay.month(), Month::March);
-        assert_eq!(pay.day(), 15);
-    }
-
-    #[test]
-    fn test_payment_date_for_period_gnma_ii() {
-        let pay = AgencyProgram::GnmaII
-            .payment_date_for_period(2024, Month::January)
-            .expect("valid payment date");
-        assert_eq!(pay.month(), Month::February);
-        assert_eq!(pay.day(), 20);
+        for (agency, canonical_name, payment_lag, is_gnma, expected_payment_date) in cases {
+            assert_eq!(agency.as_str(), canonical_name);
+            assert_eq!(agency.to_string(), canonical_name);
+            assert_eq!(agency.payment_lag_days(), payment_lag);
+            assert_eq!(agency.is_gnma(), is_gnma);
+            assert_eq!(
+                agency
+                    .payment_date_for_period(2024, Month::January)
+                    .expect("valid payment date"),
+                expected_payment_date
+            );
+        }
     }
 
     /// Item 15 regression: `payment_date_for_period` must return a `Result`
@@ -573,22 +578,6 @@ mod tests {
             .expect("December wrap should be Ok");
         assert_eq!(dec.year(), 2025);
         assert_eq!(dec.month(), Month::January);
-    }
-
-    #[test]
-    fn test_agency_program_display() {
-        assert_eq!(AgencyProgram::Fnma.as_str(), "FNMA");
-        assert_eq!(AgencyProgram::Fhlmc.as_str(), "FHLMC");
-        assert_eq!(AgencyProgram::GnmaI.as_str(), "GNMA_I");
-        assert_eq!(AgencyProgram::GnmaII.as_str(), "GNMA_II");
-    }
-
-    #[test]
-    fn test_agency_program_is_gnma() {
-        assert!(!AgencyProgram::Fnma.is_gnma());
-        assert!(!AgencyProgram::Fhlmc.is_gnma());
-        assert!(AgencyProgram::GnmaI.is_gnma());
-        assert!(AgencyProgram::GnmaII.is_gnma());
     }
 
     #[test]

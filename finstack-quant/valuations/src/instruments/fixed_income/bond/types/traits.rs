@@ -126,12 +126,18 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         match &self.cashflow_spec {
             CashflowSpec::Floating(spec) => {
                 deps.add_forward_curve(spec.rate_spec.index_id.clone());
-                deps.add_series_id(spec.rate_spec.index_id.as_str());
+                deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                    spec.rate_spec.index_id.as_str(),
+                ));
             }
             CashflowSpec::Amortizing { base, .. } => {
                 if let CashflowSpec::Floating(spec) = base.as_ref() {
                     deps.add_forward_curve(spec.rate_spec.index_id.clone());
-                    deps.add_series_id(spec.rate_spec.index_id.as_str());
+                    deps.add_series_id(
+                        finstack_quant_core::market_data::fixings::fixing_series_id(
+                            spec.rate_spec.index_id.as_str(),
+                        ),
+                    );
                 }
             }
             _ => {}
@@ -318,5 +324,25 @@ impl Bond {
             config_ref,
             discount_rate,
         )
+    }
+}
+
+#[cfg(test)]
+mod dependency_tests {
+    use super::*;
+
+    #[test]
+    fn floating_bond_uses_the_canonical_fixing_series_id() {
+        let bond = Bond::example_floating().expect("floating bond example");
+        let CashflowSpec::Floating(spec) = &bond.cashflow_spec else {
+            unreachable!("floating example must have a floating coupon");
+        };
+        let expected = finstack_quant_core::market_data::fixings::fixing_series_id(
+            spec.rate_spec.index_id.as_str(),
+        );
+
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&bond).expect("dependencies");
+        assert_eq!(deps.series_ids, vec![expected]);
     }
 }

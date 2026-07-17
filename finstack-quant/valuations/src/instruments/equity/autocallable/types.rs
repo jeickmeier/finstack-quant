@@ -442,7 +442,7 @@ impl crate::instruments::common_impl::traits::Instrument for Autocallable {
             ),
         );
         if let Some(dividend_yield) = &self.div_yield_id {
-            deps.add_series_id(dividend_yield.as_str());
+            deps.add_spot_id(dividend_yield.as_str());
         }
         Ok(deps)
     }
@@ -500,6 +500,20 @@ mod validation_tests {
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(None)
             .attributes(Attributes::new())
+    }
+
+    #[test]
+    fn dividend_yield_dependency_is_a_market_scalar() {
+        let dividend_id = CurveId::new("SPX-DIV");
+        let autocall = base_builder()
+            .div_yield_id_opt(Some(dividend_id.clone()))
+            .build()
+            .expect("valid autocallable");
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&autocall).expect("dependencies");
+
+        assert!(deps.spot_ids.contains(&dividend_id.as_str().to_string()));
+        assert!(deps.series_ids.is_empty());
     }
 
     #[test]

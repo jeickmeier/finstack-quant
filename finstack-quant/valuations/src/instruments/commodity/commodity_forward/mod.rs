@@ -37,8 +37,8 @@
 
 mod types;
 
+pub use crate::instruments::Position;
 pub use types::CommodityForward;
-pub use types::Position;
 pub use types::SettlementType;
 
 /// Metrics submodule for commodity forward risk measures.

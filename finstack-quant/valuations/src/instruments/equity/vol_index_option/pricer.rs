@@ -362,7 +362,7 @@ mod tests {
         use crate::instruments::equity::vol_index_future::{
             VolIndexContractSpecs, VolatilityIndexFuture,
         };
-        use crate::instruments::rates::ir_future::Position;
+        use crate::instruments::Position;
 
         let market = setup_market();
         let as_of = date!(2025 - 01 - 01);

@@ -161,9 +161,11 @@ impl Instrument for PrivateMarketsFund {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        // Contractual events and the optional NAV are stored on the
-        // instrument; pricing performs no market-data lookup.
-        Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        if let Some(discount_curve_id) = &self.discount_curve_id {
+            deps.add_discount_curve(discount_curve_id.clone());
+        }
+        Ok(deps)
     }
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
@@ -233,5 +235,26 @@ impl finstack_quant_cashflows::CashflowScheduleSource for PrivateMarketsFund {
         );
         Ok(schedule
             .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
+    }
+}
+
+#[cfg(test)]
+mod dependency_tests {
+    use super::*;
+
+    #[test]
+    fn market_dependencies_include_only_the_configured_discount_curve() {
+        let mut fund = PrivateMarketsFund::example().expect("example");
+        let discount_curve_id = fund
+            .discount_curve_id
+            .clone()
+            .expect("example discount curve");
+
+        let deps = Instrument::market_dependencies(&fund).expect("dependencies");
+        assert_eq!(deps.curves.discount_curves.as_slice(), &[discount_curve_id]);
+
+        fund.discount_curve_id = None;
+        let deps = Instrument::market_dependencies(&fund).expect("dependencies without curve");
+        assert!(deps.curves.discount_curves.is_empty());
     }
 }

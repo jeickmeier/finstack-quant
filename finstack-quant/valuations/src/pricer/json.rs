@@ -611,6 +611,41 @@ mod tests {
     }
 
     #[test]
+    fn json_pricing_routes_validate_instrument_before_model_resolution() {
+        let invalid = equity_option_json_with_invalid_strike();
+        let market = MarketContext::new();
+
+        let plain = price_instrument_json(&invalid, &market, "not-a-date", "not-a-model")
+            .expect_err("instrument validation must win");
+        let with_metrics = price_instrument_json_with_metrics_and_history(
+            &invalid,
+            &market,
+            "not-a-date",
+            "not-a-model",
+            &["not-a-metric".to_string()],
+            None,
+            None,
+        )
+        .expect_err("instrument validation must win");
+        let scalar = metric_value_from_instrument_json(
+            &invalid,
+            &market,
+            "not-a-date",
+            "not-a-model",
+            "not-a-metric",
+        )
+        .expect_err("instrument validation must win");
+
+        for error in [plain, with_metrics, scalar] {
+            let message = error.to_string();
+            assert!(
+                message.contains("strike") && message.contains("positive"),
+                "unexpected error ordering: {message}"
+            );
+        }
+    }
+
+    #[test]
     fn parse_model_key_recognizes_standard_keys() {
         assert_eq!(
             parse_model_key("discounting").expect("ok"),

@@ -770,7 +770,9 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
         }
         if let RateSpec::Floating(spec) = &self.rate {
             deps.add_forward_curve(spec.index_id.clone());
-            deps.add_series_id(spec.index_id.as_str());
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                spec.index_id.as_str(),
+            ));
         }
         Ok(deps)
     }
@@ -907,6 +909,20 @@ mod tests {
     use crate::instruments::fixed_income::term_loan::spec::CommitmentFeeBase;
     use finstack_quant_core::dates::Date;
     use time::Month;
+
+    #[test]
+    fn floating_term_loan_uses_the_canonical_fixing_series_id() {
+        let loan = TermLoan::example_floating_with_ddtl().expect("floating example");
+        let RateSpec::Floating(spec) = &loan.rate else {
+            unreachable!("floating example must use a floating rate");
+        };
+        let expected =
+            finstack_quant_core::market_data::fixings::fixing_series_id(spec.index_id.as_str());
+
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&loan).expect("dependencies");
+        assert_eq!(deps.series_ids, vec![expected]);
+    }
 
     #[test]
     fn test_term_loan_spec_conversion_plain() {

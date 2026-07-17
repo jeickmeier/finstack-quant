@@ -2354,6 +2354,11 @@
                 "required": [
                   "forward_curve_id"
                 ]
+              },
+              {
+                "required": [
+                  "calendar_id"
+                ]
               }
             ]
           },
@@ -2364,50 +2369,16 @@
           "title": "Canonical leg underlier"
         },
         {
-          "anyOf": [
-            {
-              "required": [
-                "strike"
-              ]
-            },
-            {
-              "required": [
-                "swap_start"
-              ]
-            },
-            {
-              "required": [
-                "swap_end"
-              ]
-            },
-            {
-              "required": [
-                "fixed_freq"
-              ]
-            },
-            {
-              "required": [
-                "float_freq"
-              ]
-            },
-            {
-              "required": [
-                "day_count"
-              ]
-            },
-            {
-              "required": [
-                "discount_curve_id"
-              ]
-            },
-            {
-              "required": [
-                "forward_curve_id"
-              ]
-            }
-          ],
-          "description": "Compatibility representation containing complete legs and matching legacy scalar fields.",
+          "description": "Compatibility representation containing complete legs and the complete matching legacy scalar underlier.",
           "required": [
+            "strike",
+            "swap_start",
+            "swap_end",
+            "fixed_freq",
+            "float_freq",
+            "day_count",
+            "discount_curve_id",
+            "forward_curve_id",
             "underlying_fixed_leg",
             "underlying_float_leg"
           ],
@@ -2755,7 +2726,7 @@
     },
     "BondFuture": {
       "additionalProperties": false,
-      "description": "Bond future instrument.\n\nA bond future is a standardized contract to buy or sell a government bond at a\nspecified price on a future date. The contract has a basket of deliverable bonds,\neach with a conversion factor. The holder of the short position chooses which\nbond to deliver (typically the Cheapest-to-Deliver or CTD bond).\n\n# Contract Mechanics\n\n- **Deliverable Basket**: Multiple bonds eligible for delivery\n- **Conversion Factors**: Published by exchange to normalize different bonds\n- **CTD Selection**: Short side chooses which bond to deliver (user-specified in this implementation)\n- **Invoice Price**: (Futures Price × Conversion Factor) + Accrued Interest\n\n# Examples\n\n```ignore\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::{\n    BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond, Position,\n};\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{InstrumentId, CurveId};\nuse time::Month;\n\n// Create a UST 10-year future\nlet future = BondFuture::builder()\n    .id(InstrumentId::new(\"TYH5\"))\n    .notional(Money::new(1_000_000.0, Currency::USD))\n    .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())\n    .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())\n    .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())\n    .quoted_price(125.50)\n    .position(Position::Long)\n    .contract_specs(BondFutureSpecs::ust_10y())\n    .deliverable_basket(vec![\n        DeliverableBond {\n            bond_id: InstrumentId::new(\"US912828XG33\"),\n            conversion_factor: 0.8234,\n        },\n    ])\n    .ctd_bond_id(InstrumentId::new(\"US912828XG33\"))\n    .discount_curve_id(CurveId::new(\"USD-TREASURY\"))\n    .build()\n    .expect(\"Valid bond future\");\n```",
+      "description": "Bond future instrument.\n\nA bond future is a standardized contract to buy or sell a government bond at a\nspecified price on a future date. The contract has a basket of deliverable bonds,\neach with a conversion factor. The holder of the short position chooses which\nbond to deliver (typically the Cheapest-to-Deliver or CTD bond).\n\n# Contract Mechanics\n\n- **Deliverable Basket**: Multiple bonds eligible for delivery\n- **Conversion Factors**: Published by exchange to normalize different bonds\n- **CTD Selection**: Short side chooses which bond to deliver (user-specified in this implementation)\n- **Invoice Price**: (Futures Price × Conversion Factor) + Accrued Interest\n\n# Examples\n\n```ignore\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::{\n    BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond,\n};\nuse finstack_quant_valuations::instruments::Position;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{InstrumentId, CurveId};\nuse time::Month;\n\n// Create a UST 10-year future\nlet future = BondFuture::builder()\n    .id(InstrumentId::new(\"TYH5\"))\n    .notional(Money::new(1_000_000.0, Currency::USD))\n    .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())\n    .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())\n    .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())\n    .quoted_price(125.50)\n    .position(Position::Long)\n    .contract_specs(BondFutureSpecs::ust_10y())\n    .deliverable_basket(vec![\n        DeliverableBond {\n            bond_id: InstrumentId::new(\"US912828XG33\"),\n            conversion_factor: 0.8234,\n        },\n    ])\n    .ctd_bond_id(InstrumentId::new(\"US912828XG33\"))\n    .discount_curve_id(CurveId::new(\"USD-TREASURY\"))\n    .build()\n    .expect(\"Valid bond future\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -5524,7 +5495,7 @@
       ]
     },
     "CommodityForward": {
-      "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_price if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T) = Discount factor to settlement date\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_forward::{CommodityForward, Position};\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```",
+      "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_price if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T) = Discount factor to settlement date\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;\nuse finstack_quant_valuations::instruments::Position;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -8467,7 +8438,7 @@
     },
     "EquityIndexFuture": {
       "additionalProperties": false,
-      "description": "Equity Index Future instrument.\n\nRepresents a futures contract on an equity index such as S&P 500, Nasdaq-100,\nEuro Stoxx 50, DAX, FTSE 100, or Nikkei 225.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::equity::equity_index_future::{\n    EquityIndexFuture, EquityFutureSpecs,\n};\nuse finstack_quant_valuations::instruments::rates::ir_future::Position;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet future = EquityIndexFuture::builder()\n    .id(InstrumentId::new(\"ES-2025M03\"))\n    .underlying_ticker(\"SPX\".to_string())\n    .notional(Money::new(2_250_000.0, Currency::USD))\n    .expiry(Date::from_calendar_date(2025, Month::March, 21).expect(\"EquityIndexFuture example is valid\"))\n    .last_trading_date(Date::from_calendar_date(2025, Month::March, 20).expect(\"EquityIndexFuture example is valid\"))\n    .position(Position::Long)\n    .contract_specs(EquityFutureSpecs::sp500_emini())\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .spot_id(\"SPX-SPOT\".into())\n    .build()\n    .expect(\"Valid future\");\n```",
+      "description": "Equity Index Future instrument.\n\nRepresents a futures contract on an equity index such as S&P 500, Nasdaq-100,\nEuro Stoxx 50, DAX, FTSE 100, or Nikkei 225.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::equity::equity_index_future::{\n    EquityIndexFuture, EquityFutureSpecs,\n};\nuse finstack_quant_valuations::instruments::Position;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet future = EquityIndexFuture::builder()\n    .id(InstrumentId::new(\"ES-2025M03\"))\n    .underlying_ticker(\"SPX\".to_string())\n    .notional(Money::new(2_250_000.0, Currency::USD))\n    .expiry(Date::from_calendar_date(2025, Month::March, 21).expect(\"EquityIndexFuture example is valid\"))\n    .last_trading_date(Date::from_calendar_date(2025, Month::March, 20).expect(\"EquityIndexFuture example is valid\"))\n    .position(Position::Long)\n    .contract_specs(EquityFutureSpecs::sp500_emini())\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .spot_id(\"SPX-SPOT\".into())\n    .build()\n    .expect(\"Valid future\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -17635,6 +17606,11 @@
                 "required": [
                   "forward_curve_id"
                 ]
+              },
+              {
+                "required": [
+                  "calendar_id"
+                ]
               }
             ]
           },
@@ -17645,50 +17621,16 @@
           "title": "Canonical leg underlier"
         },
         {
-          "anyOf": [
-            {
-              "required": [
-                "strike"
-              ]
-            },
-            {
-              "required": [
-                "swap_start"
-              ]
-            },
-            {
-              "required": [
-                "swap_end"
-              ]
-            },
-            {
-              "required": [
-                "fixed_freq"
-              ]
-            },
-            {
-              "required": [
-                "float_freq"
-              ]
-            },
-            {
-              "required": [
-                "day_count"
-              ]
-            },
-            {
-              "required": [
-                "discount_curve_id"
-              ]
-            },
-            {
-              "required": [
-                "forward_curve_id"
-              ]
-            }
-          ],
-          "description": "Compatibility representation containing complete legs and matching legacy scalar fields.",
+          "description": "Compatibility representation containing complete legs and the complete matching legacy scalar underlier.",
           "required": [
+            "strike",
+            "swap_start",
+            "swap_end",
+            "fixed_freq",
+            "float_freq",
+            "day_count",
+            "discount_curve_id",
+            "forward_curve_id",
             "underlying_fixed_leg",
             "underlying_float_leg"
           ],
@@ -19115,7 +19057,7 @@
     },
     "VolatilityIndexFuture": {
       "additionalProperties": false,
-      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::equity::vol_index_future::{\n    VolatilityIndexFuture, VolIndexContractSpecs,\n};\nuse finstack_quant_valuations::instruments::rates::ir_future::Position;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .notional(Money::new(100_000.0, Currency::USD))\n    .expiry(Date::from_calendar_date(2025, Month::March, 19).unwrap())\n    .settlement_date(Date::from_calendar_date(2025, Month::March, 19).unwrap())\n    .quoted_price(21.50)\n    .position(Position::Long)\n    .contract_specs(VolIndexContractSpecs::default())\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
+      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::equity::vol_index_future::{\n    VolatilityIndexFuture, VolIndexContractSpecs,\n};\nuse finstack_quant_valuations::instruments::Position;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .notional(Money::new(100_000.0, Currency::USD))\n    .expiry(Date::from_calendar_date(2025, Month::March, 19).unwrap())\n    .settlement_date(Date::from_calendar_date(2025, Month::March, 19).unwrap())\n    .quoted_price(21.50)\n    .position(Position::Long)\n    .contract_specs(VolIndexContractSpecs::default())\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",

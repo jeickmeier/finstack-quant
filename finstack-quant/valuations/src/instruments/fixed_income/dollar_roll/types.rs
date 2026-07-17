@@ -186,8 +186,7 @@ impl DollarRoll {
     /// Effective settlement class (explicit or inferred from agency + term).
     pub fn effective_settlement_class(&self) -> SifmaSettlementClass {
         self.settlement_class.unwrap_or_else(|| {
-            let agency_str = format!("{:?}", self.agency);
-            SifmaSettlementClass::from_agency_term(&agency_str, self.term.years())
+            SifmaSettlementClass::from_agency_term(self.agency.as_str(), self.term.years())
         })
     }
 

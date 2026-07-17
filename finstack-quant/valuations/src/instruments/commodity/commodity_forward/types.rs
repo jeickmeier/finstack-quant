@@ -9,6 +9,7 @@ use crate::cashflow::primitives::CFKind;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::{CommodityConvention, CommodityUnderlyingParams};
 use crate::instruments::common_impl::traits::Attributes;
+use crate::instruments::Position;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -18,9 +19,6 @@ use finstack_quant_core::Result;
 
 /// Settlement type for commodity contracts.
 pub use crate::instruments::common_impl::parameters::SettlementType;
-
-/// Position direction (long/short) for commodity contracts.
-pub use crate::instruments::common_impl::parameters::Position;
 
 /// Commodity forward or futures contract.
 ///
@@ -50,7 +48,8 @@ pub use crate::instruments::common_impl::parameters::Position;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_valuations::instruments::commodity::commodity_forward::{CommodityForward, Position};
+/// use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
+/// use finstack_quant_valuations::instruments::Position;
 /// use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;

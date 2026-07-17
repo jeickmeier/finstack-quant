@@ -25,7 +25,6 @@ use crate::instruments::fixed_income::structured_credit::{
     calculate_tranche_oas, scenario_table, OasConfig, OasResult, ScenarioGrid, ScenarioTable,
     StructuredCredit, TrancheMetrics,
 };
-use crate::instruments::InstrumentJson;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::parse_iso_date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -39,12 +38,12 @@ use finstack_quant_core::{Error, Result};
 /// Returns an error if the JSON is invalid or does not describe a
 /// `structured_credit` instrument.
 fn structured_credit_from_json(instrument_json: &str) -> Result<StructuredCredit> {
-    match super::json::parse_instrument_json(instrument_json)? {
-        InstrumentJson::StructuredCredit(deal) => Ok(*deal),
-        _ => Err(Error::Validation(
-            "expected a structured_credit instrument".to_string(),
-        )),
-    }
+    let instrument = super::json::parse_boxed_instrument_json(instrument_json, None)?;
+    instrument
+        .as_any()
+        .downcast_ref::<StructuredCredit>()
+        .cloned()
+        .ok_or_else(|| Error::Validation("expected a structured_credit instrument".to_string()))
 }
 
 /// Currency of the named tranche, used to interpret scalar money inputs.
@@ -194,10 +193,80 @@ mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
 
+    fn invalid_structured_credit_json() -> String {
+        let mut deal = StructuredCredit::example();
+        deal.cleanup_call_pct = Some(-0.5);
+        serde_json::to_string(&crate::instruments::InstrumentJson::StructuredCredit(
+            Box::new(deal),
+        ))
+        .expect("serialize invalid structured credit")
+    }
+
     #[test]
     fn non_finite_discount_margin_target_is_a_typed_error() {
         for target in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert!(discount_margin_target_money(target, Currency::USD).is_err());
+        }
+    }
+
+    #[test]
+    fn structured_credit_json_routes_validate_before_other_inputs_or_market_access() {
+        let instrument_json = invalid_structured_credit_json();
+        let market = MarketContext::new();
+
+        let errors = [
+            structured_credit_tranche_discount_margin_json(
+                &instrument_json,
+                "missing",
+                &market,
+                "not-a-date",
+                f64::NAN,
+            )
+            .expect_err("instrument validation must win")
+            .to_string(),
+            structured_credit_tranche_breakeven_cdr_json(
+                &instrument_json,
+                "missing",
+                &market,
+                "not-a-date",
+            )
+            .expect_err("instrument validation must win")
+            .to_string(),
+            structured_credit_tranche_oas_json(
+                &instrument_json,
+                "missing",
+                f64::NAN,
+                &market,
+                "not-a-date",
+                Some("not-json"),
+            )
+            .expect_err("instrument validation must win")
+            .to_string(),
+            structured_credit_tranche_metrics_json(
+                &instrument_json,
+                "missing",
+                &market,
+                "not-a-date",
+                Some(f64::NAN),
+            )
+            .expect_err("instrument validation must win")
+            .to_string(),
+            structured_credit_tranche_scenario_table_json(
+                &instrument_json,
+                "missing",
+                &market,
+                "not-a-date",
+                "not-json",
+            )
+            .expect_err("instrument validation must win")
+            .to_string(),
+        ];
+
+        for message in errors {
+            assert!(
+                message.contains("cleanup_call_pct"),
+                "unexpected error ordering: {message}"
+            );
         }
     }
 }

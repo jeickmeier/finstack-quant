@@ -39,7 +39,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 use time::macros::date;
 
 /// Backward-compatible path for the canonical position type.
-pub use crate::instruments::Position;
+use crate::instruments::Position;
 
 /// Interest Rate Future instrument.
 #[derive(
@@ -511,6 +511,15 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
         let mut deps = MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
+        if let Some(surface_id) = &self.vol_surface_id {
+            deps.add_volatility_dependency(
+                crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                    surface_id.clone(),
+                    None,
+                    None,
+                ),
+            );
+        }
         Ok(deps)
     }
 
@@ -526,7 +535,7 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
         ))
     }
 
-    fn value_raw(
+    fn base_value_raw(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
@@ -577,6 +586,21 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use time::macros::date;
+
+    #[test]
+    fn market_dependencies_include_optional_convexity_volatility() {
+        let mut future = InterestRateFuture::example().expect("example future");
+        let surface_id = CurveId::new("USD-SR3-NORMAL-VOL");
+        future.vol_surface_id = Some(surface_id.clone());
+
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&future).expect("dependencies");
+        assert_eq!(deps.volatility_dependencies.len(), 1);
+        let dependency = &deps.volatility_dependencies[0];
+        assert_eq!(dependency.surface_id, surface_id);
+        assert_eq!(dependency.underlying_id, None);
+        assert_eq!(dependency.reference_strike, None);
+    }
 
     #[test]
     fn ir_future_defaults_dates_from_expiry_and_contract_specs() {

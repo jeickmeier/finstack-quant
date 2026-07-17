@@ -601,7 +601,7 @@ pub fn barrier_rebate_continuous(
     rebate: f64,
     barrier_type: BarrierType,
 ) -> f64 {
-    let is_up = matches!(barrier_type, BarrierType::UpAndIn | BarrierType::UpAndOut);
+    let is_up = barrier_type.is_up();
     let p_hit = barrier_touch_probability(
         params.spot,
         params.barrier,
@@ -657,7 +657,7 @@ pub fn barrier_rebate(
             barrier_rebate_continuous(params, rebate, barrier_type)
         }
         (BarrierType::UpAndOut | BarrierType::DownAndOut, RebateTiming::AtHit) => {
-            let is_up = matches!(barrier_type, BarrierType::UpAndOut);
+            let is_up = barrier_type.is_up();
             rebate * discounted_touch_value(params, is_up)
         }
     }

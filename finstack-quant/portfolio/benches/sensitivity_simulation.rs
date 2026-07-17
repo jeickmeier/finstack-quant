@@ -84,7 +84,7 @@ impl Instrument for CurveZeroInstrument {
     fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
         Ok(Money::new(self.raw_value(market)?, Currency::USD))
     }
-    fn value_raw(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
+    fn base_value_raw(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
         self.raw_value(market)
     }
 }

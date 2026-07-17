@@ -233,7 +233,7 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
             ),
         );
         if let Some(dividend_yield) = &self.div_yield_id {
-            deps.add_series_id(dividend_yield.as_str());
+            deps.add_spot_id(dividend_yield.as_str());
         }
         Ok(deps)
     }
@@ -285,6 +285,18 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+
+    #[test]
+    fn dividend_yield_dependency_is_a_market_scalar() {
+        let dividend_id = finstack_quant_core::types::CurveId::new("SPX-DIV");
+        let mut option = super::BarrierOption::example().expect("example");
+        option.div_yield_id = Some(dividend_id.clone());
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&option).expect("dependencies");
+
+        assert!(deps.spot_ids.contains(&dividend_id.as_str().to_string()));
+        assert!(deps.series_ids.is_empty());
+    }
 
     #[test]
     fn expired_barrier_requires_observed_state() {
@@ -348,5 +360,18 @@ mod tests {
         assert_barrier_type("upandin", super::BarrierType::UpAndIn);
         assert_barrier_type("downandout", super::BarrierType::DownAndOut);
         assert!(super::BarrierType::from_str("invalid").is_err());
+    }
+
+    #[test]
+    fn barrier_type_reexports_preserve_canonical_type_identity() {
+        let core: finstack_quant_core::types::BarrierType =
+            finstack_quant_core::types::BarrierType::UpAndOut;
+        let monte_carlo: finstack_quant_monte_carlo::payoff::barrier::BarrierType = core;
+        let instrument: super::BarrierType = monte_carlo;
+        let closed_form: crate::models::closed_form::BarrierType = instrument;
+        let tree: crate::models::trees::tree_framework::BarrierType = closed_form;
+        let canonical: finstack_quant_core::types::BarrierType = tree;
+
+        assert_eq!(canonical, finstack_quant_core::types::BarrierType::UpAndOut);
     }
 }

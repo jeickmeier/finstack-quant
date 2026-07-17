@@ -6,6 +6,7 @@ use crate::instruments::fixed_income::structured_credit::types::constants::{
     Z_SPREAD_INITIAL_BRACKET, Z_SPREAD_SOLVER_TOLERANCE,
 };
 use crate::instruments::fixed_income::structured_credit::{StructuredCredit, TrancheCoupon};
+use crate::instruments::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -481,6 +482,7 @@ pub fn calculate_tranche_discount_margin(
 ) -> Result<f64> {
     use rust_decimal::prelude::ToPrimitive;
 
+    deal.validate_for_pricing()?;
     let tranche = deal
         .tranches
         .tranches

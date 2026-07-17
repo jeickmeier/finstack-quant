@@ -3,10 +3,12 @@
 //! Provides parallel and key-rate vega calculators for instruments with volatility surfaces.
 
 use crate::instruments::common_impl::traits::Instrument;
+use crate::metrics::core::finite_difference::{
+    apply_parallel_surface_bumps_in_place, revert_scratch_bumps,
+};
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::MetricCalculator;
 use crate::metrics::{MetricContext, MetricId};
-use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits};
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
 use std::marker::PhantomData;
@@ -31,15 +33,6 @@ pub(crate) fn standard_strike_ratios() -> Vec<f64> {
     vec![0.5, 0.75, 0.9, 1.0, 1.1, 1.25, 1.5]
 }
 
-fn vol_bump(value: f64) -> BumpSpec {
-    BumpSpec {
-        mode: BumpMode::Additive,
-        units: BumpUnits::Fraction,
-        value,
-        bump_type: BumpType::Parallel,
-    }
-}
-
 /// Smallest implied vol on a surface's `(expiry, strike)` grid.
 ///
 /// Used to detect whether an additive parallel down-bump of size `h` would
@@ -55,6 +48,14 @@ fn min_grid_vol(surface: &finstack_quant_core::market_data::surfaces::VolSurface
         }
     }
     min_vol
+}
+
+fn expiry_label(t: f64) -> String {
+    if t < 1.0 {
+        format!("{:.0}m", (t * 12.0).round())
+    } else {
+        format!("{:.0}y", t)
+    }
 }
 
 fn scaled_bucketed_vega_matrix(
@@ -175,17 +176,26 @@ where
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
 
         let dependencies = instrument.market_dependencies()?;
-        let vol_surface_id = dependencies
-            .volatility_dependencies
-            .first()
-            .map(|dependency| dependency.surface_id.clone())
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::Invalid)
-            })?;
+        let surface_ids: Vec<_> = dependencies
+            .unique_vol_surface_ids()
+            .into_iter()
+            .filter(|surface_id| context.curves.get_surface(surface_id.as_str()).is_ok())
+            .collect();
+        if surface_ids.is_empty() {
+            return Err(finstack_quant_core::InputError::Invalid.into());
+        }
 
         let curves = std::sync::Arc::clone(&context.curves);
         let base_ctx = curves.as_ref();
-        let vol_surface = base_ctx.get_surface(vol_surface_id.as_str())?;
+        let vol_surfaces = surface_ids
+            .iter()
+            .map(|surface_id| {
+                Ok((
+                    surface_id.clone(),
+                    base_ctx.get_surface(surface_id.as_str())?,
+                ))
+            })
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         let as_of = context.as_of;
 
@@ -197,19 +207,23 @@ where
         } else {
             context.with_market_scratch(|ctx, scratch| {
                 // Central difference O(h²) — consistent with bucketed approach.
-                let token_up = scratch
-                    .apply_surface_bump_in_place(vol_surface_id.as_str(), vol_bump(bump_pct))?;
-                let pv_up = ctx.reprice_money(scratch, as_of)?;
-                scratch.revert_scratch_bump(token_up)?;
+                let tokens_up =
+                    apply_parallel_surface_bumps_in_place(scratch, &surface_ids, bump_pct)?;
+                let pv_up = ctx.reprice_money(scratch, as_of);
+                revert_scratch_bumps(scratch, tokens_up)?;
+                let pv_up = pv_up?;
 
                 // The additive down-bump `σ - h` clamps at zero wherever `σ < h`,
                 // making a central difference divided by the full `2h` biased.
                 // Detect the clamp via the surface's minimum vol and fall back to
                 // a one-sided forward difference near zero vol.
-                let min_vol = min_grid_vol(&vol_surface);
+                let min_vol = vol_surfaces
+                    .iter()
+                    .filter_map(|(_, surface)| min_grid_vol(surface))
+                    .reduce(f64::min);
                 if min_vol.map(|m| m < bump_pct).unwrap_or(false) {
                     tracing::warn!(
-                        surface_id = %vol_surface_id,
+                        surface_ids = ?surface_ids,
                         min_vol = min_vol,
                         bump = bump_pct,
                         "key-rate vega parallel down-bump would clamp σ at 0; \
@@ -219,12 +233,11 @@ where
                     Ok((pv_up.amount() - pv_base.amount())
                         / (bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL))
                 } else {
-                    let token_down = scratch.apply_surface_bump_in_place(
-                        vol_surface_id.as_str(),
-                        vol_bump(-bump_pct),
-                    )?;
-                    let pv_down = ctx.reprice_money(scratch, as_of)?;
-                    scratch.revert_scratch_bump(token_down)?;
+                    let tokens_down =
+                        apply_parallel_surface_bumps_in_place(scratch, &surface_ids, -bump_pct)?;
+                    let pv_down = ctx.reprice_money(scratch, as_of);
+                    revert_scratch_bumps(scratch, tokens_down)?;
+                    let pv_down = pv_down?;
                     Ok((pv_up.amount() - pv_down.amount())
                         / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL))
                 }
@@ -232,53 +245,73 @@ where
         };
 
         let use_ratio_strikes = self.strikes.iter().all(|k| *k <= 10.0);
-        let strike_grid: Vec<f64> = if use_ratio_strikes {
-            let spot_id = dependencies.spot_ids.first().ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::Invalid)
-            })?;
-            let spot = base_ctx
-                .get_price(spot_id)
-                .ok()
-                .map(|scalar| match scalar {
+        let surface_strike_grids = vol_surfaces
+            .iter()
+            .map(|(surface_id, _)| {
+                if !use_ratio_strikes {
+                    return Ok(self.strikes.clone());
+                }
+                let spot_id = dependencies
+                    .volatility_dependencies
+                    .iter()
+                    .find(|dependency| {
+                        dependency.surface_id == *surface_id && dependency.underlying_id.is_some()
+                    })
+                    .and_then(|dependency| dependency.underlying_id.as_ref())
+                    .map(|id| id.as_str())
+                    .or_else(|| dependencies.spot_ids.first().map(String::as_str))
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::from(finstack_quant_core::InputError::Invalid)
+                    })?;
+                let spot = match base_ctx.get_price(spot_id)? {
                     MarketScalar::Price(m) => m.amount(),
                     MarketScalar::Unitless(v) => *v,
-                })
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::from(finstack_quant_core::InputError::Invalid)
-                })?;
+                };
+                Ok(self.strikes.iter().map(|k| k * spot).collect())
+            })
+            .collect::<finstack_quant_core::Result<Vec<Vec<f64>>>>()?;
 
-            self.strikes.iter().map(|k| k * spot).collect()
-        } else {
-            self.strikes.clone()
-        };
-
-        let (raw_matrix, raw_total) = context.with_market_scratch(|ctx, scratch| {
+        let multiple_surfaces = vol_surfaces.len() > 1;
+        let (raw_matrix, raw_total, row_labels) = context.with_market_scratch(|ctx, scratch| {
             let mut raw_matrix = Vec::new();
             let mut raw_total = NeumaierAccumulator::new();
+            let mut row_labels = Vec::new();
 
-            for &expiry in &self.expiries {
-                let mut row = Vec::new();
-                for &strike in &strike_grid {
-                    // Central differences: O(h²) accuracy, consistent with other Greeks
-                    let bumped_up = vol_surface.bump_point(expiry, strike, bump_pct)?;
-                    let bumped_down = vol_surface.bump_point(expiry, strike, -bump_pct)?;
-                    scratch.insert_surface_mut(bumped_up);
-                    let pv_up = ctx.reprice_money(scratch, as_of)?;
-                    scratch.insert_surface_mut(std::sync::Arc::clone(&vol_surface));
+            for ((surface_id, vol_surface), strike_grid) in
+                vol_surfaces.iter().zip(&surface_strike_grids)
+            {
+                for &expiry in &self.expiries {
+                    let mut row = Vec::new();
+                    for &strike in strike_grid {
+                        // Central differences: O(h²) accuracy, consistent with other Greeks.
+                        let bumped_up = vol_surface.bump_point(expiry, strike, bump_pct)?;
+                        let bumped_down = vol_surface.bump_point(expiry, strike, -bump_pct)?;
+                        scratch.insert_surface_mut(bumped_up);
+                        let pv_up = ctx.reprice_money(scratch, as_of);
+                        scratch.insert_surface_mut(std::sync::Arc::clone(vol_surface));
+                        let pv_up = pv_up?;
 
-                    scratch.insert_surface_mut(bumped_down);
-                    let pv_down = ctx.reprice_money(scratch, as_of)?;
-                    scratch.insert_surface_mut(std::sync::Arc::clone(&vol_surface));
+                        scratch.insert_surface_mut(bumped_down);
+                        let pv_down = ctx.reprice_money(scratch, as_of);
+                        scratch.insert_surface_mut(std::sync::Arc::clone(vol_surface));
+                        let pv_down = pv_down?;
 
-                    let vega = (pv_up.amount() - pv_down.amount())
-                        / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL);
-                    row.push(vega);
-                    raw_total.add(vega);
+                        let vega = (pv_up.amount() - pv_down.amount())
+                            / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL);
+                        row.push(vega);
+                        raw_total.add(vega);
+                    }
+                    raw_matrix.push(row);
+                    let expiry = expiry_label(expiry);
+                    row_labels.push(if multiple_surfaces {
+                        format!("{}::{expiry}", surface_id.as_str())
+                    } else {
+                        expiry
+                    });
                 }
-                raw_matrix.push(row);
             }
 
-            Ok((raw_matrix, raw_total.total()))
+            Ok((raw_matrix, raw_total.total(), row_labels))
         })?;
 
         // Normalize bucketed vegas so they partition the parallel vega.
@@ -311,17 +344,6 @@ where
         );
 
         // Store as 2D matrix
-        let row_labels: Vec<String> = self
-            .expiries
-            .iter()
-            .map(|&t| {
-                if t < 1.0 {
-                    format!("{:.0}m", (t * 12.0).round())
-                } else {
-                    format!("{:.0}y", t)
-                }
-            })
-            .collect();
         let col_labels: Vec<String> = self.strikes.iter().map(|&k| format!("{:.2}", k)).collect();
 
         let _ = context.store_matrix2d(MetricId::BucketedVega, row_labels, col_labels, matrix);
@@ -336,7 +358,110 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::scaled_bucketed_vega_matrix;
+    use super::{scaled_bucketed_vega_matrix, KeyRateVega};
+    use crate::instruments::common_impl::dependencies::{MarketDependencies, VolatilityDependency};
+    use crate::instruments::common_impl::traits::{Attributes, Instrument};
+    use crate::metrics::{MetricCalculator, MetricContext};
+    use crate::pricer::InstrumentType;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::CurveId;
+    use std::sync::Arc;
+    use time::macros::date;
+
+    #[derive(Clone)]
+    struct MultiSurfaceVegaInstrument {
+        attributes: Attributes,
+        surface_terms: Vec<(CurveId, f64)>,
+    }
+
+    crate::impl_empty_cashflow_provider!(
+        MultiSurfaceVegaInstrument,
+        crate::cashflow::builder::CashflowRepresentation::NoResidual
+    );
+
+    impl MultiSurfaceVegaInstrument {
+        fn raw_value(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
+            self.surface_terms
+                .iter()
+                .try_fold(0.0, |total, (surface_id, coefficient)| {
+                    let vol = market
+                        .get_surface(surface_id.as_str())?
+                        .value_checked(1.0, 100.0)?;
+                    Ok(total + coefficient * vol)
+                })
+        }
+    }
+
+    impl Instrument for MultiSurfaceVegaInstrument {
+        fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
+            let mut dependencies = MarketDependencies::new();
+            for (surface_id, _) in &self.surface_terms {
+                dependencies.add_volatility_dependency(VolatilityDependency::new(
+                    surface_id.clone(),
+                    None,
+                    None,
+                ));
+            }
+            Ok(dependencies)
+        }
+
+        fn id(&self) -> &str {
+            "MULTI-SURFACE-KEY-RATE-VEGA"
+        }
+
+        fn key(&self) -> InstrumentType {
+            InstrumentType::Equity
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+
+        fn clone_box(&self) -> Box<dyn Instrument> {
+            Box::new(self.clone())
+        }
+
+        fn attributes(&self) -> &Attributes {
+            &self.attributes
+        }
+
+        fn attributes_mut(&mut self) -> &mut Attributes {
+            &mut self.attributes
+        }
+
+        fn base_value(
+            &self,
+            market: &MarketContext,
+            _as_of: Date,
+        ) -> finstack_quant_core::Result<Money> {
+            Ok(Money::new(self.raw_value(market)?, Currency::USD))
+        }
+
+        fn base_value_raw(
+            &self,
+            market: &MarketContext,
+            _as_of: Date,
+        ) -> finstack_quant_core::Result<f64> {
+            self.raw_value(market)
+        }
+    }
+
+    fn flat_surface(id: &str, vol: f64) -> VolSurface {
+        VolSurface::builder(id)
+            .expiries(&[1.0])
+            .strikes(&[100.0])
+            .row(&[vol])
+            .build()
+            .expect("surface")
+    }
 
     #[test]
     fn zero_target_vega_forces_bucket_matrix_to_zero() {
@@ -344,5 +469,36 @@ mod tests {
 
         assert_eq!(scale, 0.0);
         assert_eq!(matrix, vec![vec![0.0, 0.0]]);
+    }
+
+    #[test]
+    fn key_rate_vega_includes_every_present_unique_surface() {
+        let first_coefficient = 1_000.0;
+        let second_coefficient = 2_500.0;
+        let instrument = MultiSurfaceVegaInstrument {
+            attributes: Attributes::new(),
+            surface_terms: vec![
+                (CurveId::new("VOL-A"), first_coefficient),
+                (CurveId::new("VOL-B"), second_coefficient),
+            ],
+        };
+        let market = MarketContext::new()
+            .insert_surface(flat_surface("VOL-A", 0.20))
+            .insert_surface(flat_surface("VOL-B", 0.30));
+        let as_of = date!(2025 - 01 - 01);
+        let base_value = instrument.value(&market, as_of).expect("base value");
+        let mut context = MetricContext::new(
+            Arc::new(instrument),
+            Arc::new(market),
+            as_of,
+            base_value,
+            MetricContext::default_config(),
+        );
+
+        let vega = KeyRateVega::<MultiSurfaceVegaInstrument>::new(vec![1.0], vec![100.0])
+            .calculate(&mut context)
+            .expect("key-rate vega");
+
+        assert!((vega - (first_coefficient + second_coefficient) * 0.01).abs() < 1e-9);
     }
 }

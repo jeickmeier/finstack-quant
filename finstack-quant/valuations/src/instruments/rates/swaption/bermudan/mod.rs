@@ -4,7 +4,6 @@ use crate::calibration::hull_white::HullWhiteParams;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::exotics_shared::{
     resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fParamSource, Hw1fResolveRequest,
-    Hw1fSurfaceCalibration,
 };
 use crate::instruments::rates::swaption::pricing::BermudanSwaptionTreeValuator;
 use crate::instruments::rates::swaption::BermudanSwaption;
@@ -308,15 +307,19 @@ impl BermudanSwaptionPricer {
     ) -> std::result::Result<(HullWhiteParams, Hw1fParamSource), PricingError> {
         let context_label = format!("BermudanSwaption {}", swaption.id);
         let overrides = hw1f_overrides_json(swaption);
+        let surface = super::hw1f_swaption_surface_calibration(
+            swaption.vol_surface_id.as_str(),
+            Some(ttm),
+            swaption.underlying_fixed_leg.frequency,
+        )
+        .map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
         let req = Hw1fResolveRequest {
             curve_id: swaption.get_discount_curve_id().as_str(),
             flavor: Hw1fCalibrationFlavor::Swaption,
             overrides: overrides.as_ref(),
-            surface: Some(Hw1fSurfaceCalibration::Swaption {
-                surface_id: swaption.vol_surface_id.as_str(),
-                max_expiry: Some(ttm),
-                frequency: crate::calibration::hull_white::SwapFrequency::SemiAnnual,
-            }),
+            surface: Some(surface),
             fallback: Some(self.config.hw_params),
             context: context_label.as_str(),
         };

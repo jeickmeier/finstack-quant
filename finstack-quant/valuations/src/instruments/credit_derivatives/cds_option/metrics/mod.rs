@@ -41,9 +41,6 @@ use crate::metrics::MetricRegistry;
 /// curve still reports a well-defined credit-spread sensitivity instead of
 /// erroring.
 ///
-/// CDS options price through their `value` path (Bloomberg CDSO), so
-/// `cs01_use_pricer_registry` returns `false` to keep scenario overrides and
-/// avoid the registry's raw path skipping them.
 impl crate::metrics::sensitivities::cs01::CdsCs01Conventions
     for crate::instruments::credit_derivatives::cds_option::CDSOption
 {
@@ -88,10 +85,6 @@ impl crate::metrics::sensitivities::cs01::CdsCs01Conventions
         // the underlying CDS), so a directly-specified hazard curve still yields
         // a well-defined CS01 rather than an error.
         Ok(None)
-    }
-
-    fn cs01_use_pricer_registry(&self) -> bool {
-        false
     }
 }
 

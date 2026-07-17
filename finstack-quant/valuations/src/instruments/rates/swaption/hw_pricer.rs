@@ -29,7 +29,7 @@ use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::exotics_shared::{
-    resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fResolveRequest, Hw1fSurfaceCalibration,
+    resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fResolveRequest,
 };
 use crate::instruments::rates::swaption::types::Swaption;
 use crate::models::trees::{HullWhiteTree, HullWhiteTreeConfig};
@@ -92,7 +92,7 @@ impl SwaptionHullWhitePricer {
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
         // Single-curve requirement (same as Bermudan pricer)
-        if swaption.underlying_forward_curve_id() != swaption.underlying_discount_curve_id() {
+        if swaption.get_forward_curve_id() != swaption.get_discount_curve_id() {
             return Err(PricingError::model_failure_with_context(
                 "Hull-White tree pricing is currently single-curve only. \
                  Set forward_curve_id equal to discount_curve_id or use a multi-curve-capable engine."
@@ -103,7 +103,7 @@ impl SwaptionHullWhitePricer {
 
         // Get discount curve
         let disc = market
-            .get_discount(swaption.underlying_discount_curve_id().as_str())
+            .get_discount(swaption.get_discount_curve_id().as_str())
             .map_err(|e| {
                 PricingError::missing_market_data_with_context(
                     e.to_string(),
@@ -112,7 +112,7 @@ impl SwaptionHullWhitePricer {
             })?;
 
         // Time to expiry
-        let time_to_expiry = year_fraction(swaption.underlying_day_count(), as_of, swaption.expiry)
+        let time_to_expiry = year_fraction(swaption.get_day_count(), as_of, swaption.expiry)
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
@@ -131,7 +131,7 @@ impl SwaptionHullWhitePricer {
         // Time horizon is swap end (need the tree to cover the full swap)
         let ctx = DayCountContext::default();
         let swap_end_time = swaption
-            .underlying_day_count()
+            .get_day_count()
             .year_fraction(as_of, swaption.get_swap_end(), ctx)
             .map_err(|e| {
                 PricingError::model_failure_with_context(
@@ -153,15 +153,19 @@ impl SwaptionHullWhitePricer {
         // → warned `HullWhiteParams::default()`.
         let context_label = format!("Swaption {}", swaption.id);
         let overrides = hw1f_overrides_json(swaption);
+        let surface = super::hw1f_swaption_surface_calibration(
+            swaption.vol_surface_id.as_str(),
+            Some(swap_end_time),
+            swaption.underlying_fixed_leg.frequency,
+        )
+        .map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
         let req = Hw1fResolveRequest {
-            curve_id: swaption.underlying_discount_curve_id().as_str(),
+            curve_id: swaption.get_discount_curve_id().as_str(),
             flavor: Hw1fCalibrationFlavor::Swaption,
             overrides: overrides.as_ref(),
-            surface: Some(Hw1fSurfaceCalibration::Swaption {
-                surface_id: swaption.vol_surface_id.as_str(),
-                max_expiry: Some(swap_end_time),
-                frequency: crate::calibration::hull_white::SwapFrequency::SemiAnnual,
-            }),
+            surface: Some(surface),
             fallback: None,
             context: context_label.as_str(),
         };
@@ -223,7 +227,7 @@ impl SwaptionHullWhitePricer {
         let mut accrual_fractions = Vec::with_capacity(periods.len());
         for period in periods {
             let t = swaption
-                .underlying_day_count()
+                .get_day_count()
                 .year_fraction(as_of, period.payment_date, ctx)
                 .map_err(|e| {
                     PricingError::model_failure_with_context(
@@ -237,7 +241,7 @@ impl SwaptionHullWhitePricer {
         }
 
         let swap_start_time = swaption
-            .underlying_day_count()
+            .get_day_count()
             .year_fraction(as_of, swaption.get_swap_start(), ctx)
             .map_err(|e| {
                 PricingError::model_failure_with_context(

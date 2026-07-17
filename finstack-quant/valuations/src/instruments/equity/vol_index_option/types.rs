@@ -580,7 +580,11 @@ impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexOpti
         pricer::compute_pv(self, curves, as_of)
     }
 
-    fn value_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+    fn base_value_raw(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
         pricer::compute_pv_raw(self, curves, as_of)
     }
 

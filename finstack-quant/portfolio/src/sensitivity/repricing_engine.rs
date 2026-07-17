@@ -336,7 +336,7 @@ mod tests {
             Ok(Money::new(amount, Currency::USD))
         }
 
-        fn value_raw(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
+        fn base_value_raw(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
             self.raw_value(market)
         }
     }

@@ -7,6 +7,7 @@
 
 use crate::cashflow::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
+use crate::instruments::Instrument;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
@@ -80,6 +81,7 @@ pub fn scenario_table(
     as_of: Date,
     grid: &ScenarioGrid,
 ) -> Result<ScenarioTable> {
+    deal.validate_for_pricing()?;
     let original_balance = deal
         .tranches
         .tranches

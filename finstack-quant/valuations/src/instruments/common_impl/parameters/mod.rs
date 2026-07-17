@@ -24,7 +24,7 @@ pub use legs::{
     BasisSwapLeg, FinancingLegSpec, FinancingRateCompounding, FixedLegSpec, FloatLegSpec,
     ParRateMethod, PayReceive, PremiumLegSpec, ProtectionLegSpec, TotalReturnLegSpec,
 };
-pub use market::{CreditParams, ExerciseStyle, OptionType, Position, SettlementType};
+pub use market::{CreditParams, ExerciseStyle, OptionType, SettlementType};
 pub use option_market::OptionMarketParams;
 pub use quanto::QuantoSpec;
 pub use underlying::{

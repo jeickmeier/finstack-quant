@@ -325,9 +325,39 @@ impl BermudanSwaptionCheyetteRoughPricer {
                 )
             })?;
 
-        // Fixed leg period
-        let tenor_months = swaption.get_fixed_freq().months().unwrap_or(6) as f64;
-        let period = tenor_months / 12.0;
+        // Preserve the canonical fixed-leg frequency and date conventions.
+        // In particular, day/week tenors must not silently become a six-month
+        // period when they have no month representation.
+        let fixed = &swaption.underlying_fixed_leg;
+        let calendar_id = fixed
+            .calendar_id
+            .as_deref()
+            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+        let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+        let period = fixed
+            .frequency
+            .to_years_with_context(fixed.start, Some(calendar), fixed.bdc, fixed.day_count)
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+        if !period.is_finite() || period <= 0.0 {
+            return Err(PricingError::model_failure_with_context(
+                format!(
+                    "Bermudan swaption {} has invalid fixed-leg period {period}",
+                    swaption.id
+                ),
+                PricingErrorContext::default(),
+            ));
+        }
 
         let as_of_curve_time = disc
             .day_count()

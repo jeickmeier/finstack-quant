@@ -663,7 +663,11 @@ impl crate::instruments::common_impl::traits::Instrument for InflationCapFloor {
         self.npv_with_model(curves, as_of, crate::pricer::ModelKey::Black76)
     }
 
-    fn value_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+    fn base_value_raw(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
         self.npv_raw_with_model(curves, as_of, crate::pricer::ModelKey::Black76)
     }
 

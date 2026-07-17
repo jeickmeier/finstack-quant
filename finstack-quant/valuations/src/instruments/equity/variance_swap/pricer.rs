@@ -477,12 +477,8 @@ pub(crate) fn remaining_forward_variance(
         .day_count
         .year_fraction(as_of, final_observation_date, Default::default())?;
 
-    for sid in [
-        inst.underlying_ticker.as_str(),
-        &format!("{}_VOL", inst.underlying_ticker),
-        &format!("{}_IMPL_VOL", inst.underlying_ticker),
-    ] {
-        if let Ok(surface) = context.get_surface(sid) {
+    for sid in inst.volatility_candidate_ids() {
+        if let Ok(surface) = context.get_surface(&sid) {
             let disc = context.get_discount(&inst.discount_curve_id)?;
             let spot_scalar = context.get_price(&inst.underlying_ticker)?;
             let spot = match spot_scalar {
@@ -502,7 +498,7 @@ pub(crate) fn remaining_forward_variance(
                 t,
                 "variance-swap replication rate",
             )?;
-            let dividend_yield_id = format!("{}-DIVYIELD", inst.underlying_ticker);
+            let dividend_yield_id = inst.dividend_yield_scalar_id();
             let q = match context.get_price(&dividend_yield_id) {
                 Ok(finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v)) => *v,
                 Ok(finstack_quant_core::market_data::scalars::MarketScalar::Price(_)) => {
@@ -536,7 +532,7 @@ pub(crate) fn remaining_forward_variance(
                 let vol_atm = surface.value_clamped(t.max(1e-8), fwd);
                 tracing::warn!(
                     instrument_id = %inst.id,
-                    surface_id = %sid,
+                surface_id = %sid,
                     vol_atm = vol_atm,
                     fallback_variance = fallback_variance,
                     "VarianceSwap forward variance: Carr-Madan replication failed; \
@@ -550,7 +546,7 @@ pub(crate) fn remaining_forward_variance(
         }
     }
 
-    if let Ok(scalar) = context.get_price(format!("{}_IMPL_VOL", inst.underlying_ticker)) {
+    if let Ok(scalar) = context.get_price(inst.implied_vol_scalar_id()) {
         let vol = match scalar {
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
             finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => {

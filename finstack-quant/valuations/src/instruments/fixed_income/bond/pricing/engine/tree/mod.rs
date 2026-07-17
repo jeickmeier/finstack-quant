@@ -86,7 +86,7 @@ impl Pricer for SimpleBondOasPricer {
             .curve_id(bond.discount_curve_id.as_str());
 
         let pv = bond
-            .value(market, as_of)
+            .base_value(market, as_of)
             .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
 
         let clean_pct = bond

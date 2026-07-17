@@ -4,13 +4,13 @@
 //! delegating to instruments' `base_value()` methods. Use these when an instrument
 //! implements the [`Instrument`] trait and doesn't need specialized pricing logic.
 //!
-//! The pricer returns the **unshocked** base PV; the scenario shock is applied
-//! by [`build_with_metrics_dyn`](crate::instruments::common_impl::helpers::build_with_metrics_dyn)
-//! in the metrics pipeline so that the shock is applied exactly once.
+//! The pricer returns the **unshocked** base PV; the registry lifecycle applies
+//! the scenario shock exactly once before returning a result or computing
+//! metrics.
 //!
 //! [`Pricer::price_dyn`] is the unchecked model kernel. The registry validates
-//! the instrument before invoking it; direct callers are responsible for doing
-//! the same.
+//! the instrument and resolves its effective valuation date before invoking it;
+//! direct callers are responsible for both preconditions.
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::pricer::{
@@ -23,7 +23,7 @@ use std::marker::PhantomData;
 /// Generic pricer for any instrument that implements the Instrument trait.
 ///
 /// This eliminates the need for instrument-specific pricer implementations that just
-/// forward to the instrument's `value()` method.
+/// forward to the instrument's unshocked `base_value()` kernel.
 pub struct GenericInstrumentPricer<I> {
     instrument_type: InstrumentType,
     model_key: ModelKey,
@@ -78,26 +78,18 @@ where
             .downcast_ref::<I>()
             .ok_or_else(|| PricingError::type_mismatch(self.instrument_type, instrument.key()))?;
 
-        // Resolve the effective valuation date. Most instruments return the
-        // requested `as_of` unchanged; instruments that anchor valuation to
-        // their own state (e.g. a private markets fund) override
-        // `resolve_pricing_as_of` and the resolved date is used for both the
-        // PV computation and the result stamp.
-        let effective_as_of = typed_instrument.resolve_pricing_as_of(market, as_of);
-
         // Compute the base (unshocked) present value; scenario shocks are
-        // applied by the metrics pipeline exactly once.
-        let pv = typed_instrument
-            .base_value(market, effective_as_of)
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::from_instrument(typed_instrument).model(self.model_key),
-                )
-            })?;
+        // applied by the registry lifecycle exactly once. The registry has
+        // already resolved the effective valuation date passed as `as_of`.
+        let pv = typed_instrument.base_value(market, as_of).map_err(|e| {
+            PricingError::model_failure_with_context(
+                e.to_string(),
+                PricingErrorContext::from_instrument(typed_instrument).model(self.model_key),
+            )
+        })?;
 
-        let mut result = ValuationResult::stamped(typed_instrument.id(), effective_as_of, pv);
-        if let Some(details) = typed_instrument.valuation_details(market, effective_as_of) {
+        let mut result = ValuationResult::stamped(typed_instrument.id(), as_of, pv);
+        if let Some(details) = typed_instrument.valuation_details(market, as_of) {
             result = result.with_details(details);
         }
         Ok(result)
@@ -113,16 +105,12 @@ where
             .as_any()
             .downcast_ref::<I>()
             .ok_or_else(|| PricingError::type_mismatch(self.instrument_type, instrument.key()))?;
-        let effective_as_of = typed_instrument.resolve_pricing_as_of(market, as_of);
-
-        typed_instrument
-            .value_raw(market, effective_as_of)
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::from_instrument(typed_instrument).model(self.model_key),
-                )
-            })
+        typed_instrument.base_value_raw(market, as_of).map_err(|e| {
+            PricingError::model_failure_with_context(
+                e.to_string(),
+                PricingErrorContext::from_instrument(typed_instrument).model(self.model_key),
+            )
+        })
     }
 }
 

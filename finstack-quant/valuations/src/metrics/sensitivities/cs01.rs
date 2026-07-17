@@ -496,7 +496,7 @@ where
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?
                 .credit_spread_bump_bp;
 
-        let reval = cs01_reval(context, true);
+        let reval = cs01_reval(context);
 
         let cs01 = compute_parallel_cs01_with_context_raw(
             context,
@@ -543,7 +543,7 @@ where
         let buckets = defaults.cs01_buckets_years;
         let bump_bp = defaults.credit_spread_bump_bp;
 
-        let reval = cs01_reval(context, true);
+        let reval = cs01_reval(context);
 
         let series_id = MetricId::custom(format!("bucketed_cs01::{}", hazard_id.as_str()));
 
@@ -795,32 +795,20 @@ pub(crate) trait CdsCs01Conventions {
     ) -> finstack_quant_core::Result<Option<MarketContext>> {
         Ok(None)
     }
-
-    /// Whether the reval closure should route through the pricer registry
-    /// (`true`, the standard path) or call `Instrument::value_raw` directly
-    /// (`false`). CDS options price via their `value` path; routing through
-    /// the registry would skip scenario overrides, so they opt out.
-    fn cs01_use_pricer_registry(&self) -> bool {
-        true
-    }
 }
 
-/// Build the reval closure used by CS01 calculators, honouring the
-/// instrument's [`CdsCs01Conventions::cs01_use_pricer_registry`] preference.
+/// Build the reval closure used by CS01 calculators.
 fn cs01_reval(
     context: &MetricContext,
-    use_registry: bool,
 ) -> impl FnMut(&MarketContext) -> finstack_quant_core::Result<f64> {
     let inst_arc = Arc::clone(&context.instrument);
     let (model, registry) = context.clone_pricer_dispatch();
     let as_of = context.as_of;
     move |temp_ctx: &MarketContext| {
-        if use_registry {
-            if let (Some(model), Some(registry)) = (model, registry.as_ref()) {
-                return registry
-                    .price_raw(inst_arc.as_ref(), model, temp_ctx, as_of)
-                    .map_err(Into::into);
-            }
+        if let (Some(model), Some(registry)) = (model, registry.as_ref()) {
+            return registry
+                .price_raw(inst_arc.as_ref(), model, temp_ctx, as_of)
+                .map_err(Into::into);
         }
         inst_arc.value_raw(temp_ctx, as_of)
     }
@@ -868,8 +856,6 @@ where
         let (doc_clause, valuation_convention) = context
             .instrument_as::<I>()?
             .cs01_bootstrap_convention(context.as_of)?;
-        let use_registry = context.instrument_as::<I>()?.cs01_use_pricer_registry();
-
         let original_curves = Arc::clone(&context.curves);
         if let Some(override_ctx) = context.instrument_as::<I>()?.cs01_curve_override(
             original_curves.as_ref(),
@@ -892,7 +878,7 @@ where
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?
                 .credit_spread_bump_bp;
 
-        let reval = cs01_reval(context, use_registry);
+        let reval = cs01_reval(context);
 
         let cs01_result = compute_parallel_cs01_with_context_raw(
             context,
@@ -954,8 +940,6 @@ where
         let (doc_clause, valuation_convention) = context
             .instrument_as::<I>()?
             .cs01_bootstrap_convention(context.as_of)?;
-        let use_registry = context.instrument_as::<I>()?.cs01_use_pricer_registry();
-
         let original_curves = Arc::clone(&context.curves);
         if let Some(override_ctx) = context.instrument_as::<I>()?.cs01_curve_override(
             original_curves.as_ref(),
@@ -978,7 +962,7 @@ where
         let buckets = defaults.cs01_buckets_years;
         let bump_bp = defaults.credit_spread_bump_bp;
 
-        let reval = cs01_reval(context, use_registry);
+        let reval = cs01_reval(context);
 
         let series_id = MetricId::custom(format!("bucketed_cs01::{}", hazard_id.as_str()));
         let bucketed_result = compute_key_rate_cs01_series_with_context_raw(

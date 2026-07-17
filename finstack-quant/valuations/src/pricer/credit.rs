@@ -122,7 +122,7 @@ impl Pricer for StructuredCreditStochasticPricer {
         let structured_credit =
             expect_inst::<StructuredCredit>(instrument, InstrumentType::StructuredCredit)?;
         let stochastic = structured_credit
-            .price_stochastic(market, as_of)
+            .price_stochastic_base(market, as_of)
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),

@@ -656,7 +656,7 @@ impl crate::instruments::common_impl::traits::Instrument for QuantoOption {
             ),
         );
         if let Some(dividend_yield) = &self.div_yield_id {
-            deps.add_series_id(dividend_yield.as_str());
+            deps.add_spot_id(dividend_yield.as_str());
         }
         let fx_underlying_id = self.fx_rate_id.as_deref().map(|id| {
             deps.add_spot_id(id);
@@ -771,13 +771,11 @@ mod tests {
                 option.foreign_discount_curve_id.clone(),
             ]
         );
-        assert_eq!(
-            deps.spot_ids,
-            vec![
-                option.spot_id.as_str().to_string(),
-                option.fx_rate_id.clone().expect("FX rate id"),
-            ]
-        );
+        let mut expected_spots = vec![option.spot_id.as_str().to_string()];
+        expected_spots.extend(option.div_yield_id.iter().map(|id| id.as_str().to_string()));
+        expected_spots.push(option.fx_rate_id.clone().expect("FX rate id"));
+        assert_eq!(deps.spot_ids, expected_spots);
+        assert!(deps.series_ids.is_empty());
         assert_eq!(deps.volatility_dependencies.len(), 2);
         assert_eq!(
             deps.volatility_dependencies[0].underlying_id.as_ref(),

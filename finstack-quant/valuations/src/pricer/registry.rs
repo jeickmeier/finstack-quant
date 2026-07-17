@@ -39,8 +39,12 @@ pub trait Pricer: Send + Sync {
     /// Price an instrument using this pricer's model.
     ///
     /// This is a low-level dispatch hook that assumes the instrument has already
-    /// passed [`Priceable::validate_for_pricing`]. Canonical callers must enter
-    /// through [`PricerRegistry::price_with_metrics`] or its internal raw path.
+    /// passed [`Priceable::validate_for_pricing`] and `as_of` has already been
+    /// resolved through [`Priceable::resolve_pricing_as_of`]. Canonical callers
+    /// must enter through [`PricerRegistry::price_with_metrics`] or its internal
+    /// raw path.
+    /// Implementations must return an unshocked result because the registry owns
+    /// exactly-once scenario application.
     fn price_dyn(
         &self,
         instrument: &dyn Priceable,
@@ -53,6 +57,8 @@ pub trait Pricer: Send + Sync {
     /// The default implementation falls back to [`Self::price_dyn`] and extracts the
     /// rounded `Money` amount. Pricers with a true raw-f64 path should override this
     /// so finite-difference risk calculations do not inherit currency rounding noise.
+    /// This is an unchecked, unshocked model kernel; canonical callers enter
+    /// through [`PricerRegistry::price_raw`].
     fn price_raw_dyn(
         &self,
         instrument: &dyn Priceable,
@@ -184,7 +190,8 @@ impl PricerRegistry {
 
     /// Look up a pricer for a specific (instrument type, model) combination.
     ///
-    /// The returned low-level pricer does not validate instruments itself.
+    /// The returned low-level pricer does not validate instruments, resolve the
+    /// effective valuation date, or apply scenario overrides itself.
     /// Canonical pricing should use [`Self::price_with_metrics`].
     pub fn get_pricer(&self, key: PricerKey) -> Option<&dyn Pricer> {
         self.pricers.get(&key).map(|p| p.as_ref())
@@ -194,22 +201,33 @@ impl PricerRegistry {
     ///
     /// Keeping this order in one helper ensures malformed instruments fail as
     /// invalid input before model lookup or any market-dependent computation.
-    fn validated_pricer(
-        &self,
-        instrument: &dyn Priceable,
+    fn validated_pricer<'registry, 'instrument>(
+        &'registry self,
+        instrument: &'instrument dyn Priceable,
         model: ModelKey,
-    ) -> std::result::Result<&dyn Pricer, PricingError> {
+    ) -> std::result::Result<
+        (
+            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle<
+                'instrument,
+                dyn Priceable + 'instrument,
+            >,
+            &'registry dyn Pricer,
+        ),
+        PricingError,
+    > {
         let context = PricingErrorContext::from_instrument(instrument).model(model);
-        instrument
-            .validate_for_pricing()
-            .map_err(|error| PricingError::from_core(error, context))?;
+        let lifecycle =
+            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)
+                .map_err(|error| PricingError::from_core(error, context))?;
 
         let key = PricerKey::new(instrument.key(), model);
-        self.get_pricer(key)
+        let pricer = self
+            .get_pricer(key)
             .ok_or_else(|| PricingError::UnknownPricer {
                 key,
                 available_models: self.available_models_for_instrument(key.instrument),
-            })
+            })?;
+        Ok((lifecycle, pricer))
     }
 
     /// Return every [`ModelKey`] registered for the given instrument type.
@@ -353,7 +371,6 @@ impl PricerRegistry {
         } = options;
 
         // --- Base PV through the registered pricer ---
-        let pricer = self.validated_pricer(instrument, model)?;
         tracing::debug!(
             instrument_id = %instrument.id(),
             instrument_type = %instrument.key(),
@@ -362,19 +379,24 @@ impl PricerRegistry {
             num_metrics = metrics.len(),
             "dispatching registered pricer"
         );
-        let mut base_result = pricer.price_dyn(instrument, market, as_of)?;
+        let (lifecycle, pricer) = self.validated_pricer(instrument, model)?;
+        let effective_as_of = lifecycle.effective_as_of(market, as_of);
+        let mut base_result = pricer.price_dyn(instrument, market, effective_as_of)?;
+        // The lifecycle owns date resolution. A model may populate a richer
+        // result envelope, but it must not replace the canonical valuation
+        // date used by downstream metrics and host-language callers.
+        base_result.as_of = effective_as_of;
         let effective_cfg = cfg
             .as_deref()
             .map_or_else(FinstackConfig::default, |c| c.clone());
         stamp_results_meta(&effective_cfg, instrument, market, &mut base_result);
 
+        // Scenario price adjustments are a valuation-boundary operation. The
+        // model kernel remains unshocked; every result and metric context sees
+        // this one adjusted value.
+        base_result.value = lifecycle.apply_value(base_result.value);
+
         if metrics.is_empty() {
-            // No extra metrics requested: apply scenario overrides and return.
-            // Keeps empty-metrics behavior consistent with `Instrument::value`.
-            base_result.value = crate::instruments::common_impl::helpers::apply_scenario_value(
-                instrument,
-                base_result.value,
-            );
             return Ok(base_result);
         }
 
@@ -382,7 +404,7 @@ impl PricerRegistry {
             instrument,
             model,
             market: shared.market.unwrap_or_else(|| Arc::new(market.clone())),
-            as_of,
+            as_of: effective_as_of,
             metrics,
             cfg,
             market_history,
@@ -399,8 +421,10 @@ impl PricerRegistry {
         market: &Market,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<f64, PricingError> {
-        let pricer = self.validated_pricer(instrument, model)?;
-        pricer.price_raw_dyn(instrument, market, as_of)
+        let (lifecycle, pricer) = self.validated_pricer(instrument, model)?;
+        let effective_as_of = lifecycle.effective_as_of(market, as_of);
+        let base_value = pricer.price_raw_dyn(instrument, market, effective_as_of)?;
+        Ok(lifecycle.apply_raw_value(base_value))
     }
 
     /// Price a batch of instruments in parallel, preserving input order.
@@ -480,7 +504,11 @@ impl PricerRegistry {
     }
 }
 
-/// Stamp result metadata from a config.
+/// Apply request-owned metadata while preserving model-owned audit fields.
+///
+/// Numeric mode and rounding come from the effective request config. Existing
+/// model timestamps and version stamps are retained, with request defaults used
+/// only when the model omitted them.
 ///
 /// FX policy precedence (highest to lowest):
 /// 1. A policy already set on `result.meta.fx_policy_applied` by the pricer.
@@ -497,11 +525,28 @@ fn stamp_results_meta(
     market: &finstack_quant_core::market_data::context::MarketContext,
     result: &mut crate::results::ValuationResult,
 ) {
-    let prev_fx_policy = result.meta.fx_policy_applied.clone();
+    let previous = result.meta.clone();
     let mut meta = results_meta_now(cfg);
-    meta.fx_policy_applied =
-        prev_fx_policy.or_else(|| collect_fx_policy_from_curves(instrument, market));
+    meta.fx_policy_applied = previous
+        .fx_policy_applied
+        .or_else(|| collect_fx_policy_from_curves(instrument, market));
+    meta.timestamp = previous.timestamp.or(meta.timestamp);
+    meta.version = previous.version.or(meta.version);
     result.meta = meta;
+}
+
+/// Attach computed metrics without replacing the model-produced result envelope.
+///
+/// Model measures are inserted last and therefore retain their historical
+/// precedence when a model and a generic calculator emit the same metric ID.
+pub(super) fn attach_metric_measures(
+    result: &mut crate::results::ValuationResult,
+    mut metric_measures: indexmap::IndexMap<crate::metrics::MetricId, f64>,
+) {
+    for (metric_id, value) in std::mem::take(&mut result.measures) {
+        metric_measures.insert(metric_id, value);
+    }
+    result.measures = metric_measures;
 }
 
 /// Walk an instrument's declared curve dependencies and join any `fx_policy`
@@ -703,6 +748,7 @@ mod tests {
         id: finstack_quant_core::types::InstrumentId,
         attributes: finstack_quant_core::types::Attributes,
         base_calls: Arc<AtomicUsize>,
+        raw_calls: Arc<AtomicUsize>,
     }
 
     crate::impl_empty_cashflow_provider!(
@@ -729,6 +775,121 @@ mod tests {
                 100.0,
                 finstack_quant_core::currency::Currency::USD,
             ))
+        }
+
+        fn base_value_raw(
+            &self,
+            _market: &Market,
+            _as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<f64> {
+            self.raw_calls.fetch_add(1, Ordering::SeqCst);
+            Ok(100.123_456_789)
+        }
+    }
+
+    #[derive(Clone)]
+    struct RawLifecycleInstrument {
+        id: finstack_quant_core::types::InstrumentId,
+        attributes: finstack_quant_core::types::Attributes,
+        raw_value: f64,
+        effective_as_of: finstack_quant_core::dates::Date,
+        raw_calls: Arc<AtomicUsize>,
+        scenario: crate::instruments::ScenarioPricingOverrides,
+    }
+
+    crate::impl_empty_cashflow_provider!(
+        RawLifecycleInstrument,
+        crate::cashflow::builder::CashflowRepresentation::NoResidual
+    );
+
+    impl Priceable for RawLifecycleInstrument {
+        crate::impl_instrument_base!(InstrumentType::Bond);
+
+        fn resolve_pricing_as_of(
+            &self,
+            _market: &Market,
+            _requested: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::dates::Date {
+            self.effective_as_of
+        }
+
+        fn base_value(
+            &self,
+            _market: &Market,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+            assert_eq!(as_of, self.effective_as_of);
+            Ok(finstack_quant_core::money::Money::new(
+                self.raw_value,
+                finstack_quant_core::currency::Currency::USD,
+            ))
+        }
+
+        fn base_value_raw(
+            &self,
+            _market: &Market,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<f64> {
+            assert_eq!(as_of, self.effective_as_of);
+            self.raw_calls.fetch_add(1, Ordering::SeqCst);
+            Ok(self.raw_value)
+        }
+
+        fn get_scenario_pricing_overrides(
+            &self,
+        ) -> Option<&crate::instruments::ScenarioPricingOverrides> {
+            Some(&self.scenario)
+        }
+    }
+
+    struct RichBondPricer;
+
+    impl Pricer for RichBondPricer {
+        fn key(&self) -> PricerKey {
+            PricerKey::new(InstrumentType::Bond, ModelKey::HazardRate)
+        }
+
+        fn price_dyn(
+            &self,
+            instrument: &dyn Priceable,
+            _market: &Market,
+            _as_of: finstack_quant_core::dates::Date,
+        ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
+            let result_as_of = time::macros::date!(2025 - 01 - 16);
+            let mut measures = indexmap::IndexMap::new();
+            measures.insert(crate::metrics::MetricId::Dv01, 7.0);
+            measures.insert(crate::metrics::MetricId::custom("model_measure"), 2.0);
+            let covenant = finstack_quant_covenants::CovenantReport {
+                covenant_type: "test".to_string(),
+                covenant_id: Some("rich-result".to_string()),
+                passed: true,
+                actual_value: Some(1.5),
+                threshold: Some(1.0),
+                details: Some("preserved".to_string()),
+                headroom: Some(0.5),
+            };
+            let mut result = crate::results::ValuationResult::stamped(
+                instrument.id(),
+                result_as_of,
+                finstack_quant_core::money::Money::new(
+                    100.0,
+                    finstack_quant_core::currency::Currency::USD,
+                ),
+            )
+            .with_measures(measures)
+            .with_details(crate::results::ValuationDetails::Fx(
+                crate::results::FxValuationDetails {
+                    fx_triangulated: Some(true),
+                },
+            ))
+            .with_covenant("rich-result", covenant)
+            .with_explanation(finstack_quant_core::explain::ExplanationTrace::new(
+                "rich-pricer",
+            ));
+            result.meta.fx_policy_applied = Some("pricer-fx-policy".to_string());
+            result.meta.timestamp = Some(time::OffsetDateTime::UNIX_EPOCH);
+            result.meta.version = Some("model-version".to_string());
+            Ok(result)
         }
     }
 
@@ -765,11 +926,13 @@ mod tests {
         use time::macros::date;
 
         let base_calls = Arc::new(AtomicUsize::new(0));
+        let raw_calls = Arc::new(AtomicUsize::new(0));
         let pricer_calls = Arc::new(AtomicUsize::new(0));
         let instrument = InvalidTestInstrument {
             id: finstack_quant_core::types::InstrumentId::new("INVALID-TEST"),
             attributes: finstack_quant_core::types::Attributes::default(),
             base_calls: Arc::clone(&base_calls),
+            raw_calls: Arc::clone(&raw_calls),
         };
         let market = Market::new();
         let as_of = date!(2025 - 01 - 15);
@@ -861,14 +1024,6 @@ mod tests {
             finstack_quant_core::Error::Validation(_)
         ));
 
-        let base_raw_err = instrument
-            .base_value_raw(&market, as_of)
-            .expect_err("direct base raw request must fail validation");
-        assert!(matches!(
-            base_raw_err,
-            finstack_quant_core::Error::Validation(_)
-        ));
-
         let raw_value_err = instrument
             .value_raw(&market, as_of)
             .expect_err("direct raw value request must fail validation");
@@ -879,6 +1034,146 @@ mod tests {
 
         assert_eq!(pricer_calls.load(Ordering::SeqCst), 0);
         assert_eq!(base_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(raw_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn raw_lifecycle_preserves_precision_resolves_date_and_applies_scenario_once() {
+        use crate::instruments::Instrument;
+        use time::macros::date;
+
+        let requested_as_of = date!(2025 - 01 - 15);
+        let effective_as_of = date!(2025 - 01 - 17);
+        let raw_value = 123.456_789_123;
+        let raw_calls = Arc::new(AtomicUsize::new(0));
+        let instrument = RawLifecycleInstrument {
+            id: finstack_quant_core::types::InstrumentId::new("RAW-LIFECYCLE"),
+            attributes: finstack_quant_core::types::Attributes::default(),
+            raw_value,
+            effective_as_of,
+            raw_calls: Arc::clone(&raw_calls),
+            scenario: crate::instruments::ScenarioPricingOverrides::default()
+                .with_price_shock_pct(-0.10),
+        };
+        let market = Market::new();
+        let mut registry = PricerRegistry::new();
+        registry.register(
+            InstrumentType::Bond,
+            ModelKey::Discounting,
+            crate::instruments::common_impl::GenericInstrumentPricer::<RawLifecycleInstrument>::discounting(
+                InstrumentType::Bond,
+            ),
+        );
+
+        let base_raw = instrument
+            .base_value_raw(&market, effective_as_of)
+            .expect("unchecked raw kernel");
+        let direct_raw = instrument
+            .value_raw(&market, requested_as_of)
+            .expect("direct raw lifecycle");
+        let registry_raw = registry
+            .price_raw(&instrument, ModelKey::Discounting, &market, requested_as_of)
+            .expect("registry raw lifecycle");
+        let result = registry
+            .price_with_metrics(
+                &instrument,
+                ModelKey::Discounting,
+                &market,
+                requested_as_of,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect("registry money lifecycle");
+        let expected_money = result.value;
+        let mut metric_context = crate::metrics::MetricContext::new(
+            Arc::new(instrument),
+            Arc::new(market.clone()),
+            effective_as_of,
+            expected_money,
+            crate::metrics::MetricContext::default_config(),
+        );
+        metric_context.set_pricer_dispatch(Some(ModelKey::Discounting), Some(Arc::new(registry)));
+        let metric_reprice = metric_context
+            .instrument_value_with_scenario(&market, requested_as_of)
+            .expect("metric scenario lifecycle");
+
+        assert_eq!(base_raw, raw_value);
+        let expected = raw_value * 0.9;
+        assert_eq!(direct_raw, expected);
+        assert_eq!(registry_raw, expected);
+        assert_eq!(result.as_of, effective_as_of);
+        assert_eq!(metric_reprice, expected_money);
+        assert_eq!(raw_calls.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn metric_attachment_preserves_the_model_result_envelope() {
+        use finstack_quant_core::config::FinstackConfig;
+        use finstack_quant_core::currency::Currency;
+        use time::macros::date;
+
+        let instrument = fixed_test_bond();
+        let market =
+            Market::new().insert(flat_discount_curve("USD-TREASURY", date!(2025 - 01 - 15)));
+        let mut registry = PricerRegistry::new();
+        registry.register(InstrumentType::Bond, ModelKey::HazardRate, RichBondPricer);
+        let mut cfg = FinstackConfig::default();
+        cfg.rounding.output_scale.overrides.insert(Currency::USD, 4);
+
+        let result = registry
+            .price_with_metrics(
+                &instrument,
+                ModelKey::HazardRate,
+                &market,
+                date!(2025 - 01 - 15),
+                &[crate::metrics::MetricId::Dv01],
+                crate::instruments::PricingOptions::default().with_config(&cfg),
+            )
+            .expect("rich model result with metrics");
+
+        assert_eq!(result.as_of, date!(2025 - 01 - 15));
+        assert!(matches!(
+            result.details,
+            Some(crate::results::ValuationDetails::Fx(
+                crate::results::FxValuationDetails {
+                    fx_triangulated: Some(true)
+                }
+            ))
+        ));
+        assert!(result
+            .covenants
+            .as_ref()
+            .is_some_and(|reports| reports.contains_key("rich-result")));
+        assert_eq!(
+            result
+                .explanation
+                .as_ref()
+                .map(|trace| trace.trace_type.as_str()),
+            Some("rich-pricer")
+        );
+        assert_eq!(
+            result.meta.fx_policy_applied.as_deref(),
+            Some("pricer-fx-policy")
+        );
+        assert_eq!(
+            result.meta.timestamp,
+            Some(time::OffsetDateTime::UNIX_EPOCH)
+        );
+        assert_eq!(result.meta.version.as_deref(), Some("model-version"));
+        assert_eq!(
+            result.meta.rounding.output_scale_by_ccy.get(&Currency::USD),
+            Some(&4)
+        );
+        assert_eq!(
+            result.measures.get(&crate::metrics::MetricId::Dv01),
+            Some(&7.0)
+        );
+        assert_eq!(
+            result
+                .measures
+                .get(&crate::metrics::MetricId::custom("model_measure")),
+            Some(&2.0)
+        );
     }
 
     /// Default discounting path parity:

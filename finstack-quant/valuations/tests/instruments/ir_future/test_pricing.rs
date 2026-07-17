@@ -3,8 +3,8 @@
 use super::utils::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::ir_future::Position;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::Position;
 
 #[test]
 fn test_basic_npv() {

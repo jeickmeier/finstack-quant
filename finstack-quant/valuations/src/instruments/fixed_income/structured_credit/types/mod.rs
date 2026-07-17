@@ -541,18 +541,34 @@ impl StructuredCredit {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
+        let lifecycle =
+            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
+        let effective_as_of = lifecycle.effective_as_of(context, as_of);
+        let result = self.price_stochastic_base(context, effective_as_of)?;
+        Ok(self.apply_stochastic_price_scenario(result))
+    }
+
+    fn default_stochastic_pricing_mode(&self) -> PricingMode {
         let num_paths = self
             .instrument_pricing_overrides
             .model_config
             .mc_paths
             .unwrap_or(10_000);
-        self.price_stochastic_with_mode(
+        PricingMode::MonteCarlo {
+            num_paths,
+            antithetic: num_paths > 1,
+        }
+    }
+
+    pub(crate) fn price_stochastic_base(
+        &self,
+        context: &MarketContext,
+        effective_as_of: Date,
+    ) -> finstack_quant_core::Result<StochasticPricingResult> {
+        self.price_stochastic_base_with_mode(
             context,
-            as_of,
-            PricingMode::MonteCarlo {
-                num_paths,
-                antithetic: num_paths > 1,
-            },
+            effective_as_of,
+            self.default_stochastic_pricing_mode(),
         )
     }
 
@@ -563,12 +579,26 @@ impl StructuredCredit {
         as_of: Date,
         pricing_mode: PricingMode,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
-        let mut tree_config = self.build_scenario_tree_config(as_of)?;
+        let lifecycle =
+            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
+        let effective_as_of = lifecycle.effective_as_of(context, as_of);
+        let result =
+            self.price_stochastic_base_with_mode(context, effective_as_of, pricing_mode)?;
+        Ok(self.apply_stochastic_price_scenario(result))
+    }
+
+    fn price_stochastic_base_with_mode(
+        &self,
+        context: &MarketContext,
+        effective_as_of: Date,
+        pricing_mode: PricingMode,
+    ) -> finstack_quant_core::Result<StochasticPricingResult> {
+        let mut tree_config = self.build_scenario_tree_config(effective_as_of)?;
         if let Some(tree_steps) = self.instrument_pricing_overrides.model_config.tree_steps {
             tree_config.num_periods = tree_steps.max(1);
         }
         let discount_curve = context.get_discount(self.discount_curve_id.as_str())?;
-        let mut config = StochasticPricerConfig::new(as_of, discount_curve, tree_config)
+        let mut config = StochasticPricerConfig::new(effective_as_of, discount_curve, tree_config)
             .with_pricing_mode(pricing_mode);
         if let Some(granularity) = self
             .instrument_pricing_overrides
@@ -578,6 +608,27 @@ impl StructuredCredit {
             config = config.with_pool_granularity(granularity);
         }
         self.run_stochastic_pricer(config, context)
+    }
+
+    fn apply_stochastic_price_scenario(
+        &self,
+        mut result: StochasticPricingResult,
+    ) -> StochasticPricingResult {
+        let Some(shock) = self.scenario_pricing_overrides.scenario_price_shock_pct else {
+            return result;
+        };
+        let factor = 1.0 + shock;
+        result.npv = Money::new(result.npv.amount() * factor, result.npv.currency());
+        result.clean_price *= factor;
+        result.dirty_price *= factor;
+        result.pv_std_error *= factor.abs();
+        let lo = result.pv_confidence_interval.0 * factor;
+        let hi = result.pv_confidence_interval.1 * factor;
+        result.pv_confidence_interval = (lo.min(hi), lo.max(hi));
+        for tranche in &mut result.tranche_results {
+            tranche.npv = Money::new(tranche.npv.amount() * factor, tranche.npv.currency());
+        }
+        result
     }
 
     fn run_stochastic_pricer(
@@ -927,6 +978,9 @@ impl Instrument for StructuredCredit {
                 )));
             }
         }
+        for swap in &self.hedge_swaps {
+            swap.validate_for_pricing()?;
+        }
         Ok(())
     }
 
@@ -1024,6 +1078,16 @@ impl StructuredCredit {
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
         let cashflows = self.get_tranche_cashflows(tranche_id, context, as_of)?;
+        let effective_as_of = self.resolve_pricing_as_of(context, as_of);
+        self.value_tranche_cashflows(&cashflows, context, effective_as_of)
+    }
+
+    fn value_tranche_cashflows(
+        &self,
+        cashflows: &TrancheCashflows,
+        context: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
         let disc = context.get_discount(&self.discount_curve_id)?;
 
         let mut pv = Money::new(0.0, self.pool.base_currency());
@@ -1035,7 +1099,7 @@ impl StructuredCredit {
             }
         }
 
-        Ok(pv)
+        Ok(crate::instruments::common_impl::helpers::apply_scenario_value(self, pv))
     }
 
     /// Get full valuation with metrics for a specific tranche.
@@ -1052,13 +1116,14 @@ impl StructuredCredit {
         };
 
         let cashflow_result = self.get_tranche_cashflows(tranche_id, context, as_of)?;
-        let pv = self.value_tranche(tranche_id, context, as_of)?;
+        let effective_as_of = self.resolve_pricing_as_of(context, as_of);
+        let pv = self.value_tranche_cashflows(&cashflow_result, context, effective_as_of)?;
 
         let mut metric_context = crate::metrics::MetricContext::new(
             std::sync::Arc::new(self.clone())
                 as std::sync::Arc<dyn crate::instruments::common_impl::traits::Instrument>,
             std::sync::Arc::new(context.clone()),
-            as_of,
+            effective_as_of,
             pv,
             MetricContext::default_config(),
         );
@@ -1103,7 +1168,7 @@ impl StructuredCredit {
 
         let wal = match computed_metrics.get(&MetricId::WAL) {
             Some(v) => *v,
-            None => calculate_tranche_wal(&cashflow_result, as_of)?,
+            None => calculate_tranche_wal(&cashflow_result, effective_as_of)?,
         };
 
         let disc = context.get_discount(&self.discount_curve_id)?;
@@ -1111,7 +1176,7 @@ impl StructuredCredit {
             .get(&MetricId::DurationMod)
             .copied()
             .unwrap_or_else(|| {
-                calculate_tranche_duration(&cashflow_result.cashflows, &disc, as_of, pv)
+                calculate_tranche_duration(&cashflow_result.cashflows, &disc, effective_as_of, pv)
                     .unwrap_or(0.0)
             });
 
@@ -1119,7 +1184,7 @@ impl StructuredCredit {
             .get(&MetricId::ZSpread)
             .copied()
             .unwrap_or_else(|| {
-                calculate_tranche_z_spread(&cashflow_result.cashflows, &disc, pv, as_of)
+                calculate_tranche_z_spread(&cashflow_result.cashflows, &disc, pv, effective_as_of)
                     .unwrap_or(0.0)
             });
 
@@ -1128,8 +1193,13 @@ impl StructuredCredit {
             .get(&MetricId::Cs01)
             .copied()
             .unwrap_or_else(|| {
-                calculate_tranche_cs01(&cashflow_result.cashflows, &disc, z_spread_decimal, as_of)
-                    .unwrap_or(0.0)
+                calculate_tranche_cs01(
+                    &cashflow_result.cashflows,
+                    &disc,
+                    z_spread_decimal,
+                    effective_as_of,
+                )
+                .unwrap_or(0.0)
             });
 
         let ytm = computed_metrics

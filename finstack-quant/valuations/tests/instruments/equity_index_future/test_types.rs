@@ -7,7 +7,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::equity::equity_index_future::{
     EquityFutureSpecs, EquityIndexFuture,
 };
-use finstack_quant_valuations::instruments::rates::ir_future::Position;
+use finstack_quant_valuations::instruments::Position;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use time::Month;
 

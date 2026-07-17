@@ -27,6 +27,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::simulation_eng
     run_simulation_with_source, OasPathFlowSource,
 };
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
+use crate::instruments::Instrument;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -113,6 +114,7 @@ pub fn calculate_tranche_oas(
     as_of: Date,
     config: &OasConfig,
 ) -> Result<OasResult> {
+    deal.validate_for_pricing()?;
     let disc = market.get_discount(deal.discount_curve_id.as_str())?;
     let tranche = deal
         .tranches

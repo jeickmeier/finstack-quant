@@ -629,7 +629,7 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
         crate::instruments::rates::irs::pricer::compute_pv(self, curves, as_of)
     }
 
-    fn value_raw(
+    fn base_value_raw(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,

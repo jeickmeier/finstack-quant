@@ -343,7 +343,7 @@ impl Pricer for RangeAccrualStaticReplicationPricer {
                 PricingError::type_mismatch(InstrumentType::RangeAccrual, instrument.key())
             })?;
 
-        let pv = npv_analytic(range_accrual, market, as_of).map_err(|e| {
+        let pv = compute_pv(range_accrual, market, as_of).map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
@@ -351,7 +351,7 @@ impl Pricer for RangeAccrualStaticReplicationPricer {
     }
 }
 
-/// Present value using Monte Carlo.
+/// Present value using the default static-replication model.
 pub(crate) fn compute_pv(
     inst: &RangeAccrual,
     curves: &MarketContext,
@@ -698,7 +698,7 @@ mod tests {
     }
 
     #[test]
-    fn model_selection_is_independent_of_mc_seed_override() {
+    fn registry_model_selection_is_independent_of_mc_seed_override() {
         let as_of = date(2024, 1, 1);
         let curves = market(as_of);
         let mut without_seed = RangeAccrual::example();
@@ -707,31 +707,91 @@ mod tests {
         let mut with_seed = without_seed.clone();
         with_seed.metric_pricing_overrides.mc_seed_scenario = Some("stress".to_string());
 
-        let analytic_without_seed =
-            compute_pv(&without_seed, &curves, as_of).expect("default model without seed");
-        let analytic_with_seed =
-            compute_pv(&with_seed, &curves, as_of).expect("default model with seed");
         let direct_analytic =
-            npv_analytic(&without_seed, &curves, as_of).expect("direct analytic price");
+            npv_analytic(&without_seed, &curves, as_of).expect("direct static-replication price");
+        let default_without_seed = without_seed
+            .price_with_metrics(
+                &curves,
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect("default model without seed");
+        let default_with_seed = with_seed
+            .price_with_metrics(
+                &curves,
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect("default model with seed");
+        let direct_without_seed = without_seed
+            .value(&curves, as_of)
+            .expect("direct default model without seed");
+        let direct_with_seed = with_seed
+            .value(&curves, as_of)
+            .expect("direct default model with seed");
 
-        assert_eq!(analytic_without_seed, direct_analytic);
-        assert_eq!(analytic_with_seed, direct_analytic);
+        assert_eq!(default_without_seed.value, direct_analytic);
+        assert_eq!(default_with_seed.value, direct_analytic);
+        assert_eq!(default_with_seed.value, default_without_seed.value);
+        assert_eq!(direct_without_seed, direct_analytic);
+        assert_eq!(direct_with_seed, direct_analytic);
 
-        let mc = RangeAccrualMcPricer::new();
-        let mc_without_seed_first = mc
-            .price_internal(&without_seed, &curves, as_of)
-            .expect("MC without seed");
-        let mc_without_seed_second = mc
-            .price_internal(&without_seed, &curves, as_of)
-            .expect("repeat MC without seed");
-        let mc_with_seed_first = mc
-            .price_internal(&with_seed, &curves, as_of)
-            .expect("MC with seed");
-        let mc_with_seed_second = mc
-            .price_internal(&with_seed, &curves, as_of)
-            .expect("repeat MC with seed");
+        let explicit_mc_without_seed = without_seed
+            .price_with_metrics(
+                &curves,
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default().with_model(ModelKey::MonteCarloGBM),
+            )
+            .expect("explicit MC without seed");
+        let explicit_mc_with_seed = with_seed
+            .price_with_metrics(
+                &curves,
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default().with_model(ModelKey::MonteCarloGBM),
+            )
+            .expect("explicit MC with seed");
+        let repeated_mc_with_seed = with_seed
+            .price_with_metrics(
+                &curves,
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default().with_model(ModelKey::MonteCarloGBM),
+            )
+            .expect("repeat explicit MC with seed");
 
-        assert_eq!(mc_without_seed_first, mc_without_seed_second);
-        assert_eq!(mc_with_seed_first, mc_with_seed_second);
+        assert_eq!(repeated_mc_with_seed.value, explicit_mc_with_seed.value);
+        assert_ne!(explicit_mc_without_seed.value, explicit_mc_with_seed.value);
+    }
+
+    #[test]
+    fn default_registry_and_direct_paths_share_static_kernel() {
+        let as_of = date(2024, 1, 1);
+        let mut rate_linked = RangeAccrual::example();
+        rate_linked.rate_index_id = Some(finstack_quant_core::types::IndexId::new("SOFR"));
+        rate_linked.projection_curve_id = Some(finstack_quant_core::types::CurveId::new("SOFR-3M"));
+        rate_linked.reference_tenor = Some(finstack_quant_core::dates::Tenor::new(
+            3,
+            finstack_quant_core::dates::TenorUnit::Months,
+        ));
+
+        let direct = rate_linked
+            .value(&market(as_of), as_of)
+            .expect_err("direct static path must reject a rate-linked contract");
+        let registered = rate_linked
+            .price_with_metrics(
+                &market(as_of),
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect_err("registered static path must reject a rate-linked contract");
+
+        let expected = "cannot use equity static replication";
+        assert!(direct.to_string().contains(expected));
+        assert!(registered.to_string().contains(expected));
     }
 }
