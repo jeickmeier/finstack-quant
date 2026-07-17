@@ -31,6 +31,11 @@ const RESERVED_DSL_IDENTIFIERS: &[&str] = &["if", "and", "or", "not", "true", "f
 /// Exposed so binding layers can pre-validate a node id without consuming a
 /// (move-based) builder — mirroring the check `compute` runs internally.
 ///
+/// # Arguments
+///
+/// * `node_id` - Candidate statement-node identifier to validate against
+///   internal prefixes and reserved formula-language keywords.
+///
 /// # Errors
 ///
 /// Returns an error if `node_id` uses a reserved prefix or collides with a DSL
