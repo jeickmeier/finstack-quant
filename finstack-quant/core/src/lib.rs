@@ -3,12 +3,14 @@
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
+#![deny(clippy::unreachable)]
 #![cfg_attr(
     test,
     allow(
         clippy::unwrap_used,
         clippy::expect_used,
         clippy::panic,
+        clippy::unreachable,
         clippy::indexing_slicing,
         clippy::float_cmp,
     )
@@ -66,6 +68,7 @@
 //! - [`error`]: Error types and result handling
 //! - [`decimal`]: `f64 ↔ Decimal` conversion helpers with explicit error propagation
 //! - [`rating_scales`]: Shared credit rating-scale registry
+//! - [`serde_guard`]: `deny_unknown_fields` enforcement for `#[serde(flatten)]` structs
 //! - [`table`]: Serializable columnar table envelope for host-language bindings
 //! - [`validation`]: Generic invariant-checking helpers
 //! - [`versions`]: Canonical model-version strings for calibration reports
@@ -129,6 +132,8 @@ pub(crate) mod parse;
 pub mod prelude;
 /// Shared credit rating-scale registry.
 pub mod rating_scales;
+/// `deny_unknown_fields` enforcement for structs that use `#[serde(flatten)]`.
+pub mod serde_guard;
 /// Serializable columnar table envelope for host-language bindings.
 pub mod table;
 /// Core type definitions (phantom-typed IDs, rates, etc.)

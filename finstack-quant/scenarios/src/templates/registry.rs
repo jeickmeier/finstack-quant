@@ -413,6 +413,7 @@ impl TemplateRegistry {
 
 impl Default for TemplateRegistry {
     /// Create a registry preloaded with built-in historical stress templates.
+    #[allow(clippy::unreachable)] // Embedded crate-owned templates are validated in tests.
     fn default() -> Self {
         Self::with_embedded_builtins().unwrap_or_else(|error| {
             unreachable!("crate-owned embedded templates must load successfully: {error}")

@@ -128,6 +128,7 @@ impl std::str::FromStr for RoundingMode {
 /// assert_eq!(cfg.output_scale(Currency::CHF), 2);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FinstackConfig {
     /// Detailed rounding policy (ingest/output scales by currency).
     pub rounding: RoundingPolicy,
@@ -268,6 +269,7 @@ impl ConfigExtensions {
 /// assert_eq!(cfg.output_scale(Currency::KWD), 3);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CurrencyScalePolicy {
     /// Explicit currency overrides for scale.
     pub overrides: BTreeMap<crate::currency::Currency, u32>,
@@ -275,6 +277,7 @@ pub struct CurrencyScalePolicy {
 
 /// Full rounding policy used at IO boundaries and normalization steps.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RoundingPolicy {
     /// Rounding behaviour to apply when mapping fractional values to a scale.
     pub mode: RoundingMode,
@@ -352,7 +355,10 @@ impl<'de> Deserialize<'de> for ToleranceConfig {
     where
         D: serde::Deserializer<'de>,
     {
+        // Strictness belongs on this raw mirror because ToleranceConfig has a
+        // manual Deserialize implementation and a committed JSON schema.
         #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct RawToleranceConfig {
             #[serde(default = "default_rate_epsilon")]
             rate_epsilon: f64,

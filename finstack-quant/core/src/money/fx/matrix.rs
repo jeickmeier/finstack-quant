@@ -36,6 +36,20 @@ struct ObservedQuote {
     triangulated: bool,
 }
 
+/// Return the canonical storage orientation for an unordered currency pair.
+///
+/// Observed quotes use one orientation so both lookup directions derive from
+/// the same stored floating-point value. The boolean is true when the caller's
+/// requested direction is the reciprocal of that canonical orientation.
+#[inline]
+fn canonical_orientation(from: Currency, to: Currency) -> (Currency, Currency, bool) {
+    if from <= to {
+        (from, to, false)
+    } else {
+        (to, from, true)
+    }
+}
+
 fn effective_snapshot_rate(
     global: &HashMap<Pair, f64>,
     pinned: &HashMap<Pair, f64>,
@@ -327,27 +341,19 @@ impl FxMatrix {
             });
         }
 
-        let (observed_direct_opt, observed_reciprocal_opt) =
-            self.read_observed_pair_bidir(from, to, on, policy);
-        if let Some(q) = observed_direct_opt {
+        if let Some(q) = self.read_observed(from, to, on, policy)? {
             let rate = validate_fx_rate(from, to, q.rate)?;
             return Ok(FxRateResult {
                 rate,
                 triangulated: q.triangulated,
             });
         }
-        if let Some(q_rev) = observed_reciprocal_opt {
-            return Ok(FxRateResult {
-                rate: reciprocal_rate_or_err(q_rev.rate, to, from)?,
-                triangulated: q_rev.triangulated,
-            });
-        }
 
-        // Try provider first
+        // The provider remains direction-sensitive; only cache storage is canonical.
         match self.provider.rate(from, to, on, policy) {
             Ok(rate) => {
                 let rate = validate_fx_rate(from, to, rate)?;
-                self.insert_observed_quote(from, to, on, policy, rate, false);
+                let rate = self.insert_observed_quote(from, to, on, policy, rate, false)?;
                 Ok(FxRateResult {
                     rate,
                     triangulated: false,
@@ -876,9 +882,8 @@ impl FxMatrix {
         let rate = a * b;
         let rate = validate_fx_rate(from, to, rate)?;
         // Cache the derived rate together with its triangulated provenance so
-        // repeat queries stamp the same metadata as the first lookup.
-        self.insert_observed_quote(from, to, on, policy, rate, true);
-        Ok(rate)
+        // repeat queries stamp the same metadata and value as the first lookup.
+        self.insert_observed_quote(from, to, on, policy, rate, true)
     }
 
     /// Insert an explicit provider quote
@@ -893,8 +898,14 @@ impl FxMatrix {
         quotes.insert(Pair(from, to), rate);
     }
 
-    /// Insert a query-sensitive provider-observed quote, recording whether the
-    /// rate was derived via triangulation.
+    /// Insert a provider-observed quote in the pair's canonical orientation.
+    ///
+    /// Returns the rate as future cache reads will serve it in the requested
+    /// direction, keeping cold and warm lookups bit-identical.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid input rate or an invalid reciprocal.
     fn insert_observed_quote(
         &self,
         from: Currency,
@@ -903,22 +914,30 @@ impl FxMatrix {
         policy: FxConversionPolicy,
         rate: f64,
         triangulated: bool,
-    ) {
-        let checked = validate_fx_rate(from, to, rate);
-        assert!(
-            checked.is_ok(),
-            "FxMatrix observed quote must be finite, positive (got {from}->{to}={rate})"
-        );
-        let mut quotes = self.observed_quotes.lock();
-        quotes.put(
+    ) -> crate::Result<f64> {
+        let rate = validate_fx_rate(from, to, rate)?;
+        let (base, quote, inverted) = canonical_orientation(from, to);
+        let (stored, served) = if inverted {
+            let stored = reciprocal_rate_or_err(rate, from, to)?;
+            let served = reciprocal_rate_or_err(stored, base, quote)?;
+            (stored, served)
+        } else {
+            (rate, rate)
+        };
+
+        self.observed_quotes.lock().put(
             QueryKey {
-                from,
-                to,
+                from: base,
+                to: quote,
                 on,
                 policy,
             },
-            ObservedQuote { rate, triangulated },
+            ObservedQuote {
+                rate: stored,
+                triangulated,
+            },
         );
+        Ok(served)
     }
 
     /// Insert an authoritative, non-evicting pinned quote (via `set_quote_on`).
@@ -1013,19 +1032,13 @@ impl FxMatrix {
             return reciprocal_rate_or_err(r_rev, to, from);
         }
         // 4) Provider-observed cache
-        let (observed_direct_opt, observed_reciprocal_opt) =
-            self.read_observed_pair_bidir(from, to, on, policy);
-        if let Some(q) = observed_direct_opt {
+        if let Some(q) = self.read_observed(from, to, on, policy)? {
             return validate_fx_rate(from, to, q.rate);
-        }
-        if let Some(q_rev) = observed_reciprocal_opt {
-            return reciprocal_rate_or_err(q_rev.rate, to, from);
         }
         // 5) Fetch from the provider
         let r = self.provider.rate(from, to, on, policy)?;
         let r = validate_fx_rate(from, to, r)?;
-        self.insert_observed_quote(from, to, on, policy, r, false);
-        Ok(r)
+        self.insert_observed_quote(from, to, on, policy, r, false)
     }
 
     /// Read direct and reciprocal cached quotes for a pair under a single lock.
@@ -1055,45 +1068,43 @@ impl FxMatrix {
         (direct, rev)
     }
 
-    /// Read provider-observed cached quotes scoped to a specific date/policy query.
+    /// Read the canonically stored observed quote in the requested direction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if resolving the reciprocal yields an invalid FX rate.
     #[inline]
-    fn read_observed_pair_bidir(
+    fn read_observed(
         &self,
         from: Currency,
         to: Currency,
         on: Date,
         policy: FxConversionPolicy,
-    ) -> (Option<ObservedQuote>, Option<ObservedQuote>) {
+    ) -> crate::Result<Option<ObservedQuote>> {
+        let (base, quote, inverted) = canonical_orientation(from, to);
+        let key = QueryKey {
+            from: base,
+            to: quote,
+            on,
+            policy,
+        };
         let mut quotes = self.observed_quotes.lock();
-        let direct_key = QueryKey {
-            from,
-            to,
-            on,
-            policy,
+        let Some(observed) = quotes.get(&key).copied() else {
+            return Ok(None);
         };
-        let rev_key = QueryKey {
-            from: to,
-            to: from,
-            on,
-            policy,
-        };
+        if !observed.rate.is_finite() || observed.rate <= 0.0 {
+            let _ = quotes.pop(&key);
+            return Ok(None);
+        }
+        drop(quotes);
 
-        let direct = quotes.get(&direct_key).copied().and_then(|q| {
-            if q.rate.is_finite() && q.rate > 0.0 {
-                Some(q)
-            } else {
-                let _ = quotes.pop(&direct_key);
-                None
-            }
-        });
-        let rev = quotes.get(&rev_key).copied().and_then(|q| {
-            if q.rate.is_finite() && q.rate > 0.0 {
-                Some(q)
-            } else {
-                let _ = quotes.pop(&rev_key);
-                None
-            }
-        });
-        (direct, rev)
+        if inverted {
+            Ok(Some(ObservedQuote {
+                rate: reciprocal_rate_or_err(observed.rate, base, quote)?,
+                triangulated: observed.triangulated,
+            }))
+        } else {
+            Ok(Some(observed))
+        }
     }
 }

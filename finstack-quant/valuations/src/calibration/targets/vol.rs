@@ -345,6 +345,7 @@ impl VolSurfaceTarget {
 
     /// Interpolate SABR parameters across the 1D expiry axis.
     #[allow(clippy::expect_used)] // Infallible after is_empty check
+    #[allow(clippy::unreachable)] // `params` is proven non-empty by the guards below
     fn interpolate_params(
         t: f64,
         params: &BTreeMap<OrderedF64, SABRParameters>,
@@ -419,7 +420,11 @@ Set params.expiry_extrapolation='clamp' to allow flat extrapolation.",
                 })
             }
             (Some((_, p)), _) | (_, Some((_, p))) => Ok(p.clone()),
-            _ => unreachable!(),
+            (None, None) => unreachable!(
+                "interpolate_params found no expiry neighbours for target t={t:.6}; `params` is \
+                 proven non-empty by the guards above, and every key is either <= t or > t, so \
+                 a non-empty map always yields at least one neighbour."
+            ),
         }
     }
 }

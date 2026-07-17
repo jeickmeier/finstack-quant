@@ -396,7 +396,10 @@ fn bench_interpolation(c: &mut Criterion) {
 
 ### Numeric Types
 
-- Use `F` type alias (`f64`) for consistency
+- Use `f64` directly for model internals (rates, curves, greeks, vols). There is
+  no `F` type alias in this workspace.
+- Use `Money` (Decimal-backed) for monetary amounts. See INVARIANTS.md §1 for the
+  per-crate Decimal/f64 convention.
 - Document precision requirements
 - Use tolerance checks for float comparisons
 

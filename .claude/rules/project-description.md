@@ -13,7 +13,7 @@ Finstack Quant is a deterministic, cross‑platform financial computation engine
 
 Finstack Quant aims to provide:
 
-- **Determinism**: Decimal by default; serial and parallel runs produce identical results.
+- **Determinism**: Decimal for monetary amounts, f64 for analytics/pricing internals (see INVARIANTS.md §1); serial and parallel runs produce identical results.
 - **Currency‑safety**: No implicit cross‑currency math; explicit FX policies stamped in results.
 - **Stable schemas**: Strict serde names for long‑lived pipelines and golden tests.
 - **Performance**: Vectorized and parallel execution without changing Decimal results.
@@ -22,52 +22,69 @@ Finstack Quant aims to provide:
 ## Architecture
 
 ```
-Workspace (meta-crate: finstack-quant)
+Workspace (umbrella crate: finstack-quant)
 ┌──────────────────────┐
-│ finstack-quant (meta) │  -> re‑exports subcrates via features
-└──────────┬───────────┘
+│ finstack-quant       │  -> unconditional re-exports of every domain crate
+└──────────┬───────────┘   (no cargo features; all-or-nothing)
            │
  ┌─────────┴──────────────────────────────────────────────────────────────────────────────────┐
- │ Subcrates (10 canonical crate domains)                                                      │
+ │ Domain crates (14 bound in Python/WASM)                                                     │
  │                                                                                             │
- │  core                 ← primitives: types, money/fx, time, expression engine, config        │
- │  analytics            ← risk metrics (sharpe, drawdown), portfolio analytics                 │
- │  valuations           ← cashflows, pricing, risk, period aggregation                        │
- │  statements           ← model graph (Value > Forecast > Formula), vectorized evaluation     │
- │  statements‑analytics ← credit covenants, alignment, reporting                              │
- │  scenarios            ← deterministic DSL + preview; adapters for market/statements         │
- │  portfolio            ← entities/positions/books; base‑currency rollups with FX             │
- │  margin               ← CSA specs, VM/IM calculators, netting                               │
- │  correlation          ← copulas, correlation matrices, factor structures                    │
- │  monte_carlo          ← simulation engine, time grids, RNG, path capture                    │
+ │  core                 ← primitives: money/fx, dates, market data, math, expr engine, config │
+ │  analytics            ← performance/risk statistics over numeric slices                     │
+ │  attribution          ← multi-period P&L attribution (waterfall, Taylor, metrics-based)     │
+ │  cashflows            ← schedule generation, accrual, currency-safe dated flows             │
+ │  covenants            ← covenant definition, evaluation, breach forecasting                 │
+ │  factor-model         ← factor primitives, matchers, credit calibration, covariance         │
+ │  features             ← vectorized panel feature transforms (bindings-facing leaf)          │
+ │  margin               ← CSA specs, VM/IM (SIMM, schedule, CCP), FRTB-SBA, SA-CCR, XVA       │
+ │  monte_carlo          ← processes, discretization, Philox RNG, payoffs, MC engine           │
+ │  valuations           ← instruments, pricing, models, calibration, metrics (mid-stack hub)  │
+ │  statements           ← model graph (Value > Forecast > Formula), evaluation                │
+ │  statements-analytics ← DCF, scenario sets, sensitivity, ECL, backtesting                   │
+ │  scenarios            ← deterministic shock/roll DSL + engine                               │
+ │  portfolio            ← positions/books; base-currency rollups (top of stack)               │
  │                                                                                             │
  │ Supporting crates                                                                           │
- │  io                   ← CSV/Parquet/Arrow interop (optional; schema‑stable)                 │
- │  finstack-quant-py          ← Python bindings (PyO3); src/bindings/ mirrors crate tree            │
- │  finstack-quant-wasm        ← WASM bindings (wasm‑bindgen); src/api/ + JS facade                  │
+ │  valuations/macros    ← FinancialBuilder + FocusedPricingOverrides derives                  │
+ │  test-utils           ← golden-test framework (dev-dependency only; not published surface)  │
+ │  finstack-quant-py    ← Python bindings (PyO3); src/bindings/ mirrors the 14 domains        │
+ │  finstack-quant-wasm  ← WASM bindings (wasm-bindgen); src/api/ + hand-written JS facade     │
  └─────────────────────────────────────────────────────────────────────────────────────────────┘
+
+Dependency direction (verified 2026-07-16):
+  core → {analytics, cashflows, covenants, features, margin, monte_carlo}
+       → factor-model → valuations → {attribution, statements}
+       → scenarios → portfolio
+  `valuations` is the true mid-stack hub: it consumes margin, monte_carlo,
+  factor-model, covenants, analytics and cashflows. Bindings depend on the Rust
+  crates; no Rust crate depends on a binding.
 ```
 
 ## Cross‑Cutting Invariants
 
 - **Determinism**: Decimal mode; stable ordering; parallel ≡ serial.
-- **Currency‑safety**: Arithmetic on `Amount` requires same currency; explicit FX conversions only.
+- **Currency‑safety**: Arithmetic on `Money` requires same currency; explicit FX conversions only.
 - **Rounding/Scale policy**: Global policy; active `RoundingContext` stamped into results metadata.
 - **FX policy visibility**: Applied conversion strategy recorded per layer (e.g., valuations, statements, portfolio).
 - **Serde stability**: Strict field names; unknown fields denied on inbound types.
-- **Time‑series standard**: Polars is the canonical DataFrame/Series surface (re‑exported from core).
+- **Time‑series standard**: `core::table` is the canonical serializable columnar surface. There is no Polars dependency; `valuations::results::dataframe` emits flat JSON for downstream pandas/Polars consumers.
 
 ## Core Responsibilities (by crate)
 
-- **core**: `Amount`, `Currency`, `Rate`; FX interfaces (`FxProvider`, `FxMatrix`); periods/calendars/day‑count; expression engine (with Polars lowering); validation; config (rounding/scale); errors; Polars re‑exports.
-- **analytics**: Risk metrics (`sharpe`, `max_drawdown`), portfolio analytics functions.
+- **core**: `Money`, `Currency`, `Rate`; FX interfaces (`FxProvider`, `FxMatrix`); periods/calendars/day-count; expression engine (DAG planning, scalar evaluation over `&[f64]`); validation; config (rounding/scale); errors; `table` columnar envelope.
+- **analytics**: Performance/risk statistics (`Performance` entry point, `beta`, `correlation`).
+- **attribution**: Multi-period P&L attribution, including waterfall, Taylor and metrics-based methods.
+- **cashflows**: Schedule generation, accrual calculations and currency-safe dated flows.
+- **covenants**: Covenant definitions, evaluation and breach forecasting.
+- **factor-model**: Factor primitives, matching, credit calibration and covariance structures.
+- **features**: Vectorized panel feature transforms.
 - **valuations**: Instrument cashflows, pricing, risk; currency‑preserving period aggregation; explicit FX collapse with policy stamping; private‑credit and real‑estate readiness.
 - **statements**: Deterministic period evaluation with precedence: **Value > Forecast > Formula**; corkscrew schedules; optional balance‑sheet articulation; long/wide DataFrame exports.
 - **statements‑analytics**: Credit covenant forecasting, alignment analysis, reporting utilities.
 - **scenarios**: DSL with quoting, selectors, and globs; deterministic preview/composition; phase‑ordered execution with precise cache invalidation.
 - **portfolio**: Positions/books, period alignment, and deterministic aggregation to base currency with explicit FX.
 - **margin**: CSA specifications, VM/IM calculators, netting sets, ISDA SIMM.
-- **correlation**: Gaussian copula, correlation matrices, factor model structures.
 - **monte_carlo**: Simulation engine, time grids, PhiloxRng, path capture, pricing evaluation.
 
 ## Language Bindings
@@ -75,7 +92,7 @@ Workspace (meta-crate: finstack-quant)
 ### Python (finstack-quant-py)
 
 - Wheels for major OSes; heavy compute releases the GIL; DataFrame‑friendly outputs.
-- Binding Rust code under `finstack-quant-py/src/bindings/` mirrors the 10 crate domains exactly.
+- Binding Rust code under `finstack-quant-py/src/bindings/` mirrors the 14 crate domains.
 - Names match Rust (e.g. `Date`, `sharpe`); no legacy aliases.
 
 ### WebAssembly (finstack-quant-wasm)
@@ -88,7 +105,7 @@ Workspace (meta-crate: finstack-quant)
 
 ### Performance
 
-- Vectorized execution via Polars pushdown; optional Rayon parallelism; caches for hot paths.
+- Rayon parallelism (unconditional on native targets; gated off for wasm32 via `cfg`); caches for hot paths.
 
 ### Safety & Standards
 
@@ -116,5 +133,5 @@ Workspace (meta-crate: finstack-quant)
 - Follow `.cursor/rules/[rust|python|wasm]/` standards; deny `unsafe`.
 - Keep cross‑currency math explicit via `FxProvider` and record policies in results.
 - Prefer compile‑time validation and strict deserialization; stable serde names.
-- Use Polars for time‑series; avoid ad‑hoc series types.
+- Use `core::table` for columnar interchange; avoid ad-hoc series types.
 - Ensure serial ≡ parallel in Decimal mode; stamp `RoundingContext` in all result envelopes.

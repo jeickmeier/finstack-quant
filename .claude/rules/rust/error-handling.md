@@ -16,13 +16,25 @@ This approach provides the best of both worlds: structured, specific error types
 
 ## 1. Library Crates: `thiserror`
 
-All library crates **MUST** define a crate-specific, public `Error` enum. This allows consumers of the library to match on specific error variants and handle them accordingly. `thiserror` is used to reduce the boilerplate required to implement `std::error::Error`.
+A library crate **SHOULD** reuse `finstack_quant_core::Error` unless it has a
+genuinely distinct failure domain.
+
+Today, six crates define their own root `Error`: `core` (the shared base itself),
+`valuations`, `portfolio`, `scenarios`, `statements` and `factor-model`. Eight
+deliberately reuse core's: `analytics`, `attribution`, `cashflows`, `covenants`,
+`features`, `margin`, `monte_carlo`, `statements-analytics`. That reuse is the
+default, not drift. (`test-utils` is a dev-only supporting crate, not one of the 14
+domain crates; it has a small `Error` of its own.)
+
+Introduce a new crate-level `Error` only when the crate's failure modes are not
+expressible as core variants, and say why in the PR description. `thiserror` is
+used where a crate-specific enum is justified.
 
 ### Guidelines
 
-- Each library crate (e.g., `finstack-quant/core`, `finstack-quant/valuations`) must have a `src/errors.rs` or similar module containing its public `Error` type.
-- The `Error` enum should be comprehensive, covering all possible failure modes for that crate.
-- When a library function calls a function from another library crate within our workspace, it should wrap the error in its own `Error` type.
+- Crates with a distinct error domain should expose a comprehensive public error type.
+- Crates reusing `finstack_quant_core::Error` should propagate it directly with `?`.
+- Do not add wrapper variants solely to hide another workspace crate's error type.
 
 ### Example: `finstack-quant/core/src/errors.rs`
 

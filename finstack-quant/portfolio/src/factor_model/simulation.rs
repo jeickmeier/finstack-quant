@@ -441,6 +441,10 @@ impl SimulationDecomposer {
             .collect()
     }
 
+    // The wildcard arm is structurally unreachable — `decompose` dispatches here
+    // only for Variance or Volatility. It cannot be removed because RiskMeasure
+    // is non-exhaustive and defined in another crate.
+    #[allow(clippy::unreachable)]
     fn variance_like_decomposition(
         covariance: &FactorCovarianceMatrix,
         scenarios: &ScenarioSet,
@@ -471,7 +475,12 @@ impl SimulationDecomposer {
                     (0.0, 0.0)
                 }
             }
-            _ => unreachable!(),
+            measure => unreachable!(
+                "SimulationDecomposer::variance_like_decomposition received \
+                 RiskMeasure::{measure:?}; its only caller dispatches here exclusively for \
+                 Variance or Volatility and routes tail measures elsewhere. A new \
+                 RiskMeasure variant must be handled in decompose first."
+            ),
         };
 
         let absolute: Vec<f64> = component_variances
@@ -500,6 +509,10 @@ impl SimulationDecomposer {
         }
     }
 
+    // The wildcard arm is structurally unreachable — `decompose` dispatches here
+    // only for VaR or ExpectedShortfall. It cannot be removed because RiskMeasure
+    // is non-exhaustive and defined in another crate.
+    #[allow(clippy::unreachable)]
     fn tail_risk_decomposition(
         &self,
         covariance: &FactorCovarianceMatrix,
@@ -554,7 +567,12 @@ impl SimulationDecomposer {
                     marginal_es.iter().map(|value| value * ratio).collect(),
                 )
             }
-            _ => unreachable!(),
+            measure => unreachable!(
+                "SimulationDecomposer::tail_risk_decomposition received \
+                 RiskMeasure::{measure:?}; its only caller dispatches here exclusively for \
+                 VaR or ExpectedShortfall and routes variance measures elsewhere. A new \
+                 RiskMeasure variant must be handled in decompose first."
+            ),
         };
 
         RiskDecomposition {
@@ -601,7 +619,12 @@ impl RiskDecomposer for SimulationDecomposer {
             RiskMeasure::VaR { confidence } | RiskMeasure::ExpectedShortfall { confidence } => {
                 self.tail_risk_decomposition(covariance, &scenarios, measure, *confidence)
             }
-            _ => unreachable!(),
+            other => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "SimulationDecomposer does not support RiskMeasure::{other:?}; \
+                     supported measures are Variance, Volatility, VaR and ExpectedShortfall"
+                )));
+            }
         };
 
         Ok(decomposition)

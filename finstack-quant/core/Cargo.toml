@@ -6,7 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Core primitives for Finstack Quant: Decimal-safe Amount/Currency/FX, dates and calendars, expression engine, and Polars-backed time series"
+description = "Core primitives for Finstack Quant: Decimal-backed Money/Currency/FX, dates and calendars, market data, math, and an expression engine"
 autobenches = false
 
 [dependencies]

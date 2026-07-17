@@ -372,6 +372,8 @@ impl ConvertibleBond {
     /// # Returns
     ///
     /// The adjusted conversion ratio, or `None` if neither ratio nor price is set.
+    // `AntiDilutionPolicy::None` is excluded by the `matches!` early return below.
+    #[allow(clippy::unreachable)]
     pub fn effective_conversion_ratio(&self) -> Option<f64> {
         let base_ratio = self.conversion_ratio()?;
 
@@ -392,7 +394,10 @@ impl ConvertibleBond {
 
         for event in &events {
             match &self.conversion.anti_dilution {
-                AntiDilutionPolicy::None => unreachable!(), // guarded above
+                AntiDilutionPolicy::None => unreachable!(
+                    "effective_conversion_ratio reached AntiDilutionPolicy::None; the \
+                     early return above excludes it"
+                ),
                 AntiDilutionPolicy::FullRatchet => {
                     // Full ratchet: conversion price drops to the new issue price
                     // if it is below the current conversion price.

@@ -118,14 +118,14 @@ profile = "finstack-strict"
 #
 # Lints that are correct for library code but wrong for tests/benches —
 # `clippy::panic`, `clippy::unwrap_used`, `clippy::expect_used`,
-# `clippy::unreachable`, `clippy::indexing_slicing`, `clippy::float_cmp` — are
-# deliberately NOT here. They are enforced as `#![deny]`/`#![warn]` attributes in
-# each crate's lib.rs, which scopes them to the library target only.
+# `clippy::unreachable`, `clippy::float_cmp` — are deliberately NOT here. They are
+# enforced as `#![deny]`/`#![warn]` attributes in each crate's lib.rs, which scopes
+# them to the library target only.
 #
-# `clippy::manual_let_else`, `clippy::match_same_arms`, `clippy::redundant_clone`,
-# `clippy::clone_on_ref_ptr`, and `clippy::match_wildcard_for_single_variants`
-# are at "warn" (target: deny) until the remaining legacy sites — mostly in
-# finstack-quant-valuations — are cleaned up.
+# `clippy::indexing_slicing` is NOT enforced anywhere today — see INVARIANTS.md §5.
+# The `cfg_attr(test, allow(indexing_slicing))` in each lib.rs is vestigial and
+# becomes load-bearing only if/when the lint is enabled.
+#
 [workspace.lints.rust]
 unsafe_code = "deny"            # project policy: no unsafe anywhere (libs use forbid)
 missing_docs = "deny"           # all public API must be documented (rustc lint, not clippy)
@@ -158,19 +158,19 @@ missing_docs = "deny"           # all public API must be documented (rustc lint,
 
 # ---- PERFORMANCE ----
 "map_clone" = "deny"
-"clone_on_ref_ptr" = "warn"  # target: deny — legacy sites remain (see header note)
+"clone_on_ref_ptr" = "deny"
 "unused_async" = "deny"
 "boxed_local" = "deny"
 
 # ---- CORRECTNESS ----
 "match_like_matches_macro" = "deny"
-"redundant_clone" = "warn"  # target: deny — legacy sites remain (see header note)
+"redundant_clone" = "deny"
 "redundant_field_names" = "deny"
-"match_same_arms" = "warn"  # target: deny — legacy sites remain (see header note)
-"match_wildcard_for_single_variants" = "warn"  # target: deny — legacy sites remain (see header note)
+"match_same_arms" = "deny"
+"match_wildcard_for_single_variants" = "deny"
 
 # ---- MODERN RUST STYLE ----
-"manual_let_else" = "warn"  # target: deny — legacy sites remain (see header note)
+"manual_let_else" = "deny"
 "manual_ok_or" = "deny"
 "manual_strip" = "deny"
 "manual_unwrap_or_default" = "deny"

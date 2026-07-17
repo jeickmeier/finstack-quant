@@ -536,6 +536,7 @@ fn warn_unsupported_quadrature_order(order: u8) {
     );
 }
 
+#[allow(clippy::unreachable)] // The compile-time default is one of the supported orders.
 fn default_quadrature() -> GaussHermiteQuadrature {
     GaussHermiteQuadrature::new(DEFAULT_QUADRATURE_ORDER as usize).unwrap_or_else(|_| {
         unreachable!("DEFAULT_QUADRATURE_ORDER must be a valid Gauss-Hermite order")

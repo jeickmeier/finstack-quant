@@ -77,7 +77,9 @@ impl CouponType {
 /// This type combines the coupon quote, payment behavior, and schedule
 /// conventions required to emit a fixed-rate leg.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(from = "RawFixedCouponSpec")]
+#[schemars(!from)]
+#[schemars(deny_unknown_fields)]
 pub struct FixedCouponSpec {
     /// Coupon settlement behavior: cash, PIK, or an explicit split of the
     /// coupon amount.
@@ -88,6 +90,33 @@ pub struct FixedCouponSpec {
     /// Accrual and payment schedule conventions.
     #[serde(flatten)]
     pub schedule: ScheduleParams,
+}
+
+#[derive(serde::Deserialize)]
+struct RawFixedCouponSpec {
+    #[serde(default)]
+    coupon_type: CouponType,
+    rate: Decimal,
+    #[serde(flatten)]
+    schedule: ScheduleParams,
+    #[serde(flatten)]
+    _unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
+}
+
+impl From<RawFixedCouponSpec> for FixedCouponSpec {
+    fn from(raw: RawFixedCouponSpec) -> Self {
+        let RawFixedCouponSpec {
+            coupon_type,
+            rate,
+            schedule,
+            _unknown_fields: _,
+        } = raw;
+        Self {
+            coupon_type,
+            rate,
+            schedule,
+        }
+    }
 }
 
 /// Compounding method for overnight rate indices (SOFR, ESTR, SONIA).
@@ -510,7 +539,9 @@ fn default_gearing_includes_spread() -> bool {
 /// Embeds the canonical `FloatingRateSpec` for rate projection and adds
 /// coupon-specific settings like payment frequency and PIK behavior.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(from = "RawFloatingCouponSpec")]
+#[schemars(!from)]
+#[schemars(deny_unknown_fields)]
 pub struct FloatingCouponSpec {
     /// Floating rate specification (contains index, spread, floor, cap, etc).
     pub rate_spec: FloatingRateSpec,
@@ -522,6 +553,33 @@ pub struct FloatingCouponSpec {
     /// Accrual and payment schedule conventions.
     #[serde(flatten)]
     pub schedule: ScheduleParams,
+}
+
+#[derive(serde::Deserialize)]
+struct RawFloatingCouponSpec {
+    rate_spec: FloatingRateSpec,
+    #[serde(default)]
+    coupon_type: CouponType,
+    #[serde(flatten)]
+    schedule: ScheduleParams,
+    #[serde(flatten)]
+    _unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
+}
+
+impl From<RawFloatingCouponSpec> for FloatingCouponSpec {
+    fn from(raw: RawFloatingCouponSpec) -> Self {
+        let RawFloatingCouponSpec {
+            rate_spec,
+            coupon_type,
+            schedule,
+            _unknown_fields: _,
+        } = raw;
+        Self {
+            rate_spec,
+            coupon_type,
+            schedule,
+        }
+    }
 }
 
 /// Step-up/step-down coupon specification.
@@ -561,7 +619,9 @@ pub struct FloatingCouponSpec {
 /// };
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(from = "RawStepUpCouponSpec")]
+#[schemars(!from)]
+#[schemars(deny_unknown_fields)]
 pub struct StepUpCouponSpec {
     /// Coupon type (Cash/PIK/Split).
     #[serde(default)]
@@ -582,6 +642,36 @@ pub struct StepUpCouponSpec {
     /// Accrual and payment schedule conventions.
     #[serde(flatten)]
     pub schedule: ScheduleParams,
+}
+
+#[derive(serde::Deserialize)]
+struct RawStepUpCouponSpec {
+    #[serde(default)]
+    coupon_type: CouponType,
+    initial_rate: Decimal,
+    step_schedule: Vec<(Date, Decimal)>,
+    #[serde(flatten)]
+    schedule: ScheduleParams,
+    #[serde(flatten)]
+    _unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
+}
+
+impl From<RawStepUpCouponSpec> for StepUpCouponSpec {
+    fn from(raw: RawStepUpCouponSpec) -> Self {
+        let RawStepUpCouponSpec {
+            coupon_type,
+            initial_rate,
+            step_schedule,
+            schedule,
+            _unknown_fields: _,
+        } = raw;
+        Self {
+            coupon_type,
+            initial_rate,
+            step_schedule,
+            schedule,
+        }
+    }
 }
 
 impl StepUpCouponSpec {

@@ -24,6 +24,19 @@ Rust is the single source of truth for all API topology and naming:
 - No convenience re‑exports at `finstack_quant.*` unless the Rust umbrella root exports them.
 - No legacy aliases or compatibility paths.
 
+Two documented deviations from strict crate-mirroring, both recorded in
+`parity_contract.toml`:
+
+- `finstack_quant.valuations.correlation` is a **merged** namespace. Most of it
+  mirrors `finstack_quant_valuations::correlation` (copulas, `CreditExposure`,
+  portfolio-loss simulation). The shared correlation-matrix helpers
+  (`validate_correlation_matrix`, `nearest_correlation_matrix`, `Error`) have their
+  canonical Rust home in `finstack_quant_analytics::correlation` and are re-exported
+  through `finstack_quant_valuations::correlation`. Python/WASM keep the historical
+  `valuations.correlation` namespace.
+- `reporting` is a pure-Python presentation layer (tear sheets, tables, charts) with
+  no Rust crate; it is explicitly exempt from crate-mirroring and has no WASM parity.
+
 See `docs/superpowers/specs/2026-04-10-rust-canonical-api-alignment-design.md` for the full spec.
 
 ## Module Layout and Registration
@@ -39,14 +52,18 @@ finstack-quant-py/src/
     mod.rs          # register_root() — registers all crate domains
     core/           # finstack_quant::core bindings
     analytics/      # finstack_quant::analytics bindings
+    attribution/
+    cashflows/
+    covenants/
+    factor_model/
+    features/
     margin/         # finstack_quant::margin bindings
+    monte_carlo/
     valuations/     # finstack_quant::valuations bindings
     statements/     # finstack_quant::statements bindings
     statements_analytics/
     portfolio/
     scenarios/
-    correlation/
-    monte_carlo/
   errors.rs         # centralized error mapping
 ```
 
@@ -78,12 +95,15 @@ Rules:
 
 ### Python Package Root
 
-`finstack-quant-py/finstack_quant/__init__.py` exposes only the 10 umbrella domains:
+`finstack-quant-py/finstack_quant/__init__.py` exposes the 14 Rust domains plus
+the pure-Python `reporting` namespace:
 
 ```python
 __all__ = (
-    "core", "analytics", "margin", "valuations", "statements",
-    "statements_analytics", "portfolio", "scenarios", "correlation", "monte_carlo",
+    "analytics", "attribution", "cashflows", "core", "covenants",
+    "factor_model", "features", "margin", "monte_carlo", "portfolio",
+    "reporting", "scenarios", "statements", "statements_analytics",
+    "valuations",
 )
 ```
 

@@ -119,3 +119,85 @@ fn tolerance_config_partial_deserialize_uses_defaults() {
     assert_eq!(tol.rate_epsilon, 1e-14);
     assert_eq!(tol.generic_epsilon, 1e-10); // default
 }
+
+/// A misspelled top-level config key must not silently select defaults.
+#[test]
+fn finstack_config_rejects_unknown_top_level_field() {
+    let json = r#"{
+        "rounding": {
+            "mode": "Bankers",
+            "ingest_scale": {"overrides": {}},
+            "output_scale": {"overrides": {}}
+        },
+        "roundingmode": "Floor"
+    }"#;
+    let error = serde_json::from_str::<FinstackConfig>(json)
+        .expect_err("a misspelled top-level key must be rejected");
+    assert!(
+        error.to_string().contains("roundingmode"),
+        "error must name the offending key: {error}"
+    );
+}
+
+#[test]
+fn rounding_policy_rejects_unknown_field() {
+    let json = r#"{
+        "rounding": {
+            "mode": "Bankers",
+            "ingest_scale": {"overrides": {}},
+            "output_scale": {"overrides": {}},
+            "output_scaal": {"overrides": {}}
+        }
+    }"#;
+    let error = serde_json::from_str::<FinstackConfig>(json)
+        .expect_err("a misspelled rounding-policy key must be rejected");
+    assert!(error.to_string().contains("output_scaal"));
+}
+
+#[test]
+fn tolerance_config_rejects_unknown_field() {
+    let json = r#"{
+        "rounding": {
+            "mode": "Bankers",
+            "ingest_scale": {"overrides": {}},
+            "output_scale": {"overrides": {}}
+        },
+        "tolerances": {"rate_epsilon": 1e-12, "rate_epsilonn": 1e-9}
+    }"#;
+    let error = serde_json::from_str::<FinstackConfig>(json)
+        .expect_err("a misspelled tolerance key must be rejected");
+    assert!(error.to_string().contains("rate_epsilonn"));
+}
+
+#[test]
+fn finstack_config_still_accepts_valid_minimal_config() {
+    let json = r#"{
+        "rounding": {
+            "mode": "Bankers",
+            "ingest_scale": {"overrides": {}},
+            "output_scale": {"overrides": {}}
+        }
+    }"#;
+    let config: serde_json::Result<FinstackConfig> = serde_json::from_str(json);
+    assert!(
+        config.is_ok(),
+        "minimal valid config must deserialize: {config:?}"
+    );
+}
+
+#[test]
+fn finstack_config_still_accepts_valid_extensions() {
+    let json = r#"{
+        "rounding": {
+            "mode": "Bankers",
+            "ingest_scale": {"overrides": {}},
+            "output_scale": {"overrides": {}}
+        },
+        "extensions": {"valuations.calibration.v2": {"anything": 1}}
+    }"#;
+    let config: serde_json::Result<FinstackConfig> = serde_json::from_str(json);
+    assert!(
+        config.is_ok(),
+        "valid extensions must deserialize: {config:?}"
+    );
+}

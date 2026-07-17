@@ -1201,6 +1201,7 @@ impl CovenantEngine {
         self.specs.iter().collect()
     }
 
+    #[allow(clippy::unreachable)] // Non-numeric covenant variants return before metric dispatch.
     fn evaluate_spec(
         &self,
         spec: &CovenantSpec,

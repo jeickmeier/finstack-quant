@@ -8,9 +8,6 @@ use crate::portfolio::Portfolio;
 use crate::types::PositionId;
 use finstack_quant_attribution::{
     attribute_pnl_metrics_based, attribute_pnl_parallel, default_attribution_metrics,
-    AttributionMethod, CorrelationsAttribution, CreditCurvesAttribution, ExecutionPolicy,
-    FxAttribution, InflationCurvesAttribution, PnlAttribution, RatesCurvesAttribution,
-    ScalarsAttribution, VolAttribution,
 };
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
@@ -20,6 +17,16 @@ use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::{fx::FxQuery, Money};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+
+/// Re-export attribution types appearing in this module's public API so direct
+/// portfolio consumers do not need a separate, version-sensitive dependency.
+pub use finstack_quant_attribution::{
+    AttributionFactor, AttributionMeta, AttributionMethod, CarryDetail, CorrelationsAttribution,
+    CreditCarryByLevel, CreditCarryDecomposition, CreditCurvesAttribution, CreditFactorAttribution,
+    CrossFactorDetail, ExecutionPolicy, FxAttribution, InflationCurvesAttribution, LevelCarry,
+    LevelPnl, ModelParamsAttribution, PnlAttribution, RatesCurvesAttribution, ScalarsAttribution,
+    SourceLine, TaylorAttributionConfig, VolAttribution,
+};
 
 /// Portfolio-level P&L attribution result.
 ///

@@ -16,6 +16,7 @@ include!("../../generated/holiday_generated.rs");
 /// arithmetic result silently spilled into the adjacent month, which could
 /// mark phantom holiday dates .
 #[inline]
+#[allow(clippy::unreachable)] // Gregorian month boundaries used below are valid by construction.
 pub(crate) fn nth_weekday_of_month(
     year: i32,
     month: Month,

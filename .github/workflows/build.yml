@@ -154,6 +154,9 @@ jobs:
           cache: true
           cache_save: false
 
+      - name: Install nightly Rust for public API docs
+        run: rustup toolchain install nightly --profile minimal
+
       - name: Install WASM dependencies
         run: npm ci --ignore-scripts
         working-directory: finstack-quant-wasm

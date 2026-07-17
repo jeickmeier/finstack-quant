@@ -62,6 +62,7 @@ use time::{Date, Duration, Month};
 /// let _ = easter_monday(2025);
 /// ```
 #[inline]
+#[allow(clippy::unreachable)] // The Gregorian Easter algorithm yields a valid March/April date.
 pub(crate) fn easter_monday(year: i32) -> Date {
     // Anonymous Gregorian algorithm
     let a = year % 19;

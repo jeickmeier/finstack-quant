@@ -25,7 +25,9 @@
 //! let matrix = FxMatrix::new(provider.clone());
 //! let date = Date::from_calendar_date(2024, Month::January, 5).expect("Valid date");
 //! let res = matrix.rate(FxQuery::new(Currency::EUR, Currency::USD, date)).expect("FX rate lookup should succeed");
-//! assert_eq!(res.rate, 1.1);
+//! // Observed quotes use a canonical storage orientation, so compare rates with
+//! // a numerical tolerance rather than relying on reciprocal round-trip equality.
+//! assert!((res.rate - 1.1).abs() < 1e-12);
 //! ```
 
 mod matrix;

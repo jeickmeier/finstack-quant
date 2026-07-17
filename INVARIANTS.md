@@ -122,9 +122,15 @@ Full remediation is tracked separately.
 
 ## 5. Error handling
 
-* Library code MUST NOT panic in the happy path. The workspace Clippy
-  profile denies `unwrap_used`, `expect_used`, `panic`, `unreachable`,
-  `indexing_slicing` in non-test code.
+* Library code MUST NOT panic in the happy path.
+* **Enforced by lint** (per-crate `lib.rs` attributes, library target only):
+  `unwrap_used`, `expect_used`, `panic`, `unreachable` — all `deny`.
+* **NOT yet enforced by lint**: `indexing_slicing`. As of 2026-07-17 there are
+  more than 1,000 indexing diagnostics in `finstack-quant-core` alone,
+  concentrated in numerical kernels. Enabling it is tracked as its own work
+  item; until then, indexing in library code is a convention, not a guarantee.
+  New code SHOULD prefer `.get()`/`.first()`/`split_at_checked` over bare `[i]`
+  in any path reachable from user input.
 * Fall-through `match _ => { ... }` arms on error enums are denied by
   `match_wild_err_arm` — list each variant explicitly so a new variant
   forces a code review.

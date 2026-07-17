@@ -25,6 +25,29 @@ impl FxProvider for StaticFx {
     }
 }
 
+struct ReciprocalFx {
+    eur_usd: f64,
+}
+
+impl FxProvider for ReciprocalFx {
+    fn rate(
+        &self,
+        from: Currency,
+        to: Currency,
+        _on: Date,
+        _policy: FxConversionPolicy,
+    ) -> finstack_quant_core::Result<f64> {
+        match (from, to) {
+            (Currency::EUR, Currency::USD) => Ok(self.eur_usd),
+            (Currency::USD, Currency::EUR) => Ok(self.eur_usd.recip()),
+            _ => Err(finstack_quant_core::InputError::NotFound {
+                id: format!("FX:{from}->{to}"),
+            }
+            .into()),
+        }
+    }
+}
+
 #[test]
 fn explicit_convert_and_add() {
     let usd = Money::new(100.0, Currency::USD);
@@ -960,4 +983,59 @@ fn reciprocal_of_subnormal_rate_is_rejected() {
         result.is_err(),
         "infinite reciprocal must be rejected, got {result:?}"
     );
+}
+
+/// Provider-observed rates must not depend on which pair direction warmed the
+/// bounded LRU first. Assertions are bit-exact because a tolerance would hide
+/// the one-ulp nondeterminism this test guards.
+#[test]
+fn fx_observed_cache_is_order_independent_across_directions() {
+    let date = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+    let rate = 31.528_877_897_691_935;
+
+    let first = FxMatrix::new(Arc::new(ReciprocalFx { eur_usd: rate }));
+    let _ = first
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, date))
+        .unwrap();
+    let first_forward = first
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, date))
+        .unwrap();
+    let first_reverse = first
+        .rate(FxQuery::new(Currency::USD, Currency::EUR, date))
+        .unwrap();
+
+    let second = FxMatrix::new(Arc::new(ReciprocalFx { eur_usd: rate }));
+    let _ = second
+        .rate(FxQuery::new(Currency::USD, Currency::EUR, date))
+        .unwrap();
+    let second_forward = second
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, date))
+        .unwrap();
+    let second_reverse = second
+        .rate(FxQuery::new(Currency::USD, Currency::EUR, date))
+        .unwrap();
+
+    assert_eq!(first_forward.rate, second_forward.rate);
+    assert_eq!(first_reverse.rate, second_reverse.rate);
+    assert_eq!(first_forward.triangulated, second_forward.triangulated);
+    assert_eq!(first_reverse.triangulated, second_reverse.triangulated);
+}
+
+/// A cold provider lookup must return exactly what its subsequent cache hit
+/// returns in both pair directions.
+#[test]
+fn fx_cold_and_warm_lookups_agree_bit_exactly() {
+    let date = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+    let rate = 31.528_877_897_691_935;
+
+    for (from, to) in [
+        (Currency::EUR, Currency::USD),
+        (Currency::USD, Currency::EUR),
+    ] {
+        let matrix = FxMatrix::new(Arc::new(ReciprocalFx { eur_usd: rate }));
+        let cold = matrix.rate(FxQuery::new(from, to, date)).unwrap();
+        let warm = matrix.rate(FxQuery::new(from, to, date)).unwrap();
+        assert_eq!(cold.rate, warm.rate, "{from}->{to}");
+        assert_eq!(cold.triangulated, warm.triangulated, "{from}->{to}");
+    }
 }

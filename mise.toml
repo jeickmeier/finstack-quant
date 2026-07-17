@@ -158,8 +158,12 @@ run = [
 ]
 
 [tasks.rust-lint]
-description = "Lint Rust (fmt --check + clippy, check-only)"
-run = ["cargo fmt --all -- --check", "cargo clippy --all-targets"]
+# `-D warnings` matches the CI pre-commit hook (.pre-commit-config.yaml) so that a
+# green local run implies a green CI run. Note this operates on `default-members`,
+# which excludes finstack-quant-py and finstack-quant-wasm — lint those with
+# `cargo clippy -p finstack-quant-py --all-targets` / `-p finstack-quant-wasm`.
+description = "Lint Rust (fmt --check + clippy with -D warnings, check-only)"
+run = ["cargo fmt --all -- --check", "cargo clippy --all-targets -- -D warnings"]
 
 [tasks.rust-audit]
 description = "Audit Rust dependencies via cargo-deny"

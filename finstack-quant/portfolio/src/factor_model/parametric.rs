@@ -228,7 +228,12 @@ impl ParametricDecomposer {
                     (0.0, 0.0)
                 }
             }
-            _ => unreachable!(),
+            other => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "ParametricDecomposer does not support RiskMeasure::{other:?}; \
+                     supported measures are Variance, Volatility, VaR and ExpectedShortfall"
+                )));
+            }
         };
 
         Ok(scaled)
@@ -369,6 +374,34 @@ mod tests {
         )?;
 
         Ok((sensitivities, covariance))
+    }
+
+    /// All four measures supported today must scale without panicking.
+    #[test]
+    fn scale_for_measure_supports_all_current_risk_measures() {
+        for measure in [
+            RiskMeasure::Variance,
+            RiskMeasure::Volatility,
+            RiskMeasure::VaR { confidence: 0.99 },
+            RiskMeasure::ExpectedShortfall { confidence: 0.975 },
+        ] {
+            let scaled = ParametricDecomposer::scale_for_measure(&measure, 4.0);
+            assert!(
+                scaled.is_ok(),
+                "supported measure {measure:?} must not error"
+            );
+        }
+    }
+
+    /// An out-of-range confidence must be a typed error, not a panic.
+    ///
+    /// `RiskMeasure` is non-exhaustive and defined in another crate, so future
+    /// variants must also degrade to an error rather than reaching a panic.
+    #[test]
+    fn scale_for_measure_rejects_invalid_confidence_without_panicking() {
+        let measure = RiskMeasure::VaR { confidence: 1.5 };
+        let result = ParametricDecomposer::scale_for_measure(&measure, 4.0);
+        assert!(result.is_err(), "confidence outside (0.5, 1) must error");
     }
 
     #[test]

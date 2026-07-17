@@ -22,19 +22,23 @@ globs:
 ```
 finstack-quant-wasm/
 ├── src/
-│   ├── lib.rs            # mod api; pub use api::*;
-│   ├── api/              # NEW: crate-namespaced binding tree
+│   ├── lib.rs            # pub mod api; no glob re-export
+│   ├── api/              # crate-namespaced binding tree
 │   │   ├── mod.rs        # pub mod declarations for each crate domain
-│   │   ├── core_ns/      # core bindings (named core_ns to avoid shadowing std::core)
+│   │   ├── core/         # core bindings (no glob re-export, so no std::core shadowing)
 │   │   ├── analytics/
+│   │   ├── attribution/
+│   │   ├── cashflows/
+│   │   ├── covenants/
+│   │   ├── factor_model/
+│   │   ├── features/
 │   │   ├── margin/
+│   │   ├── monte_carlo/
 │   │   ├── valuations/
 │   │   ├── statements/
 │   │   ├── statements_analytics/
 │   │   ├── portfolio/
 │   │   ├── scenarios/
-│   │   ├── correlation/
-│   │   └── monte_carlo/
 │   └── utils.rs          # panic hook, etc.
 ├── index.js              # hand-written JS facade (public entrypoint)
 ├── index.d.ts            # TypeScript declarations for facade
@@ -53,7 +57,9 @@ finstack-quant-wasm/
 
 - `finstack-quant-wasm/src/lib.rs` exports only the `api` tree. Old flat re-exports are removed.
 - `finstack-quant-wasm/src/api/mod.rs` declares `pub mod` for each crate domain. No `pub use *` glob re-exports (they are unnecessary for wasm-bindgen and `pub use core::*` shadows `std::core`).
-- The `core` Rust module is named `core_ns` on disk to avoid shadowing Rust's `core` prelude.
+- The `core` Rust module is named `core` (`src/api/mod.rs`). `src/lib.rs` declares
+  `pub mod api;` and deliberately does **not** `pub use api::*` — without the glob
+  there is no `std::core` shadowing, so no `core_ns` rename is needed.
 - `pkg/finstack_quant_wasm.js` is an internal generated artifact, NOT the public API.
 - The published entrypoint is `index.js`, a hand-written facade that groups raw bindgen exports into crate namespaces.
 

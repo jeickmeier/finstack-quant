@@ -173,6 +173,7 @@ enum CouponProfileMode {
     InverseFloater { leverage: f64 },
 }
 
+#[allow(clippy::unreachable)] // Each mode initializes exactly one of prev or leverage.
 fn coupon_profile(
     mode: CouponProfileMode,
     fixed_rate: f64,

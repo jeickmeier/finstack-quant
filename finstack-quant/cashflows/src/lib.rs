@@ -3,12 +3,14 @@
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
+#![deny(clippy::unreachable)]
 #![cfg_attr(
     test,
     allow(
         clippy::unwrap_used,
         clippy::expect_used,
         clippy::panic,
+        clippy::unreachable,
         clippy::indexing_slicing,
         clippy::float_cmp,
     )

@@ -28,8 +28,10 @@ pub(crate) mod example_constants {
 // Shared utilities and helper functions
 pub(crate) mod helpers;
 pub(crate) mod numeric;
-// `deny_unknown_fields` enforcement for flatten-based instrument structs.
-pub(crate) mod serde_guard;
+/// Re-export core's serde guard under the historical internal path.
+pub(crate) mod serde_guard {
+    pub(crate) use finstack_quant_core::serde_guard::UnknownFieldGuard;
+}
 // Shared volatility override/surface resolution.
 pub(crate) mod two_clock;
 pub(crate) mod validation;

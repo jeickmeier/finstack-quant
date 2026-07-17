@@ -75,6 +75,7 @@ pub(super) fn evaluate_barrier_touch(
 /// # Returns
 ///
 /// Present value of the option at time 0
+#[allow(clippy::unreachable)] // const_df is present exactly when no custom generator is set.
 pub fn price_recombining_tree<V: TreeValuator>(inputs: RecombiningInputs<'_, V>) -> Result<f64> {
     let dt = inputs.time_to_maturity / inputs.steps as f64;
 

@@ -3,12 +3,14 @@
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
+#![deny(clippy::unreachable)]
 #![cfg_attr(
     test,
     allow(
         clippy::unwrap_used,
         clippy::expect_used,
         clippy::panic,
+        clippy::unreachable,
         clippy::indexing_slicing,
         clippy::float_cmp,
     )
@@ -24,6 +26,7 @@
 //! |--------------------|-----------------------------------|
 //! | `core`             | [`finstack_quant_core`]                 |
 //! | `analytics`        | [`finstack_quant_analytics`]            |
+//! | `attribution`      | [`finstack_quant_attribution`]          |
 //! | `cashflows`        | [`finstack_quant_cashflows`]            |
 //! | `covenants`        | [`finstack_quant_covenants`]            |
 //! | `factor_model`     | [`finstack_quant_factor_model`]         |
@@ -37,6 +40,7 @@
 //! | `scenarios`        | [`finstack_quant_scenarios`]            |
 
 pub use finstack_quant_analytics as analytics;
+pub use finstack_quant_attribution as attribution;
 pub use finstack_quant_cashflows as cashflows;
 pub use finstack_quant_core as core;
 pub use finstack_quant_covenants as covenants;

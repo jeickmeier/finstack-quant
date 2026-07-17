@@ -110,6 +110,7 @@ where
 /// # Panics
 /// Never panics for valid Gregorian years supported by the `time` crate.
 #[must_use]
+#[allow(clippy::unreachable)] // Every Gregorian month has at least four Wednesdays.
 pub fn third_wednesday(month: Month, year: i32) -> Date {
     nth_weekday_of_month(year, month, Weekday::Wednesday, 3)
         .unwrap_or_else(|| unreachable!("every month has at least four Wednesdays"))
@@ -282,6 +283,7 @@ pub fn imm_option_expiry(month: Month, year: i32) -> Date {
 /// # Panics
 /// Never panics for valid Gregorian years supported by the `time` crate.
 #[must_use]
+#[allow(clippy::unreachable)] // Every Gregorian month has at least four Fridays.
 pub fn third_friday(month: Month, year: i32) -> Date {
     nth_weekday_of_month(year, month, Weekday::Friday, 3)
         .unwrap_or_else(|| unreachable!("every month has at least four Fridays"))
@@ -396,6 +398,7 @@ const fn estimated_sifma_business_day_index(class: SifmaSettlementClass) -> u8 {
     }
 }
 
+#[allow(clippy::unreachable)] // Gregorian month construction and weekday counts are invariant.
 fn estimated_sifma_base_date(month: Month, year: i32, class: SifmaSettlementClass) -> Date {
     let calendar = super::calendar_by_id("sifma");
     let target = estimated_sifma_business_day_index(class);

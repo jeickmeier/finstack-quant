@@ -11,6 +11,14 @@ stability contract and schema-version policy.
 
 ## [Unreleased]
 
+### Changed (breaking, wire format)
+
+- `FinstackConfig`, `RoundingPolicy` and `CurrencyScalePolicy` now reject unknown
+  fields during deserialization, and so does the `tolerances` object. Misspelled
+  keys previously fell back silently; config JSON/dicts with stray keys now
+  raise `ValueError` in Python and throw in JavaScript. Remove unrecognized keys
+  or move extension data under a namespaced `{crate}.{domain}.v{N}` entry.
+
 ### Fixed
 - **`finstack-quant-statements` — swap net interest receipts were booked as
   interest expense.** A two-leg instrument whose legs net to a receipt (a

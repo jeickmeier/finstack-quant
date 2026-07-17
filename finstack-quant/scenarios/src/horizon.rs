@@ -63,8 +63,7 @@ use std::sync::Arc;
 
 use finstack_quant_attribution::{
     attribute_pnl_metrics_based, attribute_pnl_parallel, attribute_pnl_taylor,
-    attribute_pnl_waterfall, default_attribution_metrics, AttributionFactor, AttributionMethod,
-    ExecutionPolicy, PnlAttribution,
+    attribute_pnl_waterfall, default_attribution_metrics, ExecutionPolicy,
 };
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::dates::Date;
@@ -75,6 +74,10 @@ use finstack_quant_valuations::instruments::PricingOptions;
 
 use crate::engine::ApplicationReport;
 use crate::{ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec};
+
+/// Re-export attribution types appearing in horizon-analysis public APIs so
+/// direct scenarios consumers do not need a separate attribution dependency.
+pub use finstack_quant_attribution::{AttributionFactor, AttributionMethod, PnlAttribution};
 
 fn horizon_unsupported_instrument_operation(scenario: &ScenarioSpec) -> Option<&'static str> {
     scenario.operations.iter().find_map(|op| match op {
