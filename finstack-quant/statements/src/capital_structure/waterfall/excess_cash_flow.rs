@@ -36,6 +36,7 @@ pub(super) fn calculate_ecf_sweep(
     state: &CapitalStructureState,
     deduct_scheduled_principal: bool,
     deduct_fees: bool,
+    warnings: &mut Vec<crate::evaluator::EvalWarning>,
 ) -> Result<Money> {
     if !(0.0..=1.0).contains(&ecf_spec.sweep_percentage) {
         return Err(crate::error::Error::capital_structure(format!(
@@ -44,31 +45,31 @@ pub(super) fn calculate_ecf_sweep(
         )));
     }
 
-    let ebitda = eval_value_or_formula(context, &ecf_spec.ebitda_node)?;
+    let ebitda = eval_value_or_formula(context, &ecf_spec.ebitda_node, warnings)?;
 
     let taxes = ecf_spec
         .taxes_node
         .as_ref()
-        .map(|expr| eval_value_or_formula(context, expr))
+        .map(|expr| eval_value_or_formula(context, expr, warnings))
         .transpose()?
         .unwrap_or(0.0);
 
     let capex = ecf_spec
         .capex_node
         .as_ref()
-        .map(|expr| eval_value_or_formula(context, expr))
+        .map(|expr| eval_value_or_formula(context, expr, warnings))
         .transpose()?
         .unwrap_or(0.0);
 
     let wc_change = ecf_spec
         .working_capital_node
         .as_ref()
-        .map(|expr| eval_value_or_formula(context, expr))
+        .map(|expr| eval_value_or_formula(context, expr, warnings))
         .transpose()?
         .unwrap_or(0.0);
 
     let cash_interest = if let Some(ref expr) = ecf_spec.cash_interest_node {
-        eval_value_or_formula(context, expr)?
+        eval_value_or_formula(context, expr, warnings)?
     } else {
         contractual_flows
             .iter()

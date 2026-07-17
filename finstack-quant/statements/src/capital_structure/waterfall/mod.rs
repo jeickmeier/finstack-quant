@@ -111,13 +111,34 @@ pub struct WaterfallPeriodResult {
 /// creditor) and `NaN < threshold` is `false` (a PIK toggle that never fires).
 /// Both surface only as misleading downstream shortfall warnings. Fail here
 /// instead, naming the expression that produced the value.
-fn eval_value_or_formula(context: &EvaluationContext, expr: &str) -> Result<f64> {
+///
+/// Warnings raised while evaluating an inline expression are appended to
+/// `warnings`. The expression runs against a scratch copy of the context, so
+/// without this they would be dropped with the copy: an expression that guards
+/// its own bad arithmetic (`coalesce(a / 0, 0)`) returns a finite value and
+/// would otherwise hide the division entirely.
+fn eval_value_or_formula(
+    context: &EvaluationContext,
+    expr: &str,
+    warnings: &mut Vec<EvalWarning>,
+) -> Result<f64> {
     let value = if let Ok(value) = context.get_value(expr) {
         value
     } else {
         let compiled = crate::dsl::parse_and_compile(expr)?;
         let mut scratch = context.clone();
-        crate::evaluator::formula::evaluate_formula(&compiled, &mut scratch, None)?
+        // The scratch inherits the context's existing warnings; only those
+        // added by this evaluation are new.
+        let inherited = scratch.warnings.len();
+        // Attribute warnings to the expression itself. The formula evaluator
+        // only records a warning when it has a node id to attach it to, so
+        // passing `None` here silently suppressed them at the source; an
+        // inline waterfall expression has no node id of its own, and the
+        // expression text is the most useful thing to name in a diagnostic.
+        let result =
+            crate::evaluator::formula::evaluate_formula(&compiled, &mut scratch, Some(expr));
+        warnings.extend(scratch.warnings.drain(inherited..));
+        result?
     };
 
     if !value.is_finite() {
@@ -275,7 +296,7 @@ pub fn execute_waterfall(
     let (pik_enable, pik_targets): (Option<bool>, Option<HashSet<String>>) =
         if let Some(pik_spec) = &waterfall_spec.pik_toggle {
             (
-                Some(evaluate_pik_toggle(context, pik_spec)?),
+                Some(evaluate_pik_toggle(context, pik_spec, &mut warnings)?),
                 pik_spec
                     .target_instrument_ids
                     .as_ref()
@@ -320,12 +341,13 @@ pub fn execute_waterfall(
             state,
             deduct_scheduled_principal,
             deduct_fees,
+            &mut warnings,
         )?
     } else {
         Money::new(0.0, cash_currency)
     };
     let available_cash = if let Some(available_cash_node) = &waterfall_spec.available_cash_node {
-        let cash = eval_value_or_formula(context, available_cash_node)?;
+        let cash = eval_value_or_formula(context, available_cash_node, &mut warnings)?;
         Some(money_from_expr(
             cash.max(0.0),
             cash_currency,
@@ -1053,6 +1075,117 @@ mod tests {
         assert!(
             msg.contains("1e30") || msg.contains("Decimal") || msg.contains("representable"),
             "error must describe the out-of-range amount, not an unrelated spec problem: {msg}"
+        );
+    }
+
+    /// Warnings raised inside an inline waterfall expression must survive.
+    ///
+    /// The expression runs against a scratch copy of the context, and the copy
+    /// (with its warnings) was dropped. A guarded expression returns a finite
+    /// value, so the bad arithmetic inside it left no trace at all.
+    #[test]
+    fn inline_expression_warnings_are_not_dropped() {
+        let period = PeriodId::quarter(2025, 1);
+        let context = build_context(period, &[("cash", 500.0)]);
+
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
+        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        contractual_flows.insert("TL-1".to_string(), breakdown);
+
+        let mut state = CapitalStructureState::new();
+        state
+            .opening_balances
+            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+
+        let waterfall = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::Equity,
+            ],
+            // Guarded: the division by zero is swallowed by `coalesce`, so the
+            // node evaluates to a perfectly finite 500 and the finiteness check
+            // cannot catch it. Only the warning reveals the broken arithmetic.
+            available_cash_node: Some("coalesce(cash / 0, cash)".into()),
+            ecf_sweep: None,
+            pik_toggle: None,
+        };
+
+        let result = execute_waterfall(
+            &period,
+            &context,
+            &waterfall,
+            &mut state,
+            &contractual_flows,
+        )
+        .expect("a guarded expression still evaluates");
+
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| matches!(w, EvalWarning::DivisionByZero { .. })),
+            "the division inside the inline expression must be surfaced: {:?}",
+            result.warnings
+        );
+    }
+
+    /// An internally inconsistent input breakdown must error, not panic.
+    ///
+    /// `waterfall_currency` compares only `interest_expense_cash` *across*
+    /// instruments, so a breakdown whose other legs carry a different currency
+    /// passed the entry check and reached `Money`'s asserting `AddAssign`,
+    /// aborting evaluation. `execute_waterfall` is public and
+    /// `CashflowBreakdown`'s fields are `pub`, so this is reachable input.
+    #[test]
+    fn inconsistent_breakdown_currency_errors_rather_than_panicking() {
+        let period = PeriodId::quarter(2025, 1);
+        let context = build_context(period, &[("cash", 1_000.0)]);
+
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
+        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        // A caller-built breakdown with one leg in the wrong currency.
+        breakdown.interest_expense_pik = Money::new(50.0, Currency::EUR);
+        contractual_flows.insert("TL-1".to_string(), breakdown);
+
+        let mut state = CapitalStructureState::new();
+        state
+            .opening_balances
+            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+
+        // A firing PIK toggle reaches `interest_expense_pik += moved` in Step
+        // 4b, where `Money`'s asserting `AddAssign` aborts on the mismatch.
+        let waterfall = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: Some("cash".into()),
+            ecf_sweep: None,
+            pik_toggle: Some(PikToggleSpec {
+                liquidity_metric: "cash".into(),
+                threshold: 1_000_000.0, // always below => PIK on
+                min_periods_in_pik: 0,
+                target_instrument_ids: Some(vec!["TL-1".to_string()]),
+            }),
+        };
+
+        let err = execute_waterfall(
+            &period,
+            &context,
+            &waterfall,
+            &mut state,
+            &contractual_flows,
+        )
+        .expect_err("an inconsistent breakdown must error rather than panic");
+        assert!(
+            err.to_string().contains("Currency mismatch"),
+            "expected a currency-mismatch diagnostic naming the field: {err}"
         );
     }
 

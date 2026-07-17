@@ -14,8 +14,9 @@ use super::eval_value_or_formula;
 pub(super) fn evaluate_pik_toggle(
     context: &EvaluationContext,
     pik_spec: &PikToggleSpec,
+    warnings: &mut Vec<crate::evaluator::EvalWarning>,
 ) -> Result<bool> {
-    let metric_value = eval_value_or_formula(context, &pik_spec.liquidity_metric)?;
+    let metric_value = eval_value_or_formula(context, &pik_spec.liquidity_metric, warnings)?;
     Ok(metric_value < pik_spec.threshold)
 }
 

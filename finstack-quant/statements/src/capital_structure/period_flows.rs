@@ -187,7 +187,18 @@ pub fn calculate_period_flows(
         // clamp basis (so legitimate PIK compounding is never frozen by the
         // clamp) while still accruing interest on the full stateful balance:
         // scale = clamp((opening - toggled_pik) / scheduled) + toggled_pik / scheduled.
-        let pik_increment = toggled_pik_capitalized.amount().max(0.0);
+        //
+        // The increment is capped at the opening balance because it is only a
+        // *component* of that balance. Once sweeps repay the debt below the
+        // cumulative toggled PIK, an uncapped `pik_part` makes the
+        // `adjusted_opening` floor bind and leaves `scale = pik / scheduled`,
+        // which exceeds `opening / scheduled` — interest would accrue on
+        // principal the borrower no longer owes, compounding every period.
+        // With the cap, an unclamped scale is exactly `opening / scheduled`.
+        let pik_increment = toggled_pik_capitalized
+            .amount()
+            .max(0.0)
+            .min(opening_balance.amount().max(0.0));
         let adjusted_opening = (opening_balance.amount() - pik_increment).max(0.0);
         let adjusted_ratio = adjusted_opening / scheduled_opening.amount();
         let pik_part = pik_increment / scheduled_opening.amount();
@@ -594,6 +605,112 @@ mod tests {
                 .amount(),
             -13_000.0,
             "net interest expense is negative when the hedge is in the money"
+        );
+    }
+
+    /// Once sweeps push the balance below the cumulative toggled PIK, the
+    /// scale must still track the real balance.
+    ///
+    /// `scale = clamp((opening - pik)/sched) + pik/sched` assumes the toggled
+    /// PIK increment is still embedded in the balance. With `adjusted_opening`
+    /// floored at zero but `pik_part` uncapped, a large paydown made the floor
+    /// bind and left `scale = pik/sched`, which exceeds `opening/sched` —
+    /// interest accrued on a balance the borrower no longer owes, compounding
+    /// every period.
+    #[test]
+    fn toggled_pik_scale_never_exceeds_the_real_opening_balance() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
+        let period = Period {
+            id: PeriodId::quarter(2025, 1),
+            start,
+            end,
+            is_actual: false,
+        };
+
+        // Scheduled notional 1M with a 20k coupon.
+        let instrument = SignedFlowInstrument {
+            schedule: test_schedule(
+                vec![CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::new(20_000.0, Currency::USD),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                )],
+                1_000_000.0,
+                start,
+            ),
+        };
+
+        let market_ctx = MarketContext::new();
+        // Sweeps have cut the balance to 50k, while 160k of PIK was toggled
+        // earlier in the instrument's life.
+        let (breakdown, _, _, _) = calculate_period_flows(
+            &instrument,
+            &period,
+            Money::new(50_000.0, Currency::USD),
+            Money::new(160_000.0, Currency::USD),
+            &market_ctx,
+            start,
+        )
+        .expect("period flow calculation should succeed");
+
+        // scale must be opening/scheduled = 50k/1M = 0.05 => 20k * 0.05 = 1k.
+        // The uncapped pik_part gave 0.16 => 3.2k, a 3.2x overstatement.
+        assert!(
+            (breakdown.interest_expense_cash.amount() - 1_000.0).abs() < 1e-6,
+            "interest must scale to the real 50k balance, got {}",
+            breakdown.interest_expense_cash.amount()
+        );
+    }
+
+    /// PIK compounding must still be honoured when the balance genuinely
+    /// contains the capitalized increment (the case the exclusion exists for).
+    #[test]
+    fn toggled_pik_still_accrues_on_the_capitalized_balance() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
+        let period = Period {
+            id: PeriodId::quarter(2025, 1),
+            start,
+            end,
+            is_actual: false,
+        };
+
+        let instrument = SignedFlowInstrument {
+            schedule: test_schedule(
+                vec![CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::new(20_000.0, Currency::USD),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                )],
+                1_000_000.0,
+                start,
+            ),
+        };
+
+        let market_ctx = MarketContext::new();
+        // Balance grew to 1.1M because 100k of PIK capitalized: interest must
+        // accrue on the full 1.1M (scale 1.1), not be frozen by the clamp.
+        let (breakdown, _, _, _) = calculate_period_flows(
+            &instrument,
+            &period,
+            Money::new(1_100_000.0, Currency::USD),
+            Money::new(100_000.0, Currency::USD),
+            &market_ctx,
+            start,
+        )
+        .expect("period flow calculation should succeed");
+
+        assert!(
+            (breakdown.interest_expense_cash.amount() - 22_000.0).abs() < 1e-6,
+            "PIK-grown balance must accrue on 1.1M (20k * 1.1 = 22k), got {}",
+            breakdown.interest_expense_cash.amount()
         );
     }
 
