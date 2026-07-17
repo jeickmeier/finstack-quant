@@ -290,6 +290,22 @@ impl CashFlowSchedule {
         schedule
     }
 
+    /// Construct and economically validate a schedule from classified flows.
+    ///
+    /// Use this constructor for untrusted or externally supplied state. Internal
+    /// builders that establish invariants while emitting flows may continue to
+    /// use [`Self::from_parts`].
+    pub fn try_from_parts(
+        flows: Vec<CashFlow>,
+        notional: Notional,
+        day_count: DayCount,
+        meta: CashFlowMeta,
+    ) -> finstack_quant_core::Result<Self> {
+        let schedule = Self::from_parts(flows, notional, day_count, meta);
+        schedule.validate()?;
+        Ok(schedule)
+    }
+
     /// Return the canonical ordered cashflows.
     #[must_use]
     pub fn get_flows(&self) -> &[CashFlow] {
@@ -563,12 +579,12 @@ impl CashFlowSchedule {
     ///     CashFlow::new(date, None, Money::new(50_000.0, Currency::USD), CFKind::Fixed, 0.5, Some(0.05)),
     ///     CashFlow::new(date, None, Money::new(100_000.0, Currency::USD), CFKind::Amortization, 0.0, None),
     /// ];
-    /// let schedule = CashFlowSchedule {
+    /// let schedule = CashFlowSchedule::from_parts(
     ///     flows,
-    ///     notional: Notional::par(1_000_000.0, Currency::USD),
-    ///     day_count: DayCount::Act365F,
-    ///     meta: CashFlowMeta::default(),
-    /// };
+    ///     Notional::par(1_000_000.0, Currency::USD),
+    ///     DayCount::Act365F,
+    ///     CashFlowMeta::default(),
+    /// );
     ///
     /// let coupons: Vec<_> = schedule.coupons().collect();
     /// assert_eq!(coupons.len(), 1);
@@ -1167,6 +1183,43 @@ mod tests {
         assert_eq!(schedule.flows[1].kind, CFKind::Amortization);
         assert_eq!(schedule.flows[2].kind, CFKind::PrePayment);
         assert_eq!(schedule.flows[3].kind, CFKind::Recovery);
+    }
+
+    #[test]
+    fn try_from_parts_rejects_over_amortization() {
+        let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+
+        let result = CashFlowSchedule::try_from_parts(
+            vec![flow(date, 150.0, CFKind::Amortization)],
+            Notional::par(100.0, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta::default(),
+        );
+
+        assert!(
+            result.is_err(),
+            "validated construction must reject over-amortization"
+        );
+    }
+
+    #[test]
+    fn serde_is_structural_and_requires_explicit_economic_validation() {
+        let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+        let unvalidated = CashFlowSchedule::from_parts(
+            vec![flow(date, 150.0, CFKind::Amortization)],
+            Notional::par(100.0, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta::default(),
+        );
+        let wire = serde_json::to_value(unvalidated).expect("serialize schedule");
+
+        let decoded: CashFlowSchedule =
+            serde_json::from_value(wire).expect("serde validates structure only");
+
+        assert!(
+            decoded.validate().is_err(),
+            "economic validation remains explicit for direct serde consumers",
+        );
     }
 
     #[test]

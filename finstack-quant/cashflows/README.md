@@ -85,7 +85,7 @@ let schedule = CashFlowSchedule::builder()
     .fixed_cf(fixed_spec)
     .build(None)?;
 
-assert!(!schedule.flows.is_empty());
+assert!(!schedule.get_flows().is_empty());
 # Ok(())
 # }
 ```
@@ -191,7 +191,7 @@ let schedule = CashFlowSchedule::builder()
     .floating_cf(float_spec)
     .build(None)?;
 
-assert!(!schedule.flows.is_empty());
+assert!(!schedule.get_flows().is_empty());
 # Ok(())
 # }
 ```
@@ -302,11 +302,11 @@ fn credit_adjusted_periodized_pv(
 }
 ```
 
-### `CashflowProvider`
+### `CashflowScheduleSource` and `CashflowProvider`
 
 ```rust,no_run
 use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
-use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -319,12 +319,12 @@ struct FixedBondLike {
     maturity: Date,
 }
 
-impl CashflowProvider for FixedBondLike {
+impl CashflowScheduleSource for FixedBondLike {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _curves: &MarketContext,
         _as_of: Date,
@@ -347,8 +347,8 @@ impl CashflowProvider for FixedBondLike {
 }
 ```
 
-Implement `cashflow_schedule`; `dated_cashflows` derives holder-view `(Date, Money)`
-pairs from that schedule.
+Implement `raw_cashflow_schedule`. The blanket `CashflowProvider` implementation
+applies public normalization and derives holder-view `(Date, Money)` pairs.
 
 ### Inspect and merge schedules
 

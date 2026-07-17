@@ -230,7 +230,7 @@ impl CashflowScheduleBuildSpec {
     /// let spec: CashflowScheduleBuildSpec = serde_json::from_str(spec_json).expect("valid spec");
     /// let schedule = spec.build(None)?;
     /// assert_eq!(
-    ///     schedule.meta.issue_date,
+    ///     schedule.get_meta().issue_date,
     ///     Some(Date::from_calendar_date(2024, Month::August, 31).expect("valid date"))
     /// );
     /// # Ok::<(), finstack_quant_core::Error>(())

@@ -422,6 +422,7 @@ pub fn get_unitless_scalar_strict(
 pub(crate) struct MetricBuildOptions {
     pub(crate) cfg: Option<Arc<FinstackConfig>>,
     pub(crate) market_history: Option<Arc<MarketHistory>>,
+    pub(crate) metric_registry: Option<Arc<crate::metrics::MetricRegistry>>,
     pub(crate) pricing_model: Option<crate::pricer::ModelKey>,
     pub(crate) pricer_registry: Option<Arc<crate::pricer::PricerRegistry>>,
 }
@@ -437,6 +438,7 @@ pub(crate) fn build_with_metrics_dyn(
     let MetricBuildOptions {
         cfg,
         market_history,
+        metric_registry,
         pricing_model,
         pricer_registry,
     } = options;
@@ -465,7 +467,10 @@ pub(crate) fn build_with_metrics_dyn(
     let market_ref: Arc<MarketContext> = Arc::clone(&context.curves);
     instrument.seed_metric_context(&mut context, market_ref.as_ref(), as_of);
 
-    let registry = standard_registry();
+    let registry = match metric_registry.as_deref() {
+        Some(registry) => registry,
+        None => standard_registry(),
+    };
     let instrument_type = instrument.key();
     let applicable: Vec<MetricId> = metrics
         .iter()

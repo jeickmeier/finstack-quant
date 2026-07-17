@@ -48,6 +48,7 @@ pub trait CashflowScheduleSource: Send + Sync {
     /// use finstack_quant_core::market_data::context::MarketContext;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_cashflows::builder::CashFlowSchedule;
+    /// use finstack_quant_cashflows::primitives::CFKind;
     /// use finstack_quant_cashflows::{CashflowScheduleSource, schedule_from_dated_flows, ScheduleBuildOpts};
     ///
     /// struct MyInstrument {
@@ -195,7 +196,7 @@ fn resolve_notional(hint: Option<Money>, fallback_currency: Currency) -> Notiona
 ///     DayCount::Thirty360,
 ///     ScheduleBuildOpts::default(),
 /// );
-/// assert_eq!(schedule.day_count, DayCount::Thirty360);
+/// assert_eq!(schedule.get_day_count(), DayCount::Thirty360);
 /// ```
 pub fn schedule_from_dated_flows(
     flows: DatedFlows,
@@ -255,10 +256,10 @@ pub fn schedule_from_dated_flows(
 ///         ..Default::default()
 ///     },
 /// );
-/// assert_eq!(schedule.flows.len(), 2);
+/// assert_eq!(schedule.get_flows().len(), 2);
 /// // Original CFKind values are preserved.
-/// assert_eq!(schedule.flows[0].kind, CFKind::Fixed);
-/// assert_eq!(schedule.flows[1].kind, CFKind::PIK);
+/// assert_eq!(schedule.get_flows()[0].kind, CFKind::Fixed);
+/// assert_eq!(schedule.get_flows()[1].kind, CFKind::PIK);
 /// ```
 pub fn schedule_from_classified_flows(
     flows: Vec<CashFlow>,

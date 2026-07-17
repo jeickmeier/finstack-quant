@@ -140,7 +140,7 @@ impl CashFlowBuilder {
     ///     .build(None)
     ///     .expect("fixed schedule builds");
     ///
-    /// assert!(!schedule.flows.is_empty());
+    /// assert!(!schedule.get_flows().is_empty());
     /// ```
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn fixed_cf(&mut self, spec: FixedCouponSpec) -> &mut Self {
@@ -579,7 +579,7 @@ impl CashFlowBuilder {
     ///     .fixed_to_float(switch, fixed_win, float_spec, CouponType::Cash)
     ///     .build(None)?;
     ///
-    /// assert!(schedule.flows.len() > 0);
+    /// assert!(!schedule.get_flows().is_empty());
     /// # Ok(())
     /// # }
     /// ```

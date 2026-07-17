@@ -78,6 +78,7 @@ pub trait Pricer: Send + Sync {
 #[derive(Clone, Default)]
 pub struct PricerRegistry {
     pricers: BTreeMap<PricerKey, Arc<dyn Pricer>>,
+    metric_registry: Option<Arc<crate::metrics::MetricRegistry>>,
     /// Keys that were registered more than once via [`PricerRegistry::register`].
     ///
     /// `register` rejects duplicates without mutation. Recording the offending
@@ -117,6 +118,30 @@ impl PricerRegistry {
     /// [`standard_registry()`](super::standard_registry).
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Attach the metric registry used by canonical pricing requests.
+    ///
+    /// When no override is attached, pricing uses
+    /// [`crate::metrics::standard_registry`].
+    pub fn with_metric_registry(
+        mut self,
+        metric_registry: Arc<crate::metrics::MetricRegistry>,
+    ) -> Self {
+        self.metric_registry = Some(metric_registry);
+        self
+    }
+
+    /// Return the metric registry used by canonical pricing requests.
+    pub fn get_metric_registry(&self) -> &crate::metrics::MetricRegistry {
+        match self.metric_registry.as_deref() {
+            Some(registry) => registry,
+            None => crate::metrics::standard_registry(),
+        }
+    }
+
+    pub(crate) fn metric_registry_override(&self) -> Option<Arc<crate::metrics::MetricRegistry>> {
+        self.metric_registry.clone()
     }
 
     /// Register a pricer for a specific (instrument type, model) combination.
@@ -313,7 +338,6 @@ impl PricerRegistry {
         request: PricingRequest<'_>,
         shared: SharedPricingInputs,
     ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
-        use crate::metrics::MetricId;
         let PricingRequest {
             instrument,
             model,
@@ -354,114 +378,17 @@ impl PricerRegistry {
             return Ok(base_result);
         }
 
-        // --- Metrics pipeline ---
-        let market_arc = shared.market.unwrap_or_else(|| Arc::new(market.clone()));
-        let err_ctx = PricingErrorContext::from_instrument(instrument).model(model);
-        let needs_split = model != ModelKey::Discounting;
-        let pricer_registry = shared.registry.unwrap_or_else(|| Arc::new(self.clone()));
-
-        if !needs_split || !instrument.has_custom_metrics_equivalent() {
-            let mut enriched = crate::instruments::common_impl::helpers::build_with_metrics_dyn(
-                std::sync::Arc::from(instrument.clone_box()),
-                Arc::clone(&market_arc),
-                as_of,
-                base_result.value,
-                metrics,
-                crate::instruments::common_impl::helpers::MetricBuildOptions {
-                    cfg,
-                    market_history,
-                    pricing_model: Some(model),
-                    pricer_registry: Some(Arc::clone(&pricer_registry)),
-                },
-            )
-            .map_err(|e| {
-                PricingError::model_failure_with_context(e.to_string(), err_ctx.clone())
-            })?;
-
-            for (k, v) in base_result.measures {
-                enriched.measures.insert(k, v);
-            }
-            return Ok(enriched);
-        }
-
-        // Non-discounting model: split metrics into spread (cash-equivalent
-        // cashflows) and risk (actual cashflows).
-        let spread_ids = MetricId::SPREAD_EQUIVALENT_METRICS;
-
-        let mut spread_metrics = Vec::with_capacity(metrics.len());
-        let mut risk_metrics = Vec::with_capacity(metrics.len());
-        for m in metrics {
-            if spread_ids.contains(m) {
-                spread_metrics.push(m.clone());
-            } else {
-                risk_metrics.push(m.clone());
-            }
-        }
-
-        // Spread metrics: cash-equivalent cashflows via metrics_equivalent()
-        let mut result = if !spread_metrics.is_empty() {
-            let spread_instrument = Arc::from(instrument.metrics_equivalent());
-            crate::instruments::common_impl::helpers::build_with_metrics_dyn(
-                spread_instrument,
-                Arc::clone(&market_arc),
-                as_of,
-                base_result.value,
-                &spread_metrics,
-                crate::instruments::common_impl::helpers::MetricBuildOptions {
-                    cfg: cfg.clone(),
-                    market_history: market_history.clone(),
-                    ..crate::instruments::common_impl::helpers::MetricBuildOptions::default()
-                },
-            )
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), err_ctx.clone()))?
-        } else {
-            // Risk-only path: `build_with_metrics_dyn` (above) applies scenario
-            // overrides internally, but this `stamped_with_meta` branch builds
-            // the result from the raw `base_result.value` directly. Apply the
-            // overrides here so the documented contract ("scenario price
-            // overrides are always applied to the returned value") holds on the
-            // risk-only non-discounting path too.
-            let value = crate::instruments::common_impl::helpers::apply_scenario_value(
-                instrument,
-                base_result.value,
-            );
-            crate::results::ValuationResult::stamped_with_meta(
-                instrument.id(),
-                as_of,
-                value,
-                base_result.meta.clone(),
-            )
-        };
-
-        // Risk metrics: actual instrument cashflows
-        if !risk_metrics.is_empty() {
-            let risk_result = crate::instruments::common_impl::helpers::build_with_metrics_dyn(
-                std::sync::Arc::from(instrument.clone_box()),
-                market_arc,
-                as_of,
-                base_result.value,
-                &risk_metrics,
-                crate::instruments::common_impl::helpers::MetricBuildOptions {
-                    cfg,
-                    market_history,
-                    pricing_model: Some(model),
-                    pricer_registry: Some(pricer_registry),
-                },
-            )
-            .map_err(|e| {
-                PricingError::model_failure_with_context(e.to_string(), err_ctx.clone())
-            })?;
-            for (k, v) in risk_result.measures {
-                result.measures.insert(k, v);
-            }
-        }
-
-        // Model-specific measures from price_dyn take priority
-        for (k, v) in base_result.measures {
-            result.measures.insert(k, v);
-        }
-
-        Ok(result)
+        super::enrichment::enrich(super::enrichment::EnrichmentRequest {
+            instrument,
+            model,
+            market: shared.market.unwrap_or_else(|| Arc::new(market.clone())),
+            as_of,
+            metrics,
+            cfg,
+            market_history,
+            pricer_registry: shared.registry.unwrap_or_else(|| Arc::new(self.clone())),
+            base_result,
+        })
     }
 
     /// Price an instrument as an unrounded scalar for internal risk repricing.
@@ -1244,6 +1171,53 @@ mod tests {
             Some(0.0),
             "custom registry must also drive metric repricing, not just base PV",
         );
+    }
+
+    #[test]
+    fn instrument_can_compose_custom_pricer_and_metric_registries() {
+        use crate::instruments::common_impl::traits::Instrument;
+        use crate::metrics::{MetricCalculator, MetricContext, MetricId, MetricRegistry};
+        use std::sync::Arc;
+        use time::macros::date;
+
+        struct ConstantDv01;
+
+        impl MetricCalculator for ConstantDv01 {
+            fn calculate(&self, _context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+                Ok(42.0)
+            }
+        }
+
+        let as_of = date!(2025 - 01 - 15);
+        let bond = fixed_test_bond();
+        let market = finstack_quant_core::market_data::context::MarketContext::new()
+            .insert(flat_discount_curve("USD-TREASURY", as_of));
+        let mut pricers = PricerRegistry::new();
+        pricers.register(
+            InstrumentType::Bond,
+            ModelKey::Discounting,
+            FixedBondPricer { amount: 990.0 },
+        );
+        let mut metrics = MetricRegistry::new();
+        metrics.register_metric(
+            MetricId::Dv01,
+            Arc::new(ConstantDv01),
+            &[InstrumentType::Bond],
+        );
+
+        let result = bond
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Dv01],
+                crate::instruments::PricingOptions::default()
+                    .with_registry(Arc::new(pricers))
+                    .with_metric_registry(Arc::new(metrics)),
+            )
+            .expect("custom pricer and metric registries should compose");
+
+        assert_eq!(result.value.amount(), 990.0);
+        assert_eq!(result.measures.get(&MetricId::Dv01), Some(&42.0));
     }
 
     #[test]

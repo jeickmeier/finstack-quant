@@ -967,6 +967,161 @@ public = [
 ]
 
 # ---------------------------------------------------------------------------
+# WASM portfolio subset
+#
+# Python tracks the full portfolio surface via [crates.portfolio.symbols].
+# WASM exposes a JSON-first subset through finstack-quant-wasm/exports/portfolio.js
+# with camelCase facade names. Built-handle and Market-reuse helpers are WASM-only.
+# ---------------------------------------------------------------------------
+[wasm_portfolio_subset]
+rust_module_root = "../finstack-quant-wasm/src/api/portfolio/"
+js_export_file   = "../finstack-quant-wasm/exports/portfolio.js"
+
+root_exports = [
+  "Portfolio",
+  "parsePortfolioSpec",
+  "brinsonFachler",
+  "carinoLink",
+  "twrrModifiedDietz",
+  "twrrLinked",
+  "mwrXirr",
+  "buildPortfolioFromSpec",
+  "portfolioResultTotalValue",
+  "portfolioResultGetMetric",
+  "aggregateMetrics",
+  "valuePortfolio",
+  "valuePortfolioBuilt",
+  "aggregateFullCashflows",
+  "aggregateFullCashflowsBuilt",
+  "applyScenarioAndRevalue",
+  "applyScenarioAndRevalueBuilt",
+  "optimizePortfolio",
+  "replayPortfolio",
+  "parametricVarDecomposition",
+  "parametricEsDecomposition",
+  "historicalVarDecomposition",
+  "evaluateRiskBudget",
+  "computeFactorSensitivities",
+  "computeFactorSensitivitiesWithMarket",
+  "computePnlProfiles",
+  "computePnlProfilesWithMarket",
+  "decomposeFactorRisk",
+  "rollEffectiveSpread",
+  "amihudIlliquidity",
+  "daysToLiquidate",
+  "liquidityTier",
+  "lvarBangia",
+  "almgrenChrissImpact",
+  "kyleLambda",
+]
+
+python_only = [
+  "CandidatePosition",
+  "Constraint",
+  "CreditVolReport",
+  "DecompositionConfig",
+  "FactorAssignmentReport",
+  "FactorContribution",
+  "FactorContributionDelta",
+  "FactorPnlProfile",
+  "FactorRiskDecomposition",
+  "FinstackFxError",
+  "FinstackOptimizationError",
+  "FinstackValuationError",
+  "Inequality",
+  "LevelVolContribution",
+  "MetricExpr",
+  "MissingMetricPolicy",
+  "Objective",
+  "OptimizationStatus",
+  "PerPositionMetric",
+  "PortfolioAttribution",
+  "PortfolioCashflows",
+  "PortfolioError",
+  "PortfolioMetrics",
+  "PortfolioOptimizationResult",
+  "PortfolioOptimizationSpec",
+  "PortfolioResult",
+  "PortfolioValuation",
+  "PositionAssignment",
+  "PositionBudgetEntry",
+  "PositionEsContribution",
+  "PositionFactorContribution",
+  "PositionFilter",
+  "PositionResidualContribution",
+  "PositionRiskDecomposition",
+  "PositionVarContribution",
+  "PositionVolContribution",
+  "RiskBudgetResult",
+  "RiskDecomposition",
+  "SensitivityMatrix",
+  "StressAttribution",
+  "StressPositionEntry",
+  "StressResult",
+  "TailScenarioBreakdown",
+  "TradeDirection",
+  "TradeSpec",
+  "TradeType",
+  "TradeUniverse",
+  "UnmatchedEntry",
+  "VolHorizon",
+  "WeightingScheme",
+  "WhatIfResult",
+  "allocate_weights",
+  "attribute_portfolio_pnl",
+  "build_credit_vol_report",
+  "build_stress_attribution",
+  "evaluate_risk_budget_typed",
+  "factor_stress",
+  "historical_var_decomposition_typed",
+  "optimize_portfolio_typed",
+  "parametric_var_decomposition_typed",
+  "position_component_var",
+  "position_what_if",
+  "validate_allocation_json",
+]
+
+wasm_only = [
+  "valuePortfolioBuilt",
+  "aggregateFullCashflowsBuilt",
+  "applyScenarioAndRevalueBuilt",
+  "computeFactorSensitivitiesWithMarket",
+  "computePnlProfilesWithMarket",
+]
+
+[wasm_portfolio_subset.python_js_map]
+Portfolio = "Portfolio"
+parse_portfolio_spec = "parsePortfolioSpec"
+brinson_fachler = "brinsonFachler"
+carino_link = "carinoLink"
+twrr_modified_dietz = "twrrModifiedDietz"
+twrr_linked = "twrrLinked"
+mwr_xirr = "mwrXirr"
+build_portfolio_from_spec = "buildPortfolioFromSpec"
+portfolio_result_total_value = "portfolioResultTotalValue"
+portfolio_result_get_metric = "portfolioResultGetMetric"
+aggregate_metrics = "aggregateMetrics"
+value_portfolio = "valuePortfolio"
+aggregate_full_cashflows = "aggregateFullCashflows"
+apply_scenario_and_revalue = "applyScenarioAndRevalue"
+optimize_portfolio = "optimizePortfolio"
+replay_portfolio = "replayPortfolio"
+parametric_var_decomposition = "parametricVarDecomposition"
+parametric_es_decomposition = "parametricEsDecomposition"
+historical_var_decomposition = "historicalVarDecomposition"
+evaluate_risk_budget = "evaluateRiskBudget"
+compute_factor_sensitivities = "computeFactorSensitivities"
+compute_pnl_profiles = "computePnlProfiles"
+decompose_factor_risk = "decomposeFactorRisk"
+roll_effective_spread = "rollEffectiveSpread"
+amihud_illiquidity = "amihudIlliquidity"
+days_to_liquidate = "daysToLiquidate"
+liquidity_tier = "liquidityTier"
+lvar_bangia = "lvarBangia"
+almgren_chriss_impact = "almgrenChrissImpact"
+kyle_lambda = "kyleLambda"
+
+# ---------------------------------------------------------------------------
 # reporting  →  finstack_quant.reporting  (pure-Python, no Rust counterpart)
 # ---------------------------------------------------------------------------
 [crates.reporting]

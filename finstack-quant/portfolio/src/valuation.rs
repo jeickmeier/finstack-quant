@@ -10,6 +10,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::results::ValuationResult;
 use indexmap::IndexMap;
@@ -388,10 +389,10 @@ pub struct PortfolioValuationOptions {
 pub fn value_portfolio(
     portfolio: &Portfolio,
     market: &MarketContext,
-    _config: &FinstackConfig,
+    config: &FinstackConfig,
     options: &PortfolioValuationOptions,
 ) -> Result<PortfolioValuation> {
-    value_portfolio_at(portfolio, market, _config, options, portfolio.as_of)
+    value_portfolio_at(portfolio, market, config, options, portfolio.as_of)
 }
 
 /// Value a portfolio at an explicit valuation date.
@@ -402,12 +403,12 @@ pub fn value_portfolio(
 pub fn value_portfolio_at(
     portfolio: &Portfolio,
     market: &MarketContext,
-    _config: &FinstackConfig,
+    config: &FinstackConfig,
     options: &PortfolioValuationOptions,
     as_of: Date,
 ) -> Result<PortfolioValuation> {
     if !should_value_portfolio_use_parallel(portfolio.positions.len()) {
-        return value_portfolio_serial_at(portfolio, market, _config, options, as_of);
+        return value_portfolio_serial_at(portfolio, market, config, options, as_of);
     }
 
     let metrics = resolve_metrics(options);
@@ -424,6 +425,7 @@ pub fn value_portfolio_at(
                 as_of,
                 &metrics,
                 options.strict_risk,
+                config,
             )
         })
         .collect::<Result<Vec<_>>>()?;
@@ -445,7 +447,7 @@ pub fn value_portfolio_at(
 pub(crate) fn value_portfolio_serial_at(
     portfolio: &Portfolio,
     market: &MarketContext,
-    _config: &FinstackConfig,
+    config: &FinstackConfig,
     options: &PortfolioValuationOptions,
     as_of: Date,
 ) -> Result<PortfolioValuation> {
@@ -462,6 +464,7 @@ pub(crate) fn value_portfolio_serial_at(
                 as_of,
                 &metrics,
                 options.strict_risk,
+                config,
             )
         })
         .collect::<Result<Vec<_>>>()?;
@@ -479,6 +482,7 @@ fn value_single_position(
     as_of: Date,
     metrics: &[MetricId],
     strict_risk: bool,
+    config: &FinstackConfig,
 ) -> Result<PositionValue> {
     // Price the instrument with metrics.
     //
@@ -493,7 +497,7 @@ fn value_single_position(
                     market,
                     as_of,
                     metrics,
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    PricingOptions::default().with_config(config),
                 )
                 .map_err(|e: finstack_quant_core::Error| Error::ValuationError {
                     position_id: position.position_id.clone(),
@@ -507,7 +511,7 @@ fn value_single_position(
             market,
             as_of,
             metrics,
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            PricingOptions::default().with_config(config),
         ) {
             Ok(result) => (result, true, None),
             Err(metric_error) => {
@@ -526,7 +530,12 @@ fn value_single_position(
                     },
                 )?;
                 (
-                    ValuationResult::stamped(position.instrument.id(), as_of, value),
+                    ValuationResult::stamped_with_config(
+                        position.instrument.id(),
+                        as_of,
+                        value,
+                        config,
+                    ),
                     false,
                     Some(metric_error.to_string()),
                 )
@@ -562,6 +571,7 @@ fn reuse_prior_or_value_position(
     portfolio: &Portfolio,
     metrics: &[MetricId],
     strict_risk: bool,
+    config: &FinstackConfig,
     prior: &PortfolioValuation,
 ) -> Result<PositionValue> {
     if let Some(pv) = prior.position_values.get(position.position_id.as_str()) {
@@ -574,6 +584,7 @@ fn reuse_prior_or_value_position(
             portfolio.as_of,
             metrics,
             strict_risk,
+            config,
         )
     }
 }
@@ -663,6 +674,7 @@ pub fn revalue_affected(
                     portfolio,
                     &metrics,
                     options.strict_risk,
+                    config,
                     prior,
                 )
             })
@@ -697,6 +709,7 @@ pub fn revalue_affected(
                         portfolio.as_of,
                         &metrics,
                         options.strict_risk,
+                        config,
                     )
                 } else {
                     reuse_prior_or_value_position(
@@ -705,6 +718,7 @@ pub fn revalue_affected(
                         portfolio,
                         &metrics,
                         options.strict_risk,
+                        config,
                         prior,
                     )
                 }
@@ -730,6 +744,7 @@ pub fn revalue_affected(
                     portfolio.as_of,
                     &metrics,
                     options.strict_risk,
+                    config,
                 )?);
             } else {
                 values.push(reuse_prior_or_value_position(
@@ -738,6 +753,7 @@ pub fn revalue_affected(
                     portfolio,
                     &metrics,
                     options.strict_risk,
+                    config,
                     prior,
                 )?);
             }

@@ -3,7 +3,8 @@
 // =============================================================================
 
 use crate::metrics::risk::MarketHistory;
-use crate::pricer::{ModelKey, PricerRegistry};
+use crate::metrics::MetricRegistry;
+use crate::pricer::{shared_standard_registry, ModelKey, PricerRegistry};
 use finstack_quant_core::config::FinstackConfig;
 use std::sync::Arc;
 
@@ -89,6 +90,23 @@ impl PricingOptions {
     /// Set an explicit pricer registry override for this pricing request.
     pub fn with_registry(mut self, registry: Arc<PricerRegistry>) -> Self {
         self.registry = Some(registry);
+        self
+    }
+
+    /// Set an explicit metric registry for this pricing request.
+    ///
+    /// The metric registry is attached to the selected pricer registry so the
+    /// existing [`Self::registry`] field remains the single dispatch bundle.
+    /// Call [`Self::with_registry`] first when overriding both registries; a
+    /// later `with_registry` call replaces the complete registry selection.
+    pub fn with_metric_registry(mut self, metric_registry: Arc<MetricRegistry>) -> Self {
+        let registry = self
+            .registry
+            .as_deref()
+            .cloned()
+            .unwrap_or_else(|| shared_standard_registry().as_ref().clone())
+            .with_metric_registry(metric_registry);
+        self.registry = Some(Arc::new(registry));
         self
     }
 }

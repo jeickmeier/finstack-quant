@@ -8,6 +8,15 @@
 //! - [`Instrument`]: Unified trait combining identity, attributes, and pricing methods
 //! - [`Attributes`]: Tag-based metadata for categorization and scenario selection
 //!
+//! # Extension policy
+//!
+//! [`Instrument`] is a stable compatibility surface used behind
+//! `Arc<dyn Instrument>` throughout portfolio and binding code. New optional
+//! capabilities should therefore use focused provider traits, following
+//! [`OptionGreeksProvider`], rather than adding more required methods to
+//! `Instrument`. Removing existing `Instrument` methods is reserved for a
+//! breaking release with a downstream migration plan.
+//!
 //! # Examples
 //!
 //! ## Basic Instrument Usage

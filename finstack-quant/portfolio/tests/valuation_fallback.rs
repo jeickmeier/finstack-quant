@@ -128,3 +128,54 @@ fn valuation_falls_back_when_metrics_fail() {
         "expected the underlying metrics failure to be surfaced"
     );
 }
+
+#[test]
+fn fallback_valuation_stamps_caller_config() {
+    let as_of = base_date();
+    let inst = Arc::new(ValueOnlyInstrument::new("VO_CONFIG", Currency::USD, 123.45));
+    let pos = Position::new(
+        "P_CONFIG",
+        "E_CONFIG",
+        "VO_CONFIG",
+        inst,
+        1.0,
+        PositionUnit::Units,
+    )
+    .expect("position");
+    let portfolio = PortfolioBuilder::new("PF_CONFIG")
+        .base_ccy(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("E_CONFIG"))
+        .position(pos)
+        .build()
+        .expect("portfolio");
+    let mut config = FinstackConfig::default();
+    config
+        .rounding
+        .output_scale
+        .overrides
+        .insert(Currency::USD, 4);
+
+    let valuation = finstack_quant_portfolio::valuation::value_portfolio(
+        &portfolio,
+        &market_with_usd(),
+        &config,
+        &Default::default(),
+    )
+    .expect("fallback valuation");
+    let result = valuation
+        .get_position_value("P_CONFIG")
+        .and_then(|value| value.valuation_result.as_ref())
+        .expect("fallback result");
+
+    assert_eq!(
+        result
+            .meta
+            .rounding
+            .output_scale_by_ccy
+            .get(&Currency::USD)
+            .copied(),
+        Some(4),
+        "PV-only fallback must stamp the caller's FinstackConfig",
+    );
+}

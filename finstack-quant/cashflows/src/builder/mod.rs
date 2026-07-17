@@ -34,7 +34,7 @@
 //!     .fixed_cf(fixed_spec)
 //!     .build(None)?;
 //!
-//! assert!(!schedule.flows.is_empty());
+//! assert!(!schedule.get_flows().is_empty());
 //! # Ok(())
 //! # }
 //! ```

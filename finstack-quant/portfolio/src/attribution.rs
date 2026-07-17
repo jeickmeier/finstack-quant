@@ -456,7 +456,8 @@ fn attribute_single_position(
                     market_t0,
                     as_of_t0,
                     &metrics,
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    finstack_quant_valuations::instruments::PricingOptions::default()
+                        .with_config(config),
                 )
                 .map_err(|e: finstack_quant_core::Error| Error::ValuationError {
                     position_id: position.position_id.clone(),
@@ -469,7 +470,8 @@ fn attribute_single_position(
                     market_t1,
                     as_of_t1,
                     &metrics,
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    finstack_quant_valuations::instruments::PricingOptions::default()
+                        .with_config(config),
                 )
                 .map_err(|e: finstack_quant_core::Error| Error::ValuationError {
                     position_id: position.position_id.clone(),
@@ -846,7 +848,86 @@ impl PortfolioAttribution {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_valuations::instruments::{Attributes, Instrument, PricingOptions};
+    use finstack_quant_valuations::metrics::MetricId;
+    use finstack_quant_valuations::pricer::InstrumentType;
+    use finstack_quant_valuations::results::ValuationResult;
+    use std::any::Any;
+    use std::sync::Arc;
     use time::macros::date;
+
+    #[derive(Clone)]
+    struct ConfigRequiredInstrument {
+        attributes: Attributes,
+    }
+
+    finstack_quant_valuations::impl_empty_cashflow_provider!(
+        ConfigRequiredInstrument,
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
+    );
+
+    impl Instrument for ConfigRequiredInstrument {
+        fn id(&self) -> &str {
+            "CONFIG_REQUIRED"
+        }
+
+        fn key(&self) -> InstrumentType {
+            InstrumentType::Basket
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+
+        fn attributes(&self) -> &Attributes {
+            &self.attributes
+        }
+
+        fn attributes_mut(&mut self) -> &mut Attributes {
+            &mut self.attributes
+        }
+
+        fn clone_box(&self) -> Box<dyn Instrument> {
+            Box::new(self.clone())
+        }
+
+        fn base_value(
+            &self,
+            _market: &MarketContext,
+            _as_of: Date,
+        ) -> finstack_quant_core::Result<Money> {
+            Ok(Money::new(100.0, Currency::USD))
+        }
+
+        fn price_with_metrics(
+            &self,
+            _market: &MarketContext,
+            as_of: Date,
+            _metrics: &[MetricId],
+            options: PricingOptions,
+        ) -> finstack_quant_core::Result<ValuationResult> {
+            let config = options.config.ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "attribution pricing did not receive FinstackConfig".to_string(),
+                )
+            })?;
+            if config.rounding.output_scale.overrides.get(&Currency::USD) != Some(&4) {
+                return Err(finstack_quant_core::Error::Validation(
+                    "attribution pricing received the wrong FinstackConfig".to_string(),
+                ));
+            }
+            Ok(ValuationResult::stamped_with_config(
+                self.id(),
+                as_of,
+                Money::new(100.0, Currency::USD),
+                config.as_ref(),
+            ))
+        }
+    }
 
     #[test]
     fn factor_bucket_indices_are_unique_and_cover_n_buckets() {
@@ -932,6 +1013,39 @@ mod tests {
     #[test]
     fn test_default_metrics_nonempty() {
         assert!(!default_attribution_metrics().is_empty());
+    }
+
+    #[test]
+    fn metrics_based_attribution_forwards_caller_config() {
+        let instrument = Arc::new(ConfigRequiredInstrument {
+            attributes: Attributes::new(),
+        });
+        let position = crate::position::Position::new(
+            "P_CONFIG",
+            "E_CONFIG",
+            "CONFIG_REQUIRED",
+            instrument,
+            1.0,
+            crate::position::PositionUnit::Units,
+        )
+        .expect("position");
+        let mut config = FinstackConfig::default();
+        config
+            .rounding
+            .output_scale
+            .overrides
+            .insert(Currency::USD, 4);
+
+        attribute_single_position(
+            &position,
+            &MarketContext::new(),
+            &MarketContext::new(),
+            date!(2026 - 01 - 02),
+            date!(2026 - 01 - 03),
+            &config,
+            &AttributionMethod::MetricsBased,
+        )
+        .expect("metrics-based attribution must forward config");
     }
 
     #[test]

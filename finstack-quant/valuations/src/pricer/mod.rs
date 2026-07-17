@@ -26,6 +26,7 @@
 //! - `commodity`: CommodityForward, CommoditySwap, CommodityOption, CommoditySwaption, CommoditySpreadOption
 
 // Core submodules
+mod enrichment;
 mod errors;
 pub mod json;
 mod keys;

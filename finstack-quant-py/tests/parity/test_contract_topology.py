@@ -587,6 +587,76 @@ def test_wasm_valuations_python_js_names_use_camel_or_pascal_case() -> None:
         assert "_" not in js_name, f"WASM name must not be snake_case: {js_name!r}"
 
 
+def test_wasm_portfolio_exports_match_contract() -> None:
+    """`exports/portfolio.js` root keys must match [wasm_portfolio_subset]."""
+    block = CONTRACT["wasm_portfolio_subset"]
+    js_path = (CONTRACT_PATH.parent / block["js_export_file"]).resolve()
+    expected = set(block["root_exports"])
+    actual = _parse_exported_const_object_keys(js_path, "portfolio")
+    assert actual == expected, (
+        "portfolio.js exports diverged from contract.\n"
+        f"  missing from JS: {sorted(expected - actual)}\n"
+        f"  unlisted in contract: {sorted(actual - expected)}"
+    )
+
+
+def test_wasm_portfolio_python_js_map_matches_facade_exports() -> None:
+    """Pinned portfolio Python-to-JS mappings must resolve on the facade."""
+    block = CONTRACT["wasm_portfolio_subset"]
+    root_exports = set(block["root_exports"])
+    for python_name, js_name in block["python_js_map"].items():
+        assert js_name in root_exports, f"python_js_map[{python_name!r}] -> {js_name!r} not in root_exports"
+
+
+def test_wasm_portfolio_python_twins_resolve() -> None:
+    """Every mapped portfolio Python twin must resolve on the live package."""
+    block = CONTRACT["wasm_portfolio_subset"]
+    module = importlib.import_module("finstack_quant.portfolio")
+    missing = [name for name in block["python_js_map"] if not hasattr(module, name)]
+    assert not missing, f"finstack_quant.portfolio missing mapped twins: {missing}"
+
+
+def test_wasm_portfolio_root_exports_are_triplet_accounted_for() -> None:
+    """Every portfolio root export is mapped from Python or listed WASM-only."""
+    block = CONTRACT["wasm_portfolio_subset"]
+    root_exports = set(block["root_exports"])
+    wasm_only = set(block.get("wasm_only", []))
+    mapped_js = set(block["python_js_map"].values())
+    unaccounted = root_exports - wasm_only - mapped_js
+    assert not unaccounted, f"root_exports must appear in python_js_map or wasm_only: {sorted(unaccounted)}"
+    overlap = wasm_only & mapped_js
+    assert not overlap, f"wasm_only must not overlap python_js_map values: {sorted(overlap)}"
+
+
+def test_wasm_portfolio_python_only_excludes_wasm_map() -> None:
+    """Portfolio Python-only symbols must not appear in the WASM map."""
+    block = CONTRACT["wasm_portfolio_subset"]
+    overlap = set(block["python_only"]) & set(block["python_js_map"])
+    assert not overlap, f"python_only overlaps python_js_map keys: {sorted(overlap)}"
+
+
+def test_wasm_portfolio_python_surface_is_exhaustively_accounted_for() -> None:
+    """Every portfolio Python symbol is mapped to WASM or explicitly Python-only."""
+    block = CONTRACT["wasm_portfolio_subset"]
+    public = set(CONTRACT["crates"]["portfolio"]["symbols"]["public"])
+    mapped_python = set(block["python_js_map"])
+    python_only = set(block["python_only"])
+    assert not mapped_python & python_only, "mapped Python names cannot also be Python-only"
+    accounted = mapped_python | python_only
+    assert accounted == public, (
+        "portfolio Python/WASM accounting diverged from the canonical Python surface.\n"
+        f"  unaccounted Python symbols: {sorted(public - accounted)}\n"
+        f"  non-public accounting entries: {sorted(accounted - public)}"
+    )
+
+
+def test_wasm_portfolio_python_js_names_use_camel_or_pascal_case() -> None:
+    """Portfolio WASM names should be camelCase or PascalCase, not snake_case."""
+    block = CONTRACT["wasm_portfolio_subset"]
+    for js_name in block["python_js_map"].values():
+        assert "_" not in js_name, f"WASM name must not be snake_case: {js_name!r}"
+
+
 def test_wasm_core_exports_match_contract() -> None:
     """``exports/core.js`` root keys must match [wasm_core_subset]."""
     block = CONTRACT["wasm_core_subset"]
