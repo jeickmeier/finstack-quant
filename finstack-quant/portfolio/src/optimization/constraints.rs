@@ -1,3 +1,5 @@
+//! Problem, decision-space, constraint, and solver types for portfolio optimization.
+//!
 use super::types::MetricExpr;
 use super::universe::PositionFilter;
 use serde::{Deserialize, Serialize};

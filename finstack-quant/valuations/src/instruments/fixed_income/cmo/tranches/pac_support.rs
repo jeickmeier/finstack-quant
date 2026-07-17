@@ -193,7 +193,8 @@ fn psa_to_smm(psa_speed: f64, month: u32) -> f64 {
 /// * `support_balance` - Current support balance
 /// * `pac_scheduled` - PAC scheduled amount for this period
 /// * `actual_psa` - Actual prepayment speed (PSA)
-/// * `collar` - PAC collar
+/// * `collar` - PAC PSA-speed collar retained for diagnostic and
+///   API-stability purposes; allocation uses realized available principal.
 ///
 /// # Returns
 ///
@@ -230,6 +231,11 @@ pub fn allocate_pac_support(
 }
 
 /// Check if PAC collar is "broken" (support depleted).
+///
+/// # Arguments
+///
+/// * `support_balance` - Remaining support-tranche balance; a non-positive
+///   amount means the PAC collar can no longer absorb prepayment variation.
 pub fn is_collar_broken(support_balance: f64) -> bool {
     support_balance <= 0.0
 }

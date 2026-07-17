@@ -1,3 +1,5 @@
+//! Instrument implementation used by the traits subsystem.
+//!
 use crate::cashflow::traits::CashflowProvider;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::model_params::ModelParamsSnapshot;

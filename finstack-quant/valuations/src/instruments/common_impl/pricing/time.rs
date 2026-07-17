@@ -52,9 +52,10 @@ use crate::constants::numerical::DF_EPSILON;
 ///
 /// # Arguments
 ///
-/// * `disc` - Discount curve
-/// * `as_of` - Valuation date (start of discounting interval)
-/// * `target` - Target payment date (end of discounting interval)
+/// * `disc` - Discount curve whose own base date and day-count convention
+///   define the date-based discounting interval.
+/// * `as_of` - Valuation date at which the relative discount factor starts.
+/// * `target` - Future or same-day cashflow date at which the factor ends.
 ///
 /// # Returns
 ///
@@ -89,9 +90,10 @@ pub fn relative_df_discount_curve(disc: &DiscountCurve, as_of: Date, target: Dat
 ///
 /// # Arguments
 ///
-/// * `disc` - Discounting trait object
-/// * `as_of` - Valuation date
-/// * `target` - Target payment date
+/// * `disc` - Discounting implementation whose base date, day count, and
+///   discount factors define the relative factor.
+/// * `as_of` - Valuation date at which the relative discount factor starts.
+/// * `target` - Future or same-day cashflow date at which the factor ends.
 ///
 /// # Returns
 ///
@@ -172,8 +174,10 @@ fn validate_relative_df(df: f64, from: Date, to: Date) -> Result<f64> {
 ///
 /// # Arguments
 ///
-/// * `fwd` - Forward curve
-/// * `date` - Target date
+/// * `fwd` - Forward curve whose own base date and day-count convention define
+///   the returned curve time.
+/// * `date` - Target reset or payment date; dates on or before the curve base
+///   map to zero time.
 ///
 /// # Returns
 ///
@@ -201,9 +205,11 @@ pub fn curve_time(fwd: &ForwardCurve, date: Date) -> Result<f64> {
 ///
 /// # Arguments
 ///
-/// * `fwd` - Forward curve
+/// * `fwd` - Forward curve whose projection discount factors imply the
+///   returned simple term rate.
 /// * `start` - Period start date
-/// * `end` - Period end date
+/// * `end` - Exclusive period end date after `start`; historical/straddling
+///   periods are rejected rather than projected.
 ///
 /// # Returns
 ///
@@ -254,6 +260,13 @@ pub fn rate_between_on_dates(fwd: &ForwardCurve, start: Date, end: Date) -> Resu
 /// This helper is only appropriate for averaging overnight observation
 /// sub-windows. For an arbitrary term projection interval, use
 /// [`rate_between_on_dates`].
+///
+/// # Arguments
+///
+/// * `fwd` - Forward curve whose own day-count convention converts dates into
+///   the averaging interval.
+/// * `start` - Beginning date of the overnight observation sub-window.
+/// * `end` - End date of the overnight observation sub-window.
 #[inline]
 pub fn rate_period_on_dates(fwd: &ForwardCurve, start: Date, end: Date) -> Result<f64> {
     let t_start = curve_time(fwd, start)?;

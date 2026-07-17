@@ -168,6 +168,17 @@ pub fn calibrate_hw1f_params(
 /// This is the piecewise-volatility counterpart to [`calibrate_hw1f_params`].
 /// It uses the exact volatility-kernel correction when deriving θ(t), so a
 /// one-segment schedule reproduces the scalar process.
+///
+/// # Arguments
+///
+/// * `model` - Calibrated Hull-White mean reversion and piecewise volatility
+///   schedule to translate into a simulation process.
+/// * `discount_curve` - Discounting curve repriced by the calibrated θ(t)
+///   drift; its date convention is rebased at `as_of`.
+/// * `as_of` - Valuation date from which the process and discount curve are
+///   rebased.
+/// * `horizon` - Positive simulation horizon in years used to build the θ(t)
+///   midpoint grid.
 pub fn calibrate_hw1f_model_params(
     model: &HullWhiteModelParams,
     discount_curve: &dyn Discounting,
@@ -214,6 +225,12 @@ pub fn calibrate_hw1f_model_params(
 /// # Errors
 ///
 /// Returns an error if the curve cannot be re-based to `as_of`.
+///
+/// # Arguments
+///
+/// * `discount_curve` - Discounting curve whose as-of-rebased instantaneous
+///   forward anchors the simulated initial short rate.
+/// * `as_of` - Valuation date at which the short-rate process is initialized.
 pub fn initial_short_rate_from_curve(discount_curve: &dyn Discounting, as_of: Date) -> Result<f64> {
     let discount_fn = rebased_discount_fn(discount_curve, as_of)?;
     Ok(fd_instantaneous_forward(&discount_fn, 0.0))

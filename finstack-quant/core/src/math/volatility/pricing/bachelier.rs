@@ -93,7 +93,8 @@ pub fn bachelier_put(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
 /// # Arguments
 ///
 /// - `forward`: Forward rate or forward price.
-/// - `strike`: Strike.
+/// - `strike`: Exercise rate or price, expressed in the same units as
+///   `forward`.
 /// - `sigma_n`: Normal volatility.
 /// - `t`: Expiry in years.
 ///
@@ -115,6 +116,15 @@ pub fn bachelier_vega(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
 /// Returns `N(d)` in the valid normal-model domain. At zero expiry or zero
 /// normal volatility, returns the intrinsic digital limit: `1.0` when
 /// `forward >= strike`, otherwise `0.0`.
+///
+/// # Arguments
+///
+/// * `forward` - Forward rate or forward price on the unit-annuity pricing
+///   scale.
+/// * `strike` - Option strike in the same units as `forward`.
+/// * `sigma_n` - Annualized normal volatility in forward-price units, not a
+///   lognormal percentage volatility.
+/// * `t` - Time to expiry in years.
 pub fn bachelier_delta_call(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
     match bachelier_state(forward, strike, sigma_n, t) {
         Some(state) => norm_cdf(state.d),
@@ -134,6 +144,15 @@ pub fn bachelier_delta_call(forward: f64, strike: f64, sigma_n: f64, t: f64) -> 
 ///
 /// Returns call delta minus one. This is the forward delta of the undiscounted
 /// unit-annuity Bachelier put.
+///
+/// # Arguments
+///
+/// * `forward` - Forward rate or forward price on the unit-annuity pricing
+///   scale.
+/// * `strike` - Option strike in the same units as `forward`.
+/// * `sigma_n` - Annualized normal volatility in forward-price units, not a
+///   lognormal percentage volatility.
+/// * `t` - Time to expiry in years.
 pub fn bachelier_delta_put(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
     bachelier_delta_call(forward, strike, sigma_n, t) - 1.0
 }
@@ -144,6 +163,15 @@ pub fn bachelier_delta_put(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f
 ///
 /// Returns `n(d) / (sigma_n sqrt(T))` in the valid normal-model domain and
 /// `0.0` for degenerate expiry or volatility.
+///
+/// # Arguments
+///
+/// * `forward` - Forward rate or forward price on the unit-annuity pricing
+///   scale.
+/// * `strike` - Option strike in the same units as `forward`.
+/// * `sigma_n` - Annualized normal volatility in forward-price units, not a
+///   lognormal percentage volatility.
+/// * `t` - Time to expiry in years.
 pub fn bachelier_gamma(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
     match bachelier_state(forward, strike, sigma_n, t) {
         Some(state) => norm_pdf(state.d) / state.st,

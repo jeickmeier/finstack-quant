@@ -1,3 +1,5 @@
+//! Configuration and metadata filters for dependency-scoped factor matching.
+//!
 use super::credit::{CreditHierarchicalConfig, CreditHierarchicalMatcher};
 use super::filter::DependencyFilter;
 use super::matchers::{

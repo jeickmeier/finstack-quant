@@ -20,20 +20,20 @@ use finstack_quant_core::Result;
 /// Uses 365.25 to account for leap years over multi-year amortisation horizons.
 pub use finstack_quant_core::dates::AVERAGE_DAYS_PER_YEAR;
 
-/// Default months in a year
+/// Number of calendar months in one year (12).
 pub const MONTHS_PER_YEAR: i32 = 12;
 
-/// Default periods per year for quarterly calculations
+/// Number of quarterly payment periods in one year (4.0).
 pub const QUARTERLY_PERIODS_PER_YEAR: f64 = 4.0;
 
 // ============================================================================
 // VALIDATION CONSTANTS
 // ============================================================================
 
-/// Default basis points divisor
+/// Divisor converting basis points to a decimal rate (10,000.0).
 pub const BASIS_POINTS_DIVISOR: f64 = 10_000.0;
 
-/// Percentage conversion factor
+/// Multiplier converting a decimal rate to a percentage (100.0).
 pub const PERCENTAGE_MULTIPLIER: f64 = 100.0;
 
 // ============================================================================
@@ -60,7 +60,7 @@ pub const YTM_SOLVER_TOLERANCE: f64 = 1e-6;
 /// Extreme distressed securities may require wider brackets.
 pub const Z_SPREAD_INITIAL_BRACKET: f64 = 0.05; // ±500 bps
 
-/// Minimum prepayment rate (floor)
+/// Lower bound for prepayment rates expressed as a decimal fraction.
 pub const MIN_PREPAYMENT_RATE: f64 = 0.0;
 
 // ============================================================================

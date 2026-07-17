@@ -386,6 +386,18 @@ impl CashFlowBuilder {
     /// Without curves, the fallback policy on each floating spec controls behavior
     /// (default: error; `SpreadOnly` uses just margin; `FixedRate(r)` uses a fixed index).
     ///
+    /// The builder compiles dates, coupon programs, fees, and principal events
+    /// into a canonical ordered [`CashFlowSchedule`]. `curves` is used only for
+    /// floating-rate projection; fixed coupons and deterministic fees do not
+    /// require a market context.
+    ///
+    /// # Errors
+    ///
+    /// Returns any deferred builder-configuration error, invalid core input or
+    /// schedule/coupon/fee/principal-event error, or a floating-rate projection
+    /// failure. In particular, a floating spec with the default error fallback
+    /// fails when its required market data is unavailable.
+    ///
     pub fn build(
         &self,
         curves: Option<&finstack_quant_core::market_data::context::MarketContext>,

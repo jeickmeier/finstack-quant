@@ -210,6 +210,11 @@ pub mod state_keys {
     /// Workloads that genuinely need thousands of indexed spots should consider
     /// raising [`INDEXED_SPOT_INLINE`] at the source rather than relying on
     /// the overflow path.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - Zero-based asset index whose canonical path-state key is
+    ///   required; values above the inline range are interned permanently.
     pub fn indexed_spot(index: usize) -> &'static str {
         if index < INDEXED_SPOT_INLINE {
             INDEXED_SPOT_TABLE[index]

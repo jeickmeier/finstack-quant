@@ -33,14 +33,32 @@ def _missing(v: Any) -> bool:
 
 
 def rgba(hex_color: str, alpha: float) -> str:
-    """Convert ``#rrggbb`` to an ``rgba(...)`` string."""
+    """Convert an RGB hex color to a CSS ``rgba(...)`` string.
+
+    Parameters
+    ----------
+    hex_color : str
+        Six-digit RGB color, with or without a leading ``#``.
+    alpha : float
+        Opacity from ``0.0`` (transparent) through ``1.0`` (opaque).
+    """
     h = hex_color.lstrip("#")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     return f"rgba({r},{g},{b},{alpha})"
 
 
 def nice_ticks(vmin: float, vmax: float, target: int = 4) -> list[float]:
-    """Return evenly spaced, human-friendly tick values spanning ``[vmin, vmax]``."""
+    """Return evenly spaced, human-friendly tick values spanning a range.
+
+    Parameters
+    ----------
+    vmin : float
+        Minimum displayed axis value before tick rounding.
+    vmax : float
+        Maximum displayed axis value before tick rounding.
+    target : int
+        Approximate desired number of intervals; defaults to four.
+    """
     if vmax <= vmin:
         vmax = vmin + 1.0
     raw = (vmax - vmin) / target
@@ -64,7 +82,17 @@ def _year(d: Any) -> int:
 
 
 def color_scale(v: Any, theme: Theme, cap: float = 8.0) -> tuple[str, str]:
-    """Background/foreground colors for a heatmap cell (value in percent units)."""
+    """Return background and foreground colors for a heatmap cell.
+
+    Parameters
+    ----------
+    v : Any
+        Value in percentage points; missing values receive a transparent cell.
+    theme : Theme
+        Report palette providing positive, negative, grid, and text colors.
+    cap : float
+        Absolute percentage-point value that maps to maximum shading intensity.
+    """
     if _missing(v):
         return ("transparent", theme.grid)
     mag = min(abs(v) / cap, 1.0)
@@ -144,7 +172,36 @@ def line_chart(
     height: int = 190,
     x_numeric: bool = False,
 ) -> str:
-    """Render a line (optionally area-filled) chart with date x-axis and value y-axis."""
+    """Render a line or area SVG chart with date or numeric x-axis.
+
+    Parameters
+    ----------
+    dates : list[Any]
+        X-axis values aligned one-for-one with ``values``; dates may be date-like
+        objects or strings, while numeric axes use numeric values.
+    values : list[Any]
+        Y-axis values aligned with ``dates``; ``None`` and ``NaN`` are skipped.
+    theme : Theme
+        Report palette and typography used for SVG elements.
+    area : bool
+        Whether to fill the area beneath the line; defaults to ``False``.
+    y_pct : bool
+        Whether y-axis labels append ``%`` to values already in percentage points.
+    zero : bool
+        Whether to include zero in the automatically chosen y-axis range.
+    ymin : float or None
+        Optional explicit lower y-axis bound before tick rounding.
+    ymax : float or None
+        Optional explicit upper y-axis bound before tick rounding.
+    color : str or None
+        Optional CSS stroke color; ``None`` uses the theme ink color.
+    fill : str or None
+        Optional CSS area-fill color; ``None`` derives a translucent stroke color.
+    height : int
+        SVG viewbox height in pixels; defaults to ``190``.
+    x_numeric : bool
+        Whether to render ``dates`` as numeric rather than calendar x-axis labels.
+    """
     color = color or theme.ink
     ml, mr, mt, mb = 48, 14, 12, 24
     pw, ph = _W - ml - mr, height - mt - mb
@@ -233,6 +290,21 @@ def cashflow_ladder(
 
     Values are in display units (e.g. $ millions). Each period gets a transparent
     full-height hover band with a native ``<title>`` summarising the flow.
+
+    Parameters
+    ----------
+    periods : list[str]
+        Payment-period labels aligned with every cashflow series.
+    coupon : list[float]
+        Coupon cashflows in displayed currency units, aligned with ``periods``.
+    principal : list[float]
+        Principal cashflows in displayed currency units, aligned with ``periods``.
+    theme : Theme
+        Report palette and typography used for SVG elements.
+    pv : list[float] or None
+        Optional present-value overlay in the same units and order as cashflows.
+    height : int
+        SVG viewbox height in pixels; defaults to ``210``.
     """
     ml, mr, mt, mb = 52, 14, 12, 24
     pw, ph = _W - ml - mr, height - mt - mb
@@ -308,6 +380,19 @@ def waterfall_chart(
     negative ``theme.neg``, and the total bar ``theme.ink``. Reuses the axis,
     gridline, value-label, and hover-band (``fq-hb``/``fq-cross``/``fq-mk``)
     conventions of :func:`bar_chart`. Deterministic.
+
+    Parameters
+    ----------
+    labels : list[str]
+        Contribution labels aligned one-for-one with ``deltas``.
+    deltas : list[Any]
+        Signed contribution values in display units; missing values become zero.
+    theme : Theme
+        Report palette and typography used for SVG elements.
+    total_label : str
+        Label shown on the final cumulative-total bar.
+    height : int
+        SVG viewbox height in pixels; defaults to ``210``.
     """
     ml, mr, mt, mb = 56, 14, 12, 40
     pw, ph = _W - ml - mr, height - mt - mb
@@ -392,7 +477,21 @@ def waterfall_chart(
 
 
 def bar_chart(labels: list[str], values: list[Any], *, theme: Theme, y_pct: bool = False, height: int = 190) -> str:
-    """Render a bar chart with category x-axis and value y-axis (value labels on bars)."""
+    """Render a categorical bar-chart SVG with value labels.
+
+    Parameters
+    ----------
+    labels : list[str]
+        Category labels aligned one-for-one with ``values``.
+    values : list[Any]
+        Signed values in display units; missing values are rendered as zero.
+    theme : Theme
+        Report palette and typography used for SVG elements.
+    y_pct : bool
+        Whether y-axis and bar labels append ``%`` to percentage-point values.
+    height : int
+        SVG viewbox height in pixels; defaults to ``190``.
+    """
     ml, mr, mt, mb = 48, 14, 12, 24
     pw, ph = _W - ml - mr, height - mt - mb
     nums = [0.0 if _missing(v) else float(v) for v in values]
@@ -464,6 +563,16 @@ def tornado_chart(
     an upside bar (right, ``theme.pos``). Reuses the value-axis, gridline, and
     hover-band (``fq-hb``/``fq-cross``/``fq-mk``) conventions of the other
     charts. Deterministic.
+
+    Parameters
+    ----------
+    entries : list[tuple[str, Any, Any]]
+        ``(label, downside, upside)`` sensitivity rows, normally pre-sorted by
+        magnitude; values use shared display units.
+    theme : Theme
+        Report palette and typography used for SVG elements.
+    height : int or None
+        Optional SVG viewbox height; ``None`` scales automatically by row count.
     """
     n = len(entries)
     row_h = 26
@@ -546,6 +655,23 @@ def fan_chart(
     than splitting the band into separate polygons.
 
     Reuses the gridline + hover-band conventions of :func:`line_chart`. Deterministic.
+
+    Parameters
+    ----------
+    periods : list[str]
+        Category labels aligned one-for-one with all percentile series.
+    p_low : list[Any]
+        Lower-percentile series in display units, aligned with ``periods``.
+    p_mid : list[Any]
+        Median-percentile series in display units, aligned with ``periods``.
+    p_high : list[Any]
+        Upper-percentile series in display units, aligned with ``periods``.
+    theme : Theme
+        Report palette and typography used for SVG elements.
+    y_pct : bool
+        Whether y-axis labels append ``%`` to percentage-point values.
+    height : int
+        SVG viewbox height in pixels; defaults to ``200``.
     """
     ml, mr, mt, mb = 48, 14, 12, 26
     pw, ph = _W - ml - mr, height - mt - mb

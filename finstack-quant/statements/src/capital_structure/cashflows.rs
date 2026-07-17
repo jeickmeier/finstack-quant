@@ -156,6 +156,11 @@ impl CashflowBreakdown {
     }
 
     /// Validate that all `Money` fields share the same currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error naming the first field whose currency
+    /// differs from `interest_expense_cash`.
     pub fn validate_currency_invariant(&self) -> crate::Result<()> {
         let expected = self.interest_expense_cash.currency();
         let fields = [
@@ -261,6 +266,12 @@ impl CapitalStructureCashflows {
     /// Returns the total interest expense in the instrument's native currency as
     /// a scalar amount.
     ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when no breakdown exists for the
+    /// `(instrument_id, period_id)` pair or when the cash and PIK currencies
+    /// differ.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -297,6 +308,15 @@ impl CapitalStructureCashflows {
     /// # Arguments
     /// * `instrument_id` - Instrument identifier
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// Cash interest as a scalar in the instrument's native currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when the requested instrument-period
+    /// breakdown is absent.
     pub fn get_interest_cash(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
         self.get_instrument_field(instrument_id, period_id, "cash interest", |cf| {
             cf.interest_expense_cash.amount()
@@ -308,6 +328,15 @@ impl CapitalStructureCashflows {
     /// # Arguments
     /// * `instrument_id` - Instrument identifier
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// PIK interest accrued during the period in the instrument's native currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when the requested instrument-period
+    /// breakdown is absent.
     pub fn get_interest_pik(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
         self.get_instrument_field(instrument_id, period_id, "PIK interest", |cf| {
             cf.interest_expense_pik.amount()
@@ -319,6 +348,15 @@ impl CapitalStructureCashflows {
     /// # Arguments
     /// * `instrument_id` - Instrument identifier
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// Principal paid during the period in the instrument's native currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when the requested instrument-period
+    /// breakdown is absent.
     pub fn get_principal(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
         self.get_instrument_field(instrument_id, period_id, "principal", |cf| {
             cf.principal_payment.amount()
@@ -330,6 +368,15 @@ impl CapitalStructureCashflows {
     /// # Arguments
     /// * `instrument_id` - Instrument identifier
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// End-of-period debt balance in the instrument's native currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when the requested instrument-period
+    /// breakdown is absent.
     pub fn get_debt_balance(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
         self.get_instrument_field(instrument_id, period_id, "debt balance", |cf| {
             cf.debt_balance.amount()
@@ -341,6 +388,15 @@ impl CapitalStructureCashflows {
     /// # Arguments
     /// * `instrument_id` - Instrument identifier
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// Fees charged during the period in the instrument's native currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when the requested instrument-period
+    /// breakdown is absent.
     pub fn get_fees(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
         self.get_instrument_field(instrument_id, period_id, "fees", |cf| cf.fees.amount())
     }
@@ -350,6 +406,15 @@ impl CapitalStructureCashflows {
     /// # Arguments
     /// * `instrument_id` - Instrument identifier
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// Accrued unpaid interest in the instrument's native currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when the requested instrument-period
+    /// breakdown is absent.
     pub fn get_accrued_interest(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
         self.get_instrument_field(instrument_id, period_id, "accrued interest", |cf| {
             cf.accrued_interest.amount()
@@ -367,6 +432,12 @@ impl CapitalStructureCashflows {
     /// Returns total interest in the reporting currency. If reporting totals are
     /// unavailable because multiple currencies are present and no FX conversion
     /// was supplied, this function returns an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when multi-currency totals lack a
+    /// reporting-currency conversion, no total exists for `period_id`, or the
+    /// cash and PIK total currencies differ.
     pub fn get_total_interest(&self, period_id: &PeriodId) -> Result<f64> {
         if self.reporting_currency.is_none()
             && self.totals.is_empty()
@@ -389,6 +460,15 @@ impl CapitalStructureCashflows {
     ///
     /// # Arguments
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// Cash interest in the reporting currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when multi-currency totals lack a
+    /// reporting-currency conversion or no total exists for `period_id`.
     pub fn get_total_interest_cash(&self, period_id: &PeriodId) -> Result<f64> {
         self.reporting_total(period_id, |cf| cf.interest_expense_cash.amount())
     }
@@ -397,6 +477,15 @@ impl CapitalStructureCashflows {
     ///
     /// # Arguments
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// PIK interest in the reporting currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when multi-currency totals lack a
+    /// reporting-currency conversion or no total exists for `period_id`.
     pub fn get_total_interest_pik(&self, period_id: &PeriodId) -> Result<f64> {
         self.reporting_total(period_id, |cf| cf.interest_expense_pik.amount())
     }
@@ -405,6 +494,15 @@ impl CapitalStructureCashflows {
     ///
     /// # Arguments
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// Principal payments in the reporting currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when multi-currency totals lack a
+    /// reporting-currency conversion or no total exists for `period_id`.
     pub fn get_total_principal(&self, period_id: &PeriodId) -> Result<f64> {
         self.reporting_total(period_id, |cf| cf.principal_payment.amount())
     }
@@ -413,6 +511,15 @@ impl CapitalStructureCashflows {
     ///
     /// # Arguments
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// End-of-period debt balance in the reporting currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when multi-currency totals lack a
+    /// reporting-currency conversion or no total exists for `period_id`.
     pub fn get_total_debt_balance(&self, period_id: &PeriodId) -> Result<f64> {
         self.reporting_total(period_id, |cf| cf.debt_balance.amount())
     }
@@ -421,6 +528,15 @@ impl CapitalStructureCashflows {
     ///
     /// # Arguments
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// Fees in the reporting currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when multi-currency totals lack a
+    /// reporting-currency conversion or no total exists for `period_id`.
     pub fn get_total_fees(&self, period_id: &PeriodId) -> Result<f64> {
         self.reporting_total(period_id, |cf| cf.fees.amount())
     }
@@ -429,6 +545,15 @@ impl CapitalStructureCashflows {
     ///
     /// # Arguments
     /// * `period_id` - Period to inspect
+    ///
+    /// # Returns
+    ///
+    /// Accrued interest in the reporting currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error when multi-currency totals lack a
+    /// reporting-currency conversion or no total exists for `period_id`.
     pub fn get_total_accrued_interest(&self, period_id: &PeriodId) -> Result<f64> {
         self.reporting_total(period_id, |cf| cf.accrued_interest.amount())
     }

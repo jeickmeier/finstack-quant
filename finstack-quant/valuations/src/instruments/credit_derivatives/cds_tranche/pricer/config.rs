@@ -1,3 +1,5 @@
+//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
+//!
 use crate::cashflow::primitives::CashFlow;
 use crate::correlation::copula::{Copula, CopulaSpec};
 use crate::correlation::recovery::RecoverySpec;

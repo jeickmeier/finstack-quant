@@ -12,6 +12,13 @@ use super::types::{CompanyId, CompanyMetrics, Multiple};
 /// Returns `None` if the required inputs are missing or the
 /// denominator is non-positive (avoids divide-by-zero and
 /// meaningless negative multiples).
+///
+/// # Arguments
+///
+/// * `metrics` - Company financial and market metrics from which the selected
+///   numerator and denominator are read.
+/// * `multiple` - Multiple definition that selects the calculation and its
+///   required metrics.
 pub fn compute_multiple(metrics: &CompanyMetrics, multiple: Multiple) -> Option<f64> {
     match multiple {
         // ---- EV multiples ----
@@ -58,6 +65,11 @@ pub fn compute_multiple(metrics: &CompanyMetrics, multiple: Multiple) -> Option<
 ///
 /// Returns `(company_id, multiple_value)` pairs for peers where the
 /// multiple is computable. Peers with missing data are silently skipped.
+///
+/// # Arguments
+///
+/// * `peer_set` - Peer universe whose companies are considered in stored order.
+/// * `multiple` - Multiple definition to calculate for each eligible peer.
 pub fn compute_peer_multiples(peer_set: &PeerSet, multiple: Multiple) -> Vec<(CompanyId, f64)> {
     peer_set
         .peers

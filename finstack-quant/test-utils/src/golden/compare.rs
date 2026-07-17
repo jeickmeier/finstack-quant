@@ -173,6 +173,12 @@ impl ComparisonResult {
 /// * `metric` - Metric name for error context
 /// * `actual` - Actual computed value
 /// * `expected` - Expected value with tolerance
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] instead of panicking when `actual` fails the
+/// exact or range expectation. The message includes the suite, case, metric,
+/// observed value, and expected tolerance or bounds.
 pub fn assert_expected_f64(
     suite_id: &str,
     case_id: &str,
@@ -206,7 +212,21 @@ pub fn assert_expected_f64(
     Err(Error::Validation(msg))
 }
 
-/// Assert using ExpectedValue structure (convenience for existing code).
+/// Assert using [`ExpectedValue`] (a convenience wrapper for existing fixtures).
+///
+/// # Arguments
+///
+/// * `suite_id` - Golden-suite identifier included in any assertion diagnostic.
+/// * `case_id` - Test-case identifier included in any assertion diagnostic.
+/// * `metric` - Name of the measured quantity being compared.
+/// * `actual` - Observed floating-point value produced by the system under test.
+/// * `expected` - Fixture expectation, including its target, range, and any
+///   configured tolerance.
+///
+/// # Errors
+///
+/// Propagates the structured assertion failure returned by
+/// [`assert_expected_f64`].
 pub fn assert_expected_value(
     suite_id: &str,
     case_id: &str,
@@ -218,7 +238,21 @@ pub fn assert_expected_value(
     assert_expected_f64(suite_id, case_id, metric, actual, &expectation)
 }
 
-/// Assert with simple tolerance (convenience function).
+/// Assert with an explicit tolerance (a convenience wrapper).
+///
+/// # Arguments
+///
+/// * `suite_id` - Golden-suite identifier included in any assertion diagnostic.
+/// * `case_id` - Test-case identifier included in any assertion diagnostic.
+/// * `metric` - Name of the measured quantity being compared.
+/// * `actual` - Observed floating-point value produced by the system under test.
+/// * `expected` - Expected floating-point value before applying `tolerance`.
+/// * `tolerance` - Absolute, relative, percentage, or basis-point comparison
+///   tolerance.
+///
+/// # Errors
+///
+/// Returns the structured mismatch error from [`assert_expected_f64`].
 pub fn assert_within_tolerance(
     suite_id: &str,
     case_id: &str,
@@ -240,7 +274,20 @@ pub fn assert_within_tolerance(
     )
 }
 
-/// Assert with absolute tolerance (convenience function).
+/// Assert with absolute tolerance (a convenience wrapper).
+///
+/// # Arguments
+///
+/// * `suite_id` - Golden-suite identifier included in any assertion diagnostic.
+/// * `case_id` - Test-case identifier included in any assertion diagnostic.
+/// * `metric` - Name of the measured quantity being compared.
+/// * `actual` - Observed floating-point value produced by the system under test.
+/// * `expected` - Expected floating-point value.
+/// * `tolerance` - Allowed absolute difference in the same units as `actual`.
+///
+/// # Errors
+///
+/// Returns the structured mismatch error from [`assert_within_tolerance`].
 pub fn assert_abs(
     suite_id: &str,
     case_id: &str,
@@ -259,7 +306,22 @@ pub fn assert_abs(
     )
 }
 
-/// Assert with basis points tolerance (convenience function).
+/// Assert with a basis-points tolerance (a convenience wrapper).
+///
+/// `tolerance_bp` is measured in basis points of absolute difference.
+///
+/// # Arguments
+///
+/// * `suite_id` - Golden-suite identifier included in any assertion diagnostic.
+/// * `case_id` - Test-case identifier included in any assertion diagnostic.
+/// * `metric` - Name of the measured quantity being compared.
+/// * `actual` - Observed floating-point value produced by the system under test.
+/// * `expected` - Expected floating-point value.
+/// * `tolerance_bp` - Allowed absolute difference expressed in basis points.
+///
+/// # Errors
+///
+/// Returns the structured mismatch error from [`assert_within_tolerance`].
 pub fn assert_bp(
     suite_id: &str,
     case_id: &str,
@@ -278,7 +340,20 @@ pub fn assert_bp(
     )
 }
 
-/// Assert with percentage tolerance (convenience function).
+/// Assert with percentage tolerance (a convenience wrapper).
+///
+/// # Arguments
+///
+/// * `suite_id` - Golden-suite identifier included in any assertion diagnostic.
+/// * `case_id` - Test-case identifier included in any assertion diagnostic.
+/// * `metric` - Name of the measured quantity being compared.
+/// * `actual` - Observed floating-point value produced by the system under test.
+/// * `expected` - Expected floating-point value.
+/// * `tolerance_pct` - Allowed relative difference expressed as a percentage.
+///
+/// # Errors
+///
+/// Returns the structured mismatch error from [`assert_within_tolerance`].
 pub fn assert_pct(
     suite_id: &str,
     case_id: &str,
@@ -297,7 +372,25 @@ pub fn assert_pct(
     )
 }
 
-/// Assert a value is within a range.
+/// Assert that a value lies within optional inclusive range bounds.
+///
+/// `None` leaves the corresponding side unbounded.
+///
+/// # Arguments
+///
+/// * `suite_id` - Golden-suite identifier included in any assertion diagnostic.
+/// * `case_id` - Test-case identifier included in any assertion diagnostic.
+/// * `metric` - Name of the measured quantity being range-checked.
+/// * `actual` - Observed floating-point value produced by the system under test.
+/// * `min` - Optional inclusive lower bound; `None` leaves the range unbounded
+///   below.
+/// * `max` - Optional inclusive upper bound; `None` leaves the range unbounded
+///   above.
+///
+/// # Errors
+///
+/// Returns the structured mismatch error from [`assert_expected_f64`] when the
+/// value falls below `min` or above `max`.
 pub fn assert_range(
     suite_id: &str,
     case_id: &str,
@@ -318,7 +411,25 @@ pub fn assert_range(
 // Money assertions
 // =============================================================================
 
-/// Assert that a Money value is within tolerance of expected.
+/// Assert that a currency-tagged amount is within tolerance of expected.
+///
+/// Both amounts must carry the same currency label before their numeric values
+/// are compared.
+///
+/// # Arguments
+///
+/// * `suite_id` - Golden-suite identifier included in any assertion diagnostic.
+/// * `case_id` - Test-case identifier included in any assertion diagnostic.
+/// * `metric` - Name of the currency-denominated quantity being compared.
+/// * `actual` - Observed amount and ISO currency label from the system under
+///   test.
+/// * `expected` - Expected amount and currency label from the golden fixture.
+/// * `tolerance` - Numeric tolerance applied after currency labels match.
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] for different currency labels or a numeric
+/// mismatch under `tolerance`.
 pub fn assert_money(
     suite_id: &str,
     case_id: &str,
@@ -343,7 +454,20 @@ pub fn assert_money(
     )
 }
 
-/// Assert Money amount with absolute tolerance.
+/// Assert a currency-tagged amount with absolute tolerance.
+///
+/// # Arguments
+///
+/// * `suite_id` - Golden-suite identifier included in any assertion diagnostic.
+/// * `case_id` - Test-case identifier included in any assertion diagnostic.
+/// * `metric` - Name of the currency-denominated quantity being compared.
+/// * `actual` - Observed amount and currency label from the system under test.
+/// * `expected` - Expected amount and currency label from the golden fixture.
+/// * `tolerance` - Allowed absolute amount difference in the shared currency.
+///
+/// # Errors
+///
+/// Propagates the currency and numeric mismatch errors from [`assert_money`].
 pub fn assert_money_abs(
     suite_id: &str,
     case_id: &str,
@@ -366,7 +490,23 @@ pub fn assert_money_abs(
 // Map/collection assertions
 // =============================================================================
 
-/// Assert all values in a HashMap match expectations.
+/// Assert all expected entries in a map against their expectations.
+///
+/// Every expected key must exist in `actual`; extra keys in `actual` are
+/// ignored so a fixture can target only selected metrics.
+///
+/// # Arguments
+///
+/// * `suite_id` - Golden-suite identifier included in combined diagnostics.
+/// * `case_id` - Test-case identifier included in combined diagnostics.
+/// * `actual` - Observed metric map keyed by metric name; additional keys are
+///   allowed.
+/// * `expected` - Required fixture expectations keyed by metric name.
+///
+/// # Errors
+///
+/// Returns one [`Error::Validation`] combining missing-key and value-mismatch
+/// diagnostics.
 pub fn assert_map_f64(
     suite_id: &str,
     case_id: &str,
@@ -395,6 +535,20 @@ pub fn assert_map_f64(
 /// Assert all values in a nested map match expectations.
 ///
 /// This is useful for statements-style results: `Map<node_id, Map<period, value>>`.
+///
+/// # Arguments
+///
+/// * `suite_id` - Golden-suite identifier included in combined diagnostics.
+/// * `case_id` - Test-case identifier included in combined diagnostics.
+/// * `actual` - Observed nested map; every expected outer and inner key must
+///   be present.
+/// * `expected` - Required nested fixture map to compare against `actual`.
+/// * `tolerance` - Allowed absolute difference for every matched numeric value.
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] when a required outer/inner key is absent or
+/// a nested value differs by more than the absolute `tolerance`.
 pub fn assert_nested_map_f64<K1, K2>(
     suite_id: &str,
     case_id: &str,
@@ -526,6 +680,10 @@ impl<'a> GoldenAssert<'a> {
     }
 
     /// Assert with absolute tolerance.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the structured mismatch error from [`assert_abs`].
     pub fn abs(
         &self,
         metric: &str,
@@ -543,7 +701,11 @@ impl<'a> GoldenAssert<'a> {
         )
     }
 
-    /// Assert with basis points tolerance.
+    /// Assert with basis-points tolerance.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the structured mismatch error from [`assert_bp`].
     pub fn bp(
         &self,
         metric: &str,
@@ -562,6 +724,10 @@ impl<'a> GoldenAssert<'a> {
     }
 
     /// Assert with percentage tolerance.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the structured mismatch error from [`assert_pct`].
     pub fn pct(
         &self,
         metric: &str,
@@ -579,7 +745,11 @@ impl<'a> GoldenAssert<'a> {
         )
     }
 
-    /// Assert within a range.
+    /// Assert within optional inclusive range bounds.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the structured mismatch error from [`assert_range`].
     pub fn range(
         &self,
         metric: &str,
@@ -590,7 +760,11 @@ impl<'a> GoldenAssert<'a> {
         assert_range(self.suite_id, self.case_id, metric, actual, min, max)
     }
 
-    /// Assert with ExpectedValue.
+    /// Assert with an [`ExpectedValue`] fixture entry.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the structured mismatch error from [`assert_expected_value`].
     pub fn expected(
         &self,
         metric: &str,
@@ -600,7 +774,11 @@ impl<'a> GoldenAssert<'a> {
         assert_expected_value(self.suite_id, self.case_id, metric, actual, expected)
     }
 
-    /// Assert Money with absolute tolerance.
+    /// Assert a currency-tagged amount with absolute tolerance.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the structured mismatch error from [`assert_money_abs`].
     pub fn money(
         &self,
         metric: &str,

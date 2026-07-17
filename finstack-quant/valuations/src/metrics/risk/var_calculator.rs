@@ -326,21 +326,27 @@ fn tail_quantile_mean(sorted: &[f64], p: f64) -> f64 {
     integral / p
 }
 
-/// Calculate Historical VaR for a single instrument using full revaluation.
+/// Calculate portfolio VaR using full revaluation of homogeneous instruments.
 ///
 /// # Arguments
 ///
-/// * `instrument` - The instrument to calculate VaR for
-/// * `base_market` - Current market context (base case)
-/// * `history` - Historical market scenarios
-/// * `as_of` - Valuation date
-/// * `config` - VaR configuration
+/// * `instruments` - References to instruments of one concrete type; each is
+///   repriced under every historical or simulated market scenario and their
+///   P&Ls are aggregated into one loss distribution.
+/// * `base_market` - Unshocked market context used for baseline valuations and
+///   as the source market that each scenario perturbs.
+/// * `history` - Ordered market scenarios or return history used to generate
+///   the VaR loss distribution.
+/// * `as_of` - Valuation date applied consistently to every baseline and
+///   scenario revaluation.
+/// * `config` - VaR method, confidence level, horizon, and scenario/pricing
+///   policy controlling the returned risk measures.
 ///
 /// # Returns
 ///
 /// VaR result including VaR, ES, and full P&L distribution
 ///
-/// This function revalues the instrument under every scenario contained in
+/// This function revalues every supplied instrument under every scenario in
 /// [`MarketHistory`]. If the history is empty, the returned VaR/ES will be zero.
 ///
 /// # Examples
@@ -393,6 +399,19 @@ fn calculate_var_dyn(
 }
 
 /// Variant of [`calculate_var`] that reuses a caller-selected pricing engine.
+///
+/// # Arguments
+///
+/// * `instruments` - Instrument references to reprice under every scenario.
+/// * `base_market` - Unshocked market context used to build scenario contexts.
+/// * `history` - Ordered market scenarios or return history for the loss
+///   distribution.
+/// * `as_of` - Valuation date applied consistently to baseline and scenarios.
+/// * `config` - VaR method, confidence level, horizon, and scenario policy.
+/// * `pricing_model` - Optional model key forced for every instrument; `None`
+///   uses each instrument's default model.
+/// * `pricer_registry` - Optional registered pricer lookup; `None` creates the
+///   canonical registry for this calculation.
 pub fn calculate_var_with_pricing(
     instruments: &[&dyn Instrument],
     base_market: &MarketContext,

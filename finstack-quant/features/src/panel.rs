@@ -11,6 +11,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// Apply a list of named panel transforms from a JSON specification.
 ///
+/// # Arguments
+///
+/// * `spec_json` - UTF-8 JSON document encoding a [`PanelTransformSpec`],
+///   including values, required partition columns, and named operations.
+///
 /// # Errors
 ///
 /// Returns a validation error when the specification is malformed or an
@@ -24,6 +29,11 @@ pub fn transform_panel(spec_json: &str) -> Result<String> {
 }
 
 /// Apply a list of named panel transforms from a typed specification.
+///
+/// # Arguments
+///
+/// * `spec` - Typed panel-transform specification whose operations reference
+///   row-aligned values and the partition columns they require.
 ///
 /// # Errors
 ///

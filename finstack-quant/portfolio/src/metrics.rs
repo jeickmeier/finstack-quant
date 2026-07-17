@@ -269,6 +269,13 @@ pub(crate) fn is_summable(metric_id: &str) -> bool {
 ///   `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 /// - Numerically stable aggregation:
 ///   `docs/REFERENCES.md#kahan-1965`
+///
+/// # Errors
+///
+/// Returns an error when `base_ccy` or `as_of` differs from the valuation,
+/// or when an out-of-base position with near-zero native PV cannot obtain an
+/// FX conversion rate from `market`. Non-finite summable metric values are
+/// recorded as skipped in the result rather than failing aggregation.
 pub fn aggregate_metrics(
     valuation: &PortfolioValuation,
     base_ccy: Currency,

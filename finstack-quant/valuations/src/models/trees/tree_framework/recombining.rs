@@ -1,3 +1,5 @@
+//! Shared node, evolution, and backward-induction components for pricing trees.
+//!
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
@@ -674,6 +676,15 @@ pub fn price_recombining_tree<V: TreeValuator>(inputs: RecombiningInputs<'_, V>)
 }
 
 /// Helper function to create initial state variables for single-factor equity model
+///
+/// # Arguments
+///
+/// * `spot` - Initial equity spot price in the option's quote currency.
+/// * `risk_free_rate` - Continuously compounded domestic risk-free rate as a
+///   decimal annual rate.
+/// * `dividend_yield` - Continuously compounded equity dividend yield as a
+///   decimal annual rate.
+/// * `volatility` - Annualized equity diffusion volatility as a decimal.
 pub fn single_factor_equity_state(
     spot: f64,
     risk_free_rate: f64,
@@ -689,6 +700,16 @@ pub fn single_factor_equity_state(
 }
 
 /// Helper function to create initial state variables for two-factor model
+///
+/// # Arguments
+///
+/// * `spot` - Initial equity spot price in the option's quote currency.
+/// * `risk_free_rate` - Continuously compounded domestic risk-free rate as a
+///   decimal annual rate.
+/// * `dividend_yield` - Continuously compounded equity dividend yield as a
+///   decimal annual rate.
+/// * `equity_volatility` - Annualized equity diffusion volatility as a decimal.
+/// * `rate_volatility` - Annualized short-rate-factor volatility as a decimal.
 pub fn two_factor_equity_rates_state(
     spot: f64,
     risk_free_rate: f64,

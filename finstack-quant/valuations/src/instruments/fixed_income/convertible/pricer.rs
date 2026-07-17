@@ -1156,6 +1156,17 @@ fn price_convertible_bond_with_inputs(
 }
 
 /// Main pricing function for convertible bonds
+///
+/// # Arguments
+///
+/// * `bond` - Convertible bond contract with cashflows, conversion terms, and
+///   required market-data identifiers.
+/// * `market_context` - Market context supplying discount curve, equity spot,
+///   volatility, credit, and other pricing inputs.
+/// * `tree_type` - Recombining tree specification controlling the convertible
+///   equity/credit valuation discretization.
+/// * `as_of` - Valuation date; dates after maturity return zero in the bond's
+///   notional currency.
 pub fn price_convertible_bond(
     bond: &ConvertibleBond,
     market_context: &MarketContext,
@@ -1182,6 +1193,18 @@ pub fn price_convertible_bond(
 /// - **Vega**: `(P(σ+0.01) - P(σ-0.01)) / (vol_up - vol_down) * 0.01` — per 1% absolute vol move
 /// - **Rho**: `(P(r+1bp) - P(r-1bp)) / 2` — per 1bp parallel curve shift (bp-count)
 /// - **Theta**: `P(t+1d) - P(t)` — change per calendar day
+///
+/// # Arguments
+///
+/// * `bond` - Convertible bond contract with cashflows, conversion terms, and
+///   required market-data identifiers.
+/// * `market_context` - Market context supplying baseline curves, equity spot,
+///   volatility, and credit data for full repricing.
+/// * `tree_type` - Recombining tree specification used consistently for every
+///   bumped valuation.
+/// * `bump_size` - Optional relative equity-spot bump as a decimal; `None`
+///   uses `0.01` (one percent) for delta and gamma.
+/// * `as_of` - Valuation date from which the one-day theta roll is measured.
 pub fn calculate_convertible_greeks(
     bond: &ConvertibleBond,
     market_context: &MarketContext,
@@ -1328,6 +1351,13 @@ pub(crate) fn build_convertible_schedule(bond: &ConvertibleBond) -> Result<CashF
 }
 
 /// Calculate convertible bond parity
+///
+/// # Arguments
+///
+/// * `bond` - Convertible bond whose effective conversion ratio and notional
+///   normalize the equity conversion value.
+/// * `current_spot` - Current conversion-share price in the bond's quote
+///   currency.
 pub fn calculate_parity(bond: &ConvertibleBond, current_spot: f64) -> f64 {
     let Some(conversion_ratio) = bond.effective_conversion_ratio() else {
         return 0.0;
@@ -1337,6 +1367,13 @@ pub fn calculate_parity(bond: &ConvertibleBond, current_spot: f64) -> f64 {
 }
 
 /// Calculate conversion premium
+///
+/// # Arguments
+///
+/// * `bond_price` - Observed or model convertible price in the same units as
+///   the conversion value.
+/// * `current_spot` - Current conversion-share price in the same quote units.
+/// * `conversion_ratio` - Shares received per bond for conversion.
 pub fn calculate_conversion_premium(
     bond_price: f64,
     current_spot: f64,
@@ -1354,6 +1391,12 @@ pub fn calculate_conversion_premium(
 ///
 /// If `settlement_days` is set, adds that many weekdays to `as_of`.
 /// Otherwise returns `as_of` unchanged.
+///
+/// # Arguments
+///
+/// * `bond` - Convertible bond whose optional business-day settlement lag is
+///   applied.
+/// * `as_of` - Trade or valuation date from which settlement is rolled.
 pub fn settlement_date(bond: &ConvertibleBond, as_of: Date) -> Date {
     match bond.settlement_days {
         Some(days) if days > 0 => as_of.add_weekdays(days as i32),
@@ -1372,6 +1415,13 @@ pub fn settlement_date(bond: &ConvertibleBond, as_of: Date) -> Date {
 ///
 /// Returns 0.0 for zero-coupon convertibles or if the date is outside all
 /// accrual periods.
+///
+/// # Arguments
+///
+/// * `bond` - Convertible bond whose coupon schedule and settlement lag define
+///   the accrued-interest period.
+/// * `as_of` - Trade or valuation date from which the bond settlement date is
+///   calculated.
 pub fn calculate_accrued_interest(bond: &ConvertibleBond, as_of: Date) -> Result<f64> {
     if bond.fixed_coupon.is_none() && bond.floating_coupon.is_none() {
         return Ok(0.0); // Zero-coupon

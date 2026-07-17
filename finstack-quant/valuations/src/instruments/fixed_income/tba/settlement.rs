@@ -27,8 +27,9 @@ pub struct TbaSettlementDates {
 ///
 /// # Arguments
 ///
-/// * `year` - Settlement year
-/// * `month` - Settlement month (1-12)
+/// * `year` - Four-digit calendar year of the requested settlement month.
+/// * `month` - One-based calendar month from 1 through 12 whose published
+///   SIFMA settlement date is requested.
 pub fn calculate_settlement_dates(year: i32, month: u8) -> Result<TbaSettlementDates> {
     calculate_settlement_dates_for_class(
         year,
@@ -38,6 +39,13 @@ pub fn calculate_settlement_dates(year: i32, month: u8) -> Result<TbaSettlementD
 }
 
 /// Calculate TBA settlement dates for a specific SIFMA class.
+///
+/// # Arguments
+///
+/// * `year` - Four-digit calendar year of the requested settlement month.
+/// * `month` - One-based calendar month from 1 through 12.
+/// * `class` - SIFMA settlement class selecting the applicable published
+///   good-delivery calendar.
 pub fn calculate_settlement_dates_for_class(
     year: i32,
     month: u8,
@@ -70,6 +78,11 @@ pub fn calculate_settlement_dates_for_class(
 /// Calculate the drop date (last trading day for a TBA month).
 ///
 /// The drop date is typically 2 business days before notification.
+///
+/// # Arguments
+///
+/// * `year` - Four-digit calendar year of the requested settlement month.
+/// * `month` - One-based calendar month from 1 through 12.
 pub fn calculate_drop_date(year: i32, month: u8) -> Result<Date> {
     let dates = calculate_settlement_dates(year, month)?;
     subtract_business_days(dates.notification_date, 2)
@@ -100,6 +113,11 @@ fn subtract_business_days(date: Date, days: u32) -> Result<Date> {
 }
 
 /// Get the next TBA settlement month from a given date.
+///
+/// # Arguments
+///
+/// * `as_of` - Trade or valuation date used to test whether the current
+///   settlement month remains tradeable through its drop date.
 pub fn next_settlement_month(as_of: Date) -> Result<(i32, u8)> {
     let year = as_of.year();
     let month = as_of.month() as u8;
@@ -124,6 +142,11 @@ pub fn next_settlement_month(as_of: Date) -> Result<(i32, u8)> {
 ///
 /// The roll typically occurs around the notification date of the
 /// front-month settlement.
+///
+/// # Arguments
+///
+/// * `front_year` - Four-digit calendar year of the front settlement month.
+/// * `front_month` - One-based front settlement month from 1 through 12.
 pub fn get_roll_date(front_year: i32, front_month: u8) -> Result<Date> {
     let front_dates = calculate_settlement_dates(front_year, front_month)?;
     // Roll typically occurs 2-3 days before notification

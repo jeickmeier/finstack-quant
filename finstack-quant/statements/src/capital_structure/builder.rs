@@ -180,6 +180,10 @@ impl<State> ModelBuilder<State> {
     ///
     /// # Returns
     /// Updated builder with the bond appended to the capital-structure spec.
+    /// The resulting specification stores the tagged valuations JSON needed by
+    /// [`Evaluator::evaluate_with_market`](crate::evaluator::Evaluator::evaluate_with_market).
+    /// It does not price the bond or check that `id` is unique in the complete
+    /// capital structure; model-level validation remains the final boundary.
     ///
     /// # Example
     /// ```ignore
@@ -205,6 +209,12 @@ impl<State> ModelBuilder<State> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error if the fixed-bond constructor rejects the dates,
+    /// rate, notional, or curve configuration, or if the tagged instrument
+    /// cannot be serialized into the model specification.
     #[cfg(feature = "valuation-integration")]
     pub fn add_bond(
         mut self,
@@ -248,6 +258,12 @@ impl<State> ModelBuilder<State> {
     /// * `convention` - Regional convention preset (e.g., `BondConvention::EurGovernment`)
     /// * `discount_curve_id` - Discount curve ID for pricing
     ///
+    /// The convention controls the coupon schedule and date conventions; its
+    /// choice must match the bond's legal terms and the supplied discount curve
+    /// must be available at evaluation time. This method records a tagged
+    /// instrument specification but does not price it or enforce global
+    /// uniqueness of `id`.
+    ///
     /// # Example
     /// ```ignore
     /// use finstack_quant_statements::builder::ModelBuilder;
@@ -272,6 +288,12 @@ impl<State> ModelBuilder<State> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error if the convention-aware bond constructor rejects
+    /// the rate, dates, notional, or curve configuration, or if the resulting
+    /// tagged instrument cannot be serialized.
     #[allow(clippy::too_many_arguments)]
     #[cfg(feature = "valuation-integration")]
     pub fn add_bond_with_convention(
@@ -376,6 +398,20 @@ impl<State> ModelBuilder<State> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The swap is created with the `Pay` side, zero floating spread, simple
+    /// compounding, and a settlement calendar chosen from the notional
+    /// currency (EUR → TARGET2, GBP → GBLO, JPY → JPTO, otherwise USNY). It
+    /// is serialized into the capital-structure specification; pricing occurs
+    /// only during market-aware evaluation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error if `fixed_rate` cannot be represented as
+    /// a finite decimal, a build error if the swap schedule or identifiers are
+    /// invalid, or a serialization error if the tagged instrument cannot be
+    /// stored. It does not check that the curve identifiers exist in market
+    /// data; that happens at evaluation time.
     #[allow(clippy::too_many_arguments)]
     #[cfg(feature = "valuation-integration")]
     pub fn add_swap(
@@ -416,6 +452,19 @@ impl<State> ModelBuilder<State> {
     /// The default [`add_swap`](Self::add_swap) uses US conventions:
     /// - Fixed: Semi-annual, 30/360, Modified Following
     /// - Float: Quarterly, ACT/360, Modified Following
+    ///
+    /// The created swap is on the `Pay` side with zero floating spread and
+    /// simple floating compounding. The caller is responsible for choosing
+    /// coherent frequencies, day-count conventions, and curve identifiers for
+    /// the market and legal confirmation being modeled.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error if `fixed_rate` cannot be represented as
+    /// a finite decimal, a build error if the swap configuration is invalid,
+    /// or a serialization error if the tagged instrument cannot be stored.
+    /// Curve availability and pricing consistency are validated later by
+    /// market-aware evaluation.
     #[allow(clippy::too_many_arguments)]
     #[cfg(feature = "valuation-integration")]
     pub fn add_swap_with_conventions(

@@ -1,3 +1,5 @@
+//! Bond price, yield, spread, duration, and risk metric calculations.
+//!
 use crate::instruments::fixed_income::bond::pricing::engine::tree::{bond_tree_config, TreePricer};
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_oas;
 use crate::instruments::fixed_income::bond::pricing::settlement::settlement_date;

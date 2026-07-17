@@ -75,6 +75,22 @@ const WING_SUBDIVISIONS: usize = 64;
 /// `bs_price_fn(strike, vol, option_type)` returns the Black-Scholes option price.
 /// All other parameters (spot, rates, etc.) should be captured by the closures.
 ///
+/// # Arguments
+///
+/// * `strikes` - At least three finite, strictly increasing positive strikes
+///   in the same price units as `forward`; the grid must contain levels below
+///   and above the forward.
+/// * `forward` - Positive forward price for the option expiry, expressed in
+///   the same units as `strikes`.
+/// * `risk_free_rate` - Continuously compounded annual risk-free rate used to
+///   convert the discounted option-price integral to forward variance.
+/// * `time_to_expiry` - Positive option expiry in years.
+/// * `vol_fn` - Implied-volatility surface queried as `(expiry_years, strike)`
+///   and returning a finite positive annualized decimal volatility.
+/// * `bs_price_fn` - Pricing callback receiving `(strike, volatility,
+///   option_type)` and returning the discounted call or put value in the same
+///   monetary units as the forward.
+///
 /// Returns `None` if:
 /// - the strike grid is too short, non-monotone, or non-finite,
 /// - the forward is non-finite or non-positive,

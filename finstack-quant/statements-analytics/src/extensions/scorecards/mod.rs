@@ -241,6 +241,12 @@ impl CreditScorecardExtension {
     /// Validate a configuration without executing.
     ///
     /// Useful for schema-style checks before constructing the extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error for an unsupported rating scale,
+    /// negative/non-finite metric weights, implausible nonzero total weights,
+    /// or an invalid explicit period ID.
     pub fn validate_config(config: &ScorecardConfig) -> Result<()> {
         if !is_supported_rating_scale(&config.rating_scale) {
             return Err(finstack_quant_statements::error::Error::invalid_input(
@@ -322,6 +328,16 @@ impl CreditScorecardExtension {
     /// # Arguments
     /// * `model` - The evaluated financial model
     /// * `results` - Evaluation output to inspect
+    ///
+    /// Individual metric failures are collected in the returned report, rather
+    /// than aborting the entire scorecard. A report with such failures has
+    /// `ScorecardStatus::Failed`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for missing/invalid extension configuration, an invalid
+    /// or missing target period, or an invalid rating-scale/minimum-rating
+    /// comparison. Per-metric evaluation errors are reported in `errors`.
     pub fn execute(
         &mut self,
         model: &FinancialModelSpec,

@@ -179,7 +179,44 @@ pub trait ModelTimeSeries: Send + Sync {
     fn period_end_date(&self, period: &PeriodId) -> Date;
 }
 
-/// Forecast a covenant using a generic time-series model adapter.
+/// Forecast one numeric covenant across supplied model periods.
+///
+/// The adapter supplies an end date and scalar metric for each [`PeriodId`].
+/// The forecast uses an explicit covenant `metric_id` first, then the
+/// conventional metric name for the covenant type, and finally a custom metric
+/// name where applicable. A threshold schedule overrides the covenant's static
+/// threshold from its effective date onward. A covenant with an unmet springing
+/// condition is inactive for that period and receives no headroom or breach
+/// probability.
+///
+/// With `config.stochastic == false`, probabilities are deterministic: `0.0`
+/// for pass and `1.0` for breach. With stochastic mode enabled, the function
+/// computes an analytic lognormal overlay using `volatility` and calendar time
+/// from the reference date. It falls back to the deterministic convention for
+/// a non-positive or non-finite metric because a multiplicative lognormal
+/// shock is not meaningful in that regime. A `NaN` metric is treated as an
+/// indeterminate breach, matching point-in-time engine evaluation.
+///
+/// # Arguments
+///
+/// * `covenant` - Numeric covenant specification whose metric, threshold, and
+///   springing condition determine the forecast.
+/// * `model` - Time-series model that supplies the covenant metric and any
+///   inputs used by a springing condition for each requested period.
+/// * `periods` - Ordered reporting periods to forecast; the slice must not be
+///   empty and each period must be covered by the covenant metric.
+/// * `config` - Forecast policy including deterministic or stochastic mode,
+///   volatility assumptions, and the reference date.
+///
+/// # Errors
+///
+/// Returns a validation error for an empty period set, invalid forecast
+/// configuration, missing stochastic volatility, or a non-numeric covenant
+/// without a bound and threshold. Returns `NotFound` when a required metric is
+/// absent for any requested period, and propagates errors raised while
+/// evaluating a springing condition. The caller should use
+/// [`forecast_breaches_generic`] when a batch should skip uncovered periods
+/// rather than fail as a whole.
 pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
     covenant: &CovenantSpec,
     model: &MTS,
@@ -392,13 +429,37 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
     })
 }
 
-/// Forecast breaches for all covenants in an engine.
+/// Forecast breaches for all active numeric covenants in an engine.
 ///
 /// For each covenant the period set is restricted to the periods where its
 /// metric actually resolves in the model; periods where the metric is missing
 /// are skipped (with a `tracing::warn!`) instead of failing the whole batch.
 /// A covenant whose projected metric is NaN in a period is reported as a
 /// breach in that period, mirroring the point-in-time engine convention.
+/// Non-numeric covenants are skipped because they lack a comparable threshold.
+/// The result is ordered first by breach date and then by stable covenant
+/// instance identifier. In stochastic mode, a period is included when the
+/// analytic probability reaches `breach_probability_threshold`; deterministic
+/// breaches are always included.
+///
+/// # Arguments
+///
+/// * `engine` - Covenant engine whose active numeric specifications are
+///   considered for breach forecasting.
+/// * `model` - Time-series model providing metric values and condition inputs
+///   across the requested periods.
+/// * `periods` - Reporting periods to inspect; uncovered metric periods are
+///   skipped per covenant rather than failing the entire batch.
+/// * `config` - Forecast policy including stochastic settings and the breach
+///   probability threshold.
+///
+/// # Errors
+///
+/// Returns configuration, stochastic-volatility, and springing-condition
+/// errors from [`forecast_covenant_generic`]. Missing metrics do not fail the
+/// batch: the affected period is omitted for that covenant and logged at warn
+/// level. The function returns an empty vector when no active numeric covenant
+/// has a covered period that meets the breach criterion.
 pub fn forecast_breaches_generic<MTS: ModelTimeSeries>(
     engine: &crate::engine::CovenantEngine,
     model: &MTS,

@@ -138,6 +138,11 @@ impl BsGreeks {
 }
 
 /// Convert host-language call/put booleans into the canonical Rust option type.
+///
+/// # Arguments
+///
+/// * `is_call` - `true` for a call/payer payoff and `false` for a put/receiver
+///   payoff when a host binding supplies the compact boolean convention.
 #[must_use]
 #[inline]
 pub fn option_type_from_bool(is_call: bool) -> OptionType {
@@ -149,6 +154,13 @@ pub fn option_type_from_bool(is_call: bool) -> OptionType {
 }
 
 /// Return a closed-form value when finite, otherwise report a validation error.
+///
+/// # Arguments
+///
+/// * `value` - Calculated formula output that must be finite before crossing a
+///   checked API boundary.
+/// * `what` - Human-readable formula or metric name included in a validation
+///   error if `value` is `NaN` or infinite.
 pub fn checked_closed_form_value(value: f64, what: &str) -> Result<f64> {
     if value.is_finite() {
         Ok(value)
@@ -165,12 +177,13 @@ pub fn checked_closed_form_value(value: f64, what: &str) -> Result<f64> {
 /// # Arguments
 ///
 /// * `spot` - Current spot price S
-/// * `strike` - Strike price K
+/// * `strike` - Exercise price K in the same units as `spot`.
 /// * `r` - Domestic (risk-free) rate, continuously compounded
 /// * `q` - Dividend yield or foreign rate, continuously compounded
 /// * `sigma` - Volatility σ (annualized)
 /// * `t` - Time to expiration T (in years)
-/// * `option_type` - Call or Put
+/// * `option_type` - Call or put payoff convention used for intrinsic value
+///   and the Black-Scholes pricing formula.
 ///
 /// # Returns
 ///
@@ -233,6 +246,17 @@ pub fn bs_price(
 /// The raw [`bs_price`] primitive remains an infallible formula for Rust call
 /// sites that intentionally handle `NaN` / infinity. Bindings should use this
 /// checked wrapper so invalid inputs cross the host boundary as errors.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `r` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `q` - Continuously compounded dividend yield or foreign-rate carry as a
+///   decimal.
+/// * `sigma` - Annualized lognormal volatility as a decimal.
+/// * `t` - Remaining time to expiry in years.
+/// * `option_type` - Call or put payoff convention for the returned price.
 #[allow(clippy::too_many_arguments)]
 pub fn bs_price_checked(
     spot: f64,
@@ -256,12 +280,12 @@ pub fn bs_price_checked(
 /// # Arguments
 ///
 /// * `spot` - Current spot price S
-/// * `strike` - Strike price K
+/// * `strike` - Exercise price K in the same units as the underlying spot.
 /// * `r` - Domestic (risk-free) rate, continuously compounded
 /// * `q` - Dividend yield or foreign rate, continuously compounded
 /// * `sigma` - Volatility σ (annualized)
 /// * `t` - Time to expiration T (in years)
-/// * `option_type` - Call or Put
+/// * `option_type` - Call or put payoff convention for the reported Greeks.
 /// * `theta_days_per_year` - Day-count basis for theta conversion (see below)
 ///
 /// # Returns
@@ -411,6 +435,19 @@ pub fn bs_greeks(
 ///
 /// Unlike the raw formula, this rejects non-finite or economically invalid
 /// inputs and verifies every returned sensitivity is finite.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `r` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `q` - Continuously compounded dividend yield or foreign-rate carry as a
+///   decimal.
+/// * `sigma` - Positive annualized lognormal volatility as a decimal.
+/// * `t` - Positive remaining time to expiry in years.
+/// * `option_type` - Call or put payoff convention for the reported Greeks.
+/// * `theta_days_per_year` - Positive calendar or trading-day basis used to
+///   convert annual theta into the returned per-day amount.
 #[allow(clippy::too_many_arguments)]
 pub fn bs_greeks_checked(
     spot: f64,
@@ -482,8 +519,8 @@ pub fn bs_greeks_checked(
 ///
 /// # Arguments
 ///
-/// * `forward` - Forward price F
-/// * `strike`  - Strike price K
+/// * `forward` - Forward price or rate F at option expiry.
+/// * `strike`  - Exercise price or rate K in the same units as `forward`.
 /// * `sigma`   - Implied volatility σ (annualized)
 /// * `t`       - Time to expiration T (in years)
 ///
@@ -509,8 +546,8 @@ pub fn black76_call(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 ///
 /// # Arguments
 ///
-/// * `forward` - Forward price F
-/// * `strike`  - Strike price K
+/// * `forward` - Forward price or rate F at option expiry.
+/// * `strike`  - Exercise price or rate K in the same units as `forward`.
 /// * `sigma`   - Implied volatility σ (annualized)
 /// * `t`       - Time to expiration T (in years)
 ///

@@ -273,7 +273,8 @@ class FinstackConfig:
         Parameters
         ----------
         key:
-            Extension key.
+            Namespaced extension key used to locate the versioned configuration
+            payload in this process-wide registry.
         value:
             Python data or a JSON string.
 
@@ -327,7 +328,7 @@ class FinstackConfig:
         Parameters
         ----------
         key:
-            Extension key.
+            Namespaced extension key whose serialized payload is requested.
 
         Returns
         -------
@@ -348,7 +349,7 @@ class FinstackConfig:
         Parameters
         ----------
         key:
-            Extension key.
+            Namespaced extension key whose JSON payload is decoded to Python.
 
         Returns
         -------

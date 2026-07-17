@@ -137,6 +137,14 @@ fn rolling_greeks_to_js(rg: &fa::RollingGreeks) -> Result<JsValue, JsValue> {
 }
 
 /// Stateful performance analytics engine over a panel of ticker price (or return) series.
+///
+/// Dates are ISO-8601 values in ascending order. Numeric inputs are row-major
+/// with one row per date and one column per ticker. Scalar rates and returns
+/// use decimal fractions; numeric outputs are Float64Array values in ticker
+/// order unless the method documents an object or matrix shape.
+///
+/// Invalid dates, shapes, frequencies, tickers, and confidence levels are
+/// returned as rejected JsValue errors.
 #[wasm_bindgen(js_name = Performance)]
 pub struct WasmPerformance {
     inner: fa::Performance,
@@ -147,6 +155,18 @@ impl WasmPerformance {
     /// Construct from a price matrix. `dates` is an array of ISO date strings,
     /// `prices` is `prices[i]` = column for ticker `i`.
     #[wasm_bindgen(constructor)]
+    /// `prices[i][j]` is the price for observation i and ticker j;
+    /// `ticker_names[j]` names the column. The default frequency is daily.
+    ///
+    /// # Errors
+    ///
+    /// Rejects malformed dates or matrices, invalid prices, unsupported
+    /// frequencies, and an unknown benchmark ticker.
+    /// @param dates - ISO-8601 observation dates in ascending order, one entry per price row.
+    /// @param prices - Row-major matrix where prices[i][j] is ticker j on observation i.
+    /// @param ticker_names - Ticker labels aligned with the price-matrix columns.
+    /// @param benchmark_ticker - Optional ticker label to use as the benchmark return series.
+    /// @param freq - Optional observation frequency token; defaults to daily.
     pub fn new(
         dates: JsValue,
         prices: JsValue,
@@ -168,6 +188,19 @@ impl WasmPerformance {
 
     /// Construct from a return matrix (one row per `dates` entry per ticker).
     #[wasm_bindgen(js_name = fromReturns)]
+    /// `returns[i][j]` is the simple decimal return for observation i and
+    /// ticker j. The date, frequency, and benchmark conventions match
+    /// Self::new.
+    ///
+    /// # Errors
+    ///
+    /// Rejects malformed dates or matrices and invalid benchmark or
+    /// frequency inputs.
+    /// @param dates - ISO-8601 observation dates in ascending order, one entry per return row.
+    /// @param returns - Row-major simple decimal return matrix where returns[i][j] is ticker j on observation i.
+    /// @param ticker_names - Ticker labels aligned with the return-matrix columns.
+    /// @param benchmark_ticker - Optional ticker label to use as the benchmark return series.
+    /// @param freq - Optional observation frequency token; defaults to daily.
     pub fn from_returns(
         dates: JsValue,
         returns: JsValue,
@@ -191,6 +224,8 @@ impl WasmPerformance {
 
     /// Restrict subsequent analytics to `[start, end]`.
     #[wasm_bindgen(js_name = resetDateRange)]
+    /// @param start - Inclusive ISO-8601 start date for the active analysis window.
+    /// @param end - Inclusive ISO-8601 end date for the active analysis window.
     pub fn reset_date_range(&mut self, start: &str, end: &str) -> Result<(), JsValue> {
         self.inner
             .reset_date_range(parse_iso_date(start)?, parse_iso_date(end)?);
@@ -199,6 +234,7 @@ impl WasmPerformance {
 
     /// Change the benchmark ticker.
     #[wasm_bindgen(js_name = resetBenchTicker)]
+    /// @param ticker - Existing ticker label to use as the benchmark return series.
     pub fn reset_bench_ticker(&mut self, ticker: &str) -> Result<(), JsValue> {
         self.inner.reset_bench_ticker(ticker).map_err(to_js_err)
     }
@@ -243,6 +279,7 @@ impl WasmPerformance {
 
     /// Date grid for one ticker's active return series as ISO date strings.
     #[wasm_bindgen(js_name = activeDatesForTicker)]
+    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
     pub fn active_dates_for_ticker(&self, ticker_idx: usize) -> Result<Vec<String>, JsValue> {
         Ok(self
             .inner
@@ -262,21 +299,25 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = meanReturn)]
     /// Mean periodic return per asset (annualized by default).
+    /// @param annualize - Whether to annualize by the configured frequency; defaults to true.
     pub fn mean_return(&self, annualize: Option<bool>) -> JsValue {
         vec_f64_to_js(&self.inner.mean_return(annualize.unwrap_or(true)))
     }
 
     /// Return volatility per asset (annualized by default).
+    /// @param annualize - Whether to annualize by the configured frequency; defaults to true.
     pub fn volatility(&self, annualize: Option<bool>) -> JsValue {
         vec_f64_to_js(&self.inner.volatility(annualize.unwrap_or(true)))
     }
 
     /// Sharpe ratio per asset for the given risk-free rate.
+    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     pub fn sharpe(&self, risk_free_rate: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.sharpe(risk_free_rate.unwrap_or(0.0)))
     }
 
     /// Sortino ratio per asset for the given per-period minimum acceptable return.
+    /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
     pub fn sortino(&self, mar: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.sortino(mar.unwrap_or(0.0)))
     }
@@ -300,6 +341,7 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = valueAtRisk)]
     /// Historical value-at-risk per asset at the given confidence level.
+    /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     pub fn value_at_risk(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(
             &self
@@ -310,6 +352,7 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = expectedShortfall)]
     /// Expected shortfall (CVaR) per asset at the given confidence level.
+    /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     pub fn expected_shortfall(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(
             &self
@@ -360,6 +403,7 @@ impl WasmPerformance {
     #[wasm_bindgen(js_name = valueAtRiskAndEs)]
     /// Per-asset historical VaR and expected shortfall from one tail pass, as
     /// `{ value_at_risk: Float64Array, expected_shortfall: Float64Array }`.
+    /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     pub fn value_at_risk_and_es(&self, confidence: Option<f64>) -> Result<JsValue, JsValue> {
         let (var, es) = self
             .inner
@@ -372,6 +416,7 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = downsideDeviation)]
     /// Downside deviation per asset below the per-period minimum acceptable return.
+    /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
     pub fn downside_deviation(&self, mar: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.downside_deviation(mar.unwrap_or(0.0)))
     }
@@ -403,11 +448,13 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = omegaRatio)]
     /// Omega ratio per asset for the given threshold return.
+    /// @param threshold - Per-period threshold return as a decimal; defaults to 0.0.
     pub fn omega_ratio(&self, threshold: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.omega_ratio(threshold.unwrap_or(0.0)))
     }
 
     /// Treynor ratio per asset for the given risk-free rate.
+    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     pub fn treynor(&self, risk_free_rate: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.treynor(risk_free_rate.unwrap_or(0.0)))
     }
@@ -444,12 +491,14 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = painRatio)]
     /// Pain ratio (excess return over pain index) per asset.
+    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     pub fn pain_ratio(&self, risk_free_rate: Option<f64>) -> Result<JsValue, JsValue> {
         result_vec_f64_to_js(self.inner.pain_ratio(risk_free_rate.unwrap_or(0.0)))
     }
 
     #[wasm_bindgen(js_name = tailRatio)]
     /// Tail ratio of upper to lower return quantiles per asset.
+    /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     pub fn tail_ratio(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(
             &self
@@ -472,6 +521,7 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = parametricVar)]
     /// Parametric (Gaussian) value-at-risk per asset.
+    /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     pub fn parametric_var(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(
             &self
@@ -482,6 +532,7 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = cornishFisherVar)]
     /// Cornish-Fisher adjusted value-at-risk per asset.
+    /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     pub fn cornish_fisher_var(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(
             &self
@@ -491,18 +542,22 @@ impl WasmPerformance {
     }
 
     /// Conditional drawdown-at-risk per asset at the given confidence level.
+    /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     pub fn cdar(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.cdar(confidence.unwrap_or(DEFAULT_CONFIDENCE)))
     }
 
     #[wasm_bindgen(js_name = mSquared)]
     /// M-squared (Modigliani) risk-adjusted return per asset.
+    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     pub fn m_squared(&self, risk_free_rate: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.m_squared(risk_free_rate.unwrap_or(0.0)))
     }
 
     #[wasm_bindgen(js_name = modifiedSharpe)]
     /// Modified Sharpe ratio using Cornish-Fisher VaR per asset.
+    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     pub fn modified_sharpe(&self, risk_free_rate: Option<f64>, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.modified_sharpe(
             risk_free_rate.unwrap_or(0.0),
@@ -512,6 +567,8 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = sterlingRatio)]
     /// Sterling ratio over the `n` largest drawdowns per asset.
+    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param n - Number of largest drawdowns to include; defaults to 5.
     pub fn sterling_ratio(
         &self,
         risk_free_rate: Option<f64>,
@@ -525,6 +582,8 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = burkeRatio)]
     /// Burke ratio over the `n` largest drawdowns per asset.
+    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param n - Number of largest drawdowns to include; defaults to 5.
     pub fn burke_ratio(
         &self,
         risk_free_rate: Option<f64>,
@@ -570,6 +629,8 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = excessReturns)]
     /// Excess returns over the supplied risk-free series per asset.
+    /// @param rf - Risk-free return series as decimal values aligned with active observations.
+    /// @param nperiods - Optional periods per year used to annualize excess returns.
     pub fn excess_returns(&self, rf: JsValue, nperiods: Option<f64>) -> Result<JsValue, JsValue> {
         let rf = parse_f64_vec(rf)?;
         Ok(matrix_f64_to_js(&self.inner.excess_returns(&rf, nperiods)))
@@ -583,12 +644,16 @@ impl WasmPerformance {
     }
 
     /// Benchmark regression annualized Jensen alpha/beta statistics per asset.
+    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     pub fn greeks(&self, risk_free_rate: Option<f64>) -> Result<JsValue, JsValue> {
         to_js(&self.inner.greeks(risk_free_rate.unwrap_or(0.0)))
     }
 
     #[wasm_bindgen(js_name = rollingGreeks)]
     /// Rolling benchmark annualized Jensen alpha/beta for one asset over a window.
+    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param window - Observation window length; defaults to 63 periods.
+    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     pub fn rolling_greeks(
         &self,
         ticker_idx: usize,
@@ -608,6 +673,8 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = rollingVolatility)]
     /// Rolling volatility series for one asset over a window.
+    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param window - Observation window length; defaults to 63 periods.
     pub fn rolling_volatility(
         &self,
         ticker_idx: usize,
@@ -622,6 +689,9 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = rollingSortino)]
     /// Rolling Sortino ratio series for one asset over a window.
+    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param window - Observation window length; defaults to 63 periods.
+    /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
     pub fn rolling_sortino(
         &self,
         ticker_idx: usize,
@@ -641,6 +711,9 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = rollingSharpe)]
     /// Rolling Sharpe ratio series for one asset over a window.
+    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param window - Observation window length; defaults to 63 periods.
+    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     pub fn rolling_sharpe(
         &self,
         ticker_idx: usize,
@@ -660,6 +733,8 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = rollingReturns)]
     /// Rolling compounded return series for one asset over a window.
+    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param window - Positive number of observations to compound in each window.
     pub fn rolling_returns(&self, ticker_idx: usize, window: usize) -> Result<JsValue, JsValue> {
         let series = self
             .inner
@@ -670,6 +745,8 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = drawdownDetails)]
     /// Details of the `n` largest drawdown episodes for one asset.
+    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param n - Number of largest drawdown episodes to return; defaults to 5.
     pub fn drawdown_details(
         &self,
         ticker_idx: usize,
@@ -685,6 +762,8 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = multiFactorGreeks)]
     /// Multi-factor regression statistics for one asset.
+    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param factor_returns - Matrix of aligned decimal factor-return series, one row per factor.
     pub fn multi_factor_greeks(
         &self,
         ticker_idx: usize,
@@ -709,6 +788,10 @@ impl WasmPerformance {
     /// (`fiscalYearStartMonth` / `fiscalYearStartDay`) adjusted to the next
     /// business day on `calendar` (default `"nyse"`); pass the calendar id
     /// matching your market for non-US panels.
+    /// @param ref_date - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
+    /// @param fiscal_year_start_month - Optional fiscal-year start month from 1 through 12; defaults to January.
+    /// @param fiscal_year_start_day - Optional fiscal-year start day; defaults to the first day.
+    /// @param calendar - Optional holiday-calendar id for FYTD adjustment; defaults to NYSE.
     pub fn lookback_returns(
         &self,
         ref_date: &str,
@@ -725,6 +808,10 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = periodStats)]
     /// Aggregated period statistics for one asset at the given frequency.
+    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param agg_freq - Optional aggregation frequency token; defaults to monthly.
+    /// @param fiscal_year_start_month - Optional fiscal-year start month from 1 through 12.
+    /// @param fiscal_year_start_day - Optional fiscal-year start day within the selected month.
     pub fn period_stats(
         &self,
         ticker_idx: usize,

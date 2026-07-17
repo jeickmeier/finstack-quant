@@ -157,6 +157,13 @@ fn prepayment_shift(
 ///
 /// Returns the shift in **basis points** of CPR (0.0 if not applicable),
 /// pairing directly with the `$ per 1bp` `Prepayment01` metric.
+///
+/// # Arguments
+///
+/// * `snapshot_t0` - Opening model-parameter snapshot containing the
+///   prepayment specification, if applicable.
+/// * `snapshot_t1` - Closing model-parameter snapshot whose prepayment terms
+///   are compared with `snapshot_t0`.
 pub fn measure_prepayment_shift(
     snapshot_t0: &ModelParamsSnapshot,
     snapshot_t1: &ModelParamsSnapshot,
@@ -197,6 +204,13 @@ fn default_shift(
 ///
 /// Returns the shift in **basis points** of CDR (0.0 if not applicable),
 /// pairing directly with the `$ per 1bp` `Default01` metric.
+///
+/// # Arguments
+///
+/// * `snapshot_t0` - Opening model-parameter snapshot containing the default
+///   specification, if applicable.
+/// * `snapshot_t1` - Closing model-parameter snapshot whose default terms are
+///   compared with `snapshot_t0`.
 pub fn measure_default_shift(
     snapshot_t0: &ModelParamsSnapshot,
     snapshot_t1: &ModelParamsSnapshot,
@@ -237,6 +251,13 @@ fn recovery_shift(
 ///
 /// Returns the shift in **percentage points** (0.0 if not applicable),
 /// pairing directly with the `$ per 1%` `Recovery01` metric.
+///
+/// # Arguments
+///
+/// * `snapshot_t0` - Opening model-parameter snapshot containing the recovery
+///   specification, if applicable.
+/// * `snapshot_t1` - Closing model-parameter snapshot whose recovery terms are
+///   compared with `snapshot_t0`.
 pub fn measure_recovery_shift(
     snapshot_t0: &ModelParamsSnapshot,
     snapshot_t1: &ModelParamsSnapshot,
@@ -278,6 +299,12 @@ fn conversion_shift(
 /// Measure conversion ratio shift between two snapshots.
 ///
 /// Returns shift in percentage points, or 0.0 if not applicable.
+///
+/// # Arguments
+///
+/// * `snapshot_t0` - Opening convertible model-parameter snapshot.
+/// * `snapshot_t1` - Closing convertible model-parameter snapshot whose
+///   conversion ratio is compared with `snapshot_t0`.
 pub fn measure_conversion_shift(
     snapshot_t0: &ModelParamsSnapshot,
     snapshot_t1: &ModelParamsSnapshot,

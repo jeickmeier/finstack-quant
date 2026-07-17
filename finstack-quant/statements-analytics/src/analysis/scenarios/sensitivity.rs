@@ -71,6 +71,11 @@ impl<'a> SensitivityAnalyzer<'a> {
     /// WebAssembly builds use the serial path (no Rayon thread pool).
     ///
     /// Full-grid and tornado modes remain serial.
+    ///
+    /// # Errors
+    ///
+    /// Propagates invalid sensitivity configuration, parameter perturbation,
+    /// model evaluation, and result-collection errors from the selected mode.
     pub fn run(&self, config: &SensitivityConfig) -> Result<SensitivityResult> {
         match config.mode {
             // Diagonal runs in parallel on native targets; wasm32 has no

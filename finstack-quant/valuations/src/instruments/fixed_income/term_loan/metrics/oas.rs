@@ -1,3 +1,5 @@
+//! Oas implementation used by the metrics subsystem.
+//!
 use crate::instruments::TermLoan;
 use crate::metrics::{MetricCalculator, MetricContext};
 

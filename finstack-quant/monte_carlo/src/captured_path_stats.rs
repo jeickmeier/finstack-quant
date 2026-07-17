@@ -1,3 +1,5 @@
+//! Online statistics computed from paths captured during Monte Carlo execution.
+//!
 use crate::estimate::Estimate;
 use crate::paths::SimulatedPath;
 

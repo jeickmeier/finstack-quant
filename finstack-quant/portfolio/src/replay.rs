@@ -83,6 +83,11 @@ impl ReplayTimeline {
     ///
     /// This is the canonical entry point used by the Python and WASM bindings;
     /// they do not parse snapshots themselves.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] when the JSON or any ISO-8601 date is
+    /// invalid, or when the decoded snapshots violate timeline ordering rules.
     pub fn from_json_snapshots(json: &str) -> Result<Self> {
         let format = time::format_description::well_known::Iso8601::DEFAULT;
         let raw: Vec<JsonSnapshot> = serde_json::from_str(json)
@@ -101,6 +106,11 @@ impl ReplayTimeline {
     ///
     /// Returns an error if the vector is empty, not sorted by date, or
     /// contains duplicate dates.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] for an empty timeline or dates that are
+    /// not strictly ascending.
     pub fn new(snapshots: Vec<(Date, MarketContext)>) -> Result<Self> {
         if snapshots.is_empty() {
             return Err(Error::InvalidInput(
@@ -226,6 +236,29 @@ const REPLAY_OUTER_PARALLEL_SNAPSHOT_THRESHOLD: usize = 8;
 ///
 /// Returns a [`ReplayResult`] containing the per-step detail and an
 /// aggregate [`ReplaySummary`].
+///
+/// Under [`ReplayErrorPolicy::Strict`], the first failed valuation or
+/// attribution aborts the replay. Under `BestEffort`, failed valuations are
+/// recorded in `skipped_dates` and P&L is measured between consecutive
+/// surviving dates; the call still fails if no snapshot can be valued.
+///
+/// # Errors
+///
+/// Returns valuation or attribution errors under the strict policy, failures
+/// from an empty best-effort result, and errors while computing daily or
+/// cumulative base-currency P&L (for example, an incompatible currency or
+/// amount overflow).
+///
+/// # Arguments
+///
+/// * `portfolio` - Static portfolio definition valued at every timeline
+///   snapshot; its base currency is used for replay P&L.
+/// * `timeline` - Ordered dated market snapshots to replay; each date is
+///   passed as the explicit valuation date for its snapshot.
+/// * `config` - Replay mode, error policy, attribution settings, and
+///   portfolio-valuation options.
+/// * `finstack_config` - Library configuration for pricing conventions and
+///   market-data resolution at each replay step.
 pub fn replay_portfolio(
     portfolio: &Portfolio,
     timeline: &ReplayTimeline,

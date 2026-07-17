@@ -1,3 +1,5 @@
+//! Problem, decision-space, constraint, and solver types for portfolio optimization.
+//!
 use super::constraints::Constraint;
 use super::types::{MissingMetricPolicy, Objective, WeightingScheme};
 use super::universe::TradeUniverse;

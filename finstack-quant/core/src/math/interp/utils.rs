@@ -48,7 +48,23 @@ where
     None
 }
 
-/// Validate strictly increasing knots with length >= 2.
+/// Validate a finite, strictly increasing interpolation knot axis.
+///
+/// The values are arbitrary real coordinates; this helper does not require
+/// times to be positive or start at zero. It checks monotonicity but not the
+/// stronger minimum-spacing requirement used by slope-sensitive strategies.
+///
+/// # Arguments
+///
+/// * `knots` - Finite interpolation coordinates in strictly increasing order.
+///   At least two values are required.
+///
+/// # Errors
+///
+/// Returns [`InputError::TooFewPoints`] for fewer than two knots,
+/// [`InputError::Invalid`] for NaN or infinity, and
+/// [`InputError::NonMonotonicKnots`] when any consecutive pair is equal or
+/// decreasing.
 pub fn validate_knots(knots: &[f64]) -> crate::Result<()> {
     if knots.len() < 2 {
         return Err(InputError::TooFewPoints.into());

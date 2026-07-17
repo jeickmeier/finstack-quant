@@ -30,6 +30,11 @@ pub const SUPERVISORY_OPTION_VOLS: &[(SaCcrAssetClass, f64)] = &[
 ];
 
 /// Look up supervisory factor for an asset class.
+///
+/// # Arguments
+///
+/// * `asset_class` - SA-CCR asset class whose BCBS supervisory factor is
+///   required; unknown future variants use the documented fallback factor.
 #[must_use]
 pub fn supervisory_factor(asset_class: SaCcrAssetClass) -> f64 {
     SUPERVISORY_FACTORS
@@ -40,6 +45,11 @@ pub fn supervisory_factor(asset_class: SaCcrAssetClass) -> f64 {
 }
 
 /// Look up supervisory correlation for an asset class.
+///
+/// # Arguments
+///
+/// * `asset_class` - SA-CCR asset class whose prescribed aggregation
+///   correlation is required; unknown future variants use the fallback 0.50.
 #[must_use]
 pub fn supervisory_correlation(asset_class: SaCcrAssetClass) -> f64 {
     SUPERVISORY_CORRELATIONS

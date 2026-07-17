@@ -1,3 +1,5 @@
+//! Shared runtime types and solver contracts for market calibration.
+//!
 use crate::calibration::api::schema::{
     CalibrationStep, HullWhiteVolatilityMode, StepParams, StepPrimaryOutput,
 };

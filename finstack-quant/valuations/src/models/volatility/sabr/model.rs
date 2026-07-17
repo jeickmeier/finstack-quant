@@ -1,3 +1,5 @@
+//! SABR model, smile, parameter, and calibration support.
+//!
 use super::parameters::SABRParameters;
 use finstack_quant_core::{Error, Result};
 

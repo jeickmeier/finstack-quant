@@ -14,6 +14,7 @@ use wasm_bindgen::prelude::*;
 /// Accepts a square matrix as a nested JS array (`number[][]`, row-major)
 /// and returns the lower-triangular factor L such that A = L L^T.
 #[wasm_bindgen(js_name = choleskyDecomposition)]
+/// @param matrix - Square numeric matrix in the nested or row-major shape required by this callable.
 pub fn cholesky_decomposition(matrix: JsValue) -> Result<JsValue, JsValue> {
     let rows: Vec<Vec<f64>> = serde_wasm_bindgen::from_value(matrix).map_err(to_js_err)?;
     let n = rows.len();
@@ -28,6 +29,8 @@ pub fn cholesky_decomposition(matrix: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Accepts L as `number[][]` and b as `number[]`. Returns x as `number[]`.
 #[wasm_bindgen(js_name = choleskySolve)]
+/// @param chol - Lower-triangular Cholesky factor of the coefficient matrix, in the documented matrix shape.
+/// @param b - Right-hand-side vector of a linear system, aligned with the Cholesky factor dimension.
 pub fn cholesky_solve(chol: JsValue, b: JsValue) -> Result<JsValue, JsValue> {
     let rows: Vec<Vec<f64>> = serde_wasm_bindgen::from_value(chol).map_err(to_js_err)?;
     let n = rows.len();
@@ -49,6 +52,8 @@ pub fn cholesky_solve(chol: JsValue, b: JsValue) -> Result<JsValue, JsValue> {
 /// Accepts a `Float64Array`/`number[]` containing `n * n` row-major entries
 /// and returns a flat lower-triangular factor.
 #[wasm_bindgen(js_name = choleskyDecompositionFlat)]
+/// @param matrix - Square numeric matrix in the nested or row-major shape required by this callable.
+/// @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
 pub fn cholesky_decomposition_flat(matrix: &[f64], n: usize) -> Result<Box<[f64]>, JsValue> {
     validate_flat_matrix_len(matrix, n)?;
     linalg::cholesky_decomposition(matrix, n)
@@ -58,6 +63,9 @@ pub fn cholesky_decomposition_flat(matrix: &[f64], n: usize) -> Result<Box<[f64]
 
 /// Solve a symmetric positive-definite linear system from a flat Cholesky factor.
 #[wasm_bindgen(js_name = choleskySolveFlat)]
+/// @param chol - Lower-triangular Cholesky factor of the coefficient matrix, in the documented matrix shape.
+/// @param b - Right-hand-side vector of a linear system, aligned with the Cholesky factor dimension.
+/// @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
 pub fn cholesky_solve_flat(chol: &[f64], b: &[f64], n: usize) -> Result<Box<[f64]>, JsValue> {
     validate_flat_matrix_len(chol, n)?;
     if b.len() != n {
@@ -76,6 +84,8 @@ pub fn cholesky_solve_flat(chol: &[f64], b: &[f64], n: usize) -> Result<Box<[f64
 /// This is the only correlation-matrix validator on the `core` namespace.
 /// Callers pass `n * n` row-major entries plus the matrix dimension `n`.
 #[wasm_bindgen(js_name = validateCorrelationMatrixFlat)]
+/// @param matrix - Square numeric matrix in the nested or row-major shape required by this callable.
+/// @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
 pub fn validate_correlation_matrix_flat(matrix: &[f64], n: usize) -> Result<(), JsValue> {
     validate_flat_matrix_len(matrix, n)?;
     linalg::validate_correlation_matrix(matrix, n).map_err(to_js_err)
@@ -87,6 +97,7 @@ pub fn validate_correlation_matrix_flat(matrix: &[f64], n: usize) -> Result<(), 
 
 /// Arithmetic mean.
 #[wasm_bindgen(js_name = mean)]
+/// @param data - Non-empty numeric observation array used by the requested statistic.
 pub fn mean(data: JsValue) -> Result<f64, JsValue> {
     let v: Vec<f64> = serde_wasm_bindgen::from_value(data).map_err(to_js_err)?;
     Ok(stats::mean(&v))
@@ -94,6 +105,7 @@ pub fn mean(data: JsValue) -> Result<f64, JsValue> {
 
 /// Sample variance (unbiased, n-1 denominator).
 #[wasm_bindgen(js_name = variance)]
+/// @param data - Non-empty numeric observation array used by the requested statistic.
 pub fn variance(data: JsValue) -> Result<f64, JsValue> {
     let v: Vec<f64> = serde_wasm_bindgen::from_value(data).map_err(to_js_err)?;
     Ok(stats::variance(&v))
@@ -101,6 +113,7 @@ pub fn variance(data: JsValue) -> Result<f64, JsValue> {
 
 /// Population variance (n denominator).
 #[wasm_bindgen(js_name = populationVariance)]
+/// @param data - Non-empty numeric observation array used by the requested statistic.
 pub fn population_variance(data: JsValue) -> Result<f64, JsValue> {
     let v: Vec<f64> = serde_wasm_bindgen::from_value(data).map_err(to_js_err)?;
     Ok(stats::population_variance(&v))
@@ -108,6 +121,8 @@ pub fn population_variance(data: JsValue) -> Result<f64, JsValue> {
 
 /// Pearson correlation coefficient.
 #[wasm_bindgen(js_name = correlation)]
+/// @param x - Numeric observation series aligned one-for-one with the other series.
+/// @param y - Numeric observation series aligned one-for-one with the other series.
 pub fn correlation(x: JsValue, y: JsValue) -> Result<f64, JsValue> {
     let xv: Vec<f64> = serde_wasm_bindgen::from_value(x).map_err(to_js_err)?;
     let yv: Vec<f64> = serde_wasm_bindgen::from_value(y).map_err(to_js_err)?;
@@ -116,6 +131,8 @@ pub fn correlation(x: JsValue, y: JsValue) -> Result<f64, JsValue> {
 
 /// Sample covariance (unbiased, n-1 denominator).
 #[wasm_bindgen(js_name = covariance)]
+/// @param x - Numeric observation series aligned one-for-one with the other series.
+/// @param y - Numeric observation series aligned one-for-one with the other series.
 pub fn covariance(x: JsValue, y: JsValue) -> Result<f64, JsValue> {
     let xv: Vec<f64> = serde_wasm_bindgen::from_value(x).map_err(to_js_err)?;
     let yv: Vec<f64> = serde_wasm_bindgen::from_value(y).map_err(to_js_err)?;
@@ -124,6 +141,8 @@ pub fn covariance(x: JsValue, y: JsValue) -> Result<f64, JsValue> {
 
 /// Empirical quantile (R-7 / NumPy default) with linear interpolation.
 #[wasm_bindgen(js_name = quantile)]
+/// @param data - Non-empty numeric observation array used by the requested statistic.
+/// @param q - Quantile probability from 0 through 1 used to select the order statistic.
 pub fn quantile(data: JsValue, q: f64) -> Result<f64, JsValue> {
     let mut v: Vec<f64> = serde_wasm_bindgen::from_value(data).map_err(to_js_err)?;
     Ok(stats::quantile(&mut v, q))
@@ -131,36 +150,45 @@ pub fn quantile(data: JsValue, q: f64) -> Result<f64, JsValue> {
 
 /// Arithmetic mean over a typed numeric array.
 #[wasm_bindgen(js_name = meanArray)]
+/// @param data - Non-empty numeric observation array used by the requested statistic.
 pub fn mean_array(data: &[f64]) -> f64 {
     stats::mean(data)
 }
 
 /// Sample variance over a typed numeric array.
 #[wasm_bindgen(js_name = varianceArray)]
+/// @param data - Non-empty numeric observation array used by the requested statistic.
 pub fn variance_array(data: &[f64]) -> f64 {
     stats::variance(data)
 }
 
 /// Population variance over a typed numeric array.
 #[wasm_bindgen(js_name = populationVarianceArray)]
+/// @param data - Non-empty numeric observation array used by the requested statistic.
 pub fn population_variance_array(data: &[f64]) -> f64 {
     stats::population_variance(data)
 }
 
 /// Pearson correlation over typed numeric arrays.
 #[wasm_bindgen(js_name = correlationArray)]
+/// @param x - Numeric observation series aligned one-for-one with the other series.
+/// @param y - Numeric observation series aligned one-for-one with the other series.
 pub fn correlation_array(x: &[f64], y: &[f64]) -> f64 {
     stats::correlation(x, y)
 }
 
 /// Sample covariance over typed numeric arrays.
 #[wasm_bindgen(js_name = covarianceArray)]
+/// @param x - Numeric observation series aligned one-for-one with the other series.
+/// @param y - Numeric observation series aligned one-for-one with the other series.
 pub fn covariance_array(x: &[f64], y: &[f64]) -> f64 {
     stats::covariance(x, y)
 }
 
 /// Empirical quantile over a typed numeric array.
 #[wasm_bindgen(js_name = quantileArray)]
+/// @param data - Non-empty numeric observation array used by the requested statistic.
+/// @param q - Quantile probability from 0 through 1 used to select the order statistic.
 pub fn quantile_array(data: &[f64], q: f64) -> f64 {
     let mut v = data.to_vec();
     stats::quantile(&mut v, q)
@@ -172,30 +200,35 @@ pub fn quantile_array(data: &[f64], q: f64) -> f64 {
 
 /// Standard normal CDF Φ(x).
 #[wasm_bindgen(js_name = normCdf)]
+/// @param x - Real-valued input to the requested scalar mathematical function.
 pub fn norm_cdf(x: f64) -> f64 {
     special_functions::norm_cdf(x)
 }
 
 /// Standard normal PDF φ(x).
 #[wasm_bindgen(js_name = normPdf)]
+/// @param x - Real-valued input to the requested scalar mathematical function.
 pub fn norm_pdf(x: f64) -> f64 {
     special_functions::norm_pdf(x)
 }
 
 /// Inverse standard normal CDF Φ⁻¹(p).
 #[wasm_bindgen(js_name = standardNormalInvCdf)]
+/// @param p - Probability input strictly between 0 and 1 for the inverse normal distribution.
 pub fn standard_normal_inv_cdf(p: f64) -> f64 {
     special_functions::standard_normal_inv_cdf(p)
 }
 
 /// Error function erf(x).
 #[wasm_bindgen(js_name = erf)]
+/// @param x - Real-valued input to the requested scalar mathematical function.
 pub fn erf(x: f64) -> f64 {
     special_functions::erf(x)
 }
 
 /// Natural logarithm of the Gamma function ln(Γ(x)).
 #[wasm_bindgen(js_name = lnGamma)]
+/// @param x - Real-valued input to the requested scalar mathematical function.
 pub fn ln_gamma(x: f64) -> f64 {
     special_functions::ln_gamma(x)
 }
@@ -206,6 +239,7 @@ pub fn ln_gamma(x: f64) -> f64 {
 
 /// Kahan compensated summation.
 #[wasm_bindgen(js_name = kahanSum)]
+/// @param values - Numeric values in the order used by the requested numerical operation.
 pub fn kahan_sum(values: JsValue) -> Result<f64, JsValue> {
     let v: Vec<f64> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
     Ok(summation::kahan_sum(v))
@@ -213,6 +247,7 @@ pub fn kahan_sum(values: JsValue) -> Result<f64, JsValue> {
 
 /// Neumaier compensated summation — handles mixed-sign values.
 #[wasm_bindgen(js_name = neumaierSum)]
+/// @param values - Numeric values in the order used by the requested numerical operation.
 pub fn neumaier_sum(values: JsValue) -> Result<f64, JsValue> {
     let v: Vec<f64> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
     Ok(summation::neumaier_sum(v))
@@ -220,6 +255,7 @@ pub fn neumaier_sum(values: JsValue) -> Result<f64, JsValue> {
 
 /// Count the longest consecutive run of strictly positive values.
 #[wasm_bindgen(js_name = countConsecutive)]
+/// @param values - Numeric values in the order used by the requested numerical operation.
 pub fn count_consecutive(values: JsValue) -> Result<usize, JsValue> {
     let v: Vec<f64> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
     Ok(math::count_consecutive(&v, |x| x > 0.0))
@@ -227,18 +263,21 @@ pub fn count_consecutive(values: JsValue) -> Result<usize, JsValue> {
 
 /// Kahan compensated summation over a typed numeric array.
 #[wasm_bindgen(js_name = kahanSumArray)]
+/// @param values - Numeric values in the order used by the requested numerical operation.
 pub fn kahan_sum_array(values: &[f64]) -> f64 {
     summation::kahan_sum(values.iter().copied())
 }
 
 /// Neumaier compensated summation over a typed numeric array.
 #[wasm_bindgen(js_name = neumaierSumArray)]
+/// @param values - Numeric values in the order used by the requested numerical operation.
 pub fn neumaier_sum_array(values: &[f64]) -> f64 {
     summation::neumaier_sum(values.iter().copied())
 }
 
 /// Count the longest consecutive run of strictly positive values in a typed array.
 #[wasm_bindgen(js_name = countConsecutiveArray)]
+/// @param values - Numeric values in the order used by the requested numerical operation.
 pub fn count_consecutive_array(values: &[f64]) -> usize {
     math::count_consecutive(values, |x| x > 0.0)
 }

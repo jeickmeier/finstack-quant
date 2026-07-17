@@ -172,6 +172,18 @@ impl FxDeltaVolSurface {
     }
 
     /// Create a surface with both 25-delta and 10-delta wings.
+    ///
+    /// All vectors are indexed by `expiries`. The 25-delta and 10-delta risk
+    /// reversals are call-volatility minus put-volatility; each butterfly is
+    /// the average wing volatility minus ATM. Volatilities are decimal annual
+    /// standard deviations (for example, `0.12` for 12%), not percentages.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any quote vector is empty or has a length different
+    /// from `expiries`, expiries are non-positive, non-finite, or not strictly
+    /// increasing, ATM volatilities are non-positive or non-finite, or any
+    /// risk-reversal or butterfly quote is non-finite.
     pub fn with_10d(
         id: impl Into<CurveId>,
         expiries: Vec<f64>,
@@ -340,6 +352,19 @@ impl FxDeltaVolSurface {
     /// * `spot`    - FX spot rate
     /// * `r_d`     - Domestic continuously compounded interest rate
     /// * `r_f`     - Foreign continuously compounded interest rate
+    ///
+    /// The resulting surface has a strike axis equal to the union of the
+    /// per-expiry delta-derived strikes. At a quoted expiry, its row exactly
+    /// reproduces that expiry's linearly interpolated smile; it is a
+    /// compatibility representation, not a delta-space interpolation model.
+    ///
+    /// # Errors
+    ///
+    /// Returns any validation or delta-to-strike conversion error from
+    /// [`FxDeltaVolSurfaceBuilder::build`], including a non-positive spot,
+    /// inconsistent quote lengths, invalid expiries or volatilities, malformed
+    /// wing pairs, or a non-positive wing volatility recovered from RR/BF
+    /// quotes.
     pub fn to_vol_surface(&self, spot: f64, r_d: f64, r_f: f64) -> crate::Result<VolSurface> {
         let mut builder = FxDeltaVolSurfaceBuilder::new(self.id.clone())
             .spot(spot)

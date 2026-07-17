@@ -77,6 +77,11 @@ pub struct AllocationResult {
 ///
 /// For full CTD analysis, users should provide explicit `assumed_pool`
 /// on the TBA instrument.
+///
+/// # Arguments
+///
+/// * `tba` - Agency TBA contract whose coupon, settlement month, and program
+///   conventions determine the assumed generic deliverable pool.
 pub fn allocate_generic_pool(tba: &AgencyTba) -> Result<AllocationResult> {
     use crate::instruments::fixed_income::tba::pricer::create_assumed_pool;
     use finstack_quant_core::dates::Date;
@@ -266,6 +271,12 @@ fn validate_positive(label: &str, value: f64) -> Result<()> {
 ///
 /// # Reference
 /// SIFMA Good Delivery Guidelines Section 3.2
+///
+/// # Arguments
+///
+/// * `allocated_face` - Face amount of pools allocated to the TBA trade.
+/// * `trade_notional` - Contract face amount used as the denominator for the
+///   allowed ±0.01% SIFMA delivery variance.
 pub fn validate_sifma_variance(allocated_face: f64, trade_notional: f64) -> bool {
     if trade_notional <= 0.0 {
         return false;
@@ -277,6 +288,13 @@ pub fn validate_sifma_variance(allocated_face: f64, trade_notional: f64) -> bool
 /// Calculate value adjustment for a specified pool vs. generic.
 ///
 /// Positive adjustment means the specified pool is worth more than generic.
+///
+/// # Arguments
+///
+/// * `_characteristics` - Specified-pool collateral characteristics intended
+///   for the future pay-up model; currently retained for API compatibility.
+/// * `tba` - Agency TBA contract identified in the explicit not-implemented
+///   validation error returned by this placeholder.
 pub fn calculate_pay_up(
     _characteristics: &PoolCharacteristics,
     tba: &AgencyTba,

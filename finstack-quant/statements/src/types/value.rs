@@ -94,6 +94,21 @@ impl From<Money> for AmountOrScalar {
 /// - `Ok(Some(NodeValueType::Scalar))` when all values are scalar
 /// - `Ok(Some(NodeValueType::Monetary { .. }))` when all values are monetary and share a currency
 /// - `Err(..)` when the series mixes scalars and amounts or mixes currencies
+///
+/// This inference protects one financial-statement node from silently mixing a
+/// money series with a ratio/quantity series. It does not convert currencies
+/// or apply FX; callers must convert values before constructing the series.
+///
+/// # Arguments
+///
+/// * `values` - Iterable of scalar or monetary node values to inspect; a
+///   non-empty series must contain one compatible value type and currency.
+///
+/// # Errors
+///
+/// Returns a currency-mismatch error when monetary entries use different
+/// currencies, or an invalid-input error when scalar and monetary entries are
+/// mixed. Empty input is valid and yields `Ok(None)`.
 pub fn infer_series_value_type<'a, I>(values: I) -> Result<Option<NodeValueType>>
 where
     I: IntoIterator<Item = &'a AmountOrScalar>,

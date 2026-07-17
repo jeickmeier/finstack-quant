@@ -52,6 +52,17 @@ impl FromStr for PairwiseOp {
 
 /// Transform a cross-section within each `(time_key, group)` sub-partition.
 ///
+/// # Arguments
+///
+/// * `values` - Row-aligned numeric input values; missing or non-finite values
+///   are handled by the selected cross-sectional operation.
+/// * `time_key` - Row-aligned time partition labels; each time/group pair is
+///   transformed independently.
+/// * `groups` - Row-aligned group labels that subdivide every time partition.
+/// * `op` - Canonical snake-case cross-sectional operation name.
+/// * `params` - Optional operation-specific JSON parameters; omitted keys use
+///   the operation's documented defaults.
+///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, `op` is unsupported,
@@ -68,6 +79,17 @@ pub fn transform_cross_sectional_grouped(
 }
 
 /// Transform a cross-section within each `(time_key, group)` sub-partition.
+///
+/// # Arguments
+///
+/// * `values` - Row-aligned numeric input values; output preserves the input
+///   row order after transforming each time/group sub-partition.
+/// * `time_key` - Row-aligned time partition labels; length must equal
+///   `values`.
+/// * `groups` - Row-aligned group labels; length must equal `values`.
+/// * `op` - Typed cross-sectional operation to apply to each sub-partition.
+/// * `params` - Optional operation-specific JSON parameters; omitted keys use
+///   the operation's documented defaults.
 ///
 /// # Errors
 ///
@@ -101,6 +123,15 @@ fn grouped_partition_key(time: &str, group: &str) -> String {
 /// `exposures` is a slice of columns, each aligned to `values`. Parameters:
 /// `fit_intercept` (default `true`).
 ///
+/// # Arguments
+///
+/// * `values` - Row-aligned dependent-variable observations to residualize.
+/// * `time_key` - Row-aligned labels defining independent cross-sectional OLS
+///   regressions for each time partition.
+/// * `exposures` - Explanatory-variable columns, each row-aligned with
+///   `values`; incomplete rows yield no residual.
+/// * `params` - Optional JSON parameters; `fit_intercept` defaults to `true`.
+///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, exposure shapes are
@@ -128,6 +159,20 @@ pub fn neutralize(
 
 /// Transform two value columns per entity with a rolling pairwise operation.
 ///
+/// # Arguments
+///
+/// * `values` - Row-aligned first series, treated as the dependent series for
+///   rolling beta.
+/// * `other` - Row-aligned second series; paired observations require finite
+///   values in both series.
+/// * `entity` - Row-aligned entity identifiers; each entity is rolled
+///   independently.
+/// * `order` - Row-aligned sortable keys that establish order within entities.
+/// * `op` - Canonical operation name: `"rolling_cov"`, `"rolling_corr"`, or
+///   `"rolling_beta"`.
+/// * `params` - Optional JSON parameters; `window` defaults to 1 and
+///   `min_periods` defaults to `window`.
+///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, `op` is unsupported,
@@ -151,6 +196,19 @@ pub fn transform_timeseries_pairwise(
 }
 
 /// Transform two value columns per entity with a typed rolling pairwise op.
+///
+/// # Arguments
+///
+/// * `values` - Row-aligned first series, treated as the dependent series for
+///   rolling beta.
+/// * `other` - Row-aligned second series; paired observations require finite
+///   values in both series.
+/// * `entity` - Row-aligned entity identifiers; each entity is rolled
+///   independently.
+/// * `order` - Row-aligned sortable keys that establish order within entities.
+/// * `op` - Typed pairwise rolling statistic to calculate.
+/// * `params` - Optional JSON parameters; `window` defaults to 1 and
+///   `min_periods` defaults to `window`.
 ///
 /// # Errors
 ///
@@ -202,6 +260,17 @@ pub fn transform_timeseries_pairwise_with_op(
 /// Parameters: `window`, `min_periods` (default `window`), and `fit_intercept`
 /// (default `true`).
 ///
+/// # Arguments
+///
+/// * `values` - Row-aligned dependent observations used in each rolling OLS
+///   regression.
+/// * `exposures` - Explanatory-variable columns, each aligned to `values`.
+/// * `entity` - Row-aligned entity identifiers; regressions do not cross entity
+///   boundaries.
+/// * `order` - Row-aligned sortable keys that establish rolling chronology.
+/// * `params` - Optional JSON controls for `window`, `min_periods`, and
+///   `fit_intercept`.
+///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, exposure shapes are
@@ -242,6 +311,16 @@ pub fn rolling_regression_residual(
 ///
 /// Finite rows are transformed as `signal / volatility`, then normalized so the
 /// sum of absolute weights in each time partition is one.
+///
+/// # Arguments
+///
+/// * `values` - Row-aligned raw signal values to convert into portfolio weights.
+/// * `time_key` - Row-aligned labels defining independently normalized
+///   cross-sections.
+/// * `volatility` - Row-aligned risk estimates; zero, missing, or non-finite
+///   values produce missing output weights.
+/// * `_params` - Reserved JSON parameter object; it is accepted for pipeline
+///   compatibility and currently has no effect.
 ///
 /// # Errors
 ///
@@ -294,6 +373,14 @@ pub fn risk_scaled_weights(
 ///
 /// Parameters are forwarded to `clip_by_quantile` (`lower`, `upper`).
 ///
+/// # Arguments
+///
+/// * `values` - Row-aligned signal values to winsorize within each time
+///   partition.
+/// * `time_key` - Row-aligned labels defining the cross-sections to clean.
+/// * `params` - Optional `lower` and `upper` quantile bounds forwarded to
+///   `clip_by_quantile`.
+///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ or clipping parameters
@@ -311,6 +398,13 @@ pub fn clean_signal(
 /// `params.method` defaults to `zscore` and may name any single-column
 /// cross-sectional operation.
 ///
+/// # Arguments
+///
+/// * `values` - Row-aligned raw signal values to normalize.
+/// * `time_key` - Row-aligned labels defining independent cross-sections.
+/// * `params` - Optional JSON configuration; `method` selects a
+///   cross-sectional operation and defaults to `"zscore"`.
+///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, the method is
@@ -326,6 +420,15 @@ pub fn normalize_signal(
 
 /// Convert cross-sectional ranks into gross-normalized long/short weights.
 ///
+/// # Arguments
+///
+/// * `values` - Row-aligned signal values to rank before demeaning and gross
+///   normalization.
+/// * `time_key` - Row-aligned labels defining independently normalized
+///   cross-sections.
+/// * `_params` - Reserved JSON parameter object; it is accepted for pipeline
+///   compatibility and currently has no effect.
+///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ.
@@ -339,6 +442,15 @@ pub fn rank_to_weights(
 }
 
 /// Neutralize a signal against exposures and z-score the residuals.
+///
+/// # Arguments
+///
+/// * `values` - Row-aligned signal observations to neutralize and standardize.
+/// * `time_key` - Row-aligned labels defining independent cross-sectional
+///   regressions and z-scores.
+/// * `exposures` - Explanatory-variable columns, each aligned to `values`.
+/// * `params` - Optional neutralization controls; `fit_intercept` defaults to
+///   `true`.
 ///
 /// # Errors
 ///

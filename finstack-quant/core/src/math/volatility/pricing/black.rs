@@ -141,7 +141,8 @@ pub fn black_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 /// # Arguments
 ///
 /// - `spot`: Current spot price `S`.
-/// - `strike`: Strike `K`.
+/// - `strike`: Exercise price `K`, expressed in the same currency and price
+///   units as `spot`.
 /// - `rate`: Continuously compounded risk-free rate.
 /// - `dividend_yield`: Continuously compounded dividend or convenience yield.
 /// - `sigma`: Lognormal volatility as an annual decimal.
@@ -193,7 +194,8 @@ pub fn black_scholes_spot_call(
 /// # Arguments
 ///
 /// - `spot`: Current spot price `S`.
-/// - `strike`: Strike `K`.
+/// - `strike`: Exercise price `K`, expressed in the same currency and price
+///   units as `spot`.
 /// - `rate`: Continuously compounded risk-free rate.
 /// - `dividend_yield`: Continuously compounded dividend or convenience yield.
 /// - `sigma`: Lognormal volatility as an annual decimal.
@@ -298,7 +300,8 @@ pub fn geometric_asian_call(
 /// # Arguments
 ///
 /// - `forward`: Forward rate or forward price `F`.
-/// - `strike`: Strike `K`.
+/// - `strike`: Exercise price `K`, expressed in the same rate or price units
+///   as `forward`.
 /// - `sigma`: Lognormal volatility as an annual decimal.
 /// - `t`: Expiry in years.
 ///
@@ -320,6 +323,14 @@ pub fn black_vega(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 /// Returns `N(d1)` in the valid lognormal domain. At zero expiry or another
 /// degenerate domain, returns the intrinsic digital limit: `1.0` when
 /// `forward >= strike`, otherwise `0.0`.
+///
+/// # Arguments
+///
+/// * `forward` - Positive forward rate or forward price `F` on the unit-annuity
+///   pricing scale.
+/// * `strike` - Positive option strike `K` in the same units as `forward`.
+/// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
+/// * `t` - Time to expiry in years.
 pub fn black_delta_call(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
     match black_state(forward, strike, sigma, t) {
         Some(state) => norm_cdf(state.d1),
@@ -339,6 +350,14 @@ pub fn black_delta_call(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 ///
 /// Returns call delta minus one. This is the forward delta of the undiscounted
 /// unit-annuity Black-76 put.
+///
+/// # Arguments
+///
+/// * `forward` - Positive forward rate or forward price `F` on the unit-annuity
+///   pricing scale.
+/// * `strike` - Positive option strike `K` in the same units as `forward`.
+/// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
+/// * `t` - Time to expiry in years.
 pub fn black_delta_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
     black_delta_call(forward, strike, sigma, t) - 1.0
 }
@@ -349,6 +368,14 @@ pub fn black_delta_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 ///
 /// Returns `n(d1) / (F sigma sqrt(T))` in the valid lognormal domain and `0.0`
 /// for degenerate inputs.
+///
+/// # Arguments
+///
+/// * `forward` - Positive forward rate or forward price `F` on the unit-annuity
+///   pricing scale.
+/// * `strike` - Positive option strike `K` in the same units as `forward`.
+/// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
+/// * `t` - Time to expiry in years.
 pub fn black_gamma(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
     match black_state(forward, strike, sigma, t) {
         Some(state) => norm_pdf(state.d1) / (forward * state.st),
@@ -396,6 +423,15 @@ pub fn d1_black76(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 /// Applies [`black_call`] to `forward + shift` and `strike + shift`. The shifted
 /// forward and strike must be positive for the lognormal formula; otherwise the
 /// underlying Black-76 degenerate-input intrinsic rule applies.
+///
+/// # Arguments
+///
+/// * `forward` - Unshifted forward rate or price in the option's native units.
+/// * `strike` - Unshifted option strike in the same units as `forward`.
+/// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
+/// * `t` - Time to expiry in years.
+/// * `shift` - Additive displacement applied to both forward and strike before
+///   Black-76 pricing.
 #[inline]
 pub fn black_shifted_call(forward: f64, strike: f64, sigma: f64, t: f64, shift: f64) -> f64 {
     black_call(forward + shift, strike + shift, sigma, t)
@@ -405,6 +441,15 @@ pub fn black_shifted_call(forward: f64, strike: f64, sigma: f64, t: f64, shift: 
 ///
 /// Applies [`black_put`] to `forward + shift` and `strike + shift` on the same
 /// undiscounted unit-annuity scale as the unshifted Black-76 functions.
+///
+/// # Arguments
+///
+/// * `forward` - Unshifted forward rate or price in the option's native units.
+/// * `strike` - Unshifted option strike in the same units as `forward`.
+/// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
+/// * `t` - Time to expiry in years.
+/// * `shift` - Additive displacement applied to both forward and strike before
+///   Black-76 pricing.
 #[inline]
 pub fn black_shifted_put(forward: f64, strike: f64, sigma: f64, t: f64, shift: f64) -> f64 {
     black_put(forward + shift, strike + shift, sigma, t)
@@ -413,6 +458,15 @@ pub fn black_shifted_put(forward: f64, strike: f64, sigma: f64, t: f64, shift: f
 /// Shifted Black vega with unit annuity.
 ///
 /// Applies [`black_vega`] to `forward + shift` and `strike + shift`.
+///
+/// # Arguments
+///
+/// * `forward` - Unshifted forward rate or price in the option's native units.
+/// * `strike` - Unshifted option strike in the same units as `forward`.
+/// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
+/// * `t` - Time to expiry in years.
+/// * `shift` - Additive displacement applied to both forward and strike before
+///   Black-76 pricing.
 #[inline]
 pub fn black_shifted_vega(forward: f64, strike: f64, sigma: f64, t: f64, shift: f64) -> f64 {
     black_vega(forward + shift, strike + shift, sigma, t)

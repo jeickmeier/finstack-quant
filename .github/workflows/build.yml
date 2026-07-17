@@ -126,6 +126,38 @@ jobs:
         run: cargo nextest run --workspace --exclude finstack-quant-py --lib --tests --no-fail-fast
 
   # ============================================
+  # Documentation — strict rustdoc and public input-doc contract
+  # ============================================
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: prime-cache
+
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 1
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols -C linker=cc -C link-arg=-fuse-ld=bfd"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@v2
+        with:
+          cache: true
+          cache_save: false
+
+      - name: Build and verify documentation
+        run: mise run rust-doc
+
+  # ============================================
   # Test Python — maturin build + pytest
   # ============================================
   test-python:

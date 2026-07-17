@@ -1,3 +1,5 @@
+//! Shared defaults and calculations used by term-structure implementations.
+//!
 /// Calculate triangular weight for key-rate DV01.
 ///
 /// Returns a weight in [0, 1] that peaks at `target`. The shape is:

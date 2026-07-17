@@ -67,6 +67,12 @@ pub trait ExerciseBoundaryPayoff: Payoff {
 }
 
 /// Standard degree-2 regression basis `[1, r, r², t·r]`.
+///
+/// # Arguments
+///
+/// * `t_years` - Exercise time in years used in the time-rate interaction term.
+/// * `short_rate` - Simulated instantaneous short rate at that exercise time,
+///   expressed as a decimal annual rate.
 pub fn standard_basis(t_years: f64, short_rate: f64) -> Vec<f64> {
     vec![
         1.0,
@@ -77,6 +83,13 @@ pub fn standard_basis(t_years: f64, short_rate: f64) -> Vec<f64> {
 }
 
 /// Degree-3 regression basis `[1, r, r², r³, t·r, t·r²]`.
+///
+/// # Arguments
+///
+/// * `t_years` - Exercise time in years used in the time-rate interaction
+///   terms.
+/// * `short_rate` - Simulated instantaneous short rate at that exercise time,
+///   expressed as a decimal annual rate.
 pub fn extended_basis(t_years: f64, short_rate: f64) -> Vec<f64> {
     let r = short_rate;
     vec![1.0, r, r * r, r * r * r, t_years * r, t_years * r * r]

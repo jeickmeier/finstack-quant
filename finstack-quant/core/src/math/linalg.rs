@@ -463,6 +463,12 @@ pub fn cholesky_correlation(
 /// Exposed as a shared helper so downstream crates (`finstack-quant-valuations`,
 /// etc.) can delegate their eigendecomposition without pulling `nalgebra`
 /// in as a direct dependency.
+///
+/// # Arguments
+///
+/// * `matrix` - Symmetric square matrix in row-major order with exactly `n * n`
+///   entries.
+/// * `n` - Matrix dimension used to interpret the flat row-major buffer.
 pub fn symmetric_eigen(
     matrix: &[f64],
     n: usize,
@@ -586,6 +592,14 @@ pub fn cholesky_decomposition(
 /// Cholesky decomposition into a caller-provided buffer (avoids allocation).
 ///
 /// The output buffer `l` must have length `n * n` and will be overwritten.
+///
+/// # Arguments
+///
+/// * `matrix` - Symmetric positive-definite input matrix in row-major order
+///   with exactly `n * n` finite entries.
+/// * `n` - Matrix dimension used to interpret both flat buffers.
+/// * `l` - Mutable `n * n` output buffer overwritten with the lower-triangular
+///   Cholesky factor in row-major order.
 pub fn cholesky_decomposition_into(
     matrix: &[f64],
     n: usize,
@@ -713,6 +727,18 @@ pub fn apply_correlation(
 /// * `chol` - Lower triangular Cholesky factor L (n x n, row-major)
 /// * `b` - Right-hand side vector (length n)
 /// * `x` - Output solution vector (length n)
+///
+/// The caller supplies the factor rather than the original matrix, so this
+/// function does not re-check triangularity, symmetry, or factorization
+/// accuracy. `x` is used as temporary storage for the forward-substitution
+/// solution before it is overwritten with the final solution.
+///
+/// # Errors
+///
+/// Returns an error if `chol.len() != b.len()²`, `x.len() != b.len()`, or a
+/// diagonal factor is too close to zero relative to the largest diagonal
+/// magnitude. On a singular-factor error, `x` may already contain a partial
+/// forward-substitution result and must not be used as a solution.
 pub fn cholesky_solve(chol: &[f64], b: &[f64], x: &mut [f64]) -> Result<()> {
     let n = b.len();
     if chol.len() != n * n || x.len() != n {
@@ -817,6 +843,19 @@ pub fn build_correlation_matrix(
 /// 3. Matrix is symmetric
 /// 4. Matrix is positive semi-definite (via Cholesky)
 ///
+/// `matrix` is row-major and must contain exactly `n * n` elements. The
+/// diagonal and symmetry checks use this module's numerical tolerances, rather
+/// than requiring exact binary equality. Positive semidefiniteness is checked
+/// through the correlation-specific pivoted Cholesky path, allowing nearly
+/// rank-deficient but otherwise valid correlation matrices.
+///
+/// # Errors
+///
+/// Returns an error if the matrix shape is wrong; a diagonal differs from one
+/// beyond tolerance; an off-diagonal entry is outside `[-1, 1]`; the matrix is
+/// not symmetric within tolerance; or the Cholesky check finds it not positive
+/// semidefinite.
+///
 /// # Example
 ///
 /// ```
@@ -828,6 +867,12 @@ pub fn build_correlation_matrix(
 /// let invalid = vec![1.0, 1.5, 1.5, 1.0]; // Correlation > 1
 /// assert!(validate_correlation_matrix(&invalid, 2).is_err());
 /// ```
+///
+/// # Arguments
+///
+/// * `matrix` - Candidate correlation matrix in row-major order with exactly
+///   `n * n` finite entries.
+/// * `n` - Matrix dimension used to interpret the flat row-major buffer.
 pub fn validate_correlation_matrix(matrix: &[f64], n: usize) -> Result<()> {
     if matrix.len() != n * n {
         return Err(crate::error::InputError::DimensionMismatch.into());

@@ -1,3 +1,5 @@
+//! Shared runtime types and solver contracts for market calibration.
+//!
 use finstack_quant_core::Result;
 
 /// Result type for building time grid and initial guesses.

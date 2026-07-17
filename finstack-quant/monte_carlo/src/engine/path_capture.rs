@@ -1,3 +1,5 @@
+//! Execution, configuration, and diagnostics for Monte Carlo pricing.
+//!
 /// Selects how simulated paths are captured for diagnostics.
 ///
 /// Use [`PathCaptureMode::All`] when every path should be retained. Use

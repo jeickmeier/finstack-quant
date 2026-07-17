@@ -243,6 +243,16 @@ impl Money {
     }
 
     /// Fallible constructor using ISO-4217 minor units and bankers rounding.
+    ///
+    /// Ingests the `f64` through its shortest round-trippable Decimal form,
+    /// then rounds to the currency's ISO-4217 minor-unit scale. Use
+    /// [`Self::from_decimal`] when the caller already holds an exact Decimal.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::NonFiniteValue` for NaN or infinity, or
+    /// `InputError::ConversionOverflow` when the finite amount cannot be
+    /// represented by the internal Decimal type.
     pub fn try_new(amount: f64, currency: Currency) -> Result<Self, Error> {
         Self::try_new_impl(amount, currency, None)
     }
@@ -255,12 +265,14 @@ impl Money {
     /// a string and parsed via `Decimal::from_str`). Use this for hedge-fund
     /// notionals where IEEE 754 rounding of the input would be unacceptable.
     ///
-    /// Returns `Err(ConversionOverflow)` if the decimal is finite-but-out-of-bounds
-    /// for the internal representation. `rust_decimal::Decimal` already rejects
-    /// `NaN` / `Infinity` at parse time, so callers parsing user-supplied strings
-    /// will surface those errors before reaching this constructor; this method
-    /// validates the residual edge case where the value is malformed only after
-    /// arithmetic.
+    /// `rust_decimal::Decimal` already rejects `NaN` / `Infinity` at parse
+    /// time, so callers parsing user-supplied strings will surface those errors
+    /// before reaching this constructor.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::ConversionOverflow` when the Decimal cannot be
+    /// converted to the finite `f64` view used by [`Self::amount`].
     pub fn from_decimal(amount: rust_decimal::Decimal, currency: Currency) -> Result<Self, Error> {
         // rust_decimal::Decimal models a fixed-precision number with no
         // NaN/Infinity representation, so finiteness is structural. The
@@ -274,6 +286,15 @@ impl Money {
     }
 
     /// Fallible constructor using an explicit configuration for rounding.
+    ///
+    /// Uses `cfg` to select the ingest scale and rounding mode for `currency`.
+    /// This is the configuration-aware counterpart to [`Self::try_new`].
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::NonFiniteValue` for NaN or infinity, or
+    /// `InputError::ConversionOverflow` when rounding or conversion cannot
+    /// produce a representable Decimal amount.
     pub fn try_new_with_config(
         amount: f64,
         currency: Currency,
@@ -413,6 +434,11 @@ impl Money {
     /// let sum = lhs.checked_add(rhs).expect("Currency match should succeed");
     /// assert_eq!(sum.amount(), 75.0);
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::CurrencyMismatch` when the currencies differ, or
+    /// `InputError::ConversionOverflow` when the Decimal sum is out of range.
     #[must_use = "returns new Money if currencies match"]
     #[inline]
     pub fn checked_add(self, rhs: Self) -> Result<Self, Error> {
@@ -442,6 +468,12 @@ impl Money {
     /// let diff = lhs.checked_sub(rhs).expect("Currency match should succeed");
     /// assert_eq!(diff.amount(), 25.0);
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::CurrencyMismatch` when the currencies differ, or
+    /// `InputError::ConversionOverflow` when the Decimal difference is out of
+    /// range.
     #[must_use = "returns new Money if currencies match"]
     #[inline]
     pub fn checked_sub(self, rhs: Self) -> Result<Self, Error> {
@@ -472,6 +504,12 @@ impl Money {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::NonFiniteValue` for a NaN or infinite scalar, or
+    /// `InputError::ConversionOverflow` when the scalar or product is outside
+    /// the Decimal representation range.
     #[must_use = "returns new Money on success"]
     #[inline]
     pub fn checked_mul_f64(self, rhs: f64) -> Result<Self, Error> {
@@ -502,6 +540,12 @@ impl Money {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::Invalid` for a zero scalar,
+    /// `InputError::NonFiniteValue` for NaN or infinity, or
+    /// `InputError::ConversionOverflow` when the quotient is out of range.
     #[must_use = "returns new Money on success"]
     #[inline]
     pub fn checked_div_f64(self, rhs: f64) -> Result<Self, Error> {
@@ -551,6 +595,13 @@ impl Money {
     /// assert_eq!(usd.amount(), 120.0);
     /// assert_eq!(usd.currency(), Currency::USD);
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Propagates a provider lookup failure. It also returns
+    /// `InputError::InvalidFxRate` for a non-finite or non-positive quote, and
+    /// `InputError::ConversionOverflow` when applying a valid quote exceeds
+    /// Decimal precision.
     pub fn convert(
         self,
         to: Currency,
@@ -570,6 +621,12 @@ impl Money {
     /// The multiplication remains Decimal-backed and therefore preserves the
     /// stored amount's precision. The supplied rate must be finite and strictly
     /// positive. A same-currency conversion returns the input unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::InvalidFxRate` when `rate` is non-finite or not
+    /// strictly positive, or `InputError::ConversionOverflow` when the
+    /// converted amount cannot be represented as a Decimal.
     pub fn convert_at_rate(self, to: Currency, rate: f64) -> crate::Result<Self> {
         if self.currency == to {
             return Ok(self);

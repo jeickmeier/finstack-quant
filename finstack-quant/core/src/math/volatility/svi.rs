@@ -138,6 +138,18 @@ impl SviParams {
     /// # Returns
     ///
     /// Implied volatility `σ = √(w(k) / T)` with checked error semantics.
+    ///
+    /// The result is annualized Black-Scholes volatility in decimal units. It
+    /// is meaningful only when the parameterization represents non-negative
+    /// total variance at the requested log-moneyness; this method checks that
+    /// local condition but does not run the full SVI butterfly-arbitrage test.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `t <= 0` or the calculated total variance is
+    /// negative. NaN values are not separately rejected by these comparisons,
+    /// so non-finite `k`, `t`, or parameters can yield NaN rather than an
+    /// error.
     pub fn implied_vol(&self, k: f64, t: f64) -> crate::Result<f64> {
         if t <= 0.0 {
             return Err(crate::Error::Validation(

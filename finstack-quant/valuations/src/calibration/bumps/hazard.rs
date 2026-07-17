@@ -151,6 +151,17 @@ fn recalibrate_from_par_spreads(
 ///
 /// This function is strictly recalibration-only; callers that want a
 /// model hazard shift should call [`bump_hazard_shift`] explicitly.
+///
+/// # Arguments
+///
+/// * `hazard` - Existing hazard curve from which par CDS spreads are implied
+///   before applying the shock and re-bootstrap.
+/// * `context` - Market context supplying the discount curve and calibration
+///   dependencies required for CDS repricing.
+/// * `bump` - Parallel or tenor-specific CDS spread shock in [`BumpRequest`]
+///   basis point units.
+/// * `discount_id` - Optional discount curve ID; `None` is rejected because
+///   spread re-calibration must choose a discounting curve.
 pub fn bump_hazard_spreads(
     hazard: &HazardCurve,
     context: &MarketContext,
@@ -162,6 +173,15 @@ pub fn bump_hazard_spreads(
 
 /// Bump hazard curve by shocking par spreads and re-calibrating with an
 /// explicit CDS documentation clause.
+///
+/// # Arguments
+///
+/// * `hazard` - Existing hazard curve from which par CDS spreads are implied.
+/// * `context` - Market context supplying discounting and other dependencies.
+/// * `bump` - Parallel or tenor-specific CDS spread shock in basis point units.
+/// * `discount_id` - Optional discount curve ID; `None` is rejected.
+/// * `doc_clause` - Optional ISDA CDS documentation clause; `None` uses the
+///   canonical North American clause.
 pub fn bump_hazard_spreads_with_doc_clause(
     hazard: &HazardCurve,
     context: &MarketContext,
@@ -181,6 +201,17 @@ pub fn bump_hazard_spreads_with_doc_clause(
 
 /// Bump hazard curve by shocking par spreads and re-calibrating with an
 /// explicit CDS documentation clause and valuation convention.
+///
+/// # Arguments
+///
+/// * `hazard` - Existing hazard curve from which par CDS spreads are implied.
+/// * `context` - Market context supplying discounting and other dependencies.
+/// * `bump` - Parallel or tenor-specific CDS spread shock in basis point units.
+/// * `discount_id` - Optional discount curve ID; `None` is rejected.
+/// * `doc_clause` - Optional ISDA CDS documentation clause; `None` selects
+///   the canonical North American clause.
+/// * `cds_valuation_convention` - Optional premium-leg/accrual convention;
+///   `None` uses the calibration runtime default.
 pub fn bump_hazard_spreads_with_doc_clause_and_valuation_convention(
     hazard: &HazardCurve,
     context: &MarketContext,
@@ -203,6 +234,13 @@ pub fn bump_hazard_spreads_with_doc_clause_and_valuation_convention(
 }
 
 /// Bump hazard curve directly (model hazard shift), without recalibration.
+///
+/// # Arguments
+///
+/// * `hazard` - Existing hazard curve whose model hazard nodes are shifted
+///   directly without recovering par spreads.
+/// * `bump` - Parallel or tenor-specific hazard-rate shock in [`BumpRequest`]
+///   basis point units.
 pub fn bump_hazard_shift(
     hazard: &HazardCurve,
     bump: &BumpRequest,

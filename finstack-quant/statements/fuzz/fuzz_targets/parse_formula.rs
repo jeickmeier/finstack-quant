@@ -1,3 +1,5 @@
+//! Fuzz target for the surrounding parser or validation boundary.
+//!
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;

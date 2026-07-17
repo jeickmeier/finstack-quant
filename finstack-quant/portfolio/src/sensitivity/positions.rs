@@ -22,6 +22,20 @@ struct PositionInput {
 
 /// Parse factor-model position JSON into boxed instruments using the shared
 /// instrument JSON pipeline.
+///
+/// Each element must contain an ID, a serialized supported instrument, and a
+/// weight/notional multiplier. Instrument decoding is delegated to the
+/// valuations crate so its canonical instrument schema remains authoritative.
+///
+/// # Arguments
+///
+/// * `positions_json` - UTF-8 JSON array of position inputs; every entry has a
+///   user ID, an instrument JSON payload, and a risk weight multiplier.
+///
+/// # Errors
+///
+/// Returns validation errors for malformed position or instrument JSON, and
+/// propagates unsupported-instrument and instrument-construction errors.
 pub fn parse_positions_json(
     positions_json: &str,
 ) -> finstack_quant_core::Result<Vec<ParsedPosition>> {
@@ -53,6 +67,11 @@ pub fn parse_positions_json(
 
 /// Convert parsed positions into the borrowed tuple form required by the
 /// factor-model engines.
+///
+/// # Arguments
+///
+/// * `positions` - Parsed positions whose owned instruments remain borrowed by
+///   the returned engine tuples; callers must keep this slice alive.
 pub fn pricing_positions(positions: &[ParsedPosition]) -> Vec<(String, &dyn Instrument, f64)> {
     positions
         .iter()

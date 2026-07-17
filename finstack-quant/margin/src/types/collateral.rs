@@ -21,19 +21,25 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 ///
 /// BCBS-IOSCO "Margin requirements for non-centrally cleared derivatives" (2020)
 /// Annex A: Standardized haircut schedule
-#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
 pub enum CollateralAssetClass {
     /// Cash in eligible currency
     #[default]
     Cash,
+    /// Sovereign government bonds accepted as collateral.
     GovernmentBonds,
+    /// Debt issued or guaranteed by eligible agencies.
     AgencyBonds,
+    /// Covered bonds meeting the applicable eligibility criteria.
     CoveredBonds,
+    /// Investment-grade corporate bonds accepted under the CSA.
     CorporateBonds,
+    /// Eligible listed equity collateral.
     Equity,
+    /// Eligible gold collateral.
     Gold,
+    /// Eligible mutual funds or exchange-traded funds.
     MutualFunds,
     /// Custom / user-defined asset class (from JSON)
     Custom(String),
@@ -150,6 +156,15 @@ impl CollateralAssetClass {
     /// # Returns
     ///
     /// Haircut as a decimal (e.g., 0.02 = 2%)
+    ///
+    /// The returned value is the embedded baseline for the asset class, before
+    /// maturity, rating, concentration, wrong-way-risk, or bilateral CSA
+    /// adjustments.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded margin registry cannot load a default
+    /// entry for this asset class (in particular, an unregistered custom class).
     pub fn standard_haircut(&self) -> finstack_quant_core::Result<f64> {
         Ok(self.default_entry("standard haircut")?.standard_haircut)
     }
@@ -158,6 +173,15 @@ impl CollateralAssetClass {
     ///
     /// Per BCBS-IOSCO, an 8% add-on applies when collateral currency
     /// differs from the settlement currency of the derivative.
+    ///
+    /// The result is a decimal multiplier applied only after the caller has
+    /// determined that the currencies differ; this method does not compare
+    /// currencies itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded margin registry cannot load a default
+    /// entry for this asset class.
     pub fn fx_addon(&self) -> finstack_quant_core::Result<f64> {
         Ok(self.default_entry("FX addon")?.fx_addon)
     }
@@ -418,6 +442,15 @@ impl EligibleCollateralSchedule {
     }
 
     /// Load a named schedule from a provided config (with overrides).
+    ///
+    /// Configured registry overrides take precedence over the embedded margin
+    /// registry. The returned schedule is cloned from the registry, so later
+    /// changes to `cfg` do not mutate it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if registry configuration cannot be parsed or validated,
+    /// or `schedule_id` does not name a configured or embedded schedule.
     pub fn from_finstack_config(
         cfg: &FinstackConfig,
         schedule_id: &str,

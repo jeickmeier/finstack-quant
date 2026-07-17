@@ -153,6 +153,17 @@ impl HestonParams {
     /// * `sigma_v` - Vol-of-vol (> 0)
     /// * `rho` - Correlation in [-1, 1]
     /// * `v0` - Initial variance (> 0)
+    ///
+    /// Rates and variances are continuous annualized decimals; `theta` and
+    /// `v0` are variance levels (not volatilities), while `sigma_v` is the
+    /// volatility of variance. Feller-condition satisfaction is informative
+    /// rather than a constructor requirement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either rate is non-finite, any positive variance
+    /// parameter is non-finite or non-positive, or `rho` is non-finite or
+    /// outside `[-1, 1]`.
     pub fn new(
         r: f64,
         q: f64,
@@ -236,6 +247,10 @@ impl HestonProcess {
     /// If the Feller condition (2κθ ≥ σᵥ²) is violated, a warning is logged.
     /// When violated, the variance process can reach zero with positive probability,
     /// though the QE scheme handles this gracefully via truncation.
+    ///
+    /// This constructor accepts already validated parameters and does not
+    /// enforce the Feller condition; use [`HestonParams::new`] or
+    /// [`Self::with_params`] when constructing raw numeric inputs.
     pub fn new(params: HestonParams) -> Self {
         // Warn when Feller condition is violated (variance may hit zero)
         if !params.satisfies_feller() {
@@ -255,6 +270,16 @@ impl HestonProcess {
     }
 
     /// Create with explicit parameters.
+    ///
+    /// This validates raw annualized Heston parameters through
+    /// [`HestonParams::new`], then constructs a process. A Feller-condition
+    /// violation is permitted and logged by [`Self::new`], because the QE
+    /// discretization supports boundary truncation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the validation errors from [`HestonParams::new`] for non-finite
+    /// rates, invalid variance parameters, or an out-of-range correlation.
     pub fn with_params(
         r: f64,
         q: f64,

@@ -17,6 +17,11 @@ use crate::extensions::corkscrew::{AccountType, CorkscrewConfig};
 /// Assets = Liabilities + Equity across the configured accounts.
 ///
 /// Returns an empty `Vec` if the config has no accounts.
+///
+/// # Arguments
+///
+/// * `config` - Corkscrew account configuration whose asset, liability, and
+///   equity node IDs are grouped into structural checks.
 pub fn corkscrew_as_checks(config: &CorkscrewConfig) -> Vec<Box<dyn Check>> {
     let mut assets: Vec<NodeId> = Vec::new();
     let mut liabilities: Vec<NodeId> = Vec::new();

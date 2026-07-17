@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for interest-rate instruments.
+//!
 use crate::instruments::common_impl::pricing::time::{
     rate_between_on_dates, relative_df_discount_curve,
 };
@@ -14,6 +16,13 @@ use crate::instruments::IRSConvention;
 
 /// Resolve the reference-swap convention from an explicit override or the
 /// notional currency.
+///
+/// # Arguments
+///
+/// * `explicit` - Optional contractual swap convention override; when `Some`,
+///   it takes precedence over the currency-derived default.
+/// * `currency` - Notional currency used to select USD, EUR, GBP, or JPY
+///   market-standard convention when no override is supplied.
 pub fn resolve_reference_swap_convention(
     explicit: Option<IRSConvention>,
     currency: Currency,
@@ -103,6 +112,12 @@ pub struct ForwardSwapRateInputs<'a> {
 /// - Discount factors use the discount curve's own day-count basis
 /// - Forward rates use the forward curve's own time basis
 /// - Accruals use the supplied fixed and floating leg day-count conventions
+///
+/// # Arguments
+///
+/// * `inputs` - Complete reference-swap definition: market context, curve IDs,
+///   valuation/start/end dates, leg frequencies/day counts, calendar,
+///   business-day/stub/EOM rules, payment lag, and tenor-enforcement policy.
 pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<(f64, f64)> {
     let disc = inputs
         .market

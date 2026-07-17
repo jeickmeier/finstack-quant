@@ -28,6 +28,15 @@ pub use finstack_quant_core::dates::fx::{
 ///
 /// Returns an error if calendar resolution fails or the iteration limit is
 /// exceeded (see [`fx_spot_date`]).
+///
+/// # Arguments
+///
+/// * `trade_date` - FX trade date from which spot settlement is rolled.
+/// * `spot_lag_days` - Contractual spot lag in joint business days.
+/// * `base_currency` - Base leg currency used to detect the pair's USD leg.
+/// * `quote_currency` - Quote leg currency used to detect the pair's USD leg.
+/// * `base_cal_id` - Optional base-currency business-calendar identifier.
+/// * `quote_cal_id` - Optional quote-currency business-calendar identifier.
 pub fn fx_spot_date_for_pair(
     trade_date: Date,
     spot_lag_days: u32,

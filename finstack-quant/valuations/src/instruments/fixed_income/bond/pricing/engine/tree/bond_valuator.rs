@@ -1,3 +1,5 @@
+//! Pricing-engine components for fixed-income bonds.
+//!
 use super::super::super::super::types::Bond;
 use super::TreePricer;
 use crate::models::trees::hull_white_tree::HullWhiteTree;

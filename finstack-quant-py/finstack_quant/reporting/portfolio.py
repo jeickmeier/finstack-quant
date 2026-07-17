@@ -190,8 +190,10 @@ def portfolio_tearsheet(
         An ``aggregate_metrics`` result; enables the sensitivities & buckets sections.
     cashflows : dict | str, optional
         An ``aggregate_full_cashflows().to_json()`` result; enables the cashflow ladder.
-    title, subtitle : str, optional
-        Header text.
+    title : str, optional
+        Optional main report heading for the portfolio summary.
+    subtitle : str, optional
+        Optional secondary heading shown below ``title``.
     sections : list[str], optional
         Subset of :data:`ALL_SECTIONS` (default: all).
     theme : Theme

@@ -411,9 +411,13 @@ use std::sync::Arc;
 ///
 /// # Arguments
 ///
-/// * `instrument` - Instrument to price at both dates.
-/// * `market_t0`, `market_t1` - Market states at T₀ and T₁.
-/// * `as_of_t0`, `as_of_t1` - Valuation dates.
+/// * `instrument` - Instrument to reprice at both valuation dates.
+/// * `market_t0` - Opening market state used to calculate the T₀ value and
+///   opening FX conversion.
+/// * `market_t1` - Closing market state used to calculate the T₁ value and
+///   closing FX conversion.
+/// * `as_of_t0` - Opening valuation date used for the T₀ repricing.
+/// * `as_of_t1` - Closing valuation date used for the T₁ repricing.
 /// * `target_ccy` - Currency to report P&L in; FX is resolved from the
 ///   date-specific market contexts.
 ///

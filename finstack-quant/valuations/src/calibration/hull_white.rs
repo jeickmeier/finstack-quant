@@ -416,6 +416,11 @@ pub(crate) fn calibrate_fixed_kappa_sigma_to_caplet_prices(
 /// assert_eq!(kappa, "USD-OIS_HW1F_KAPPA");
 /// assert_eq!(sigma, "USD-OIS_HW1F_SIGMA");
 /// ```
+///
+/// # Arguments
+///
+/// * `curve_id` - Discount or projection curve identifier prefixed into the
+///   returned mean-reversion and volatility scalar metric keys.
 #[must_use]
 pub fn hw1f_scalar_keys(curve_id: &str) -> (String, String) {
     (
@@ -441,6 +446,11 @@ pub fn hw1f_scalar_keys(curve_id: &str) -> (String, String) {
 /// assert_eq!(kappa, "USD-OIS_CAPFLOOR_HW1F_KAPPA");
 /// assert_eq!(sigma, "USD-OIS_CAPFLOOR_HW1F_SIGMA");
 /// ```
+///
+/// # Arguments
+///
+/// * `curve_id` - Curve identifier prefixed into the returned cap/floor
+///   mean-reversion and volatility scalar metric keys.
 #[must_use]
 pub fn capfloor_hw1f_scalar_keys(curve_id: &str) -> (String, String) {
     (
@@ -450,6 +460,11 @@ pub fn capfloor_hw1f_scalar_keys(curve_id: &str) -> (String, String) {
 }
 
 /// Market-context series key for a cap/floor-calibrated piecewise HW1F sigma schedule.
+///
+/// # Arguments
+///
+/// * `curve_id` - Curve identifier prefixed into the returned cap/floor
+///   time-dependent sigma schedule metric key.
 #[must_use]
 pub fn capfloor_hw1f_sigma_schedule_key(curve_id: &str) -> String {
     format!("{curve_id}_CAPFLOOR_HW1F_SIGMA_SCHEDULE")
@@ -1244,7 +1259,15 @@ fn calibrate_hull_white_to_swaptions_core(
 ///
 /// # Arguments
 ///
-/// * `schedules[i]` — per-period accrual year fractions for `quotes[i]`.
+/// * `df` - Discount-factor function where `df(t)` returns `P(0,t)` for a
+///   year fraction `t` measured on the same time axis as the quote expiries
+///   and tenors. It must return finite positive factors and `df(0) ≈ 1`.
+/// * `quotes` - ATM European swaption quotes to fit. Their expiries, tenors,
+///   and volatility conventions must be consistent with `df` and `frequency`.
+/// * `frequency` - Fixed-leg payment frequency used to construct each
+///   underlying swap's schedule and annuity.
+/// * `schedules` - Per-quote accrual year fractions, where `schedules[i]`
+///   corresponds to `quotes[i]`.
 ///   Must contain `(quotes[i].tenor * frequency.periods_per_year()).round()`
 ///   strictly-positive values; their sum must equal `quotes[i].tenor` to
 ///   within numerical precision. If any schedule is malformed, the calibrator
@@ -1252,6 +1275,8 @@ fn calibrate_hull_white_to_swaptions_core(
 ///   `tracing::warn!`, and stamps the report metadata: `schedule_source`
 ///   becomes `"mixed"` (or `"synthetic_constant_dt"` when every quote fell
 ///   back) and `schedule_fallback_quotes` lists the affected quotes.
+/// * `initial_guess` - Optional starting `(kappa, sigma)` parameters for the
+///   optimizer. `None` uses the calibrator's bounded default seed.
 ///
 /// # OIS-Specific Limitations
 ///
@@ -1287,6 +1312,19 @@ pub fn calibrate_hull_white_to_swaptions_with_schedules(
 /// reprices the same cap/floor decomposition using HW1F-implied normal caplet
 /// volatilities. A single quote requires `config.fixed_kappa`; otherwise the
 /// two model parameters are underdetermined.
+///
+/// # Arguments
+///
+/// * `discount_df` - Discount-factor function where `discount_df(t)` returns
+///   `P(0,t)` for time `t` in years on the cap/floor quote time axis.
+/// * `forward_df` - Projection-curve discount-factor function where
+///   `forward_df(t)` returns `P(0,t)` for the same time axis; forward rates
+///   are derived from ratios of these factors.
+/// * `quotes` - Normal-vol cap or floor market quotes to fit. Each maturity,
+///   strike, and volatility is interpreted using the configured payment
+///   frequency and standard caplet fixing-date convention.
+/// * `config` - Frequency plus fixed-mean-reversion or initial-parameter
+///   settings. A one-quote calibration requires `config.fixed_kappa`.
 pub fn calibrate_hull_white_to_cap_floors(
     discount_df: &dyn Fn(f64) -> f64,
     forward_df: &dyn Fn(f64) -> f64,
@@ -1751,6 +1789,19 @@ impl PiecewiseSigmaCalibrationConfig {
 /// Earlier segments remain frozen when solving a later pillar. Multiple quotes
 /// at a common expiry are deliberately rejected here: a single segment cannot
 /// exactly identify a smile without an explicit least-squares policy.
+///
+/// # Arguments
+///
+/// * `discount_df` - Discount-factor function where `discount_df(t)` returns
+///   `P(0,t)` for time `t` in years on the cap/floor quote time axis.
+/// * `forward_df` - Projection-curve discount-factor function where
+///   `forward_df(t)` returns `P(0,t)` on the same time axis; its factor ratios
+///   determine forward rates for the caplet decomposition.
+/// * `quotes` - Normal-vol cap or floor quotes with distinct increasing
+///   maturities. One left-continuous volatility segment is solved at each
+///   quoted maturity.
+/// * `config` - Fixed mean-reversion, sigma search bounds, and coupon
+///   frequency used while sequentially solving the volatility schedule.
 pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
     discount_df: &dyn Fn(f64) -> f64,
     forward_df: &dyn Fn(f64) -> f64,

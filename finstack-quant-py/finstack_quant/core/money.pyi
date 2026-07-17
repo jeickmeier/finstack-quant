@@ -223,6 +223,14 @@ class Money:
 
         The multiplication remains Decimal-backed; no destination minor-unit
         rounding is applied until formatting.
+
+        Parameters
+        ----------
+        target : Currency or str
+            Destination currency as a ``Currency`` object or ISO-4217 code.
+        rate : float
+            Positive conversion rate satisfying ``1 source_currency = rate
+            target_currency``; it must already reflect the desired quote side.
         """
         ...
 

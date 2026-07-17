@@ -24,6 +24,11 @@ pub const BASEL_IRB_PD_FLOOR: f64 = 0.0003;
 ///
 /// Generic PD conversion and calibration helpers intentionally do not apply
 /// regulatory floors by default. Use this helper explicitly in IRB workflows.
+///
+/// # Arguments
+///
+/// * `pd` - Finite one-year probability of default as a decimal fraction. The
+///   returned value is never below 0.0003 unless `pd` is `NaN`.
 #[must_use]
 pub fn apply_basel_irb_pd_floor(pd: f64) -> f64 {
     if pd.is_nan() {
@@ -67,6 +72,13 @@ pub struct PdCycleParams {
 ///
 /// PD_PiT = Phi( (Phi^{-1}(PD_TtC) - sqrt(rho) * z) / sqrt(1 - rho) )
 ///
+/// # Arguments
+///
+/// * `pd_ttc` - Through-the-cycle one-year probability of default as a decimal
+///   fraction strictly between `0.0` and `1.0`.
+/// * `params` - Asset-correlation and systematic-cycle inputs for the
+///   Merton-Vasicek single-factor transformation.
+///
 /// # Errors
 ///
 /// - [`PdCalibrationError::PdOutOfRange`] if `pd_ttc` is not in (0, 1).
@@ -90,6 +102,13 @@ pub fn ttc_to_pit(pd_ttc: f64, params: &PdCycleParams) -> Result<f64, PdCalibrat
 /// Convert a Point-in-Time PD to a Through-the-Cycle PD.
 ///
 /// PD_TtC = Phi( Phi^{-1}(PD_PiT) * sqrt(1 - rho) + sqrt(rho) * z )
+///
+/// # Arguments
+///
+/// * `pd_pit` - Point-in-time one-year probability of default as a decimal
+///   fraction strictly between `0.0` and `1.0`.
+/// * `params` - Asset-correlation and systematic-cycle inputs for the
+///   Merton-Vasicek single-factor transformation.
 ///
 /// # Errors
 ///

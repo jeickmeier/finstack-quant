@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use crate::instruments::rates::xccy_swap::XccySwap;
 use crate::market::build::xccy::build_xccy_instrument;
 use crate::market::conventions::ids::XccyConventionId;

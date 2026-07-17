@@ -49,16 +49,25 @@ pub struct MertonJumpParams {
 }
 
 impl MertonJumpParams {
-    /// Create new Merton jump-diffusion parameters.
+    /// Construct risk-neutral Merton jump-diffusion parameters.
     ///
     /// # Arguments
     ///
-    /// * `r` - Risk-free rate
-    /// * `q` - Dividend/foreign rate
-    /// * `sigma` - Continuous diffusion volatility
-    /// * `lambda` - Jump intensity (jumps per year)
-    /// * `mu_j` - Mean of log-jump
-    /// * `sigma_j` - Std dev of log-jump
+    /// * `r` - Annual continuously compounded risk-free rate.
+    /// * `q` - Annual continuously compounded dividend or foreign rate.
+    /// * `sigma` - Annualized continuous-diffusion volatility.
+    /// * `lambda` - Poisson intensity in expected jumps per year.
+    /// * `mu_j` - Dimensionless mean of the normal log-jump size `ln(J)`.
+    /// * `sigma_j` - Dimensionless standard deviation of `ln(J)`.
+    ///
+    /// The process applies the risk-neutral compensation
+    /// `lambda * (exp(mu_j + sigma_j² / 2) - 1)` to the GBM drift.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] for non-finite
+    /// `mu_j`, negative or non-finite `lambda`/`sigma_j`, or invalid base GBM
+    /// inputs as checked by [`GbmParams::new`].
     pub fn new(
         r: f64,
         q: f64,

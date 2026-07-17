@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for interest-rate instruments.
+//!
 use crate::instruments::common_impl::GenericInstrumentPricer;
 
 /// IR Future Option pricer using the generic discounting implementation.

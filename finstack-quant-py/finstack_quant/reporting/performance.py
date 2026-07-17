@@ -165,8 +165,10 @@ def performance_tearsheet(
         A constructed performance engine (the caller owns its config).
     ticker : int, default 0
         Zero-based column index of the primary series.
-    title, subtitle : str, optional
-        Header text; defaults derive from the data.
+    title : str, optional
+        Optional main report heading; defaults derive from the primary series.
+    subtitle : str, optional
+        Optional secondary heading shown below ``title``.
     sections : list[str], optional
         Subset of :data:`ALL_SECTIONS` to render (default: all).
     theme : Theme

@@ -292,7 +292,24 @@ fn validate_finite_positive(name: &str, value: f64) -> crate::Result<()> {
 /// General normal cumulative distribution function.
 ///
 /// Computes the CDF of `N(mean, std_dev^2)` by standardizing into the standard
-/// normal and delegating to [`norm_cdf`].
+/// normal and delegating to [`norm_cdf`]:
+/// `Φ((x - mean) / std_dev)`.
+///
+/// `std_dev` is the standard deviation in the same units as `x` and `mean`,
+/// not the variance. `x` and `mean` are passed through IEEE-754 arithmetic;
+/// non-finite values therefore produce the corresponding floating-point CDF
+/// result rather than a validation error.
+///
+/// # Arguments
+///
+/// * `x` - Point at which to evaluate the normal CDF.
+/// * `mean` - Mean of the normal distribution, in the same units as `x`.
+/// * `std_dev` - Strictly positive standard deviation, in the same units as
+///   `x` and `mean`; this is not the variance.
+///
+/// # Errors
+///
+/// Returns an error only if `std_dev` is non-finite or not strictly positive.
 pub fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f64> {
     validate_finite_positive("std_dev", std_dev)?;
     Ok(norm_cdf((x - mean) / std_dev))
@@ -301,7 +318,23 @@ pub fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 /// General normal probability density function.
 ///
 /// Computes the PDF of `N(mean, std_dev^2)` by standardizing into the standard
-/// normal and applying the Jacobian scaling factor.
+/// normal and applying the Jacobian scaling factor:
+/// `φ((x - mean) / std_dev) / std_dev`.
+///
+/// `std_dev` is the standard deviation in the same units as `x` and `mean`,
+/// not the variance. `x` and `mean` are passed through IEEE-754 arithmetic;
+/// non-finite values are not separately rejected.
+///
+/// # Arguments
+///
+/// * `x` - Point at which to evaluate the normal density.
+/// * `mean` - Mean of the normal distribution, in the same units as `x`.
+/// * `std_dev` - Strictly positive standard deviation, in the same units as
+///   `x` and `mean`; this is not the variance.
+///
+/// # Errors
+///
+/// Returns an error only if `std_dev` is non-finite or not strictly positive.
 pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f64> {
     validate_finite_positive("std_dev", std_dev)?;
     Ok(norm_pdf((x - mean) / std_dev) / std_dev)

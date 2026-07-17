@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use crate::models::trees::BinomialTree;
 use crate::instruments::OptionMarketParams;
 

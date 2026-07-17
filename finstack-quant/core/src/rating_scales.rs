@@ -46,7 +46,18 @@ pub struct ScorecardScale {
 }
 
 impl RatingLevel {
-    /// Deserialize a rating level from JSON and validate scores and name.
+    /// Deserialize and validate one scorecard rating level from JSON.
+    ///
+    /// `score` and `min_score` are both normalized scores on the inclusive
+    /// 0–100 scale. The level name is a display/lookup label such as `AAA` or
+    /// `Aaa`; a scale's best-to-worst ordering is validated by
+    /// [`ScorecardScale::from_json`], not by this individual-level parser.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if the JSON is malformed, unknown fields
+    /// violate the schema, the name is blank, or either score is non-finite or
+    /// outside the inclusive 0–100 range.
     pub fn from_json(json: &str) -> Result<Self> {
         let level: RatingLevel = serde_json::from_str(json)
             .map_err(|err| Error::Validation(format!("invalid rating level JSON: {err}")))?;
@@ -56,7 +67,18 @@ impl RatingLevel {
 }
 
 impl ScorecardScale {
-    /// Deserialize a scorecard scale from JSON and validate its rating levels.
+    /// Deserialize and validate one best-to-worst scorecard scale from JSON.
+    ///
+    /// The first rating is the strongest grade. Both `score` and `min_score`
+    /// must strictly descend through the list because scorecard classification
+    /// uses the first qualifying threshold. A scale is intentionally distinct
+    /// from a migration-matrix rating state set.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if the JSON is malformed, the rating list
+    /// is empty, a level is invalid or duplicated, or the score/minimum-score
+    /// order is not strictly best-to-worst.
     pub fn from_json(json: &str) -> Result<Self> {
         let scale: ScorecardScale = serde_json::from_str(json)
             .map_err(|err| Error::Validation(format!("invalid scorecard scale JSON: {err}")))?;
@@ -78,7 +100,18 @@ pub enum UnknownScalePolicy {
 }
 
 impl UnknownScalePolicy {
-    /// Deserialize a policy from JSON.
+    /// Deserialize the policy applied to an unknown scorecard-scale name.
+    ///
+    /// The policy governs [`RatingScaleRegistry::rating_scale`]: `Error`
+    /// rejects an unknown name, while the two fallback variants return the
+    /// registry's configured default scale. `WarnAndFallback` leaves emission
+    /// of a warning to the caller that owns logging policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if `json` is not one of the serde
+    /// snake-case enum representations: `"error"`, `"fallback_to_default"`,
+    /// or `"warn_and_fallback"`.
     pub fn from_json(json: &str) -> Result<Self> {
         serde_json::from_str(json)
             .map_err(|err| Error::Validation(format!("invalid unknown scale policy JSON: {err}")))
@@ -131,7 +164,18 @@ impl RatingScaleRegistry {
         self.resolve_scale_id(name).is_some()
     }
 
-    /// Resolve a scale name or alias to a rating scale.
+    /// Resolve a scorecard scale ID or alias under the configured unknown-name policy.
+    ///
+    /// Exact scale IDs take precedence over aliases. An unknown name either
+    /// returns an error or resolves to `default_scale_id`, depending on
+    /// [`UnknownScalePolicy`]. Call [`is_known_rating_scale`](Self::is_known_rating_scale)
+    /// first when a caller must distinguish an explicit match from fallback.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if `name` is unknown and the policy is
+    /// [`UnknownScalePolicy::Error`], or if the configured default scale is
+    /// missing (which indicates an invalid registry state).
     pub fn rating_scale(&self, name: &str) -> Result<&ScorecardScale> {
         let id = match self.resolve_scale_id(name) {
             Some(id) => id,
@@ -214,12 +258,40 @@ impl RatingScaleRegistry {
     }
 }
 
-/// Returns the embedded rating-scale registry.
+/// Load the embedded, versioned rating-scale registry.
+///
+/// This is the workspace default for scorecard classification. The parsed
+/// registry is cached after successful validation,
+/// so repeated calls do not reparse the bundled JSON.
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] if the embedded document is malformed or
+/// violates the supported schema, identifier, alias, score-range, default-scale,
+/// or ordering invariants. Such an error signals a build/package defect rather
+/// than caller-supplied runtime data.
 pub fn embedded_registry() -> Result<&'static RatingScaleRegistry> {
     EMBEDDED_REGISTRY.load(validate_registry)
 }
 
-/// Loads a rating-scale registry from configuration or falls back to the embedded registry.
+/// Load a rating-scale registry from configuration or fall back to the embedded registry.
+///
+/// When `config.extensions` contains [`RATING_SCALES_EXTENSION_KEY`], that
+/// replacement document is validated and returned. Otherwise this returns a
+/// clone of the validated embedded registry, allowing callers to own and amend
+/// their configured view without mutating the global cached default.
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] if the configured extension exists but is
+/// malformed or violates registry invariants, or if the embedded fallback is
+/// invalid. Invalid configured data never silently falls back to the embedded
+/// scale because that would conceal a production configuration error.
+///
+/// # Arguments
+///
+/// * `config` - Library configuration that may contain a validated rating-scale
+///   registry extension; otherwise the embedded registry is cloned.
 pub fn registry_from_config(config: &FinstackConfig) -> Result<RatingScaleRegistry> {
     EMBEDDED_REGISTRY.load_from_config(config, validate_registry)
 }

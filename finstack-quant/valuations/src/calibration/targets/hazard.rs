@@ -1,3 +1,5 @@
+//! Calibration target construction and shared input validation.
+//!
 use crate::calibration::api::schema::HazardCurveParams;
 use crate::calibration::config::{
     CalibrationConfig, CalibrationMethod, HazardCurveSolveConfig, ResidualWeightingScheme,

@@ -187,6 +187,18 @@ impl MasterScale {
     /// | B     | 0.07      | 0.04       |
     /// | CCC   | 0.25      | 0.12       |
     /// | CC/C  | 1.0       | 0.40       |
+    ///
+    /// The selected scale ID comes from the embedded credit-assumptions
+    /// registry's default PD master-scale setting. The labels resemble S&P
+    /// notation solely as a reporting convention; neither boundaries nor
+    /// central PDs should be presented as agency-published statistics.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded credit registry cannot be loaded, its
+    /// configured default PD master-scale ID is absent, or the registry grades
+    /// violate [`MasterScale::new`] invariants. This indicates an invalid
+    /// package/configuration, not an inability to map a particular PD.
     pub fn sp_assumptions_v1() -> crate::Result<Self> {
         Self::from_registry_id(
             crate::credit::registry::embedded_registry()?.default_pd_master_scale_id(),
@@ -197,6 +209,11 @@ impl MasterScale {
     ///
     /// Despite the historical method name, the returned bands are versioned
     /// Finstack Quant assumptions, not sourced S&P empirical default rates.
+    ///
+    /// # Errors
+    ///
+    /// Propagates all registry-loading and grade-validation errors from
+    /// [`sp_assumptions_v1`](Self::sp_assumptions_v1).
     pub fn sp_empirical() -> crate::Result<Self> {
         Self::sp_assumptions_v1()
     }
@@ -216,6 +233,17 @@ impl MasterScale {
     /// | B     | 0.08      | 0.04       |
     /// | Caa   | 0.25      | 0.13       |
     /// | Ca/C  | 1.0       | 0.45       |
+    ///
+    /// These are Finstack Quant library assumptions using Moody's-style
+    /// notation, not Moody's historical default-rate observations or a rating
+    /// agency calibration. Select this scale only when that reporting-label
+    /// convention is appropriate for the downstream scorecard.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded credit registry cannot be loaded, the
+    /// `moodys_assumptions_v1` entry is absent, or its grades violate
+    /// [`MasterScale::new`] invariants.
     pub fn moodys_assumptions_v1() -> crate::Result<Self> {
         Self::from_registry_id("moodys_assumptions_v1")
     }
@@ -224,6 +252,11 @@ impl MasterScale {
     ///
     /// Despite the historical method name, the returned bands are versioned
     /// Finstack Quant assumptions, not sourced Moody's empirical default rates.
+    ///
+    /// # Errors
+    ///
+    /// Propagates all registry-loading and grade-validation errors from
+    /// [`moodys_assumptions_v1`](Self::moodys_assumptions_v1).
     pub fn moodys_empirical() -> crate::Result<Self> {
         Self::moodys_assumptions_v1()
     }
@@ -232,7 +265,16 @@ impl MasterScale {
     ///
     /// Deprecated registry aliases remain readable for backward-compatible
     /// configuration loading and emit a warning. New configurations should
-    /// use `sp_assumptions_v1` or `moodys_assumptions_v1`.
+    /// use `sp_assumptions_v1` or `moodys_assumptions_v1`. The returned scale
+    /// retains grades in best-to-worst order and maps PD boundaries
+    /// inclusively, exactly as [`map_pd`](Self::map_pd) documents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded registry cannot load, `id` is unknown
+    /// after compatibility-alias resolution, or the selected grades fail the
+    /// non-empty, finite, in-range, strictly increasing-boundary invariants of
+    /// [`MasterScale::new`].
     pub fn from_registry_id(id: &str) -> crate::Result<Self> {
         let grades = crate::credit::registry::embedded_registry()?.pd_master_scale_grades(id)?;
         Self::new(grades).map_err(|err| {

@@ -58,7 +58,7 @@ pub trait Pricer: Send + Sync {
     /// rounded `Money` amount. Pricers with a true raw-f64 path should override this
     /// so finite-difference risk calculations do not inherit currency rounding noise.
     /// This is an unchecked, unshocked model kernel; canonical callers enter
-    /// through [`PricerRegistry::price_raw`].
+    /// through the registry's raw-pricing path.
     fn price_raw_dyn(
         &self,
         instrument: &dyn Priceable,

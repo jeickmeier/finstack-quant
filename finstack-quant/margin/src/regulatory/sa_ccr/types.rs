@@ -125,6 +125,16 @@ pub struct SaCcrNettingSetConfig {
 
 impl SaCcrNettingSetConfig {
     /// Validate collateral and margin-agreement inputs.
+    ///
+    /// Collateral and NICA are signed net amounts (positive means the bank holds
+    /// collateral); threshold and MTA are non-negative agreement amounts.
+    /// A margined netting set must specify a positive MPOR, while an unmargined
+    /// set may leave `mpor_days` at zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if collateral, threshold, MTA, or NICA is non-finite;
+    /// threshold or MTA is negative; or a margined set has zero MPOR.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         for (name, value) in [
             ("collateral", self.collateral),

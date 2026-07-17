@@ -425,6 +425,15 @@ pub fn convexity_adjustment(
 
 /// First-order CMS convexity adjustment using the actual reference-swap fixed
 /// payment frequency.
+///
+/// # Arguments
+///
+/// * `volatility` - Annualized swap-rate volatility as a decimal.
+/// * `time_to_fixing` - Remaining time to CMS fixing in years.
+/// * `swap_tenor` - Underlying reference-swap tenor in years.
+/// * `forward_rate` - Forward par swap rate before convexity adjustment.
+/// * `payments_per_year` - Fixed-leg payment frequency, such as `2.0` for
+///   semiannual coupons, used by the annuity proxy.
 pub fn convexity_adjustment_with_frequency(
     volatility: f64,
     time_to_fixing: f64,

@@ -91,6 +91,11 @@ pub struct DietzFlow {
 /// cashflows) is non-positive — a typical sign of an error-case
 /// portfolio (zero NAV after redemptions, or mis-specified flows)
 /// where the return is not meaningfully defined.
+///
+/// # Arguments
+///
+/// * `period` - Beginning and ending market values plus signed external flows
+///   whose fractions specify the remaining portion of the measurement period.
 #[must_use]
 pub fn twrr_modified_dietz(period: &TwrrPeriod) -> Option<f64> {
     if period.cashflows.iter().any(|flow| {
@@ -161,6 +166,13 @@ pub struct DatedCashflow {
 /// value) to skip annualization and return only the cumulative figure. Per GIPS
 /// 2020, horizons shorter than one year are also reported as cumulative rather
 /// than annualized. In those cases the `annualised` field mirrors `cumulative`.
+///
+/// # Arguments
+///
+/// * `periods` - Sequential sub-period returns as decimal fractions, such as
+///   `0.02` for 2%; every value must be finite.
+/// * `horizon_years` - Full elapsed horizon in 365-day calendar years; values
+///   below one skip annualization.
 #[must_use]
 pub fn twrr_linked(periods: &[f64], horizon_years: f64) -> Option<LinkedReturn> {
     if periods.iter().any(|r| !r.is_finite()) {
@@ -192,11 +204,36 @@ pub fn twrr_linked(periods: &[f64], horizon_years: f64) -> Option<LinkedReturn> 
 /// XIRR solves the PV-zero condition from the investor's perspective.
 /// Callers coming from Dietz-flow input should flip signs at the
 /// boundary.
+///
+/// The returned annualized rate uses the core XIRR helper's `Act/365F` basis.
+///
+/// # Arguments
+///
+/// * `cashflows` - Dated investor-perspective cashflows: contributions are
+///   negative and withdrawals or terminal value are positive.
+///
+/// # Errors
+///
+/// Propagates XIRR validation and numerical-solver errors, including an
+/// insufficient or invalid cashflow series and failure to find a root.
 pub fn mwr_xirr(cashflows: &[(Date, f64)]) -> finstack_quant_core::Result<f64> {
     finstack_quant_core::cashflow::xirr(cashflows, None)
 }
 
 /// Money-weighted return via XIRR from serde-friendly dated cashflow objects.
+///
+/// This is equivalent to [`mwr_xirr`] after projecting each object to its
+/// `(date, amount)` pair, including the same investor-sign convention and
+/// `Act/365F` annualization.
+///
+/// # Arguments
+///
+/// * `cashflows` - Serde-friendly dated investor-perspective cashflows whose
+///   contributions are negative and terminal value is positive.
+///
+/// # Errors
+///
+/// Propagates the errors returned by [`mwr_xirr`].
 pub fn mwr_xirr_from_cashflows(cashflows: &[DatedCashflow]) -> finstack_quant_core::Result<f64> {
     let flows = cashflows
         .iter()

@@ -1,3 +1,5 @@
+//! Problem, decision-space, constraint, and solver types for portfolio optimization.
+//!
 use super::problem::PortfolioOptimizationProblem;
 use super::tolerances::{GROSS_BASE_TOL, MIN_WEIGHT_TOL, PV_PER_UNIT_TOL};
 use super::types::{MissingMetricPolicy, WeightingScheme};

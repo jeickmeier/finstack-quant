@@ -194,6 +194,17 @@ impl ModelBuilder<NeedPeriods> {
     ///
     /// * `range` - Period range (e.g., "2025Q1..Q4", "2025Q1..2026Q2")
     /// * `actuals_until` - Optional cutoff for actuals (e.g., Some("2025Q2"))
+    ///
+    /// The range DSL creates the model timeline and classification of actual
+    /// versus forecast periods. `actuals_until` must use the same period family
+    /// as `range`; it labels periods through that cutoff as actuals without
+    /// supplying any values for them.
+    ///
+    /// # Errors
+    ///
+    /// Returns a period error if the range or actuals cutoff cannot be parsed,
+    /// uses incompatible period kinds, is reversed, or resolves to no periods.
+    /// The type-state transition succeeds only with a non-empty period plan.
     pub fn periods(self, range: &str, actuals_until: Option<&str>) -> Result<ModelBuilder<Ready>> {
         let period_plan = build_periods(range, actuals_until)?;
 
@@ -219,6 +230,16 @@ impl ModelBuilder<NeedPeriods> {
     /// # Arguments
     /// * `periods` - Vector of [`Period`](finstack_quant_core::dates::Period) instances, typically
     ///   produced by `finstack_quant_core::dates::build_periods`
+    ///
+    /// The supplied sequence is retained in the given order. It is therefore
+    /// appropriate for models whose actual and forecast periods cannot be
+    /// expressed with the range DSL, but callers remain responsible for
+    /// providing a coherent non-empty period plan.
+    ///
+    /// # Errors
+    ///
+    /// Returns a period error when `periods` is empty. No additional period
+    /// ordering or continuity validation is performed at this boundary.
     pub fn periods_explicit(self, periods: Vec<Period>) -> Result<ModelBuilder<Ready>> {
         if periods.is_empty() {
             return Err(Error::period(
@@ -277,6 +298,13 @@ impl ModelBuilder<Ready> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// Duplicate periods in `values` follow [`IndexMap`] insertion semantics:
+    /// the final entry for a period is retained. The values' monetary/scalar
+    /// consistency is inferred and checked at [`build`](Self::build), so this
+    /// fluent method can remain useful while a node is being assembled.
+    /// Reusing an existing node identifier replaces its former definition and
+    /// emits a warning because its values, forecast, and formula are discarded.
     #[must_use = "builder methods must be chained"]
     pub fn value(
         mut self,
@@ -320,6 +348,12 @@ impl ModelBuilder<Ready> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The first value establishes the node's monetary currency when every
+    /// supplied value shares it. If values mix currencies, the type is left
+    /// unresolved so [`build`](Self::build) can reject the invalid series with
+    /// a precise diagnostic. Duplicate periods retain their final entry.
+    /// Reusing `node_id` replaces the former definition and emits a warning.
     #[must_use = "builder methods must be chained"]
     pub fn value_money(
         mut self,
@@ -375,6 +409,10 @@ impl ModelBuilder<Ready> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// Duplicate periods retain their final entry. Reusing `node_id` replaces
+    /// the former definition and emits a warning; scalar consistency is already
+    /// explicit in this typed convenience method.
     #[must_use = "builder methods must be chained"]
     pub fn value_scalar(mut self, node_id: impl Into<NodeId>, values: &[(PeriodId, f64)]) -> Self {
         let node_id = node_id.into();
@@ -411,6 +449,17 @@ impl ModelBuilder<Ready> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// Formula syntax is checked immediately, while cross-node references,
+    /// period coverage, and type compatibility are checked when the completed
+    /// model is built. Reusing `node_id` intentionally replaces the previous
+    /// node definition and emits a warning because prior values, forecasts, and
+    /// formulas are discarded.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `node_id` uses an internal prefix or DSL keyword,
+    /// `formula` is blank, or the formula cannot be parsed and compiled.
     #[must_use = "builder methods must be chained"]
     pub fn compute(
         mut self,
@@ -658,6 +707,14 @@ impl ModelBuilder<Ready> {
     /// ```
     ///
     /// [`add_metric_from_registry`]: ModelBuilder::add_metric_from_registry
+    ///
+    /// # Errors
+    ///
+    /// Returns registry or formula errors if the built-in catalog cannot be
+    /// loaded, a built-in metric has an unresolved dependency, or dependency
+    /// formulas cannot be prepared for this builder. Existing nodes are not
+    /// overwritten when their identifiers match a built-in metric or one of
+    /// its dependencies.
     #[must_use = "builder methods must be chained"]
     pub fn with_builtin_metrics(self) -> Result<Self> {
         let registry = crate::registry::Registry::with_builtins()?;
@@ -692,6 +749,20 @@ impl ModelBuilder<Ready> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// Dependencies are added before the requested metric. References to
+    /// metrics in the same namespace are qualified in the generated formulas,
+    /// preventing an unqualified dependency from accidentally resolving to a
+    /// caller-defined node with the same short name. Nodes already present in
+    /// the builder take precedence and are left unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns a registry error if `qualified_id` is not in
+    /// `namespace.metric_id` form, is unknown to `registry`, or any dependency
+    /// is unavailable. It also propagates errors while obtaining the
+    /// dependency order. The builder is consumed, so callers should retain
+    /// validation at [`build`](Self::build) as the final model-level check.
     pub fn add_metric_from_registry(
         mut self,
         qualified_id: &str,
@@ -767,9 +838,23 @@ impl ModelBuilder<Ready> {
         crate::utils::formula::qualify_identifiers(formula, metrics_in_namespace, namespace)
     }
 
-    /// Build the final model specification.
+    /// Build and validate the final financial-model specification.
     ///
-    /// This validates the model and returns a `FinancialModelSpec`.
+    /// When name normalization is enabled, aliases in formulas and `where`
+    /// clauses are resolved against the nodes already in this builder before
+    /// validation. A defined node name always wins over an alias, so adding a
+    /// node named `sales` does not silently rewrite it to `revenue`.
+    ///
+    /// The returned [`FinancialModelSpec`] is the immutable input to the
+    /// evaluator; use it only after this method succeeds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if alias normalization cannot parse a formula, or if
+    /// the completed specification violates semantic invariants such as
+    /// invalid node definitions, incompatible values, or unresolved model
+    /// dependencies. Builder calls may accept intermediate state, so this is
+    /// the authoritative whole-model validation boundary.
     pub fn build(mut self) -> Result<FinancialModelSpec> {
         let _span = tracing::info_span!(
             "statements.build",
@@ -843,6 +928,13 @@ impl MixedNodeBuilder {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a formula parse or compilation error if `formula` is blank or
+    /// is not valid Statements DSL. The formula is checked immediately, but
+    /// reference resolution and type compatibility remain part of the parent
+    /// model's final [`ModelBuilder::build`] validation.
     #[must_use = "builder methods must be chained"]
     pub fn values(mut self, values: &[(PeriodId, AmountOrScalar)]) -> Self {
         self.values = Some(values.iter().cloned().collect());
@@ -895,6 +987,16 @@ impl MixedNodeBuilder {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The fallback is used only when neither an explicit value nor a forecast
+    /// resolves for a period. It is syntax-checked immediately; references and
+    /// dimensions are checked when the parent [`ModelBuilder`] is finalized.
+    ///
+    /// # Errors
+    ///
+    /// Returns a formula parse or compilation error if `formula` is blank or
+    /// invalid Statements DSL. It does not yet verify that referenced nodes
+    /// exist or that their units are compatible.
     #[must_use = "builder methods must be chained"]
     pub fn formula(mut self, formula: impl Into<String>) -> Result<Self> {
         let formula = formula.into();
@@ -937,6 +1039,8 @@ impl MixedNodeBuilder {
     ///
     /// This validates the mixed node ID eagerly before attaching it to the
     /// parent builder so there is a single completion path for mixed nodes.
+    /// Values, forecasts, and formulas are retained together; evaluation uses
+    /// the mixed-node precedence documented on [`ModelBuilder::mixed`].
     ///
     /// # Example
     ///
@@ -956,6 +1060,13 @@ impl MixedNodeBuilder {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the mixed node identifier uses a reserved internal
+    /// prefix or shadows a Statements DSL keyword. Formula syntax, forecast
+    /// compatibility, period coverage, and cross-node references are validated
+    /// later when the parent builder is finalized.
     #[must_use = "builder methods must be chained"]
     pub fn build(mut self) -> Result<ModelBuilder<Ready>> {
         validate_node_id(self.node_id.as_str())?;

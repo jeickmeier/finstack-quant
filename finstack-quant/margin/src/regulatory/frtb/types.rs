@@ -365,6 +365,17 @@ impl FrtbSensitivities {
     }
 
     /// Validate regulatory labels, buckets, identifiers, and numeric inputs.
+    ///
+    /// This is a structural input check before FRTB-SA aggregation. It verifies
+    /// supported GIRR tenors and risk-class buckets, non-empty identifiers,
+    /// finite sensitivity/notional data, and the label combinations required by
+    /// the supported delta, vega, curvature, DRC, and RRAO containers. It does
+    /// not calculate capital or determine whether a portfolio is complete.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error naming the first invalid field when a label, tenor,
+    /// bucket, identifier, or numeric input is unsupported, empty, or non-finite.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         fn finite(field: &str, value: f64) -> finstack_quant_core::Result<()> {
             if value.is_finite() {

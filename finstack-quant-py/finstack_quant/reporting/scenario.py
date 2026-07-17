@@ -112,8 +112,10 @@ def scenario_tearsheet(
         Fraction (e.g. ``0.12``) used for the breach KPI and the MC caption.
     target_metric : str, optional
         Name of the metric being analysed (header subtitle only).
-    title, subtitle : str, optional
-        Header text.
+    title : str, optional
+        Optional main report heading for the scenario analysis.
+    subtitle : str, optional
+        Optional secondary heading shown below ``title``.
     sections : list[str], optional
         Subset of :data:`ALL_SECTIONS` (default: all).
     theme : Theme

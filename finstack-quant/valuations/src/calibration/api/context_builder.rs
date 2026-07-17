@@ -40,6 +40,15 @@ use std::sync::Arc;
 /// construction) or by `MarketContext::get_hazard` /
 /// `MarketContext::get_base_correlation` lookups when reconstructing credit
 /// indices.
+///
+/// # Arguments
+///
+/// * `prior` - Previously calibrated market objects inserted before new input
+///   data so later records can reference established curves and surfaces.
+/// * `data` - Flat v3 market-data records used to construct or replace context
+///   objects after `prior` has been loaded.
+/// * `settings` - Calibration configuration controlling construction policy,
+///   including FX matrix and credit-index reconstruction behavior.
 pub fn build_initial_context(
     prior: &[PriorMarketObject],
     data: &[MarketDatum],

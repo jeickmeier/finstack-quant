@@ -417,6 +417,12 @@ impl RawPdCurve {
     ///    knot" guarantee).
     /// 2. Knot times strictly increasing.
     /// 3. Cumulative PDs monotonically non-decreasing and in `[0, 1]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for fewer than two knots, an unanchored first knot,
+    /// non-increasing times, non-finite values, or cumulative probabilities
+    /// that decrease or fall outside `[0, 1]`.
     pub fn new(rating: impl Into<String>, knots: Vec<(f64, f64)>) -> Result<Self> {
         if knots.len() < 2 {
             return Err(InputError::TooFewPoints.into());

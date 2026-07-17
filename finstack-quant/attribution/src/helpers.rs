@@ -49,11 +49,13 @@ pub(crate) fn reprice_instrument(
 ///
 /// # Arguments
 ///
-/// * `val_t0` - Value at T₀
-/// * `val_t1` - Value at T₁
-/// * `target_ccy` - Currency for P&L
-/// * `market_t1` - Market context at T₁ (for FX conversion)
-/// * `as_of_t1` - Date at T₁
+/// * `val_t0` - Opening mark-to-market amount, converted with the T₁ FX matrix
+///   under this simple non-isolated convention.
+/// * `val_t1` - Closing mark-to-market amount to compare with `val_t0`.
+/// * `target_ccy` - Currency in which the returned P&L is reported.
+/// * `market_t1` - Closing market context supplying the FX matrix used to
+///   convert both marks.
+/// * `as_of_t1` - Closing valuation date supplied to the T₁ FX conversion.
 ///
 /// # Returns
 ///
@@ -82,13 +84,15 @@ pub fn compute_pnl(
 ///
 /// # Arguments
 ///
-/// * `val_t0` - Value at T₀
-/// * `val_t1` - Value at T₁
-/// * `target_ccy` - Currency for P&L
-/// * `market_fx_t0` - Market context at T₀ (for T₀ FX conversion)
-/// * `market_fx_t1` - Market context at T₁ (for T₁ FX conversion)
-/// * `as_of_t0` - Date at T₀
-/// * `as_of_t1` - Date at T₁
+/// * `val_t0` - Opening mark-to-market amount, converted with T₀ FX.
+/// * `val_t1` - Closing mark-to-market amount, converted with T₁ FX.
+/// * `target_ccy` - Currency in which the returned P&L is reported.
+/// * `market_fx_t0` - Opening market context supplying the FX matrix for the
+///   opening-value translation.
+/// * `market_fx_t1` - Closing market context supplying the FX matrix for the
+///   closing-value translation.
+/// * `as_of_t0` - Opening valuation date supplied to the T₀ FX conversion.
+/// * `as_of_t1` - Closing valuation date supplied to the T₁ FX conversion.
 ///
 /// # Returns
 ///

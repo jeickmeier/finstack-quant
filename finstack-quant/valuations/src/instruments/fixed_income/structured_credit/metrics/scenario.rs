@@ -68,7 +68,8 @@ pub struct ScenarioTable {
 /// * `deal` - The structured-credit deal owning the tranche.
 /// * `tranche_id` - Identifier of the tranche to evaluate.
 /// * `context` - Market context for cashflow projection and discounting.
-/// * `as_of` - Valuation date.
+/// * `as_of` - Valuation date used for every projected/repriced CPR, CDR, and
+///   severity scenario cell.
 /// * `grid` - The scenario grid to sweep.
 ///
 /// # Errors

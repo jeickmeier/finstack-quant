@@ -42,6 +42,18 @@ impl FactorCovarianceMatrix {
     /// - factor identifiers are unique
     /// - the matrix is symmetric within a small floating-point tolerance
     /// - the matrix is positive semi-definite according to a Cholesky-style test
+    ///
+    /// The `data` vector is row-major in the exact `factor_ids` order. Its
+    /// entries must use the canonical annualized covariance units described on
+    /// [`FactorCovarianceMatrix`]; this constructor validates structure and
+    /// numerical matrix properties, not market-unit consistency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the data is not square for the supplied identifiers,
+    /// an identifier is duplicated, the matrix is asymmetric beyond the
+    /// scale-relative tolerance, or the Cholesky-style test finds it not
+    /// positive semidefinite.
     pub fn new(factor_ids: Vec<FactorId>, data: Vec<f64>) -> finstack_quant_core::Result<Self> {
         let n = factor_ids.len();
         if data.len() != n * n {

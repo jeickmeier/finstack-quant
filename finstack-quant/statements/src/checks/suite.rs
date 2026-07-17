@@ -47,6 +47,19 @@ impl CheckSuite {
 
     /// Execute all checks in the suite, applying `min_severity` and
     /// `materiality_threshold` filters from the config.
+    ///
+    /// Each check produces its full findings first; filtering then removes
+    /// findings below the configured severity or absolute materiality. A check
+    /// passes when none of its retained findings has `Error` severity. The
+    /// returned summary counts only retained findings, so it describes the
+    /// reporting policy rather than every raw diagnostic a check generated.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the first error returned by an individual check, such as a
+    /// missing required model node, incompatible result data, or invalid
+    /// check-specific configuration. On error no partial `CheckReport` is
+    /// returned; run smaller suites when callers need per-check isolation.
     pub fn run(
         &self,
         model: &FinancialModelSpec,
@@ -208,7 +221,15 @@ impl CheckSuiteSpec {
     ///
     /// Only built-in checks are materialized; [`FormulaCheckSpec`] entries
     /// require the analytics crate's `FormulaCheck` and must be resolved
-    /// separately.
+    /// separately. The resolved suite preserves this spec's name, description,
+    /// and filtering configuration.
+    ///
+    /// # Errors
+    ///
+    /// This currently returns `Ok` for every deserialized spec because built-in
+    /// variants are converted without runtime I/O or model access. Formula
+    /// checks are intentionally omitted rather than treated as an error; the
+    /// analytics crate owns their resolution.
     pub fn resolve(&self) -> Result<CheckSuite> {
         let checks: Vec<Box<dyn Check>> = self
             .builtin_checks

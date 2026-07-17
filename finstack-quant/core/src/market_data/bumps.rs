@@ -171,6 +171,16 @@ impl BumpSpec {
     ///
     /// Call this at public mutation boundaries before cloning or mutating market
     /// data so failed bumps cannot contaminate reusable scratch state.
+    ///
+    /// For a triangular key-rate bump, this includes the target bucket and any
+    /// supplied neighbouring bucket coordinates. It deliberately does not
+    /// validate unit/mode compatibility; use a product-specific resolver after
+    /// this structural check.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bump magnitude, target bucket, or a supplied
+    /// neighbouring bucket is NaN or infinite.
     pub fn validate_finite(&self) -> crate::Result<()> {
         let buckets_are_finite = match self.bump_type {
             BumpType::Parallel => true,
@@ -339,7 +349,15 @@ impl BumpSpec {
 
     /// If additive, return the bump as a normalized fraction (e.g., 100bp -> 0.01, 2% -> 0.02).
     ///
-    /// Ensure the bump type is Parallel.
+    /// Ensures the bump type is parallel before a product applies it. This
+    /// does not restrict the mode or units because supported combinations are
+    /// product-specific.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any numeric bump input is non-finite or the bump is
+    /// a triangular key-rate bump rather than [`BumpType::Parallel`]. The
+    /// `context` string is included in the unsupported-bump diagnostic.
     pub fn validate_parallel(&self, context: &str) -> crate::Result<()> {
         self.validate_finite()?;
         if !matches!(self.bump_type, BumpType::Parallel) {
@@ -726,6 +744,19 @@ impl InflationIndex {
     /// `published_through` anchors the projected CPI path; later observations
     /// are treated as forecasts and receive the same zero-rate bump semantics as
     /// [`InflationCurve`].
+    ///
+    /// Additive percentage/fraction bumps change the annualized zero-inflation
+    /// rate from the anchor to each projected observation. A multiplicative
+    /// factor scales `1 + zero_rate`; it is not a direct multiplier on CPI.
+    /// The returned index retains every published observation unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `spec` is non-finite, non-parallel, or uses an
+    /// unsupported unit/mode combination; no observation exists on or before
+    /// `published_through`; an anchor or projected CPI level is non-positive
+    /// or non-finite; the Act/365F year fraction fails; a shock implies an
+    /// invalid growth factor; or the rebuilt index fails validation.
     pub fn apply_projection_bump(
         &self,
         published_through: Date,

@@ -1,3 +1,5 @@
+//! Core identifiers and definitions used by the factor model.
+//!
 use super::{FactorId, FactorType};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::bumps::BumpUnits;

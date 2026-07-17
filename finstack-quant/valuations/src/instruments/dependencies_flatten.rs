@@ -1,7 +1,14 @@
+//! Dependencies flatten implementation used by the instruments subsystem.
+//!
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use finstack_quant_factor_model::{CurveType, MarketDependency};
 
 /// Flattens aggregated market dependencies into individually matchable entries.
+///
+/// # Arguments
+///
+/// * `deps` - Aggregated instrument market dependencies; each curve, spot,
+///   volatility surface, and FX pair is expanded into a separate typed entry.
 #[must_use]
 pub fn decompose(deps: &MarketDependencies) -> Vec<MarketDependency> {
     let mut result = Vec::new();

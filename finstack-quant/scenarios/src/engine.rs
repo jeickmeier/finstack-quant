@@ -834,6 +834,12 @@ impl ScenarioEngine {
     /// Currently the only compose-time-detectable pathology is the presence of
     /// more than one [`OperationSpec::TimeRollForward`] across the composed
     /// scenarios. Production callers should prefer this method.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if composition contains multiple time-roll
+    /// operations. Other conflicts remain in the composed spec and are
+    /// validated when [`Self::apply`] is called.
     pub fn try_compose(
         &self,
         scenarios: Vec<ScenarioSpec>,
@@ -881,6 +887,13 @@ impl ScenarioEngine {
     /// scenario to a clone of the market context and swap it in on success
     /// (the Python and WASM bindings do exactly this by operating on
     /// deserialized copies).
+    ///
+    /// # Errors
+    ///
+    /// Returns validation errors for an invalid spec, unsupported operation
+    /// data, missing market objects, or hierarchy-targeted operations without
+    /// an attached hierarchy. Because execution is not atomic, an error can
+    /// follow successful mutation by earlier operations.
     #[tracing::instrument(skip_all, fields(scenario_id = %spec.id))]
     pub fn apply(
         &self,

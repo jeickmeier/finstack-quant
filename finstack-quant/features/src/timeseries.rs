@@ -136,6 +136,19 @@ impl FromStr for TimeSeriesOp {
 /// `order` is compared lexicographically within each entity. Use ISO-8601 date
 /// strings or another sortable key format when passing temporal labels.
 ///
+/// # Arguments
+///
+/// * `values` - Row-aligned observations to transform; missing and non-finite
+///   values are handled by the selected time-series operation.
+/// * `entity` - Row-aligned entity identifiers; each entity is transformed
+///   independently.
+/// * `order` - Row-aligned sortable keys that define chronological order within
+///   an entity, typically ISO-8601 date strings.
+/// * `op` - Canonical snake-case operation name, such as `"rolling_mean"` or
+///   `"returns"`.
+/// * `params` - Optional operation-specific JSON parameters; omitted keys use
+///   the operation's documented defaults.
+///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, `op` is unsupported,
@@ -154,6 +167,18 @@ pub fn transform_timeseries(
 ///
 /// `order` is compared lexicographically within each entity. Use ISO-8601 date
 /// strings or another sortable key format when passing temporal labels.
+///
+/// # Arguments
+///
+/// * `values` - Row-aligned observations to transform; output preserves this
+///   row order after processing each entity chronologically.
+/// * `entity` - Row-aligned entity identifiers; length must equal `values`.
+/// * `order` - Row-aligned sortable keys that establish order within each
+///   entity; length must equal `values`.
+/// * `op` - Typed time-series operation that determines the transform and
+///   accepted parameter keys.
+/// * `params` - Optional operation-specific JSON parameters; omitted keys use
+///   the operation's documented defaults.
 ///
 /// # Errors
 ///

@@ -69,6 +69,7 @@ pub struct WasmPortfolio {
 impl WasmPortfolio {
     /// Build from a JSON-serialised `PortfolioSpec`.
     #[wasm_bindgen(js_name = fromSpec)]
+    /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
     pub fn from_spec(spec_json: &str) -> Result<WasmPortfolio, JsValue> {
         let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
             serde_json::from_str(spec_json).map_err(to_js_err)?;
@@ -114,6 +115,7 @@ impl WasmPortfolio {
 ///
 /// Returns the re-serialized canonical JSON form.
 #[wasm_bindgen(js_name = parsePortfolioSpec)]
+/// @param json_str - Canonical JSON string to validate, parse, or normalize for this API.
 pub fn parse_portfolio_spec(json_str: &str) -> Result<String, JsValue> {
     let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
         serde_json::from_str(json_str).map_err(to_js_err)?;
@@ -126,6 +128,7 @@ pub fn parse_portfolio_spec(json_str: &str) -> Result<String, JsValue> {
 /// Accepts a JSON array of `SectorPeriod` objects and returns a JSON
 /// `BrinsonPeriodResult`.
 #[wasm_bindgen(js_name = brinsonFachler)]
+/// @param sectors_json - Canonical JSON payload representing the sectors consumed by this API.
 pub fn brinson_fachler(sectors_json: &str) -> Result<String, JsValue> {
     let sectors: Vec<finstack_quant_portfolio::SectorPeriod> =
         serde_json::from_str(sectors_json).map_err(to_js_err)?;
@@ -138,6 +141,7 @@ pub fn brinson_fachler(sectors_json: &str) -> Result<String, JsValue> {
 /// Accepts a JSON array of periods, where each period is an array of
 /// `SectorPeriod` objects, and returns a JSON `CarinoLinkedAttribution`.
 #[wasm_bindgen(js_name = carinoLink)]
+/// @param periods_json - Canonical JSON payload representing the periods consumed by this API.
 pub fn carino_link(periods_json: &str) -> Result<String, JsValue> {
     let periods: Vec<Vec<finstack_quant_portfolio::SectorPeriod>> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
@@ -148,6 +152,7 @@ pub fn carino_link(periods_json: &str) -> Result<String, JsValue> {
 
 /// Compute a Modified-Dietz TWRR sub-period return from period JSON.
 #[wasm_bindgen(js_name = twrrModifiedDietz)]
+/// @param period_json - Canonical JSON payload representing the period consumed by this API.
 pub fn twrr_modified_dietz(period_json: &str) -> Result<Option<f64>, JsValue> {
     let period: finstack_quant_portfolio::TwrrPeriod =
         serde_json::from_str(period_json).map_err(to_js_err)?;
@@ -156,6 +161,8 @@ pub fn twrr_modified_dietz(period_json: &str) -> Result<Option<f64>, JsValue> {
 
 /// Geometrically link TWRR sub-period returns from returns JSON.
 #[wasm_bindgen(js_name = twrrLinked)]
+/// @param returns_json - Canonical JSON payload representing the returns consumed by this API.
+/// @param horizon_years - Return-linking horizon measured in years for annualization.
 pub fn twrr_linked(returns_json: &str, horizon_years: f64) -> Result<Option<String>, JsValue> {
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
     finstack_quant_portfolio::twrr_linked(&returns, horizon_years)
@@ -165,6 +172,7 @@ pub fn twrr_linked(returns_json: &str, horizon_years: f64) -> Result<Option<Stri
 
 /// Compute money-weighted return via XIRR from dated cashflow JSON.
 #[wasm_bindgen(js_name = mwrXirr)]
+/// @param cashflows_json - Canonical JSON payload representing the cashflows consumed by this API.
 pub fn mwr_xirr(cashflows_json: &str) -> Result<f64, JsValue> {
     let cashflows: Vec<finstack_quant_portfolio::DatedCashflow> =
         serde_json::from_str(cashflows_json).map_err(to_js_err)?;
@@ -176,6 +184,7 @@ pub fn mwr_xirr(cashflows_json: &str) -> Result<f64, JsValue> {
 /// Deserializes the spec, constructs the portfolio with live instruments,
 /// validates structural invariants, then re-serializes for confirmation.
 #[wasm_bindgen(js_name = buildPortfolioFromSpec)]
+/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
 pub fn build_portfolio_from_spec(spec_json: &str) -> Result<String, JsValue> {
     let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
         serde_json::from_str(spec_json).map_err(to_js_err)?;
@@ -188,6 +197,7 @@ pub fn build_portfolio_from_spec(spec_json: &str) -> Result<String, JsValue> {
 
 /// Extract the total portfolio value from a JSON result.
 #[wasm_bindgen(js_name = portfolioResultTotalValue)]
+/// @param result_json - Canonical JSON payload representing the result consumed by this API.
 pub fn portfolio_result_total_value(result_json: &str) -> Result<f64, JsValue> {
     let result: finstack_quant_portfolio::results::PortfolioResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
@@ -199,6 +209,8 @@ pub fn portfolio_result_total_value(result_json: &str) -> Result<f64, JsValue> {
 ///
 /// Returns `undefined` (via `Option`) if the metric was not produced.
 #[wasm_bindgen(js_name = portfolioResultGetMetric)]
+/// @param result_json - Canonical JSON payload representing the result consumed by this API.
+/// @param metric_id - Stable metric identifier used to select the required domain object.
 pub fn portfolio_result_get_metric(result_json: &str, metric_id: &str) -> Result<JsValue, JsValue> {
     let result: finstack_quant_portfolio::results::PortfolioResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
@@ -211,6 +223,10 @@ pub fn portfolio_result_get_metric(result_json: &str, metric_id: &str) -> Result
 
 /// Aggregate portfolio metrics from a valuation JSON.
 #[wasm_bindgen(js_name = aggregateMetrics)]
+/// @param valuation_json - Canonical JSON payload representing the valuation consumed by this API.
+/// @param base_ccy - ISO-4217 base currency in which aggregate portfolio values are reported.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 pub fn aggregate_metrics(
     valuation_json: &str,
     base_ccy: &str,
@@ -232,6 +248,9 @@ pub fn aggregate_metrics(
 
 /// Value a portfolio from its spec and market context.
 #[wasm_bindgen(js_name = valuePortfolio)]
+/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param strict_risk - Whether unavailable risk metrics are treated as calculation errors.
 pub fn value_portfolio(
     spec_json: &str,
     market_json: &str,
@@ -243,6 +262,8 @@ pub fn value_portfolio(
 
 /// Aggregate the full classified cashflow ladder for a portfolio.
 #[wasm_bindgen(js_name = aggregateFullCashflows)]
+/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 pub fn aggregate_full_cashflows(spec_json: &str, market_json: &str) -> Result<String, JsValue> {
     let portfolio = WasmPortfolio::from_spec(spec_json)?;
     aggregate_full_cashflows_built(&portfolio, market_json)
@@ -255,6 +276,8 @@ pub fn aggregate_full_cashflows(spec_json: &str, market_json: &str) -> Result<St
 /// For batched or chained workflows (repeated cashflow builds across market
 /// scenarios on the same portfolio), this is the cheap path.
 #[wasm_bindgen(js_name = aggregateFullCashflowsBuilt)]
+/// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 pub fn aggregate_full_cashflows_built(
     portfolio: &WasmPortfolio,
     market_json: &str,
@@ -267,11 +290,14 @@ pub fn aggregate_full_cashflows_built(
     serde_json::to_string(&cashflows).map_err(to_js_err)
 }
 
-/// Value an already-built [`Portfolio`] handle. Skips the per-call
+/// Value an already-built [`WasmPortfolio`] handle. Skips the per-call
 /// `PortfolioSpec` parse + `Portfolio::from_spec` rebuild that
 /// [`value_portfolio`] performs; use this when sweeping market scenarios
 /// against a fixed portfolio.
 #[wasm_bindgen(js_name = valuePortfolioBuilt)]
+/// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param strict_risk - Whether unavailable risk metrics are treated as calculation errors.
 pub fn value_portfolio_built(
     portfolio: &WasmPortfolio,
     market_json: &str,
@@ -294,9 +320,12 @@ pub fn value_portfolio_built(
     serde_json::to_string(&valuation).map_err(to_js_err)
 }
 
-/// Apply a scenario to an already-built [`Portfolio`] handle and revalue.
+/// Apply a scenario to an already-built [`WasmPortfolio`] handle and revalue.
 /// Returns a JS object with structured `valuation` and `report` values.
 #[wasm_bindgen(js_name = applyScenarioAndRevalueBuilt)]
+/// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
+/// @param scenario_json - Canonical JSON payload representing the scenario consumed by this API.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 pub fn apply_scenario_and_revalue_built(
     portfolio: &WasmPortfolio,
     scenario_json: &str,
@@ -321,6 +350,9 @@ pub fn apply_scenario_and_revalue_built(
 ///
 /// Returns a JS object with structured `valuation` and `report` values.
 #[wasm_bindgen(js_name = applyScenarioAndRevalue)]
+/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+/// @param scenario_json - Canonical JSON payload representing the scenario consumed by this API.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 pub fn apply_scenario_and_revalue(
     spec_json: &str,
     scenario_json: &str,
@@ -335,6 +367,8 @@ pub fn apply_scenario_and_revalue(
 /// Accepts a `PortfolioOptimizationSpec` JSON (portfolio + objective +
 /// constraints + options) and a `MarketContext` JSON.
 #[wasm_bindgen(js_name = optimizePortfolio)]
+/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 pub fn optimize_portfolio(spec_json: &str, market_json: &str) -> Result<String, JsValue> {
     let spec: finstack_quant_portfolio::optimization::PortfolioOptimizationSpec =
         serde_json::from_str(spec_json).map_err(to_js_err)?;
@@ -352,6 +386,9 @@ pub fn optimize_portfolio(spec_json: &str, market_json: &str) -> Result<String, 
 /// Accepts a portfolio spec, an array of dated market snapshots, and a
 /// replay configuration. Returns a JSON-serialized `ReplayResult`.
 #[wasm_bindgen(js_name = replayPortfolio)]
+/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+/// @param snapshots_json - Canonical JSON payload representing the snapshots consumed by this API.
+/// @param config_json - Canonical JSON payload representing the config consumed by this API.
 pub fn replay_portfolio(
     spec_json: &str,
     snapshots_json: &str,
@@ -385,6 +422,10 @@ pub fn replay_portfolio(
 ///
 /// `covariance_json` must deserialize to an `n x n` row-major nested array.
 #[wasm_bindgen(js_name = parametricVarDecomposition)]
+/// @param position_ids_json - Canonical JSON payload representing the position ids consumed by this API.
+/// @param weights_json - Canonical JSON payload representing the weights consumed by this API.
+/// @param covariance_json - Canonical JSON payload representing the covariance consumed by this API.
+/// @param confidence - Tail confidence as a decimal probability, such as 0.95 for 95%.
 pub fn parametric_var_decomposition(
     position_ids_json: &str,
     weights_json: &str,
@@ -423,6 +464,10 @@ pub fn parametric_var_decomposition(
 /// object whose ``contributions`` entries are
 /// ``{position_id, component_es, marginal_es, pct_contribution}``.
 #[wasm_bindgen(js_name = parametricEsDecomposition)]
+/// @param position_ids_json - Canonical JSON payload representing the position ids consumed by this API.
+/// @param weights_json - Canonical JSON payload representing the weights consumed by this API.
+/// @param covariance_json - Canonical JSON payload representing the covariance consumed by this API.
+/// @param confidence - Tail confidence as a decimal probability, such as 0.95 for 95%.
 pub fn parametric_es_decomposition(
     position_ids_json: &str,
     weights_json: &str,
@@ -457,6 +502,9 @@ pub fn parametric_es_decomposition(
 ///
 /// `position_pnls_json` is a nested array shaped `[n_positions][n_scenarios]`.
 #[wasm_bindgen(js_name = historicalVarDecomposition)]
+/// @param position_ids_json - Canonical JSON payload representing the position ids consumed by this API.
+/// @param position_pnls_json - Canonical JSON payload representing the position pnls consumed by this API.
+/// @param confidence - Tail confidence as a decimal probability, such as 0.95 for 95%.
 pub fn historical_var_decomposition(
     position_ids_json: &str,
     position_pnls_json: &str,
@@ -485,6 +533,11 @@ pub fn historical_var_decomposition(
 
 /// Evaluate a per-position risk budget against actual component VaRs.
 #[wasm_bindgen(js_name = evaluateRiskBudget)]
+/// @param position_ids_json - Canonical JSON payload representing the position ids consumed by this API.
+/// @param actual_var_json - Canonical JSON payload representing the actual var consumed by this API.
+/// @param target_var_pct_json - Canonical JSON payload representing the target var pct consumed by this API.
+/// @param portfolio_var - Total portfolio VaR used to convert risk-budget shares into absolute amounts.
+/// @param utilization_threshold - Actual-to-target risk ratio that flags a budget breach.
 pub fn evaluate_risk_budget(
     position_ids_json: &str,
     actual_var_json: &str,
@@ -548,6 +601,7 @@ fn flatten_square_matrix(
 /// Effective bid-ask spread via Roll (1984). Returns `undefined` when the
 /// serial covariance is non-negative (Roll assumption violated) or inputs too short.
 #[wasm_bindgen(js_name = rollEffectiveSpread)]
+/// @param returns_json - Canonical JSON payload representing the returns consumed by this API.
 pub fn roll_effective_spread(returns_json: &str) -> Result<Option<f64>, JsValue> {
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
     Ok(finstack_quant_portfolio::liquidity::roll_effective_spread(
@@ -557,6 +611,8 @@ pub fn roll_effective_spread(returns_json: &str) -> Result<Option<f64>, JsValue>
 
 /// Amihud (2002) illiquidity ratio from returns and volumes.
 #[wasm_bindgen(js_name = amihudIlliquidity)]
+/// @param returns_json - Canonical JSON payload representing the returns consumed by this API.
+/// @param volumes_json - Canonical JSON payload representing the volumes consumed by this API.
 pub fn amihud_illiquidity(returns_json: &str, volumes_json: &str) -> Result<Option<f64>, JsValue> {
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
     let volumes: Vec<f64> = serde_json::from_str(volumes_json).map_err(to_js_err)?;
@@ -567,6 +623,9 @@ pub fn amihud_illiquidity(returns_json: &str, volumes_json: &str) -> Result<Opti
 
 /// Trading days required to liquidate at the given participation rate.
 #[wasm_bindgen(js_name = daysToLiquidate)]
+/// @param position_value - Current position market value in the relevant currency units.
+/// @param avg_daily_volume - Average daily trading volume in the same units as the position size.
+/// @param participation_rate - Maximum fraction of average daily volume used for execution.
 pub fn days_to_liquidate(
     position_value: f64,
     avg_daily_volume: f64,
@@ -584,6 +643,7 @@ pub fn days_to_liquidate(
 /// Uses the default `[1, 5, 20, 60]` trading-day thresholds. Returns one of
 /// `"tier1" .. "tier5"`.
 #[wasm_bindgen(js_name = liquidityTier)]
+/// @param days_to_liquidate - Days to liquidate supplied to liquidity tier; follow the type and convention required by the surrounding API.
 pub fn liquidity_tier(days_to_liquidate: f64) -> String {
     use finstack_quant_portfolio::liquidity::classify_tier;
     let config = finstack_quant_portfolio::liquidity::LiquidityConfig::default();
@@ -595,6 +655,11 @@ pub fn liquidity_tier(days_to_liquidate: f64) -> String {
 /// Liquidity-adjusted VaR following Bangia, Diebold, Schuermann & Stroughair (1999).
 /// Loss sign convention: `var` and `lvar` are non-positive.
 #[wasm_bindgen(js_name = lvarBangia)]
+/// @param var - Base market value-at-risk before adding the liquidity adjustment.
+/// @param spread_mean - Mean bid-ask spread in the quote units required by the liquidity model.
+/// @param spread_vol - Volatility of the bid-ask spread in the liquidity model's units.
+/// @param confidence - Tail confidence as a decimal probability, such as 0.95 for 95%.
+/// @param position_value - Current position market value in the relevant currency units.
 pub fn lvar_bangia(
     var: f64,
     spread_mean: f64,
@@ -615,6 +680,13 @@ pub fn lvar_bangia(
 
 /// Almgren-Chriss (2001) market impact decomposition for a uniform execution.
 #[wasm_bindgen(js_name = almgrenChrissImpact)]
+/// @param position_size - Trade size in shares or notional units for the execution calculation.
+/// @param avg_daily_volume - Average daily trading volume in the same units as the position size.
+/// @param volatility - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param execution_horizon_days - Planned execution horizon measured in trading days.
+/// @param permanent_impact_coef - Permanent market-impact coefficient in the execution-cost model.
+/// @param temporary_impact_coef - Temporary market-impact coefficient in the execution-cost model.
+/// @param reference_price - Optional reference price used to express execution impact in monetary units.
 pub fn almgren_chriss_impact(
     position_size: f64,
     avg_daily_volume: f64,
@@ -640,6 +712,8 @@ pub fn almgren_chriss_impact(
 /// Kyle (1985) linear price impact lambda estimated from observed volumes
 /// and returns via the Amihud-ratio proxy. Returns `undefined` on invalid inputs.
 #[wasm_bindgen(js_name = kyleLambda)]
+/// @param volumes_json - Canonical JSON payload representing the volumes consumed by this API.
+/// @param returns_json - Canonical JSON payload representing the returns consumed by this API.
 pub fn kyle_lambda(volumes_json: &str, returns_json: &str) -> Result<Option<f64>, JsValue> {
     let volumes: Vec<f64> = serde_json::from_str(volumes_json).map_err(to_js_err)?;
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;

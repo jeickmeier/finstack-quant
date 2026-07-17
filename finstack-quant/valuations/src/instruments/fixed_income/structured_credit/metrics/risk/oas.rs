@@ -97,9 +97,16 @@ pub struct OasResult {
 ///
 /// # Arguments
 ///
-/// * `deal`, `tranche_id` - the tranche to price.
-/// * `market_price_pct` - quoted price as a percentage of original balance.
-/// * `market`, `as_of` - market context and valuation date.
+/// * `deal` - Validated structured-credit deal owning the requested tranche
+///   and its waterfall and credit assumptions.
+/// * `tranche_id` - Identifier of the tranche whose option-adjusted spread is
+///   solved.
+/// * `market_price_pct` - Observed clean price as a percentage of original
+///   tranche balance.
+/// * `market` - Market context supplying the discount curve and stochastic
+///   scenario dependencies.
+/// * `as_of` - Valuation date used for projected tranche cashflows and
+///   discounting.
 /// * `config` - stochastic-rate/credit coupling and Monte-Carlo settings.
 ///
 /// # Errors

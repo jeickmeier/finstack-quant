@@ -78,6 +78,25 @@ impl MarketContext {
     /// Like [`roll_forward`](Self::roll_forward), but also returns
     /// [`ContextMutationInfo`](super::ContextMutationInfo) describing any
     /// credit indices invalidated by the roll.
+    ///
+    /// The returned context owns rolled copies of every curve and rebinds its
+    /// credit indices to those copies. `ContextMutationInfo` identifies credit
+    /// indices whose derived state was invalidated during that rebinding, so a
+    /// caller can recompute or inspect them deliberately. The source context
+    /// is never modified.
+    ///
+    /// Non-curve market data is retained at its original state: FX quotes,
+    /// volatility surfaces, scalar prices, historical series, inflation
+    /// fixings, dividend schedules, and collateral/hierarchy metadata are
+    /// cloned or shared without a time roll. Rebuild those inputs separately
+    /// when a scenario requires them to advance consistently with the curves.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any contained curve cannot roll by `days`, such as
+    /// when its day-count calculation fails or insufficient pillars survive.
+    /// Because construction occurs in local maps before the result is exposed,
+    /// no partially rolled context is returned on error.
     pub fn roll_forward_observed(
         &self,
         days: i64,

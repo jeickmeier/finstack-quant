@@ -296,6 +296,15 @@ impl StatementResult {
     /// Export to a long-format table.
     ///
     /// Schema: `(node_id, period_id, value, value_money, currency, value_type)`.
+    /// Rows preserve the result's node and period declaration order. Monetary
+    /// nodes duplicate their numerical value in `value_money` and set
+    /// `currency`; scalar nodes leave those two fields null.
+    ///
+    /// # Errors
+    ///
+    /// Returns a table-construction error if the result cannot be represented
+    /// as a valid [`finstack_quant_core::table::TableEnvelope`]. Empty results
+    /// are valid and produce an empty table with the full six-column schema.
     pub fn to_table_long(&self) -> Result<finstack_quant_core::table::TableEnvelope> {
         super::export::to_table_long(self)
     }
@@ -306,6 +315,16 @@ impl StatementResult {
     ///
     /// # Arguments
     /// * `node_filter` - Optional list of node identifiers to keep
+    ///
+    /// Unknown node identifiers are ignored, allowing a caller to reuse a
+    /// report layout across models with different optional outputs. Row and
+    /// monetary-value semantics match [`to_table_long`](Self::to_table_long).
+    ///
+    /// # Errors
+    ///
+    /// Returns a table-construction error if the filtered result cannot be
+    /// represented as a valid table envelope. An empty filter includes all
+    /// nodes; a filter with no matching nodes returns an empty six-column table.
     pub fn to_table_long_filtered(
         &self,
         node_filter: &[&str],
@@ -315,7 +334,17 @@ impl StatementResult {
 
     /// Export to a wide-format table.
     ///
-    /// Schema: `(period_id, <node1>, <node2>, ...)`
+    /// Schema: `(period_id, <node1>, <node2>, ...)`. One row is emitted per
+    /// unique period in ascending chronological order, and node columns follow
+    /// result declaration order. Missing node-period observations are encoded
+    /// as `NaN`, not zero, so downstream analytics can distinguish absence from
+    /// an evaluated zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns a table-construction error if a node identifier or result shape
+    /// cannot be represented in a valid table envelope. Empty results are valid
+    /// and produce a zero-row table containing only `period_id`.
     pub fn to_table_wide(&self) -> Result<finstack_quant_core::table::TableEnvelope> {
         super::export::to_table_wide(self)
     }

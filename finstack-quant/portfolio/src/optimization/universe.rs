@@ -1,3 +1,5 @@
+//! Problem, decision-space, constraint, and solver types for portfolio optimization.
+//!
 use crate::position::PositionUnit;
 use crate::types::{AttributeTest, AttributeValue, EntityId, PositionId};
 use finstack_quant_valuations::instruments::Instrument;

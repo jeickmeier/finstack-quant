@@ -26,6 +26,16 @@ pub enum PeriodDateConvention {
 /// Iterates periods in `model.periods` order and extracts values from `results` for `node_id`.
 /// Each period is mapped to a date using `date_convention`.
 ///
+/// # Arguments
+///
+/// * `model` - Financial model whose ordered periods define the exported
+///   schedule dates.
+/// * `results` - Evaluated statement results containing the requested node's
+///   period values.
+/// * `node_id` - Statement node identifier to export as dated numeric amounts.
+/// * `date_convention` - Rule selecting each half-open period's start date or
+///   last inclusive day as the cashflow date.
+///
 /// # Errors
 ///
 /// Returns an error if the node is missing entirely.

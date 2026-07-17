@@ -122,6 +122,11 @@ pub static WEEKENDS_ONLY: Calendar = Calendar::new("weekends_only", "Weekends On
 ///
 /// Returns an error naming the first unknown identifier. Unlike the removed
 /// registry helper, unknown identifiers are never silently dropped.
+///
+/// # Arguments
+///
+/// * `ids` - Typed calendar IDs to resolve in order. Each ID must name a
+///   built-in calendar; the output preserves this input order.
 pub fn calendars_by_ids(
     ids: &[crate::types::CalendarId],
 ) -> crate::Result<Vec<&'static dyn HolidayCalendar>> {

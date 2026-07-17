@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for interest-rate instruments.
+//!
 use crate::instruments::rates::deposit::Deposit;
 use crate::metrics::{MetricCalculator, MetricContext};
 use rust_decimal::prelude::ToPrimitive;

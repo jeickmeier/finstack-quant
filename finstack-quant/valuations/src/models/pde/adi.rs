@@ -646,6 +646,18 @@ fn implicit_y_sweep(
 /// interior solution.
 ///
 /// `u_full` has length `nx * ny`, `u_int` has length `nx_int * ny_int`.
+///
+/// # Arguments
+///
+/// * `problem` - PDE problem supplying time-dependent lower and upper boundary
+///   conditions for both grid axes.
+/// * `grid` - Full and interior grid dimensions plus coordinate points used to
+///   place the supplied solution.
+/// * `u_full` - Mutable row-major full-grid buffer of length `nx * ny`; its
+///   interior and boundary entries are overwritten.
+/// * `u_int` - Row-major interior solution buffer of length
+///   `nx_int * ny_int` copied into `u_full` before boundary conditions apply.
+/// * `t` - PDE time at which the boundary conditions are evaluated.
 pub fn fill_boundaries(
     problem: &dyn PdeProblem2D,
     grid: &Grid2D,

@@ -18,6 +18,11 @@ use finstack_quant_statements::types::{NodeId, NodeSpec, NodeType};
 /// * `name` - Name of the resulting total node (e.g., "revenue")
 /// * `new_volume_node` - Node ID for the new volume per period (e.g., "new_sales")
 /// * `decay_curve` - Multipliers for the vintage curve (index 0 = inception, 1 = next period, etc.)
+///
+/// # Errors
+///
+/// Propagates model-builder errors for invalid or duplicate node IDs, an
+/// unavailable new-volume node, or generated convolution formulas.
 pub fn add_vintage_buildup(
     mut builder: ModelBuilder<Ready>,
     name: &str,

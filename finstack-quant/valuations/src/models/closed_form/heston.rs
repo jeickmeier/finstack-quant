@@ -1093,10 +1093,11 @@ fn heston_pj(
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price
-/// * `strike` - Strike price
-/// * `time` - Time to maturity (years)
-/// * `params` - Heston model parameters
+/// * `spot` - Current underlying spot price in the option quote currency.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
+///   volatility-of-variance, and correlation parameters.
 ///
 /// # Returns
 ///
@@ -1150,6 +1151,15 @@ pub fn heston_call_price_fourier(spot: f64, strike: f64, time: f64, params: &Hes
 
 /// Price a strip of European call options under the Heston model using shared
 /// characteristic-function precomputation.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option quote currency.
+/// * `strikes` - Exercise prices in result order, each in the same units as
+///   `spot`; the returned vector has the same length and order.
+/// * `time` - Common remaining time to expiry in years.
+/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
+///   volatility-of-variance, and correlation parameters.
 #[must_use]
 pub fn heston_call_prices_fourier(
     spot: f64,
@@ -1167,6 +1177,17 @@ pub fn heston_call_prices_fourier(
 }
 
 /// Price a strip of European call options with custom integration settings.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option quote currency.
+/// * `strikes` - Exercise prices in result order, each in the same units as
+///   `spot`; the returned vector has the same length and order.
+/// * `time` - Common remaining time to expiry in years.
+/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
+///   volatility-of-variance, and correlation parameters.
+/// * `settings` - Fourier integration grid, truncation, and damping settings
+///   applied consistently to the whole strike strip.
 #[must_use]
 pub fn heston_call_prices_fourier_with_settings(
     spot: f64,
@@ -1204,6 +1225,15 @@ pub fn heston_call_prices_fourier_with_settings(
 
 /// Price a strip of European put options under the Heston model using shared
 /// characteristic-function precomputation.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option quote currency.
+/// * `strikes` - Exercise prices in result order, each in the same units as
+///   `spot`; the returned vector has the same length and order.
+/// * `time` - Common remaining time to expiry in years.
+/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
+///   volatility-of-variance, and correlation parameters.
 #[must_use]
 pub fn heston_put_prices_fourier(
     spot: f64,
@@ -1221,6 +1251,17 @@ pub fn heston_put_prices_fourier(
 }
 
 /// Price a strip of European put options with custom integration settings.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option quote currency.
+/// * `strikes` - Exercise prices in result order, each in the same units as
+///   `spot`; the returned vector has the same length and order.
+/// * `time` - Common remaining time to expiry in years.
+/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
+///   volatility-of-variance, and correlation parameters.
+/// * `settings` - Fourier integration grid, truncation, and damping settings
+///   applied consistently to the whole strike strip.
 #[must_use]
 pub fn heston_put_prices_fourier_with_settings(
     spot: f64,
@@ -1252,6 +1293,16 @@ pub fn heston_put_prices_fourier_with_settings(
 /// Price a European call option with custom integration settings.
 ///
 /// See [`heston_call_price_fourier`] for details.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option quote currency.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to expiry in years.
+/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
+///   volatility-of-variance, and correlation parameters.
+/// * `settings` - Fourier integration grid, truncation, and damping settings
+///   for this single-option inversion.
 #[must_use]
 pub fn heston_call_price_fourier_with_settings(
     spot: f64,
@@ -1384,10 +1435,11 @@ pub fn heston_call_price_fourier_with_settings(
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price
-/// * `strike` - Strike price
-/// * `time` - Time to maturity (years)
-/// * `params` - Heston model parameters
+/// * `spot` - Current underlying spot price in the option quote currency.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
+///   volatility-of-variance, and correlation parameters.
 ///
 /// # Returns
 ///
@@ -1410,6 +1462,16 @@ pub fn heston_put_price_fourier(spot: f64, strike: f64, time: f64, params: &Hest
 /// Price a European put option with custom integration settings.
 ///
 /// See [`heston_put_price_fourier`] for details.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option quote currency.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to expiry in years.
+/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
+///   volatility-of-variance, and correlation parameters.
+/// * `settings` - Fourier integration grid, truncation, and damping settings
+///   for this single-option inversion.
 pub fn heston_put_price_fourier_with_settings(
     spot: f64,
     strike: f64,

@@ -60,6 +60,11 @@ pub struct ZmijewskiInput {
 /// # Errors
 ///
 /// Returns [`CreditScoringError::NonFiniteInput`] if any input is NaN or infinite.
+///
+/// # Arguments
+///
+/// * `input` - Finite profitability, leverage, and liquidity ratios for the
+///   original three-factor Zmijewski distress model.
 pub fn zmijewski_score(input: &ZmijewskiInput) -> Result<ScoringResult, CreditScoringError> {
     check_finite(
         "net_income_to_total_assets",

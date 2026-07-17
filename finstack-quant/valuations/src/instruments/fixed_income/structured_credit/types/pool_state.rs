@@ -1,3 +1,5 @@
+//! Public structured-credit deal, pool, tranche, and waterfall types.
+//!
 use super::pool::AssetPool;
 use finstack_quant_core::dates::{Date, DayCount};
 

@@ -64,6 +64,13 @@ impl Registry {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an embedded metric document cannot be parsed,
+    /// validated, dependency-sorted, or added without colliding with an
+    /// already-registered metric. The registry is left unchanged when loading
+    /// any individual document fails.
     pub fn with_builtins() -> Result<Self> {
         let mut registry = Self::new();
         registry.load_builtins()?;
@@ -88,6 +95,18 @@ impl Registry {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// Built-ins are compile-time embedded, so this method performs no
+    /// filesystem lookup and works in packaged and WASM builds. All standard
+    /// metrics share the `fin` namespace and may reference one another.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an embedded document is malformed, a metric has an
+    /// invalid identifier or formula, its dependency graph is cyclic, or one
+    /// of its fully-qualified identifiers already exists. Each rejected
+    /// document leaves the registry unchanged, although documents loaded
+    /// before it remain available.
     pub fn load_builtins(&mut self) -> Result<()> {
         // Load from embedded JSON files
         for json in crate::registry::builtins::builtin_metric_sources()? {
@@ -96,7 +115,7 @@ impl Registry {
         Ok(())
     }
 
-    /// Load metrics from a JSON file path.
+    /// Load one metric registry document from a UTF-8 JSON file.
     ///
     /// # Example
     ///
@@ -109,26 +128,59 @@ impl Registry {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The file must encode a [`MetricRegistry`]. Its namespace is part of
+    /// every stored metric identity, so a `gross_margin` definition in `fin`
+    /// and one in `custom` are distinct metrics addressed as
+    /// `fin.gross_margin` and `custom.gross_margin`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates file-read failures and returns a registry error if the JSON
+    /// is malformed, definitions or formulas are invalid, dependencies are
+    /// cyclic, or a fully-qualified ID collides with an existing metric. A
+    /// failed document is staged and rejected atomically; it cannot leave a
+    /// partially loaded namespace behind.
     pub fn load_from_json(&mut self, path: &str) -> Result<()> {
         let json = std::fs::read_to_string(path)?;
         self.load_from_json_str(&json)?;
         Ok(())
     }
 
-    /// Load metrics from a JSON string.
+    /// Load one metric registry document from JSON text.
     ///
     /// Returns the deserialized [`MetricRegistry`]
-    /// for further inspection when needed.
+    /// for further inspection when needed. This is useful at a binding or
+    /// service boundary when the caller needs both the parsed metadata and the
+    /// registry update from the same canonical input.
+    ///
+    /// # Errors
+    ///
+    /// Returns a JSON decode or registry error if the document is malformed,
+    /// violates metric-definition rules, has a cyclic dependency graph, or
+    /// collides with a registered fully-qualified ID. The registry is not
+    /// mutated when validation of the document fails.
     pub fn load_from_json_str(&mut self, json: &str) -> Result<MetricRegistry> {
         let registry: MetricRegistry = serde_json::from_str(json)?;
         self.load_registry(registry.clone())?;
         Ok(registry)
     }
 
-    /// Load a metric registry.
+    /// Validate and atomically add a metric registry document.
     ///
     /// Validates all metrics and checks for collisions.
-    /// Supports inter-metric dependencies - metrics can reference other metrics in the same registry.
+    /// Supports inter-metric dependencies: metrics in the same namespace are
+    /// topologically ordered so every dependency is stored before its
+    /// dependent. Definitions may also refer to metrics already loaded in the
+    /// same namespace. No part of `registry` is committed unless every
+    /// definition passes validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a registry error when the namespace is empty, a definition has
+    /// an invalid ID, name, or DSL formula, the document contains a dependency
+    /// cycle, or a fully-qualified metric ID already exists. On error, `self`
+    /// retains its exact prior metrics and namespace set.
     pub fn load_registry(&mut self, registry: MetricRegistry) -> Result<()> {
         let namespace = registry.namespace.clone();
 
@@ -195,6 +247,12 @@ impl Registry {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a registry error if `qualified_id` is absent. The diagnostic
+    /// includes a small sample of registered identifiers to help callers
+    /// distinguish a namespace mistake from an unloaded metric catalog.
     pub fn get(&self, qualified_id: &str) -> Result<&StoredMetric> {
         self.metrics.get(qualified_id).ok_or_else(|| {
             let available: Vec<_> = self.metrics.keys().take(5).map(|s| s.as_str()).collect();
@@ -342,9 +400,21 @@ impl Registry {
         crate::utils::formula::extract_identifiers(formula, all_metric_ids)
     }
 
-    /// Get dependencies for a specific metric (including transitive dependencies).
+    /// Get a metric's transitive dependencies in insertion order.
     ///
-    /// Returns the ordered list of metric IDs (qualified) that must be added before this metric.
+    /// Returns fully-qualified IDs in an order suitable for constructing a
+    /// model: each dependency appears before the metric that consumes it. The
+    /// requested metric itself is not included. Only dependencies present in
+    /// the metric's namespace are returned; identifiers outside the registered
+    /// set are treated as model inputs rather than registry metrics.
+    ///
+    /// # Errors
+    ///
+    /// Returns a registry error if `qualified_id` is unknown or if a stored
+    /// formula cannot be parsed while its dependencies are being extracted.
+    /// Valid registries loaded through [`load_registry`](Self::load_registry)
+    /// normally avoid the latter case because formulas are checked at load
+    /// time.
     pub fn get_metric_dependencies(&self, qualified_id: &str) -> Result<Vec<String>> {
         // Recursively get transitive dependencies
         let mut all_deps = IndexSet::new();

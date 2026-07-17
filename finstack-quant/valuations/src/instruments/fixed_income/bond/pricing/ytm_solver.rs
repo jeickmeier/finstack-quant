@@ -400,10 +400,15 @@ impl YtmSolver {
 ///
 /// # Arguments
 ///
-/// * `cashflows` - Bond cashflows as `(Date, Money)` pairs
-/// * `as_of` - Valuation date
-/// * `target_price` - Target dirty price to match
-/// * `spec` - YTM pricing specification
+/// * `cashflows` - Dated contractual coupon and principal payments in the
+///   same currency as `spec.notional`; payments on or before `as_of` do not
+///   contribute to the solved price.
+/// * `as_of` - Valuation date from which remaining cashflow times are measured
+///   with `spec.day_count`.
+/// * `target_price` - Dirty present value in the bond currency that the yield
+///   solve must reproduce.
+/// * `spec` - Coupon, notional, day-count, payment-frequency, and compounding
+///   conventions used to discount the supplied cashflows.
 ///
 /// # Returns
 ///

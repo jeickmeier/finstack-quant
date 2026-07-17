@@ -60,9 +60,19 @@ impl SimpleFxProvider {
     /// Insert or update a single FX quote.
     ///
     /// # Parameters
-    /// - `from`: Base currency
-    /// - `to`: Quote currency
-    /// - `rate`: FX rate (from → to)
+    /// - `from`: Base currency.
+    /// - `to`: Quote currency.
+    /// - `rate`: Units of `to` per one unit of `from` (for example, `1.25`
+    ///   for GBP/USD when `from` is GBP and `to` is USD).
+    ///
+    /// Replaces any existing direct quote for the same ordered pair. It does
+    /// not insert the reciprocal pair; reciprocal lookup is performed by the
+    /// [`FxProvider`] implementation at read time.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `rate` is non-finite or not strictly positive. On
+    /// error the provider is unchanged.
     ///
     /// # Examples
     /// ```rust
@@ -82,6 +92,17 @@ impl SimpleFxProvider {
     ///
     /// # Parameters
     /// - `quotes`: Slice of `(from, to, rate)` tuples
+    ///
+    /// Each rate is units of `to` per unit of `from`. All inputs are validated
+    /// before the provider acquires its write lock, so the operation is atomic
+    /// with respect to the quote map: if any tuple is invalid, no tuple is
+    /// written; otherwise readers observe the full batch together. Later
+    /// duplicate pairs in the slice replace earlier entries in that batch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any rate is non-finite or not strictly positive.
+    /// The provider remains unchanged in that case.
     ///
     /// # Examples
     /// ```rust

@@ -41,11 +41,12 @@ use finstack_quant_core::math::volatility::{black_scholes_spot_call, black_schol
 /// # Arguments
 ///
 /// * `spot` - Current spot price
-/// * `strike` - Strike price
+/// * `strike` - Option exercise price in the same price units as `spot`.
 /// * `time_to_maturity` - Time to maturity in years
-/// * `rate` - Risk-free rate
-/// * `dividend_yield` - Dividend yield
-/// * `volatility` - Volatility
+/// * `rate` - Continuously compounded annual risk-free rate as a decimal.
+/// * `dividend_yield` - Continuously compounded annual dividend or carry yield
+///   as a decimal.
+/// * `volatility` - Annualized lognormal volatility as a decimal.
 ///
 /// # Returns
 ///
@@ -69,6 +70,20 @@ pub fn black_scholes_call(
 }
 
 /// Black-Scholes formula for European put option.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot in the same price units as `strike`.
+/// * `strike` - Option exercise price in the same price units as `spot`.
+/// * `time_to_maturity` - Time from valuation to option expiry in years.
+/// * `rate` - Continuously compounded annual risk-free rate as a decimal.
+/// * `dividend_yield` - Continuously compounded annual dividend or carry yield
+///   as a decimal.
+/// * `volatility` - Annualized lognormal volatility as a decimal.
+///
+/// # Returns
+///
+/// Returns the undiscounted-scale European put price in the units of `spot`.
 pub fn black_scholes_put(
     spot: f64,
     strike: f64,
@@ -165,6 +180,12 @@ pub fn apply_control_variate(
 }
 
 /// Compute covariance between two samples.
+///
+/// # Arguments
+///
+/// * `x` - First sample values, aligned one-for-one with `y`.
+/// * `y` - Second sample values, aligned one-for-one with `x`; unequal lengths
+///   trigger the function's assertion.
 #[must_use]
 pub fn covariance(x: &[f64], y: &[f64]) -> f64 {
     assert_eq!(x.len(), y.len(), "Samples must have same length");

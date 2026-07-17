@@ -147,7 +147,14 @@ impl NormalizationConfig {
     /// Add an adjustment to the configuration.
     ///
     /// Returns an error if an adjustment with the same `id` is already present,
-    /// preventing accidental double-counting.
+    /// preventing accidental double-counting. Order matters for progressive
+    /// self-referential caps, so the adjustment is appended rather than sorted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error if another adjustment already uses
+    /// `adjustment.id`. It does not validate the referenced nodes or cap
+    /// economics; those are checked while normalization runs against results.
     pub fn add_adjustment(mut self, adjustment: Adjustment) -> crate::error::Result<Self> {
         if self.adjustments.iter().any(|a| a.id == adjustment.id) {
             return Err(crate::error::Error::invalid_input(format!(

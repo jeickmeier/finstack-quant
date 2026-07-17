@@ -68,6 +68,11 @@ impl<'a> DependencyTracer<'a> {
     /// # Returns
     ///
     /// Vector of node IDs that are direct dependencies
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when `node_id` is absent from the
+    /// dependency graph.
     pub fn direct_dependencies(&self, node_id: &str) -> Result<Vec<&str>> {
         let deps = self
             .graph
@@ -88,6 +93,11 @@ impl<'a> DependencyTracer<'a> {
     /// # Returns
     ///
     /// Vector of node IDs in dependency order (dependencies before dependents)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `node_id` or a traversed dependency is absent, or
+    /// when the graph contains a dependency cycle.
     pub fn all_dependencies(&self, node_id: &str) -> Result<Vec<String>> {
         let mut all_deps = IndexSet::new();
         let mut visited = IndexSet::new();
@@ -130,6 +140,11 @@ impl<'a> DependencyTracer<'a> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `node_id` or a reachable dependency is absent, or
+    /// when a cycle prevents construction of a finite tree.
     pub fn dependency_tree(&self, node_id: &str) -> Result<DependencyTree> {
         let mut visited = IndexSet::new();
         self.build_tree(node_id, &mut visited)
@@ -144,6 +159,10 @@ impl<'a> DependencyTracer<'a> {
     /// # Returns
     ///
     /// Vector of node IDs that depend on this node
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when `node_id` is absent from the graph.
     pub fn dependents(&self, node_id: &str) -> Result<Vec<&str>> {
         let deps = self
             .graph
@@ -491,6 +510,11 @@ impl<'a> FormulaExplainer<'a> {
     /// # Returns
     ///
     /// Detailed explanation of the calculation
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when the model has no such node or the
+    /// supplied evaluation results contain no value for it in `period`.
     pub fn explain(&self, node_id: &str, period: &PeriodId) -> Result<Explanation> {
         let node_spec = self
             .model

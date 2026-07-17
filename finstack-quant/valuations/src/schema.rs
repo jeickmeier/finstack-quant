@@ -285,6 +285,11 @@ pub fn instrument_types() -> finstack_quant_core::Result<Vec<String>> {
 ///
 /// Returns `Error::Validation` if the embedded schema JSON is malformed or the
 /// requested instrument type is not supported.
+///
+/// # Arguments
+///
+/// * `instrument_type` - Registered tagged-instrument type string whose
+///   dedicated schema, or supported fallback schema, is requested.
 pub fn instrument_schema(instrument_type: &str) -> finstack_quant_core::Result<Value> {
     if let Some(schema) = instrument_schema_cache().get(instrument_type) {
         return schema
@@ -359,6 +364,11 @@ pub fn valuation_result_schema() -> finstack_quant_core::Result<&'static Value> 
 /// # Errors
 ///
 /// Returns `Error::Validation` if the JSON does not conform to the schema.
+///
+/// # Arguments
+///
+/// * `instance` - Parsed JSON instrument envelope to validate against the
+///   versioned envelope schema and its selected type schema.
 pub fn validate_instrument_envelope_json(instance: &Value) -> finstack_quant_core::Result<()> {
     let schema = instrument_envelope_schema()?;
     let envelope_result = validate_against_schema(instance, schema, "instrument envelope");
@@ -387,6 +397,12 @@ pub fn validate_instrument_envelope_json(instance: &Value) -> finstack_quant_cor
 /// # Errors
 ///
 /// Returns `Error::Validation` if the JSON does not conform to the schema.
+///
+/// # Arguments
+///
+/// * `instrument_type` - Registered tagged-instrument type whose schema is
+///   selected for validation.
+/// * `instance` - Parsed JSON value to validate against that type schema.
 pub fn validate_instrument_type_json(
     instrument_type: &str,
     instance: &Value,

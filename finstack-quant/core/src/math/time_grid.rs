@@ -384,6 +384,12 @@ impl TimeGrid {
 /// to one float-noise tolerance beyond maturity are clamped to the terminal
 /// step; dates materially beyond maturity are dropped (they cannot be
 /// represented on the grid).
+///
+/// # Arguments
+///
+/// * `exercise_dates` - Exercise times in years from the valuation date.
+/// * `total_time` - Maturity time in years represented by the lattice.
+/// * `steps` - Number of uniform lattice intervals between zero and maturity.
 pub fn map_exercise_dates_to_steps(
     exercise_dates: &[f64],
     total_time: f64,
@@ -412,6 +418,15 @@ pub fn map_exercise_dates_to_steps(
 
 /// Map a calendar date to a step index using a day-count convention and context.
 ///
+/// # Arguments
+///
+/// * `base_date` - Valuation date that defines time zero for the lattice.
+/// * `event_date` - Calendar date to map to the nearest lattice step.
+/// * `maturity_date` - Terminal lattice date that defines the full time span.
+/// * `steps` - Number of uniform lattice intervals between base and maturity.
+/// * `dc` - Day-count convention used to convert dates to year fractions.
+/// * `ctx` - Supplemental calendar or reference-period data required by `dc`.
+///
 /// # Errors
 ///
 /// Propagates day-count errors, including missing calendars for `Bus252` and
@@ -436,6 +451,15 @@ pub fn map_date_to_step(
 }
 
 /// Map multiple calendar dates to step indices.
+///
+/// # Arguments
+///
+/// * `base_date` - Valuation date that defines time zero for the lattice.
+/// * `dates` - Calendar dates to map; output positions preserve this order.
+/// * `maturity_date` - Terminal lattice date that defines the full time span.
+/// * `steps` - Number of uniform lattice intervals between base and maturity.
+/// * `dc` - Day-count convention used to convert dates to year fractions.
+/// * `ctx` - Supplemental calendar or reference-period data required by `dc`.
 ///
 /// # Errors
 ///

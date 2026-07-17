@@ -210,6 +210,25 @@ pub struct MarketContextState {
 /// [`crate::market_data::context::MarketContextState::fx`]-style quotes) can
 /// materialize the same quote-only snapshot provider without duplicating the
 /// internal `SnapshotFxProvider` plumbing.
+///
+/// Each quote is units of `to` per one unit of `from`. The provider contains
+/// only the supplied direct quotes and its reciprocal lookup; it carries no
+/// live-feed, historical, or policy-date behavior. The resulting matrix uses
+/// `config` for cache, policy, and triangulation settings, while its initial
+/// global quotes come from `quotes`.
+///
+/// # Errors
+///
+/// Returns an error if the FX configuration is invalid or any quote cannot be
+/// loaded into the matrix (for example, it is non-finite or not strictly
+/// positive). No matrix is returned on failure.
+///
+/// # Arguments
+///
+/// * `config` - FX policy, caching, and triangulation configuration used by the
+///   reconstructed matrix.
+/// * `quotes` - Owned direct FX quotes as `(from, to, rate)`, with `rate` in
+///   units of `to` per one unit of `from`.
 pub fn build_snapshot_fx_matrix(
     config: crate::money::fx::FxConfig,
     quotes: Vec<(crate::currency::Currency, crate::currency::Currency, f64)>,

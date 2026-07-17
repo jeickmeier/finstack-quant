@@ -381,6 +381,12 @@ pub struct TierAllocation {
 /// Classify a position into a liquidity tier based on days-to-liquidate.
 ///
 /// Pure function using the configured thresholds.
+///
+/// # Arguments
+///
+/// * `days_to_liquidate` - Estimated trading days needed to liquidate the
+///   position under the selected participation assumption.
+/// * `thresholds` - Four ascending day-count boundaries separating Tiers 1–5.
 pub fn classify_tier(days_to_liquidate: f64, thresholds: &[f64; 4]) -> LiquidityTier {
     if days_to_liquidate < thresholds[0] {
         LiquidityTier::Tier1

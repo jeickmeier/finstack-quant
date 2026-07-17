@@ -27,7 +27,21 @@ pub const STANDARD_OPTION_GREEKS: &[&str] = &[
     "volga",
 ];
 
-/// Parse tagged instrument JSON into the canonical Rust enum.
+/// Parse a tagged instrument JSON payload into the canonical Rust enum.
+///
+/// This accepts the `InstrumentJson` form used by direct Rust callers. For an
+/// envelope that can also carry schema metadata, use
+/// [`parse_boxed_instrument_json`].
+///
+/// # Arguments
+///
+/// * `json` - UTF-8 JSON containing a recognized instrument `type` tag and
+///   the matching instrument specification.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `json` is malformed or does not match a
+/// supported tagged instrument shape.
 pub fn parse_instrument_json(json: &str) -> finstack_quant_core::Result<InstrumentJson> {
     serde_json::from_str(json)
         .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))
@@ -35,6 +49,27 @@ pub fn parse_instrument_json(json: &str) -> finstack_quant_core::Result<Instrume
 
 /// Build and validate canonical tagged instrument JSON from either a bare spec
 /// object or an already-tagged instrument object.
+///
+/// A bare object is wrapped as `{ "type": type_tag, "spec": value }`. A
+/// tagged object must carry the same `type_tag`; this prevents an API caller
+/// from accidentally pricing one instrument under another's route.
+///
+/// # Arguments
+///
+/// * `type_tag` - Canonical instrument discriminator expected by the caller's
+///   API route.
+/// * `value` - A bare instrument spec or an already-tagged instrument object.
+///
+/// # Returns
+///
+/// Canonical serialized JSON after the type-specific deserialization and
+/// validation path has succeeded.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when the tag is missing or non-string, differs
+/// from `type_tag`, the payload is not a supported instrument, or canonical
+/// serialization fails.
 pub fn canonical_instrument_json(
     type_tag: &str,
     value: Value,
@@ -62,6 +97,19 @@ pub fn canonical_instrument_json(
 }
 
 /// Build and validate canonical tagged instrument JSON from a JSON string.
+///
+/// This is the string-input counterpart to [`canonical_instrument_json`].
+///
+/// # Arguments
+///
+/// * `type_tag` - Canonical instrument discriminator expected by the caller.
+/// * `json` - A JSON object containing either a bare spec or tagged payload.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `json` is malformed or when canonicalizing
+/// the resulting value fails the rules documented by
+/// [`canonical_instrument_json`].
 pub fn canonical_instrument_json_from_str(
     type_tag: &str,
     json: &str,
@@ -73,6 +121,20 @@ pub fn canonical_instrument_json_from_str(
 
 /// Validate tagged instrument JSON against the pricing contract and return its
 /// canonical JSON representation.
+///
+/// A payload with a `schema` member is parsed as an [`InstrumentEnvelope`]; all
+/// other payloads are parsed as [`InstrumentJson`]. This function is useful for
+/// accepting external configuration before any market data or pricing model is
+/// involved.
+///
+/// # Arguments
+///
+/// * `json` - Tagged instrument JSON in direct or envelope form.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when parsing, instrument validation, or
+/// canonical serialization fails.
 pub fn validate_instrument_json(json: &str) -> finstack_quant_core::Result<String> {
     parse_boxed_instrument_json(json, None)?;
     let value: Value = serde_json::from_str(json)
@@ -118,6 +180,17 @@ pub fn list_standard_metrics_grouped() -> BTreeMap<String, Vec<String>> {
 
 /// Parse tagged instrument JSON, optionally merge metric pricing overrides, and
 /// box the concrete instrument for pricing dispatch.
+///
+/// # Arguments
+///
+/// * `instrument_json` - Tagged direct or envelope instrument JSON.
+/// * `pricing_options` - Optional JSON overrides merged into the instrument's
+///   metric-pricing configuration before validation.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when either JSON value is malformed, the
+/// override cannot be merged, or the resulting instrument is invalid.
 pub fn parse_boxed_instrument_json(
     instrument_json: &str,
     pricing_options: Option<&str>,
@@ -126,7 +199,21 @@ pub fn parse_boxed_instrument_json(
     InstrumentEnvelope::from_str(effective_json.as_ref())
 }
 
-/// Parse a string model key used by the JSON pricing helpers.
+/// Parse a concrete model key used by the JSON pricing helpers.
+///
+/// This function only accepts named [`ModelKey`] values. The special
+/// case-insensitive `"default"` selector is handled by the pricing entry
+/// points, where it resolves to the instrument's default model.
+///
+/// # Arguments
+///
+/// * `model` - Canonical textual model key, such as `"discounting"` or
+///   `"black76"`.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `model` is not a supported concrete model
+/// key.
 pub fn parse_model_key(model: &str) -> finstack_quant_core::Result<ModelKey> {
     model
         .parse::<ModelKey>()
@@ -134,6 +221,20 @@ pub fn parse_model_key(model: &str) -> finstack_quant_core::Result<ModelKey> {
 }
 
 /// Pretty-print tagged instrument JSON for inspection-oriented binding APIs.
+///
+/// This reformats arbitrary valid JSON; it does not validate that the value is
+/// an instrument payload. Use [`validate_instrument_json`] when the caller also
+/// needs pricing-contract validation.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `json` is malformed or cannot be rendered
+/// as a JSON string.
+///
+/// # Arguments
+///
+/// * `json` - UTF-8 JSON text to parse and reserialize with canonical
+///   indentation; it need not be an instrument envelope.
 pub fn pretty_instrument_json(json: &str) -> finstack_quant_core::Result<String> {
     let value: Value = serde_json::from_str(json)
         .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))?;
@@ -153,6 +254,23 @@ fn resolve_model_key(
 }
 
 /// Price a tagged instrument JSON payload using the shared standard registry.
+///
+/// This is the host-language-friendly path for a single valuation with no
+/// explicit metric requests. Pass `"default"` for `model` to use the
+/// instrument's native pricing model.
+///
+/// # Arguments
+///
+/// * `instrument_json` - Tagged direct or envelope instrument JSON.
+/// * `market` - Market context supplying all required curves, surfaces,
+///   fixings, and FX data.
+/// * `as_of` - ISO-8601 valuation date.
+/// * `model` - A concrete model key or the case-insensitive `"default"`.
+///
+/// # Errors
+///
+/// Returns an error when the instrument JSON, valuation date, or model key is
+/// invalid, required market data is missing, or the selected pricer fails.
 pub fn price_instrument_json(
     instrument_json: &str,
     market: &MarketContext,
@@ -164,6 +282,25 @@ pub fn price_instrument_json(
 
 /// Price a tagged instrument JSON payload with explicit metric requests and
 /// optional historical scenarios for VaR-style metrics.
+///
+/// # Arguments
+///
+/// * `instrument_json` - Tagged direct or envelope instrument JSON.
+/// * `market` - Market context used for pricing and risk calculations.
+/// * `as_of` - ISO-8601 valuation date.
+/// * `model` - A concrete model key or the case-insensitive `"default"`.
+/// * `metrics` - Strict metric identifiers requested in addition to the base
+///   valuation.
+/// * `pricing_options` - Optional JSON metric-pricing overrides applied to the
+///   instrument before validation.
+/// * `market_history_json` - Optional serialized market history for metrics
+///   that require historical scenarios, such as historical VaR.
+///
+/// # Errors
+///
+/// Returns an error for invalid JSON, date, model, metric identifier, or market
+/// history; missing required market data; or a failure in the selected pricer or
+/// metric calculation.
 pub fn price_instrument_json_with_metrics_and_history(
     instrument_json: &str,
     market: &MarketContext,
@@ -223,6 +360,23 @@ fn price_instrument_json_request(
 
 /// Price a tagged instrument JSON payload and return one requested scalar
 /// metric, failing when the metric is not produced by the selected model.
+///
+/// # Errors
+///
+/// Propagates pricing and input-validation failures from
+/// [`price_instrument_json`], and returns `Error::Validation` when the selected
+/// model does not produce `metric`.
+///
+/// # Arguments
+///
+/// * `instrument_json` - UTF-8 canonical tagged instrument JSON to construct
+///   and price.
+/// * `market` - Market context supplying model-required curves, quotes, and FX
+///   data.
+/// * `as_of` - ISO-8601 valuation date passed to the pricing lifecycle.
+/// * `model` - Canonical model key, or `"default"` to use the instrument's
+///   registered default model.
+/// * `metric` - Scalar metric name that must be produced by the selected model.
 pub fn metric_value_from_instrument_json(
     instrument_json: &str,
     market: &MarketContext,
@@ -247,6 +401,28 @@ pub fn metric_value_from_instrument_json(
 
 /// Price a tagged instrument JSON payload and return the requested scalar
 /// metrics that were produced by the selected model.
+///
+/// The returned pairs preserve the requested order but omit unavailable
+/// metrics. Use [`metric_value_from_instrument_json`] when an unavailable
+/// metric must be treated as an error.
+///
+/// # Errors
+///
+/// Returns an error for the same input, market-data, or pricing failures as
+/// [`price_instrument_json`]. Missing individual metrics are omitted rather
+/// than causing an error.
+///
+/// # Arguments
+///
+/// * `instrument_json` - UTF-8 canonical tagged instrument JSON to construct
+///   and price.
+/// * `market` - Market context supplying model-required curves, quotes, and FX
+///   data.
+/// * `as_of` - ISO-8601 valuation date passed to the pricing lifecycle.
+/// * `model` - Canonical model key, or `"default"` to use the instrument's
+///   registered default model.
+/// * `metrics` - Requested scalar metric names in desired output order;
+///   unavailable entries are omitted from the returned pairs.
 pub fn present_metric_values_from_instrument_json<'a>(
     instrument_json: &str,
     market: &MarketContext,
@@ -272,6 +448,24 @@ pub fn present_metric_values_from_instrument_json<'a>(
 
 /// Price a tagged option instrument JSON payload and return the standard sparse
 /// option Greek set produced by the selected model.
+///
+/// The result is an ordered subset of [`STANDARD_OPTION_GREEKS`]. Models that
+/// cannot produce a requested Greek omit it rather than fabricating a zero.
+///
+/// # Errors
+///
+/// Returns an error for the same input, market-data, or pricing failures as
+/// [`price_instrument_json`].
+///
+/// # Arguments
+///
+/// * `instrument_json` - UTF-8 canonical tagged option-instrument JSON to
+///   construct and price.
+/// * `market` - Market context supplying model-required curves, volatilities,
+///   quotes, and FX data.
+/// * `as_of` - ISO-8601 valuation date passed to the pricing lifecycle.
+/// * `model` - Canonical option model key, or `"default"` for the
+///   instrument's registered default model.
 pub fn present_standard_option_greeks_from_instrument_json(
     instrument_json: &str,
     market: &MarketContext,

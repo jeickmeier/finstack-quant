@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 // Tests for Monte Carlo path capture functionality (integration tests).
 use finstack_quant_monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_monte_carlo::process::metadata::ProcessMetadata;

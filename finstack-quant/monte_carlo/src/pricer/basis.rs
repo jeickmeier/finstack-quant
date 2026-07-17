@@ -103,6 +103,15 @@ impl BasisFunctions for LsmcBasis {
 /// `strike` supplies the normalization level for Laguerre and normalized
 /// polynomial bases.
 ///
+/// # Arguments
+///
+/// * `kind` - Parsed basis family that determines the recurrence and whether
+///   spot values are normalized by `strike`.
+/// * `degree` - Number of basis terms or maximum polynomial degree, subject to
+///   the selected family's validation rules.
+/// * `strike` - Exercise-price scale used to normalize Laguerre and normalized
+///   polynomial basis inputs; ignored by the unnormalized polynomial basis.
+///
 /// # Errors
 ///
 /// Returns validation errors from the selected concrete basis constructor.
@@ -118,6 +127,13 @@ pub fn build_lsmc_basis(kind: BasisKind, degree: usize, strike: f64) -> Result<L
 }
 
 /// Parse a basis name and build the corresponding LSMC basis.
+///
+/// # Arguments
+///
+/// * `name` - Canonical basis-family name parsed by [`BasisKind::parse`].
+/// * `degree` - Number of basis terms or maximum polynomial degree, subject to
+///   the selected family's validation rules.
+/// * `strike` - Exercise-price scale used to normalize applicable basis inputs.
 ///
 /// # Errors
 ///

@@ -305,6 +305,11 @@ macro_rules! define_metric_calculator {
 /// }
 /// ```
 /// Create a typed NotFound error for a missing metric.
+///
+/// # Arguments
+///
+/// * `metric` - Required metric identifier that was absent from a valuation
+///   result or dependency set; it is embedded in the returned `metric:` ID.
 #[inline]
 pub fn metric_not_found(metric: MetricId) -> finstack_quant_core::Error {
     finstack_quant_core::InputError::NotFound {
@@ -340,6 +345,11 @@ pub fn metric_not_found(metric: MetricId) -> finstack_quant_core::Error {
 ///         .ok_or_else(|| context_not_found("discount_curve_id"))
 /// }
 /// ```
+///
+/// # Arguments
+///
+/// * `field` - Required context field name that was absent; it is embedded in
+///   the returned `context.`-prefixed not-found identifier.
 #[inline]
 pub fn context_not_found(field: &str) -> finstack_quant_core::Error {
     finstack_quant_core::InputError::NotFound {

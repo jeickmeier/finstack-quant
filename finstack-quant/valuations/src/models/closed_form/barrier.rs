@@ -509,6 +509,18 @@ fn barrier_helper(
 /// Calculate probability of hitting the barrier before T (Touch Probability).
 ///
 /// Returns P(min S < H) for down barrier, or P(max S > H) for up barrier.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the barrier's quote units.
+/// * `barrier` - Continuously monitored trigger level in the same units as
+///   `spot`.
+/// * `time` - Remaining monitoring horizon in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `is_up` - `true` for an upper barrier and `false` for a lower barrier.
 pub fn barrier_touch_probability(
     spot: f64,
     barrier: f64,
@@ -596,6 +608,15 @@ pub fn barrier_touch_probability(
 ///
 /// `params.strike` is unused by this function; callers can pass any value
 /// (conventionally `params.barrier`) when building the parameter bag.
+///
+/// # Arguments
+///
+/// * `params` - Barrier market parameters; only spot, barrier, time, rates,
+///   carry, and volatility affect the rebate value.
+/// * `rebate` - Cash amount paid under the rebate condition in option-price
+///   currency units.
+/// * `barrier_type` - Knock-in or knock-out direction and activation
+///   convention controlling whether hit or no-hit earns the rebate.
 pub fn barrier_rebate_continuous(
     params: &BarrierParams,
     rebate: f64,
@@ -645,6 +666,17 @@ pub fn barrier_rebate_continuous(
 /// Returns a `NaN` sentinel when the at-hit closed form is undefined
 /// (`μ² + 2r/σ² < 0`, requiring an extremely negative rate relative to σ²),
 /// matching this module's invalid-input convention.
+///
+/// # Arguments
+///
+/// * `params` - Barrier market parameters used for hit probability and
+///   discounting; strike is not used for the standalone rebate.
+/// * `rebate` - Cash amount paid under the rebate condition in option-price
+///   currency units.
+/// * `barrier_type` - Knock-in or knock-out direction and activation
+///   convention controlling whether hit or no-hit earns the rebate.
+/// * `timing` - Whether a knock-out rebate is paid at expiry or immediately
+///   on barrier hit; knock-in no-hit rebates always settle at expiry.
 pub fn barrier_rebate(
     params: &BarrierParams,
     rebate: f64,
@@ -734,6 +766,17 @@ fn discounted_touch_value(params: &BarrierParams, is_up: bool) -> f64 {
 /// `spot`, `strike` or `barrier` is not strictly positive and finite. Such
 /// corrupt inputs cannot produce a meaningful barrier price; the `NaN` is
 /// rejected by downstream `is_finite()` guards rather than silently mispriced.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's quote units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `barrier` - Upper continuously monitored knock-out level.
+/// * `time` - Remaining monitoring and option lifetime in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 pub fn up_out_call(
     spot: f64,
     strike: f64,
@@ -766,6 +809,17 @@ pub fn up_out_call(
 ///
 /// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
 /// `spot`/`strike`/`barrier` (see [`up_out_call`]).
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's quote units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `barrier` - Upper continuously monitored knock-in level.
+/// * `time` - Remaining monitoring and option lifetime in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 pub fn up_in_call(
     spot: f64,
     strike: f64,
@@ -791,6 +845,17 @@ pub fn up_in_call(
 ///
 /// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
 /// `spot`/`strike`/`barrier` (see [`up_out_call`]).
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's quote units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `barrier` - Lower continuously monitored knock-out level.
+/// * `time` - Remaining monitoring and option lifetime in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 pub fn down_out_call(
     spot: f64,
     strike: f64,
@@ -822,6 +887,17 @@ pub fn down_out_call(
 ///
 /// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
 /// `spot`/`strike`/`barrier` (see [`up_out_call`]).
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's quote units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `barrier` - Lower continuously monitored knock-in level.
+/// * `time` - Remaining monitoring and option lifetime in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 pub fn down_in_call(
     spot: f64,
     strike: f64,
@@ -844,6 +920,13 @@ pub fn down_in_call(
 }
 
 /// Generic barrier call price dispatcher.
+///
+/// # Arguments
+///
+/// * `params` - Complete barrier option market parameter bag used by the
+///   selected continuous-monitoring formula.
+/// * `barrier_type` - Up/down and knock-in/knock-out convention selecting the
+///   call formula to dispatch.
 pub fn barrier_call_continuous(params: &BarrierParams, barrier_type: BarrierType) -> f64 {
     let BarrierParams {
         spot,
@@ -866,6 +949,17 @@ pub fn barrier_call_continuous(params: &BarrierParams, barrier_type: BarrierType
 ///
 /// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
 /// `spot`/`strike`/`barrier` (see [`up_out_call`]).
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's quote units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `barrier` - Lower continuously monitored knock-in level.
+/// * `time` - Remaining monitoring and option lifetime in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 pub fn down_in_put(
     spot: f64,
     strike: f64,
@@ -891,6 +985,17 @@ pub fn down_in_put(
 ///
 /// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
 /// `spot`/`strike`/`barrier` (see [`up_out_call`]).
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's quote units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `barrier` - Lower continuously monitored knock-out level.
+/// * `time` - Remaining monitoring and option lifetime in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 pub fn down_out_put(
     spot: f64,
     strike: f64,
@@ -922,6 +1027,17 @@ pub fn down_out_put(
 ///
 /// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
 /// `spot`/`strike`/`barrier` (see [`up_out_call`]).
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's quote units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `barrier` - Upper continuously monitored knock-in level.
+/// * `time` - Remaining monitoring and option lifetime in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 pub fn up_in_put(
     spot: f64,
     strike: f64,
@@ -947,6 +1063,17 @@ pub fn up_in_put(
 ///
 /// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
 /// `spot`/`strike`/`barrier` (see [`up_out_call`]).
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's quote units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `barrier` - Upper continuously monitored knock-out level.
+/// * `time` - Remaining monitoring and option lifetime in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 pub fn up_out_put(
     spot: f64,
     strike: f64,
@@ -975,6 +1102,13 @@ pub fn up_out_put(
 }
 
 /// Generic barrier put price dispatcher.
+///
+/// # Arguments
+///
+/// * `params` - Complete barrier option market parameter bag used by the
+///   selected continuous-monitoring formula.
+/// * `barrier_type` - Up/down and knock-in/knock-out convention selecting the
+///   put formula to dispatch.
 pub fn barrier_put_continuous(params: &BarrierParams, barrier_type: BarrierType) -> f64 {
     let BarrierParams {
         spot,

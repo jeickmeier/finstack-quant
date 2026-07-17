@@ -56,8 +56,21 @@ use crate::error::InputError;
 ///
 /// (eigenvalues, eigenvectors, permutation)
 /// - eigenvalues: sorted in descending order
-/// - eigenvectors: columns are eigenvectors (sorted by eigenvalue)
-/// - permutation: maps original dimensions to PCA-ordered dimensions
+/// - eigenvectors: column-major columns are the corresponding eigenvectors
+/// - permutation: `permutation[sorted_component]` is the original
+///   eigendecomposition column selected for that PCA-ordered component
+///
+/// The input is symmetrized as `(ρ + ρᵀ) / 2` before eigendecomposition. This
+/// is a numerical-stability accommodation, not correlation-matrix validation:
+/// callers that require a valid correlation matrix should first call
+/// [`crate::math::linalg::validate_correlation_matrix`].
+///
+/// # Errors
+///
+/// Returns an error only when `correlation.len()` is not
+/// `num_factors * num_factors`. The function does not reject non-finite values
+/// or negative eigenvalues; such inputs can produce non-finite or unsuitable
+/// PCA outputs for downstream sampling.
 pub fn pca_ordering(
     correlation: &[f64],
     num_factors: usize,
@@ -112,6 +125,11 @@ pub fn pca_ordering(
 /// d_eff = (Σ λ_i)² / Σ λ_i²
 ///
 /// where λ_i are eigenvalues of correlation matrix.
+///
+/// # Arguments
+///
+/// * `eigenvalues` - Correlation-matrix eigenvalues whose squared concentration
+///   determines the quasi-Monte-Carlo effective dimension.
 pub fn effective_dimension(eigenvalues: &[f64]) -> f64 {
     let sum = eigenvalues.iter().sum::<f64>();
     let sum_sq = eigenvalues.iter().map(|&x| x * x).sum::<f64>();
@@ -138,8 +156,21 @@ pub fn effective_dimension(eigenvalues: &[f64]) -> f64 {
 ///
 /// * `z_pca` - Shocks in PCA-ordered space (component `j` scaled by `√λ_j`)
 /// * `eigenvectors` - Sorted eigenvector matrix from [`pca_ordering`] (column-major)
-/// * `permutation` - Permutation from [`pca_ordering`] (validated, not applied)
+/// * `permutation` - Permutation from [`pca_ordering`] (length-checked, not applied)
 /// * `z_out` - Output shocks in original asset order
+///
+/// The factor shocks must already include any intended eigenvalue scaling
+/// (typically component `j` is scaled by `sqrt(λ_j)`). The returned vector is
+/// in original asset row order because PCA sorting reorders matrix columns,
+/// not rows. The contents of `permutation` are intentionally ignored for API
+/// compatibility; only its length is checked.
+///
+/// # Errors
+///
+/// Returns an error when `eigenvectors` is not an `n × n` column-major matrix,
+/// `z_out` does not have length `n`, or `permutation` does not have length `n`,
+/// where `n = z_pca.len()`. Inputs are otherwise not validated for finiteness
+/// or orthogonality.
 pub fn transform_pca_to_assets(
     z_pca: &[f64],
     eigenvectors: &[f64],

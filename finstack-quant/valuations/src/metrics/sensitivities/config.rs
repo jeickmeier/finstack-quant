@@ -26,6 +26,11 @@ pub const STANDARD_BUCKET_LABELS: [&str; 11] = [
 /// returns the canonical label ("3m", "6m", "1y", etc.).
 /// For non-standard buckets, dynamically formats as "{N}m" or "{N}y".
 ///
+/// # Arguments
+///
+/// * `years` - Non-negative bucket tenor in years; canonical grid tenors use
+///   stable labels and other tenors are rendered as rounded months or years.
+///
 /// # Examples
 ///
 /// ```

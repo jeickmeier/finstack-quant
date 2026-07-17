@@ -93,8 +93,10 @@ def statement_tearsheet(
         Periods (columns) to show (default: all present, ascending).
     variance : dict, optional
         A ``run_variance`` result (``{"rows": [...]}``); enables the variance section.
-    title, subtitle : str, optional
-        Header text; defaults derive from the data.
+    title : str, optional
+        Optional main report heading; defaults derive from the statement data.
+    subtitle : str, optional
+        Optional secondary heading shown below ``title``.
     sections : list[str], optional
         Subset of :data:`ALL_SECTIONS` (default: all).
     theme : Theme

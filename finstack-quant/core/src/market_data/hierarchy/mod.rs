@@ -306,7 +306,17 @@ impl MarketDataHierarchy {
         None
     }
 
-    /// Set a tag on a node at the given `/`-separated path.
+    /// Set or replace a tag on a node at the given `/`-separated path.
+    ///
+    /// `path` is split into non-empty hierarchy segments. Existing tags with
+    /// the same `key` are overwritten; this operation does not alter the
+    /// node's children or curve references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the path syntax is invalid or if no node exists at
+    /// the resolved path. It does not create missing hierarchy nodes; use the
+    /// builder or mutable node APIs for that workflow.
     pub fn set_tag(&mut self, path: &str, key: &str, value: &str) -> crate::Result<()> {
         let segments = parse_path(path)?;
         let node = self.get_node_mut(&segments).ok_or_else(|| {
@@ -323,6 +333,16 @@ impl MarketDataHierarchy {
     ///
     /// This is primarily useful after performing low-level manual mutations via
     /// `get_node_mut`, `get_or_create_child`, or `add_curve_id`.
+    ///
+    /// A valid hierarchy has non-empty names which agree with their containing
+    /// map keys, and each [`CurveId`] appears at most once across every root
+    /// and descendant. Empty hierarchy roots are permitted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty node name, a child whose name does not
+    /// match its map key, or a curve identifier assigned to more than one
+    /// hierarchy path. The diagnostic identifies the conflicting paths.
     pub fn validate(&self) -> crate::Result<()> {
         fn visit(
             node: &HierarchyNode,

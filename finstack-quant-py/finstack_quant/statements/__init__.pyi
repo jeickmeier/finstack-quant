@@ -845,7 +845,8 @@ class ModelBuilder:
         Parameters
         ----------
         key:
-            Metadata key.
+            Namespaced model-metadata key used to identify the supplied JSON
+            value in serialized model output.
         value_json:
             JSON-serialized metadata value.
 
@@ -2020,9 +2021,38 @@ class EcfSweepSpec:
         working_capital_node: str | None = None,
         cash_interest_node: str | None = None,
         target_instrument_id: str | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Configure an excess-cash-flow debt sweep.
+
+        Parameters
+        ----------
+        ebitda_node : str
+            Model node identifier supplying EBITDA before ECF deductions.
+        sweep_percentage : float
+            Decimal fraction of computed ECF swept to debt, such as ``0.50``.
+        taxes_node : str or None, default None
+            Optional node identifier for cash taxes deducted from EBITDA.
+        capex_node : str or None, default None
+            Optional node identifier for capital expenditures deducted from EBITDA.
+        working_capital_node : str or None, default None
+            Optional node identifier for working-capital cash use or release.
+        cash_interest_node : str or None, default None
+            Optional node identifier for cash interest deducted before the sweep.
+        target_instrument_id : str or None, default None
+            Optional debt instrument receiving the ECF paydown; ``None`` uses
+            the waterfall's eligible debt allocation.
+        """
+        ...
     @staticmethod
-    def from_json(json: str) -> EcfSweepSpec: ...
+    def from_json(json: str) -> EcfSweepSpec:
+        """Parse an ECF sweep specification from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing the sweep node identifiers and percentage.
+        """
+        ...
     def to_json(self) -> str: ...
     @property
     def ebitda_node(self) -> str: ...
@@ -2045,9 +2075,32 @@ class PikToggleSpec:
         threshold: float,
         target_instrument_ids: list[str] | None = None,
         min_periods_in_pik: int = 0,
-    ) -> None: ...
+    ) -> None:
+        """Configure a liquidity-triggered payment-in-kind interest toggle.
+
+        Parameters
+        ----------
+        liquidity_metric : str
+            Model metric or node identifier compared with the trigger threshold.
+        threshold : float
+            Liquidity threshold in the metric's units that activates PIK logic.
+        target_instrument_ids : list[str] or None, default None
+            Optional debt instruments subject to the toggle; ``None`` targets
+            all eligible instruments in the waterfall.
+        min_periods_in_pik : int, default 0
+            Minimum number of forecast periods to remain in PIK after activation.
+        """
+        ...
     @staticmethod
-    def from_json(json: str) -> PikToggleSpec: ...
+    def from_json(json: str) -> PikToggleSpec:
+        """Parse a PIK-toggle specification from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing the liquidity trigger and target instruments.
+        """
+        ...
     def to_json(self) -> str: ...
     @property
     def liquidity_metric(self) -> str: ...
@@ -2071,9 +2124,32 @@ class WaterfallSpec:
         available_cash_node: str | None = None,
         ecf_sweep: EcfSweepSpec | None = None,
         pik_toggle: PikToggleSpec | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Configure dynamic cash allocation for a financial-model waterfall.
+
+        Parameters
+        ----------
+        priority_of_payments : list[str] or None, default None
+            Ordered payment labels, from highest to lowest priority; ``None``
+            applies the builder's default debt-before-equity sequence.
+        available_cash_node : str or None, default None
+            Optional model node containing cash available for waterfall allocation.
+        ecf_sweep : EcfSweepSpec or None, default None
+            Optional excess-cash-flow sweep applied within the waterfall.
+        pik_toggle : PikToggleSpec or None, default None
+            Optional liquidity-driven PIK versus cash-interest configuration.
+        """
+        ...
     @staticmethod
-    def from_json(json: str) -> WaterfallSpec: ...
+    def from_json(json: str) -> WaterfallSpec:
+        """Parse a waterfall specification from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing priority, cash source, and optional features.
+        """
+        ...
     def to_json(self) -> str: ...
     def validate(self) -> None: ...
     @property

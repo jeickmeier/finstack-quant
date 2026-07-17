@@ -255,6 +255,19 @@ pub fn default_ecl_config() -> EclConfig {
 }
 
 /// Return the default IFRS 9 ECL configuration from config or embedded policy.
+///
+/// A complete policy registry in the ECL config extension replaces the
+/// embedded registry; it is not merged with it.
+///
+/// # Arguments
+///
+/// * `config` - Finstack configuration whose ECL policy extension, if present,
+///   fully replaces the embedded IFRS 9 policy registry.
+///
+/// # Errors
+///
+/// Returns an error if the configured registry cannot be parsed or validated,
+/// the embedded fallback cannot load, or it contains no default IFRS 9 policy.
 pub fn default_ecl_config_from_config(config: &FinstackConfig) -> Result<EclConfig> {
     let registry = registry_from_config(config)?;
     registry.default_ifrs9_policy().map(ecl_config_from_policy)
@@ -282,6 +295,16 @@ pub fn default_staging_config() -> StagingConfig {
 }
 
 /// Return the default IFRS 9 staging configuration from config or embedded policy.
+///
+/// # Arguments
+///
+/// * `config` - Finstack configuration whose ECL policy extension, if present,
+///   fully replaces the embedded IFRS 9 policy registry.
+///
+/// # Errors
+///
+/// Returns an error if the configured registry cannot be parsed or validated,
+/// the embedded fallback cannot load, or it contains no default IFRS 9 policy.
 pub fn default_staging_config_from_config(config: &FinstackConfig) -> Result<StagingConfig> {
     let registry = registry_from_config(config)?;
     registry
@@ -296,6 +319,16 @@ pub fn default_cecl_config() -> CeclConfig {
 }
 
 /// Return the default CECL configuration from config or embedded policy.
+///
+/// # Arguments
+///
+/// * `config` - Finstack configuration whose ECL policy extension, if present,
+///   fully replaces the embedded CECL policy registry.
+///
+/// # Errors
+///
+/// Returns an error if the configured registry cannot be parsed or validated,
+/// the embedded fallback cannot load, or it contains no default CECL policy.
 pub fn default_cecl_config_from_config(config: &FinstackConfig) -> Result<CeclConfig> {
     let registry = registry_from_config(config)?;
     registry.default_cecl_policy().map(cecl_config_from_policy)

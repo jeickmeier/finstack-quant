@@ -30,6 +30,7 @@ pub fn csa_eur_regulatory() -> Result<String, JsValue> {
 ///
 /// Deserializes and re-serializes the input to verify it conforms
 /// to the `CsaSpec` schema. Returns the canonical JSON on success.
+/// @param json - CSA specification JSON to validate and normalize into canonical form.
 #[wasm_bindgen(js_name = validateCsaJson)]
 pub fn validate_csa_json(json: &str) -> Result<String, JsValue> {
     let csa: finstack_quant_margin::CsaSpec = serde_json::from_str(json).map_err(to_js_err)?;
@@ -49,7 +50,14 @@ pub fn validate_csa_json(json: &str) -> Result<String, JsValue> {
 /// * `currency` - ISO currency code (e.g. "USD")
 /// * `year` - Calculation year
 /// * `month` - Calculation month (1-12)
-/// * `day` - Calculation day
+/// * `day` - Calendar day number within the selected month of the VM calculation date.
+/// @param csa_json - CSA specification JSON governing thresholds, minimum transfer, and timing.
+/// @param exposure - Current mark-to-market exposure in the supplied currency units.
+/// @param posted_collateral - Collateral already posted in the supplied currency units.
+/// @param currency - ISO-4217 currency code shared by exposure and collateral amounts.
+/// @param year - Calendar year of the VM calculation date.
+/// @param month - Calendar month from 1 through 12 of the VM calculation date.
+/// @param day - Calendar day number within the selected month of the VM calculation date.
 #[wasm_bindgen(js_name = calculateVm)]
 pub fn calculate_vm(
     csa_json: &str,

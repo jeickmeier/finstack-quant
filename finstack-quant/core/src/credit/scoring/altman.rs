@@ -154,6 +154,11 @@ pub struct AltmanZDoublePrimeInput {
 /// assert_eq!(result.zone, ScoringZone::Distress);
 /// # Ok::<_, finstack_quant_core::credit::scoring::CreditScoringError>(())
 /// ```
+///
+/// # Arguments
+///
+/// * `input` - Finite public-company accounting ratios for the original
+///   five-factor 1968 Altman Z-Score model.
 pub fn altman_z_score(input: &AltmanZScoreInput) -> Result<ScoringResult, CreditScoringError> {
     check_finite(
         "working_capital_to_total_assets",
@@ -186,6 +191,13 @@ pub fn altman_z_score(input: &AltmanZScoreInput) -> Result<ScoringResult, Credit
 }
 
 /// Compute the original Altman Z-Score and apply an explicit PD heuristic.
+///
+/// # Arguments
+///
+/// * `input` - Finite public-company accounting ratios for the original
+///   five-factor 1968 Altman Z-Score model.
+/// * `calibration` - Explicit score-to-probability-of-default mapping applied
+///   after the model score and zone are calculated.
 pub fn altman_z_score_with_pd(
     input: &AltmanZScoreInput,
     calibration: AltmanPdCalibration,
@@ -228,6 +240,11 @@ pub fn altman_z_score_with_pd(
 /// assert_eq!(result.zone, ScoringZone::Safe);
 /// # Ok::<_, finstack_quant_core::credit::scoring::CreditScoringError>(())
 /// ```
+///
+/// # Arguments
+///
+/// * `input` - Finite private-company accounting ratios for the five-factor
+///   Z' model, including book rather than market equity.
 pub fn altman_z_prime(input: &AltmanZPrimeInput) -> Result<ScoringResult, CreditScoringError> {
     check_finite(
         "working_capital_to_total_assets",
@@ -260,6 +277,13 @@ pub fn altman_z_prime(input: &AltmanZPrimeInput) -> Result<ScoringResult, Credit
 }
 
 /// Compute the Altman Z'-Score and apply an explicit PD heuristic.
+///
+/// # Arguments
+///
+/// * `input` - Finite private-company accounting ratios for the five-factor
+///   Z' model, including book rather than market equity.
+/// * `calibration` - Explicit score-to-probability-of-default mapping applied
+///   after the model score and zone are calculated.
 pub fn altman_z_prime_with_pd(
     input: &AltmanZPrimeInput,
     calibration: AltmanPdCalibration,
@@ -307,6 +331,11 @@ pub fn altman_z_prime_with_pd(
 /// assert_eq!(result.zone, ScoringZone::Safe);
 /// # Ok::<_, finstack_quant_core::credit::scoring::CreditScoringError>(())
 /// ```
+///
+/// # Arguments
+///
+/// * `input` - Finite non-manufacturing-company accounting ratios for the
+///   four-factor constant-free Z'' model.
 pub fn altman_z_double_prime(
     input: &AltmanZDoublePrimeInput,
 ) -> Result<ScoringResult, CreditScoringError> {
@@ -341,6 +370,13 @@ pub fn altman_z_double_prime(
 }
 
 /// Compute the Altman Z''-Score and apply an explicit PD heuristic.
+///
+/// # Arguments
+///
+/// * `input` - Finite non-manufacturing-company accounting ratios for the
+///   four-factor constant-free Z'' model.
+/// * `calibration` - Explicit score-to-probability-of-default mapping applied
+///   after the model score and zone are calculated.
 pub fn altman_z_double_prime_with_pd(
     input: &AltmanZDoublePrimeInput,
     calibration: AltmanPdCalibration,

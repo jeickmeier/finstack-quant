@@ -48,6 +48,11 @@ impl MbsFeeSpec {
     }
 
     /// Create a servicing fee specification using a typed basis-point rate.
+    ///
+    /// # Arguments
+    ///
+    /// * `annual_rate_bps` - Annual servicing fee in basis points, preserved
+    ///   without float conversion in the standard monthly 30/360 convention.
     pub fn servicing_bps(annual_rate_bps: Bps) -> Self {
         Self {
             name: "servicing".to_string(),
@@ -76,6 +81,11 @@ impl MbsFeeSpec {
     }
 
     /// Create a guarantee fee specification using a typed basis-point rate.
+    ///
+    /// # Arguments
+    ///
+    /// * `annual_rate_bps` - Annual agency guarantee fee in basis points,
+    ///   preserved in the standard monthly 30/360 convention.
     pub fn guarantee_bps(annual_rate_bps: Bps) -> Self {
         Self {
             name: "guarantee_fee".to_string(),
@@ -114,6 +124,11 @@ impl MbsFeeSpec {
 ///
 /// This allows integration with the existing fee emission infrastructure
 /// in the cashflow builder.
+///
+/// # Arguments
+///
+/// * `mbs_fee` - Agency MBS servicing or guarantee-fee specification to map
+///   into a periodic drawn-balance fee under its own frequency and day count.
 pub fn to_cashflow_fee_spec(mbs_fee: &MbsFeeSpec) -> crate::cashflow::builder::FeeSpec {
     use crate::cashflow::builder::{FeeBase, FeeSpec};
 
@@ -151,6 +166,12 @@ pub fn net_coupon(gross_wac: f64, servicing_rate: f64, guarantee_rate: f64) -> f
 }
 
 /// Calculate net coupon using typed rate inputs.
+///
+/// # Arguments
+///
+/// * `gross_wac` - Gross weighted-average mortgage coupon as a decimal rate.
+/// * `servicing_rate` - Annual servicing fee as a decimal rate.
+/// * `guarantee_rate` - Annual agency guarantee fee as a decimal rate.
 pub fn net_coupon_rate(gross_wac: Rate, servicing_rate: Rate, guarantee_rate: Rate) -> Rate {
     Rate::from_decimal(
         gross_wac.as_decimal() - servicing_rate.as_decimal() - guarantee_rate.as_decimal(),
@@ -173,6 +194,12 @@ pub fn gross_wac(net_rate: f64, servicing_rate: f64, guarantee_rate: f64) -> f64
 }
 
 /// Calculate gross WAC using typed rate inputs.
+///
+/// # Arguments
+///
+/// * `net_rate` - Net investor pass-through coupon as a decimal rate.
+/// * `servicing_rate` - Annual servicing fee as a decimal rate.
+/// * `guarantee_rate` - Annual agency guarantee fee as a decimal rate.
 pub fn gross_wac_rate(net_rate: Rate, servicing_rate: Rate, guarantee_rate: Rate) -> Rate {
     Rate::from_decimal(
         net_rate.as_decimal() + servicing_rate.as_decimal() + guarantee_rate.as_decimal(),

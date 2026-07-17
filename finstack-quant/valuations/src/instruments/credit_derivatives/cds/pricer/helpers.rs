@@ -1,3 +1,5 @@
+//! Configuration, integration, and metric helpers for CDS pricing.
+//!
 use crate::constants::{credit, numerical};
 use finstack_quant_core::dates::{Date, DateExt, DayCount, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};

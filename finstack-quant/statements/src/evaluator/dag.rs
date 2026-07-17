@@ -39,6 +39,18 @@ impl DependencyGraph {
     /// assert!(graph.dependencies["b"].contains("a"));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    ///
+    /// `lag()` and `shift()` references are intentionally excluded from direct
+    /// dependency edges so a temporal corkscrew can refer to a prior period
+    /// without becoming a same-period cycle. Capital-structure `cs.*`
+    /// references are also deferred to market-aware evaluation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a formula or `where` clause cannot be parsed for
+    /// dependency extraction, or if it references an unknown node identifier.
+    /// It does not reject cycles; call [`detect_cycles`](Self::detect_cycles) or
+    /// [`evaluate_order`] after construction when an executable order is needed.
     pub fn from_model(model: &FinancialModelSpec) -> Result<Self> {
         // Validate all formula references before building graph
         Self::validate_formula_references(model)?;
@@ -154,6 +166,12 @@ impl DependencyGraph {
     /// exists. The `visited` set is shared across every starting node so a
     /// fully-explored subgraph is never re-walked, keeping the whole scan
     /// `O(V + E)` rather than `O(V * (V + E))`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a circular-dependency error containing one representative cycle
+    /// when same-period dependencies form a loop. Temporal `lag` and `shift`
+    /// links are not graph edges and therefore do not cause this error.
     pub fn detect_cycles(&self) -> Result<()> {
         let mut visited: IndexSet<NodeId> = IndexSet::new();
         let mut path: Vec<NodeId> = Vec::new();
@@ -246,6 +264,16 @@ fn add_dependency_edges(
 /// assert!(order.iter().position(|n| n == "a") < order.iter().position(|n| n == "b"));
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// The order is deterministic for a fixed graph and is suitable for one
+/// period's evaluation. It does not imply an ordering between historical
+/// references, because those are intentionally excluded from direct edges.
+///
+/// # Errors
+///
+/// Returns an evaluation error if the graph contains a same-period cycle. The
+/// diagnostic lists the nodes that remain unprocessed so callers can locate
+/// the circular dependency.
 pub fn evaluate_order(graph: &DependencyGraph) -> Result<Vec<NodeId>> {
     crate::utils::graph::toposort_ids(&graph.dependencies).map_err(|unprocessed| {
         Error::eval(format!(

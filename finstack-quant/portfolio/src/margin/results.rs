@@ -242,6 +242,14 @@ impl PortfolioMarginResult {
     /// * `result` - The netting set margin to add
     /// * `fx_rate` - FX rate to convert from netting set currency to base currency
     ///   (e.g., if netting set is EUR and base is USD, rate is EUR/USD)
+    ///
+    /// Every monetary amount in the netting-set result, its sensitivities, and
+    /// its IM breakdown is multiplied by the same spot rate before aggregation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error if `fx_rate` is non-finite or not strictly
+    /// positive. Existing entries with the same netting-set ID are replaced.
     pub fn add_netting_set_with_fx(
         &mut self,
         result: NettingSetMargin,

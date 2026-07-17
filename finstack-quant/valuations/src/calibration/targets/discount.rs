@@ -1,3 +1,5 @@
+//! Calibration target construction and shared input validation.
+//!
 use crate::calibration::api::schema::DiscountCurveParams;
 use crate::calibration::config::ResidualWeightingScheme;
 use crate::calibration::config::{CalibrationConfig, CalibrationMethod};

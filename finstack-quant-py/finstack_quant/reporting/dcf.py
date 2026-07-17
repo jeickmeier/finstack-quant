@@ -104,8 +104,10 @@ def dcf_tearsheet(
         for the sensitivity tornado.
     ufcf_node : str, default "ufcf"
         Node id holding unlevered free cash flow.
-    title, subtitle : str, optional
-        Header text.
+    title : str, optional
+        Optional main report heading for the DCF valuation summary.
+    subtitle : str, optional
+        Optional secondary heading shown below ``title``.
     sections : list[str], optional
         Subset of :data:`ALL_SECTIONS` (default: all). ``sections`` controls
         which sections are included, not their order (order is fixed).

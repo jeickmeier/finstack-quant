@@ -1,3 +1,9 @@
+//! User-defined tags and key-value metadata attached to instruments.
+//!
+//! Tags are set-like labels; metadata is a string-to-string map. Selectors
+//! support the documented tag and metadata forms and return false for unknown
+//! syntax.
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};

@@ -1,3 +1,5 @@
+//! Shared runtime types and solver contracts for market calibration.
+//!
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;

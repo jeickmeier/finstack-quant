@@ -315,6 +315,15 @@ fn validate_diversion_rules(
 // ============================================================================
 
 /// Quick validation helper that returns true if spec is valid.
+///
+/// # Arguments
+///
+/// * `tiers` - Ordered waterfall allocation tiers to validate for references,
+///   ordering, and allocation invariants.
+/// * `diversion_rules` - Coverage-test diversion rules that may redirect cash
+///   among the supplied tiers.
+/// * `coverage_test_ids` - Declared coverage-test identifiers referenced by
+///   tiers and diversion rules.
 pub fn is_valid_waterfall_spec(
     tiers: &[WaterfallTier],
     diversion_rules: &[DiversionRule],
@@ -329,6 +338,15 @@ pub fn is_valid_waterfall_spec(
 }
 
 /// Get validation errors as a list.
+///
+/// # Arguments
+///
+/// * `tiers` - Ordered waterfall allocation tiers to validate for references,
+///   ordering, and allocation invariants.
+/// * `diversion_rules` - Coverage-test diversion rules that may redirect cash
+///   among the supplied tiers.
+/// * `coverage_test_ids` - Declared coverage-test identifiers referenced by
+///   tiers and diversion rules.
 pub fn get_validation_errors(
     tiers: &[WaterfallTier],
     diversion_rules: &[DiversionRule],

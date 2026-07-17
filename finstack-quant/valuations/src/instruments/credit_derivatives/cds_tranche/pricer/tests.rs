@@ -1,3 +1,5 @@
+//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
+//!
 use super::config::{DiscountAt, DEFAULT_QUADRATURE_ORDER};
 use super::*;
 use crate::cashflow::primitives::CFKind;

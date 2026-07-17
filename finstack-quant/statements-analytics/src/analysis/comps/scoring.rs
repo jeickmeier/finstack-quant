@@ -120,6 +120,19 @@ pub struct RelativeValueResult {
 /// signals are unitless, so configured weights compare like with like.
 /// Each dimension's [`ScoringDimension::direction`] maps its signal onto
 /// the composite sign convention: positive = cheap.
+///
+/// # Arguments
+///
+/// * `peer_set` - Peer universe containing the subject company and the
+///   comparison companies from which metric distributions are built.
+/// * `dimensions` - Non-empty scoring dimensions defining metric extractors,
+///   direction conventions, and relative weights.
+///
+/// # Errors
+///
+/// Returns validation errors for an empty dimension set or unusable peer data,
+/// and propagates metric extraction, regression, and statistical-calculation
+/// errors for the configured dimensions.
 pub fn score_relative_value(
     peer_set: &PeerSet,
     dimensions: &[ScoringDimension],

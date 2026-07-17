@@ -77,6 +77,16 @@ use finstack_quant_core::dates::PeriodId;
 /// # Returns
 ///
 /// Map of period_id → forecasted value
+/// in the same order as `forecast_periods`. An empty period slice is valid and
+/// returns an empty map.
+///
+/// # Errors
+///
+/// Returns an error when `spec` has missing, malformed, or out-of-range method
+/// parameters (including an absent statistical seed), when a time-series or
+/// seasonal input is invalid, or when projected growth overflows. `base_value`
+/// is passed through to the selected method; callers should validate its
+/// economic meaning and units before forecasting.
 pub fn apply_forecast(
     spec: &ForecastSpec,
     base_value: f64,

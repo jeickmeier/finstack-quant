@@ -232,6 +232,12 @@ class ValuationResult:
         is excluded. Malformed legacy escapes remain literal; decoded
         coordinate collisions fall back to literal wire components so no
         entries are dropped or deduplicated.
+
+        Parameters
+        ----------
+        base : str
+            Unqualified metric base key, such as ``"bucketed_dv01"``, used to
+            select its encoded coordinate series from the valuation measures.
         """
         ...
 
@@ -345,6 +351,20 @@ def instrument_cashflows(
     a per-flow ``pandas.DataFrame`` with ``date`` / ``reset_date`` parsed as
     ``datetime64``. See :func:`instrument_cashflows_json` for argument and
     error semantics.
+
+    Parameters
+    ----------
+    instrument_json : str
+        Canonical tagged instrument JSON accepted by the valuation bindings.
+    market : MarketContext or str
+        Market context object or canonical market JSON containing the curves,
+        fixings, and scalar data required by the requested pricing model.
+    as_of : str
+        ISO-8601 valuation date used to exclude settled flows and calculate
+        schedule-relative discount factors.
+    model : str
+        Registered pricing model key, such as ``"discounting"``, for the
+        instrument cashflow projection.
 
     Returns
     -------
@@ -1059,7 +1079,24 @@ class SabrParameters:
         nu: float,
         rho: float,
         shift: float | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Create a validated SABR volatility-smile parameter set.
+
+        Parameters
+        ----------
+        alpha : float
+            Positive SABR level parameter in the rate or price unit convention.
+        beta : float
+            CEV elasticity constrained to the closed interval ``[0, 1]``.
+        nu : float
+            Non-negative volatility-of-volatility parameter per square-root year.
+        rho : float
+            Instantaneous forward/volatility correlation in ``[-1, 1]``.
+        shift : float or None, default None
+            Optional positive shifted-lognormal displacement for negative-rate
+            strikes and forwards; ``None`` uses the unshifted formula.
+        """
+        ...
     @staticmethod
     def equity_default() -> SabrParameters:
         """Equity-standard defaults ``(alpha=0.20, beta=1.0, nu=0.30, rho=-0.20)``.
@@ -1643,7 +1680,23 @@ def inverse_floater_coupon_profile(
     cap: float,
     leverage: float,
 ) -> list[float]:
-    """Compute a path-independent inverse-floater coupon schedule."""
+    """Compute a path-independent inverse-floater coupon schedule.
+
+    Parameters
+    ----------
+    fixed_rate : float
+        Fixed strike rate in decimal annual-rate units.
+    floating_fixings : list[float]
+        Floating reference-rate fixings in decimal annual-rate units, one per
+        coupon period in the returned schedule.
+    floor : float
+        Per-period minimum coupon rate in decimal annual-rate units.
+    cap : float
+        Per-period maximum coupon rate in decimal annual-rate units; use
+        ``float("inf")`` for no cap.
+    leverage : float
+        Multiplier applied to each floating fixing before it offsets the fixed rate.
+    """
     ...
 
 def cms_spread_option_intrinsic(

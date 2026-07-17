@@ -1,3 +1,5 @@
+//! Execution, configuration, and diagnostics for Monte Carlo pricing.
+//!
 use super::path_capture::PathCaptureConfig;
 use super::pricing::McEngine;
 use crate::time_grid::TimeGrid;

@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for interest-rate instruments.
+//!
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::inflation_cap_floor::InflationCapFloor;
 use crate::pricer::{

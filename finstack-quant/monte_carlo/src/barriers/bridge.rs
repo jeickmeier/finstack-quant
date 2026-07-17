@@ -32,11 +32,14 @@
 ///
 /// # Arguments
 ///
-/// * `s_t` - Spot at time t
+/// * `s_t` - Underlying spot observed at the start of the monitoring interval,
+///   in the same price units as `barrier`.
 /// * `s_t_dt` - Spot at time t+Δt
-/// * `barrier` - Barrier level
+/// * `barrier` - Continuously monitored barrier level in the same price units
+///   as the two spot observations.
 /// * `sigma` - Instantaneous volatility over the step (constant assumption)
-/// * `dt` - Time step
+/// * `dt` - Positive monitoring-interval length in years; non-positive values
+///   return zero unless discrete observations already cross the barrier.
 ///
 /// # Returns
 ///
@@ -100,12 +103,14 @@ pub fn bridge_hit_probability(s_t: f64, s_t_dt: f64, barrier: f64, sigma: f64, d
 ///
 /// # Arguments
 ///
-/// * `s_t` - Spot at time t
+/// * `s_t` - Underlying spot at the start of the monitoring interval, in the
+///   same price units as `barrier`.
 /// * `s_t_dt` - Spot at time t+Δt
-/// * `barrier` - Barrier level
+/// * `barrier` - Up or down barrier level in the same price units as the spot
+///   observations.
 /// * `barrier_type` - Type of barrier (up or down)
-/// * `sigma` - Volatility
-/// * `dt` - Time step
+/// * `sigma` - Constant annualized volatility assumed over the interval.
+/// * `dt` - Monitoring-interval length in years used by the bridge correction.
 /// * `uniform_random` - Uniform random number in [0, 1)
 ///
 /// # Returns

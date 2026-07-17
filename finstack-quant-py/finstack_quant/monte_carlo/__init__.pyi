@@ -739,11 +739,42 @@ def simulate_gbm_paths(
     ``num_paths`` is the estimator and simulated-path count because captured
     paths do not support antithetic pairing. Passing ``antithetic=True`` raises
     ``ValueError``.
+
+    Parameters
+    ----------
+    spot : float
+        Positive initial underlying price in the output path's price units.
+    rate : float
+        Continuously compounded annual risk-free rate as a decimal.
+    div_yield : float
+        Continuously compounded annual dividend or carry yield as a decimal.
+    vol : float
+        Positive annualized GBM volatility as a decimal, such as ``0.20``.
+    expiry : float
+        Positive time to maturity in years.
+    num_steps : int
+        Number of equally spaced simulation steps over the expiry horizon.
+    num_paths : int
+        Number of independently simulated paths retained in the summary.
+    seed : int or None, default None
+        Optional deterministic random seed; ``None`` uses the runtime generator.
+    antithetic : bool, default False
+        Antithetic-path request. This compact path API rejects ``True``.
     """
     ...
 
 def heston_satisfies_feller(kappa: float, theta: float, vol_of_vol: float) -> bool:
-    """Validate Heston parameters and test the strict Feller condition."""
+    """Validate Heston parameters and test the strict Feller condition.
+
+    Parameters
+    ----------
+    kappa : float
+        Positive mean-reversion speed of the variance process per year.
+    theta : float
+        Positive long-run variance level in squared-volatility units.
+    vol_of_vol : float
+        Positive annualized volatility of the variance process.
+    """
     ...
 
 class EuropeanPricer:
@@ -1672,10 +1703,34 @@ def price_heston_put(
 
     Parameters
     ----------
-    spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry
-        See :func:`price_heston_call`.
-    num_paths, seed, num_steps, currency
-        Monte Carlo configuration; see :func:`price_heston_call`.
+    spot : float
+        Positive initial underlying price in the requested currency units.
+    strike : float
+        Positive put strike in the same price units as ``spot``.
+    rate : float
+        Continuously compounded annual risk-free rate as a decimal.
+    div_yield : float
+        Continuously compounded annual dividend or carry yield as a decimal.
+    kappa : float
+        Positive mean-reversion speed of the Heston variance process per year.
+    theta : float
+        Positive long-run variance level in squared-volatility units.
+    vol_of_vol : float
+        Positive annualized volatility of the Heston variance process.
+    rho : float
+        Spot/variance Brownian correlation in the closed interval ``[-1, 1]``.
+    v0 : float
+        Positive initial variance, not initial volatility.
+    expiry : float
+        Positive time to the European put expiry in years.
+    num_paths : int or None, default None
+        Optional number of Monte Carlo paths; ``None`` selects the engine default.
+    seed : int or None, default None
+        Optional deterministic random seed for reproducible path generation.
+    num_steps : int or None, default None
+        Optional number of time steps; ``None`` selects the engine default grid.
+    currency : str or None, default None
+        ISO-4217 output currency tag; ``None`` applies the binding default.
 
     Returns
     -------

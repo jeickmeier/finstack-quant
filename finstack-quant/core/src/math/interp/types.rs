@@ -324,6 +324,20 @@ impl InterpStyle {
     /// * `values` – corresponding values.
     /// * `extrapolation` – extrapolation policy.
     /// * `validation` – validation policy controlling whether negative values are allowed.
+    ///
+    /// Ownership of both boxed slices transfers to the returned interpolator.
+    /// `LogLinear` and `MonotoneConvex` always upgrade validation to strict
+    /// positive finite values because their formulas use logarithms; linear,
+    /// cubic-Hermite, and piecewise-quadratic-forward styles respect the
+    /// requested policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when knots have fewer than two entries, are non-finite,
+    /// or are not strictly increasing; when value length differs from knot
+    /// length; when values violate the effective validation policy; or when
+    /// the selected strategy rejects its data (for example, insufficient knot
+    /// spacing for a slope-based method).
     pub fn build(
         self,
         knots: Box<[f64]>,

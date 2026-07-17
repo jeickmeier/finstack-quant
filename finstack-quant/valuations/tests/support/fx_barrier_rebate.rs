@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 #[allow(clippy::expect_used, clippy::unwrap_used, dead_code, unused_imports)]
 mod test_utils {
     include!(concat!(

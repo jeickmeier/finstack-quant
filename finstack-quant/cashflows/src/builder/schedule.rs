@@ -295,6 +295,15 @@ impl CashFlowSchedule {
     /// Use this constructor for untrusted or externally supplied state. Internal
     /// builders that establish invariants while emitting flows may continue to
     /// use [`Self::from_parts`].
+    ///
+    /// Flows are first put into canonical schedule order, then all row-level,
+    /// notional, ordering, and cross-flow economic invariants are checked.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the notional or a cashflow is invalid, flow dates
+    /// are not in canonical order after construction, or the schedule violates
+    /// its economic funding, balance, or currency invariants.
     pub fn try_from_parts(
         flows: Vec<CashFlow>,
         notional: Notional,
@@ -345,6 +354,16 @@ impl CashFlowSchedule {
     }
 
     /// Fallible variant of [`Self::update_flows`].
+    ///
+    /// Invokes `update` in the existing schedule order and restores canonical
+    /// ordering only after every update succeeds.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the first error returned by `update`. Earlier flow mutations
+    /// remain applied and the schedule is not re-sorted on that error, so
+    /// callers requiring atomic replacement should update a clone and replace
+    /// the schedule only after success.
     pub fn try_update_flows(
         &mut self,
         mut update: impl FnMut(&mut CashFlow) -> finstack_quant_core::Result<()>,
@@ -423,6 +442,16 @@ impl CashFlowSchedule {
     ///
     /// This is primarily used to apply leg direction before schedules are
     /// composed. A non-finite scale is rejected.
+    ///
+    /// `scale` multiplies every `Money` amount, including principal, interest,
+    /// fees, and recoveries, but leaves the representative notional and all
+    /// flow classification/date metadata unchanged. A negative scale reverses
+    /// the cashflow direction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `scale` is NaN or infinite. Because the schedule is
+    /// consumed, no modified schedule is returned on error.
     pub fn scale_amounts(mut self, scale: f64) -> finstack_quant_core::Result<Self> {
         if !scale.is_finite() {
             return Err(finstack_quant_core::Error::Validation(
@@ -441,6 +470,18 @@ impl CashFlowSchedule {
     }
 
     /// Validate all schedule-level and per-flow invariants.
+    ///
+    /// This checks the representative notional, each flow, nondecreasing flow
+    /// dates, and the cross-flow economic invariants that reconcile funding,
+    /// outstanding balances, currencies, and the recorded schedule metadata.
+    /// Use this after low-level mutation or deserializing state that bypassed
+    /// [`Self::try_from_parts`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the first invalid-notional or invalid-flow error, an error for
+    /// out-of-order dates, or an error when a cross-flow economic invariant is
+    /// violated.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.notional.validate()?;
         for flow in &self.flows {
@@ -721,6 +762,23 @@ impl CashFlowSchedule {
 }
 
 /// Calculate Act/365F weighted average life from dated principal reductions.
+///
+/// Only positive principal amounts strictly after `as_of` contribute. Each
+/// contribution is weighted by its Act/365F year fraction, and the result is
+/// expressed in years. Non-positive or already-realized entries are ignored;
+/// when no eligible principal remains, this returns `0.0`.
+///
+/// # Arguments
+///
+/// * `principal` - Dated principal reductions as `(payment_date, amount)`
+///   pairs; only positive amounts strictly after `as_of` contribute.
+/// * `as_of` - Valuation date from which Act/365F time weights are measured.
+///
+/// # Errors
+///
+/// Returns an error if eligible principal reductions use more than one
+/// currency or the Act/365F year-fraction calculation fails. Currencies of
+/// ignored entries are not examined.
 pub fn weighted_average_life_from_principal<I>(
     principal: I,
     as_of: Date,
@@ -794,8 +852,9 @@ fn merge_matching_option<T: Copy + PartialEq>(current: &mut Option<Option<T>>, v
 /// Concatenates flows from every input schedule, including mixed-currency
 /// rows, deduplicates the union of
 /// their `meta.calendar_ids`, and reduces remaining metadata fields with the
-/// rules listed below. The combined flow list is then re-sorted via
-/// [`sort_flows`] so the resulting schedule is in canonical order.
+/// rules listed below. The combined flow list is then re-sorted by the crate's
+/// canonical flow-ordering helper so the resulting schedule is in canonical
+/// order.
 ///
 /// # Arguments
 ///

@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 mod consistency_tests;
 mod credit_tests;
 mod formula_check_tests;

@@ -39,6 +39,11 @@ fn table_metadata(source: &str) -> IndexMap<String, serde_json::Value> {
 ///
 /// A [`Result`] wrapping the generated [`TableEnvelope`].
 ///
+/// # Errors
+///
+/// Returns an error if the table envelope rejects the generated columns or
+/// metadata.
+///
 /// # Examples
 ///
 /// ```ignore
@@ -102,6 +107,11 @@ pub fn positions_to_table(valuation: &PortfolioValuation) -> Result<TableEnvelop
 /// # Returns
 ///
 /// A [`Result`] containing the generated [`TableEnvelope`].
+///
+/// # Errors
+///
+/// Returns an error if the table envelope rejects the generated columns or
+/// metadata.
 pub fn entities_to_table(valuation: &PortfolioValuation) -> Result<TableEnvelope> {
     let n = valuation.by_entity.len();
     let mut entity_ids: Vec<String> = Vec::with_capacity(n);
@@ -138,6 +148,11 @@ pub fn entities_to_table(valuation: &PortfolioValuation) -> Result<TableEnvelope
 /// # Returns
 ///
 /// A [`Result`] containing the generated [`TableEnvelope`].
+///
+/// # Errors
+///
+/// Returns an error if the table envelope rejects the generated columns or
+/// metadata.
 pub fn metrics_to_table(metrics: &PortfolioMetrics) -> Result<TableEnvelope> {
     let row_count: usize = metrics
         .by_position
@@ -184,6 +199,11 @@ pub fn metrics_to_table(metrics: &PortfolioMetrics) -> Result<TableEnvelope> {
 /// # Returns
 ///
 /// A [`Result`] containing the generated [`TableEnvelope`].
+///
+/// # Errors
+///
+/// Returns an error if the table envelope rejects the generated columns or
+/// metadata.
 pub fn aggregated_metrics_to_table(metrics: &PortfolioMetrics) -> Result<TableEnvelope> {
     let n = metrics.aggregated.len();
     let mut metric_ids: Vec<String> = Vec::with_capacity(n);

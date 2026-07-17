@@ -1,3 +1,5 @@
+//! Market inputs implementation used by the convertible subsystem.
+//!
 use super::ConvertibleBond;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::InputError;

@@ -189,6 +189,35 @@ def attribution_tearsheet(
     inline by passing ``instrument=`` plus ``market_t0``/``market_t1``/``as_of_t0``/
     ``as_of_t1`` (and optional ``method``/``config``). ``sections`` selects a subset
     of ``ALL_SECTIONS``.
+
+    Parameters
+    ----------
+    attribution : Any
+        Precomputed ``PnlAttribution`` object or equivalent canonical payload.
+    instrument : Any
+        Instrument JSON/object to attribute inline instead of supplying results.
+    market_t0 : Any
+        Opening market context or JSON used for inline attribution.
+    market_t1 : Any
+        Closing market context or JSON used for inline attribution.
+    as_of_t0 : str or None
+        ISO-8601 opening valuation date required for inline attribution.
+    as_of_t1 : str or None
+        ISO-8601 closing valuation date required for inline attribution.
+    method : Any
+        Attribution-method identifier or configuration passed to the core API.
+    config : Any
+        Optional method-specific attribution configuration.
+    title : str or None
+        Optional main report heading; ``None`` uses the attributed instrument.
+    subtitle : str or None
+        Optional secondary heading displayed below ``title``.
+    sections : list[str] or None
+        Optional subset of supported sections; ``None`` renders the full sheet.
+    theme : Theme
+        Report palette and typography used for the rendered tear sheet.
+    generated : Any
+        Optional generated date or timestamp; supply a fixed value for reproducibility.
     """
     if instrument is not None:
         attribution = _attribute_path(instrument, market_t0, market_t1, as_of_t0, as_of_t1, method, config)

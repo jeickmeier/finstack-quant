@@ -31,6 +31,11 @@ use super::{CreditMapping, ThreeStatementMapping, TrendDirection};
 ///   `capex_node` are all provided)
 /// - **NonFiniteCheck** over all mapping nodes
 /// - **MissingValueCheck** for required nodes
+///
+/// # Arguments
+///
+/// * `mapping` - Three-statement node mapping that identifies balance-sheet,
+///   cash-flow, and optional depreciation-reconciliation source nodes.
 pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
     let mut builder = CheckSuite::builder("Three-Statement Checks")
         .description("Structural and data-quality checks for a three-statement model");
@@ -113,6 +118,11 @@ pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
 /// - **FcfSignCheck** (if `fcf_node` is provided)
 /// - **TrendCheck** on leverage (decreasing is good) and coverage
 ///   (increasing is good), both with 3-period lookback
+///
+/// # Arguments
+///
+/// * `mapping` - Credit-analysis node mapping that identifies debt, EBITDA,
+///   interest, and optional free-cash-flow inputs plus warning thresholds.
 pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
     let warn = mapping.leverage_warn.unwrap_or((0.0, 6.0));
     let cov_warn = mapping.coverage_min_warn.unwrap_or(1.5);
@@ -185,6 +195,13 @@ pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
 /// Merges [`three_statement_checks`] and [`credit_underwriting_checks`],
 /// overriding the leverage warning range to `(0.0, 8.0)` to accommodate
 /// the higher leverage typical in buyouts.
+///
+/// # Arguments
+///
+/// * `mapping` - Three-statement node mapping used to construct structural and
+///   data-quality checks.
+/// * `credit` - Credit-underwriting node mapping; its leverage warning range
+///   is replaced with the LBO-specific range.
 pub fn lbo_model_checks(mapping: ThreeStatementMapping, credit: CreditMapping) -> CheckSuite {
     let ts_suite = three_statement_checks(mapping);
 
@@ -209,6 +226,11 @@ pub fn lbo_model_checks(mapping: ThreeStatementMapping, credit: CreditMapping) -
 /// only materializes built-in checks because `FormulaCheck` lives in this
 /// crate. Calling this function instead guarantees the same spec produces the
 /// same check report on every host.
+///
+/// # Arguments
+///
+/// * `spec` - Serialized check-suite definition containing built-in check
+///   configuration and optional formula checks to materialize.
 ///
 /// # Errors
 ///

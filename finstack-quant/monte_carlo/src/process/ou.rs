@@ -379,6 +379,35 @@ where
 ///
 /// The curve-fit correction is `Var[x(t)] / κ`, which reduces exactly to
 /// `σ²(1 - exp(-2κt)) / (2κ²)` for a constant σ.
+///
+/// `sigma_times` and `sigma_values` define the piecewise-constant annualized
+/// short-rate-volatility curve. `theta_times` gives the requested year-fraction
+/// knots for the returned piecewise-constant mean-reversion-level curve; an
+/// empty slice produces one value at time zero. `discount_curve_fn(t)` must
+/// return the discount factor `P(0,t)` on the same time basis. The forward rate
+/// and derivative are obtained with finite differences of width `1e-4` years.
+///
+/// If a sampled discount factor is non-positive, the finite-difference helper
+/// logs a warning and substitutes a zero forward contribution rather than
+/// returning an error. Production callers should therefore provide positive,
+/// finite discount factors and treat warnings as a market-data failure.
+///
+/// # Arguments
+///
+/// * `kappa` - Positive Hull-White mean-reversion speed in inverse years.
+/// * `sigma_times` - Increasing time boundaries in years for the piecewise
+///   constant annualized short-rate-volatility schedule.
+/// * `sigma_values` - Annualized short-rate volatilities aligned with
+///   `sigma_times` according to [`PiecewiseConstantCurve`] semantics.
+/// * `discount_curve_fn` - Function returning the discount factor `P(0,t)` for
+///   a year-fraction input `t` on the same time basis as the schedules.
+/// * `theta_times` - Requested theta-curve knot times in years; empty produces
+///   a single time-zero theta value.
+///
+/// # Errors
+///
+/// Returns validation errors for a non-positive or non-finite `kappa`, an
+/// invalid volatility schedule, or an incompatible output theta schedule.
 pub fn calibrate_theta_from_curve_with_piecewise_sigma<F>(
     kappa: f64,
     sigma_times: Vec<f64>,

@@ -1,3 +1,5 @@
+//! Problem, decision-space, constraint, and solver types for portfolio optimization.
+//!
 use super::constraints::{Constraint, Inequality};
 use super::decision::{
     build_decision_space, DecisionFeatures, DecisionItem, OptimizationDenominators,

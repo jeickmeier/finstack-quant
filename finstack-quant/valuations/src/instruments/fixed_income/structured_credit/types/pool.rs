@@ -15,46 +15,50 @@ use super::enums::{AssetType, DealType};
 use crate::instruments::fixed_income::structured_credit::types::constants::BASIS_POINTS_DIVISOR;
 use finstack_quant_core::types::CreditRating;
 
-/// Individual asset in the structured credit pool
+/// Individual asset held in a structured-credit collateral pool.
+///
+/// Monetary fields use the asset's native currency. Rates are annual decimal
+/// rates unless a field explicitly says basis points.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PoolAsset {
-    /// Unique asset identifier
+    /// Stable identifier used to match the asset to diagnostics and scenarios.
     pub id: InstrumentId,
-    /// Asset classification
+    /// Economic asset classification used by pool-level assumptions.
     pub asset_type: AssetType,
-    /// Current outstanding balance
+    /// Current outstanding principal balance in the asset currency.
     pub balance: Money,
-    /// Current interest rate (all-in coupon)
+    /// Current all-in coupon as an annual decimal rate.
     pub rate: f64,
-    /// Spread over index in basis points (for floating rate assets)
-    /// For WAS calculation: use this field, not the all-in rate
+    /// Spread over the reference index in basis points for floating-rate assets.
+    /// Weighted-average-spread calculations use this field rather than the
+    /// all-in coupon because the index component is not a credit spread.
     pub spread_bps: Option<f64>,
-    /// Reference index for floating rate (e.g., "SOFR-3M", "LIBOR-3M")
+    /// Reference index identifier for floating-rate assets, such as SOFR-3M.
     pub index_id: Option<String>,
-    /// Maturity date
+    /// Contractual maturity date of the asset.
     #[schemars(with = "String")]
     pub maturity: Date,
-    /// Credit quality
+    /// Optional credit-quality classification of the obligor or asset.
     pub credit_quality: Option<CreditRating>,
-    /// Industry classification
+    /// Optional industry classification used by concentration checks.
     pub industry: Option<String>,
-    /// Obligor/borrower identifier
+    /// Optional obligor identifier used for single-name concentration limits.
     pub obligor_id: Option<String>,
-    /// Default status
+    /// Whether the asset is currently treated as defaulted by the pool model.
     pub is_defaulted: bool,
-    /// Recovery amount (if defaulted)
+    /// Realized or modeled recovery amount when the asset is defaulted.
     pub recovery_amount: Option<Money>,
-    /// Purchase price (for trading gain/loss)
+    /// Acquisition price in the asset currency, used for trading gain/loss.
     pub purchase_price: Option<Money>,
-    /// Acquisition date
+    /// Date on which the pool acquired the asset, if known.
     #[schemars(with = "Option<String>")]
     pub acquisition_date: Option<Date>,
-    /// Day count convention for interest calculation
+    /// Day-count convention used for coupon and accrual calculations.
     pub day_count: DayCount,
-    /// Optional override for Single Monthly Mortality (SMM)
+    /// Optional decimal Single Monthly Mortality override.
     #[serde(default)]
     pub smm_override: Option<f64>,
-    /// Optional override for Monthly Default Rate (MDR)
+    /// Optional decimal Monthly Default Rate override.
     #[serde(default)]
     pub mdr_override: Option<f64>,
     /// Contractual periodic payment for level-pay assets. Required for exact
@@ -843,6 +847,13 @@ impl AssetPool {
 ///
 /// This function computes all pool statistics on-demand without caching.
 /// This ensures statistics are always up-to-date and eliminates cache invalidation bugs.
+///
+/// # Arguments
+///
+/// * `pool` - Asset pool whose active/defaulted balances, obligors, industries,
+///   coupons, and collateral attributes are summarized.
+/// * `as_of` - Reporting date used to classify asset state and calculate
+///   date-dependent pool measures.
 pub fn calculate_pool_stats(pool: &AssetPool, as_of: Date) -> PoolStats {
     // Count unique obligors and industries
     let mut obligors = finstack_quant_core::HashSet::default();

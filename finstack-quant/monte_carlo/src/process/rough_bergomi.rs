@@ -201,9 +201,20 @@ impl RoughBergomiProcess {
         Self { params }
     }
 
-    /// Create with inline parameter construction.
+    /// Create an rBergomi process from annualized market and rough-volatility inputs.
     ///
-    /// Delegates to [`RoughBergomiParams::new`] for validation.
+    /// `r` and `q` are continuously compounded annual rates, `xi` supplies the
+    /// initial forward variance (not volatility), and `eta` scales the
+    /// log-variance driver. `hurst` and `rho` control the Volterra roughness and
+    /// spot-vol correlation. Simulate this process only with
+    /// `RoughBergomiEuler`, which supplies the required fractional noise.
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`RoughBergomiParams::new`] validation for non-finite rates,
+    /// non-positive or non-finite `eta`, and non-finite correlations outside
+    /// `[-1, 1]`. A non-rough Hurst exponent is accepted but logged as a model
+    /// suitability warning.
     pub fn with_params(
         r: f64,
         q: f64,

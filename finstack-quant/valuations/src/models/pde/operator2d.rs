@@ -208,6 +208,14 @@ fn compute_cross_derivative(problem: &dyn PdeProblem2D, grid: &Grid2D, t: f64) -
 ///
 /// Returns a flat vector of length `nx_int * ny_int` containing
 /// `a_xy / (4 hx hy) * [u(i+1,j+1) - u(i+1,j-1) - u(i-1,j+1) + u(i-1,j-1)]`.
+///
+/// # Arguments
+///
+/// * `cross_coeffs` - Row-major interior cross-derivative coefficients with
+///   length `nx_int * ny_int`.
+/// * `u_full` - Row-major full-grid solution including boundaries, with length
+///   `grid.total()`.
+/// * `grid` - Two-dimensional grid defining full and interior dimensions.
 pub fn apply_cross_derivative(cross_coeffs: &[f64], u_full: &[f64], grid: &Grid2D) -> Vec<f64> {
     let mut result = vec![0.0; grid.nx_interior() * grid.ny_interior()];
     apply_cross_derivative_into(&mut result, cross_coeffs, u_full, grid);
@@ -220,6 +228,16 @@ pub fn apply_cross_derivative(cross_coeffs: &[f64], u_full: &[f64], grid: &Grid2
 /// The Modified Craig-Sneyd ADI stepper applies the cross-derivative operator
 /// twice per timestep; reusing a caller-owned scratch buffer here removes two
 /// full interior-grid allocations from every step of the time march.
+///
+/// # Arguments
+///
+/// * `out` - Mutable row-major interior buffer of length `nx_int * ny_int`
+///   overwritten with the cross-derivative result.
+/// * `cross_coeffs` - Row-major interior cross-derivative coefficients with
+///   the same required length as `out`.
+/// * `u_full` - Row-major full-grid solution including boundaries, with length
+///   `grid.total()`.
+/// * `grid` - Two-dimensional grid defining full and interior dimensions.
 pub fn apply_cross_derivative_into(
     out: &mut [f64],
     cross_coeffs: &[f64],

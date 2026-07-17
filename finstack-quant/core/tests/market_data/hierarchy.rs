@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use finstack_quant_core::market_data::hierarchy::{
     HierarchyNode, HierarchyTarget, MarketDataHierarchy, ResolutionMode, TagFilter, TagPredicate,
 };

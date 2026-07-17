@@ -1,3 +1,4 @@
+// Shared test helper fragment for attribution modules and integration tests.
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;

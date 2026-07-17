@@ -4,6 +4,22 @@
 //! (conditions, ordering, finiteness) without encoding market-specific defaults.
 
 /// Require a condition to be true, otherwise return a validation error.
+///
+/// This is a concise guard for structural or domain invariants. `message` is
+/// converted only when `condition` is false; use [`require_with`] when forming
+/// that message itself is expensive.
+///
+/// # Arguments
+///
+/// * `condition` - Invariant or validation predicate that must evaluate to
+///   `true` for success.
+/// * `message` - Error text converted to an owned string only when `condition`
+///   is false.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] containing `message` when `condition`
+/// is false.
 #[inline]
 pub fn require(condition: bool, message: impl Into<String>) -> crate::Result<()> {
     if condition {
@@ -14,6 +30,21 @@ pub fn require(condition: bool, message: impl Into<String>) -> crate::Result<()>
 }
 
 /// Require a condition to be true, otherwise return the provided error.
+///
+/// Use this when a caller needs to preserve a domain-specific error variant
+/// rather than collapse a failed predicate into `Error::Validation`.
+///
+/// # Arguments
+///
+/// * `condition` - Invariant or validation predicate that must evaluate to
+///   `true` for success.
+/// * `err` - Domain-specific error converted and returned when `condition` is
+///   false.
+///
+/// # Errors
+///
+/// Returns `err.into()` when `condition` is false, preserving the supplied
+/// error's category and diagnostic information.
 #[inline]
 pub fn require_or(condition: bool, err: impl Into<crate::Error>) -> crate::Result<()> {
     if condition {
@@ -24,6 +55,21 @@ pub fn require_or(condition: bool, err: impl Into<crate::Error>) -> crate::Resul
 }
 
 /// Require a condition to be true, lazily constructing the error message.
+///
+/// The closure is never invoked when the condition holds, making this helper
+/// appropriate when an error message needs formatting or data collection.
+///
+/// # Arguments
+///
+/// * `condition` - Invariant or validation predicate that must evaluate to
+///   `true` for success.
+/// * `message` - Closure that lazily constructs validation text only when
+///   `condition` is false.
+///
+/// # Errors
+///
+/// Invokes `message` and returns [`crate::Error::Validation`] with its result
+/// when `condition` is false. If `message` panics, that panic propagates.
 #[inline]
 pub fn require_with(condition: bool, message: impl FnOnce() -> String) -> crate::Result<()> {
     if condition {

@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 // Common test fixtures and helpers for convertible bond testing.
 //
 // Provides standardized market contexts, bond configurations, and utility
@@ -158,5 +160,4 @@ pub fn create_convertible_with_policy(policy: ConversionPolicy) -> ConvertibleBo
 
 /// Relaxed relative tolerance for convergence tests (5%)
 pub const CONVERGENCE_TOLERANCE_PCT: f64 = 0.05;
-
 

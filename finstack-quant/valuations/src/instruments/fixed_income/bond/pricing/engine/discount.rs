@@ -1,3 +1,5 @@
+//! Pricing-engine components for fixed-income bonds.
+//!
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::explain::{ExplainOpts, ExplanationTrace, TraceEntry};
 use finstack_quant_core::market_data::context::MarketContext;

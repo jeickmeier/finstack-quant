@@ -715,7 +715,20 @@ impl CovenantEngine {
         }
     }
 
-    /// Validate engine configuration before evaluation or JSON canonicalization.
+    /// Validate the engine configuration before evaluation or JSON canonicalization.
+    ///
+    /// This checks every top-level and window-specific specification, verifies
+    /// that testing windows are ordered, non-overlapping, and unique, and
+    /// checks waiver date ranges and amended thresholds. It does not query
+    /// metrics or evaluate a covenant; call this when accepting a package from
+    /// a user, a file, or a binding before relying on its state.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when a contained specification is invalid, a
+    /// window starts after it ends, two windows overlap or duplicate one
+    /// another, a waiver expires before it takes effect, or an amended waiver
+    /// threshold is non-finite.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         for spec in &self.specs {
             spec.validate()?;
@@ -814,10 +827,25 @@ impl CovenantEngine {
         self
     }
 
-    /// Evaluate all covenants against current metrics (both maintenance and incurrence).
+    /// Evaluate every applicable covenant against current metrics.
     ///
-    /// Use [`evaluate_for_trigger`](Self::evaluate_for_trigger) to test only
-    /// covenants matching a specific scope.
+    /// This evaluates both maintenance and incurrence specifications. Use
+    /// [`evaluate_for_trigger`](Self::evaluate_for_trigger) when an event type
+    /// matters, so incurrence covenants are not accidentally tested as routine
+    /// maintenance tests. At `test_date`, a matching covenant window replaces
+    /// the engine's top-level specification set. Results are keyed by stable
+    /// covenant instance key, preserving separate labels for same-type tests.
+    ///
+    /// Inactive covenants, unmet springing conditions, and full waivers produce
+    /// passing reports with explanatory details. An amended waiver instead
+    /// changes the threshold used by the applicable evaluation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the engine configuration is invalid, applicable
+    /// specifications have duplicate instance keys, the metric source cannot
+    /// provide a required input, a custom metric or custom evaluator fails, or
+    /// a covenant cannot compute its test value from the supplied metrics.
     pub fn evaluate(
         &self,
         context: &mut dyn CovenantMetricSource,
@@ -932,12 +960,20 @@ impl CovenantEngine {
         Ok(reports)
     }
 
-    /// Evaluate only covenants matching the given trigger scope.
+    /// Evaluate applicable covenants that match one event trigger scope.
     ///
     /// `Maintenance` triggers test covenants with [`CovenantScope::Maintenance`].
     /// `Incurrence` triggers test covenants with [`CovenantScope::Incurrence`].
     /// This avoids the common error of testing incurrence covenants on a
-    /// periodic schedule when they should only fire on specific actions.
+    /// periodic schedule when they should only fire on specific actions. A
+    /// matching test window still replaces the top-level specification set, and
+    /// reports retain their stable covenant instance keys.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same configuration, duplicate-instance-key, metric-source,
+    /// custom-evaluator, and calculation errors as [`evaluate`](Self::evaluate)
+    /// for the filtered set of covenants.
     pub fn evaluate_for_trigger(
         &self,
         context: &mut dyn CovenantMetricSource,
@@ -959,11 +995,22 @@ impl CovenantEngine {
         self.evaluate_specs(&filtered, context, test_date)
     }
 
-    /// Evaluate covenants and automatically record breaches in history.
+    /// Evaluate covenants and update the engine's breach history.
     ///
     /// Combines [`evaluate`](Self::evaluate) with breach tracking: any failing
     /// covenant that doesn't already have an active (uncured) breach record
-    /// gets a new [`CovenantBreach`] entry in `breach_history`.
+    /// gets a new [`CovenantBreach`] entry in `breach_history`. A later passing
+    /// report cures the newest active breach only when its cure deadline has
+    /// not elapsed. Repeated failures for the same still-active breach do not
+    /// create duplicate records. This method does not apply consequences; pass
+    /// the tracked breaches to [`apply_consequences`](Self::apply_consequences)
+    /// after their cure periods have elapsed.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`evaluate`](Self::evaluate). On error, no
+    /// breach-history update occurs because evaluation completes before the
+    /// mutation phase begins.
     pub fn evaluate_and_track(
         &mut self,
         context: &mut dyn CovenantMetricSource,
@@ -1048,10 +1095,26 @@ impl CovenantEngine {
         Ok(reports)
     }
 
-    /// Apply consequences for breached covenants.
+    /// Apply eligible consequences for the supplied breach records.
     ///
     /// Consequences that have already been applied (recorded in `breach_history`)
-    /// are skipped to prevent double-application.
+    /// are skipped to prevent double-application. Cured breaches and breaches
+    /// still inside their cure period are also skipped. Each successful
+    /// application is returned and recorded against the matching historical
+    /// breach, making repeated calls idempotent for that breach date and
+    /// covenant instance.
+    ///
+    /// `breaches` should normally be drawn from [`breach_history`](Self::breach_history)
+    /// after [`evaluate_and_track`](Self::evaluate_and_track). A supplied
+    /// breach must identify an existing specification by its instance key.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::InputError::NotFound`] if an eligible
+    /// breach has no matching covenant specification. It also propagates errors
+    /// from the [`InstrumentMutator`] while applying a configured consequence;
+    /// callers should treat a returned error as a potentially partial mutation
+    /// and reconcile the instrument before retrying.
     pub fn apply_consequences<T>(
         &mut self,
         instrument: &mut T,

@@ -139,8 +139,10 @@ def credit_tearsheet(
         Per-instrument rows (``instrument``/``dscr``/``interest_coverage``/``ltv``).
     covenants : list[dict], optional
         Covenant rows (``covenant``/``threshold``/``current``/``headroom``/``status``).
-    title, subtitle : str, optional
-        Header text; defaults derive from the assessment.
+    title : str, optional
+        Optional main report heading; defaults derive from the assessment.
+    subtitle : str, optional
+        Optional secondary heading shown below ``title``.
     sections : list[str], optional
         Subset of :data:`ALL_SECTIONS` (default: all).
     theme : Theme

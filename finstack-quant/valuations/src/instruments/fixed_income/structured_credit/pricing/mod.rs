@@ -28,6 +28,15 @@ use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
 
 /// Run full deterministic cashflow simulation for a structured credit instrument.
+///
+/// # Arguments
+///
+/// * `instrument` - Validated structured-credit deal containing asset pool,
+///   tranche structure, waterfall, and deterministic credit/prepayment model.
+/// * `context` - Market context used for rate resets, discounting, and other
+///   projection dependencies.
+/// * `as_of` - Requested valuation date; lifecycle policy may resolve an
+///   effective date from the market context.
 pub fn run_simulation(
     instrument: &StructuredCredit,
     context: &MarketContext,
@@ -41,6 +50,14 @@ pub fn run_simulation(
 }
 
 /// Generate aggregated deterministic cashflows for all tranches.
+///
+/// # Arguments
+///
+/// * `instrument` - Validated structured-credit deal to project through its
+///   deterministic pool and waterfall model.
+/// * `context` - Market context used for rate resets and projection inputs.
+/// * `as_of` - Requested valuation date used to select known versus projected
+///   cashflows.
 pub fn generate_cashflows(
     instrument: &StructuredCredit,
     context: &MarketContext,
@@ -51,6 +68,15 @@ pub fn generate_cashflows(
 }
 
 /// Generate deterministic cashflows for a specific tranche.
+///
+/// # Arguments
+///
+/// * `instrument` - Validated structured-credit deal to project through its
+///   deterministic pool and waterfall model.
+/// * `tranche_id` - Identifier of the requested tranche within `instrument`.
+/// * `context` - Market context used for rate resets and projection inputs.
+/// * `as_of` - Requested valuation date used to select known versus projected
+///   cashflows.
 pub fn generate_tranche_cashflows(
     instrument: &StructuredCredit,
     tranche_id: &str,

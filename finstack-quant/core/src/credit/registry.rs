@@ -276,7 +276,20 @@ impl CreditAssumptionRegistry {
     }
 }
 
-/// Returns the embedded credit assumptions registry.
+/// Load the embedded versioned registry of credit assumptions.
+///
+/// The registry supplies the library defaults for WARF tables, recovery
+/// calibrations, PD master scales, downturn/workout LGD presets, and market
+/// recovery. It is parsed and validated lazily, then cached for subsequent
+/// callers; consumers should select an explicit named entry when a governing
+/// policy requires a methodology other than the embedded default.
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] if the bundled JSON cannot be parsed or fails
+/// its schema/version, identifier uniqueness, default-reference, probability,
+/// recovery, or calibration validation. An error represents a package defect,
+/// not missing market data that can safely be projected at runtime.
 pub fn embedded_registry() -> Result<&'static CreditAssumptionRegistry> {
     EMBEDDED_REGISTRY.load(validate_registry)
 }
@@ -286,7 +299,16 @@ pub fn embedded_registry() -> Result<&'static CreditAssumptionRegistry> {
 /// Returns `Err` if the embedded credit-assumptions JSON fails to parse or
 /// validate. This is the preferred entry point for fallible call sites and
 /// for any new code; existing infallible builders use
-/// `default_market_recovery_rate_or_panic`.
+/// `default_market_recovery_rate_or_panic`. The value is a unit-interval
+/// recovery assumption (for example, `0.40` means 40% recovery), not LGD; a
+/// caller calculates LGD as `1 - recovery` only when that is the relevant
+/// modeling convention.
+///
+/// # Errors
+///
+/// Propagates registry-loading and validation errors from
+/// [`embedded_registry`]. A successful result is guaranteed finite and inside
+/// `[0, 1]` by registry validation.
 pub fn default_market_recovery_rate() -> Result<f64> {
     Ok(embedded_registry()?.default_market_recovery_rate())
 }
@@ -314,7 +336,25 @@ pub(crate) fn default_market_recovery_rate_or_panic() -> f64 {
         .default_market_recovery_rate()
 }
 
-/// Loads a credit assumptions registry from configuration or falls back to the embedded registry.
+/// Load a credit-assumptions registry from configuration or the embedded fallback.
+///
+/// A value under [`CREDIT_ASSUMPTIONS_EXTENSION_KEY`] replaces every embedded
+/// default after strict registry validation. Without that extension, this
+/// returns a clone of the cached embedded registry, so callers can own their
+/// selected assumptions without mutating global state.
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] if a configured extension exists but is
+/// malformed or violates schema, ID, default-reference, probability, or
+/// recovery/calibration invariants. Invalid configured data does not silently
+/// fall back to the embedded registry, because that would conceal a material
+/// credit-model configuration error.
+///
+/// # Arguments
+///
+/// * `config` - Library configuration that may contain a validated credit
+///   assumption-registry extension; otherwise the embedded registry is cloned.
 pub fn registry_from_config(config: &FinstackConfig) -> Result<CreditAssumptionRegistry> {
     EMBEDDED_REGISTRY.load_from_config(config, validate_registry)
 }

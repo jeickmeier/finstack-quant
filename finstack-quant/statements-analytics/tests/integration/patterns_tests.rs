@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::prelude::*;
 use finstack_quant_statements_analytics::templates::{TemplatesExtension, VintageExtension};

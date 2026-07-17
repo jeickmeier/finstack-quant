@@ -1,3 +1,5 @@
+//! Pricing-engine components for fixed-income bonds.
+//!
 use super::super::super::super::types::Bond;
 use super::bond_valuator::BondValuator;
 use super::config::{TreeModelChoice, TreePricerConfig};
@@ -797,10 +799,14 @@ fn validate_bdt_calibration_quality(quality: Option<&CalibrationResult>) -> Resu
 ///
 /// # Arguments
 ///
-/// * `bond` - The bond to calculate OAS for
-/// * `market_context` - Market context with curves
-/// * `as_of` - Valuation date
-/// * `clean_price` - Market clean price as percentage of par
+/// * `bond` - Bond whose embedded optionality and contractual cashflows are
+///   valued on the calibrated interest-rate tree.
+/// * `market_context` - Market context supplying discounting inputs and
+///   calibration data required by the tree pricer.
+/// * `as_of` - Valuation date used as the tree and settlement cutoff; only
+///   remaining cashflows contribute to the OAS solve.
+/// * `clean_price` - Observed clean market price as a percentage of par, used
+///   as the target price for the option-adjusted-spread solve.
 ///
 /// # Returns
 ///

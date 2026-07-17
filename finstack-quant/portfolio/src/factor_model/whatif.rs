@@ -1,3 +1,5 @@
+//! Portfolio-level factor assignment, decomposition, and what-if analysis.
+//!
 use super::model::FactorModel;
 use super::RiskDecomposition;
 use crate::error::{Error, Result};
@@ -99,7 +101,20 @@ impl<'a> WhatIfEngine<'a> {
         }
     }
 
-    /// Reallocate existing sensitivity rows to simulate remove/resize scenarios.
+    /// Reallocate existing sensitivity rows to simulate remove or resize scenarios.
+    ///
+    /// A removal zeroes that position's sensitivity row; a resize scales it in
+    /// proportion to the original nonzero quantity. The method then recomputes
+    /// risk decomposition and credit residual risk. Adding a new position is
+    /// intentionally unsupported because it requires repricing fresh
+    /// sensitivities rather than reallocating existing rows.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an unsupported add, unknown position, non-finite
+    /// replacement quantity, or an attempt to proportionally resize a zero
+    /// quantity. Propagates decomposition, portfolio-update, and credit-risk
+    /// calculation errors.
     pub fn position_what_if(&self, changes: &[PositionChange]) -> Result<WhatIfResult> {
         let mut sensitivities = self.base_sensitivities.clone();
         let mut scenario_positions = self.portfolio.positions().to_vec();
@@ -188,6 +203,16 @@ impl<'a> WhatIfEngine<'a> {
     }
 
     /// Shock factors, reprice positions, and recompute the stressed decomposition.
+    ///
+    /// Returns each position's stressed-minus-base PV and a portfolio total in
+    /// the portfolio base currency. The helper does not apply an FX conversion
+    /// policy: every position must already price in that base currency.
+    ///
+    /// # Errors
+    ///
+    /// Propagates invalid factor shocks, market-stress construction, pricing,
+    /// and decomposition errors. Returns validation errors for non-finite PVs
+    /// or a position whose pricing currency differs from the portfolio base.
     pub fn factor_stress(&self, stresses: &[(FactorId, f64)]) -> Result<StressResult> {
         let stressed_market =
             self.model

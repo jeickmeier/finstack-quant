@@ -1089,6 +1089,14 @@ pub enum Thirty360Convention {
 /// // ISDA 2006 §4.16(f): D1 31 → 30, then D2 31 → 30.
 /// assert_eq!(days_30_360(start, end, Thirty360Convention::Isda), 60);
 /// ```
+///
+/// # Arguments
+///
+/// * `start` - Inclusive accrual-period start date.
+/// * `end` - Exclusive accrual-period end date. Earlier values produce a
+///   negative count rather than an error.
+/// * `convention` - 30/360 variant that determines February and month-end
+///   adjustments.
 #[inline]
 pub fn days_30_360(start: Date, end: Date, convention: Thirty360Convention) -> i32 {
     let (y1, m1, d1) = (start.year(), start.month() as i32, start.day() as i32);
@@ -1184,6 +1192,14 @@ fn is_last_day_of_month(date: Date) -> bool {
 /// # References
 ///
 /// - ISDA (2006). "2006 ISDA Definitions." Section 4.16(h).
+///
+/// # Arguments
+///
+/// * `start` - Inclusive accrual-period start date.
+/// * `end` - Exclusive accrual-period end date. Earlier values produce a
+///   negative count rather than an error.
+/// * `end_is_termination_date` - Whether `end` is the instrument's final
+///   maturity date, which preserves a February month-end under the ISDA rule.
 #[inline]
 pub fn days_30e_360_isda(start: Date, end: Date, end_is_termination_date: bool) -> i32 {
     let (y1, m1, d1) = (start.year(), start.month() as i32, start.day() as i32);

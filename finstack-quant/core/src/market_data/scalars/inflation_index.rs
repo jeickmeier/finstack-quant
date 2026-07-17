@@ -294,6 +294,17 @@ impl InflationIndex {
     /// - `id`: stable identifier, e.g. `"US-CPI-U"`
     /// - `observations`: `(Date, value)` pairs in chronological order
     /// - `currency`: reporting currency
+    ///
+    /// Observations are normalized and validated by [`ScalarTimeSeries`]; the
+    /// default lookup convention is step interpolation with no publication lag
+    /// and no seasonality. Configure the returned index explicitly for the
+    /// legal indexation convention of the instrument being priced.
+    ///
+    /// # Errors
+    ///
+    /// Returns an input error if `observations` is empty or cannot form a valid
+    /// scalar time series, including duplicate observation dates or invalid
+    /// values rejected by the underlying storage.
     pub fn new(
         id: impl Into<String>,
         observations: Vec<(Date, f64)>,
@@ -339,13 +350,38 @@ impl InflationIndex {
         self
     }
 
-    /// Add seasonal adjustment factors (one per calendar month).
+    /// Add multiplicative seasonal adjustment factors, indexed January through December.
+    ///
+    /// Each lookup multiplies its lag-adjusted, interpolated base index by the
+    /// factor for the effective date's calendar month. Factors are stored as
+    /// supplied; use `1.0` for a month with no adjustment and ensure they are
+    /// economically appropriate for the source series.
+    ///
+    /// # Errors
+    ///
+    /// This method currently returns `Ok` for every `[f64; 12]` input and does
+    /// not independently reject non-finite or negative factors. Callers that
+    /// ingest seasonality externally should validate its data-quality policy
+    /// before construction.
     pub fn with_seasonality(mut self, factors: [f64; 12]) -> Result<Self> {
         self.seasonality = Some(factors);
         Ok(self)
     }
 
-    /// Get the index value on a given date with interpolation and adjustments.
+    /// Get the index value on a settlement/reference date with all active conventions.
+    ///
+    /// This first applies the configured publication lag, then evaluates the
+    /// configured step or linear interpolation, and finally applies the
+    /// effective month's seasonal factor. The date passed here is the contract
+    /// date, not a pre-lagged observation date.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if applying a day lag underflows the supported date
+    /// range, or if the lag-adjusted date cannot be evaluated from the time
+    /// series under its interpolation contract (for example, it is outside the
+    /// available observations). Seasonal multiplication itself does not add
+    /// validation errors.
     pub fn value_on(&self, date: Date) -> Result<f64> {
         // Apply lag to get the effective date
         let effective_date = self.apply_lag(date)?;
@@ -395,6 +431,18 @@ impl InflationIndex {
     }
 
     /// Calculate the index ratio `I(settle_date) / I(base_date)`.
+    ///
+    /// Both values use this index's lag, interpolation, and seasonality
+    /// conventions. The result is dimensionless and is the standard indexation
+    /// factor for inflation-linked principal, coupon, and zero-coupon swap
+    /// calculations; it is not annualized inflation.
+    ///
+    /// # Errors
+    ///
+    /// Propagates lookup errors from either date and returns an input error if
+    /// the lag-adjusted base index is exactly zero, since the ratio would be
+    /// undefined. Negative base values are not rejected here, though they are
+    /// generally not economically meaningful for CPI/RPI series.
     pub fn ratio(&self, base_date: Date, settle_date: Date) -> Result<f64> {
         let base_value = self.value_on(base_date)?;
         let settle_value = self.value_on(settle_date)?;
@@ -406,7 +454,16 @@ impl InflationIndex {
         Ok(settle_value / base_value)
     }
 
-    /// Get the date range covered by observations
+    /// Get the inclusive date range covered by stored observations.
+    ///
+    /// The range describes raw observation coverage, not the later dates that
+    /// may be queried after applying a lag or interpolation convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns an internal error only if the invariant established by
+    /// [`new`](Self::new) is violated and the underlying series is empty. A
+    /// normally constructed index always has at least one observation.
     pub fn date_range(&self) -> Result<(Date, Date)> {
         let observations = self.series.observations();
 
@@ -607,7 +664,20 @@ impl InflationIndexBuilder {
         self
     }
 
-    /// Build the inflation index.
+    /// Build the inflation index with the configured conventions.
+    ///
+    /// This is equivalent to constructing with [`InflationIndex::new`] and then
+    /// applying the configured interpolation, lag, and optional seasonality.
+    /// Observation order may be arbitrary because the underlying time-series
+    /// constructor normalizes it; the returned index retains the chosen
+    /// currency tag for market-context and instrument compatibility.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same time-series construction errors as
+    /// [`InflationIndex::new`]. Seasonal factors are accepted as supplied, so
+    /// validation of their finiteness and economic appropriateness remains the
+    /// caller's responsibility.
     pub fn build(self) -> Result<InflationIndex> {
         let mut index = InflationIndex::new(self.id, self.observations, self.currency)?
             .with_interpolation(self.interpolation)

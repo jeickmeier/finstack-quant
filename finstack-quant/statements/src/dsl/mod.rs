@@ -90,6 +90,14 @@ pub use parser::parse_formula;
 /// # Ok(())
 /// # }
 /// ```
+///
+/// # Errors
+///
+/// Returns a formula-parse error if `formula` is not one complete valid DSL
+/// expression, or a compilation error if the parsed AST contains an unsupported
+/// capital-structure component or invalid function/operator form. It performs
+/// no model-specific reference or dimension validation; those require the
+/// model's node set and value types.
 pub fn parse_and_compile(formula: &str) -> crate::error::Result<finstack_quant_core::expr::Expr> {
     let ast = parse_formula(formula)?;
     compile(&ast)

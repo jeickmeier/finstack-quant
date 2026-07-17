@@ -271,9 +271,20 @@ impl CheyetteRoughVolProcess {
         Self { params }
     }
 
-    /// Create with inline parameter construction.
+    /// Create a Cheyette rough-volatility process from market inputs.
     ///
-    /// Delegates to [`CheyetteRoughVolParams::new`] for validation.
+    /// `kappa` is the annual short-rate mean-reversion speed, `sigma_base` is
+    /// the deterministic annualized base-volatility term structure, and
+    /// `phi_points` defines the initial instantaneous-forward curve as
+    /// `(time_in_years, annual_rate)` knots. The rough-vol driver uses `hurst`,
+    /// `eta`, and the rate-vol correlation `rho`; use the dedicated
+    /// `CheyetteRoughEuler` discretization to evolve this non-Markovian model.
+    ///
+    /// # Errors
+    ///
+    /// Propagates validation from [`CheyetteRoughVolParams::new`], including
+    /// non-positive or non-finite `kappa`/`eta`, an invalid `rho`, and an empty,
+    /// non-finite, negative-time, or non-increasing forward curve.
     pub fn with_params(
         kappa: f64,
         sigma_base: ForwardVarianceCurve,

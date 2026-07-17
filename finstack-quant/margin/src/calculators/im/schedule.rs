@@ -23,7 +23,6 @@ use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
 
 /// Asset class for schedule-based IM calculation.
-#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ScheduleAssetClass {
     /// Interest rate derivatives

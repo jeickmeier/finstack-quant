@@ -14,6 +14,13 @@ use finstack_quant_core::Result;
 use rust_decimal::Decimal;
 
 /// Build a cross-currency swap instrument from an [`XccyQuote`].
+///
+/// # Arguments
+///
+/// * `quote` - Cross-currency basis-swap market quote supplying convention ID,
+///   maturity pillar, basis spread, and required FX spot input.
+/// * `ctx` - Build context with optional curve-ID overrides used to wire the
+///   domestic and foreign discounting and forwarding dependencies.
 pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dyn Instrument>> {
     tracing::debug!(quote_id = %quote.id(), "building XCCY instrument");
     let registry = ConventionRegistry::try_global()?;

@@ -137,6 +137,16 @@ pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<Car
 
 /// Calculate roll specialness (implied rate vs. repo rate).
 ///
+/// # Arguments
+///
+/// * `roll` - Dollar-roll contract whose front and back prices, settlement
+///   dates, coupon, and TBA pool assumptions determine implied financing.
+/// * `prepay_rate` - Monthly single-month mortality (SMM) assumption as a
+///   decimal. A positive value layers additional prepayment over the modelled
+///   pool projection when it is larger than the model's SMM.
+/// * `repo_rate` - Comparable annualized repo financing rate as a decimal on
+///   the same ACT/360 basis used for the roll's implied financing rate.
+///
 /// # Returns
 ///
 /// Roll specialness in basis points (positive = roll is special, i.e.
@@ -155,6 +165,19 @@ pub fn roll_specialness(roll: &DollarRoll, prepay_rate: f64, repo_rate: f64) -> 
 /// drop = coupon_income + paydown × (100 − back_price)/100
 ///        − target_rate × front_price × days/360
 /// ```
+///
+/// # Arguments
+///
+/// * `target_rate` - Desired annualized financing rate as a decimal on the
+///   ACT/360 convention used by dollar-roll carry.
+/// * `front_price` - Front-month TBA price in points per 100 of face.
+/// * `back_price` - Back-month TBA price in points per 100 of face.
+/// * `coupon_income` - Expected accrued coupon income over the roll period in
+///   points per 100 of face.
+/// * `principal_paydown` - Expected scheduled and prepaid principal received
+///   during the roll period in points per 100 of face.
+/// * `days` - Actual number of calendar days between front and back settlement
+///   dates, annualized on a 360-day basis.
 ///
 /// # Returns
 ///

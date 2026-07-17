@@ -87,7 +87,7 @@ pub trait CashflowScheduleSource: Send + Sync {
     /// Build the complete signed schedule before public lifecycle normalization.
     ///
     /// Implementations must preserve classification and attach the correct
-    /// [`CashflowRepresentation`] to schedule metadata. They must not perform
+    /// [`crate::builder::CashflowRepresentation`] to schedule metadata. They must not perform
     /// public date filtering, PIK omission, or final sorting.
     fn raw_cashflow_schedule(
         &self,

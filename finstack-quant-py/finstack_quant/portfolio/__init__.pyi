@@ -131,7 +131,14 @@ class Portfolio:
 
     @staticmethod
     def from_spec(spec_json: str) -> Portfolio:
-        """Parse a ``PortfolioSpec`` JSON string into a runtime portfolio."""
+        """Parse a ``PortfolioSpec`` JSON string into a runtime portfolio.
+
+        Parameters
+        ----------
+        spec_json : str
+            Portfolio specification JSON, including positions, base currency,
+            and as-of date, to validate and compile for reuse.
+        """
         ...
 
     @property
@@ -197,7 +204,14 @@ class PortfolioAttribution:
         ...
 
     def reconciliation_check(self, tolerance: float) -> dict[str, float | bool]:
-        """Reconcile aggregate factor P&L to total P&L."""
+        """Reconcile aggregate factor P&L to total P&L.
+
+        Parameters
+        ----------
+        tolerance : float
+            Absolute base-currency difference tolerated before reconciliation
+            is reported as failing.
+        """
         ...
 
     @property
@@ -239,7 +253,14 @@ class PortfolioValuation:
 
     @staticmethod
     def from_json(valuation_json: str) -> PortfolioValuation:
-        """Deserialize a ``PortfolioValuation`` from JSON."""
+        """Deserialize a ``PortfolioValuation`` from JSON.
+
+        Parameters
+        ----------
+        valuation_json : str
+            Canonical valuation payload returned by ``value_portfolio`` or an
+            equivalent serialized portfolio valuation.
+        """
         ...
 
     def to_json(self) -> str:
@@ -303,7 +324,14 @@ class PortfolioCashflows:
 
     @staticmethod
     def from_json(cashflows_json: str) -> PortfolioCashflows:
-        """Deserialize a cashflow ladder from JSON."""
+        """Deserialize a cashflow ladder from JSON.
+
+        Parameters
+        ----------
+        cashflows_json : str
+            Canonical classified-cashflow payload returned by the aggregation
+            API or an equivalent serialized ladder.
+        """
         ...
 
     def to_json(self) -> str:
@@ -364,6 +392,16 @@ class PortfolioCashflows:
 
         Uses **spot-equivalent** FX at each payment date. ``as_of`` is the
         valuation/run date used to flag far-future conversions.
+
+        Parameters
+        ----------
+        market : MarketContext or str
+            Market context object or JSON providing FX data for payment-date
+            base-currency conversion.
+        base_ccy : str
+            ISO currency code into which each classified cashflow is converted.
+        as_of : str
+            ISO-8601 valuation date used for conversion diagnostics and limits.
         """
         ...
 
@@ -392,7 +430,13 @@ class PortfolioResult:
 
     @staticmethod
     def from_json(result_json: str) -> PortfolioResult:
-        """Deserialize a portfolio result envelope from JSON."""
+        """Deserialize a portfolio result envelope from JSON.
+
+        Parameters
+        ----------
+        result_json : str
+            Canonical portfolio-result JSON containing total value and metrics.
+        """
         ...
 
     def to_json(self) -> str:
@@ -413,11 +457,23 @@ class PortfolioResult:
         ...
 
     def get_metric(self, metric_id: str) -> float | None:
-        """Return a metric value, or ``None`` when it is absent."""
+        """Return a metric value, or ``None`` when it is absent.
+
+        Parameters
+        ----------
+        metric_id : str
+            Fully qualified metric key, such as ``"pv01::usd_ois"``.
+        """
         ...
 
     def require_metric(self, metric_id: str) -> float:
-        """Return a metric value, raising ``KeyError`` when it is absent."""
+        """Return a metric value, raising ``KeyError`` when it is absent.
+
+        Parameters
+        ----------
+        metric_id : str
+            Fully qualified metric key that must be present in the result.
+        """
         ...
 
     def __repr__(self) -> str:
@@ -433,7 +489,13 @@ class PortfolioMetrics:
 
     @staticmethod
     def from_json(metrics_json: str) -> PortfolioMetrics:
-        """Deserialize canonical ``PortfolioMetrics`` JSON."""
+        """Deserialize canonical ``PortfolioMetrics`` JSON.
+
+        Parameters
+        ----------
+        metrics_json : str
+            Canonical metric payload returned by ``aggregate_metrics``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -449,13 +511,25 @@ class PortfolioMetrics:
         Entity mappings preserve Rust ``IndexMap`` insertion order. Malformed
         legacy escapes remain literal; decoded coordinate collisions use
         literal wire components so no aggregate entry is lost.
+
+        Parameters
+        ----------
+        base : str
+            Metric namespace prefix used to select matching metric series.
         """
         ...
 
     def __repr__(self) -> str: ...
 
 def parse_portfolio_spec(json_str: str) -> str:
-    """Parse and canonicalize a ``PortfolioSpec`` from JSON."""
+    """Parse and canonicalize a ``PortfolioSpec`` from JSON.
+
+    Parameters
+    ----------
+    json_str : str
+        Portfolio specification JSON to validate and normalize into canonical
+        Rust serialization.
+    """
     ...
 
 def build_portfolio_from_spec(spec_json: str) -> str:
@@ -463,6 +537,11 @@ def build_portfolio_from_spec(spec_json: str) -> str:
 
     Prefer :meth:`Portfolio.from_spec` for real work — it returns the typed
     object that pipeline functions reuse without rebuilding.
+
+    Parameters
+    ----------
+    spec_json : str
+        Portfolio specification JSON to validate, compile, and serialize back.
     """
     ...
 
@@ -471,6 +550,11 @@ def portfolio_result_total_value(result: PortfolioResult | str) -> float:
 
     Accepts a typed :class:`PortfolioResult` (O(1)) or a JSON string
     (O(size-of-envelope)).
+
+    Parameters
+    ----------
+    result : PortfolioResult or str
+        Typed result envelope or canonical result JSON containing total value.
     """
     ...
 
@@ -478,6 +562,13 @@ def portfolio_result_get_metric(result: PortfolioResult | str, metric_id: str) -
     """Read one metric from a ``PortfolioResult``.
 
     Accepts a typed :class:`PortfolioResult` or a JSON string.
+
+    Parameters
+    ----------
+    result : PortfolioResult or str
+        Typed result envelope or canonical JSON containing portfolio metrics.
+    metric_id : str
+        Fully qualified metric key, such as ``"cs01::BOND_A"``.
     """
     ...
 
@@ -490,6 +581,17 @@ def aggregate_metrics(
     """Aggregate portfolio metrics from a valuation.
 
     Accepts a typed :class:`PortfolioValuation` (fast path) or a JSON string.
+
+    Parameters
+    ----------
+    valuation : PortfolioValuation or str
+        Typed valuation or canonical valuation JSON to aggregate.
+    base_ccy : str
+        ISO base-currency code in which aggregate values and metrics are stated.
+    market : MarketContext or str
+        Market context object or JSON supplying conversion and market inputs.
+    as_of : str
+        ISO-8601 valuation date used to resolve date-dependent market data.
     """
     ...
 
@@ -505,6 +607,16 @@ def value_portfolio(
     string. Returns JSON for backwards compatibility — wrap with
     :meth:`PortfolioValuation.from_json` once to enable the fast downstream
     path into ``aggregate_metrics``.
+
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        Built portfolio or canonical ``PortfolioSpec`` JSON to value.
+    market : MarketContext or str
+        Market context object or JSON supplying curves, quotes, and FX data.
+    strict_risk : bool
+        Whether absent or failed risk calculations are treated as errors rather
+        than diagnostic output; defaults to ``False``.
     """
     ...
 
@@ -513,6 +625,13 @@ def aggregate_full_cashflows(portfolio: Portfolio | str, market: MarketContext |
 
     Returns a typed :class:`PortfolioCashflows` wrapper; call ``to_json()``
     to get the raw ladder or use the typed accessors to drill in.
+
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        Built portfolio or canonical ``PortfolioSpec`` JSON to expand.
+    market : MarketContext or str
+        Market context object or JSON needed for instrument cashflow generation.
     """
     ...
 
@@ -524,6 +643,15 @@ def apply_scenario_and_revalue(
     """Apply a scenario and revalue the portfolio.
 
     Returns ``(valuation_json, report_json)``.
+
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        Built portfolio or canonical ``PortfolioSpec`` JSON to revalue.
+    scenario_json : str
+        Canonical scenario specification JSON describing market-data shocks.
+    market : MarketContext or str
+        Base market context object or JSON to shock before revaluation.
     """
     ...
 
@@ -536,7 +664,25 @@ def attribute_portfolio_pnl(
     method: str | dict[str, Any],
     config: dict[str, Any] | str | None = None,
 ) -> PortfolioAttribution:
-    """Attribute portfolio P&L with Rust-owned aggregation and FX translation."""
+    """Attribute portfolio P&L with Rust-owned aggregation and FX translation.
+
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        Built portfolio or canonical ``PortfolioSpec`` JSON being attributed.
+    market_t0 : MarketContext or str
+        Opening market context object or JSON at the start of the P&L interval.
+    market_t1 : MarketContext or str
+        Closing market context object or JSON at the end of the P&L interval.
+    as_of_t0 : str
+        ISO-8601 opening valuation date associated with ``market_t0``.
+    as_of_t1 : str
+        ISO-8601 closing valuation date associated with ``market_t1``.
+    method : str or dict[str, Any]
+        Attribution-method name or method configuration understood by Rust.
+    config : dict[str, Any] or str or None
+        Optional attribution configuration mapping or canonical JSON payload.
+    """
     ...
 
 def allocate_weights(spec_json: str) -> str:
@@ -789,6 +935,12 @@ def roll_effective_spread(returns: list[float]) -> float | None:
 
     Returns ``None`` when there are too few observations or the first-order
     autocovariance does not imply a positive spread.
+
+    Parameters
+    ----------
+    returns : list[float]
+        Ordered simple decimal returns sampled at a consistent observation
+        frequency.
     """
     ...
 
@@ -839,7 +991,13 @@ def days_to_liquidate(
     ...
 
 def liquidity_tier(days_to_liquidate: float) -> str:
-    """Classify liquidation horizon into the Rust liquidity-tier labels."""
+    """Classify liquidation horizon into the Rust liquidity-tier labels.
+
+    Parameters
+    ----------
+    days_to_liquidate : float
+        Estimated trading-day horizon required to fully liquidate the position.
+    """
     ...
 
 def lvar_bangia(
@@ -911,6 +1069,13 @@ def kyle_lambda(volumes: list[float], returns: list[float]) -> float | None:
 
     Returns ``None`` when the aligned sample has too few valid observations or
     cannot support the regression-style estimate.
+
+    Parameters
+    ----------
+    volumes : list[float]
+        Ordered trading-volume observations in consistent notional or share units.
+    returns : list[float]
+        Ordered simple decimal returns aligned one-for-one with ``volumes``.
     """
     ...
 
@@ -1074,7 +1239,14 @@ class FactorContribution:
 
     @classmethod
     def from_json(cls, json_str: str) -> FactorContribution:
-        """Deserialize a factor contribution from JSON."""
+        """Deserialize a factor contribution from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized factor contribution, normally produced by
+            ``FactorContribution.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1134,7 +1306,14 @@ class PositionFactorContribution:
 
     @classmethod
     def from_json(cls, json_str: str) -> PositionFactorContribution:
-        """Deserialize a position-factor contribution from JSON."""
+        """Deserialize a position-factor contribution from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized position-factor contribution, normally
+            produced by ``PositionFactorContribution.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1185,7 +1364,14 @@ class PositionResidualContribution:
 
     @classmethod
     def from_json(cls, json_str: str) -> PositionResidualContribution:
-        """Deserialize a residual contribution from JSON."""
+        """Deserialize a residual contribution from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized residual contribution, normally produced by
+            ``PositionResidualContribution.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1245,7 +1431,14 @@ class RiskDecomposition:
 
     @classmethod
     def from_json(cls, json_str: str) -> RiskDecomposition:
-        """Deserialize a risk decomposition from JSON."""
+        """Deserialize a risk decomposition from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized factor-and-residual decomposition, normally
+            produced by ``RiskDecomposition.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1323,7 +1516,14 @@ class PositionVarContribution:
 
     @classmethod
     def from_json(cls, json_str: str) -> PositionVarContribution:
-        """Deserialize a position VaR contribution from JSON."""
+        """Deserialize a position VaR contribution from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized component and marginal VaR contribution,
+            normally produced by ``PositionVarContribution.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1392,7 +1592,14 @@ class PositionEsContribution:
 
     @classmethod
     def from_json(cls, json_str: str) -> PositionEsContribution:
-        """Deserialize a position ES contribution from JSON."""
+        """Deserialize a position ES contribution from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized component and marginal expected-shortfall
+            contribution, normally produced by ``PositionEsContribution.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1452,7 +1659,14 @@ class PositionRiskDecomposition:
 
     @classmethod
     def from_json(cls, json_str: str) -> PositionRiskDecomposition:
-        """Deserialize a position risk decomposition from JSON."""
+        """Deserialize a position risk decomposition from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized VaR/ES decomposition, normally produced by
+            ``PositionRiskDecomposition.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1548,7 +1762,14 @@ class PositionBudgetEntry:
 
     @classmethod
     def from_json(cls, json_str: str) -> PositionBudgetEntry:
-        """Deserialize a risk-budget entry from JSON."""
+        """Deserialize a risk-budget entry from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized per-position budget comparison, normally
+            produced by ``PositionBudgetEntry.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1617,7 +1838,14 @@ class RiskBudgetResult:
 
     @classmethod
     def from_json(cls, json_str: str) -> RiskBudgetResult:
-        """Deserialize a risk-budget result from JSON."""
+        """Deserialize a risk-budget result from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized portfolio risk-budget result, normally
+            produced by ``RiskBudgetResult.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1668,7 +1896,14 @@ class FactorContributionDelta:
 
     @classmethod
     def from_json(cls, json_str: str) -> FactorContributionDelta:
-        """Deserialize a factor contribution delta from JSON."""
+        """Deserialize a factor contribution delta from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized baseline-to-scenario factor delta, normally
+            produced by ``FactorContributionDelta.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1719,7 +1954,14 @@ class WhatIfResult:
 
     @classmethod
     def from_json(cls, json_str: str) -> WhatIfResult:
-        """Deserialize a what-if result from JSON."""
+        """Deserialize a what-if result from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized before-and-after risk result, normally
+            produced by ``WhatIfResult.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1770,7 +2012,14 @@ class StressResult:
 
     @classmethod
     def from_json(cls, json_str: str) -> StressResult:
-        """Deserialize a stress result from JSON."""
+        """Deserialize a stress result from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized stressed P&L and decomposition result, normally
+            produced by ``StressResult.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1821,7 +2070,14 @@ class StressPositionEntry:
 
     @classmethod
     def from_json(cls, json_str: str) -> StressPositionEntry:
-        """Deserialize a stress position entry from JSON."""
+        """Deserialize a stress position entry from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized per-position tail-stress contribution, normally
+            produced by ``StressPositionEntry.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1881,7 +2137,14 @@ class TailScenarioBreakdown:
 
     @classmethod
     def from_json(cls, json_str: str) -> TailScenarioBreakdown:
-        """Deserialize a tail scenario breakdown from JSON."""
+        """Deserialize a tail scenario breakdown from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized tail-scenario P&L breakdown, normally
+            produced by ``TailScenarioBreakdown.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -1934,7 +2197,14 @@ class StressAttribution:
 
     @classmethod
     def from_json(cls, json_str: str) -> StressAttribution:
-        """Deserialize stress attribution from JSON."""
+        """Deserialize stress attribution from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized tail-loss attribution, normally produced by
+            ``StressAttribution.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -2009,7 +2279,14 @@ class PositionAssignment:
 
     @classmethod
     def from_json(cls, json_str: str) -> PositionAssignment:
-        """Deserialize a position assignment from JSON."""
+        """Deserialize a position assignment from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized factor assignment for one position, normally
+            produced by ``PositionAssignment.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -2068,7 +2345,14 @@ class UnmatchedEntry:
 
     @classmethod
     def from_json(cls, json_str: str) -> UnmatchedEntry:
-        """Deserialize an unmatched dependency entry from JSON."""
+        """Deserialize an unmatched dependency entry from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized unmatched-factor diagnostic, normally produced
+            by ``UnmatchedEntry.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -2109,7 +2393,14 @@ class FactorAssignmentReport:
 
     @classmethod
     def from_json(cls, json_str: str) -> FactorAssignmentReport:
-        """Deserialize a factor assignment report from JSON."""
+        """Deserialize a factor assignment report from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized factor-model assignment report, normally
+            produced by ``FactorAssignmentReport.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -2311,17 +2602,37 @@ class VolHorizon:
 
     @classmethod
     def n_steps(cls, n: int) -> VolHorizon:
-        """Scale the forecast to ``n`` discrete steps."""
+        """Scale the forecast to a fixed number of discrete steps.
+
+        Parameters
+        ----------
+        n : int
+            Positive number of calibrated sampling periods to forecast ahead.
+        """
         ...
 
     @classmethod
     def years(cls, years: float) -> VolHorizon:
-        """Scale the forecast to a year fraction."""
+        """Scale the forecast to a year fraction.
+
+        Parameters
+        ----------
+        years : float
+            Positive forecast horizon in years, converted using the calibrated
+            model's observation frequency.
+        """
         ...
 
     @classmethod
     def parse(cls, s: str) -> VolHorizon:
-        """Parse a horizon string accepted by the Rust factor model."""
+        """Parse a horizon string accepted by the Rust factor model.
+
+        Parameters
+        ----------
+        s : str
+            Horizon expression such as ``"one_step"``, ``"unconditional"``,
+            a step count, or a year-based form accepted by the model.
+        """
         ...
 
     @property
@@ -2374,7 +2685,14 @@ class DecompositionConfig:
 
     @classmethod
     def historical(cls, confidence: float) -> DecompositionConfig:
-        """Historical decomposition config at ``confidence``."""
+        """Build a historical VaR decomposition configuration.
+
+        Parameters
+        ----------
+        confidence : float
+            VaR confidence as a decimal probability in ``(0, 1)``, such as
+            ``0.95`` for a 95% confidence level.
+        """
         ...
 
     def with_incremental(self) -> DecompositionConfig:
@@ -2386,7 +2704,13 @@ class DecompositionConfig:
         ...
 
     def with_seed(self, seed: int) -> DecompositionConfig:
-        """Return a copy with deterministic simulation/randomization seed."""
+        """Return a copy with a deterministic simulation seed.
+
+        Parameters
+        ----------
+        seed : int
+            Integer seed used to reproduce any randomized decomposition steps.
+        """
         ...
 
     @property
@@ -2440,7 +2764,22 @@ def parametric_var_decomposition_typed(
     confidence: float = 0.95,
     compute_incremental: bool = False,
 ) -> PositionRiskDecomposition:
-    """Typed sibling of :func:`parametric_var_decomposition`."""
+    """Return a typed parametric VaR decomposition.
+
+    Parameters
+    ----------
+    position_ids : list[str]
+        Position identifiers aligned with weights and covariance rows/columns.
+    weights : list[float]
+        Decimal portfolio weights aligned one-for-one with ``position_ids``.
+    covariance : list[list[float]]
+        Square covariance matrix aligned to ``position_ids`` in row and column
+        order, using returns at the selected risk horizon.
+    confidence : float
+        VaR confidence as a decimal probability; defaults to ``0.95``.
+    compute_incremental : bool
+        Whether to include incremental VaR estimates for each position.
+    """
     ...
 
 def historical_var_decomposition_typed(
@@ -2448,7 +2787,18 @@ def historical_var_decomposition_typed(
     position_pnls: list[list[float]],
     confidence: float = 0.95,
 ) -> PositionRiskDecomposition:
-    """Typed sibling of :func:`historical_var_decomposition`."""
+    """Return a typed historical VaR decomposition.
+
+    Parameters
+    ----------
+    position_ids : list[str]
+        Position identifiers aligned with the P&L matrix columns.
+    position_pnls : list[list[float]]
+        Scenario-major matrix of position P&Ls, with each row aligned to
+        ``position_ids``.
+    confidence : float
+        VaR confidence as a decimal probability; defaults to ``0.95``.
+    """
     ...
 
 def evaluate_risk_budget_typed(
@@ -2458,7 +2808,21 @@ def evaluate_risk_budget_typed(
     portfolio_var: float,
     utilization_threshold: float = 1.20,
 ) -> RiskBudgetResult:
-    """Typed sibling of :func:`evaluate_risk_budget`."""
+    """Return a typed comparison of actual and target risk budgets.
+
+    Parameters
+    ----------
+    position_ids : list[str]
+        Position identifiers aligned with all per-position risk vectors.
+    actual_var : list[float]
+        Actual component VaR amounts aligned with ``position_ids``.
+    target_var_pct : list[float]
+        Target decimal shares of total portfolio VaR for each position.
+    portfolio_var : float
+        Total portfolio VaR used to convert target shares into amounts.
+    utilization_threshold : float
+        Actual-to-target ratio that flags a budget breach; defaults to ``1.20``.
+    """
     ...
 
 def factor_stress(
@@ -2627,7 +2991,16 @@ def position_component_var(
     decomp: PositionRiskDecomposition,
     position_id: str,
 ) -> float:
-    """Look up a position's component VaR inside a decomposition (raises KeyError)."""
+    """Look up a position's component VaR inside a decomposition.
+
+    Parameters
+    ----------
+    decomp : PositionRiskDecomposition
+        Typed risk decomposition containing component VaR by position.
+    position_id : str
+        Position identifier whose component VaR is required; absent IDs raise
+        ``KeyError``.
+    """
     ...
 
 # ---------------------------------------------------------------------------
@@ -2814,12 +3187,25 @@ class PerPositionMetric:
 
     @classmethod
     def metric(cls, metric_id: str) -> PerPositionMetric:
-        """Use a valuation metric by metric ID."""
+        """Use a valuation metric by fully qualified metric ID.
+
+        Parameters
+        ----------
+        metric_id : str
+            Per-position metric key, such as ``"pv01::usd_ois"`` or
+            ``"cs01::BOND_A"``.
+        """
         ...
 
     @classmethod
     def custom_key(cls, key: str) -> PerPositionMetric:
-        """Use a custom per-position metric key."""
+        """Use a custom per-position metric key.
+
+        Parameters
+        ----------
+        key : str
+            Custom metric key emitted by the portfolio valuation pipeline.
+        """
         ...
 
     @classmethod
@@ -2834,7 +3220,14 @@ class PerPositionMetric:
 
     @classmethod
     def attribute(cls, key: str) -> PerPositionMetric:
-        """Use a position attribute as a metric source."""
+        """Use a position attribute as a metric source.
+
+        Parameters
+        ----------
+        key : str
+            Attribute name stored on positions, whose numeric values become the
+            metric for selected positions.
+        """
         ...
 
     @classmethod
@@ -2845,17 +3238,42 @@ class PerPositionMetric:
         text: str | None = None,
         number: float | None = None,
     ) -> PerPositionMetric:
-        """Use a boolean position-attribute comparison as an indicator metric."""
+        """Use a boolean position-attribute comparison as an indicator metric.
+
+        Parameters
+        ----------
+        key : str
+            Position attribute name to compare.
+        op : str
+            Comparison operator accepted by Rust, such as ``"eq"`` or ``"gt"``.
+        text : str or None
+            Optional string comparison value; supply when ``op`` compares text.
+        number : float or None
+            Optional numeric comparison value; supply when ``op`` compares numbers.
+        """
         ...
 
     @classmethod
     def constant(cls, value: float) -> PerPositionMetric:
-        """Use a constant metric value for every selected position."""
+        """Use a constant metric value for every selected position.
+
+        Parameters
+        ----------
+        value : float
+            Numeric metric value assigned identically to each selected position.
+        """
         ...
 
     @classmethod
     def from_json(cls, json_str: str) -> PerPositionMetric:
-        """Deserialize a per-position metric expression from JSON."""
+        """Deserialize a per-position metric expression from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized metric-source expression, normally produced by
+            ``PerPositionMetric.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -2893,7 +3311,13 @@ class PositionFilter:
 
     @classmethod
     def by_entity_id(cls, entity_id: str) -> PositionFilter:
-        """Select positions for one entity ID."""
+        """Select positions for one entity ID.
+
+        Parameters
+        ----------
+        entity_id : str
+            Entity identifier assigned to positions that should be selected.
+        """
         ...
 
     @classmethod
@@ -2904,32 +3328,75 @@ class PositionFilter:
         text: str | None = None,
         number: float | None = None,
     ) -> PositionFilter:
-        """Select positions by attribute comparison."""
+        """Select positions by attribute comparison.
+
+        Parameters
+        ----------
+        key : str
+            Position attribute name to compare.
+        op : str
+            Comparison operator accepted by Rust, such as ``"eq"`` or ``"gte"``.
+        text : str or None
+            Optional string comparison value for text-valued attributes.
+        number : float or None
+            Optional numeric comparison value for numeric attributes.
+        """
         ...
 
     @classmethod
     def by_position_ids(cls, position_ids: list[str]) -> PositionFilter:
-        """Select positions by explicit position IDs."""
+        """Select positions by explicit position IDs.
+
+        Parameters
+        ----------
+        position_ids : list[str]
+            Explicit portfolio position identifiers to include in the filter.
+        """
         ...
 
     @classmethod
     def not_(cls, inner: PositionFilter) -> PositionFilter:
-        """Negate another filter."""
+        """Negate another filter.
+
+        Parameters
+        ----------
+        inner : PositionFilter
+            Existing filter whose matching positions should be excluded.
+        """
         ...
 
     @classmethod
     def and_(cls, filters: list[PositionFilter]) -> PositionFilter:
-        """Select positions matching all child filters."""
+        """Select positions matching all child filters.
+
+        Parameters
+        ----------
+        filters : list[PositionFilter]
+            Child filters that every selected position must satisfy.
+        """
         ...
 
     @classmethod
     def or_(cls, filters: list[PositionFilter]) -> PositionFilter:
-        """Select positions matching any child filter."""
+        """Select positions matching any child filter.
+
+        Parameters
+        ----------
+        filters : list[PositionFilter]
+            Child filters of which at least one must match each selected position.
+        """
         ...
 
     @classmethod
     def from_json(cls, json_str: str) -> PositionFilter:
-        """Deserialize a position filter from JSON."""
+        """Deserialize a position filter from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized filter tree, normally produced by
+            ``PositionFilter.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -2966,7 +3433,15 @@ class MetricExpr:
         metric: PerPositionMetric,
         filter: PositionFilter | None = None,
     ) -> MetricExpr:
-        """Build a weighted-sum portfolio metric expression."""
+        """Build a weighted-sum portfolio metric expression.
+
+        Parameters
+        ----------
+        metric : PerPositionMetric
+            Per-position value to multiply by each selected position weight.
+        filter : PositionFilter or None
+            Optional selector limiting the expression to matching positions.
+        """
         ...
 
     @classmethod
@@ -2975,12 +3450,27 @@ class MetricExpr:
         metric: PerPositionMetric,
         filter: PositionFilter | None = None,
     ) -> MetricExpr:
-        """Build a value-weighted-average portfolio metric expression."""
+        """Build a value-weighted-average portfolio metric expression.
+
+        Parameters
+        ----------
+        metric : PerPositionMetric
+            Per-position value to average using portfolio market-value weights.
+        filter : PositionFilter or None
+            Optional selector limiting the expression to matching positions.
+        """
         ...
 
     @classmethod
     def from_json(cls, json_str: str) -> MetricExpr:
-        """Deserialize a metric expression from JSON."""
+        """Deserialize a metric expression from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized portfolio metric expression, normally produced
+            by ``MetricExpr.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -3013,17 +3503,36 @@ class Objective:
 
     @classmethod
     def maximize(cls, expr: MetricExpr) -> Objective:
-        """Maximize the supplied metric expression."""
+        """Maximize the supplied metric expression.
+
+        Parameters
+        ----------
+        expr : MetricExpr
+            Portfolio-level metric expression the optimizer should maximize.
+        """
         ...
 
     @classmethod
     def minimize(cls, expr: MetricExpr) -> Objective:
-        """Minimize the supplied metric expression."""
+        """Minimize the supplied metric expression.
+
+        Parameters
+        ----------
+        expr : MetricExpr
+            Portfolio-level metric expression the optimizer should minimize.
+        """
         ...
 
     @classmethod
     def from_json(cls, json_str: str) -> Objective:
-        """Deserialize an optimization objective from JSON."""
+        """Deserialize an optimization objective from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized objective direction and metric expression,
+            normally produced by ``Objective.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -3071,7 +3580,19 @@ class Constraint:
         rhs: float,
         label: str | None = None,
     ) -> Constraint:
-        """Constrain a metric expression against a right-hand side."""
+        """Constrain a metric expression against a right-hand side.
+
+        Parameters
+        ----------
+        metric : MetricExpr
+            Portfolio expression whose evaluated value is constrained.
+        op : Inequality
+            Less-than, greater-than, or equality operator for the bound.
+        rhs : float
+            Numeric right-hand-side bound in the metric expression's units.
+        label : str or None
+            Optional stable label for diagnostics, reporting, and dual values.
+        """
         ...
 
     @classmethod
@@ -3082,7 +3603,19 @@ class Constraint:
         max: float,
         label: str | None = None,
     ) -> Constraint:
-        """Constrain selected position weights to a min/max interval."""
+        """Constrain selected position weights to a min/max interval.
+
+        Parameters
+        ----------
+        filter : PositionFilter
+            Selector identifying the positions subject to the weight interval.
+        min : float
+            Inclusive lower bound on each selected position's decimal weight.
+        max : float
+            Inclusive upper bound on each selected position's decimal weight.
+        label : str or None
+            Optional stable label for diagnostics, reporting, and dual values.
+        """
         ...
 
     @classmethod
@@ -3091,12 +3624,27 @@ class Constraint:
         max_turnover: float,
         label: str | None = None,
     ) -> Constraint:
-        """Constrain total portfolio turnover."""
+        """Constrain total portfolio turnover.
+
+        Parameters
+        ----------
+        max_turnover : float
+            Maximum permitted aggregate turnover as a decimal weight fraction.
+        label : str or None
+            Optional stable label for diagnostics, reporting, and dual values.
+        """
         ...
 
     @classmethod
     def budget(cls, rhs: float) -> Constraint:
-        """Constrain total portfolio budget/weight to ``rhs``."""
+        """Constrain total portfolio budget/weight to ``rhs``.
+
+        Parameters
+        ----------
+        rhs : float
+            Required total portfolio weight, normally ``1.0`` for a fully
+            invested long-only budget.
+        """
         ...
 
     @classmethod
@@ -3107,7 +3655,19 @@ class Constraint:
         max_share: float,
         label: str | None = None,
     ) -> Constraint:
-        """Constrain maximum exposure share for an attribute key/value."""
+        """Constrain maximum exposure share for an attribute key/value.
+
+        Parameters
+        ----------
+        key : str
+            Position attribute name used to define the exposure bucket.
+        value : str
+            Attribute value identifying the exposure bucket to cap.
+        max_share : float
+            Maximum decimal portfolio-weight share permitted in the bucket.
+        label : str or None
+            Optional stable label for diagnostics, reporting, and dual values.
+        """
         ...
 
     @classmethod
@@ -3118,16 +3678,41 @@ class Constraint:
         min_share: float,
         label: str | None = None,
     ) -> Constraint:
-        """Constrain minimum exposure share for an attribute key/value."""
+        """Constrain minimum exposure share for an attribute key/value.
+
+        Parameters
+        ----------
+        key : str
+            Position attribute name used to define the exposure bucket.
+        value : str
+            Attribute value identifying the exposure bucket to floor.
+        min_share : float
+            Minimum decimal portfolio-weight share required in the bucket.
+        label : str or None
+            Optional stable label for diagnostics, reporting, and dual values.
+        """
         ...
 
     def with_label(self, label: str) -> Constraint:
-        """Return a copy with a human-readable label."""
+        """Return a copy with a human-readable label.
+
+        Parameters
+        ----------
+        label : str
+            Stable reader-facing name used in diagnostics and optimizer reports.
+        """
         ...
 
     @classmethod
     def from_json(cls, json_str: str) -> Constraint:
-        """Deserialize an optimization constraint from JSON."""
+        """Deserialize an optimization constraint from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized constraint, normally produced by
+            ``Constraint.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -3296,17 +3881,36 @@ class OptimizationStatus:
 
     @classmethod
     def infeasible(cls, conflicting_constraints: list[str]) -> OptimizationStatus:
-        """Optimization problem is infeasible with the listed constraints."""
+        """Create an infeasible status with the listed conflicting constraints.
+
+        Parameters
+        ----------
+        conflicting_constraints : list[str]
+            Constraint labels implicated in the infeasibility diagnosis.
+        """
         ...
 
     @classmethod
     def error(cls, message: str) -> OptimizationStatus:
-        """Solver or model-building error status."""
+        """Create a solver or model-building error status.
+
+        Parameters
+        ----------
+        message : str
+            Reader-facing error or diagnostic message returned by the optimizer.
+        """
         ...
 
     @classmethod
     def from_json(cls, json_str: str) -> OptimizationStatus:
-        """Deserialize an optimization status from JSON."""
+        """Deserialize an optimization status from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized solver status, normally produced by
+            ``OptimizationStatus.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -3366,7 +3970,14 @@ class TradeSpec:
 
     @classmethod
     def from_json(cls, json_str: str) -> TradeSpec:
-        """Deserialize a trade specification from JSON."""
+        """Deserialize a trade specification from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized trade recommendation, normally produced by
+            ``TradeSpec.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -3475,32 +4086,77 @@ class PortfolioOptimizationSpec:
         portfolio_spec_json: str,
         objective: Objective,
     ) -> PortfolioOptimizationSpec:
-        """Create a portfolio optimization specification from portfolio JSON and objective."""
+        """Create an optimization specification from portfolio JSON and objective.
+
+        Parameters
+        ----------
+        portfolio_spec_json : str
+            Canonical ``PortfolioSpec`` JSON defining positions and starting weights.
+        objective : Objective
+            Direction and metric expression the optimizer should solve for.
+        """
         ...
 
     def with_constraint(self, constraint: Constraint) -> PortfolioOptimizationSpec:
-        """Return a copy with an additional constraint."""
+        """Return a copy with an additional constraint.
+
+        Parameters
+        ----------
+        constraint : Constraint
+            Constraint to append to the current optimization specification.
+        """
         ...
 
     def with_objective(self, objective: Objective) -> PortfolioOptimizationSpec:
-        """Return a copy with a replacement objective."""
+        """Return a copy with a replacement objective.
+
+        Parameters
+        ----------
+        objective : Objective
+            New direction and metric expression that replaces the existing one.
+        """
         ...
 
     def with_weighting(self, weighting: WeightingScheme) -> PortfolioOptimizationSpec:
-        """Return a copy with a replacement weighting scheme."""
+        """Return a copy with a replacement weighting scheme.
+
+        Parameters
+        ----------
+        weighting : WeightingScheme
+            Market-value or notional convention used to calculate portfolio weights.
+        """
         ...
 
     def with_missing_metric_policy(self, policy: MissingMetricPolicy) -> PortfolioOptimizationSpec:
-        """Return a copy with a replacement missing-metric policy."""
+        """Return a copy with a replacement missing-metric policy.
+
+        Parameters
+        ----------
+        policy : MissingMetricPolicy
+            Policy defining how positions without required metric data are handled.
+        """
         ...
 
     def with_label(self, label: str) -> PortfolioOptimizationSpec:
-        """Return a copy with a human-readable label."""
+        """Return a copy with a human-readable label.
+
+        Parameters
+        ----------
+        label : str
+            Stable reader-facing name for reports, diagnostics, and persistence.
+        """
         ...
 
     @classmethod
     def from_json(cls, json_str: str) -> PortfolioOptimizationSpec:
-        """Deserialize an optimization specification from JSON."""
+        """Deserialize an optimization specification from canonical JSON.
+
+        Parameters
+        ----------
+        json_str : str
+            Canonical serialized portfolio optimization specification, normally
+            produced by ``PortfolioOptimizationSpec.to_json``.
+        """
         ...
 
     def to_json(self) -> str:
@@ -3722,6 +4378,13 @@ def optimize_portfolio_typed(
 
     Accepts a typed :class:`PortfolioOptimizationSpec` and returns a typed
     :class:`PortfolioOptimizationResult` rather than JSON strings.
+
+    Parameters
+    ----------
+    spec : PortfolioOptimizationSpec
+        Typed portfolio definition, objective, constraints, and solver policy.
+    market : MarketContext or str
+        Market context object or JSON used to value positions and calculate metrics.
     """
     ...
 
@@ -3786,7 +4449,7 @@ class SensitivityMatrix:
         Parameters
         ----------
         position_idx : int
-            Row index.
+            Zero-based row index into ``position_ids`` for the requested position.
         factor_idx : int
             Column index.
 
@@ -3803,7 +4466,7 @@ class SensitivityMatrix:
         Parameters
         ----------
         position_idx : int
-            Row index.
+            Zero-based row index into ``position_ids`` for the requested position.
 
         Returns
         -------

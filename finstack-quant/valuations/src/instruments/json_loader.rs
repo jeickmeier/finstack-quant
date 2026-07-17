@@ -592,6 +592,11 @@ impl InstrumentEnvelope {
 ///
 /// Returns an error when the payload does not match a registered instrument
 /// type or fails spec validation.
+///
+/// # Arguments
+///
+/// * `value` - Parsed canonical tagged instrument JSON, either versioned
+///   envelope or bare form, to construct as a runtime cashflow provider.
 pub fn cashflow_provider_from_value(
     value: serde_json::Value,
 ) -> Result<Arc<dyn finstack_quant_cashflows::CashflowProvider + Send + Sync>> {

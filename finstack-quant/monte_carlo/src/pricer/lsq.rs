@@ -35,6 +35,21 @@ use finstack_quant_core::Result;
 /// # Returns
 ///
 /// Coefficient vector β (k elements)
+///
+/// The SVD cutoff is relative to the largest singular value and matrix size,
+/// so near-rank-deficient directions are truncated rather than amplified. The
+/// returned coefficients are in the units implied by `y` per basis-function
+/// unit.
+///
+/// # Errors
+///
+/// Returns an error if `n < k` or the SVD solver cannot produce a least-squares
+/// solution (for example, a numerically singular design matrix).
+///
+/// # Panics
+///
+/// Panics if `design.len()` is not exactly `n * k`; callers must also pass a
+/// response vector compatible with `n` observations.
 pub fn solve_least_squares(design: &[f64], y: &[f64], n: usize, k: usize) -> Result<Vec<f64>> {
     use nalgebra::{DMatrix, DVector};
 
@@ -95,6 +110,17 @@ pub fn solve_least_squares(design: &[f64], y: &[f64], n: usize, k: usize) -> Res
 /// # Returns
 ///
 /// Coefficient vector β with length `basis.num_basis()`.
+///
+/// `x` and `y` represent paired observations; basis values are evaluated in
+/// `x` order to form a row-major design matrix. Coefficients can be reused for
+/// an out-of-sample continuation-value policy only with the same basis and
+/// state-variable convention.
+///
+/// # Errors
+///
+/// Propagates the least-squares error when there are fewer observations than
+/// basis functions or the SVD solve fails. A response vector with an
+/// incompatible length is rejected by the underlying solver.
 pub fn regression_coefficients_with_basis<B>(x: &[f64], y: &[f64], basis: &B) -> Result<Vec<f64>>
 where
     B: BasisFunctions + ?Sized,
@@ -131,6 +157,15 @@ where
 /// # Returns
 ///
 /// Predicted continuation values for each x value (same length as x)
+///
+/// This fits and predicts on the same sample; it is an in-sample continuation
+/// estimate, not an independently validated exercise policy.
+///
+/// # Errors
+///
+/// Propagates the coefficient-fit errors from
+/// [`regression_coefficients_with_basis`], including insufficient observations
+/// for the selected basis or an unsuccessful SVD solve.
 pub fn regression_with_basis<B>(x: &[f64], y: &[f64], basis: &B) -> Result<Vec<f64>>
 where
     B: BasisFunctions + ?Sized,

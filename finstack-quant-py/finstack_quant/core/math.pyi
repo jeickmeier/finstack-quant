@@ -14,7 +14,8 @@ def count_consecutive(values: list[float]) -> int:
     Parameters
     ----------
     values:
-        Numeric series.
+        Ordered numeric observations; only values strictly greater than zero
+        extend a run, while zero and negative values reset it.
 
     Returns
     -------

@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use smallvec::SmallVec;
 use crate::metrics::MetricId;

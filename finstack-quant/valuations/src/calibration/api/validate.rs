@@ -71,6 +71,11 @@ pub struct DependencyNode {
 /// Always returns a [`ValidationReport`]; inspect `errors` to see what failed.
 /// The validator is solver-free — runs in microseconds, suitable as a
 /// pre-flight check before invoking [`engine::execute`](super::engine::execute).
+///
+/// # Arguments
+///
+/// * `envelope` - Typed calibration plan, market data, prior market objects,
+///   quote sets, and solver settings to validate without executing solvers.
 pub fn validate(envelope: &CalibrationEnvelope) -> ValidationReport {
     let mut errors = Vec::new();
     let initial_ids = collect_initial_ids(envelope);
@@ -98,6 +103,11 @@ pub fn validate(envelope: &CalibrationEnvelope) -> ValidationReport {
 ///
 /// Returns the report serialized as pretty-printed JSON. Returns an
 /// [`EnvelopeError::JsonParse`] if the envelope is malformed.
+///
+/// # Arguments
+///
+/// * `envelope_json` - UTF-8 JSON calibration-envelope document to parse and
+///   run through static, solver-free validation.
 pub fn dry_run(envelope_json: &str) -> Result<String, EnvelopeError> {
     let envelope = parse_envelope(envelope_json)?;
     let report = validate(&envelope);
@@ -105,6 +115,11 @@ pub fn dry_run(envelope_json: &str) -> Result<String, EnvelopeError> {
 }
 
 /// JSON-friendly wrapper that returns just the dependency graph.
+///
+/// # Arguments
+///
+/// * `envelope_json` - UTF-8 JSON calibration-envelope document whose initial
+///   market IDs and ordered step dependencies are serialized as a graph.
 pub fn dependency_graph_json(envelope_json: &str) -> Result<String, EnvelopeError> {
     let envelope = parse_envelope(envelope_json)?;
     let nodes = build_nodes(&envelope.plan.steps);
@@ -122,6 +137,11 @@ pub fn dependency_graph_json(envelope_json: &str) -> Result<String, EnvelopeErro
 /// This is the Rust-owned implementation used by host-language bindings. It
 /// centralizes the parse and pretty-serialization path so Python and WASM do
 /// not each reimplement the same validation logic.
+///
+/// # Arguments
+///
+/// * `envelope_json` - UTF-8 JSON calibration-envelope document to parse,
+///   statically validate, and reserialize in canonical pretty JSON form.
 pub fn validate_calibration_json(envelope_json: &str) -> Result<String, EnvelopeError> {
     let envelope = parse_envelope(envelope_json)?;
     serialize_pretty_json(&envelope, "CalibrationEnvelope")
@@ -144,6 +164,11 @@ fn serialize_pretty_json<T: Serialize>(value: &T, target: &str) -> Result<String
 /// section with flat `market_data` / `prior_market` lists. Envelopes that still
 /// carry the v2 `initial_market` key get a targeted message pointing at the
 /// migration design doc rather than the generic serde `unknown field` error.
+///
+/// # Arguments
+///
+/// * `json` - UTF-8 JSON calibration-envelope document in the v3 flat-market
+///   shape; legacy v2 `initial_market` input is rejected with migration detail.
 pub fn parse_envelope(json: &str) -> Result<CalibrationEnvelope, EnvelopeError> {
     let value: serde_json::Value =
         serde_json::from_str(json).map_err(|e| EnvelopeError::JsonParse {

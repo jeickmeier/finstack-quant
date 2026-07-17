@@ -77,6 +77,15 @@ pub struct PacContext {
 }
 
 /// Execute waterfall for a single period (convenience entry point).
+///
+/// # Arguments
+///
+/// * `waterfall` - Mutable CMO waterfall; tranche balances and payment history
+///   are updated in place.
+/// * `available_principal` - Total collateral principal available for this
+///   distribution period in waterfall base-currency amount units.
+/// * `available_interest` - Total collateral interest available for this
+///   distribution period in the same currency units.
 pub fn execute_waterfall(
     waterfall: &mut CmoWaterfall,
     available_principal: f64,
@@ -86,6 +95,15 @@ pub fn execute_waterfall(
 }
 
 /// Execute waterfall with optional PAC schedule context.
+///
+/// # Arguments
+///
+/// * `waterfall` - Mutable CMO waterfall; tranche balances and payment history
+///   are updated in place.
+/// * `available_principal` - Total collateral principal available this period.
+/// * `available_interest` - Total collateral interest available this period.
+/// * `pac_context` - Optional PAC schedule, period index, and realized PSA;
+///   `None` applies no PAC collar constraint.
 pub fn execute_waterfall_with_pac(
     waterfall: &mut CmoWaterfall,
     available_principal: f64,
@@ -106,6 +124,20 @@ pub fn execute_waterfall_with_pac(
 ///
 /// `collateral_factor` is the collateral pool factor (current/original
 /// balance) for this period; IO strip notionals amortize with it.
+///
+/// # Arguments
+///
+/// * `waterfall` - Mutable CMO waterfall; tranche balances and payment history
+///   are updated in place.
+/// * `scheduled_principal` - Level-pay collateral principal collected this
+///   period before voluntary prepayments.
+/// * `prepayment_principal` - Voluntary/prepaid collateral principal collected
+///   this period.
+/// * `available_interest` - Total collateral interest available this period.
+/// * `collateral_factor` - Current/original collateral balance ratio used to
+///   amortize IO strip notional.
+/// * `pac_context` - Optional PAC schedule, period index, and realized PSA;
+///   `None` applies no PAC collar constraint.
 pub fn execute_waterfall_with_principal_breakdown(
     waterfall: &mut CmoWaterfall,
     scheduled_principal: f64,
@@ -442,6 +474,13 @@ fn allocate_principal_to_group(
 ///
 /// IO strips receive interest based on their notional and coupon,
 /// but their notional decreases as the underlying pool pays down.
+///
+/// # Arguments
+///
+/// * `io_tranche` - Interest-only CMO tranche whose original face and monthly
+///   coupon determine the period interest allocation.
+/// * `collateral_factor` - Current/original collateral balance ratio applied
+///   to reduce the IO strip's effective notional.
 pub fn allocate_io_cashflow(io_tranche: &CmoTranche, collateral_factor: f64) -> f64 {
     // IO payment = notional × factor × coupon / 12
     let adjusted_notional = io_tranche.original_face.amount() * collateral_factor;

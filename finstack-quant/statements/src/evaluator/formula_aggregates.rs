@@ -1,3 +1,5 @@
+//! Formula-evaluation helpers for statement expressions.
+//!
 use super::formula::{
     calculate_mean, calculate_median, calculate_std, calculate_variance,
     collect_all_historical_values, collect_expression_values_sorted,

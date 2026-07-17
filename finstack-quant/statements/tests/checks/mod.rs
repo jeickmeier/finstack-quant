@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 mod balance_sheet_tests;
 mod cash_reconciliation_tests;
 mod data_quality_tests;

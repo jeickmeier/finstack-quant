@@ -1,3 +1,5 @@
+//! SABR model, smile, parameter, and calibration support.
+//!
 use super::model::{SABRModel, BETA_SNAP_TOL};
 use super::parameters::SABRParameters;
 use finstack_quant_core::math::volatility::{bachelier_vega, black_vega};

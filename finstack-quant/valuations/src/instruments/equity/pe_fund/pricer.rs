@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for equity instruments.
+//!
 use crate::instruments::equity::pe_fund::waterfall::{AllocationLedger, EquityWaterfallEngine};
 use crate::instruments::equity::pe_fund::PrivateMarketsFund;
 use finstack_quant_core::dates::Date;

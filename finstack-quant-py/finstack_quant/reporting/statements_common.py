@@ -29,11 +29,25 @@ class StatementView:
     """
 
     def __init__(self, nodes: dict[str, dict[str, float]]) -> None:
-        """Store the node map; callers should use :func:`parse_statement` instead."""
+        """Store a statement node-value map.
+
+        Parameters
+        ----------
+        nodes : dict[str, dict[str, float]]
+            Mapping from statement node ID to period-label/value mappings.
+        """
         self._nodes = nodes
 
     def get(self, node_id: str, period: str) -> float | None:
-        """Return the value at ``(node_id, period)``, or ``None`` if absent."""
+        """Return the value at ``(node_id, period)``, or ``None`` if absent.
+
+        Parameters
+        ----------
+        node_id : str
+            Statement node identifier to look up.
+        period : str
+            Model period label within the requested node's value series.
+        """
         node = self._nodes.get(node_id)
         return node.get(period) if node else None
 
@@ -56,6 +70,13 @@ def json_or_dict(obj: Any, *, noun: str = "value") -> dict[str, Any]:
     Raises:
         TypeError: if ``obj`` is not a dict/str, or its JSON does not decode to
             an object.
+
+    Parameters
+    ----------
+    obj : Any
+        Mapping object or JSON-object string to normalize into a dictionary.
+    noun : str
+        Reader-facing noun used in type and JSON-decoding error messages.
     """
     if isinstance(obj, dict):
         return obj
@@ -77,6 +98,12 @@ def parse_statement(results: Any) -> StatementView:
     Raises:
         TypeError: if ``results`` is none of the accepted types.
         json.JSONDecodeError: if ``results`` is a string that is not valid JSON.
+
+    Parameters
+    ----------
+    results : Any
+        ``StatementResult``, canonical JSON, parsed dictionary, or existing
+        ``StatementView`` to expose through the common lookup interface.
     """
     if isinstance(results, StatementView):
         return results
@@ -108,6 +135,17 @@ def pl_matrix_table(
     ``formatter(view.get(node_id, period))``. Pure presentation — the formatter
     handles ``None`` (missing) values. Reuses the existing data-table CSS so the
     first column is left-aligned and value columns are right-aligned.
+
+    Parameters
+    ----------
+    view : StatementView
+        Statement value view supplying node values by ID and period.
+    rows : list[tuple[str, str, Callable[[Any], str]]]
+        Ordered ``(display_label, node_id, formatter)`` line-item definitions.
+    periods : list[str]
+        Ordered model period labels rendered as table columns.
+    theme : Theme
+        Report theme retained for a consistent chart/table helper interface.
     """
     head = "<th></th>" + "".join(f"<th>{_esc(p)}</th>" for p in periods)
     body_rows: list[str] = []
@@ -123,6 +161,13 @@ def variance_table(variance: Any, *, theme: Theme) -> str | None:
 
     Returns ``None`` when there are no rows. Pure presentation; ``pct_var`` is
     scaled to percent for display.
+
+    Parameters
+    ----------
+    variance : Any
+        Variance-report mapping or compatible object containing a ``rows`` list.
+    theme : Theme
+        Report palette and typography passed to the generic data-table renderer.
     """
     rows = variance.get("rows") if isinstance(variance, dict) else None
     if not rows:

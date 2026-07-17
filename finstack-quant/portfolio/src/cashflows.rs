@@ -260,7 +260,25 @@ impl PortfolioCashflows {
 /// `valuation.rs` so the crate uses one consistent parallel cutover.
 const AGGREGATE_CASHFLOWS_PARALLEL_MIN_POSITIONS: usize = 64;
 
-/// Aggregate full portfolio cashflows while preserving `CFKind` classification.
+/// Aggregate contractual portfolio cashflows while preserving `CFKind` classification.
+///
+/// Successful positions contribute scaled events, deterministic date/currency/
+/// kind aggregates, and per-position summaries. A position whose instrument
+/// cannot build a contractual schedule is retained as a `BuildFailed` issue
+/// and does not abort extraction for the rest of the portfolio.
+///
+/// # Errors
+///
+/// Returns an error only if successful same-date, same-currency, same-kind
+/// amounts cannot be added (for example, a monetary overflow). Per-position
+/// schedule-construction failures are reported in the returned `issues` field.
+///
+/// # Arguments
+///
+/// * `portfolio` - Portfolio whose position quantities scale contractual
+///   instrument cashflows and whose `as_of` date anchors schedule generation.
+/// * `market` - Market data used by instruments that require it to construct
+///   contractual schedules, such as floating-rate or indexed cashflows.
 pub fn aggregate_full_cashflows(
     portfolio: &Portfolio,
     market: &MarketContext,

@@ -36,6 +36,11 @@ std::thread_local! {
 ///
 /// Best-effort fallback for callers that don't have explicit currency metadata.
 /// Returns USD if no known currency or benchmark-rate token appears in the ID.
+///
+/// # Arguments
+///
+/// * `curve` - Discount curve whose identifier is tokenized for an inferred
+///   currency when explicit curve metadata is unavailable.
 pub fn infer_currency_from_discount_curve_id(curve: &DiscountCurve) -> Currency {
     infer_currency_from_id(curve.id().as_str())
 }
@@ -44,6 +49,17 @@ pub fn infer_currency_from_discount_curve_id(curve: &DiscountCurve) -> Currency 
 ///
 /// This applies a [`BumpRequest`] to a collection of [`RateQuote`]s and
 /// re-executes the calibration step to produce a new [`DiscountCurve`].
+///
+/// # Arguments
+///
+/// * `quotes` - Original rate calibration quotes to shock and bootstrap;
+///   quote IDs and maturity conventions must match `params`.
+/// * `params` - Discount-curve calibration recipe, including base date,
+///   curve ID, conventions, and calibration method.
+/// * `base_context` - Unshocked market context supplying dependencies needed
+///   by the calibration step.
+/// * `bump` - Parallel or tenor-specific rate shock, expressed in basis points
+///   as defined by [`BumpRequest`].
 pub fn bump_discount_curve(
     quotes: &[RateQuote],
     params: &DiscountCurveParams,
@@ -1263,7 +1279,17 @@ pub(crate) fn find_closest_quote(
 /// the current curve discount factors, applies shocks, and re-bootstraps.
 ///
 /// # Arguments
-/// * `currency` - Currency of the curve (required; DiscountCurve does not carry currency metadata).
+///
+/// * `curve` - Existing discount curve from which synthetic par quotes are
+///   implied before re-bootstrap.
+/// * `context` - Market context supplying curve and convention dependencies
+///   for the synthetic calibration step.
+/// * `bump` - Parallel or tenor-specific rate shock in [`BumpRequest`] basis
+///   point units.
+/// * `as_of` - Valuation/base date used to convert curve times into synthetic
+///   instrument maturities.
+/// * `currency` - Curve currency used to select synthetic money-market and
+///   OIS index conventions because `DiscountCurve` lacks currency metadata.
 pub fn bump_discount_curve_synthetic(
     curve: &finstack_quant_core::market_data::term_structures::DiscountCurve,
     context: &MarketContext,

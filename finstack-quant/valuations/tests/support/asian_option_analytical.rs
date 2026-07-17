@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 // Tests for analytical Asian option pricers.
 // These specifically target `instruments/asian_option/pricer.rs` (non-MC paths).
 #[allow(clippy::expect_used, clippy::unwrap_used, dead_code, unused_imports)]

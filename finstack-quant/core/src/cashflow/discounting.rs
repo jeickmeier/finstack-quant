@@ -139,8 +139,10 @@ pub trait Discountable: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `disc` - Discount curve implementing the `Discounting` trait
-    /// * `base` - Valuation date
+    /// * `disc` - Discount curve that supplies discount factors using its own
+    ///   base date and day-count convention.
+    /// * `base` - Valuation date to which strictly future cashflows are
+    ///   discounted; flows dated on or before it are excluded.
     ///
     /// # Returns
     ///
@@ -169,9 +171,12 @@ pub trait Discountable: Send + Sync {
 ///
 /// # Arguments
 ///
-/// * `disc` - Discount curve implementing the `Discounting` trait
-/// * `base` - Valuation date
-/// * `flows` - Dated cashflows to discount
+/// * `disc` - Discount curve that supplies discount factors using its own
+///   base date and day-count convention.
+/// * `base` - Valuation date to which strictly future cashflows are
+///   discounted; flows dated on or before it are excluded.
+/// * `flows` - Payment-date and `Money` pairs to discount; every amount must
+///   have the same currency and dated flows must be supplied explicitly.
 ///
 /// # Returns
 ///
@@ -277,6 +282,17 @@ impl NpvOptions {
 /// "Valuation-Date Cutoff"). Use [`npv_with_options`] to opt in to the
 /// legacy include-everything behavior.
 ///
+/// # Arguments
+///
+/// * `disc` - Discounting source that supplies discount factors, base date, and
+///   day-count convention for the monetary cashflows.
+/// * `base` - Valuation date to which eligible cashflows are discounted. Flows
+///   on or before this date are excluded.
+/// * `ctx` - Supplemental day-count information, such as calendars or
+///   reference periods, required by the discount source's convention.
+/// * `flows` - Dated cashflows in one currency. Empty input or mixed currencies
+///   return an error.
+///
 /// # Errors
 ///
 /// Same error conditions as [`npv`].
@@ -294,6 +310,19 @@ pub fn npv_with_ctx<D: Discounting + ?Sized>(
 /// This is the most general entry point: it accepts a day-count context and
 /// options controlling whether flows on or before the valuation date are
 /// included (see [`NpvOptions::include_past_flows`]).
+///
+/// # Arguments
+///
+/// * `disc` - Discounting source that supplies discount factors, base date, and
+///   day-count convention for the monetary cashflows.
+/// * `base` - Valuation date to which flows are discounted.
+/// * `ctx` - Supplemental day-count information, such as calendars or
+///   reference periods, required by the discount source's convention.
+/// * `options` - Inclusion policy for flows on or before `base`. The default
+///   follows market valuation and excludes settled flows.
+/// * `flows` - Dated cashflows in one currency. Empty input or mixed currencies
+///   return an error.
+///
 /// # Errors
 ///
 /// Returns `Err` when:
@@ -343,6 +372,15 @@ pub fn npv_with_options<D: Discounting + ?Sized>(
 /// Cashflows on or before `base` are excluded: valuation on a date assumes
 /// cash settling that day has already been paid. Discount factors are relative
 /// to `base`, even when the curve has a different base date.
+///
+/// # Arguments
+///
+/// * `disc` - Discounting source that provides relative discount factors and
+///   its day-count convention.
+/// * `base` - Valuation date to which future scalar flows are discounted.
+///   Flows on or before this date are excluded.
+/// * `flows` - Dated scalar cashflows in the caller's chosen amount units.
+///   Empty input returns an error.
 ///
 /// # Errors
 ///
@@ -424,6 +462,11 @@ where
 /// avoids the `f64` rounding that occurs in [`npv_with_ctx`] when
 /// multiplying `Money` by `f64` discount factors.
 ///
+/// # Arguments
+///
+/// * `flows` - Already discounted monetary amounts to sum. Every amount must
+///   use the same currency, and an empty slice returns an error.
+///
 /// # Errors
 ///
 /// - [`InputError::TooFewPoints`](crate::error::InputError::TooFewPoints): Empty flow slice
@@ -458,7 +501,7 @@ pub fn sum_prediscounted_money(flows: &[Money]) -> crate::Result<Money> {
 /// - Internally this is converted to continuous compounding via `ln(1 + r)` for stability.
 ///
 /// Defaults (when the optional arguments are `None`):
-/// - `base_date`: first cashflow date
+/// - `base_date`: earliest cashflow date
 /// - `day_count`: [`DayCount::Act365F`]
 ///
 /// # Flow Convention
@@ -467,6 +510,17 @@ pub fn sum_prediscounted_money(flows: &[Money]) -> crate::Result<Money> {
 /// flows are included, with signed year fractions relative to the base date.
 /// The time-0 outlay (a flow on the base date) is part of the result, which
 /// is what project/return analytics expect.
+///
+/// # Arguments
+///
+/// * `cash_flows` - Dated scalar amounts in a consistent caller-defined unit.
+///   The time-zero amount is included; an empty slice returns an error.
+/// * `discount_rate` - Flat annually compounded decimal rate (`0.05` means
+///   5%). It must be finite and greater than `-1.0`.
+/// * `base_date` - Optional valuation origin. When omitted, the earliest
+///   cashflow date is used.
+/// * `day_count` - Optional year-fraction convention. When omitted,
+///   [`DayCount::Act365F`] is used.
 ///
 /// # Errors
 /// - [`InputError::TooFewPoints`](crate::error::InputError::TooFewPoints) when `cash_flows` is empty
@@ -487,6 +541,37 @@ pub fn npv_amounts(
 }
 
 /// Compute scalar NPV with an explicit day-count context.
+///
+/// This is the contextual form of [`npv_amounts`]. It discounts each signed
+/// scalar amount by `exp(-ln(1 + discount_rate) * t)`, where `t` is the signed
+/// year fraction from `base_date` (or the earliest cashflow date when omitted)
+/// under `day_count` (or Act/365F when omitted). The supplied `ctx` is passed
+/// unchanged to every year-fraction calculation, which matters for
+/// conventions that require calendars or reference-period information.
+///
+/// Amounts are not separately validated: IEEE-754 NaN or infinity in an
+/// amount propagates into the returned NPV. Accumulation uses Neumaier
+/// compensation to reduce cancellation error for mixed-sign cashflows.
+///
+/// # Arguments
+///
+/// * `cash_flows` - Dated scalar amounts in a consistent caller-defined unit.
+///   The time-zero amount is included; an empty slice returns an error.
+/// * `discount_rate` - Flat annually compounded decimal rate (`0.05` means
+///   5%). It must be finite and greater than `-1.0`.
+/// * `base_date` - Optional valuation origin. When omitted, the earliest
+///   cashflow date is used.
+/// * `day_count` - Optional year-fraction convention. When omitted,
+///   [`DayCount::Act365F`] is used.
+/// * `ctx` - Supplemental day-count information passed unchanged to each
+///   year-fraction calculation, including calendar and reference-period data.
+///
+/// # Errors
+///
+/// Returns an error if `cash_flows` is empty, `discount_rate` is non-finite or
+/// less than or equal to `-1.0` (so annual-to-continuous conversion is
+/// undefined), or a signed year-fraction calculation fails for the chosen
+/// day-count context.
 pub fn npv_amounts_with_ctx(
     cash_flows: &[(Date, f64)],
     discount_rate: f64,

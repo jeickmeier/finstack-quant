@@ -1,3 +1,5 @@
+//! Bond price, yield, spread, duration, and risk metric calculations.
+//!
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_dm;
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::fixed_income::bond::CashflowSpec;

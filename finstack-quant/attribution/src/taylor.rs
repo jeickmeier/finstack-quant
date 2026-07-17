@@ -84,6 +84,15 @@ impl Default for TaylorAttributionConfig {
 
 impl TaylorAttributionConfig {
     /// Validates configuration parameters.
+    ///
+    /// Rate and credit bumps are in basis points; `vol_bump` is an absolute
+    /// volatility fraction (for example, `0.01` is one volatility point).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] unless each rate and
+    /// credit bump lies in `(0, 100]` bp and the volatility bump lies in
+    /// `(0, 0.20]`.
     pub fn validate(&self) -> Result<()> {
         if self.rate_bump_bp <= 0.0 || self.rate_bump_bp > 100.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -475,6 +484,38 @@ fn compute_taylor_result(
 /// `attribution/parallel.rs` when scalar attribution is required). FX
 /// *translation* into a non-native reporting currency is likewise out of scope
 /// for this standalone path, which reports in the instrument's pricing currency.
+///
+/// The result uses bump-and-reprice first-order factor P&Ls and any configured
+/// gamma term. The residual reconciles actual repriced P&L less explained
+/// factor P&L; factor computations that fail internally are recorded through
+/// the result metadata/residual rather than aborting the entire attribution
+/// whenever the base repricing remains available. `execution_policy` is copied
+/// into result metadata so callers can distinguish deterministic and parallel
+/// runs.
+///
+/// # Arguments
+///
+/// * `instrument` - Instrument to reprice and whose risk factors are
+///   approximated by first- and optional second-order terms.
+/// * `market_t0` - Opening market state used for the base value and factor
+///   changes.
+/// * `market_t1` - Closing market state used for the repriced value and bump
+///   contexts.
+/// * `as_of_t0` - Opening valuation date used for the base repricing.
+/// * `as_of_t1` - Closing valuation date used for closing and bumped repricing.
+/// * `config` - Taylor attribution policy, including factor selection, bump
+///   sizes, and optional gamma treatment.
+/// * `execution_policy` - Sequential or parallel execution policy recorded in
+///   result metadata and used for independent factor work.
+///
+/// # Errors
+///
+/// Returns an error if the base instrument repricing, required market lookup,
+/// FX conversion used to calculate total P&L, or result construction fails.
+/// It can also return an error when factor accumulation detects an invalid
+/// currency or non-finite monetary amount. It does not attribute spot,
+/// dividend, or index moves; those appear in the residual rather than causing
+/// an error.
 pub fn attribute_pnl_taylor(
     instrument: &Arc<dyn Instrument>,
     market_t0: &MarketContext,

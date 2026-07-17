@@ -1,3 +1,5 @@
+//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
+//!
 use super::config::{
     CDSTranchePricer, CDSTranchePricerConfig, DiscountAt, EffectiveStructure,
     ProjectedDiscountedRow, ProjectionInputs, PROBABILITY_CLIP,

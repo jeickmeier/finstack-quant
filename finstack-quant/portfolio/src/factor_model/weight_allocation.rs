@@ -98,6 +98,11 @@ pub struct AllocationDiagnostics {
 /// # Errors
 ///
 /// Returns [`Error::ValidationFailed`] when inputs violate scheme invariants.
+///
+/// # Arguments
+///
+/// * `spec_json` - UTF-8 JSON [`WeightAllocationSpec`] selecting the
+///   allocation scheme, strategy inputs, and any required covariance data.
 pub fn allocate_weights(spec_json: &str) -> Result<String> {
     let spec = parse_allocation_spec(spec_json)?;
     let result = spec.execute()?;
@@ -110,6 +115,11 @@ pub fn allocate_weights(spec_json: &str) -> Result<String> {
 /// # Errors
 ///
 /// Returns [`Error::ValidationFailed`] when inputs violate scheme invariants.
+///
+/// # Arguments
+///
+/// * `spec_json` - UTF-8 JSON [`WeightAllocationSpec`] to parse and execute
+///   solely for validation; no allocation result is serialized on success.
 pub fn validate_allocation_json(spec_json: &str) -> Result<()> {
     let spec = parse_allocation_spec(spec_json)?;
     spec.execute().map(|_| ())

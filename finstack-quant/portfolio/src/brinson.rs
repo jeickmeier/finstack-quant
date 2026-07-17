@@ -139,6 +139,11 @@ pub struct BrinsonPeriodResult {
 ///
 /// * `Error::InvalidInput` if weights don't sum to 1.0 or any return is
 ///   non-finite.
+///
+/// # Arguments
+///
+/// * `sectors` - Sector-level portfolio and benchmark weights and returns;
+///   weights on each side must sum to one, including zero-weight sectors.
 pub fn brinson_fachler(sectors: &[SectorPeriod]) -> Result<BrinsonPeriodResult> {
     const WEIGHT_TOLERANCE: f64 = 1e-6;
 
@@ -259,6 +264,11 @@ pub struct CarinoLinkedAttribution {
 ///
 /// * `Error::InvalidInput` if `periods` is empty, has inconsistent sector
 ///   ordering across periods, or any per-period return is non-finite.
+///
+/// # Arguments
+///
+/// * `periods` - Chronologically ordered Brinson-Fachler period results with
+///   identical sector ordering for every observation.
 pub fn carino_link(periods: &[BrinsonPeriodResult]) -> Result<CarinoLinkedAttribution> {
     if periods.is_empty() {
         return Err(Error::invalid_input(
@@ -354,6 +364,11 @@ pub fn carino_link(periods: &[BrinsonPeriodResult]) -> Result<CarinoLinkedAttrib
 ///
 /// This is the canonical entry point for bindings that receive raw sector
 /// period inputs rather than precomputed [`BrinsonPeriodResult`] values.
+///
+/// # Arguments
+///
+/// * `periods` - Chronologically ordered period slices of raw sector inputs;
+///   each slice must satisfy [`brinson_fachler`] weight and finiteness rules.
 ///
 /// # Errors
 ///

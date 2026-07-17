@@ -551,6 +551,18 @@ pub(crate) fn credit_adjusted_period_pv(
 /// survival weighting, and principal recovery treatment used by periodized
 /// valuation.
 ///
+/// # Arguments
+///
+/// * `cashflow` - Classified dated cashflow to value; non-cash rows and flows
+///   dated on or before `base` have zero present value by convention.
+/// * `discount_factor` - Non-negative discount factor from `base` to the
+///   cashflow payment date.
+/// * `survival_probability` - Survival probability to the payment date as a
+///   finite decimal in `[0, 1]`.
+/// * `recovery_rate` - Optional recovery rate in `[0, 1]` applied to defaulted
+///   principal; `None` excludes the expected recovery term.
+/// * `base` - Valuation date that determines the historical-flow cutoff.
+///
 /// # Errors
 ///
 /// Returns a validation error when the discount factor, survival probability,

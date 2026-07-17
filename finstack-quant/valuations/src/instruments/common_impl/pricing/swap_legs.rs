@@ -820,12 +820,17 @@ pub struct LegPeriod {
 ///
 /// # Arguments
 ///
-/// * `periods` - Iterator over the leg periods
-/// * `notional` - Notional amount (absolute value)
-/// * `params` - Floating leg parameters
-/// * `disc` - Discount curve for PV calculation
-/// * `fwd` - Forward curve for rate projection
-/// * `as_of` - Valuation date
+/// * `periods` - Iterator over the leg's accrual periods; it is consumed while
+///   calculating projected and fixed cashflows.
+/// * `notional` - Unsigned contractual notional in the leg currency. The
+///   caller applies payer/receiver sign conventions to the returned PV.
+/// * `params` - Coupon, day-count, reset, compounding, and payment-lag
+///   conventions for the floating leg.
+/// * `disc` - Discount curve used to value future payments relative to
+///   `as_of`.
+/// * `fwd` - Forward curve used to project unfixed coupon rates.
+/// * `as_of` - Valuation date and cashflow cutoff: payments on or before this
+///   date are excluded, and remaining payments are discounted from it.
 /// * `fixings` - Optional historical fixings for seasoned instruments. Required when
 ///   `reset_date < as_of` for any period; if missing, returns an error.
 ///
@@ -1090,11 +1095,15 @@ impl FixedLegParams {
 ///
 /// # Arguments
 ///
-/// * `periods` - Iterator over the leg periods
-/// * `notional` - Notional amount (absolute value)
-/// * `params` - Fixed leg parameters
-/// * `disc` - Discount curve for PV calculation
-/// * `as_of` - Valuation date
+/// * `periods` - Iterator over the leg's accrual periods; it is consumed while
+///   valuing the fixed coupons.
+/// * `notional` - Unsigned contractual notional in the leg currency. The
+///   caller applies payer/receiver sign conventions to the returned PV.
+/// * `params` - Fixed coupon rate, day-count, and payment-lag conventions.
+/// * `disc` - Discount curve used to value future payments relative to
+///   `as_of`.
+/// * `as_of` - Valuation date and cashflow cutoff: payments on or before this
+///   date are excluded, and remaining payments are discounted from it.
 ///
 /// # Returns
 ///
@@ -1153,11 +1162,16 @@ where
 ///
 /// # Arguments
 ///
-/// * `periods` - Iterator over the leg periods
-/// * `disc` - Discount curve for PV calculation
-/// * `as_of` - Valuation date
-/// * `payment_lag_days` - Payment delay in business days
-/// * `calendar_id` - Optional calendar ID for payment date adjustments
+/// * `periods` - Iterator over the leg's accrual periods; it is consumed to
+///   build the discounted accrual-factor sum.
+/// * `disc` - Discount curve used to value each eligible payment date relative
+///   to `as_of`.
+/// * `as_of` - Valuation date and cashflow cutoff: only payment dates after it
+///   contribute to the annuity.
+/// * `payment_lag_days` - Business-day payment delay applied after each
+///   accrual end before discounting.
+/// * `calendar_id` - Optional holiday-calendar identifier used to adjust the
+///   delayed payment date; `None` uses the unadjusted lag calculation.
 ///
 /// # Returns
 ///

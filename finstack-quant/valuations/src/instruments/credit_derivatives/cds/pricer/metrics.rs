@@ -1,3 +1,5 @@
+//! Configuration, integration, and metric helpers for CDS pricing.
+//!
 use super::engine::{AodInputs, CDSPricer, CouponPeriod};
 use super::helpers::{df_asof_to, sp_cond_to};
 use crate::constants::{credit, numerical, BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};

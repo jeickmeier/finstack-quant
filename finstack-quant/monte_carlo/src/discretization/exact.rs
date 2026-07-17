@@ -219,6 +219,16 @@ impl ExactMultiGbmCorrelated {
     /// Create from a MultiGbmProcess (convenience method).
     ///
     /// Returns `None` if the process has no correlation (use `ExactMultiGbm` instead).
+    ///
+    /// When a correlation matrix is present, this validates and factorizes it
+    /// in the process's asset order, producing a discretization that transforms
+    /// independent shocks before applying exact lognormal steps.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the process correlation matrix has the wrong shape,
+    /// is not a valid symmetric correlation matrix, or cannot be factorized as
+    /// positive semidefinite.
     pub fn from_process(process: &MultiGbmProcess) -> finstack_quant_core::Result<Option<Self>> {
         if let Some(corr) = process.correlation() {
             Ok(Some(Self::new(corr, process.dim())?))

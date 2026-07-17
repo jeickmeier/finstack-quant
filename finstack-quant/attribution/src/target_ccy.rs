@@ -44,13 +44,17 @@ use crate::types::{CarryDetail, PnlAttribution, SourceLine};
 ///
 /// # Arguments
 ///
-/// * `attribution` - the populated attribution, in `val_t1.currency()`.
-/// * `val_t0` - opening native-currency value (used to compute the
+/// * `attribution` - Populated attribution in its native pricing currency;
+///   aggregate P&L fields are translated in place.
+/// * `val_t0` - Opening native-currency value used to compute the
 ///   translation adjustment).
-/// * `target_ccy` - reporting currency to translate into.
-/// * `market_t0`, `market_t1` - market states (carry the FX matrices used for
-///   the T0 / T1 conversions).
-/// * `as_of_t0`, `as_of_t1` - valuation dates passed to `convert_money`.
+/// * `target_ccy` - Reporting currency into which aggregate P&L is translated.
+/// * `market_t0` - Opening market state carrying the FX matrix for the T₀
+///   conversion.
+/// * `market_t1` - Closing market state carrying the FX matrix for T₁ factor
+///   and total-P&L conversion.
+/// * `as_of_t0` - Opening valuation date passed to the T₀ FX conversion.
+/// * `as_of_t1` - Closing valuation date passed to the T₁ FX conversion.
 ///
 /// # Behavior
 ///

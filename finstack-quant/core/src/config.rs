@@ -214,6 +214,19 @@ impl ConfigExtensions {
     }
 
     /// Insert or replace a section by key.
+    ///
+    /// Extension keys must use a versioned namespace such as
+    /// `valuations.calibration.v2`. The stored JSON is intentionally opaque to
+    /// core; the crate that owns the namespace validates its schema when it
+    /// consumes the section. The prior value, if any, is returned so a caller
+    /// can implement an explicit configuration update policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `key` does not contain at least
+    /// two lowercase/digit/underscore namespace segments followed by a `vN`
+    /// version segment. On error, this map is unchanged and `value` is not
+    /// stored.
     #[inline]
     pub fn insert(
         &mut self,
@@ -302,7 +315,20 @@ pub struct ToleranceConfig {
 }
 
 impl ToleranceConfig {
-    /// Create validated numerical tolerances.
+    /// Create validated numerical tolerances for rate and generic comparisons.
+    ///
+    /// `rate_epsilon` is used for yields, discount factors, and similarly small
+    /// financial ratios; `generic_epsilon` applies to broader floating-point
+    /// computations. Both values are absolute, not relative, tolerances. Use
+    /// the defaults unless a documented numerical policy requires a different
+    /// threshold, because changing either alters zero tests and equality-like
+    /// decisions throughout downstream calculations.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if either epsilon is `NaN`,
+    /// infinite, zero, or negative. A successful configuration stores the
+    /// values without further normalization.
     pub fn new(rate_epsilon: f64, generic_epsilon: f64) -> crate::Result<Self> {
         for (name, value) in [
             ("rate_epsilon", rate_epsilon),
@@ -556,6 +582,11 @@ impl FinstackConfig {
 /// let ctx = rounding_context_from(&FinstackConfig::default());
 /// assert_eq!(ctx.version, 1);
 /// ```
+///
+/// # Arguments
+///
+/// * `cfg` - Library configuration whose rounding overrides, tolerance policy,
+///   and rounding mode are copied into the immutable snapshot.
 pub fn rounding_context_from(cfg: &FinstackConfig) -> RoundingContext {
     RoundingContext {
         mode: cfg.rounding.mode,
@@ -620,6 +651,11 @@ pub const NUMERIC_MODE: NumericMode = NumericMode::F64;
 /// assert_eq!(meta.numeric_mode, NumericMode::F64);
 /// assert!(meta.timestamp.is_none());
 /// ```
+///
+/// # Arguments
+///
+/// * `cfg` - Library configuration used to derive the result's rounding
+///   snapshot. The returned metadata has no timestamp.
 pub fn results_meta(cfg: &FinstackConfig) -> ResultsMeta {
     results_meta_with_timestamp(cfg, None)
 }
@@ -628,6 +664,11 @@ pub fn results_meta(cfg: &FinstackConfig) -> ResultsMeta {
 ///
 /// Use this at user-facing IO boundaries and audit trails. For deterministic outputs
 /// (golden tests, reproducible snapshots), prefer [`results_meta`].
+///
+/// # Arguments
+///
+/// * `cfg` - Library configuration used to derive the result's rounding
+///   snapshot before the current UTC timestamp is added.
 pub fn results_meta_now(cfg: &FinstackConfig) -> ResultsMeta {
     // With `wasm-bindgen` feature enabled in `time` crate, `now_utc()` works on WASM too.
     results_meta_with_timestamp(cfg, Some(time::OffsetDateTime::now_utc()))
@@ -637,6 +678,13 @@ pub fn results_meta_now(cfg: &FinstackConfig) -> ResultsMeta {
 ///
 /// This is useful for deterministic injection (tests) or when a higher-level layer
 /// controls timestamping.
+///
+/// # Arguments
+///
+/// * `cfg` - Library configuration used to derive the result's rounding
+///   snapshot.
+/// * `timestamp` - Optional UTC audit timestamp. Use `None` for deterministic
+///   metadata without a time-of-construction value.
 pub fn results_meta_with_timestamp(
     cfg: &FinstackConfig,
     timestamp: Option<time::OffsetDateTime>,

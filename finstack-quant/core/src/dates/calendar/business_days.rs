@@ -273,6 +273,14 @@ impl core::str::FromStr for BusinessDayConvention {
 /// let adj = adjust(sat, BusinessDayConvention::Following, &cal).expect("Adjustment should succeed");
 /// assert_eq!(adj, Date::from_calendar_date(2025, Month::January, 6).expect("Valid date"));
 /// ```
+///
+/// # Arguments
+///
+/// * `date` - Unadjusted date to test and, if necessary, roll to a business day.
+/// * `conv` - Business-day convention that selects the roll direction and
+///   month-crossing treatment.
+/// * `cal` - Holiday calendar used to determine whether candidate dates are
+///   business days.
 pub fn adjust<C: HolidayCalendar + ?Sized>(
     date: Date,
     conv: BusinessDayConvention,

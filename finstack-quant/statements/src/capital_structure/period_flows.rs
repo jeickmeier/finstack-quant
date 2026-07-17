@@ -57,7 +57,8 @@ pub(crate) fn period_snapshot_date(period: &Period) -> Date {
 ///   Excluded from the scale-clamp basis so toggle-driven PIK compounding is
 ///   not frozen by the clamp; pass zero when no toggle state exists.
 /// * `market_ctx` - Market context for pricing
-/// * `as_of` - Valuation date
+/// * `as_of` - Valuation date used to generate the instrument's full cashflow
+///   schedule and identify historical versus projected amounts.
 ///
 /// # Returns
 ///

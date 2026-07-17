@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::term_structures::FlatCurve;
 use finstack_quant_core::market_data::traits::{Discounting, TermStructure};

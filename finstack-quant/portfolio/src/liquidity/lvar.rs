@@ -141,6 +141,17 @@ pub struct LvarBangiaScalar {
 /// lvar        = var - spread_cost
 /// ```
 ///
+/// # Arguments
+///
+/// * `var` - Market VaR in the library's loss-negative sign convention.
+/// * `spread_mean` - Mean relative bid-ask spread as a non-negative fraction
+///   of mid price.
+/// * `spread_vol` - Standard deviation of relative bid-ask spread as a
+///   non-negative fraction of mid price.
+/// * `confidence` - VaR confidence level strictly between zero and one.
+/// * `position_value` - Signed market value whose absolute magnitude scales
+///   the expected liquidation cost.
+///
 /// # Errors
 ///
 /// Returns `Error::InvalidInput` if `var` is positive or non-finite, if

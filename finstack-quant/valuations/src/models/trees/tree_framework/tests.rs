@@ -1,3 +1,5 @@
+//! Shared node, evolution, and backward-induction components for pricing trees.
+//!
 use super::*;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::HashMap;

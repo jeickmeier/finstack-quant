@@ -56,6 +56,7 @@ impl DayCountContext {
 
     /// Return a copy with the calendar used by Bus/252.
     #[wasm_bindgen(js_name = withCalendar)]
+    /// @param calendar_code - Registered holiday-calendar identifier used by the Bus/252 convention.
     pub fn with_calendar(&self, calendar_code: &str) -> DayCountContext {
         let mut next = self.clone();
         next.calendar_code = Some(calendar_code.to_string());
@@ -64,6 +65,7 @@ impl DayCountContext {
 
     /// Return a copy with the coupon frequency used by Act/Act ISMA.
     #[wasm_bindgen(js_name = withFrequency)]
+    /// @param frequency - Coupon-frequency Tenor required by Actual/Actual ICMA calculations.
     pub fn with_frequency(&self, frequency: &Tenor) -> DayCountContext {
         let mut next = self.clone();
         next.frequency = Some(frequency.inner);
@@ -72,6 +74,7 @@ impl DayCountContext {
 
     /// Return a copy with the business-day basis used by Bus/252.
     #[wasm_bindgen(js_name = withBusBasis)]
+    /// @param bus_basis - Business-day denominator for Bus/252, normally 252.
     pub fn with_bus_basis(&self, bus_basis: u16) -> DayCountContext {
         let mut next = self.clone();
         next.bus_basis = Some(bus_basis);
@@ -82,6 +85,8 @@ impl DayCountContext {
     /// Act/Act ICMA. Errors when either date is out of range or
     /// `start >= end`.
     #[wasm_bindgen(js_name = withCouponPeriod)]
+    /// @param start_epoch_days - Reference coupon-period start as days since 1970-01-01.
+    /// @param end_epoch_days - Reference coupon-period end as days since 1970-01-01.
     pub fn with_coupon_period(
         &self,
         start_epoch_days: i32,
@@ -100,6 +105,7 @@ impl DayCountContext {
     /// Return a copy indicating whether the accrual end is the instrument's
     /// termination date (required by 30E/360 ISDA February-end handling).
     #[wasm_bindgen(js_name = withEndIsTerminationDate)]
+    /// @param value - Whether the accrual end is the contractual termination date for 30E/360 ISDA.
     pub fn with_end_is_termination_date(&self, value: bool) -> DayCountContext {
         let mut next = self.clone();
         next.end_is_termination_date = value;
@@ -266,6 +272,8 @@ impl DayCount {
 
     /// Compute a signed year fraction, preserving the start/end orientation.
     #[wasm_bindgen(js_name = signedYearFraction)]
+    /// @param start_epoch_days - Start date as days since 1970-01-01.
+    /// @param end_epoch_days - End date as days since 1970-01-01.
     pub fn signed_year_fraction(
         &self,
         start_epoch_days: i32,
@@ -280,6 +288,9 @@ impl DayCount {
 
     /// Compute the year fraction with explicit convention context.
     #[wasm_bindgen(js_name = yearFractionWithContext)]
+    /// @param start_epoch_days - Start date as days since 1970-01-01.
+    /// @param end_epoch_days - End date as days since 1970-01-01.
+    /// @param ctx - DayCountContext supplying calendar, frequency, coupon-period, and termination metadata.
     pub fn year_fraction_with_context(
         &self,
         start_epoch_days: i32,
@@ -295,6 +306,8 @@ impl DayCount {
 
     /// Count the calendar days between two dates (epoch days).
     #[wasm_bindgen(js_name = calendarDays)]
+    /// @param start_epoch_days - Start date as days since 1970-01-01.
+    /// @param end_epoch_days - End date as days since 1970-01-01.
     pub fn calendar_days(
         &self,
         start_epoch_days: i32,
@@ -430,6 +443,9 @@ impl Tenor {
 
 /// Create a date and return it as epoch days (days since 1970-01-01).
 #[wasm_bindgen(js_name = createDate)]
+/// @param year - Four-digit calendar year component of the supplied date.
+/// @param month - Calendar month number from 1 through 12.
+/// @param day - Calendar day number within the selected month.
 pub fn create_date(year: i32, month: u8, day: u8) -> Result<i32, JsValue> {
     let m = time::Month::try_from(month).map_err(to_js_err)?;
     let date = finstack_quant_core::dates::create_date(year, m, day).map_err(to_js_err)?;
@@ -438,6 +454,7 @@ pub fn create_date(year: i32, month: u8, day: u8) -> Result<i32, JsValue> {
 
 /// Convert epoch days back to `[year, month, day]` as a JS array-compatible triple.
 #[wasm_bindgen(js_name = dateFromEpochDays)]
+/// @param days - Number of days since 1970-01-01 to decompose into year, month, and day.
 pub fn date_from_epoch_days(days: i32) -> Result<Vec<i32>, JsValue> {
     let date = finstack_quant_core::dates::date_from_epoch_days(days)
         .ok_or_else(|| JsValue::from_str("epoch days out of valid date range"))?;
@@ -448,6 +465,9 @@ pub fn date_from_epoch_days(days: i32) -> Result<Vec<i32>, JsValue> {
 ///
 /// Returns the adjusted date as epoch days.
 #[wasm_bindgen(js_name = adjust)]
+/// @param epoch_days - Unadjusted date as days since 1970-01-01.
+/// @param convention - Business-day adjustment convention string accepted by the date API.
+/// @param calendar_code - Registered holiday-calendar identifier used to find business days.
 pub fn adjust(epoch_days: i32, convention: &str, calendar_code: &str) -> Result<i32, JsValue> {
     let date = epoch_to_date(epoch_days)?;
     let bdc: BusinessDayConvention = convention

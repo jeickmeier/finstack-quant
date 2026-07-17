@@ -11,10 +11,16 @@ use finstack_quant_statements::types::{NodeId, NodeSpec, NodeType};
 /// (the first period opens at zero).
 ///
 /// # Arguments
-/// * `builder` - Model builder
+/// * `builder` - Typed model builder to which beginning- and ending-balance
+///   nodes and their formulas are appended.
 /// * `name` - Base name for the roll-forward (e.g., "arr")
 /// * `increases` - List of node IDs that increase the balance
 /// * `decreases` - List of node IDs that decrease the balance
+///
+/// # Errors
+///
+/// Propagates model-builder errors while creating the beginning and ending
+/// balance nodes and their formulas.
 pub fn add_roll_forward<State>(
     builder: ModelBuilder<State>,
     name: &str,
@@ -32,12 +38,18 @@ pub fn add_roll_forward<State>(
 /// - `{name}_end`: Ending balance (Begin + Increases - Decreases)
 ///
 /// # Arguments
-/// * `builder` - Model builder
+/// * `builder` - Typed model builder to which beginning- and ending-balance
+///   nodes and their formulas are appended.
 /// * `name` - Base name for the roll-forward (e.g., "arr")
 /// * `increases` - List of node IDs that increase the balance
 /// * `decreases` - List of node IDs that decrease the balance
 /// * `opening` - Opening balance used in the first period (no prior ending
 ///   balance exists); emitted as `coalesce(lag({name}_end, 1), {opening})`
+///
+/// # Errors
+///
+/// Propagates model-builder errors for invalid/duplicate node IDs, referenced
+/// input nodes, or generated formulas.
 pub fn add_roll_forward_with_opening<State>(
     mut builder: ModelBuilder<State>,
     name: &str,

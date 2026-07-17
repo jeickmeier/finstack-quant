@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for equity instruments.
+//!
 use crate::instruments::common_impl::parameters::market::OptionType;
 use crate::instruments::common_impl::pricing::variance_replication::carr_madan_forward_variance;
 use crate::instruments::equity::variance_swap::VarianceSwap;

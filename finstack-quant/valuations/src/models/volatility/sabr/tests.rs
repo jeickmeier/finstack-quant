@@ -1,3 +1,5 @@
+//! SABR model, smile, parameter, and calibration support.
+//!
 #![allow(clippy::expect_used, clippy::panic)]
 
 use super::calibration::solve_alpha_for_atm;

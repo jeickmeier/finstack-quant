@@ -1,3 +1,5 @@
+//! Calibration target construction and shared input validation.
+//!
 use crate::calibration::api::schema::{
     SabrInterpolationMethod, SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams,
 };

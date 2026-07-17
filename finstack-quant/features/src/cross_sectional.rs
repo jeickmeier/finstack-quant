@@ -113,6 +113,17 @@ impl FromStr for CrossSectionalOp {
 
 /// Transform a value column across entities within each time partition.
 ///
+/// # Arguments
+///
+/// * `values` - Row-aligned numeric input values; `None` and non-finite values
+///   are handled according to the selected operation.
+/// * `time_key` - Row-aligned partition labels; each distinct label defines one
+///   cross-section transformed independently.
+/// * `op` - Canonical snake-case operation name, such as `"zscore"` or
+///   `"winsorize"`.
+/// * `params` - Optional operation-specific JSON parameters; omitted keys use
+///   the operation's documented defaults.
+///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, `op` is unsupported,
@@ -127,6 +138,16 @@ pub fn transform_cross_sectional(
 }
 
 /// Transform a value column across entities within each time partition.
+///
+/// # Arguments
+///
+/// * `values` - Row-aligned numeric input values; output preserves this row
+///   order after independently transforming each partition.
+/// * `time_key` - Row-aligned partition labels; length must equal `values`.
+/// * `op` - Typed cross-sectional operation that determines the transform and
+///   accepted parameter keys.
+/// * `params` - Optional operation-specific JSON parameters; omitted keys use
+///   the operation's documented defaults.
 ///
 /// # Errors
 ///

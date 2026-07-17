@@ -1,3 +1,5 @@
+//! SABR model, smile, parameter, and calibration support.
+//!
 use super::model::SABRModel;
 use crate::models::volatility::black::d1_d2_black76;
 use finstack_quant_core::{Error, Result};

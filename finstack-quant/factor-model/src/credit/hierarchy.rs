@@ -75,6 +75,11 @@ use std::collections::{BTreeMap, BTreeSet};
 /// - `Region` → `"region"`
 /// - `Sector` → `"sector"`
 /// - `Custom(name)` → `name` (the caller-chosen string, used verbatim).
+///
+/// # Arguments
+///
+/// * `dim` - Hierarchy dimension whose canonical tag-map key is required;
+///   custom dimensions preserve their configured name exactly.
 #[must_use]
 pub fn dimension_key(dim: &HierarchyDimension) -> String {
     match dim {

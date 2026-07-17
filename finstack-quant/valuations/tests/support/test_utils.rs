@@ -1,3 +1,4 @@
+// Shared test helper fragment included by valuation, attribution, and statements tests.
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 // Shared helpers for unit tests to reduce boilerplate market setup.
 use finstack_quant_core::{

@@ -191,6 +191,13 @@ impl EvaluationContext {
     /// # Arguments
     /// * `node_id` - Identifier of the node being updated
     /// * `value` - Numeric result to store for the current period
+    ///
+    /// # Errors
+    ///
+    /// Returns a node-not-found error if `node_id` is not part of this
+    /// evaluation plan. Non-finite `value`s are deliberately stored and
+    /// reported as warnings rather than errors, allowing DSL guards such as
+    /// `coalesce` or conditionals to decide how to handle them.
     pub fn set_value(&mut self, node_id: &str, value: f64) -> Result<()> {
         let idx = self
             .node_to_column
@@ -226,6 +233,13 @@ impl EvaluationContext {
     ///
     /// # Arguments
     /// * `node_id` - Identifier to query
+    ///
+    /// # Errors
+    ///
+    /// Returns a node-not-found error if `node_id` is outside the evaluation
+    /// plan, or an evaluation error if it is in the plan but has not yet been
+    /// computed for this period. A computed `NaN` is returned as `Ok(NaN)` so
+    /// callers can distinguish it from an absent value.
     pub fn get_value(&self, node_id: &str) -> Result<f64> {
         let idx = self
             .node_to_column
@@ -257,6 +271,13 @@ impl EvaluationContext {
     /// deferred; callers that need Decimal can opt in explicitly via
     /// this boundary without forcing every downstream consumer to
     /// migrate.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same missing-node or not-yet-evaluated errors as
+    /// [`get_value`](Self::get_value). It also returns an evaluation error when
+    /// the stored value is non-finite or cannot be represented as
+    /// [`rust_decimal::Decimal`].
     pub fn get_value_decimal(&self, node_id: &str) -> Result<rust_decimal::Decimal> {
         let value = self.get_value(node_id)?;
         if !value.is_finite() {
@@ -327,7 +348,19 @@ impl EvaluationContext {
         }
     }
 
-    /// Get historical capital-structure value for a specific period.
+    /// Get a capital-structure component from one completed period.
+    ///
+    /// `component` accepts `interest_expense`, `interest_expense_cash`,
+    /// `interest_expense_pik`, `principal_payment`, `debt_balance`, `fees`, or
+    /// `accrued_interest`. Pass an instrument identifier in
+    /// `instrument_or_total` for its native-currency value, or `total` for the
+    /// cashflow aggregate, which requires the reporting-currency invariant.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error if no historical snapshot exists for
+    /// `period_id`, the component is unknown, the instrument or its cashflow is
+    /// absent, or an aggregate cannot be formed under the currency invariant.
     pub fn get_historical_cs_value(
         &self,
         component: &str,
@@ -372,6 +405,17 @@ impl EvaluationContext {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The component names `fees` and `accrued_interest` are also supported.
+    /// Per-instrument values use their native currencies; `total` values use
+    /// the capital structure's reporting-currency aggregation convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error if this evaluation has no cashflow
+    /// state, `component` is unsupported, the requested instrument or period
+    /// cashflow is absent, or an aggregate cannot satisfy the currency
+    /// invariant.
     pub fn get_cs_value(&self, component: &str, instrument_or_total: &str) -> Result<f64> {
         let cs_cashflows = self
             .capital_structure_cashflows

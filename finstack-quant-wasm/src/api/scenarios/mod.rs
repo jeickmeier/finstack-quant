@@ -45,6 +45,7 @@ fn apply_with_context(
 ///
 /// Returns the validated, re-serialized JSON.
 #[wasm_bindgen(js_name = parseScenarioSpec)]
+/// @param json_str - Canonical JSON string to validate, parse, or normalize for this API.
 pub fn parse_scenario_spec(json_str: &str) -> Result<String, JsValue> {
     let spec: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(json_str).map_err(to_js_err)?;
@@ -58,6 +59,7 @@ pub fn parse_scenario_spec(json_str: &str) -> Result<String, JsValue> {
 ///
 /// Specs are merged in priority order (lower number runs first).
 #[wasm_bindgen(js_name = composeScenarios)]
+/// @param specs_json - JSON array of validated ScenarioSpec objects to compose in priority order.
 pub fn compose_scenarios(specs_json: &str) -> Result<String, JsValue> {
     compose_scenarios_json(specs_json).map_err(to_js_err)
 }
@@ -76,6 +78,7 @@ fn compose_scenarios_json(specs_json: &str) -> Result<String, String> {
 ///
 /// Returns `true` if valid, throws on error.
 #[wasm_bindgen(js_name = validateScenarioSpec)]
+/// @param json_str - Canonical JSON string to validate, parse, or normalize for this API.
 pub fn validate_scenario_spec(json_str: &str) -> Result<bool, JsValue> {
     let spec: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(json_str).map_err(to_js_err)?;
@@ -106,6 +109,7 @@ pub fn list_builtin_template_metadata() -> Result<String, JsValue> {
 ///
 /// Returns JSON-serialized `ScenarioSpec`.
 #[wasm_bindgen(js_name = buildFromTemplate)]
+/// @param template_id - Identifier of a built-in scenario template in the embedded registry.
 pub fn build_from_template(template_id: &str) -> Result<String, JsValue> {
     let registry = builtin_registry()?;
     let entry = registry
@@ -120,6 +124,7 @@ pub fn build_from_template(template_id: &str) -> Result<String, JsValue> {
 ///
 /// Returns a JS array of component ID strings.
 #[wasm_bindgen(js_name = listTemplateComponents)]
+/// @param template_id - Identifier of a built-in scenario template in the embedded registry.
 pub fn list_template_components(template_id: &str) -> Result<JsValue, JsValue> {
     let registry = builtin_registry()?;
     let entry = registry
@@ -136,6 +141,8 @@ pub fn list_template_components(template_id: &str) -> Result<JsValue, JsValue> {
 
 /// Build a specific component from a built-in composite template.
 #[wasm_bindgen(js_name = buildTemplateComponent)]
+/// @param template_id - Identifier of a built-in scenario template in the embedded registry.
+/// @param component_id - Identifier of a component within the selected composite template.
 pub fn build_template_component(template_id: &str, component_id: &str) -> Result<String, JsValue> {
     let registry = builtin_registry()?;
     let entry = registry
@@ -152,6 +159,11 @@ pub fn build_template_component(template_id: &str, component_id: &str) -> Result
 
 /// Build a scenario spec from fields.
 #[wasm_bindgen(js_name = buildScenarioSpec)]
+/// @param id - Stable identifier used to name and retrieve the supplied domain object.
+/// @param operations_json - JSON array of scenario operation specifications in execution order.
+/// @param name - Optional human-readable scenario name.
+/// @param description - Optional human-readable description of the scenario purpose.
+/// @param priority - Execution priority; lower values run earlier during composition.
 pub fn build_scenario_spec(
     id: &str,
     operations_json: &str,
@@ -187,6 +199,10 @@ pub fn build_scenario_spec(
 /// warning, and `time_roll_forward` in `business_days` mode adjusts without
 /// holiday information.
 #[wasm_bindgen(js_name = applyScenario)]
+/// @param scenario_json - JSON-serialized ScenarioSpec to validate and apply.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param model_json - JSON-serialized FinancialModelSpec that scenario operations may mutate.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 pub fn apply_scenario(
     scenario_json: &str,
     market_json: &str,
@@ -212,6 +228,9 @@ pub fn apply_scenario(
 /// Returns the same envelope shape as [`apply_scenario`] minus `model_json`;
 /// the same caveats apply (no instrument portfolio, no holiday calendar).
 #[wasm_bindgen(js_name = applyScenarioToMarket)]
+/// @param scenario_json - JSON-serialized ScenarioSpec to validate and apply.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 pub fn apply_scenario_to_market(
     scenario_json: &str,
     market_json: &str,
@@ -245,6 +264,7 @@ pub fn apply_scenario_to_market(
 ///
 /// JSON-serialized `HorizonResult`.
 #[wasm_bindgen(js_name = computeHorizonReturn)]
+/// @param config_json - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
 pub fn compute_horizon_return(
     instrument_json: &str,
     market_json: &str,

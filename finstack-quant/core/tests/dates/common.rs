@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use std::collections::HashSet;
 
 use finstack_quant_core::dates::Date;

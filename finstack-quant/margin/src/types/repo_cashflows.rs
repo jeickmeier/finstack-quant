@@ -84,6 +84,19 @@ pub fn generate_margin_cashflows(
 /// # Returns
 ///
 /// Vector of margin interest cashflows.
+///
+/// Each consecutive pair accrues simple interest on the *previous* cash margin
+/// balance: `balance × margin_interest_rate × year_fraction`. The balance sign
+/// determines the interest sign. A flow is emitted on the later date only when
+/// its absolute amount exceeds `0.01` in the supplied currency's scalar units;
+/// this function does not round the amount. Disabled margin-interest terms or
+/// fewer than two observations return an empty vector.
+///
+/// # Errors
+///
+/// Returns an error if the selected day-count convention cannot calculate a
+/// year fraction for any consecutive date pair. No validation is performed on
+/// the rate or balances beyond the arithmetic used to construct the flows.
 pub fn generate_margin_interest_cashflows(
     spec: &RepoMarginSpec,
     margin_balances: &[(Date, f64)],
@@ -130,6 +143,11 @@ pub fn generate_margin_interest_cashflows(
 ///
 /// Transforms margin call events into classified cashflows for
 /// inclusion in the full cashflow schedule.
+///
+/// # Arguments
+///
+/// * `calls` - Margin-call events whose settlement date, call date, amount,
+///   and type are mapped into schedule cashflow rows.
 pub fn margin_calls_to_cashflows(calls: &[MarginCall]) -> Vec<CashFlow> {
     calls
         .iter()

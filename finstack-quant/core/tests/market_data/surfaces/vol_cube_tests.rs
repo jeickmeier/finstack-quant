@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use finstack_quant_core::market_data::surfaces::{VolCube, VolInterpolationMode};
 use finstack_quant_core::math::volatility::sabr::SabrParams;
 

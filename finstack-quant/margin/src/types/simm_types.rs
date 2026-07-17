@@ -720,6 +720,11 @@ impl SimmSensitivities {
 /// SIMM correlation matrices are symmetric, so only `(min, max)` keys are
 /// stored in the registry. All callers MUST route pair lookups through this
 /// helper to avoid missing entries.
+///
+/// # Arguments
+///
+/// * `a` - First SIMM risk class to normalize for a symmetric lookup.
+/// * `b` - Second SIMM risk class to normalize for a symmetric lookup.
 #[must_use]
 pub fn ordered_risk_class_pair(
     a: SimmRiskClass,
@@ -733,6 +738,13 @@ pub fn ordered_risk_class_pair(
 }
 
 /// Canonical ordering of a tenor-label pair for symmetric correlation lookups.
+///
+/// # Arguments
+///
+/// * `a` - First tenor label, compared lexicographically without changing its
+///   text in the returned key.
+/// * `b` - Second tenor label, compared lexicographically without changing its
+///   text in the returned key.
 #[must_use]
 pub fn ordered_tenor_pair(a: &str, b: &str) -> (String, String) {
     if a <= b {
@@ -743,6 +755,11 @@ pub fn ordered_tenor_pair(a: &str, b: &str) -> (String, String) {
 }
 
 /// Canonical ordering of a credit-sector pair for symmetric correlation lookups.
+///
+/// # Arguments
+///
+/// * `a` - First SIMM credit sector to normalize for a symmetric lookup.
+/// * `b` - Second SIMM credit sector to normalize for a symmetric lookup.
 #[must_use]
 pub fn ordered_credit_sector_pair(
     a: SimmCreditSector,

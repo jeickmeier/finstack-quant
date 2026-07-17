@@ -1,3 +1,5 @@
+//! Calibration target construction and shared input validation.
+//!
 use crate::calibration::api::schema::InflationCurveParams;
 use crate::calibration::config::{CalibrationConfig, CalibrationMethod, ResidualWeightingScheme};
 use crate::calibration::constants::{TOLERANCE_DUP_KNOTS, WEIGHT_MIN_FLOOR};

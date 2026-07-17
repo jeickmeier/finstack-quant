@@ -88,8 +88,10 @@ fn bumped_down_spot(initial_spot: f64, h: f64) -> f64 {
 /// * `disc` - Discretization scheme
 /// * `initial_spot` - Initial spot price (S₀)
 /// * `payoff` - Payoff specification
-/// * `currency` - Currency tag
-/// * `discount_factor` - Discount factor
+/// * `currency` - Currency tag assigned to each simulated payoff and resulting
+///   price estimate.
+/// * `discount_factor` - Discount factor from the payoff horizon to valuation;
+///   it must use the same pricing convention as `payoff`.
 /// * `bump_size` - Relative bump (e.g. `0.01` for 1 %)
 ///
 /// # Returns
@@ -167,7 +169,33 @@ where
 ///
 /// `(gamma, stderr)` — the second-difference estimator and a conservative
 /// standard error under the assumption of independent MC stderrs at the
-/// three grid points.
+/// three grid points. Both values are in the pricing currency per squared
+/// initial-spot unit; the reported error is deliberately conservative because
+/// the common random numbers induce positive dependence between valuations.
+///
+/// The absolute bump is `max(|S₀| * bump_size, 1e-8)`. The down-bump is
+/// clamped to `1e-12`, so the stencil is no longer symmetric when the initial
+/// spot is close to zero.
+///
+/// # Arguments
+///
+/// * `engine` - Monte Carlo engine used for the base, up-bumped, and
+///   down-bumped valuation runs.
+/// * `rng` - Splittable random stream; matching child streams provide common
+///   random numbers across all stencil points.
+/// * `process` - Stochastic process that evolves the bumped initial state.
+/// * `disc` - Cloneable discretization scheme compatible with `process`.
+/// * `initial_spot` - Base underlying spot level in the payoff's price units.
+/// * `payoff` - Payoff evaluated on each simulated path.
+/// * `currency` - Currency tag assigned to each simulated payoff and price.
+/// * `discount_factor` - Discount factor from payoff horizon to valuation.
+/// * `bump_size` - Relative spot bump, such as `0.01` for one percent.
+///
+/// # Errors
+///
+/// Returns [`finstack_quant_core::Error::Validation`] when `rng` cannot split
+/// deterministically, because that would invalidate common-random-number
+/// pairing. Propagates errors from any of the three [`McEngine::price`] runs.
 #[allow(clippy::too_many_arguments)]
 pub fn finite_diff_gamma<R, P, D, F>(
     engine: &McEngine,
@@ -357,6 +385,20 @@ where
 /// Always runs serially (paired stderr requires deterministic per-path order).
 /// The pricer's `use_parallel` flag is honored only by [`finite_diff_delta`].
 ///
+/// # Arguments
+///
+/// * `engine` - Monte Carlo engine that supplies deterministic serial path
+///   valuation for the paired estimator.
+/// * `rng` - Splittable random stream providing common random numbers for the
+///   up and down paths.
+/// * `process` - Stochastic process that evolves the bumped initial state.
+/// * `disc` - Cloneable discretization scheme compatible with `process`.
+/// * `initial_spot` - Base underlying spot level in the payoff's price units.
+/// * `payoff` - Payoff evaluated path by path at the simulation horizon.
+/// * `currency` - Currency tag assigned to path payoff amounts.
+/// * `discount_factor` - Discount factor from payoff horizon to valuation.
+/// * `bump_size` - Relative spot bump, such as `0.01` for one percent.
+///
 /// # Returns
 ///
 /// `(delta, stderr)` where `stderr` is the **paired** standard error.
@@ -417,6 +459,20 @@ where
 /// per-path second-difference estimator
 /// `(V_up_i − 2 V_base_i + V_down_i) / h²`, which is typically one to two
 /// orders of magnitude tighter than the independence bound.
+///
+/// # Arguments
+///
+/// * `engine` - Monte Carlo engine that supplies deterministic serial path
+///   valuation for the paired estimator.
+/// * `rng` - Splittable random stream providing common random numbers for all
+///   three stencil valuations.
+/// * `process` - Stochastic process that evolves the bumped initial state.
+/// * `disc` - Cloneable discretization scheme compatible with `process`.
+/// * `initial_spot` - Base underlying spot level in the payoff's price units.
+/// * `payoff` - Payoff evaluated path by path at the simulation horizon.
+/// * `currency` - Currency tag assigned to path payoff amounts.
+/// * `discount_factor` - Discount factor from payoff horizon to valuation.
+/// * `bump_size` - Relative spot bump, such as `0.01` for one percent.
 ///
 /// # Returns
 ///

@@ -1,3 +1,5 @@
+//! Configuration, integration, and metric helpers for CDS pricing.
+//!
 use crate::constants::time as time_constants;
 
 /// Configuration for CDS pricing.

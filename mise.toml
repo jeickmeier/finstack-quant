@@ -17,6 +17,7 @@ node = "24"
 "cargo:cargo-nextest" = "latest"
 "cargo:cargo-llvm-cov" = "latest"
 "cargo:cargo-deny" = "latest"
+"cargo:cargo-public-api" = "latest"
 "cargo:maturin" = "latest"
 
 [env]
@@ -116,9 +117,10 @@ description = "Run Rust tests via cargo-nextest"
 run = "cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --no-fail-fast"
 
 [tasks.rust-doc]
-description = "Build workspace docs with strict rustdoc and run core doctests"
+description = "Build workspace docs, enforce input docs, and run core doctests"
 run = [
   "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps",
+  "python3 scripts/check_public_api_input_docs.py",
   "cargo test -p finstack-quant-core --doc",
 ]
 
@@ -223,7 +225,12 @@ description = "Lint Python (ruff format --check + ruff check, check-only)"
 run = [
   "uv run --no-sync ruff format . --check",
   "uv run --no-sync ruff check . --no-fix",
+  "uv run --no-sync python scripts/check_python_api_input_docs.py",
 ]
+
+[tasks.python-doc]
+description = "Enforce substantive Python binding input documentation"
+run = "uv run --no-sync python scripts/check_python_api_input_docs.py"
 
 [tasks.python-typecheck]
 description = "Type-check Python bindings with ty"
@@ -281,7 +288,12 @@ description = "Lint WASM/TS code (prettier --check + eslint, check-only)"
 run = [
   "npm --prefix finstack-quant-wasm run format",
   "npm --prefix finstack-quant-wasm run lint",
+  "python3 scripts/check_wasm_api_input_docs.py",
 ]
+
+[tasks.wasm-doc]
+description = "Enforce substantive WASM export input documentation"
+run = "python3 scripts/check_wasm_api_input_docs.py"
 
 [tasks.wasm-pkg]
 description = "Build WASM package (web + node targets)"

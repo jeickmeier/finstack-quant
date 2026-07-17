@@ -464,6 +464,12 @@ impl FloatingRateSpec {
     /// - `reset_lag_days` must be non-negative (fixing before accrual start)
     /// - Index floor must not exceed index cap (if both specified)
     /// - All-in floor must not exceed all-in cap (if both specified)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reset lag is negative, an index floor exceeds
+    /// its index cap, or an all-in floor exceeds its all-in cap. Rates and
+    /// spreads are quoted in basis points where the field name ends in `_bp`.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         if self.reset_lag_days < 0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -580,6 +586,12 @@ pub struct StepUpCouponSpec {
 
 impl StepUpCouponSpec {
     /// Validate step dates and rates before compilation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `step_schedule` dates are duplicated or not
+    /// strictly increasing. Rates are applied in their given decimal units;
+    /// this method does not impose a rate floor or cap.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         for (window, current) in self
             .step_schedule

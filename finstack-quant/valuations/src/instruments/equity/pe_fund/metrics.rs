@@ -194,6 +194,14 @@ impl MetricCalculator for CarryAccruedCalculator {
 /// invariance, and unbounded high-rate handling. The waterfall IRR routine
 /// (`WaterfallSpec::calculate_irr`) delegates here so both stay consistent.
 ///
+/// # Arguments
+///
+/// * `flows` - Dated LP or fund cashflows. Negative amounts represent capital
+///   contributions and positive amounts distributions; all amounts must share
+///   one currency because currency is deliberately removed before solving.
+/// * `day_count` - Convention used to convert each date from the earliest
+///   cashflow into a fractional year for the XIRR discount equation.
+///
 /// # Errors
 ///
 /// Propagates errors from

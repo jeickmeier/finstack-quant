@@ -6824,10 +6824,10 @@
       ]
     },
     "CoverageTrigger": {
-      "description": "Coverage test trigger specification",
+      "description": "Coverage-test trigger specification for a tranche or deal.",
       "properties": {
         "breach_date": {
-          "description": "Date when breach occurred (if any)",
+          "description": "Date on which the breach was recorded, if one has occurred.",
           "format": "date",
           "type": [
             "string",
@@ -6836,10 +6836,10 @@
         },
         "consequence": {
           "$ref": "#/$defs/TriggerConsequence",
-          "description": "What happens when triggered"
+          "description": "Consequence applied while the trigger is breached."
         },
         "cure_level": {
-          "description": "Higher level required to cure breach",
+          "description": "Optional higher coverage ratio required to cure a breach.",
           "format": "double",
           "type": [
             "number",
@@ -6847,7 +6847,7 @@
           ]
         },
         "trigger_level": {
-          "description": "Trigger threshold level (e.g., 1.20 for 120% OC)",
+          "description": "Breach threshold, expressed as a coverage ratio (1.20 means 120%).",
           "format": "double",
           "type": "number"
         }
@@ -6980,28 +6980,28 @@
       "type": "object"
     },
     "CreditEnhancement": {
-      "description": "Credit enhancement mechanisms for a tranche",
+      "description": "Credit-enhancement amounts and flags available to a tranche.",
       "properties": {
         "cash_trap_active": {
-          "description": "Cash trap/turbo active",
+          "description": "Whether residual cash is currently trapped or turboed into principal.",
           "type": "boolean"
         },
         "excess_spread": {
-          "description": "Available excess spread",
+          "description": "Excess spread available to absorb losses, as an annual decimal rate.",
           "format": "double",
           "type": "number"
         },
         "overcollateralization": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Overcollateralization amount"
+          "description": "Collateral balance in excess of rated tranche balance."
         },
         "reserve_account": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Reserve account balance"
+          "description": "Cash reserve balance available as credit enhancement."
         },
         "subordination": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Subordination amount (sum of junior tranches)"
+          "description": "Principal subordination supplied by junior tranches."
         }
       },
       "required": [
@@ -14614,10 +14614,10 @@
       "type": "object"
     },
     "PoolAsset": {
-      "description": "Individual asset in the structured credit pool",
+      "description": "Individual asset held in a structured-credit collateral pool.\n\nMonetary fields use the asset's native currency. Rates are annual decimal\nrates unless a field explicitly says basis points.",
       "properties": {
         "acquisition_date": {
-          "description": "Acquisition date",
+          "description": "Date on which the pool acquired the asset, if known.",
           "format": "date",
           "type": [
             "string",
@@ -14626,11 +14626,11 @@
         },
         "asset_type": {
           "$ref": "#/$defs/AssetType",
-          "description": "Asset classification"
+          "description": "Economic asset classification used by pool-level assumptions."
         },
         "balance": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Current outstanding balance"
+          "description": "Current outstanding principal balance in the asset currency."
         },
         "contractual_payment": {
           "anyOf": [
@@ -14653,42 +14653,42 @@
               "type": "null"
             }
           ],
-          "description": "Credit quality"
+          "description": "Optional credit-quality classification of the obligor or asset."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for interest calculation"
+          "description": "Day-count convention used for coupon and accrual calculations."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique asset identifier"
+          "description": "Stable identifier used to match the asset to diagnostics and scenarios."
         },
         "index_id": {
-          "description": "Reference index for floating rate (e.g., \"SOFR-3M\", \"LIBOR-3M\")",
+          "description": "Reference index identifier for floating-rate assets, such as SOFR-3M.",
           "type": [
             "string",
             "null"
           ]
         },
         "industry": {
-          "description": "Industry classification",
+          "description": "Optional industry classification used by concentration checks.",
           "type": [
             "string",
             "null"
           ]
         },
         "is_defaulted": {
-          "description": "Default status",
+          "description": "Whether the asset is currently treated as defaulted by the pool model.",
           "type": "boolean"
         },
         "maturity": {
-          "description": "Maturity date",
+          "description": "Contractual maturity date of the asset.",
           "format": "date",
           "type": "string"
         },
         "mdr_override": {
           "default": null,
-          "description": "Optional override for Monthly Default Rate (MDR)",
+          "description": "Optional decimal Monthly Default Rate override.",
           "format": "double",
           "type": [
             "number",
@@ -14696,7 +14696,7 @@
           ]
         },
         "obligor_id": {
-          "description": "Obligor/borrower identifier",
+          "description": "Optional obligor identifier used for single-name concentration limits.",
           "type": [
             "string",
             "null"
@@ -14711,10 +14711,10 @@
               "type": "null"
             }
           ],
-          "description": "Purchase price (for trading gain/loss)"
+          "description": "Acquisition price in the asset currency, used for trading gain/loss."
         },
         "rate": {
-          "description": "Current interest rate (all-in coupon)",
+          "description": "Current all-in coupon as an annual decimal rate.",
           "format": "double",
           "type": "number"
         },
@@ -14727,11 +14727,11 @@
               "type": "null"
             }
           ],
-          "description": "Recovery amount (if defaulted)"
+          "description": "Realized or modeled recovery amount when the asset is defaulted."
         },
         "smm_override": {
           "default": null,
-          "description": "Optional override for Single Monthly Mortality (SMM)",
+          "description": "Optional decimal Single Monthly Mortality override.",
           "format": "double",
           "type": [
             "number",
@@ -14739,7 +14739,7 @@
           ]
         },
         "spread_bps": {
-          "description": "Spread over index in basis points (for floating rate assets)\nFor WAS calculation: use this field, not the all-in rate",
+          "description": "Spread over the reference index in basis points for floating-rate assets.\nWeighted-average-spread calculations use this field rather than the\nall-in coupon because the index component is not a credit spread.",
           "format": "double",
           "type": [
             "number",
@@ -18548,11 +18548,11 @@
       ]
     },
     "TrancheBehaviorType": {
-      "description": "Tranche behavioral types (simplified to standard only)",
+      "description": "Tranche behavioral type used by the structured-credit waterfall.",
       "oneOf": [
         {
           "const": "Standard",
-          "description": "Standard bond (pays interest and principal)",
+          "description": "Standard debt tranche that receives interest and principal payments.",
           "type": "string"
         }
       ]

@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use super::test_helpers::{
     sample_base_correlation_curve, sample_base_date, sample_discount_curve, sample_forward_curve,
     sample_hazard_curve, sample_inflation_curve, sample_vol_surface,

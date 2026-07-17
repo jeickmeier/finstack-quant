@@ -60,6 +60,13 @@ pub const GIRR_XCCY_BASIS_CORRELATION: f64 = 0.0;
 ///
 /// Uses the parametric formula from BCBS d457:
 /// `rho = max(exp(-theta * |T_k - T_l| / min(T_k, T_l)), floor)`
+///
+/// # Arguments
+///
+/// * `tenor_k_years` - First GIRR risk-factor tenor, expressed as a positive
+///   number of years.
+/// * `tenor_l_years` - Second GIRR risk-factor tenor, expressed as a positive
+///   number of years; equal tenors return correlation 1.0.
 #[must_use]
 pub fn girr_tenor_correlation(tenor_k_years: f64, tenor_l_years: f64) -> f64 {
     if (tenor_k_years - tenor_l_years).abs() < 1e-12 {
@@ -75,6 +82,11 @@ pub fn girr_tenor_correlation(tenor_k_years: f64, tenor_l_years: f64) -> f64 {
 }
 
 /// Convert a standard tenor label to years.
+///
+/// # Arguments
+///
+/// * `tenor` - Exact BCBS standard tenor label, such as `"0.25Y"` or `"10Y"`;
+///   unsupported labels return `None`.
 #[must_use]
 pub fn tenor_to_years(tenor: &str) -> Option<f64> {
     match tenor {

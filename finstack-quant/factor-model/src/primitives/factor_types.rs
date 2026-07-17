@@ -1,3 +1,5 @@
+//! Core identifiers and definitions used by the factor model.
+//!
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
