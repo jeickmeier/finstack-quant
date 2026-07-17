@@ -143,7 +143,7 @@ mod tests {
     use super::*;
     use finstack_quant_core::HashMap;
     use finstack_quant_valuations::calibration::api::schema::{
-        CALIBRATION_SCHEMA, CalibrationPlan,
+        CalibrationPlan, CALIBRATION_SCHEMA,
     };
 
     fn empty_envelope_json() -> String {

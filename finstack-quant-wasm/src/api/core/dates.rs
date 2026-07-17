@@ -2,9 +2,9 @@
 
 use crate::utils::to_js_err;
 use finstack_quant_core::dates::{
+    adjust as core_adjust, available_calendars as core_available_calendars, calendar_by_id,
     BusinessDayConvention, DayCount as RustDayCount, DayCountContext as RustDayCountContext,
-    Tenor as RustTenor, adjust as core_adjust, available_calendars as core_available_calendars,
-    calendar_by_id,
+    Tenor as RustTenor,
 };
 use wasm_bindgen::prelude::*;
 

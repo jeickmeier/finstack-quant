@@ -9,9 +9,9 @@
 
 use crate::utils::to_js_err;
 use finstack_quant_valuations::pricer::cos::{
-    BlackScholesCosParams, MertonJumpCosParams, VarianceGammaCosParams,
     bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
-    vg_cos_price as rust_vg_cos_price,
+    vg_cos_price as rust_vg_cos_price, BlackScholesCosParams, MertonJumpCosParams,
+    VarianceGammaCosParams,
 };
 use wasm_bindgen::prelude::*;
 

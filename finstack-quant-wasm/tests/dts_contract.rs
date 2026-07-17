@@ -383,9 +383,12 @@ fn core_daycount_dts_exposes_context_for_context_dependent_conventions() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "ActActIsma and Bus252 require explicit context"
+        "Act/Act ISMA and Bus/252 require explicit frequency/calendar context"
     ));
-    assert!(contains_ignoring_ws(&dts, "throws when called without it"));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "This method throws for those conventions"
+    ));
 }
 
 #[test]

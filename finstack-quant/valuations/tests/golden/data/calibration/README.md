@@ -19,10 +19,10 @@ This pattern covers two distinct test shapes with one runner:
 1. **Vendor parity** — `expected` values are sourced from a vendor
    (Bloomberg SWPM, QuantLib `IsdaCdsEngine`, etc.). Any drift in
    calibration math surfaces as a parity failure.
-  - Example: [`pricing/bloomberg/irs/usd_sofr_5y_receive_fixed_swpm.json`](../pricing/bloomberg/irs/usd_sofr_5y_receive_fixed_swpm.json)
+- Example: [`pricing/bloomberg/irs/usd_sofr_5y_receive_fixed_swpm.json`](../pricing/bloomberg/irs/usd_sofr_5y_receive_fixed_swpm.json)
      — bootstraps USD-SOFR from 26 SWPM Curve 490 quotes, prices a 5Y
      receive-fixed swap, expected NPV from the SWPM screen.
-  - Example: [`pricing/quantlib/cds/cds_quantlib_flat_hazard_decomposition.json`](../pricing/quantlib/cds/cds_quantlib_flat_hazard_decomposition.json)
+- Example: [`pricing/quantlib/cds/cds_quantlib_flat_hazard_decomposition.json`](../pricing/quantlib/cds/cds_quantlib_flat_hazard_decomposition.json)
      — flat 1% hazard / flat 2% discount, prices each CDS leg, expected
      values from QuantLib `IsdaCdsEngine`.
 
@@ -30,7 +30,7 @@ This pattern covers two distinct test shapes with one runner:
    calibration inputs. `expected.npv` ≈ 0 with a tight tolerance,
    demonstrating the bootstrap converged. These are formula-source and
    serve as bit-stable regression catches for any calibration code change.
-  - Example: [`pricing/regression_goldens/cds/usd_5y_cds_self_test.json`](../pricing/regression_goldens/cds/usd_5y_cds_self_test.json)
+- Example: [`pricing/regression_goldens/cds/usd_5y_cds_self_test.json`](../pricing/regression_goldens/cds/usd_5y_cds_self_test.json)
 
 ## When would a calibration-specific runner make sense?
 

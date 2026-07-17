@@ -7,7 +7,7 @@
 
 use crate::utils::{date_to_iso, to_js_err};
 use finstack_quant_analytics as fa;
-use finstack_quant_core::dates::{FiscalConfig, HolidayCalendar, PeriodKind, calendar_by_id};
+use finstack_quant_core::dates::{calendar_by_id, FiscalConfig, HolidayCalendar, PeriodKind};
 use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
 

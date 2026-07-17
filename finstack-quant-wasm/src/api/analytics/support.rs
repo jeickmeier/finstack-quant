@@ -3,8 +3,8 @@
 use crate::utils::to_js_err;
 pub(super) use crate::utils::{parse_iso_date, parse_iso_dates};
 use js_sys::{Array, Float64Array};
-use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 
 pub(super) fn parse_f64_vec(value: JsValue) -> Result<Vec<f64>, JsValue> {
     if value.is_instance_of::<Float64Array>() {

@@ -369,8 +369,8 @@ mod tests {
     pub(crate) fn bond_instrument_json() -> String {
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::money::Money;
-        use finstack_quant_valuations::instruments::InstrumentJson;
         use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+        use finstack_quant_valuations::instruments::InstrumentJson;
 
         let bond = Bond::fixed(
             "TEST-BOND",
@@ -385,8 +385,8 @@ mod tests {
     }
 
     pub(crate) fn bermudan_swaption_json() -> String {
-        use finstack_quant_valuations::instruments::InstrumentJson;
         use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
+        use finstack_quant_valuations::instruments::InstrumentJson;
 
         serde_json::to_string(&InstrumentJson::BermudanSwaption(
             BermudanSwaption::example(),

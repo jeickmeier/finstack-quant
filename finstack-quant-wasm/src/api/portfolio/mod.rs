@@ -433,7 +433,7 @@ pub fn parametric_var_decomposition(
     confidence: f64,
 ) -> Result<String, JsValue> {
     use finstack_quant_portfolio::factor_model::{
-        DecompositionConfig, ParametricPositionDecomposer, parametric_var_decomposition_view,
+        parametric_var_decomposition_view, DecompositionConfig, ParametricPositionDecomposer,
     };
     use finstack_quant_portfolio::types::PositionId;
 
@@ -475,7 +475,7 @@ pub fn parametric_es_decomposition(
     confidence: f64,
 ) -> Result<String, JsValue> {
     use finstack_quant_portfolio::factor_model::{
-        DecompositionConfig, ParametricPositionDecomposer, parametric_es_decomposition_view,
+        parametric_es_decomposition_view, DecompositionConfig, ParametricPositionDecomposer,
     };
     use finstack_quant_portfolio::types::PositionId;
 
@@ -511,8 +511,8 @@ pub fn historical_var_decomposition(
     confidence: f64,
 ) -> Result<String, JsValue> {
     use finstack_quant_portfolio::factor_model::{
-        DecompositionConfig, HistoricalPositionDecomposer, flatten_position_pnls,
-        parametric_var_decomposition_view,
+        flatten_position_pnls, parametric_var_decomposition_view, DecompositionConfig,
+        HistoricalPositionDecomposer,
     };
     use finstack_quant_portfolio::types::PositionId;
 
@@ -545,7 +545,7 @@ pub fn evaluate_risk_budget(
     portfolio_var: f64,
     utilization_threshold: f64,
 ) -> Result<String, JsValue> {
-    use finstack_quant_portfolio::factor_model::{RiskBudget, risk_budget_result_view};
+    use finstack_quant_portfolio::factor_model::{risk_budget_result_view, RiskBudget};
     use finstack_quant_portfolio::types::PositionId;
     use indexmap::IndexMap;
 

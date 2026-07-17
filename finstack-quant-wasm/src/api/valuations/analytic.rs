@@ -427,20 +427,18 @@ mod tests {
             "a non-finite quanto option price must produce an error"
         );
         // A well-posed input still returns a finite price.
-        assert!(
-            quanto_option_price(
-                100.0,
-                100.0,
-                1.0,
-                0.03,
-                0.01,
-                0.0,
-                0.20,
-                0.10,
-                0.3,
-                Some(true)
-            )
-            .is_ok()
-        );
+        assert!(quanto_option_price(
+            100.0,
+            100.0,
+            1.0,
+            0.03,
+            0.01,
+            0.0,
+            0.20,
+            0.10,
+            0.3,
+            Some(true)
+        )
+        .is_ok());
     }
 }

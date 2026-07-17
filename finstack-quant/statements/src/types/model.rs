@@ -143,10 +143,7 @@ impl FinancialModelSpec {
     /// period appears after any forecast period.
     fn validate_period_timeline(periods: &[finstack_quant_core::dates::Period]) -> Result<()> {
         for window in periods.windows(2) {
-            let (prev, next) = match window {
-                [prev, next] => (prev, next),
-                _ => continue,
-            };
+            let [prev, next] = window else { continue };
             if next.id <= prev.id {
                 return Err(Error::build(format!(
                     "Model periods must be in strictly increasing chronological order, but \

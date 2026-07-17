@@ -19,6 +19,7 @@ node = "24"
 "cargo:cargo-deny" = "latest"
 "cargo:cargo-public-api" = "latest"
 "cargo:maturin" = "latest"
+"aqua:google/osv-scanner" = "2.3.5"
 
 [env]
 CARGO_INCREMENTAL = "{{ env.CARGO_INCREMENTAL | default(value='1') }}"
@@ -95,9 +96,19 @@ depends = ["rust-update", "python-update"]
 description = "Remove build artifacts and virtualenvs"
 run = ["cargo clean", '''python3 scripts/clean_workspace.py''']
 
+[tasks.all-doc]
+description = "Verify Rust, Python, and WASM documentation (CI docs job)"
+depends = ["rust-doc", "python-doc", "wasm-doc"]
+
 [tasks.all-ci]
-description = "Run CI-equivalent checks locally (wasm-build + pre-commit + all-test)"
-depends = ["wasm-build", "pre-commit-run", "all-test"]
+description = "Run CI build.yml checks locally (lint, tests, docs, cargo-deny, publish checks)"
+depends = [
+  "pre-commit-run",
+  "all-test",
+  "all-doc",
+  "rust-audit",
+  "rust-publish-checks",
+]
 
 # ─────────────────────────────────────────────────────────────────
 # Rust
@@ -359,7 +370,7 @@ git diff --quiet finstack-quant/cashflows/schemas/ finstack-quant/valuations/sch
 """
 
 # ─────────────────────────────────────────────────────────────────
-# Pre-commit
+# Pre-commit / CI supply-chain
 # ─────────────────────────────────────────────────────────────────
 
 [tasks.pre-commit-install]
@@ -370,7 +381,7 @@ run = [
 ]
 
 [tasks.pre-commit-run]
-description = "Run all pre-commit hooks on the full tree"
+description = "Run all pre-commit hooks on the full tree (CI lint job)"
 run = [
   "uv run --no-sync pre-commit run --all-files",
   "uv run --no-sync pre-commit run --all-files --hook-stage pre-push",
@@ -379,6 +390,15 @@ run = [
 [tasks.pre-commit-update]
 description = "Autoupdate pre-commit hook versions"
 run = "uv run --no-sync pre-commit autoupdate"
+
+[tasks.osv-scan]
+description = "Full OSV lockfile scan (CI push-to-master job; PR CI is diff-only)"
+run = """
+osv-scanner \
+  --lockfile=Cargo.lock \
+  --lockfile=uv.lock \
+  --lockfile=finstack-quant-wasm/package-lock.json
+"""
 
 # ─────────────────────────────────────────────────────────────────
 # Benchmarks (Rust-only)

@@ -10,11 +10,11 @@
 //! factories.
 
 use crate::utils::to_js_err;
-use finstack_quant_valuations::instruments::InstrumentJson;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CDSIndex;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CDSOption;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
+use finstack_quant_valuations::instruments::InstrumentJson;
 use wasm_bindgen::prelude::*;
 
 /// Example tagged `CreditDefaultSwap` instrument JSON.

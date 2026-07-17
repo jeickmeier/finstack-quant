@@ -91,8 +91,8 @@ fn estimate_to_js(est: &MoneyEstimate) -> Result<JsValue, JsValue> {
 }
 
 /// Resolve the embedded binding defaults from the registry.
-fn binding_defaults()
--> Result<&'static finstack_quant_monte_carlo::registry::PythonBindingDefaults, JsValue> {
+fn binding_defaults(
+) -> Result<&'static finstack_quant_monte_carlo::registry::PythonBindingDefaults, JsValue> {
     finstack_quant_monte_carlo::registry::embedded_defaults()
         .map(|defaults| &defaults.python_bindings)
         .map_err(to_js_err)
@@ -400,7 +400,7 @@ fn price_asian(
     currency: Option<String>,
 ) -> Result<JsValue, JsValue> {
     use finstack_quant_monte_carlo::payoff::asian::{
-        AsianCall, AsianPut, AveragingMethod, default_fixing_steps,
+        default_fixing_steps, AsianCall, AsianPut, AveragingMethod,
     };
     use finstack_quant_monte_carlo::pricer::path_dependent::{
         PathDependentPricer, PathDependentPricerConfig,

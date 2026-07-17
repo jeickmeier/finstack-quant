@@ -160,4 +160,3 @@ pub fn create_convertible_with_policy(policy: ConversionPolicy) -> ConvertibleBo
 
 /// Relaxed relative tolerance for convergence tests (5%)
 pub const CONVERGENCE_TOLERANCE_PCT: f64 = 0.05;
-

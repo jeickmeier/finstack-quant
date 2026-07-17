@@ -30,7 +30,7 @@ For every exported function/class/constructor/static factory/method/property:
   - Name every caller-supplied parameter exactly (Rust or generated camelCase).
   - Give a substantive description including units and constraints.
   - JSDoc form: `@param <name> - description`.
-  - Rustdoc form: `* `<name>` - description`.
+  - Rustdoc form: `*`<name>`- description`.
   - `@returns - description (include units)`
   - `@throws - when an error is thrown`
 - **Conventions** (when applicable):

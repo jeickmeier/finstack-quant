@@ -1023,7 +1023,7 @@ mod tests {
                 .periods("2025Q1..Q1", None)
                 .expect("valid periods")
                 .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-                .compute("scaled", &format!("revenue * {factor}"))
+                .compute("scaled", format!("revenue * {factor}"))
                 .expect("valid formula")
                 .build()
                 .expect("valid model")

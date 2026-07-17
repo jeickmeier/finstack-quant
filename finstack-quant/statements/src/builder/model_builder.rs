@@ -25,8 +25,8 @@ const RESERVED_DSL_IDENTIFIERS: &[&str] = &["if", "and", "or", "not", "true", "f
 ///
 /// The `__cs__` prefix is reserved for internal capital structure references,
 /// `__` prefix is reserved for other internal use, and identifiers that
-/// collide with a DSL keyword or built-in function (see
-/// [`RESERVED_DSL_IDENTIFIERS`]) would shadow the language primitive.
+/// collide with a DSL keyword (see `RESERVED_DSL_IDENTIFIERS`) would shadow the
+/// language primitive.
 ///
 /// Exposed so binding layers can pre-validate a node id without consuming a
 /// (move-based) builder — mirroring the check `compute` runs internally.

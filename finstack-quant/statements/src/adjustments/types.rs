@@ -181,7 +181,7 @@ impl NormalizationConfig {
     /// Returns an error naming the first adjustment ID that appears more than
     /// once.
     ///
-    /// [`NormalizationEngine::normalize`]: crate::adjustments::NormalizationEngine::normalize
+    /// [`NormalizationEngine::normalize`]: crate::adjustments::engine::NormalizationEngine::normalize
     pub fn validate(&self) -> crate::error::Result<()> {
         let mut seen: IndexSet<&str> = IndexSet::with_capacity(self.adjustments.len());
         for adjustment in &self.adjustments {
