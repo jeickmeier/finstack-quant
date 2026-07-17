@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-e03-move-analytic-dispatch-to-rust`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Move analytic option dispatch and validation into Rust
 
-**Tier:** 3/4 (binding logic and numerical boundary)  
-**Estimated net LOC:** −120 to −220  
-**Addresses:** F26  
+**Tier:** 3/4 (binding logic and numerical boundary)
+**Estimated net LOC:** −120 to −220
+**Addresses:** F26
 **Depends on:** B08 and C07
 
 **Files/filesets:**

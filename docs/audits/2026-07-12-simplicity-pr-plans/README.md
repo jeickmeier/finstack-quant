@@ -1,8 +1,8 @@
 # Simplicity Remediation PR Plan Index
 
-**Based on:** [2026-07-12 core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md)  
-**Snapshot:** `1868f5b6b`  
-**Plan date:** 2026-07-12  
+**Based on:** [2026-07-12 core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md)
+**Snapshot:** `1868f5b6b`
+**Plan date:** 2026-07-12
 **Total standalone PR plans:** 61
 
 These plans close all 33 audit findings and all 12 incidental hazards. Each file is a self-contained handoff for one implementation branch. The normal target is 1–5 files and fewer than 300 net changed lines. Plans marked as compile-atomic or domain-wave exceptions are intentionally larger because splitting them would leave a non-compiling or half-migrated public type.

@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-e08-centralize-binding-export-contract`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Make the parity contract authoritative for repeated export manifests
 
-**Tier:** 2/3 (contract tooling)  
-**Estimated net LOC:** −40 to −100  
-**Addresses:** F33 and binding-drift follow-up  
+**Tier:** 2/3 (contract tooling)
+**Estimated net LOC:** −40 to −100
+**Addresses:** F33 and binding-drift follow-up
 **Depends on:** A11, A12, E01-E07
 
 **Files/filesets:**

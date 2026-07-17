@@ -1,13 +1,13 @@
 # Audit Report: `finstack-quant::{core,cashflows,valuations}`
 
-**Scope:** all Rust source under `finstack-quant/core/src`, `finstack-quant/cashflows/src`, and `finstack-quant/valuations/src`, plus related Python/WASM bindings, stubs, facades, schemas, parity contracts, tests, and examples.  
+**Scope:** all Rust source under `finstack-quant/core/src`, `finstack-quant/cashflows/src`, and `finstack-quant/valuations/src`, plus related Python/WASM bindings, stubs, facades, schemas, parity contracts, tests, and examples.
 **Bindings in scope:**
 
 - `finstack-quant-py/src/bindings/{core,cashflows,valuations}` — exists
 - `finstack-quant-wasm/src/api/{core,cashflows,valuations}` — exists
 - Python stubs/package exports, JS facades, `index.d.ts`, generated WASM types, and `parity_contract.toml` — exists
 
-**Date:** 2026-07-12  
+**Date:** 2026-07-12
 **Auditor:** finstack-simplify / Phase 1 (read-only)
 
 ## Executive summary
@@ -106,9 +106,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Delete the disconnected types and root re-exports. If host request DTOs are required, name them `*Request` and add checked conversions into the real construction types.
 
-**Invariants touched:** Decimal, serde, parity  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** Decimal, serde, parity
+**Impact:** H
+**Risk:** M
 **Tier:** 3
 
 ---
@@ -127,9 +127,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Retain one calibrator with focused shift/ATM options. Privatize or delete derivative-only DTOs and delegate binding validation to Rust.
 
-**Invariants touched:** negative-rate shift, objective weights, ATM pinning  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** negative-rate shift, objective weights, ATM pinning
+**Impact:** H
+**Risk:** M
 **Tier:** 3
 
 ---
@@ -148,9 +148,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Require principal/horizon at builder construction, or make fallible mutators return `Result`. Remove silent no-ops and error clearing. Rename `build_with_curves` only as part of this redesign.
 
-**Invariants touched:** precedence, contractual completeness  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** precedence, contractual completeness
+**Impact:** H
+**Risk:** M
 **Tier:** 3
 
 ---
@@ -168,9 +168,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Build through a metadata-safe canonical constructor and delete instrument-local rank/sort functions.
 
-**Invariants touched:** precedence, balance replay, deterministic serde  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** precedence, balance replay, deterministic serde
+**Impact:** H
+**Risk:** M
 **Tier:** 3
 
 ---
@@ -189,9 +189,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Create one numerically stable checked annual/monthly mortality kernel. Any clamping must be an explicitly named caller-boundary operation; move standard seasoning parameters to one dependency-neutral owner.
 
-**Invariants touched:** rate units, numerical stability, financial conventions  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** rate units, numerical stability, financial conventions
+**Impact:** H
+**Risk:** M
 **Tier:** 4
 
 ---
@@ -210,9 +210,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Make `&mut self` canonical. Retain only deliberate `with_*` consuming conveniences where chaining is materially useful, and have bindings call mutable kernels directly.
 
-**Invariants touched:** FX, credit-index rebinding, cache invalidation  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** FX, credit-index rebinding, cache invalidation
+**Impact:** H
+**Risk:** M
 **Tier:** 3
 
 ---
@@ -231,9 +231,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Keep one typed-array Rust primitive per calculation. Let the JS facade accept the existing `NumericArray = number[] | Float64Array` union and normalize nested matrix inputs there.
 
-**Invariants touched:** parity, floating-point identity  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** parity, floating-point identity
+**Impact:** H
+**Risk:** M
 **Tier:** 3
 
 ---
@@ -252,9 +252,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Keep generic strategies and one enum-backed construction kernel. Remove the boxed factory/trait, or implement a compatibility adapter from the canonical enum during deprecation.
 
-**Invariants touched:** extrapolation, monotonicity, numerical outputs  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** extrapolation, monotonicity, numerical outputs
+**Impact:** H
+**Risk:** M
 **Tier:** 2/3
 
 ---
@@ -280,9 +280,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Establish one dependency-neutral type for each domain concept. Preserve old paths with aliases or checked conversions during migration; do not merge genuinely different credit-barrier concepts.
 
-**Invariants touched:** serde, payoff dispatch, barrier inequalities, position sign  
-**Impact:** H  
-**Risk:** M/H  
+**Invariants touched:** serde, payoff dispatch, barrier inequalities, position sign
+**Impact:** H
+**Risk:** M/H
 **Tier:** 3/4
 
 ---
@@ -301,9 +301,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Standardize on `calendar_by_id`, `available_calendars`, and a typed-ID helper. Remove the singleton, lifetime parameter, and the auxiliary weekends-only ownership wrapper.
 
-**Invariants touched:** ISDA, calendars, serde  
-**Impact:** H  
-**Risk:** M/H  
+**Invariants touched:** ISDA, calendars, serde
+**Impact:** H
+**Risk:** M/H
 **Tier:** 4
 
 ---
@@ -323,9 +323,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** First enrich `MarketDependencies` with typed volatility requests and reference strikes. Then migrate all generic metric bounds and delete both legacy traits. Do not rely on an empty default for production instruments.
 
-**Invariants touched:** curve roles, factor discovery, vega localization  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** curve roles, factor discovery, vega localization
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -344,9 +344,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Introduce one atomic scheduled-flow record containing the flow, accrual period, day count, and eventually resolved rate decomposition. Make schedule storage private and version the serde migration.
 
-**Invariants touched:** serde, day count, precedence, balance replay  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** serde, day count, precedence, balance replay
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -365,9 +365,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Embed one `ScheduleParams`, using temporary serde flattening if necessary. Separate floating-index terms from payment-schedule terms and replace the three step-up pathways with one explicit coupon program.
 
-**Invariants touched:** ISDA, serde, calendars, stubs  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** ISDA, serde, calendars, stubs
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -386,9 +386,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Create one `build_schedule(BuildPeriodsParams) -> PeriodSchedule`; make the single-period case delegate to it, migrate callers, and privatize old entry points.
 
-**Invariants touched:** calendars, stubs, reset/payment lag, day count  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** calendars, stubs, reset/payment lag, day count
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -407,9 +407,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Define one serializable coupon/payment-program schema and make both the Rust builder and bindings compile it.
 
-**Invariants touched:** serde, parity, contract economics  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** serde, parity, contract economics
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -428,9 +428,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Generate and store cashflow schemas beside the cashflows crate. Valuations should consume the published resource rather than own it.
 
-**Invariants touched:** serde, schema IDs, parity  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** serde, schema IDs, parity
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -450,9 +450,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Retain flattening only in a wire adapter. Store focused runtime state and pass metric/scenario controls through their owning pipelines; then remove full-bag hooks and forwarding builders.
 
-**Invariants touched:** serde, bump units, deterministic seeds, scenario precedence  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** serde, bump units, deterministic seeds, scenario precedence
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -472,9 +472,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Core owns unit-annuity states, prices, and Greeks. Valuations dispatches option type and applies DF/annuity/notional. Select and document degenerate-limit behavior before deleting copies.
 
-**Invariants touched:** zero-vol/expiry limits, Greek units, put-call parity  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** zero-vol/expiry limits, Greek units, put-call parity
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -494,9 +494,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Create one internal lifecycle: validate → resolve as-of → base/raw PV → scenario → details → metrics → metadata. Every Rust and binding entry point delegates to it.
 
-**Invariants touched:** validation, scenario exactly once, raw PV, result stamping  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** validation, scenario exactly once, raw PV, result stamping
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -516,9 +516,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** One builder should build `FxDeltaVolSurface`; keep generic conversion private and expose one fallible pillar accessor used by both bindings.
 
-**Invariants touched:** FX, wing ordering, interpolation, parity  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** FX, wing ordering, interpolation, parity
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -537,9 +537,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Stop emitting cache fields and remove runtime APIs. If old payload support is required, consume old fields through private wire types.
 
-**Invariants touched:** serde  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** serde
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -559,9 +559,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Make fallible construction canonical. Restrict trusted construction to private helpers or explicitly named `_unchecked` operations and stage removal of panicking conversions.
 
-**Invariants touched:** Decimal, finite values, serde  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** Decimal, finite values, serde
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -580,9 +580,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Use one normalized `ForwardPrices` representation. Accept the scalar legacy form only at serde/binding boundaries.
 
-**Invariants touched:** per-expiry forwards, local-vol density, serde  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** per-expiry forwards, local-vol density, serde
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -607,9 +607,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** One balance replay primitive should produce pre/post states. Carry resolved index-rate decomposition in the scheduled row and derive DataFrame/WAL views from canonical classified flows.
 
-**Invariants touched:** Decimal, day count, PIK ordering, reporting  
-**Impact:** M  
-**Risk:** H  
+**Invariants touched:** Decimal, day count, PIK ordering, reporting
+**Impact:** M
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -628,9 +628,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Make full leg specs canonical and convert legacy wire fields into them during deserialization.
 
-**Invariants touched:** serde, curve roles, compounded overnight legs, calendars  
-**Impact:** M  
-**Risk:** H  
+**Invariants touched:** serde, curve roles, compounded overnight legs, calendars
+**Impact:** M
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -649,9 +649,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Add checked typed request facades in Rust. Bindings perform only host conversion. Replace the FX macro universe with the generic JSON API or one canonical `Instrument` handle.
 
-**Invariants touched:** parity, defaults, accepted labels, error mapping  
-**Impact:** M  
-**Risk:** M  
+**Invariants touched:** parity, defaults, accepted labels, error mapping
+**Impact:** M
+**Risk:** M
 **Tier:** 3
 
 ---
@@ -671,9 +671,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Choose one binding wire format or remove the envelope. If retained, pass real provenance. Move bond construction to `valuations.instruments` or create a first-class custom-cashflow instrument there.
 
-**Invariants touched:** serde, schema versioning, parity  
-**Impact:** M  
-**Risk:** M  
+**Invariants touched:** serde, schema versioning, parity
+**Impact:** M
+**Risk:** M
 **Tier:** 3/4
 
 ---
@@ -693,9 +693,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Select one canonical typed/options-object construction path per host. Put array-shape normalization and string-to-handle adaptation in facades rather than exporting new calculation names.
 
-**Invariants touched:** parity, serde, interpolation  
-**Impact:** M  
-**Risk:** M  
+**Invariants touched:** parity, serde, interpolation
+**Impact:** M
+**Risk:** M
 **Tier:** 3
 
 ---
@@ -713,9 +713,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Use an atomic `add_node(path, curve_ids, tags)` operation or an explicit node sub-builder.
 
-**Invariants touched:** hierarchy targeting, serde  
-**Impact:** M  
-**Risk:** M  
+**Invariants touched:** hierarchy targeting, serde
+**Impact:** M
+**Risk:** M
 **Tier:** 3
 
 ---
@@ -733,9 +733,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Move it to test/migration support or a clearly time-boxed compatibility module.
 
-**Invariants touched:** serde  
-**Impact:** M  
-**Risk:** L/M  
+**Invariants touched:** serde
+**Impact:** M
+**Risk:** L/M
 **Tier:** 3
 
 ---
@@ -753,9 +753,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Select models only through `ModelKey`; use the seed field only after an MC model is selected.
 
-**Invariants touched:** deterministic MC, pricing model  
-**Impact:** M  
-**Risk:** M  
+**Invariants touched:** deterministic MC, pricing model
+**Impact:** M
+**Risk:** M
 **Tier:** 3
 
 ---
@@ -782,9 +782,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Demote implementation details, map legacy loan input to `TermLoan`, and stage aliases through deprecation or wire-only adapters.
 
-**Invariants touched:** serde, parity, FX  
-**Impact:** M  
-**Risk:** M  
+**Invariants touched:** serde, parity, FX
+**Impact:** M
+**Risk:** M
 **Tier:** 2/3
 
 ---
@@ -803,9 +803,9 @@ Previously fixed F1–F25 items were rechecked and excluded. These include Tenor
 
 **Proposed fix:** Delete unused functions, retain `Display` plus `format_with`, remove ignored parameters during the next breaking window, and derive binding manifests from one source.
 
-**Invariants touched:** parity, formatting  
-**Impact:** L  
-**Risk:** L  
+**Invariants touched:** parity, formatting
+**Impact:** L
+**Risk:** L
 **Tier:** 1/2
 
 ## Slop clusters

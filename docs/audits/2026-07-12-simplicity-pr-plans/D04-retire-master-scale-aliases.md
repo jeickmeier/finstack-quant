@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-d04-retire-master-scale-aliases`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Retire legacy MasterScale constructor aliases
 
-**Tier:** 3 (public surface simplification)  
-**Estimated net LOC:** −20 to −50  
-**Addresses:** F32  
+**Tier:** 3 (public surface simplification)
+**Estimated net LOC:** −20 to −50
+**Addresses:** F32
 **Depends on:** None
 
 **Files/filesets:**

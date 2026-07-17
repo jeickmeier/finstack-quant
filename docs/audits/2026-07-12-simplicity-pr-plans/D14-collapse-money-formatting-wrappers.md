@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-d14-collapse-money-formatting-wrappers`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Collapse Money formatting wrappers into FormatOpts
 
-**Tier:** 3 (public surface simplification)  
-**Estimated net LOC:** −40 to −80  
-**Addresses:** F33  
+**Tier:** 3 (public surface simplification)
+**Estimated net LOC:** −40 to −80
+**Addresses:** F33
 **Depends on:** D12
 
 **Files/filesets:**

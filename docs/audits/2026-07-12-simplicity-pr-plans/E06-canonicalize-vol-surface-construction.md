@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-e06-canonicalize-vol-surface-construction`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Give VolSurface one canonical construction model
 
-**Tier:** 3/4 (public and numerical boundary)  
-**Estimated net LOC:** −80 to −160  
-**Addresses:** F28  
+**Tier:** 3/4 (public and numerical boundary)
+**Estimated net LOC:** −80 to −160
+**Addresses:** F28
 **Depends on:** C09 and D09
 
 **Files/filesets:**

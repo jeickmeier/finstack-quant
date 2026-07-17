@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-d12-make-money-construction-fallible`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Make Money construction uniformly fallible
 
-**Tier:** 4 (Decimal/public API-sensitive)  
-**Estimated net LOC:** −50 to −150 net; very high mechanical churn  
-**Addresses:** F22  
+**Tier:** 4 (Decimal/public API-sensitive)
+**Estimated net LOC:** −50 to −150 net; very high mechanical churn
+**Addresses:** F22
 **Depends on:** A03-A05 recommended first
 
 **Files/filesets:**
@@ -27,7 +27,7 @@
 - `finstack-quant/core/src/money/mod.rs`
 - `finstack-quant-py/src/bindings/core/money.rs`
 - `finstack-quant-wasm/src/api/core/money.rs`
-- `All workspace `Money::new` and `new_with_config` call sites, fixtures, docs, benches, and generated schemas`
+- `All workspace`Money::new` and `new_with_config`call sites, fixtures, docs, benches, and generated schemas`
 
 **Scope:** Make the short public constructor checked, remove panicking constructor shadows, and reserve explicit crate-private `_unchecked` construction only for trusted constants after call-site audit.
 

@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-d08-make-hierarchy-builder-atomic`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Make HierarchyBuilder node creation atomic
 
-**Tier:** 3 (public surface simplification)  
-**Estimated net LOC:** −20 to −60  
-**Addresses:** F29; H11  
+**Tier:** 3 (public surface simplification)
+**Estimated net LOC:** −20 to −60
+**Addresses:** F29; H11
 **Depends on:** None
 
 **Files/filesets:**

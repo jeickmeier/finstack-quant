@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-d09-normalize-arbitrage-forwards`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Normalize arbitrage forwards to one representation
 
-**Tier:** 4 (serde/parity-sensitive)  
-**Estimated net LOC:** −40 to −90  
-**Addresses:** F23  
+**Tier:** 4 (serde/parity-sensitive)
+**Estimated net LOC:** −40 to −90
+**Addresses:** F23
 **Depends on:** D03 recommended
 
 **Files/filesets:**

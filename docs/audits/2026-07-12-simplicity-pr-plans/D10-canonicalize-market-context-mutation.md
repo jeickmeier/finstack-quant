@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-d10-canonicalize-market-context-mutation`
 
 ## Slicing principles applied
@@ -17,16 +17,16 @@
 
 ## Slice 1 — Give MarketContext one canonical mutation API
 
-**Tier:** 3/4 (public API and FX-sensitive)  
-**Estimated net LOC:** −150 to −350 net; high mechanical churn  
-**Addresses:** F6  
+**Tier:** 3/4 (public API and FX-sensitive)
+**Estimated net LOC:** −150 to −350 net; high mechanical churn
+**Addresses:** F6
 **Depends on:** C09 recommended; no Cluster B market-context edits in flight
 
 **Files/filesets:**
 - `finstack-quant/core/src/market_data/context/mod.rs`
 - `finstack-quant/core/src/market_data/context/**`
 - `finstack-quant-py/src/bindings/core/market_data/context.rs`
-- `Workspace call sites returned by `rg` for consuming `insert*`, `clear_fx`, and `map_collateral` methods`
+- `Workspace call sites returned by`rg` for consuming `insert*`,`clear_fx`, and`map_collateral`methods`
 - `Affected notebooks, benches, rustdoc, stubs, and parity entries`
 
 **Scope:** Make `insert*`, FX, collateral, and index operations canonical `&mut self -> &mut Self` methods. Retain only explicitly named `with_*` consuming conveniences for heavily used fluent construction, all delegating to the mutable kernels.

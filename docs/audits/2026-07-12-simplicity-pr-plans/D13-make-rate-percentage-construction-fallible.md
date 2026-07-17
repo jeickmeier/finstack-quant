@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-d13-make-rate-percentage-construction-fallible`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Make Rate and Percentage construction uniformly fallible
 
-**Tier:** 4 (numeric/public API-sensitive)  
-**Estimated net LOC:** −30 to −90 net; high mechanical churn  
-**Addresses:** F22  
+**Tier:** 4 (numeric/public API-sensitive)
+**Estimated net LOC:** −30 to −90 net; high mechanical churn
+**Addresses:** F22
 **Depends on:** D12 recommended
 
 **Files/filesets:**
@@ -27,7 +27,7 @@
 - `finstack-quant/core/src/types/mod.rs`
 - `finstack-quant-py/src/bindings/core/types.rs`
 - `finstack-quant-wasm/src/api/core/types.rs`
-- `Workspace call sites of `Rate::from_decimal`, `Rate::from(f64)`, `Percentage::new`, and `Percentage::from(f64)``
+- `Workspace call sites of`Rate::from_decimal`,`Rate::from(f64)`,`Percentage::new`, and`Percentage::from(f64)``
 
 **Scope:** Keep one checked constructor per type, delete panicking `From<f64>` and constructor shadows, and use explicit private `_unchecked` construction only for trusted constants.
 

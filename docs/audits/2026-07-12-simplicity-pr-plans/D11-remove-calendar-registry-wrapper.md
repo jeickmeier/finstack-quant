@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-d11-remove-calendar-registry-wrapper`
 
 ## Slicing principles applied
@@ -17,15 +17,15 @@
 
 ## Slice 1 — Replace zero-state calendar wrappers with free resolution APIs
 
-**Tier:** 4 (calendar/serde-sensitive)  
-**Estimated net LOC:** −100 to −250 net; high mechanical churn  
-**Addresses:** F10; H9  
+**Tier:** 4 (calendar/serde-sensitive)
+**Estimated net LOC:** −100 to −250 net; high mechanical churn
+**Addresses:** F10; H9
 **Depends on:** A07 recommended before cashflow schedule consolidation
 
 **Files/filesets:**
 - `finstack-quant/core/src/dates/calendar/{registry.rs,mod.rs}`
 - `finstack-quant/core/src/dates/{daycount.rs,fx.rs,mod.rs}`
-- `Core/cashflows/valuations callers of `CalendarRegistry` and `CalendarWrapper``
+- `Core/cashflows/valuations callers of`CalendarRegistry` and `CalendarWrapper``
 - `Python/WASM core dates and analytics performance bindings`
 - `Calendar/day-count docs, tests, stubs, and parity entries`
 

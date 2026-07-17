@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-e01-collapse-wasm-stat-array-exports`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Collapse WASM scalar and typed-array statistic exports
 
-**Tier:** 3 (binding public surface)  
-**Estimated net LOC:** −80 to −140  
-**Addresses:** F7  
+**Tier:** 3 (binding public surface)
+**Estimated net LOC:** −80 to −140
+**Addresses:** F7
 **Depends on:** None
 
 **Files/filesets:**

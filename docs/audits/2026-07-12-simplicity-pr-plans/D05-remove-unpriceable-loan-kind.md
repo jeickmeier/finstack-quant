@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-d05-remove-unpriceable-loan-kind`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Remove the unpriceable InstrumentType::Loan fossil
 
-**Tier:** 4 (serde-sensitive public change)  
-**Estimated net LOC:** −10 to −40  
-**Addresses:** F32  
+**Tier:** 4 (serde-sensitive public change)
+**Estimated net LOC:** −10 to −40
+**Addresses:** F32
 **Depends on:** B03 recommended
 
 **Files/filesets:**

@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-d06-remove-test-only-cashflow-emitters`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Remove test-only default and prepayment emitters from the public API
 
-**Tier:** 3 (public surface simplification)  
-**Estimated net LOC:** −60 to −140  
-**Addresses:** F32  
+**Tier:** 3 (public surface simplification)
+**Estimated net LOC:** −60 to −140
+**Addresses:** F32
 **Depends on:** Before A03, or after A12; do not overlap Cluster A schedule work
 
 **Files/filesets:**

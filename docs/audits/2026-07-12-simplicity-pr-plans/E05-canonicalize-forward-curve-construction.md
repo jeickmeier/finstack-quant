@@ -2,10 +2,10 @@
 
 **Program index and mandatory merge gate:** [README.md](README.md#mandatory-green-gates)
 
-**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12  
-**User priorities:** complete all five clusters through PR-sized, independently green slices  
-**Plan date:** 2026-07-12  
-**Status:** planned  
+**Based on:** [Core, cashflows, and valuations simplicity audit](../2026-07-12-core-cashflows-valuations-simplicity-audit.md) dated 2026-07-12
+**User priorities:** complete all five clusters through PR-sized, independently green slices
+**Plan date:** 2026-07-12
+**Status:** planned
 **Suggested branch:** `codex/simplify-e05-canonicalize-forward-curve-construction`
 
 ## Slicing principles applied
@@ -17,9 +17,9 @@
 
 ## Slice 1 — Give ForwardCurve one host construction path
 
-**Tier:** 3 (binding public surface)  
-**Estimated net LOC:** −40 to −90  
-**Addresses:** F28  
+**Tier:** 3 (binding public surface)
+**Estimated net LOC:** −40 to −90
+**Addresses:** F28
 **Depends on:** D10 recommended
 
 **Files/filesets:**

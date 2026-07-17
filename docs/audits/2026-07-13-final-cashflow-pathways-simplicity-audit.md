@@ -1,13 +1,13 @@
 # Audit Report: `finstack-quant::{cashflows,valuations}::cashflow-pathways`
 
-**Scope:** all cashflow construction, classification, composition, provider, export, and validation paths under `finstack-quant/cashflows/src` and `finstack-quant/valuations/src`, plus related Python/WASM bindings, facades, stubs, parity contracts, and focused contract tests.  
+**Scope:** all cashflow construction, classification, composition, provider, export, and validation paths under `finstack-quant/cashflows/src` and `finstack-quant/valuations/src`, plus related Python/WASM bindings, facades, stubs, parity contracts, and focused contract tests.
 **Bindings in scope:**
 
 - `finstack-quant-py/src/bindings/{cashflows,valuations}` — exists
 - `finstack-quant-wasm/src/api/{cashflows,valuations}` — exists
 - Python stubs/package exports, JS facades, `index.d.ts`, and `finstack-quant-py/parity_contract.toml` — exists
 
-**Date:** 2026-07-13  
+**Date:** 2026-07-13
 **Auditor:** finstack-simplify / Phase 1 (read-only code audit; this report is the only created artifact)
 
 ## Executive summary
@@ -115,9 +115,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Introduce one non-overridable provider boundary, for example a sealed/raw schedule implementation plus a blanket public finalizer. Raw generators should produce complete classified schedules; only the shared boundary may apply `as_of`, PIK, ordering, and representation policy. Migrate all 33 non-empty/delegating providers and delete local lifecycle filtering and repeated finalization code.
 
-**Invariants touched:** ISDA, precedence, parity  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** ISDA, precedence, parity
+**Impact:** H
+**Risk:** M
 **Tier:** 4
 
 ---
@@ -136,9 +136,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Make dated extraction a non-overridable schedule method/free function and remove all provider overrides. If structured-credit analytics needs same-day aggregation, add an explicitly named operation such as `aggregate_cash_settlements_by_date`, implemented from canonical dated flows.
 
-**Invariants touched:** Decimal, parity, precedence  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** Decimal, parity, precedence
+**Impact:** H
+**Risk:** M
 **Tier:** 4
 
 ---
@@ -159,9 +159,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Construct classified flows once with `Fixed`, `FloatReset`, and `InflationCoupon`, carrying `CashFlowAccrual` and rate metadata from shared periods. Then pass those rows through `schedule_from_classified_flows` and the one provider finalizer.
 
-**Invariants touched:** Decimal, ISDA, precedence  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** Decimal, ISDA, precedence
+**Impact:** H
+**Risk:** M
 **Tier:** 4
 
 ---
@@ -180,9 +180,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Keep the checked annual/monthly conversion kernel in cashflows and delegate MBS directly. Where structured-credit compatibility requires clamping, make that policy explicit in a narrowly named boundary adapter that clamps first and then calls the shared kernel; add CDR/MDR to the same canonical kernel family.
 
-**Invariants touched:** Decimal, precedence  
-**Impact:** H  
-**Risk:** M  
+**Invariants touched:** Decimal, precedence
+**Impact:** H
+**Risk:** M
 **Tier:** 4
 
 ---
@@ -202,9 +202,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Route builder, adapters, serde, and merge through one canonical constructor and one immutable validation contract. Make flow mutation controlled through append/merge APIs and private accessors; phase public field removal as an explicit breaking change. Keep the legacy accrual wire translation at the deserialize boundary, then immediately canonicalize through the same constructor.
 
-**Invariants touched:** serde, parity, precedence  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** serde, parity, precedence
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -225,9 +225,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Make the schedule model's mixed-currency semantics explicit and let one shared combiner preserve all rows and metadata; currency-specific analytics should validate homogeneity at the point where they require it. Migrate IRS and Basis to the shared merge, construct FX Swap in one classified/datetime schedule call, migrate XCCY to the shared composite route, and remove every production `flows.extend`.
 
-**Invariants touched:** FX, serde, parity, ISDA  
-**Impact:** H  
-**Risk:** H  
+**Invariants touched:** FX, serde, parity, ISDA
+**Impact:** H
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -246,9 +246,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Make the provider matrix explicit and table-driven, covering every non-empty provider plus empty/error categories. Test post-start `as_of`, same-day boundaries, PIK/non-cash filtering, canonical kind/accrual metadata, ordering, and metadata union; make its flatten assertion use the shared cash-settlement predicate.
 
-**Invariants touched:** parity, ISDA, precedence  
-**Impact:** M  
-**Risk:** L  
+**Invariants touched:** parity, ISDA, precedence
+**Impact:** M
+**Risk:** L
 **Tier:** 1
 
 ---
@@ -267,9 +267,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Move the tests into module-level unit tests or an explicit test-support feature, delete the public re-exports and orphan emitter module, and decide the separate serde compatibility fate of `DefaultEvent` without keeping unused executable APIs.
 
-**Invariants touched:** serde, parity  
-**Impact:** M  
-**Risk:** M  
+**Invariants touched:** serde, parity
+**Impact:** M
+**Risk:** M
 **Tier:** 3
 
 ---
@@ -290,9 +290,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Make the MBS projection produce one artifact containing the canonical schedule plus optional row diagnostics and have both the provider/export path consume it once. Promote a focused, checked per-row credit-PV primitive from cashflows and delegate export calculations to it.
 
-**Invariants touched:** Decimal, parity, precedence  
-**Impact:** M  
-**Risk:** M  
+**Invariants touched:** Decimal, parity, precedence
+**Impact:** M
+**Risk:** M
 **Tier:** 4
 
 ---
@@ -314,9 +314,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Migrate contractual grids that already own `ScheduleParams` through `BuildPeriodsParams::from_schedule` and `build_periods`; keep observation/quote grids on core `ScheduleBuilder` only where they are not cashflow periods. Consolidate term-loan coupon and commitment-fee periods in a dedicated regression slice, then either retain a used `from_schedule` bridge or delete it.
 
-**Invariants touched:** ISDA, serde, precedence  
-**Impact:** M  
-**Risk:** M  
+**Invariants touched:** ISDA, serde, precedence
+**Impact:** M
+**Risk:** M
 **Tier:** 4
 
 ---
@@ -336,9 +336,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Place both variants under `valuations.instruments`, update `index.d.ts`, the JS facade, and the parity contract in one breaking slice, and remove the root method instead of retaining a permanent alias.
 
-**Invariants touched:** parity  
-**Impact:** M  
-**Risk:** M  
+**Invariants touched:** parity
+**Impact:** M
+**Risk:** M
 **Tier:** 4
 
 ---
@@ -358,9 +358,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Keep `StepUpCouponSpec` as the canonical step-up representation. Translate any required compatibility input at the JSON boundary, use explicit fixed windows for truly arbitrary programs, and remove `fixed_stepup_decimal` plus `FixedRateProgram` in a breaking release.
 
-**Invariants touched:** Decimal, serde, parity  
-**Impact:** M  
-**Risk:** H  
+**Invariants touched:** Decimal, serde, parity
+**Impact:** M
+**Risk:** H
 **Tier:** 4
 
 ---
@@ -381,9 +381,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** After F1, F5, and F6 land, run one mechanical cleanup: delegate the dated adapter, sort only in the canonical constructor, demote `sort_flows`, remove pre-sorts/day-count overwrites, and make representation a finalizer concern only.
 
-**Invariants touched:** none  
-**Impact:** L  
-**Risk:** L  
+**Invariants touched:** none
+**Impact:** L
+**Risk:** L
 **Tier:** 2 (Tier 3 only for demoting the public sorter)
 
 ---
@@ -403,9 +403,9 @@ The worktree already contained unrelated QuantLib golden/generator edits when th
 
 **Proposed fix:** Return the canonical Rust JSON string directly. Either require `model` explicitly in Python or define the default once in Rust and expose it identically in both hosts; update the stub and parity tests in the same slice.
 
-**Invariants touched:** serde, parity  
-**Impact:** L  
-**Risk:** M  
+**Invariants touched:** serde, parity
+**Impact:** L
+**Risk:** M
 **Tier:** 3/4
 
 ## Slop clusters
