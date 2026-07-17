@@ -20,7 +20,7 @@
 /// # Numerical value
 ///
 /// Using `ζ(1/2) = -1.4603545088095868…` and `√(2π) = 2.5066282746310002…`
-/// gives `β ≈ 0.5825971579390106`, i.e. full f64 precision. 
+/// gives `β ≈ 0.5825971579390106`, i.e. full f64 precision.
 ///
 /// References:
 /// - Broadie, Glasserman & Kou (1997). "A Continuity Correction for Discrete
