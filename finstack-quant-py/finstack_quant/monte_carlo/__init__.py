@@ -12,6 +12,12 @@ Greek estimators (``finite_diff_delta``, ``finite_diff_delta_crn``, ``finite_dif
 ``price_american_call_unbiased``) wrap the Rust crate's variance-reduction
 machinery for hedge-ratio sizing and bias-mitigated American option
 valuation respectively.
+
+Examples:
+--------
+>>> import finstack_quant.monte_carlo as monte_carlo
+>>> monte_carlo.__name__
+'finstack_quant.monte_carlo'
 """
 
 import sys

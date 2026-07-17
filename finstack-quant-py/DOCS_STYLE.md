@@ -189,6 +189,13 @@ entry with:
   missing-data handling, supported `op`/`method` strings). Do not ship one-line
   summaries for non-trivial bindings, even thin wrappers that delegate to Rust.
   The stub should at least match the binding's `///` comment and may exceed it.
+- A module-level runnable doctest plus a runnable doctest for every public
+  class, classmethod, and free function. Class examples may demonstrate
+  ordinary instance accessors instead of repeating those examples on each
+  accessor. Examples must use real package imports and valid input shapes, not
+  `help()` calls or placeholder values.
+- Exact public exception types and conditions. Catchable errors must be named
+  from the binding error-conversion contract rather than described generically.
 - NumPy-style sections are preferred, but match the flavor already used in the
   module (some modules, e.g. `features`, use Google-style `Args:`/`Returns:`).
 - Inclusion in the module's `__all__` list.
@@ -198,6 +205,10 @@ Pure-Python modules in `finstack_quant/**` (e.g. `features/dataframe.py`) have
 no separate stub — their function and class docstrings are the only IDE surface,
 so hold them to the same bar (summary, parameters, returns, raises, notes). Thin
 re-export shims that only rebind compiled types need just a module docstring.
+
+Run `mise run python-doc` before submitting a Python API change. It enforces
+the structural baseline above; reviewers must still verify the descriptions,
+examples, units, and error types against the binding source.
 
 ### Templates
 

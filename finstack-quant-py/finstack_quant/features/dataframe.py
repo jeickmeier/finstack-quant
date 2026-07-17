@@ -14,6 +14,12 @@ raise :class:`ValueError` instead of guessing.
 
 ``pandas`` is an optional dependency; importing or calling these helpers without
 it installed raises :class:`ImportError`.
+
+Examples:
+--------
+>>> import finstack_quant.features.dataframe as dataframe
+>>> dataframe.__name__
+'finstack_quant.features.dataframe'
 """
 
 from __future__ import annotations
@@ -202,6 +208,12 @@ def cross_sectional(
         ImportError: If pandas is not installed.
         KeyError: If ``value`` or ``time_key`` is not a column of ``df``.
         ValueError: If ``op`` is unsupported or ``params`` are malformed.
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import cross_sectional
+    >>> callable(cross_sectional)
+    True
     """
     op = _require_operation(op)
     out = _transform_cross_sectional(
@@ -251,6 +263,12 @@ def timeseries(
         KeyError: If ``value``, ``entity``, or ``order`` is not a column of
             ``df``.
         ValueError: If ``op`` is unsupported or ``params`` are malformed.
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import timeseries
+    >>> callable(timeseries)
+    True
     """
     op = _require_operation(op)
     out = _transform_timeseries(
@@ -301,6 +319,12 @@ def panel(
         KeyError: If ``value`` or a referenced key column is not in ``df``.
         ValueError: If the pipeline spec is invalid (missing required keys,
             duplicate or empty names, or a failing operation).
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import panel
+    >>> callable(panel)
+    True
     """
     pd = _require_pandas()
     spec: dict[str, Any] = {
@@ -366,6 +390,12 @@ def grouped(
         KeyError: If ``value``, ``time_key``, or ``groups`` is not a column of
             ``df``.
         ValueError: If ``op`` is unsupported or ``params`` are malformed.
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import grouped
+    >>> callable(grouped)
+    True
     """
     op = _require_operation(op)
     out = _transform_cross_sectional_grouped(
@@ -413,6 +443,12 @@ def neutralize(
         ImportError: If pandas is not installed.
         KeyError: If ``value``, ``time_key``, or any exposure column is missing.
         ValueError: If ``params`` are malformed.
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import neutralize
+    >>> callable(neutralize)
+    True
     """
     out = _neutralize(
         _numeric_column(df, value),
@@ -463,6 +499,12 @@ def pairwise(
         ImportError: If pandas is not installed.
         KeyError: If ``value``, ``other``, ``entity``, or ``order`` is missing.
         ValueError: If ``op`` is unsupported or ``params`` are malformed.
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import pairwise
+    >>> callable(pairwise)
+    True
     """
     op = _require_operation(op)
     out = _transform_timeseries_pairwise(
@@ -510,6 +552,12 @@ def rolling_regression_residual(
         KeyError: If ``value``, ``entity``, ``order``, or any exposure column is
             missing.
         ValueError: If ``params`` are malformed.
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import rolling_regression_residual
+    >>> callable(rolling_regression_residual)
+    True
     """
     out = _rolling_regression_residual(
         _numeric_column(df, value),
@@ -550,6 +598,12 @@ def risk_scaled_weights(
     Raises:
         ImportError: If pandas is not installed.
         KeyError: If ``value``, ``time_key``, or ``volatility`` is missing.
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import risk_scaled_weights
+    >>> callable(risk_scaled_weights)
+    True
     """
     out = _risk_scaled_weights(
         _numeric_column(df, value),
@@ -593,6 +647,12 @@ def clean_signal(
         ImportError: If pandas is not installed.
         KeyError: If ``value`` or ``time_key`` is missing.
         ValueError: If quantile bounds violate ``0 <= lower <= upper <= 1``.
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import clean_signal
+    >>> callable(clean_signal)
+    True
     """
     out = _clean_signal(
         _numeric_column(df, value),
@@ -636,6 +696,12 @@ def normalize_signal(
         ImportError: If pandas is not installed.
         KeyError: If ``value`` or ``time_key`` is missing.
         ValueError: If ``method`` is unsupported or ``params`` are malformed.
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import normalize_signal
+    >>> callable(normalize_signal)
+    True
     """
     out = _normalize_signal(
         _numeric_column(df, value),
@@ -676,6 +742,12 @@ def rank_to_weights(
     Raises:
         ImportError: If pandas is not installed.
         KeyError: If ``value`` or ``time_key`` is missing.
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import rank_to_weights
+    >>> callable(rank_to_weights)
+    True
     """
     out = _rank_to_weights(
         _numeric_column(df, value),
@@ -721,6 +793,12 @@ def neutralize_and_zscore(
         ImportError: If pandas is not installed.
         KeyError: If ``value``, ``time_key``, or any exposure column is missing.
         ValueError: If ``params`` are malformed.
+
+    Examples:
+    --------
+    >>> from finstack_quant.features.dataframe import neutralize_and_zscore
+    >>> callable(neutralize_and_zscore)
+    True
     """
     out = _neutralize_and_zscore(
         _numeric_column(df, value),

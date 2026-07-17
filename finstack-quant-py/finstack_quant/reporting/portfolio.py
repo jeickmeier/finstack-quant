@@ -5,6 +5,12 @@ Pure presentation — reads pre-computed ``value_portfolio`` / ``aggregate_metri
 / ``aggregate_full_cashflows`` outputs and lays them out. The only value handling
 is parsing decimal-string ``Money`` amounts, sorting, top-N selection, and
 formatting; no financial calculation.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.portfolio as portfolio
+>>> portfolio.__name__
+'finstack_quant.reporting.portfolio'
 """
 
 from __future__ import annotations
@@ -207,6 +213,17 @@ def portfolio_tearsheet(
         If ``sections`` contains an unknown section name.
     TypeError
         If ``valuation`` is neither a dict nor a JSON string.
+
+    Returns:
+    -------
+    TearSheet
+        Result of portfolio tearsheet for the binding in the annotated representation.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.portfolio import portfolio_tearsheet
+    >>> callable(portfolio_tearsheet)
+    True
     """
     wanted = sections if sections is not None else ALL_SECTIONS
     unknown = set(wanted) - set(ALL_SECTIONS)

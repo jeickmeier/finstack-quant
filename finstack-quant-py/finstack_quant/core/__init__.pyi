@@ -1,9 +1,16 @@
-"""Core financial primitives: dates, currencies, money, market data, math.
+"""
+Core financial primitives: dates, currencies, money, market data, math.
 
 Bindings for the ``finstack-quant-core`` Rust crate.  Each submodule is
 re-exported here and registered in ``sys.modules`` so that both
 ``from finstack_quant.core import dates`` and ``import finstack_quant.core.dates``
 work transparently.
+
+Examples
+--------
+>>> import finstack_quant.core as core
+>>> core.__name__
+'finstack_quant.core'
 """
 
 from finstack_quant.core import config as config

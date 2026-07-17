@@ -1,10 +1,17 @@
-"""Volatility surface arbitrage detection.
+"""
+Volatility surface arbitrage detection.
 
 Model-free static checks for butterfly arbitrage (Durrleman density),
 calendar-spread arbitrage (total-variance monotonicity), and Dupire local-vol
 density positivity on an implied-volatility grid. Inputs are flat arrays so
 callers can pass numpy-friendly grids without first constructing a
 ``VolSurface`` wrapper.
+
+Examples
+--------
+>>> import finstack_quant.core.market_data.arbitrage as arbitrage
+>>> arbitrage.__name__
+'finstack_quant.core.market_data.arbitrage'
 """
 
 from __future__ import annotations
@@ -51,7 +58,8 @@ def check_butterfly_grid(
     forward_prices: list[float],
     tolerance: float = 1e-6,
 ) -> list[_ArbitrageViolation]:
-    """Check butterfly arbitrage via Durrleman's ``g(k)`` density condition.
+    """
+    Check butterfly arbitrage via Durrleman's ``g(k)`` density condition.
 
     Parameters
     ----------
@@ -97,7 +105,8 @@ def check_calendar_spread_grid(
     forward_prices: list[float],
     tolerance: float = 1e-6,
 ) -> list[_ArbitrageViolation]:
-    """Check calendar-spread arbitrage (total-variance monotonicity in log-moneyness).
+    """
+    Check calendar-spread arbitrage (total-variance monotonicity in log-moneyness).
 
     Parameters
     ----------
@@ -135,7 +144,8 @@ def check_local_vol_density_grid(
     vols: list[list[float]],
     forward_prices: list[float],
 ) -> list[_ArbitrageViolation]:
-    """Check Dupire local-volatility density positivity on the implied-vol grid.
+    """
+    Check Dupire local-volatility density positivity on the implied-vol grid.
 
     Parameters
     ----------
@@ -177,7 +187,8 @@ def check_surface_grid(
     forward_prices: Optional[list[float]] = None,
     tolerance: float = 1e-6,
 ) -> _ArbitrageReport:
-    """Run butterfly, calendar-spread, and local-vol density checks together.
+    """
+    Run butterfly, calendar-spread, and local-vol density checks together.
 
     Parameters
     ----------

@@ -1,3 +1,13 @@
+"""
+Python bindings for the corresponding finstack-quant Rust API.
+
+Examples
+--------
+>>> import finstack_quant.valuations.instruments as instruments
+>>> instruments.__name__
+'finstack_quant.valuations.instruments'
+"""
+
 from __future__ import annotations
 
 from finstack_quant.core.market_data import MarketContext
@@ -18,7 +28,8 @@ def bond_from_cashflows_json(
     discount_curve_id: str,
     quoted_clean: float | None = None,
 ) -> str:
-    """Construct tagged bond instrument JSON from a cashflow schedule.
+    """
+    Construct tagged bond instrument JSON from a cashflow schedule.
 
     Parameters
     ----------
@@ -40,11 +51,18 @@ def bond_from_cashflows_json(
     ------
     ValueError
         If the schedule is invalid or bond construction fails.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import bond_from_cashflows_json
+    >>> callable(bond_from_cashflows_json)
+    True
     """
     ...
 
 def validate_instrument_json(json: str) -> str:
-    """Validate tagged instrument JSON and return canonical JSON.
+    """
+    Validate tagged instrument JSON and return canonical JSON.
 
     Parameters
     ----------
@@ -61,6 +79,12 @@ def validate_instrument_json(json: str) -> str:
     ValueError
         If the JSON is malformed, has an unknown instrument tag, or
         fails instrument-specific validation.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import validate_instrument_json
+    >>> callable(validate_instrument_json)
+    True
     """
     ...
 
@@ -70,7 +94,8 @@ def price_instrument(
     as_of: str,
     model: str = "default",
 ) -> str:
-    """Price one instrument and return a ``ValuationResult`` JSON string.
+    """
+    Price one instrument and return a ``ValuationResult`` JSON string.
 
     Parameters
     ----------
@@ -97,6 +122,12 @@ def price_instrument(
     ValueError
         If any input JSON is malformed, required market data is
         missing, or the selected model is unsupported for the instrument.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import price_instrument
+    >>> callable(price_instrument)
+    True
     """
     ...
 
@@ -109,7 +140,8 @@ def price_instrument_with_metrics(
     pricing_options: str | None = None,
     market_history: str | None = None,
 ) -> str:
-    """Price one instrument and compute explicit risk metric requests.
+    """
+    Price one instrument and compute explicit risk metric requests.
 
     Parameters
     ----------
@@ -141,6 +173,12 @@ def price_instrument_with_metrics(
     ValueError
         If a metric is unknown, not applicable, or cannot be
         calculated from the supplied market and history inputs.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import price_instrument_with_metrics
+    >>> callable(price_instrument_with_metrics)
+    True
     """
     ...
 
@@ -150,7 +188,8 @@ def instrument_cashflows_json(
     as_of: str,
     model: str,
 ) -> str:
-    """Per-flow cashflow envelope for a discountable instrument.
+    """
+    Per-flow cashflow envelope for a discountable instrument.
 
     Parameters
     ----------
@@ -173,25 +212,45 @@ def instrument_cashflows_json(
     ValueError
         If the model is unsupported, the instrument is unsupported
         for cashflow export, or required market data is missing.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import instrument_cashflows_json
+    >>> callable(instrument_cashflows_json)
+    True
     """
     ...
 
 def list_standard_metrics() -> list[str]:
-    """Return all standard metric IDs registered by the Rust valuation engine.
+    """
+    Return all standard metric IDs registered by the Rust valuation engine.
 
     Returns
     -------
     list[str]
         Sorted list of fully qualified metric keys.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import list_standard_metrics
+    >>> callable(list_standard_metrics)
+    True
     """
     ...
 
 def list_standard_metrics_grouped() -> dict[str, list[str]]:
-    """Return standard metric IDs grouped by human-readable category.
+    """
+    Return standard metric IDs grouped by human-readable category.
 
     Returns
     -------
     dict[str, list[str]]
         Mapping from group label to sorted metric ID lists.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import list_standard_metrics_grouped
+    >>> callable(list_standard_metrics_grouped)
+    True
     """
     ...

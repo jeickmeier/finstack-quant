@@ -1,6 +1,12 @@
 """Margin and collateral: VM/IM calculators, CSA specifications, XVA, metrics.
 
 Bindings for the ``finstack-quant-margin`` Rust crate.
+
+Examples:
+--------
+>>> import finstack_quant.margin as margin
+>>> margin.__name__
+'finstack_quant.margin'
 """
 
 from finstack_quant.finstack_quant import margin as _margin

@@ -1,10 +1,17 @@
-"""Monte Carlo convenience bindings (``finstack-quant-monte-carlo``).
+"""
+Monte Carlo convenience bindings (``finstack-quant-monte-carlo``).
 
 Exposes simulation primitives: time grids, engine configuration, pricers,
 closed-form Black-Scholes helpers, and selected non-GBM process wrappers.
 Advanced Rust process, discretization, RNG, payoff, and Greeks types are not
 surfaced as standalone Python types yet; their parameters are passed directly
 as numeric arguments to the exposed pricer constructors and methods.
+
+Examples
+--------
+>>> import finstack_quant.monte_carlo as monte_carlo
+>>> monte_carlo.__name__
+'finstack_quant.monte_carlo'
 """
 
 from __future__ import annotations
@@ -37,7 +44,8 @@ __all__ = [
 ]
 
 class MoneyEstimate:
-    """Discounted Monte Carlo estimate with money units and confidence bands.
+    """
+    Discounted Monte Carlo estimate with money units and confidence bands.
 
     Examples
     --------
@@ -49,7 +57,8 @@ class MoneyEstimate:
 
     @property
     def mean(self) -> Money:
-        """Discounted mean present value.
+        """
+        Discounted mean present value.
 
         Returns
         -------
@@ -66,7 +75,8 @@ class MoneyEstimate:
 
     @property
     def stderr(self) -> float:
-        """Standard error of the discounted mean.
+        """
+        Standard error of the discounted mean.
 
         Returns
         -------
@@ -83,7 +93,8 @@ class MoneyEstimate:
 
     @property
     def std_dev(self) -> float | None:
-        """Sample standard deviation of path discounted values, if available.
+        """
+        Sample standard deviation of path discounted values, if available.
 
         Returns
         -------
@@ -94,7 +105,8 @@ class MoneyEstimate:
 
     @property
     def ci_lower(self) -> Money:
-        """Lower bound of the 95% confidence interval for the mean.
+        """
+        Lower bound of the 95% confidence interval for the mean.
 
         Returns
         -------
@@ -112,7 +124,8 @@ class MoneyEstimate:
 
     @property
     def ci_upper(self) -> Money:
-        """Upper bound of the 95% confidence interval for the mean.
+        """
+        Upper bound of the 95% confidence interval for the mean.
 
         Returns
         -------
@@ -130,7 +143,8 @@ class MoneyEstimate:
 
     @property
     def num_paths(self) -> int:
-        """Number of independent path estimators contributing to the result.
+        """
+        Number of independent path estimators contributing to the result.
 
         Equals the configured ``num_paths`` when antithetic variates are off,
         or half the number of simulated paths when antithetic pairing is on.
@@ -150,7 +164,8 @@ class MoneyEstimate:
 
     @property
     def num_simulated_paths(self) -> int:
-        """Total number of simulated sample paths driving the estimator.
+        """
+        Total number of simulated sample paths driving the estimator.
 
         Equals :attr:`num_paths` without variance reduction, or
         ``2 * num_paths`` when antithetic variates are enabled.
@@ -164,7 +179,8 @@ class MoneyEstimate:
 
     @property
     def median(self) -> float | None:
-        """Median of captured discounted path values, if captured.
+        """
+        Median of captured discounted path values, if captured.
 
         Returns
         -------
@@ -176,7 +192,8 @@ class MoneyEstimate:
 
     @property
     def percentile_25(self) -> float | None:
-        """25th percentile of captured discounted path values, if captured.
+        """
+        25th percentile of captured discounted path values, if captured.
 
         Returns
         -------
@@ -188,7 +205,8 @@ class MoneyEstimate:
 
     @property
     def percentile_75(self) -> float | None:
-        """75th percentile of captured discounted path values, if captured.
+        """
+        75th percentile of captured discounted path values, if captured.
 
         Returns
         -------
@@ -200,7 +218,8 @@ class MoneyEstimate:
 
     @property
     def min(self) -> float | None:
-        """Minimum of captured discounted path values, if captured.
+        """
+        Minimum of captured discounted path values, if captured.
 
         Returns
         -------
@@ -212,7 +231,8 @@ class MoneyEstimate:
 
     @property
     def max(self) -> float | None:
-        """Maximum of captured discounted path values, if captured.
+        """
+        Maximum of captured discounted path values, if captured.
 
         Returns
         -------
@@ -223,7 +243,8 @@ class MoneyEstimate:
         ...
 
     def relative_stderr(self) -> float:
-        """Relative standard error (stderr divided by absolute mean amount).
+        """
+        Relative standard error (stderr divided by absolute mean amount).
 
         Returns
         -------
@@ -239,7 +260,8 @@ class MoneyEstimate:
         ...
 
 class Estimate:
-    """Scalar Monte Carlo estimate without currency tagging.
+    """
+    Scalar Monte Carlo estimate without currency tagging.
 
     Examples
     --------
@@ -249,7 +271,8 @@ class Estimate:
 
     @property
     def mean(self) -> float:
-        """Point estimate (mean).
+        """
+        Point estimate (mean).
 
         Returns
         -------
@@ -260,7 +283,8 @@ class Estimate:
 
     @property
     def stderr(self) -> float:
-        """Standard error of the mean.
+        """
+        Standard error of the mean.
 
         Returns
         -------
@@ -271,7 +295,8 @@ class Estimate:
 
     @property
     def std_dev(self) -> float | None:
-        """Sample standard deviation, if available.
+        """
+        Sample standard deviation, if available.
 
         Returns
         -------
@@ -282,7 +307,8 @@ class Estimate:
 
     @property
     def ci_lower(self) -> float:
-        """Lower 95% confidence bound.
+        """
+        Lower 95% confidence bound.
 
         Returns
         -------
@@ -293,7 +319,8 @@ class Estimate:
 
     @property
     def ci_upper(self) -> float:
-        """Upper 95% confidence bound.
+        """
+        Upper 95% confidence bound.
 
         Returns
         -------
@@ -304,7 +331,8 @@ class Estimate:
 
     @property
     def num_paths(self) -> int:
-        """Number of independent path estimators contributing to the estimate.
+        """
+        Number of independent path estimators contributing to the estimate.
 
         Equals the configured ``num_paths`` when antithetic variates are off,
         or half the number of simulated paths when antithetic pairing is on.
@@ -318,7 +346,8 @@ class Estimate:
 
     @property
     def num_simulated_paths(self) -> int:
-        """Total number of simulated sample paths driving the estimator.
+        """
+        Total number of simulated sample paths driving the estimator.
 
         Equals :attr:`num_paths` without variance reduction, or
         ``2 * num_paths`` when antithetic variates are enabled.
@@ -332,7 +361,8 @@ class Estimate:
 
     @property
     def median(self) -> float | None:
-        """Median of captured path values, if captured.
+        """
+        Median of captured path values, if captured.
 
         Returns
         -------
@@ -343,7 +373,8 @@ class Estimate:
 
     @property
     def percentile_25(self) -> float | None:
-        """25th percentile of captured path values, if captured.
+        """
+        25th percentile of captured path values, if captured.
 
         Returns
         -------
@@ -355,7 +386,8 @@ class Estimate:
 
     @property
     def percentile_75(self) -> float | None:
-        """75th percentile of captured path values, if captured.
+        """
+        75th percentile of captured path values, if captured.
 
         Returns
         -------
@@ -367,7 +399,8 @@ class Estimate:
 
     @property
     def min(self) -> float | None:
-        """Minimum of captured path values, if captured.
+        """
+        Minimum of captured path values, if captured.
 
         Returns
         -------
@@ -379,7 +412,8 @@ class Estimate:
 
     @property
     def max(self) -> float | None:
-        """Maximum of captured path values, if captured.
+        """
+        Maximum of captured path values, if captured.
 
         Returns
         -------
@@ -390,7 +424,8 @@ class Estimate:
         ...
 
 class TimeGrid:
-    """Discretised time axis for Monte Carlo stepping.
+    """
+    Discretised time axis for Monte Carlo stepping.
 
     Examples
     --------
@@ -400,7 +435,8 @@ class TimeGrid:
     """
 
     def __init__(self, t_max: float, num_steps: int) -> None:
-        """Build a uniform grid from ``0`` to ``t_max`` with ``num_steps`` steps.
+        """
+        Build a uniform grid from ``0`` to ``t_max`` with ``num_steps`` steps.
 
         Parameters
         ----------
@@ -424,7 +460,8 @@ class TimeGrid:
 
     @staticmethod
     def from_times(times: Sequence[float]) -> TimeGrid:
-        """Construct a grid from explicit increasing time points.
+        """
+        Construct a grid from explicit increasing time points.
 
         Parameters
         ----------
@@ -453,13 +490,15 @@ class TimeGrid:
 
     @property
     def num_steps(self) -> int:
-        """Number of time steps on the grid.
+        """
+        Number of time steps on the grid.
 
         Returns
         -------
         int
             Step count.
 
+            The num steps exposed by this `TimeGrid`.
         Examples
         --------
         >>> from finstack_quant.monte_carlo import TimeGrid
@@ -470,7 +509,8 @@ class TimeGrid:
 
     @property
     def t_max(self) -> float:
-        """Terminal time of the grid.
+        """
+        Terminal time of the grid.
 
         Returns
         -------
@@ -487,7 +527,8 @@ class TimeGrid:
 
     @property
     def is_uniform(self) -> bool:
-        """Whether step sizes are uniform.
+        """
+        Whether step sizes are uniform.
 
         Returns
         -------
@@ -504,7 +545,8 @@ class TimeGrid:
 
     @property
     def times(self) -> list[float]:
-        """All time coordinates including the origin.
+        """
+        All time coordinates including the origin.
 
         Returns
         -------
@@ -521,7 +563,8 @@ class TimeGrid:
 
     @property
     def dts(self) -> list[float]:
-        """Step sizes between consecutive times.
+        """
+        Step sizes between consecutive times.
 
         Returns
         -------
@@ -537,7 +580,8 @@ class TimeGrid:
         ...
 
     def time(self, step: int) -> float:
-        """Time at a given step index.
+        """
+        Time at a given step index.
 
         Parameters
         ----------
@@ -563,7 +607,8 @@ class TimeGrid:
         ...
 
     def dt(self, step: int) -> float:
-        """Step size following the given step index.
+        """
+        Step size following the given step index.
 
         Parameters
         ----------
@@ -589,19 +634,67 @@ class TimeGrid:
         ...
 
 class GbmPathSummary:
-    """Compact captured GBM spot paths."""
+    """
+    Compact captured GBM spot paths.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import GbmPathSummary
+    >>> GbmPathSummary.__name__
+    'GbmPathSummary'
+    """
 
     @property
-    def num_paths(self) -> int: ...
+    def num_paths(self) -> int:
+        """
+        Return the num paths for `GbmPathSummary`.
+
+        Returns
+        -------
+        int
+            The num paths exposed by this `GbmPathSummary`.
+        """
+        ...
+
     @property
-    def num_simulated_paths(self) -> int: ...
+    def num_simulated_paths(self) -> int:
+        """
+        Return the num simulated paths for `GbmPathSummary`.
+
+        Returns
+        -------
+        int
+            The num simulated paths exposed by this `GbmPathSummary`.
+        """
+        ...
+
     @property
-    def times(self) -> list[float]: ...
+    def times(self) -> list[float]:
+        """
+        Return the times for `GbmPathSummary`.
+
+        Returns
+        -------
+        list[float]
+            The times exposed by this `GbmPathSummary`.
+        """
+        ...
+
     @property
-    def paths(self) -> list[list[float]]: ...
+    def paths(self) -> list[list[float]]:
+        """
+        Return the paths for `GbmPathSummary`.
+
+        Returns
+        -------
+        list[list[float]]
+            The paths exposed by this `GbmPathSummary`.
+        """
+        ...
 
 class McEngine:
-    """Full Monte Carlo engine bound to a :class:`TimeGrid`.
+    """
+    Full Monte Carlo engine bound to a :class:`TimeGrid`.
 
     Examples
     --------
@@ -618,7 +711,8 @@ class McEngine:
         use_parallel: bool | None = None,
         antithetic: bool | None = None,
     ) -> None:
-        """Create a Monte Carlo engine.
+        """
+        Create a Monte Carlo engine.
 
         Parameters
         ----------
@@ -642,6 +736,11 @@ class McEngine:
         >>> from finstack_quant.monte_carlo import McEngine, TimeGrid
         >>> McEngine(10, TimeGrid(1.0, 5), seed=1, use_parallel=True)  # doctest: +ELLIPSIS
         McEngine(...)
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -654,7 +753,8 @@ class McEngine:
         vol: float,
         currency: str | None = None,
     ) -> MoneyEstimate:
-        """Price a European call on the engine's grid under GBM.
+        """
+        Price a European call on the engine's grid under GBM.
 
         Parameters
         ----------
@@ -681,6 +781,11 @@ class McEngine:
         >>> from finstack_quant.monte_carlo import McEngine, TimeGrid
         >>> McEngine(500, TimeGrid(1.0, 52)).price_european_call(100, 100, 0.05, 0.0, 0.25).num_paths
         500
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -693,7 +798,8 @@ class McEngine:
         vol: float,
         currency: str | None = None,
     ) -> MoneyEstimate:
-        """Price a European put on the engine's grid under GBM.
+        """
+        Price a European put on the engine's grid under GBM.
 
         Parameters
         ----------
@@ -720,6 +826,11 @@ class McEngine:
         >>> from finstack_quant.monte_carlo import McEngine, TimeGrid
         >>> McEngine(500, TimeGrid(1.0, 52)).price_european_put(100, 100, 0.05, 0.0, 0.25).num_paths
         500
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -734,7 +845,8 @@ def simulate_gbm_paths(
     seed: int | None = None,
     antithetic: bool = False,
 ) -> GbmPathSummary:
-    """Simulate compact GBM spot paths through Rust path capture.
+    """
+    Simulate compact GBM spot paths through Rust path capture.
 
     ``num_paths`` is the estimator and simulated-path count because captured
     paths do not support antithetic pairing. Passing ``antithetic=True`` raises
@@ -760,11 +872,28 @@ def simulate_gbm_paths(
         Optional deterministic random seed; ``None`` uses the runtime generator.
     antithetic : bool, default False
         Antithetic-path request. This compact path API rejects ``True``.
+
+    Returns
+    -------
+    GbmPathSummary
+        Result of simulate gbm paths for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import simulate_gbm_paths
+    >>> callable(simulate_gbm_paths)
+    True
     """
     ...
 
 def heston_satisfies_feller(kappa: float, theta: float, vol_of_vol: float) -> bool:
-    """Validate Heston parameters and test the strict Feller condition.
+    """
+    Validate Heston parameters and test the strict Feller condition.
 
     Parameters
     ----------
@@ -774,11 +903,28 @@ def heston_satisfies_feller(kappa: float, theta: float, vol_of_vol: float) -> bo
         Positive long-run variance level in squared-volatility units.
     vol_of_vol : float
         Positive annualized volatility of the variance process.
+
+    Returns
+    -------
+    bool
+        Result of heston satisfies feller for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import heston_satisfies_feller
+    >>> callable(heston_satisfies_feller)
+    True
     """
     ...
 
 class EuropeanPricer:
-    """European-option Monte Carlo pricer under GBM (exact time-stepping).
+    """
+    European-option Monte Carlo pricer under GBM (exact time-stepping).
 
     Examples
     --------
@@ -793,7 +939,8 @@ class EuropeanPricer:
         seed: int | None = None,
         use_parallel: bool | None = None,
     ) -> None:
-        """Create a European-option pricer.
+        """
+        Create a European-option pricer.
 
         Parameters
         ----------
@@ -809,12 +956,18 @@ class EuropeanPricer:
         >>> from finstack_quant.monte_carlo import EuropeanPricer
         >>> EuropeanPricer(500, 9).seed
         9
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def num_paths(self) -> int:
-        """Configured path count.
+        """
+        Configured path count.
 
         Returns
         -------
@@ -831,7 +984,9 @@ class EuropeanPricer:
 
     @property
     def seed(self) -> int:
-        """RNG seed.
+        """
+        Return the seed for `EuropeanPricer`.
+        RNG seed.
 
         Returns
         -------
@@ -848,7 +1003,8 @@ class EuropeanPricer:
 
     @property
     def use_parallel(self) -> bool:
-        """Whether path accumulation runs on the rayon pool.
+        """
+        Whether path accumulation runs on the rayon pool.
 
         Returns
         -------
@@ -868,7 +1024,8 @@ class EuropeanPricer:
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
-        """Price a European call.
+        """
+        Price a European call.
 
         Parameters
         ----------
@@ -899,6 +1056,11 @@ class EuropeanPricer:
         >>> from finstack_quant.monte_carlo import EuropeanPricer
         >>> EuropeanPricer(800, 0).price_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=52).num_paths
         800
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -913,7 +1075,8 @@ class EuropeanPricer:
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
-        """Price a European put.
+        """
+        Price a European put.
 
         Parameters
         ----------
@@ -944,11 +1107,17 @@ class EuropeanPricer:
         >>> from finstack_quant.monte_carlo import EuropeanPricer
         >>> EuropeanPricer(800, 0).price_put(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=52).num_paths
         800
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 class PathDependentPricer:
-    """Path-dependent Monte Carlo pricer (Asian-style exotics on GBM).
+    """
+    Path-dependent Monte Carlo pricer (Asian-style exotics on GBM).
 
     Examples
     --------
@@ -963,7 +1132,8 @@ class PathDependentPricer:
         seed: int | None = None,
         use_parallel: bool | None = None,
     ) -> None:
-        """Create a path-dependent pricer.
+        """
+        Create a path-dependent pricer.
 
         Parameters
         ----------
@@ -979,6 +1149,11 @@ class PathDependentPricer:
         >>> from finstack_quant.monte_carlo import PathDependentPricer
         >>> PathDependentPricer(100, 1, use_parallel=True).num_paths
         100
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -993,7 +1168,8 @@ class PathDependentPricer:
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
-        """Price an arithmetic Asian call (post-initial fixings at every step).
+        """
+        Price an arithmetic Asian call (post-initial fixings at every step).
 
         Parameters
         ----------
@@ -1026,6 +1202,11 @@ class PathDependentPricer:
         >>> from finstack_quant.monte_carlo import PathDependentPricer
         >>> PathDependentPricer(400, 0).price_asian_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=12).num_paths
         400
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -1040,7 +1221,8 @@ class PathDependentPricer:
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
-        """Price an arithmetic Asian put (post-initial fixings at every step).
+        """
+        Price an arithmetic Asian put (post-initial fixings at every step).
 
         Parameters
         ----------
@@ -1073,12 +1255,18 @@ class PathDependentPricer:
         >>> from finstack_quant.monte_carlo import PathDependentPricer
         >>> PathDependentPricer(400, 0).price_asian_put(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=12).num_paths
         400
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def num_paths(self) -> int:
-        """Configured path count.
+        """
+        Configured path count.
 
         Returns
         -------
@@ -1095,7 +1283,9 @@ class PathDependentPricer:
 
     @property
     def seed(self) -> int:
-        """RNG seed.
+        """
+        Return the seed for `PathDependentPricer`.
+        RNG seed.
 
         Returns
         -------
@@ -1111,7 +1301,8 @@ class PathDependentPricer:
         ...
 
 class LsmcPricer:
-    """Longstaff–Schwartz Monte Carlo pricer for American options under GBM.
+    """
+    Longstaff–Schwartz Monte Carlo pricer for American options under GBM.
 
     Examples
     --------
@@ -1128,7 +1319,8 @@ class LsmcPricer:
         basis: str | None = None,
         basis_degree: int | None = None,
     ) -> None:
-        """Create an LSMC pricer.
+        """
+        Create an LSMC pricer.
 
         Parameters
         ----------
@@ -1163,7 +1355,8 @@ class LsmcPricer:
 
     @property
     def num_paths(self) -> int:
-        """Configured path count.
+        """
+        Configured path count.
 
         Returns
         -------
@@ -1174,7 +1367,9 @@ class LsmcPricer:
 
     @property
     def seed(self) -> int:
-        """RNG seed.
+        """
+        Return the seed for `LsmcPricer`.
+        RNG seed.
 
         Returns
         -------
@@ -1185,7 +1380,8 @@ class LsmcPricer:
 
     @property
     def use_parallel(self) -> bool:
-        """Whether path generation runs on the rayon pool.
+        """
+        Whether path generation runs on the rayon pool.
 
         Returns
         -------
@@ -1196,7 +1392,8 @@ class LsmcPricer:
 
     @property
     def basis(self) -> str:
-        """Regression basis family name.
+        """
+        Regression basis family name.
 
         Returns
         -------
@@ -1208,7 +1405,8 @@ class LsmcPricer:
 
     @property
     def basis_degree(self) -> int:
-        """Configured polynomial/Laguerre degree.
+        """
+        Configured polynomial/Laguerre degree.
 
         Returns
         -------
@@ -1228,7 +1426,8 @@ class LsmcPricer:
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
-        """Price an American put via LSMC.
+        """
+        Price an American put via LSMC.
 
         Parameters
         ----------
@@ -1259,6 +1458,11 @@ class LsmcPricer:
         >>> from finstack_quant.monte_carlo import LsmcPricer
         >>> LsmcPricer(200, 0).price_american_put(100, 100, 0.05, 0.0, 0.25, 1.0, num_steps=8).num_paths
         200
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -1273,7 +1477,8 @@ class LsmcPricer:
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
-        """Price an American call via LSMC.
+        """
+        Price an American call via LSMC.
 
         Parameters
         ----------
@@ -1304,6 +1509,11 @@ class LsmcPricer:
         >>> from finstack_quant.monte_carlo import LsmcPricer
         >>> LsmcPricer(200, 0).price_american_call(100, 100, 0.05, 0.0, 0.25, 1.0, num_steps=8).num_paths
         200
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -1319,7 +1529,8 @@ class LsmcPricer:
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
-        """Two-pass unbiased American put price.
+        """
+        Two-pass unbiased American put price.
 
         Mitigates the in-sample upward bias of single-pass LSMC by fitting
         the regression on a training path set seeded by the pricer's ``seed``
@@ -1372,7 +1583,8 @@ class LsmcPricer:
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
-        """Two-pass unbiased American call price.
+        """
+        Two-pass unbiased American call price.
 
         See :meth:`price_american_put_unbiased` for the bias-mitigation
         rationale and the meaning of ``pricing_seed``.
@@ -1419,7 +1631,8 @@ def black_scholes_call(
     vol: float,
     expiry: float,
 ) -> float:
-    """Black–Scholes European call present value under GBM.
+    """
+    Black–Scholes European call present value under GBM.
 
     Uses continuously compounded ``rate`` and ``div_yield`` with volatility
     quoted in decimal form. This is a closed-form option price, not a raw
@@ -1466,7 +1679,8 @@ def black_scholes_put(
     vol: float,
     expiry: float,
 ) -> float:
-    """Black–Scholes European put present value under GBM.
+    """
+    Black–Scholes European put present value under GBM.
 
     Uses continuously compounded ``rate`` and ``div_yield`` with volatility
     quoted in decimal form. This is a closed-form option price, not a raw
@@ -1517,7 +1731,8 @@ def price_european_call(
     num_steps: int | None = None,
     currency: str | None = None,
 ) -> MoneyEstimate:
-    """Monte Carlo European call under GBM (standalone convenience).
+    """
+    Monte Carlo European call under GBM (standalone convenience).
 
     Parameters
     ----------
@@ -1552,6 +1767,11 @@ def price_european_call(
     >>> from finstack_quant.monte_carlo import price_european_call
     >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=2000).num_paths
     2000
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -1567,7 +1787,8 @@ def price_european_put(
     num_steps: int | None = None,
     currency: str | None = None,
 ) -> MoneyEstimate:
-    """Monte Carlo European put under GBM (standalone convenience).
+    """
+    Monte Carlo European put under GBM (standalone convenience).
 
     Parameters
     ----------
@@ -1602,6 +1823,11 @@ def price_european_put(
     >>> from finstack_quant.monte_carlo import price_european_put
     >>> price_european_put(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=2000).num_paths
     2000
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -1621,7 +1847,8 @@ def price_heston_call(
     num_steps: int | None = None,
     currency: str | None = None,
 ) -> MoneyEstimate:
-    """Monte Carlo European call under Heston stochastic volatility.
+    """
+    Monte Carlo European call under Heston stochastic volatility.
 
     Simulates spot and variance with the QE Heston discretization. Rates and
     dividend yield are continuously compounded decimals; Heston parameters follow
@@ -1697,7 +1924,8 @@ def price_heston_put(
     num_steps: int | None = None,
     currency: str | None = None,
 ) -> MoneyEstimate:
-    """Monte Carlo European put under Heston stochastic volatility.
+    """
+    Monte Carlo European put under Heston stochastic volatility.
 
     Same conventions as :func:`price_heston_call` but pays ``max(K - S_T, 0)``.
 
@@ -1769,7 +1997,8 @@ def finite_diff_delta(
     option_type: str | None = None,
     currency: str | None = None,
 ) -> tuple[float, float]:
-    """Finite-difference delta for a European option (independence-bound stderr).
+    """
+    Finite-difference delta for a European option (independence-bound stderr).
 
     Reports a conservative upper bound on the standard error that treats
     the bumped and base runs as if they were statistically independent.
@@ -1807,6 +2036,17 @@ def finite_diff_delta(
     -------
     tuple[float, float]
         ``(delta, stderr)``.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import finite_diff_delta
+    >>> callable(finite_diff_delta)
+    True
     """
     ...
 
@@ -1824,7 +2064,8 @@ def finite_diff_delta_crn(
     option_type: str | None = None,
     currency: str | None = None,
 ) -> tuple[float, float]:
-    """Finite-difference delta with paired common-random-number stderr.
+    """
+    Finite-difference delta with paired common-random-number stderr.
 
     Computes per-path paired differences and reports their true standard
     error, which exploits CRN cancellation and is typically 1–2 orders of
@@ -1862,6 +2103,17 @@ def finite_diff_delta_crn(
     -------
     tuple[float, float]
         ``(delta, paired_stderr)``.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import finite_diff_delta_crn
+    >>> callable(finite_diff_delta_crn)
+    True
     """
     ...
 
@@ -1879,7 +2131,8 @@ def finite_diff_gamma(
     option_type: str | None = None,
     currency: str | None = None,
 ) -> tuple[float, float]:
-    """Finite-difference gamma (independence-bound stderr).
+    """
+    Finite-difference gamma (independence-bound stderr).
 
     See :func:`finite_diff_gamma_crn` for the tighter paired CRN variant.
 
@@ -1914,6 +2167,17 @@ def finite_diff_gamma(
     -------
     tuple[float, float]
         ``(gamma, stderr)``.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import finite_diff_gamma
+    >>> callable(finite_diff_gamma)
+    True
     """
     ...
 
@@ -1931,7 +2195,8 @@ def finite_diff_gamma_crn(
     option_type: str | None = None,
     currency: str | None = None,
 ) -> tuple[float, float]:
-    """Finite-difference gamma with paired common-random-number stderr.
+    """
+    Finite-difference gamma with paired common-random-number stderr.
 
     Returns ``(gamma, paired_stderr)`` where the standard error is the
     per-path paired error of ``(V_up_i − 2 V_base_i + V_down_i) / h²``.
@@ -1968,5 +2233,16 @@ def finite_diff_gamma_crn(
     -------
     tuple[float, float]
         ``(gamma, paired_stderr)``.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import finite_diff_gamma_crn
+    >>> callable(finite_diff_gamma_crn)
+    True
     """
     ...

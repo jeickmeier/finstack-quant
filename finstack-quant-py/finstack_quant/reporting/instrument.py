@@ -5,6 +5,12 @@ Pure formatter — reads the already-priced ``result`` (scalar metrics incl.
 ``bucketed_*::curve::tenor`` composite keys, covenants), parses ``result.to_json()``
 read-only for meta/details, and renders the optional ``cashflows`` DataFrame and
 ``definition`` JSON. It never prices; ``recommended_metrics`` is a static mapping.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.instrument as instrument
+>>> instrument.__name__
+'finstack_quant.reporting.instrument'
 """
 
 from __future__ import annotations
@@ -93,6 +99,22 @@ def recommended_metrics(instrument_type: str) -> list[str]:
     instrument_type : str
         Canonical instrument type tag, such as ``"bond"`` or ``"swap"``, used
         to select metrics supported by the pricing model.
+
+    Returns:
+    -------
+    list[str]
+        Result of recommended metrics for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.instrument import recommended_metrics
+    >>> callable(recommended_metrics)
+    True
     """
     return list(_RECOMMENDED.get(instrument_type, []))
 
@@ -684,6 +706,22 @@ def instrument_tearsheet(
         Report palette and typography used for the rendered tear sheet.
     generated : datetime.date or None
         Optional generated date; supply a fixed date for reproducible output.
+
+    Returns:
+    -------
+    TearSheet
+        Result of instrument tearsheet for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.instrument import instrument_tearsheet
+    >>> callable(instrument_tearsheet)
+    True
     """
     if isinstance(result, (str, dict)):
         result, cashflows, definition = _price_path(result, market, as_of, model, market_price, cashflows)

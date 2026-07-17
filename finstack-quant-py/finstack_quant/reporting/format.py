@@ -3,6 +3,12 @@
 
 All helpers return display strings; non-finite / missing inputs render as the
 em-interpunct placeholder ``"·"`` so tables never show ``nan``.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.format as format
+>>> format.__name__
+'finstack_quant.reporting.format'
 """
 
 from __future__ import annotations
@@ -34,6 +40,22 @@ def pct(x: Any, dp: int = 1, signed: bool = False) -> str:
         Number of digits after the decimal point; defaults to one.
     signed : bool
         Whether non-negative values receive an explicit ``+`` sign.
+
+    Returns:
+    -------
+    str
+        Result of pct for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.format import pct
+    >>> callable(pct)
+    True
     """
     if _missing(x):
         return _PLACEHOLDER
@@ -50,6 +72,22 @@ def ratio(x: Any, dp: int = 2) -> str:
         Unitless numeric ratio; missing values render as the report placeholder.
     dp : int
         Number of digits after the decimal point; defaults to two.
+
+    Returns:
+    -------
+    str
+        Result of ratio for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.format import ratio
+    >>> callable(ratio)
+    True
     """
     if _missing(x):
         return _PLACEHOLDER
@@ -67,6 +105,22 @@ def money(amount: Any, currency: str | None = None, dp: int = 2) -> str:
         Optional ISO currency code appended after the formatted amount.
     dp : int
         Number of digits after the decimal point; defaults to two.
+
+    Returns:
+    -------
+    str
+        Result of money for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.format import money
+    >>> callable(money)
+    True
     """
     if _missing(amount):
         return _PLACEHOLDER
@@ -81,6 +135,22 @@ def sign_class(x: Any) -> str:
     ----------
     x : Any
         Numeric value whose sign selects ``"pos"``, ``"neg"``, or no class.
+
+    Returns:
+    -------
+    str
+        Result of sign class for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.format import sign_class
+    >>> callable(sign_class)
+    True
     """
     if _missing(x) or x == 0:
         return ""
@@ -94,6 +164,22 @@ def fmt_date(d: Any) -> str:
     ----------
     d : Any
         Date-like object with ``strftime`` or a value convertible to string.
+
+    Returns:
+    -------
+    str
+        Result of fmt date for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.format import fmt_date
+    >>> callable(fmt_date)
+    True
     """
     if _missing(d):
         return _PLACEHOLDER

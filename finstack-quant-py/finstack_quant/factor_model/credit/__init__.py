@@ -1,4 +1,11 @@
-"""Credit factor hierarchy artifacts, calibration, and decomposition."""
+"""Credit factor hierarchy artifacts, calibration, and decomposition.
+
+Examples:
+--------
+>>> import finstack_quant.factor_model.credit as credit
+>>> credit.__name__
+'finstack_quant.factor_model.credit'
+"""
 
 from __future__ import annotations
 

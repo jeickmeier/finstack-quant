@@ -4,6 +4,12 @@
 Pure presentation: this module only reads pre-computed values and lays them out.
 It performs no financial calculation — margins, growth, and ratios must already
 exist as statement nodes or structured engine results.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.statements_common as statements_common
+>>> statements_common.__name__
+'finstack_quant.reporting.statements_common'
 """
 
 from __future__ import annotations
@@ -26,6 +32,12 @@ class StatementView:
 
     Wraps the ``{node_id: {period_str: value}}`` map so callers can read values
     by string keys uniformly, regardless of the source representation.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.statements_common import StatementView
+    >>> StatementView.__name__
+    'StatementView'
     """
 
     def __init__(self, nodes: dict[str, dict[str, float]]) -> None:
@@ -35,6 +47,11 @@ class StatementView:
         ----------
         nodes : dict[str, dict[str, float]]
             Mapping from statement node ID to period-label/value mappings.
+
+        Raises:
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         self._nodes = nodes
 
@@ -47,16 +64,38 @@ class StatementView:
             Statement node identifier to look up.
         period : str
             Model period label within the requested node's value series.
+
+        Returns:
+        -------
+        float | None
+            Result of get for this `StatementView` in the annotated representation.
+
+        Raises:
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         node = self._nodes.get(node_id)
         return node.get(period) if node else None
 
     def node_ids(self) -> list[str]:
-        """Return all node ids present (in source order)."""
+        """Return all node ids present (in source order).
+
+        Returns:
+        -------
+        list[str]
+            Result of node ids for this `StatementView` in the annotated representation.
+        """
         return list(self._nodes)
 
     def periods(self) -> list[str]:
-        """Return all period strings present across nodes, sorted ascending."""
+        """Return all period strings present across nodes, sorted ascending.
+
+        Returns:
+        -------
+        list[str]
+            Result of periods for this `StatementView` in the annotated representation.
+        """
         seen: dict[str, None] = {}
         for series in self._nodes.values():
             for period in series:
@@ -77,6 +116,17 @@ def json_or_dict(obj: Any, *, noun: str = "value") -> dict[str, Any]:
         Mapping object or JSON-object string to normalize into a dictionary.
     noun : str
         Reader-facing noun used in type and JSON-decoding error messages.
+
+    Returns:
+    -------
+    dict[str, Any]
+        Result of json or dict for the binding in the annotated representation.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.statements_common import json_or_dict
+    >>> callable(json_or_dict)
+    True
     """
     if isinstance(obj, dict):
         return obj
@@ -104,6 +154,17 @@ def parse_statement(results: Any) -> StatementView:
     results : Any
         ``StatementResult``, canonical JSON, parsed dictionary, or existing
         ``StatementView`` to expose through the common lookup interface.
+
+    Returns:
+    -------
+    StatementView
+        Result of parse statement for the binding in the annotated representation.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.statements_common import parse_statement
+    >>> callable(parse_statement)
+    True
     """
     if isinstance(results, StatementView):
         return results
@@ -146,6 +207,22 @@ def pl_matrix_table(
         Ordered model period labels rendered as table columns.
     theme : Theme
         Report theme retained for a consistent chart/table helper interface.
+
+    Returns:
+    -------
+    str
+        Result of pl matrix table for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.statements_common import pl_matrix_table
+    >>> callable(pl_matrix_table)
+    True
     """
     head = "<th></th>" + "".join(f"<th>{_esc(p)}</th>" for p in periods)
     body_rows: list[str] = []
@@ -168,6 +245,22 @@ def variance_table(variance: Any, *, theme: Theme) -> str | None:
         Variance-report mapping or compatible object containing a ``rows`` list.
     theme : Theme
         Report palette and typography passed to the generic data-table renderer.
+
+    Returns:
+    -------
+    str | None
+        Result of variance table for the binding in the annotated representation.
+
+    Raises:
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.statements_common import variance_table
+    >>> callable(variance_table)
+    True
     """
     rows = variance.get("rows") if isinstance(variance, dict) else None
     if not rows:

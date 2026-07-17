@@ -1,8 +1,15 @@
-"""Margin and collateral: VM/IM calculators, CSA specifications, XVA, metrics.
+"""
+Margin and collateral: VM/IM calculators, CSA specifications, XVA, metrics.
 
 This module exposes variation and initial margin types, netting-set identifiers,
 credit support annex (CSA) specs, eligible collateral schedules, XVA configuration
 and results, and margin analytics helpers.
+
+Examples
+--------
+>>> import finstack_quant.margin as margin
+>>> margin.__name__
+'finstack_quant.margin'
 """
 
 from __future__ import annotations
@@ -51,7 +58,8 @@ __all__ = [
 CONSTANTS: Final[dict[str, str]] = ...
 
 class ImMethodology:
-    """Initial margin calculation methodology.
+    """
+    Initial margin calculation methodology.
 
     Parameters
     ----------
@@ -70,7 +78,8 @@ class ImMethodology:
 
     @staticmethod
     def haircut() -> ImMethodology:
-        """Haircut-based IM (repos and securities financing).
+        """
+        Haircut-based IM (repos and securities financing).
 
         Returns
         -------
@@ -86,7 +95,8 @@ class ImMethodology:
 
     @staticmethod
     def simm() -> ImMethodology:
-        """ISDA SIMM (sensitivities-based, OTC derivatives).
+        """
+        ISDA SIMM (sensitivities-based, OTC derivatives).
 
         Returns
         -------
@@ -102,7 +112,8 @@ class ImMethodology:
 
     @staticmethod
     def schedule() -> ImMethodology:
-        """BCBS-IOSCO regulatory schedule approach.
+        """
+        BCBS-IOSCO regulatory schedule approach.
 
         Returns
         -------
@@ -118,7 +129,8 @@ class ImMethodology:
 
     @staticmethod
     def internal_model() -> ImMethodology:
-        """Internal model approved by regulator.
+        """
+        Internal model approved by regulator.
 
         Returns
         -------
@@ -134,7 +146,8 @@ class ImMethodology:
 
     @staticmethod
     def clearing_house() -> ImMethodology:
-        """Clearing house (CCP-specific) methodology.
+        """
+        Clearing house (CCP-specific) methodology.
 
         Returns
         -------
@@ -150,7 +163,8 @@ class ImMethodology:
 
     @staticmethod
     def from_str(s: str) -> ImMethodology:
-        """Parse from a string (e.g. ``"simm"``, ``"schedule"``).
+        """
+        Parse from a string (e.g. ``"simm"``, ``"schedule"``).
 
         Parameters
         ----------
@@ -179,7 +193,8 @@ class ImMethodology:
     def __str__(self) -> str: ...
 
 class MarginTenor:
-    """Margin call frequency.
+    """
+    Margin call frequency.
 
     Parameters
     ----------
@@ -198,7 +213,8 @@ class MarginTenor:
 
     @staticmethod
     def daily() -> MarginTenor:
-        """Daily margin calls (standard for OTC derivatives post-2016).
+        """
+        Daily margin calls (standard for OTC derivatives post-2016).
 
         Returns
         -------
@@ -214,7 +230,8 @@ class MarginTenor:
 
     @staticmethod
     def weekly() -> MarginTenor:
-        """Weekly margin calls.
+        """
+        Weekly margin calls.
 
         Returns
         -------
@@ -230,7 +247,8 @@ class MarginTenor:
 
     @staticmethod
     def monthly() -> MarginTenor:
-        """Monthly margin calls.
+        """
+        Monthly margin calls.
 
         Returns
         -------
@@ -246,7 +264,8 @@ class MarginTenor:
 
     @staticmethod
     def on_demand() -> MarginTenor:
-        """On-demand margin calls.
+        """
+        On-demand margin calls.
 
         Returns
         -------
@@ -262,7 +281,8 @@ class MarginTenor:
 
     @staticmethod
     def from_str(s: str) -> MarginTenor:
-        """Parse from string.
+        """
+        Parse from string.
 
         Parameters
         ----------
@@ -292,7 +312,8 @@ class MarginTenor:
     def __str__(self) -> str: ...
 
 class MarginCallType:
-    """Type of margin call.
+    """
+    Type of margin call.
 
     Parameters
     ----------
@@ -311,7 +332,8 @@ class MarginCallType:
 
     @staticmethod
     def initial_margin() -> MarginCallType:
-        """Initial margin posting requirement.
+        """
+        Initial margin posting requirement.
 
         Returns
         -------
@@ -327,7 +349,8 @@ class MarginCallType:
 
     @staticmethod
     def variation_margin_delivery() -> MarginCallType:
-        """Variation margin delivery (margin to be posted).
+        """
+        Variation margin delivery (margin to be posted).
 
         Returns
         -------
@@ -343,7 +366,8 @@ class MarginCallType:
 
     @staticmethod
     def variation_margin_return() -> MarginCallType:
-        """Variation margin return (margin to be received back).
+        """
+        Variation margin return (margin to be received back).
 
         Returns
         -------
@@ -359,7 +383,8 @@ class MarginCallType:
 
     @staticmethod
     def top_up() -> MarginCallType:
-        """Top-up margin call.
+        """
+        Top-up margin call.
 
         Returns
         -------
@@ -375,7 +400,8 @@ class MarginCallType:
 
     @staticmethod
     def substitution() -> MarginCallType:
-        """Collateral substitution request.
+        """
+        Collateral substitution request.
 
         Returns
         -------
@@ -393,7 +419,8 @@ class MarginCallType:
     def __repr__(self) -> str: ...
 
 class ClearingStatus:
-    """Clearing status for OTC derivatives.
+    """
+    Clearing status for OTC derivatives.
 
     Parameters
     ----------
@@ -412,7 +439,8 @@ class ClearingStatus:
 
     @staticmethod
     def bilateral() -> ClearingStatus:
-        """Bilateral (uncleared) trade governed by CSA.
+        """
+        Bilateral (uncleared) trade governed by CSA.
 
         Returns
         -------
@@ -428,7 +456,8 @@ class ClearingStatus:
 
     @staticmethod
     def cleared(ccp: str) -> ClearingStatus:
-        """Trade cleared through a CCP.
+        """
+        Trade cleared through a CCP.
 
         Parameters
         ----------
@@ -444,12 +473,18 @@ class ClearingStatus:
         --------
         >>> ClearingStatus.cleared("LCH").is_cleared
         True
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def is_bilateral(self) -> bool:
-        """Whether this is a bilateral trade.
+        """
+        Whether this is a bilateral trade.
 
         Returns
         -------
@@ -465,7 +500,8 @@ class ClearingStatus:
 
     @property
     def is_cleared(self) -> bool:
-        """Whether this is a cleared trade.
+        """
+        Whether this is a cleared trade.
 
         Returns
         -------
@@ -484,7 +520,8 @@ class ClearingStatus:
     def __str__(self) -> str: ...
 
 class CollateralAssetClass:
-    """Collateral asset class per BCBS-IOSCO standards.
+    """
+    Collateral asset class per BCBS-IOSCO standards.
 
     Parameters
     ----------
@@ -503,7 +540,8 @@ class CollateralAssetClass:
 
     @staticmethod
     def cash() -> CollateralAssetClass:
-        """Cash collateral class.
+        """
+        Cash collateral class.
 
         Returns
         -------
@@ -519,7 +557,8 @@ class CollateralAssetClass:
 
     @staticmethod
     def government_bonds() -> CollateralAssetClass:
-        """Government bonds class.
+        """
+        Government bonds class.
 
         Returns
         -------
@@ -535,7 +574,8 @@ class CollateralAssetClass:
 
     @staticmethod
     def agency_bonds() -> CollateralAssetClass:
-        """Agency bonds class.
+        """
+        Agency bonds class.
 
         Returns
         -------
@@ -551,7 +591,8 @@ class CollateralAssetClass:
 
     @staticmethod
     def covered_bonds() -> CollateralAssetClass:
-        """Covered bonds class.
+        """
+        Covered bonds class.
 
         Returns
         -------
@@ -567,7 +608,8 @@ class CollateralAssetClass:
 
     @staticmethod
     def corporate_bonds() -> CollateralAssetClass:
-        """Corporate bonds class.
+        """
+        Corporate bonds class.
 
         Returns
         -------
@@ -583,7 +625,9 @@ class CollateralAssetClass:
 
     @staticmethod
     def equity() -> CollateralAssetClass:
-        """Equity class.
+        """
+        Compute equity for `CollateralAssetClass`.
+        Equity class.
 
         Returns
         -------
@@ -599,7 +643,9 @@ class CollateralAssetClass:
 
     @staticmethod
     def gold() -> CollateralAssetClass:
-        """Gold class.
+        """
+        Compute gold for `CollateralAssetClass`.
+        Gold class.
 
         Returns
         -------
@@ -615,7 +661,8 @@ class CollateralAssetClass:
 
     @staticmethod
     def mutual_funds() -> CollateralAssetClass:
-        """Mutual funds class.
+        """
+        Mutual funds class.
 
         Returns
         -------
@@ -631,7 +678,8 @@ class CollateralAssetClass:
 
     @staticmethod
     def from_str(s: str) -> CollateralAssetClass:
-        """Parse from string.
+        """
+        Parse from string.
 
         Parameters
         ----------
@@ -656,7 +704,8 @@ class CollateralAssetClass:
         ...
 
     def standard_haircut(self) -> float:
-        """BCBS-IOSCO standard haircut for this asset class.
+        """
+        BCBS-IOSCO standard haircut for this asset class.
 
         Returns
         -------
@@ -676,7 +725,8 @@ class CollateralAssetClass:
         ...
 
     def fx_addon(self) -> float:
-        """FX haircut add-on for currency mismatch.
+        """
+        FX haircut add-on for currency mismatch.
 
         Returns
         -------
@@ -700,7 +750,8 @@ class CollateralAssetClass:
     def __str__(self) -> str: ...
 
 class NettingSetId:
-    """Identifies a margin netting set.
+    """
+    Identifies a margin netting set.
 
     Parameters
     ----------
@@ -719,7 +770,8 @@ class NettingSetId:
 
     @staticmethod
     def bilateral(counterparty_id: str, csa_id: str) -> NettingSetId:
-        """Create a bilateral netting set.
+        """
+        Create a bilateral netting set.
 
         Parameters
         ----------
@@ -737,12 +789,18 @@ class NettingSetId:
         --------
         >>> NettingSetId.bilateral("A", "CSA").is_cleared
         False
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @staticmethod
     def cleared(ccp_id: str) -> NettingSetId:
-        """Create a cleared netting set.
+        """
+        Create a cleared netting set.
 
         Parameters
         ----------
@@ -758,12 +816,18 @@ class NettingSetId:
         --------
         >>> NettingSetId.cleared("LCH").is_cleared
         True
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def is_cleared(self) -> bool:
-        """Whether this is a cleared netting set.
+        """
+        Whether this is a cleared netting set.
 
         Returns
         -------
@@ -779,7 +843,8 @@ class NettingSetId:
 
     @property
     def counterparty_id(self) -> str:
-        """Counterparty identifier. For cleared netting sets this returns
+        """
+        Counterparty identifier. For cleared netting sets this returns
         the CCP id; for bilateral, the explicit counterparty id.
 
         Returns
@@ -798,7 +863,8 @@ class NettingSetId:
 
     @property
     def csa_id(self) -> str | None:
-        """CSA identifier when bilateral; ``None`` for cleared sets.
+        """
+        CSA identifier when bilateral; ``None`` for cleared sets.
 
         Returns
         -------
@@ -816,7 +882,8 @@ class NettingSetId:
 
     @property
     def ccp_id(self) -> str | None:
-        """CCP identifier when cleared; ``None`` for bilateral sets.
+        """
+        CCP identifier when cleared; ``None`` for bilateral sets.
 
         Returns
         -------
@@ -836,7 +903,8 @@ class NettingSetId:
     def __str__(self) -> str: ...
 
 class CsaSpec:
-    """Credit Support Annex specification (ISDA standard).
+    """
+    Credit Support Annex specification (ISDA standard).
 
     Parameters
     ----------
@@ -855,7 +923,8 @@ class CsaSpec:
 
     @staticmethod
     def usd_regulatory() -> CsaSpec:
-        """Standard regulatory CSA for USD derivatives.
+        """
+        Standard regulatory CSA for USD derivatives.
 
         Returns
         -------
@@ -876,7 +945,8 @@ class CsaSpec:
 
     @staticmethod
     def eur_regulatory() -> CsaSpec:
-        """Standard regulatory CSA for EUR derivatives.
+        """
+        Standard regulatory CSA for EUR derivatives.
 
         Returns
         -------
@@ -897,7 +967,8 @@ class CsaSpec:
 
     @staticmethod
     def from_json(json: str) -> CsaSpec:
-        """Deserialize from a JSON string.
+        """
+        Deserialize from a JSON string.
 
         Parameters
         ----------
@@ -921,7 +992,8 @@ class CsaSpec:
         ...
 
     def to_json(self) -> str:
-        """Serialize to a JSON string.
+        """
+        Serialize to a JSON string.
 
         Returns
         -------
@@ -942,13 +1014,16 @@ class CsaSpec:
 
     @property
     def id(self) -> str:
-        """CSA identifier.
+        """
+        Return the id for `CsaSpec`.
+        CSA identifier.
 
         Returns
         -------
         str
             CSA id.
 
+            The id exposed by this `CsaSpec`.
         Examples
         --------
         >>> isinstance(CsaSpec.usd_regulatory().id, str)
@@ -958,7 +1033,8 @@ class CsaSpec:
 
     @property
     def base_currency(self) -> str:
-        """Base currency code.
+        """
+        Base currency code.
 
         Returns
         -------
@@ -974,12 +1050,20 @@ class CsaSpec:
 
     @property
     def calendar_id(self) -> str:
-        """Contractual business-day calendar identifier."""
+        """
+        Contractual business-day calendar identifier.
+
+        Returns
+        -------
+        str
+            The calendar id exposed by this `CsaSpec`.
+        """
         ...
 
     @property
     def requires_im(self) -> bool:
-        """Whether this CSA requires initial margin.
+        """
+        Whether this CSA requires initial margin.
 
         Returns
         -------
@@ -996,7 +1080,8 @@ class CsaSpec:
     def __repr__(self) -> str: ...
 
 class EligibleCollateralSchedule:
-    """Eligible collateral schedule with haircuts.
+    """
+    Eligible collateral schedule with haircuts.
 
     Parameters
     ----------
@@ -1015,7 +1100,8 @@ class EligibleCollateralSchedule:
 
     @staticmethod
     def cash_only() -> EligibleCollateralSchedule:
-        """Cash-only schedule.
+        """
+        Cash-only schedule.
 
         Returns
         -------
@@ -1035,7 +1121,8 @@ class EligibleCollateralSchedule:
 
     @staticmethod
     def bcbs_standard() -> EligibleCollateralSchedule:
-        """Standard BCBS-IOSCO compliant schedule.
+        """
+        Standard BCBS-IOSCO compliant schedule.
 
         Returns
         -------
@@ -1056,7 +1143,8 @@ class EligibleCollateralSchedule:
 
     @staticmethod
     def us_treasuries() -> EligibleCollateralSchedule:
-        """US Treasuries repo schedule.
+        """
+        US Treasuries repo schedule.
 
         Returns
         -------
@@ -1077,7 +1165,8 @@ class EligibleCollateralSchedule:
 
     @staticmethod
     def from_json(json: str) -> EligibleCollateralSchedule:
-        """Deserialize from JSON.
+        """
+        Deserialize from JSON.
 
         Parameters
         ----------
@@ -1101,7 +1190,8 @@ class EligibleCollateralSchedule:
         ...
 
     def to_json(self) -> str:
-        """Serialize to JSON.
+        """
+        Serialize to JSON.
 
         Returns
         -------
@@ -1122,7 +1212,8 @@ class EligibleCollateralSchedule:
 
     @property
     def rehypothecation_allowed(self) -> bool:
-        """Whether rehypothecation is allowed.
+        """
+        Whether rehypothecation is allowed.
 
         Returns
         -------
@@ -1138,7 +1229,8 @@ class EligibleCollateralSchedule:
 
     @property
     def eligible_count(self) -> int:
-        """Number of eligible collateral types.
+        """
+        Number of eligible collateral types.
 
         Returns
         -------
@@ -1153,7 +1245,8 @@ class EligibleCollateralSchedule:
         ...
 
     def is_eligible(self, asset_class: CollateralAssetClass) -> bool:
-        """Check if an asset class is eligible.
+        """
+        Check if an asset class is eligible.
 
         Parameters
         ----------
@@ -1170,11 +1263,17 @@ class EligibleCollateralSchedule:
         >>> s = EligibleCollateralSchedule.cash_only()
         >>> s.is_eligible(CollateralAssetClass.cash())
         True
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def haircut_for(self, asset_class: CollateralAssetClass) -> float | None:
-        """Get the haircut for an asset class.
+        """
+        Get the haircut for an asset class.
 
         Parameters
         ----------
@@ -1191,13 +1290,19 @@ class EligibleCollateralSchedule:
         >>> s = EligibleCollateralSchedule.cash_only()
         >>> s.haircut_for(CollateralAssetClass.cash()) is not None
         True
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def __repr__(self) -> str: ...
 
 class VmResult:
-    """Variation margin calculation result.
+    """
+    Variation margin calculation result.
 
     Parameters
     ----------
@@ -1217,7 +1322,8 @@ class VmResult:
 
     @property
     def gross_exposure(self) -> float:
-        """Gross mark-to-market exposure amount.
+        """
+        Gross mark-to-market exposure amount.
 
         Returns
         -------
@@ -1234,7 +1340,8 @@ class VmResult:
 
     @property
     def net_exposure(self) -> float:
-        """Net exposure after threshold and independent amount.
+        """
+        Net exposure after threshold and independent amount.
 
         Returns
         -------
@@ -1251,7 +1358,8 @@ class VmResult:
 
     @property
     def delivery_amount(self) -> float:
-        """Delivery amount (positive = we post margin).
+        """
+        Delivery amount (positive = we post margin).
 
         Returns
         -------
@@ -1268,7 +1376,8 @@ class VmResult:
 
     @property
     def return_amount(self) -> float:
-        """Return amount (positive = we receive margin back).
+        """
+        Return amount (positive = we receive margin back).
 
         Returns
         -------
@@ -1285,7 +1394,8 @@ class VmResult:
 
     @property
     def net_margin(self) -> float:
-        """Net margin amount (delivery − return).
+        """
+        Net margin amount (delivery − return).
 
         Returns
         -------
@@ -1302,7 +1412,8 @@ class VmResult:
 
     @property
     def requires_call(self) -> bool:
-        """Whether a margin call is required.
+        """
+        Whether a margin call is required.
 
         Returns
         -------
@@ -1320,7 +1431,8 @@ class VmResult:
     def __repr__(self) -> str: ...
 
 class VmCalculator:
-    """Variation margin calculator following ISDA CSA rules.
+    """
+    Variation margin calculator following ISDA CSA rules.
 
     Parameters
     ----------
@@ -1340,7 +1452,22 @@ class VmCalculator:
     True
     """
 
-    def __init__(self, csa: CsaSpec) -> None: ...
+    def __init__(self, csa: CsaSpec) -> None:
+        """
+        Compute   init for `VmCalculator`.
+
+        Parameters
+        ----------
+        csa : object
+            Value supplied for `csa` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     def calculate(
         self,
         exposure: float,
@@ -1350,7 +1477,8 @@ class VmCalculator:
         month: int,
         day: int,
     ) -> VmResult:
-        """Calculate variation margin.
+        """
+        Calculate variation margin.
 
         Parameters
         ----------
@@ -1389,7 +1517,8 @@ class VmCalculator:
         ...
 
 class ImResult:
-    """Initial margin calculation result.
+    """
+    Initial margin calculation result.
 
     Parameters
     ----------
@@ -1408,7 +1537,8 @@ class ImResult:
 
     @property
     def amount(self) -> float:
-        """Calculated initial margin amount.
+        """
+        Calculated initial margin amount.
 
         Returns
         -------
@@ -1423,7 +1553,8 @@ class ImResult:
 
     @property
     def currency(self) -> str:
-        """Currency of the IM amount.
+        """
+        Currency of the IM amount.
 
         Returns
         -------
@@ -1438,7 +1569,8 @@ class ImResult:
 
     @property
     def methodology(self) -> ImMethodology:
-        """Methodology used for calculation.
+        """
+        Methodology used for calculation.
 
         Returns
         -------
@@ -1453,7 +1585,8 @@ class ImResult:
 
     @property
     def mpor_days(self) -> int:
-        """Margin Period of Risk (days).
+        """
+        Margin Period of Risk (days).
 
         Returns
         -------
@@ -1468,7 +1601,8 @@ class ImResult:
 
     @property
     def as_of(self) -> str:
-        """Calculation date as an ISO 8601 string.
+        """
+        Calculation date as an ISO 8601 string.
 
         Returns
         -------
@@ -1478,7 +1612,8 @@ class ImResult:
         ...
 
     def breakdown_keys(self) -> list[str]:
-        """Risk-class breakdown keys (if available).
+        """
+        Risk-class breakdown keys (if available).
 
         Returns
         -------
@@ -1492,7 +1627,8 @@ class ImResult:
         ...
 
     def breakdown_amount(self, key: str) -> float | None:
-        """Get breakdown amount for a risk class.
+        """
+        Get breakdown amount for a risk class.
 
         Parameters
         ----------
@@ -1507,13 +1643,19 @@ class ImResult:
         Examples
         --------
         >>> # Depends on instance data
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def __repr__(self) -> str: ...
 
 class SimmSensitivities:
-    """ISDA SIMM sensitivity portfolio.
+    """
+    ISDA SIMM sensitivity portfolio.
 
     Stores signed sensitivity amounts by SIMM risk class and bucket. Amounts
     are currency amounts, not percentages or spot levels. Rate and credit
@@ -1523,10 +1665,17 @@ class SimmSensitivities:
 
     Use ``from_json``/``to_json`` for full-fidelity interop with the canonical
     Rust JSON shape, or the ``add_*`` helpers for notebook-style construction.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import SimmSensitivities
+    >>> SimmSensitivities.__name__
+    'SimmSensitivities'
     """
 
     def __init__(self, base_currency: str = "USD") -> None:
-        """Create an empty SIMM sensitivity set.
+        """
+        Create an empty SIMM sensitivity set.
 
         Parameters
         ----------
@@ -1543,7 +1692,8 @@ class SimmSensitivities:
 
     @staticmethod
     def from_json(json: str) -> SimmSensitivities:
-        """Deserialize SIMM sensitivities from the canonical JSON shape.
+        """
+        Deserialize SIMM sensitivities from the canonical JSON shape.
 
         Parameters
         ----------
@@ -1562,11 +1712,18 @@ class SimmSensitivities:
         ValueError
             If the payload is not valid JSON or does not match the SIMM
             sensitivity schema.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import SimmSensitivities
+        >>> callable(SimmSensitivities.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize sensitivities to the canonical pretty-printed JSON shape.
+        """
+        Serialize sensitivities to the canonical pretty-printed JSON shape.
 
         Returns
         -------
@@ -1576,7 +1733,8 @@ class SimmSensitivities:
         ...
 
     def add_ir_delta(self, currency: str, tenor: str, amount: float) -> None:
-        """Add an interest-rate delta bucket.
+        """
+        Add an interest-rate delta bucket.
 
         Parameters
         ----------
@@ -1596,7 +1754,8 @@ class SimmSensitivities:
         ...
 
     def add_ir_vega(self, currency: str, tenor: str, amount: float) -> None:
-        """Add an interest-rate vega bucket.
+        """
+        Add an interest-rate vega bucket.
 
         Parameters
         ----------
@@ -1615,7 +1774,8 @@ class SimmSensitivities:
         ...
 
     def add_credit_delta(self, name: str, qualifying: bool, tenor: str, amount: float) -> None:
-        """Add a credit delta bucket.
+        """
+        Add a credit delta bucket.
 
         Parameters
         ----------
@@ -1628,11 +1788,17 @@ class SimmSensitivities:
             Credit tenor bucket, such as ``"5Y"``.
         amount : float
             Signed CS01-style currency amount per 1bp move.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_credit_delta_bucketed(self, sector: str, name: str, tenor: str, amount: float) -> None:
-        """Add a bucketed credit-qualifying delta sensitivity.
+        """
+        Add a bucketed credit-qualifying delta sensitivity.
 
         Parameters
         ----------
@@ -1656,7 +1822,8 @@ class SimmSensitivities:
         ...
 
     def add_equity_delta(self, underlier: str, amount: float) -> None:
-        """Add an equity delta bucket.
+        """
+        Add an equity delta bucket.
 
         Parameters
         ----------
@@ -1664,11 +1831,17 @@ class SimmSensitivities:
             Equity underlier or index identifier.
         amount : float
             Signed currency sensitivity amount.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_equity_vega(self, underlier: str, amount: float) -> None:
-        """Add an equity vega bucket.
+        """
+        Add an equity vega bucket.
 
         Parameters
         ----------
@@ -1676,11 +1849,17 @@ class SimmSensitivities:
             Equity underlier or index identifier.
         amount : float
             Signed currency vega amount.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_fx_delta(self, currency: str, amount: float) -> None:
-        """Add an FX delta bucket.
+        """
+        Add an FX delta bucket.
 
         Parameters
         ----------
@@ -1697,7 +1876,8 @@ class SimmSensitivities:
         ...
 
     def add_fx_vega(self, ccy1: str, ccy2: str, amount: float) -> None:
-        """Add an FX vega bucket for a currency pair.
+        """
+        Add an FX vega bucket for a currency pair.
 
         Parameters
         ----------
@@ -1716,7 +1896,8 @@ class SimmSensitivities:
         ...
 
     def add_commodity_delta(self, bucket: str, amount: float) -> None:
-        """Add a commodity delta bucket.
+        """
+        Add a commodity delta bucket.
 
         Parameters
         ----------
@@ -1725,11 +1906,17 @@ class SimmSensitivities:
             such as ``"energy"``.
         amount : float
             Signed currency sensitivity amount.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_curvature(self, risk_class: str, amount: float) -> None:
-        """Add a curvature contribution for a SIMM risk class.
+        """
+        Add a curvature contribution for a SIMM risk class.
 
         Parameters
         ----------
@@ -1750,7 +1937,8 @@ class SimmSensitivities:
         ...
 
     def is_empty(self) -> bool:
-        """Return whether no sensitivity buckets have been populated.
+        """
+        Return whether no sensitivity buckets have been populated.
 
         Returns
         -------
@@ -1762,7 +1950,8 @@ class SimmSensitivities:
 
     @property
     def base_currency(self) -> str:
-        """Currency context in which sensitivity amounts are expressed.
+        """
+        Currency context in which sensitivity amounts are expressed.
 
         Returns
         -------
@@ -1772,14 +1961,22 @@ class SimmSensitivities:
         ...
 
 class SimmCalculator:
-    """ISDA SIMM initial-margin calculator.
+    """
+    ISDA SIMM initial-margin calculator.
 
     Loads registry-backed SIMM parameters for the requested rule version and
     calculates initial margin from explicit ``SimmSensitivities``.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import SimmCalculator
+    >>> SimmCalculator.__name__
+    'SimmCalculator'
     """
 
     def __init__(self, version: str = "v2_6", mpor_days: int | None = None) -> None:
-        """Create a SIMM calculator from the embedded margin registry.
+        """
+        Create a SIMM calculator from the embedded margin registry.
 
         Parameters
         ----------
@@ -1800,7 +1997,8 @@ class SimmCalculator:
 
     @property
     def version(self) -> str:
-        """Stable SIMM version label, either ``"v2_5"`` or ``"v2_6"``.
+        """
+        Stable SIMM version label, either ``"v2_5"`` or ``"v2_6"``.
 
         Returns
         -------
@@ -1811,7 +2009,8 @@ class SimmCalculator:
 
     @property
     def mpor_days(self) -> int:
-        """Margin period of risk in calendar days.
+        """
+        Margin period of risk in calendar days.
 
         Returns
         -------
@@ -1828,7 +2027,8 @@ class SimmCalculator:
         month: int,
         day: int,
     ) -> ImResult:
-        """Calculate SIMM from explicit sensitivities.
+        """
+        Calculate SIMM from explicit sensitivities.
 
         Parameters
         ----------
@@ -1857,16 +2057,24 @@ class SimmCalculator:
         ...
 
 class ScheduleImCalculator:
-    """BCBS-IOSCO regulatory schedule initial-margin calculator.
+    """
+    BCBS-IOSCO regulatory schedule initial-margin calculator.
 
     Applies registry-backed schedule rates to explicit notionals or to a
     single-asset-class netting set with the BCBS-IOSCO net-to-gross ratio
     reduction.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import ScheduleImCalculator
+    >>> ScheduleImCalculator.__name__
+    'ScheduleImCalculator'
     """
 
     @staticmethod
     def bcbs_standard() -> ScheduleImCalculator:
-        """Create the embedded BCBS-IOSCO standard schedule calculator.
+        """
+        Create the embedded BCBS-IOSCO standard schedule calculator.
 
         Returns
         -------
@@ -1877,12 +2085,19 @@ class ScheduleImCalculator:
         ------
         ValueError
             If embedded registry data cannot be loaded.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import ScheduleImCalculator
+        >>> callable(ScheduleImCalculator.bcbs_standard)
+        True
         """
         ...
 
     @staticmethod
     def from_registry_id(schedule_id: str) -> ScheduleImCalculator:
-        """Create a schedule calculator from a registry identifier.
+        """
+        Create a schedule calculator from a registry identifier.
 
         Parameters
         ----------
@@ -1898,11 +2113,18 @@ class ScheduleImCalculator:
         ------
         ValueError
             If ``schedule_id`` is unknown or registry data is invalid.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import ScheduleImCalculator
+        >>> callable(ScheduleImCalculator.from_registry_id)
+        True
         """
         ...
 
     def with_asset_class(self, asset_class: str) -> ScheduleImCalculator:
-        """Return a copy with a new default schedule asset class.
+        """
+        Return a copy with a new default schedule asset class.
 
         Parameters
         ----------
@@ -1924,7 +2146,8 @@ class ScheduleImCalculator:
         ...
 
     def with_maturity(self, years: float) -> ScheduleImCalculator:
-        """Return a copy with a new default maturity.
+        """
+        Return a copy with a new default maturity.
 
         Parameters
         ----------
@@ -1935,11 +2158,17 @@ class ScheduleImCalculator:
         -------
         ScheduleImCalculator
             Copy of this calculator with the default maturity changed.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def rate(self, asset_class: str, maturity_years: float) -> float:
-        """Look up a decimal schedule rate.
+        """
+        Look up a decimal schedule rate.
 
         Parameters
         ----------
@@ -1970,7 +2199,8 @@ class ScheduleImCalculator:
         month: int,
         day: int,
     ) -> ImResult:
-        """Calculate gross schedule IM from an explicit notional.
+        """
+        Calculate gross schedule IM from an explicit notional.
 
         Parameters
         ----------
@@ -2013,7 +2243,8 @@ class ScheduleImCalculator:
         month: int,
         day: int,
     ) -> ImResult | None:
-        """Calculate schedule IM for a netting set using NGR.
+        """
+        Calculate schedule IM for a netting set using NGR.
 
         Applies the BCBS-IOSCO reduction ``0.4 + 0.6 * NGR`` to a
         single-asset-class set of ``(signed_mtm, gross_notional)`` positions.
@@ -2053,16 +2284,24 @@ class ScheduleImCalculator:
         ...
 
 class HaircutImCalculator:
-    """Haircut-based initial-margin calculator.
+    """
+    Haircut-based initial-margin calculator.
 
     Applies eligible-collateral haircuts and optional FX add-ons to explicit
     collateral values. This path is intended for repo and securities-financing
     style collateral IM rather than SIMM sensitivities.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import HaircutImCalculator
+    >>> HaircutImCalculator.__name__
+    'HaircutImCalculator'
     """
 
     @staticmethod
     def bcbs_standard() -> HaircutImCalculator:
-        """Create a haircut calculator with the BCBS-IOSCO schedule.
+        """
+        Create a haircut calculator with the BCBS-IOSCO schedule.
 
         Returns
         -------
@@ -2073,12 +2312,19 @@ class HaircutImCalculator:
         ------
         ValueError
             If embedded registry data cannot be loaded.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import HaircutImCalculator
+        >>> callable(HaircutImCalculator.bcbs_standard)
+        True
         """
         ...
 
     @staticmethod
     def us_treasuries() -> HaircutImCalculator:
-        """Create a haircut calculator for US Treasury collateral.
+        """
+        Create a haircut calculator for US Treasury collateral.
 
         Returns
         -------
@@ -2089,12 +2335,19 @@ class HaircutImCalculator:
         ------
         ValueError
             If embedded registry data cannot be loaded.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import HaircutImCalculator
+        >>> callable(HaircutImCalculator.us_treasuries)
+        True
         """
         ...
 
     @staticmethod
     def from_schedule(schedule: EligibleCollateralSchedule) -> HaircutImCalculator:
-        """Create a haircut calculator from an eligible-collateral schedule.
+        """
+        Create a haircut calculator from an eligible-collateral schedule.
 
         Parameters
         ----------
@@ -2105,11 +2358,23 @@ class HaircutImCalculator:
         -------
         HaircutImCalculator
             Calculator backed by ``schedule``.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import HaircutImCalculator
+        >>> callable(HaircutImCalculator.from_schedule)
+        True
         """
         ...
 
     def with_default_asset_class(self, asset_class: CollateralAssetClass) -> HaircutImCalculator:
-        """Return a copy configured with a default collateral asset class.
+        """
+        Return a copy configured with a default collateral asset class.
 
         Parameters
         ----------
@@ -2120,11 +2385,17 @@ class HaircutImCalculator:
         -------
         HaircutImCalculator
             Copy of this calculator with the default asset class changed.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def with_posted_collateral_currency(self, currency: str) -> HaircutImCalculator:
-        """Return a copy configured with a posted-collateral currency.
+        """
+        Return a copy configured with a posted-collateral currency.
 
         Parameters
         ----------
@@ -2145,7 +2416,8 @@ class HaircutImCalculator:
         ...
 
     def haircut_for(self, asset_class: CollateralAssetClass) -> float:
-        """Look up the decimal haircut for a collateral asset class.
+        """
+        Look up the decimal haircut for a collateral asset class.
 
         Parameters
         ----------
@@ -2175,7 +2447,8 @@ class HaircutImCalculator:
         month: int,
         day: int,
     ) -> ImResult:
-        """Calculate haircut IM from explicit collateral value and asset class.
+        """
+        Calculate haircut IM from explicit collateral value and asset class.
 
         Parameters
         ----------
@@ -2209,7 +2482,8 @@ class HaircutImCalculator:
         ...
 
 class FundingConfig:
-    """Funding cost/benefit configuration for FVA calculation.
+    """
+    Funding cost/benefit configuration for FVA calculation.
 
     Parameters
     ----------
@@ -2233,10 +2507,28 @@ class FundingConfig:
         self,
         funding_spread_bps: float,
         funding_benefit_bps: float | None = None,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `FundingConfig`.
+
+        Parameters
+        ----------
+        funding_spread_bps : object
+            Rate or spread expressed in the convention documented for this API.
+        funding_benefit_bps : object
+            Value supplied for `funding_benefit_bps` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def funding_spread_bps(self) -> float:
-        """Funding spread in basis points.
+        """
+        Funding spread in basis points.
 
         Returns
         -------
@@ -2252,7 +2544,8 @@ class FundingConfig:
 
     @property
     def funding_benefit_bps(self) -> float | None:
-        """Funding benefit spread in basis points (or None).
+        """
+        Funding benefit spread in basis points (or None).
 
         Returns
         -------
@@ -2267,7 +2560,8 @@ class FundingConfig:
         ...
 
     def effective_benefit_bps(self) -> float:
-        """Effective funding benefit spread in basis points.
+        """
+        Effective funding benefit spread in basis points.
 
         Returns
         -------
@@ -2284,7 +2578,8 @@ class FundingConfig:
     def __repr__(self) -> str: ...
 
 class XvaConfig:
-    """XVA calculation configuration.
+    """
+    XVA calculation configuration.
 
     Parameters
     ----------
@@ -2315,10 +2610,32 @@ class XvaConfig:
         recovery_rate: float | None = None,
         own_recovery_rate: float | None = None,
         funding: FundingConfig | None = None,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `XvaConfig`.
+
+        Parameters
+        ----------
+        time_grid : object
+            Value supplied for `time_grid` to the documented binding operation.
+        recovery_rate : object
+            Rate or spread expressed in the convention documented for this API.
+        own_recovery_rate : object
+            Rate or spread expressed in the convention documented for this API.
+        funding : object
+            Value supplied for `funding` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> XvaConfig:
-        """Deserialize from JSON.
+        """
+        Deserialize from JSON.
 
         Parameters
         ----------
@@ -2342,7 +2659,8 @@ class XvaConfig:
         ...
 
     def to_json(self) -> str:
-        """Serialize to JSON.
+        """
+        Serialize to JSON.
 
         Returns
         -------
@@ -2362,7 +2680,8 @@ class XvaConfig:
         ...
 
     def validate(self) -> None:
-        """Validate configuration parameters.
+        """
+        Validate configuration parameters.
 
         Returns
         -------
@@ -2381,7 +2700,8 @@ class XvaConfig:
 
     @property
     def time_grid(self) -> list[float]:
-        """Time grid for exposure simulation (years from today).
+        """
+        Time grid for exposure simulation (years from today).
 
         Returns
         -------
@@ -2397,7 +2717,8 @@ class XvaConfig:
 
     @property
     def recovery_rate(self) -> float:
-        """Recovery rate for counterparty default.
+        """
+        Recovery rate for counterparty default.
 
         Returns
         -------
@@ -2413,7 +2734,8 @@ class XvaConfig:
 
     @property
     def own_recovery_rate(self) -> float | None:
-        """Recovery rate for own default (or None).
+        """
+        Recovery rate for own default (or None).
 
         Returns
         -------
@@ -2430,7 +2752,8 @@ class XvaConfig:
     def __repr__(self) -> str: ...
 
 class ExposureDiagnostics:
-    """Diagnostics from exposure simulation.
+    """
+    Diagnostics from exposure simulation.
 
     Parameters
     ----------
@@ -2449,7 +2772,8 @@ class ExposureDiagnostics:
 
     @property
     def market_roll_failures(self) -> int:
-        """Number of market-roll failures.
+        """
+        Number of market-roll failures.
 
         Returns
         -------
@@ -2464,7 +2788,8 @@ class ExposureDiagnostics:
 
     @property
     def valuation_failures(self) -> int:
-        """Total instrument valuation failures.
+        """
+        Total instrument valuation failures.
 
         Returns
         -------
@@ -2479,7 +2804,8 @@ class ExposureDiagnostics:
 
     @property
     def total_time_points(self) -> int:
-        """Total time grid points evaluated.
+        """
+        Total time grid points evaluated.
 
         Returns
         -------
@@ -2495,7 +2821,8 @@ class ExposureDiagnostics:
     def __repr__(self) -> str: ...
 
 class ExposureProfile:
-    """Exposure profile at each time grid point.
+    """
+    Exposure profile at each time grid point.
 
     Parameters
     ----------
@@ -2526,10 +2853,32 @@ class ExposureProfile:
         mtm_values: list[float],
         epe: list[float],
         ene: list[float],
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `ExposureProfile`.
+
+        Parameters
+        ----------
+        times : object
+            Value supplied for `times` to the documented binding operation.
+        mtm_values : object
+            Value supplied for `mtm_values` to the documented binding operation.
+        epe : object
+            Value supplied for `epe` to the documented binding operation.
+        ene : object
+            Value supplied for `ene` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> ExposureProfile:
-        """Deserialize from JSON.
+        """
+        Deserialize from JSON.
 
         Parameters
         ----------
@@ -2553,7 +2902,8 @@ class ExposureProfile:
         ...
 
     def to_json(self) -> str:
-        """Serialize to JSON.
+        """
+        Serialize to JSON.
 
         Returns
         -------
@@ -2572,7 +2922,8 @@ class ExposureProfile:
         ...
 
     def validate(self) -> None:
-        """Validate internal consistency.
+        """
+        Validate internal consistency.
 
         Returns
         -------
@@ -2591,7 +2942,8 @@ class ExposureProfile:
 
     @property
     def times(self) -> list[float]:
-        """Time points in years.
+        """
+        Time points in years.
 
         Returns
         -------
@@ -2607,7 +2959,8 @@ class ExposureProfile:
 
     @property
     def mtm_values(self) -> list[float]:
-        """Portfolio MtM values at each time point.
+        """
+        Portfolio MtM values at each time point.
 
         Returns
         -------
@@ -2623,7 +2976,8 @@ class ExposureProfile:
 
     @property
     def epe(self) -> list[float]:
-        """Expected Positive Exposure at each time point.
+        """
+        Expected Positive Exposure at each time point.
 
         Returns
         -------
@@ -2639,7 +2993,8 @@ class ExposureProfile:
 
     @property
     def ene(self) -> list[float]:
-        """Expected Negative Exposure at each time point.
+        """
+        Expected Negative Exposure at each time point.
 
         Returns
         -------
@@ -2669,7 +3024,8 @@ class ExposureProfile:
         ...
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Export as a pandas DataFrame with time (years) as index.
+        """
+        Export as a pandas DataFrame with time (years) as index.
 
         Columns: ``mtm_values``, ``epe``, ``ene``.
 
@@ -2683,7 +3039,8 @@ class ExposureProfile:
     def __repr__(self) -> str: ...
 
 class XvaResult:
-    """Result of XVA calculations (CVA, DVA, FVA, exposure profiles).
+    """
+    Result of XVA calculations (CVA, DVA, FVA, exposure profiles).
 
     Parameters
     ----------
@@ -2702,7 +3059,8 @@ class XvaResult:
 
     @staticmethod
     def from_json(json: str) -> XvaResult:
-        """Deserialize from JSON.
+        """
+        Deserialize from JSON.
 
         Parameters
         ----------
@@ -2726,7 +3084,8 @@ class XvaResult:
         ...
 
     def to_json(self) -> str:
-        """Serialize to JSON.
+        """
+        Serialize to JSON.
 
         Returns
         -------
@@ -2746,7 +3105,8 @@ class XvaResult:
 
     @property
     def cva(self) -> float:
-        """Unilateral CVA (positive = cost).
+        """
+        Unilateral CVA (positive = cost).
 
         Returns
         -------
@@ -2761,7 +3121,8 @@ class XvaResult:
 
     @property
     def dva(self) -> float | None:
-        """DVA (own-default benefit, or None).
+        """
+        DVA (own-default benefit, or None).
 
         Returns
         -------
@@ -2776,7 +3137,8 @@ class XvaResult:
 
     @property
     def fva(self) -> float | None:
-        """FVA (net funding cost/benefit, or None).
+        """
+        FVA (net funding cost/benefit, or None).
 
         Returns
         -------
@@ -2791,7 +3153,8 @@ class XvaResult:
 
     @property
     def bilateral_cva(self) -> float | None:
-        """Bilateral CVA = CVA − DVA (or None).
+        """
+        Bilateral CVA = CVA − DVA (or None).
 
         Returns
         -------
@@ -2806,13 +3169,15 @@ class XvaResult:
 
     @property
     def max_pfe(self) -> float:
-        """Maximum PFE across the profile.
+        """
+        Maximum PFE across the profile.
 
         Returns
         -------
         float
             Peak PFE.
 
+            The max pfe exposed by this `XvaResult`.
         Examples
         --------
         >>> # Instance field
@@ -2821,7 +3186,8 @@ class XvaResult:
 
     @property
     def effective_epe(self) -> float:
-        """Effective EPE (time-weighted average, regulatory metric).
+        """
+        Effective EPE (time-weighted average, regulatory metric).
 
         Returns
         -------
@@ -2836,7 +3202,8 @@ class XvaResult:
 
     @property
     def epe_profile(self) -> list[tuple[float, float]]:
-        """EPE profile as list of (time, value) tuples.
+        """
+        EPE profile as list of (time, value) tuples.
 
         Returns
         -------
@@ -2851,7 +3218,8 @@ class XvaResult:
 
     @property
     def ene_profile(self) -> list[tuple[float, float]]:
-        """ENE profile as list of (time, value) tuples.
+        """
+        ENE profile as list of (time, value) tuples.
 
         Returns
         -------
@@ -2866,7 +3234,8 @@ class XvaResult:
 
     @property
     def pfe_profile(self) -> list[tuple[float, float]]:
-        """PFE profile as list of (time, value) tuples.
+        """
+        PFE profile as list of (time, value) tuples.
 
         Returns
         -------
@@ -2881,7 +3250,8 @@ class XvaResult:
 
     @property
     def effective_epe_profile(self) -> list[tuple[float, float]]:
-        """Effective EPE profile as list of (time, value) tuples.
+        """
+        Effective EPE profile as list of (time, value) tuples.
 
         Returns
         -------
@@ -2895,7 +3265,8 @@ class XvaResult:
         ...
 
     def profiles_to_dataframe(self) -> pd.DataFrame:
-        """Export exposure profiles as a pandas DataFrame.
+        """
+        Export exposure profiles as a pandas DataFrame.
 
         Columns: ``epe``, ``ene``, ``pfe``, ``effective_epe`` -- indexed
         by time in years.
@@ -2910,7 +3281,8 @@ class XvaResult:
     def __repr__(self) -> str: ...
 
 class CsaTerms:
-    """Credit Support Annex terms for XVA collateralization.
+    """
+    Credit Support Annex terms for XVA collateralization.
 
     Parameters
     ----------
@@ -2940,10 +3312,32 @@ class CsaTerms:
         mta: float,
         mpor_days: int,
         independent_amount: float,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `CsaTerms`.
+
+        Parameters
+        ----------
+        threshold : object
+            Value supplied for `threshold` to the documented binding operation.
+        mta : object
+            Value supplied for `mta` to the documented binding operation.
+        mpor_days : object
+            Value supplied for `mpor_days` to the documented binding operation.
+        independent_amount : object
+            Value supplied for `independent_amount` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def threshold(self) -> float:
-        """Threshold below which no collateral is required.
+        """
+        Threshold below which no collateral is required.
 
         Returns
         -------
@@ -2959,13 +3353,15 @@ class CsaTerms:
 
     @property
     def mta(self) -> float:
-        """Minimum transfer amount.
+        """
+        Minimum transfer amount.
 
         Returns
         -------
         float
             MTA.
 
+            The mta exposed by this `CsaTerms`.
         Examples
         --------
         >>> CsaTerms(0.0, 5e4, 5, 0.0).mta
@@ -2975,13 +3371,15 @@ class CsaTerms:
 
     @property
     def mpor_days(self) -> int:
-        """Margin period of risk in calendar days.
+        """
+        Margin period of risk in calendar days.
 
         Returns
         -------
         int
             MPOR days.
 
+            The mpor days exposed by this `CsaTerms`.
         Examples
         --------
         >>> CsaTerms(0.0, 0.0, 14, 0.0).mpor_days
@@ -2991,7 +3389,8 @@ class CsaTerms:
 
     @property
     def independent_amount(self) -> float:
-        """Independent amount (initial margin).
+        """
+        Independent amount (initial margin).
 
         Returns
         -------
@@ -3008,7 +3407,8 @@ class CsaTerms:
     def __repr__(self) -> str: ...
 
 class XvaNettingSet:
-    """XVA netting set: trades under a single ISDA master agreement.
+    """
+    XVA netting set: trades under a single ISDA master agreement.
 
     Parameters
     ----------
@@ -3043,16 +3443,39 @@ class XvaNettingSet:
         counterparty_id: str,
         csa: CsaTerms | None = None,
         reporting_currency: str | None = None,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `XvaNettingSet`.
+
+        Parameters
+        ----------
+        id : object
+            Stable identifier used to select the required object or result entry.
+        counterparty_id : object
+            Stable identifier used to select the required object or result entry.
+        csa : object
+            Value supplied for `csa` to the documented binding operation.
+        reporting_currency : object
+            Value supplied for `reporting_currency` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def id(self) -> str:
-        """Netting set identifier.
+        """
+        Netting set identifier.
 
         Returns
         -------
         str
             Id string.
 
+            The id exposed by this `XvaNettingSet`.
         Examples
         --------
         >>> XvaNettingSet("A", "B").id
@@ -3062,7 +3485,8 @@ class XvaNettingSet:
 
     @property
     def counterparty_id(self) -> str:
-        """Counterparty identifier.
+        """
+        Counterparty identifier.
 
         Returns
         -------
@@ -3078,7 +3502,8 @@ class XvaNettingSet:
 
     @property
     def is_collateralized(self) -> bool:
-        """Whether this netting set is collateralized.
+        """
+        Whether this netting set is collateralized.
 
         Returns
         -------
@@ -3095,7 +3520,8 @@ class XvaNettingSet:
     def __repr__(self) -> str: ...
 
 class MarginUtilization:
-    """Margin utilization result (ratio of posted to required margin).
+    """
+    Margin utilization result (ratio of posted to required margin).
 
     Parameters
     ----------
@@ -3128,10 +3554,30 @@ class MarginUtilization:
         posted_amount: float,
         required_amount: float,
         currency: str,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `MarginUtilization`.
+
+        Parameters
+        ----------
+        posted_amount : object
+            Value supplied for `posted_amount` to the documented binding operation.
+        required_amount : object
+            Value supplied for `required_amount` to the documented binding operation.
+        currency : object
+            Value supplied for `currency` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def posted(self) -> float:
-        """Posted margin amount.
+        """
+        Posted margin amount.
 
         Returns
         -------
@@ -3147,7 +3593,8 @@ class MarginUtilization:
 
     @property
     def required(self) -> float:
-        """Required margin amount.
+        """
+        Required margin amount.
 
         Returns
         -------
@@ -3163,13 +3610,15 @@ class MarginUtilization:
 
     @property
     def ratio(self) -> float:
-        """Utilization ratio (posted / required).
+        """
+        Utilization ratio (posted / required).
 
         Returns
         -------
         float
             Ratio.
 
+            The ratio exposed by this `MarginUtilization`.
         Examples
         --------
         >>> MarginUtilization(50.0, 100.0, "EUR").ratio
@@ -3178,7 +3627,8 @@ class MarginUtilization:
         ...
 
     def is_adequate(self) -> bool:
-        """Whether margin is adequate (ratio >= 1.0).
+        """
+        Whether margin is adequate (ratio >= 1.0).
 
         Returns
         -------
@@ -3193,7 +3643,8 @@ class MarginUtilization:
         ...
 
     def shortfall(self) -> float:
-        """Shortfall amount (if any).
+        """
+        Shortfall amount (if any).
 
         Returns
         -------
@@ -3210,7 +3661,8 @@ class MarginUtilization:
     def __repr__(self) -> str: ...
 
 class ExcessCollateral:
-    """Excess collateral result.
+    """
+    Excess collateral result.
 
     Parameters
     ----------
@@ -3242,10 +3694,30 @@ class ExcessCollateral:
         collateral_value: float,
         required_value: float,
         currency: str,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `ExcessCollateral`.
+
+        Parameters
+        ----------
+        collateral_value : object
+            Value supplied for `collateral_value` to the documented binding operation.
+        required_value : object
+            Value supplied for `required_value` to the documented binding operation.
+        currency : object
+            Value supplied for `currency` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def collateral_value(self) -> float:
-        """Collateral value.
+        """
+        Collateral value.
 
         Returns
         -------
@@ -3261,7 +3733,9 @@ class ExcessCollateral:
 
     @property
     def required_value(self) -> float:
-        """Required value.
+        """
+        Return the required value for `ExcessCollateral`.
+        Required value.
 
         Returns
         -------
@@ -3277,7 +3751,8 @@ class ExcessCollateral:
 
     @property
     def excess(self) -> float:
-        """Excess amount (positive) or shortfall (negative).
+        """
+        Excess amount (positive) or shortfall (negative).
 
         Returns
         -------
@@ -3292,7 +3767,8 @@ class ExcessCollateral:
         ...
 
     def has_excess(self) -> bool:
-        """Whether there is excess collateral.
+        """
+        Whether there is excess collateral.
 
         Returns
         -------
@@ -3307,7 +3783,8 @@ class ExcessCollateral:
         ...
 
     def has_shortfall(self) -> bool:
-        """Whether there is a shortfall.
+        """
+        Whether there is a shortfall.
 
         Returns
         -------
@@ -3322,7 +3799,8 @@ class ExcessCollateral:
         ...
 
     def excess_percentage(self) -> float:
-        """Excess as a percentage of required.
+        """
+        Excess as a percentage of required.
 
         Returns
         -------
@@ -3339,7 +3817,8 @@ class ExcessCollateral:
     def __repr__(self) -> str: ...
 
 class MarginFundingCost:
-    """Margin funding cost result.
+    """
+    Margin funding cost result.
 
     Parameters
     ----------
@@ -3375,10 +3854,32 @@ class MarginFundingCost:
         funding_rate: float,
         collateral_rate: float,
         currency: str,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `MarginFundingCost`.
+
+        Parameters
+        ----------
+        margin_posted : object
+            Value supplied for `margin_posted` to the documented binding operation.
+        funding_rate : object
+            Rate or spread expressed in the convention documented for this API.
+        collateral_rate : object
+            Rate or spread expressed in the convention documented for this API.
+        currency : object
+            Value supplied for `currency` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def margin_posted(self) -> float:
-        """Posted margin amount.
+        """
+        Posted margin amount.
 
         Returns
         -------
@@ -3394,7 +3895,8 @@ class MarginFundingCost:
 
     @property
     def funding_rate(self) -> float:
-        """Funding rate (annualized).
+        """
+        Funding rate (annualized).
 
         Returns
         -------
@@ -3410,7 +3912,8 @@ class MarginFundingCost:
 
     @property
     def collateral_rate(self) -> float:
-        """Collateral return rate.
+        """
+        Collateral return rate.
 
         Returns
         -------
@@ -3426,7 +3929,8 @@ class MarginFundingCost:
 
     @property
     def annual_cost(self) -> float:
-        """Annualized funding cost.
+        """
+        Annualized funding cost.
 
         Returns
         -------
@@ -3441,7 +3945,8 @@ class MarginFundingCost:
         ...
 
     def spread(self) -> float:
-        """Funding spread (funding rate − collateral rate).
+        """
+        Funding spread (funding rate − collateral rate).
 
         Returns
         -------
@@ -3456,7 +3961,8 @@ class MarginFundingCost:
         ...
 
     def cost_for_period(self, year_fraction: float) -> float:
-        """Cost for a specific period.
+        """
+        Cost for a specific period.
 
         Parameters
         ----------
@@ -3472,13 +3978,19 @@ class MarginFundingCost:
         --------
         >>> MarginFundingCost(1e6, 0.04, 0.0, "USD").cost_for_period(0.5) >= 0
         True
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def __repr__(self) -> str: ...
 
 class Haircut01:
-    """Haircut sensitivity: PV change for +1bp haircut change.
+    """
+    Haircut sensitivity: PV change for +1bp haircut change.
 
     Parameters
     ----------
@@ -3511,10 +4023,30 @@ class Haircut01:
         collateral_value: float,
         current_haircut: float,
         currency: str,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `Haircut01`.
+
+        Parameters
+        ----------
+        collateral_value : object
+            Value supplied for `collateral_value` to the documented binding operation.
+        current_haircut : object
+            Value supplied for `current_haircut` to the documented binding operation.
+        currency : object
+            Value supplied for `currency` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def collateral_value(self) -> float:
-        """Collateral value.
+        """
+        Collateral value.
 
         Returns
         -------
@@ -3530,13 +4062,15 @@ class Haircut01:
 
     @property
     def current_haircut(self) -> float:
-        """Current haircut (decimal).
+        """
+        Current haircut (decimal).
 
         Returns
         -------
         float
             Haircut.
 
+            The current haircut exposed by this `Haircut01`.
         Examples
         --------
         >>> Haircut01(100.0, 0.1, "USD").current_haircut
@@ -3546,7 +4080,8 @@ class Haircut01:
 
     @property
     def pv_change(self) -> float:
-        """PV change for +1bp haircut.
+        """
+        PV change for +1bp haircut.
 
         Returns
         -------
@@ -3561,7 +4096,8 @@ class Haircut01:
         ...
 
     def haircut_bps(self) -> float:
-        """Current haircut in basis points.
+        """
+        Current haircut in basis points.
 
         Returns
         -------
@@ -3578,7 +4114,8 @@ class Haircut01:
     def __repr__(self) -> str: ...
 
 class FrtbSensitivities:
-    """FRTB sensitivity portfolio for the Sensitivity-Based Approach.
+    """
+    FRTB sensitivity portfolio for the Sensitivity-Based Approach.
 
     Build up delta / vega / curvature inputs with the ``add_*`` methods, then
     pass to :func:`frtb_sba_charge` to compute the capital charge under one or
@@ -3595,10 +4132,26 @@ class FrtbSensitivities:
     >>> sens.add_girr_delta("5Y", 100_000.0)
     """
 
-    def __init__(self, base_currency: str = "USD") -> None: ...
+    def __init__(self, base_currency: str = "USD") -> None:
+        """
+        Compute   init for `FrtbSensitivities`.
+
+        Parameters
+        ----------
+        base_currency : object
+            Value supplied for `base_currency` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> FrtbSensitivities:
-        """Construct from a JSON serialization.
+        """
+        Construct from a JSON serialization.
 
         Parameters
         ----------
@@ -3609,11 +4162,23 @@ class FrtbSensitivities:
         -------
         FrtbSensitivities
             Sensitivity set populated from the JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import FrtbSensitivities
+        >>> callable(FrtbSensitivities.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize to a JSON string.
+        """
+        Serialize to a JSON string.
 
         Returns
         -------
@@ -3623,7 +4188,8 @@ class FrtbSensitivities:
         ...
 
     def add_girr_delta(self, tenor: str, amount: float, currency: str | None = None) -> None:
-        """Add a GIRR delta sensitivity (currency P&L per 1 percentage-point move).
+        """
+        Add a GIRR delta sensitivity (currency P&L per 1 percentage-point move).
 
         Parameters
         ----------
@@ -3633,11 +4199,17 @@ class FrtbSensitivities:
             Signed sensitivity amount per 1 percentage-point move (``100 * DV01``).
         currency : str, optional
             Currency code; defaults to the base currency.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_csr_delta(self, issuer: str, bucket: int, tenor: str, amount: float) -> None:
-        """Add a CSR (non-securitization) delta sensitivity.
+        """
+        Add a CSR (non-securitization) delta sensitivity.
 
         Parameters
         ----------
@@ -3649,11 +4221,17 @@ class FrtbSensitivities:
             Credit tenor bucket.
         amount : float
             Signed sensitivity amount per 1bp move.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_equity_delta(self, underlier: str, bucket: int, amount: float) -> None:
-        """Add an equity delta sensitivity.
+        """
+        Add an equity delta sensitivity.
 
         Parameters
         ----------
@@ -3663,11 +4241,17 @@ class FrtbSensitivities:
             Equity bucket number.
         amount : float
             Signed sensitivity amount per 1bp move.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_fx_delta(self, ccy1: str, ccy2: str, amount: float) -> None:
-        """Add an FX delta sensitivity for the pair (ccy1, ccy2).
+        """
+        Add an FX delta sensitivity for the pair (ccy1, ccy2).
 
         Parameters
         ----------
@@ -3677,11 +4261,17 @@ class FrtbSensitivities:
             Second currency in the FX pair.
         amount : float
             Signed sensitivity amount per 1bp move.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_commodity_delta(self, name: str, bucket: int, tenor: str, amount: float) -> None:
-        """Add a commodity delta sensitivity.
+        """
+        Add a commodity delta sensitivity.
 
         Parameters
         ----------
@@ -3693,6 +4283,11 @@ class FrtbSensitivities:
             Commodity tenor bucket.
         amount : float
             Signed sensitivity amount per 1bp move.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -3703,7 +4298,8 @@ class FrtbSensitivities:
         amount: float,
         currency: str | None = None,
     ) -> None:
-        """Add a GIRR vega sensitivity.
+        """
+        Add a GIRR vega sensitivity.
 
         Parameters
         ----------
@@ -3715,11 +4311,17 @@ class FrtbSensitivities:
             Signed vega amount.
         currency : str, optional
             Currency code; defaults to the base currency.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_equity_vega(self, underlier: str, bucket: int, maturity: str, amount: float) -> None:
-        """Add an equity vega sensitivity.
+        """
+        Add an equity vega sensitivity.
 
         Parameters
         ----------
@@ -3731,11 +4333,17 @@ class FrtbSensitivities:
             Option maturity bucket.
         amount : float
             Signed vega amount.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_fx_vega(self, ccy1: str, ccy2: str, maturity: str, amount: float) -> None:
-        """Add an FX vega sensitivity.
+        """
+        Add an FX vega sensitivity.
 
         Parameters
         ----------
@@ -3747,11 +4355,17 @@ class FrtbSensitivities:
             Option maturity bucket.
         amount : float
             Signed vega amount.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_girr_curvature(self, cvr_up: float, cvr_down: float, currency: str | None = None) -> None:
-        """Add a GIRR curvature sensitivity.
+        """
+        Add a GIRR curvature sensitivity.
 
         Parameters
         ----------
@@ -3761,11 +4375,17 @@ class FrtbSensitivities:
             Curvature sensitivity for downward shock.
         currency : str, optional
             Currency code; defaults to the base currency.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_equity_curvature(self, underlier: str, bucket: int, cvr_up: float, cvr_down: float) -> None:
-        """Add an equity curvature sensitivity.
+        """
+        Add an equity curvature sensitivity.
 
         Parameters
         ----------
@@ -3777,11 +4397,17 @@ class FrtbSensitivities:
             Curvature sensitivity for upward shock.
         cvr_down : float
             Curvature sensitivity for downward shock.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_fx_curvature(self, ccy1: str, ccy2: str, cvr_up: float, cvr_down: float) -> None:
-        """Add an FX curvature sensitivity.
+        """
+        Add an FX curvature sensitivity.
 
         Parameters
         ----------
@@ -3793,11 +4419,17 @@ class FrtbSensitivities:
             Curvature sensitivity for upward shock.
         cvr_down : float
             Curvature sensitivity for downward shock.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_rrao_position(self, instrument_id: str, notional: float, is_exotic: bool = False) -> None:
-        """Add a Residual Risk Add-On position.
+        """
+        Add a Residual Risk Add-On position.
 
         Parameters
         ----------
@@ -3807,12 +4439,18 @@ class FrtbSensitivities:
             Notional amount for the RRAO position.
         is_exotic : bool, default False
             Whether the instrument is exotic (higher RRAO weight).
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def base_currency(self) -> str:
-        """Base / reporting currency code.
+        """
+        Base / reporting currency code.
 
         Returns
         -------
@@ -3824,7 +4462,8 @@ class FrtbSensitivities:
     def __repr__(self) -> str: ...
 
 class FrtbSbaEngine:
-    """FRTB SBA engine matching the canonical Rust API.
+    """
+    FRTB SBA engine matching the canonical Rust API.
 
     Calculates the Sensitivity-Based Approach capital charge under one or more
     correlation scenarios per BCBS d457.
@@ -3834,11 +4473,33 @@ class FrtbSbaEngine:
     correlation_scenario : str or None, optional
         If provided (``"low"``, ``"medium"``, or ``"high"``), only that
         scenario is evaluated. Otherwise all three are run.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import FrtbSbaEngine
+    >>> FrtbSbaEngine.__name__
+    'FrtbSbaEngine'
     """
 
-    def __init__(self, correlation_scenario: str | None = None) -> None: ...
+    def __init__(self, correlation_scenario: str | None = None) -> None:
+        """
+        Compute   init for `FrtbSbaEngine`.
+
+        Parameters
+        ----------
+        correlation_scenario : object
+            Value supplied for `correlation_scenario` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     def calculate(self, sensitivities: FrtbSensitivities) -> tuple[float, dict[str, Any]]:
-        """Calculate the FRTB SBA charge for a sensitivity portfolio.
+        """
+        Calculate the FRTB SBA charge for a sensitivity portfolio.
 
         Parameters
         ----------
@@ -3852,11 +4513,17 @@ class FrtbSbaEngine:
             ``delta``, ``vega``, ``curvature`` (each dict of risk class -> charge),
             plus ``drc``, ``rrao``, ``binding_scenario``, and
             ``scenario_charges``.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 class SaCcrTrade:
-    """A derivative trade for SA-CCR EAD computation per BCBS 279.
+    """
+    A derivative trade for SA-CCR EAD computation per BCBS 279.
 
     Parameters
     ----------
@@ -3886,6 +4553,12 @@ class SaCcrTrade:
         ``+1.0`` for long, ``-1.0`` for short.
     mtm : float, default 0.0
         Current mark-to-market value.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import SaCcrTrade
+    >>> SaCcrTrade.__name__
+    'SaCcrTrade'
     """
 
     def __init__(
@@ -3903,10 +4576,50 @@ class SaCcrTrade:
         hedging_set: str,
         direction: float = 1.0,
         mtm: float = 0.0,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `SaCcrTrade`.
+
+        Parameters
+        ----------
+        trade_id : object
+            Stable identifier used to select the required object or result entry.
+        asset_class : object
+            Value supplied for `asset_class` to the documented binding operation.
+        notional : object
+            Value supplied for `notional` to the documented binding operation.
+        start_year : object
+            Value supplied for `start_year` to the documented binding operation.
+        start_month : object
+            Value supplied for `start_month` to the documented binding operation.
+        start_day : object
+            Value supplied for `start_day` to the documented binding operation.
+        end_year : object
+            Value supplied for `end_year` to the documented binding operation.
+        end_month : object
+            Value supplied for `end_month` to the documented binding operation.
+        end_day : object
+            Value supplied for `end_day` to the documented binding operation.
+        underlier : object
+            Value supplied for `underlier` to the documented binding operation.
+        hedging_set : object
+            Value supplied for `hedging_set` to the documented binding operation.
+        direction : object
+            Value supplied for `direction` to the documented binding operation.
+        mtm : object
+            Value supplied for `mtm` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> SaCcrTrade:
-        """Construct from a JSON serialization.
+        """
+        Construct from a JSON serialization.
 
         Parameters
         ----------
@@ -3917,11 +4630,23 @@ class SaCcrTrade:
         -------
         SaCcrTrade
             Parsed trade.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import SaCcrTrade
+        >>> callable(SaCcrTrade.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize to a JSON string.
+        """
+        Serialize to a JSON string.
 
         Returns
         -------
@@ -3932,7 +4657,8 @@ class SaCcrTrade:
 
     @property
     def trade_id(self) -> str:
-        """Unique trade identifier.
+        """
+        Unique trade identifier.
 
         Returns
         -------
@@ -3943,7 +4669,8 @@ class SaCcrTrade:
 
     @property
     def asset_class(self) -> str:
-        """Asset class label.
+        """
+        Asset class label.
 
         Returns
         -------
@@ -3954,7 +4681,8 @@ class SaCcrTrade:
 
     @property
     def notional(self) -> float:
-        """Adjusted notional in reporting currency.
+        """
+        Adjusted notional in reporting currency.
 
         Returns
         -------
@@ -3965,7 +4693,8 @@ class SaCcrTrade:
 
     @property
     def mtm(self) -> float:
-        """Current mark-to-market value.
+        """
+        Current mark-to-market value.
 
         Returns
         -------
@@ -3976,11 +4705,18 @@ class SaCcrTrade:
     def __repr__(self) -> str: ...
 
 class SaCcrNettingSetConfig:
-    """SA-CCR netting-set configuration with explicit valuation date.
+    """
+    SA-CCR netting-set configuration with explicit valuation date.
 
     Parameters
     ----------
     (Use ``un margined`` or ``margined`` factories.)
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import SaCcrNettingSetConfig
+    >>> SaCcrNettingSetConfig.__name__
+    'SaCcrNettingSetConfig'
     """
 
     @staticmethod
@@ -3992,7 +4728,8 @@ class SaCcrNettingSetConfig:
         as_of_month: int,
         as_of_day: int,
     ) -> SaCcrNettingSetConfig:
-        """Create an unmargined netting-set configuration.
+        """
+        Create an unmargined netting-set configuration.
 
         Parameters
         ----------
@@ -4013,6 +4750,17 @@ class SaCcrNettingSetConfig:
         -------
         SaCcrNettingSetConfig
             Unmargined netting-set config.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import SaCcrNettingSetConfig
+        >>> callable(SaCcrNettingSetConfig.unmargined)
+        True
         """
         ...
 
@@ -4029,7 +4777,8 @@ class SaCcrNettingSetConfig:
         as_of_month: int,
         as_of_day: int,
     ) -> SaCcrNettingSetConfig:
-        """Create a margined netting-set configuration.
+        """
+        Create a margined netting-set configuration.
 
         Parameters
         ----------
@@ -4058,12 +4807,24 @@ class SaCcrNettingSetConfig:
         -------
         SaCcrNettingSetConfig
             Margined netting-set config.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import SaCcrNettingSetConfig
+        >>> callable(SaCcrNettingSetConfig.margined)
+        True
         """
         ...
 
     @staticmethod
     def from_json(json: str) -> SaCcrNettingSetConfig:
-        """Construct from a JSON serialization.
+        """
+        Construct from a JSON serialization.
 
         Parameters
         ----------
@@ -4074,11 +4835,23 @@ class SaCcrNettingSetConfig:
         -------
         SaCcrNettingSetConfig
             Parsed netting-set config.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import SaCcrNettingSetConfig
+        >>> callable(SaCcrNettingSetConfig.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize to a JSON string.
+        """
+        Serialize to a JSON string.
 
         Returns
         -------
@@ -4089,7 +4862,8 @@ class SaCcrNettingSetConfig:
 
     @property
     def is_margined(self) -> bool:
-        """Whether the netting set is margined.
+        """
+        Whether the netting set is margined.
 
         Returns
         -------
@@ -4100,7 +4874,8 @@ class SaCcrNettingSetConfig:
 
     @property
     def collateral(self) -> float:
-        """Net collateral currently held.
+        """
+        Net collateral currently held.
 
         Returns
         -------
@@ -4110,7 +4885,8 @@ class SaCcrNettingSetConfig:
         ...
 
 class SaCcrEngine:
-    """SA-CCR EAD engine matching the canonical Rust API.
+    """
+    SA-CCR EAD engine matching the canonical Rust API.
 
     Parameters
     ----------
@@ -4118,11 +4894,35 @@ class SaCcrEngine:
         Supervisory alpha factor; defaults to 1.4 when ``None``.
     reporting_currency : str, default "USD"
         ISO currency code for EAD reporting.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import SaCcrEngine
+    >>> SaCcrEngine.__name__
+    'SaCcrEngine'
     """
 
-    def __init__(self, alpha: float | None = None, reporting_currency: str = "USD") -> None: ...
+    def __init__(self, alpha: float | None = None, reporting_currency: str = "USD") -> None:
+        """
+        Compute   init for `SaCcrEngine`.
+
+        Parameters
+        ----------
+        alpha : object
+            Value supplied for `alpha` to the documented binding operation.
+        reporting_currency : object
+            Value supplied for `reporting_currency` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     def calculate_ead(self, config: SaCcrNettingSetConfig, trades: list[SaCcrTrade]) -> dict[str, Any]:
-        """Calculate SA-CCR EAD for a netting set and trade list.
+        """
+        Calculate SA-CCR EAD for a netting set and trade list.
 
         Parameters
         ----------
@@ -4135,13 +4935,19 @@ class SaCcrEngine:
         -------
         dict[str, Any]
             EAD breakdown including replacement cost, PFE, and total EAD.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 def frtb_sba_charge(
     sensitivities: FrtbSensitivities, correlation_scenario: str | None = None
 ) -> tuple[float, dict[str, Any]]:
-    """Compute the FRTB SBA capital charge.
+    """
+    Compute the FRTB SBA capital charge.
 
     Parameters
     ----------
@@ -4167,11 +4973,17 @@ def frtb_sba_charge(
     >>> total, breakdown = frtb_sba_charge(sens)
     >>> total > 0.0
     True
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def saccr_ead(trades: list[SaCcrTrade], margined: bool = False, collateral: float = 0.0) -> tuple[float, float, float]:
-    """Compute SA-CCR Exposure at Default per BCBS 279.
+    """
+    Compute SA-CCR Exposure at Default per BCBS 279.
 
     Parameters
     ----------
@@ -4186,5 +4998,16 @@ def saccr_ead(trades: list[SaCcrTrade], margined: bool = False, collateral: floa
     -------
     tuple[float, float, float]
         ``(rc, pfe, ead)`` where ``ead = alpha * (rc + pfe)`` with alpha = 1.4.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import saccr_ead
+    >>> callable(saccr_ead)
+    True
     """
     ...

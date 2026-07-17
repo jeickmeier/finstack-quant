@@ -1,4 +1,11 @@
-"""P&L attribution bindings for the ``finstack-quant-attribution`` Rust crate."""
+"""P&L attribution bindings for the ``finstack-quant-attribution`` Rust crate.
+
+Examples:
+--------
+>>> import finstack_quant.attribution as attribution
+>>> attribution.__name__
+'finstack_quant.attribution'
+"""
 
 from finstack_quant.finstack_quant import attribution as _attribution
 

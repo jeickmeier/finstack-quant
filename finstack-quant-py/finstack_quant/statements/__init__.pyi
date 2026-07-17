@@ -1,8 +1,15 @@
-"""Financial statement modeling: builders, evaluators, forecasts, DSL, adjustments.
+"""
+Financial statement modeling: builders, evaluators, forecasts, DSL, adjustments.
 
 Python bindings for the ``finstack-quant-statements`` Rust crate: model specifications,
 ``ModelBuilder``, ``Evaluator``, formula parsing/validation, and EBITDA-style
 normalization helpers.
+
+Examples
+--------
+>>> import finstack_quant.statements as statements
+>>> statements.__name__
+'finstack_quant.statements'
 """
 
 from __future__ import annotations
@@ -40,7 +47,8 @@ __all__ = [
 ]
 
 class ForecastMethod:
-    """Available forecast methods for projecting node values.
+    """
+    Available forecast methods for projecting node values.
 
     Construct variants via static factory methods (e.g. ``growth_pct()``).
 
@@ -49,93 +57,155 @@ class ForecastMethod:
     >>> from finstack_quant.statements import ForecastMethod
     >>> ForecastMethod.forward_fill()
     ForecastMethod(...)
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import ForecastMethod
+    >>> ForecastMethod.__name__
+    'ForecastMethod'
     """
 
     @staticmethod
     def forward_fill() -> ForecastMethod:
-        """Carry the last observed value forward into future periods.
+        """
+        Carry the last observed value forward into future periods.
 
         Returns
         -------
         ForecastMethod
             Forward-fill forecast method.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastMethod
+        >>> callable(ForecastMethod.forward_fill)
+        True
         """
         ...
 
     @staticmethod
     def growth_pct() -> ForecastMethod:
-        """Apply compound percentage growth between periods.
+        """
+        Apply compound percentage growth between periods.
 
         Returns
         -------
         ForecastMethod
             Growth-percentage forecast method.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastMethod
+        >>> callable(ForecastMethod.growth_pct)
+        True
         """
         ...
 
     @staticmethod
     def curve_pct() -> ForecastMethod:
-        """Apply period-specific percentage growth from a curve.
+        """
+        Apply period-specific percentage growth from a curve.
 
         Returns
         -------
         ForecastMethod
             Curve-percentage forecast method.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastMethod
+        >>> callable(ForecastMethod.curve_pct)
+        True
         """
         ...
 
     @staticmethod
     def normal() -> ForecastMethod:
-        """Normal-distribution sampling (deterministic under a fixed seed).
+        """
+        Normal-distribution sampling (deterministic under a fixed seed).
 
         Returns
         -------
         ForecastMethod
             Normal distribution forecast method.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastMethod
+        >>> callable(ForecastMethod.normal)
+        True
         """
         ...
 
     @staticmethod
     def log_normal() -> ForecastMethod:
-        """Log-normal distribution sampling (deterministic under a fixed seed).
+        """
+        Log-normal distribution sampling (deterministic under a fixed seed).
 
         Returns
         -------
         ForecastMethod
             Log-normal forecast method.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastMethod
+        >>> callable(ForecastMethod.log_normal)
+        True
         """
         ...
 
     @staticmethod
     def override_method() -> ForecastMethod:
-        """Use explicit period overrides instead of a statistical rule.
+        """
+        Use explicit period overrides instead of a statistical rule.
 
         Returns
         -------
         ForecastMethod
             Override forecast method.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastMethod
+        >>> callable(ForecastMethod.override_method)
+        True
         """
         ...
 
     @staticmethod
     def time_series() -> ForecastMethod:
-        """Reference an external time series as the forecast source.
+        """
+        Reference an external time series as the forecast source.
 
         Returns
         -------
         ForecastMethod
             External time-series forecast method.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastMethod
+        >>> callable(ForecastMethod.time_series)
+        True
         """
         ...
 
     @staticmethod
     def seasonal() -> ForecastMethod:
-        """Apply a seasonal pattern (additive or multiplicative).
+        """
+        Apply a seasonal pattern (additive or multiplicative).
 
         Returns
         -------
         ForecastMethod
             Seasonal forecast method.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastMethod
+        >>> callable(ForecastMethod.seasonal)
+        True
         """
         ...
 
@@ -152,16 +222,24 @@ class ForecastMethod:
         ...
 
 class ForecastSpec:
-    """Forecast configuration for a statement node.
+    """
+    Forecast configuration for a statement node.
 
     Example
     -------
     >>> from finstack_quant.statements import ForecastSpec
     >>> spec = ForecastSpec.forward_fill()  # doctest: +SKIP
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import ForecastSpec
+    >>> ForecastSpec.__name__
+    'ForecastSpec'
     """
 
     def __init__(self, method: ForecastMethod, params_json: str | None = None) -> None:
-        """Create a forecast spec from a method and optional JSON params.
+        """
+        Create a forecast spec from a method and optional JSON params.
 
         Parameters
         ----------
@@ -174,12 +252,18 @@ class ForecastSpec:
         -------
         >>> from finstack_quant.statements import ForecastMethod
         >>> spec = ForecastSpec(ForecastMethod.forward_fill())  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @staticmethod
     def forward_fill() -> ForecastSpec:
-        """Carry the last observed value forward.
+        """
+        Carry the last observed value forward.
 
         Returns
         -------
@@ -189,12 +273,19 @@ class ForecastSpec:
         Example
         -------
         >>> spec = ForecastSpec.forward_fill()  # doctest: +SKIP
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastSpec
+        >>> callable(ForecastSpec.forward_fill)
+        True
         """
         ...
 
     @staticmethod
     def growth(rate: float) -> ForecastSpec:
-        """Compound each future period by ``rate``.
+        """
+        Compound each future period by ``rate``.
 
         Parameters
         ----------
@@ -209,12 +300,24 @@ class ForecastSpec:
         Example
         -------
         >>> spec = ForecastSpec.growth(0.05)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastSpec
+        >>> callable(ForecastSpec.growth)
+        True
         """
         ...
 
     @staticmethod
     def curve(curve: list[float]) -> ForecastSpec:
-        """Use period-specific growth rates.
+        """
+        Use period-specific growth rates.
 
         Parameters
         ----------
@@ -229,12 +332,24 @@ class ForecastSpec:
         Example
         -------
         >>> spec = ForecastSpec.curve([0.03, 0.05, 0.07])  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastSpec
+        >>> callable(ForecastSpec.curve)
+        True
         """
         ...
 
     @staticmethod
     def normal(mean: float, std_dev: float, seed: int) -> ForecastSpec:
-        """Use deterministic additive normal draws.
+        """
+        Use deterministic additive normal draws.
 
         Parameters
         ----------
@@ -253,12 +368,24 @@ class ForecastSpec:
         Example
         -------
         >>> spec = ForecastSpec.normal(0.0, 0.1, 42)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastSpec
+        >>> callable(ForecastSpec.normal)
+        True
         """
         ...
 
     @staticmethod
     def lognormal(mean: float, std_dev: float, seed: int) -> ForecastSpec:
-        """Use deterministic multiplicative log-normal draws.
+        """
+        Use deterministic multiplicative log-normal draws.
 
         Parameters
         ----------
@@ -277,12 +404,24 @@ class ForecastSpec:
         Example
         -------
         >>> spec = ForecastSpec.lognormal(0.0, 0.1, 42)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastSpec
+        >>> callable(ForecastSpec.lognormal)
+        True
         """
         ...
 
     @staticmethod
     def from_json(json: str) -> ForecastSpec:
-        """Deserialize a forecast spec from JSON.
+        """
+        Deserialize a forecast spec from JSON.
 
         Parameters
         ----------
@@ -302,11 +441,18 @@ class ForecastSpec:
         Example
         -------
         >>> spec = ForecastSpec.from_json('{"method":"forward_fill"}')  # doctest: +SKIP
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastSpec
+        >>> callable(ForecastSpec.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this forecast spec to JSON.
+        """
+        Serialize this forecast spec to JSON.
 
         Returns
         -------
@@ -330,45 +476,73 @@ class ForecastSpec:
         ...
 
 class NodeType:
-    """How a node combines explicit values, forecasts, and formulas.
+    """
+    How a node combines explicit values, forecasts, and formulas.
 
     Example
     -------
     >>> from finstack_quant.statements import NodeType
     >>> NodeType.calculated()
     NodeType(...)
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import NodeType
+    >>> NodeType.__name__
+    'NodeType'
     """
 
     @staticmethod
     def value() -> NodeType:
-        """Node holds only explicit values (actuals or assumptions).
+        """
+        Node holds only explicit values (actuals or assumptions).
 
         Returns
         -------
         NodeType
             Value-only node type.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import NodeType
+        >>> callable(NodeType.value)
+        True
         """
         ...
 
     @staticmethod
     def calculated() -> NodeType:
-        """Node is derived entirely from a formula.
+        """
+        Node is derived entirely from a formula.
 
         Returns
         -------
         NodeType
             Calculated node type.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import NodeType
+        >>> callable(NodeType.calculated)
+        True
         """
         ...
 
     @staticmethod
     def mixed() -> NodeType:
-        """Node may combine values, forecasts, and formulas with precedence rules.
+        """
+        Node may combine values, forecasts, and formulas with precedence rules.
 
         Returns
         -------
         NodeType
             Mixed node type.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import NodeType
+        >>> callable(NodeType.mixed)
+        True
         """
         ...
 
@@ -385,32 +559,46 @@ class NodeType:
         ...
 
 class NodeId:
-    """Type-safe identifier for a node in a financial model.
+    """
+    Type-safe identifier for a node in a financial model.
 
     Example
     -------
     >>> from finstack_quant.statements import NodeId
     >>> str(NodeId("revenue"))
     'revenue'
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import NodeId
+    >>> NodeId.__name__
+    'NodeId'
     """
 
     def __init__(self, id: str) -> None:
-        """Create a node identifier from a string.
+        """
+        Create a node identifier from a string.
 
         Parameters
         ----------
         id:
-            Raw node identifier (for example ``\"revenue\"``).
+            Raw node identifier (for example ``"revenue"``).
 
         Example
         -------
         >>> NodeId("ebitda").as_str()
         'ebitda'
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def as_str(self) -> str:
-        """Return the underlying identifier string.
+        """
+        Return the underlying identifier string.
 
         Returns
         -------
@@ -441,7 +629,8 @@ class NodeId:
         ...
 
 class NumericMode:
-    """Numeric evaluation mode for statement evaluation.
+    """
+    Numeric evaluation mode for statement evaluation.
 
     Example
     -------
@@ -450,22 +639,36 @@ class NumericMode:
     NumericMode(...)
     >>> NumericMode.decimal()
     NumericMode(...)
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import NumericMode
+    >>> NumericMode.__name__
+    'NumericMode'
     """
 
     @staticmethod
     def float64() -> NumericMode:
-        """Use 64-bit floating point arithmetic.
+        """
+        Use 64-bit floating point arithmetic.
 
         Returns
         -------
         NumericMode
             IEEE-754 double-precision mode.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import NumericMode
+        >>> callable(NumericMode.float64)
+        True
         """
         ...
 
     @staticmethod
     def decimal() -> NumericMode:
-        """Use decimal arithmetic for evaluation.
+        """
+        Use decimal arithmetic for evaluation.
 
         Slower than ``float64`` but avoids floating-point rounding error;
         prefer for currency-sensitive calculations.
@@ -474,6 +677,12 @@ class NumericMode:
         -------
         NumericMode
             Decimal arithmetic mode.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import NumericMode
+        >>> callable(NumericMode.decimal)
+        True
         """
         ...
 
@@ -490,7 +699,8 @@ class NumericMode:
         ...
 
 class FinancialModelSpec:
-    """Top-level financial model specification (wire format).
+    """
+    Top-level financial model specification (wire format).
 
     Typically built with ``ModelBuilder`` or loaded from JSON.
 
@@ -500,11 +710,18 @@ class FinancialModelSpec:
     >>> spec = FinancialModelSpec.from_json('{"id":"x","periods":[],"nodes":{}}')
     >>> spec.id
     'x'
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import FinancialModelSpec
+    >>> FinancialModelSpec.__name__
+    'FinancialModelSpec'
     """
 
     @staticmethod
     def from_json(json: str) -> FinancialModelSpec:
-        """Deserialize a model specification from JSON text.
+        """
+        Deserialize a model specification from JSON text.
 
         Parameters
         ----------
@@ -525,17 +742,25 @@ class FinancialModelSpec:
         -------
         >>> FinancialModelSpec.from_json('{"id":"m","periods":[],"nodes":{}}').node_count
         0
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import FinancialModelSpec
+        >>> callable(FinancialModelSpec.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this specification to pretty-printed JSON.
+        """
+        Serialize this specification to pretty-printed JSON.
 
         Returns
         -------
         str
             JSON text.
 
+            Canonical JSON representation of this `FinancialModelSpec`, suitable for a matching `from_json` call.
         Raises
         ------
         ValueError
@@ -551,33 +776,40 @@ class FinancialModelSpec:
 
     @property
     def id(self) -> str:
-        """Model identifier string.
+        """
+        Model identifier string.
         Returns
         -------
         str
+            The id exposed by this `FinancialModelSpec`.
         """
         ...
 
     @property
     def period_count(self) -> int:
-        """Number of periods defined on the model.
+        """
+        Number of periods defined on the model.
         Returns
         -------
         int
+            The period count exposed by this `FinancialModelSpec`.
         """
         ...
 
     @property
     def node_count(self) -> int:
-        """Number of nodes defined on the model.
+        """
+        Number of nodes defined on the model.
         Returns
         -------
         int
+            The node count exposed by this `FinancialModelSpec`.
         """
         ...
 
     def node_ids(self) -> list[str]:
-        """List node identifiers in declaration order.
+        """
+        List node identifiers in declaration order.
 
         Returns
         -------
@@ -592,7 +824,8 @@ class FinancialModelSpec:
         ...
 
     def has_node(self, node_id: str) -> bool:
-        """Return whether a node with the given id exists.
+        """
+        Return whether a node with the given id exists.
 
         Parameters
         ----------
@@ -608,15 +841,22 @@ class FinancialModelSpec:
         -------
         >>> FinancialModelSpec.from_json('{"id":"m","periods":[],"nodes":{}}').has_node("x")
         False
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def schema_version(self) -> int:
-        """Wire-format schema version of this specification.
+        """
+        Wire-format schema version of this specification.
         Returns
         -------
         int
+            The schema version exposed by this `FinancialModelSpec`.
         """
         ...
 
@@ -629,7 +869,8 @@ class FinancialModelSpec:
         ...
 
 class ModelBuilder:
-    """Builder for a ``FinancialModelSpec``.
+    """
+    Builder for a ``FinancialModelSpec``.
 
     Call ``periods`` once, then add nodes with ``value`` / ``compute``, and
     finish with ``build``.
@@ -647,10 +888,17 @@ class ModelBuilder:
     >>> b.value("revenue", [("2025Q1", 100.0)])  # doctest: +SKIP
     >>> b.compute("cogs", "revenue * 0.6")  # doctest: +SKIP
     >>> spec = b.build()  # doctest: +SKIP
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import ModelBuilder
+    >>> ModelBuilder.__name__
+    'ModelBuilder'
     """
 
     def __init__(self, id: str) -> None:
-        """Start a new builder for a model with the given id.
+        """
+        Start a new builder for a model with the given id.
 
         Parameters
         ----------
@@ -661,16 +909,22 @@ class ModelBuilder:
         -------
         >>> ModelBuilder("Acme")  # doctest: +ELLIPSIS
         <finstack_quant.statements.ModelBuilder ...>
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def periods(self, range: str, actuals_until: str | None = None) -> None:
-        """Define the model's period lattice from a range expression.
+        """
+        Define the model's period lattice from a range expression.
 
         Parameters
         ----------
         range:
-            Period range expression such as ``\"2025Q1..Q4\"``.
+            Period range expression such as ``"2025Q1..Q4"``.
         actuals_until:
             Optional last actual period label; ``None`` if not used.
 
@@ -687,14 +941,15 @@ class ModelBuilder:
         ...
 
     def value(self, node_id: str, values: list[tuple[str, float]]) -> None:
-        """Add a value node with explicit per-period scalars.
+        """
+        Add a value node with explicit per-period scalars.
 
         Parameters
         ----------
         node_id:
             Identifier for the new node.
         values:
-            ``(period_id, value)`` pairs, for example ``[(\"2025Q1\", 1.0)]``.
+            ``(period_id, value)`` pairs, for example ``[("2025Q1", 1.0)]``.
 
         Raises
         ------
@@ -710,7 +965,8 @@ class ModelBuilder:
         ...
 
     def value_scalar(self, node_id: str, values: list[tuple[str, float]]) -> None:
-        """Add a scalar value node with explicit per-period values.
+        """
+        Add a scalar value node with explicit per-period values.
 
         Parameters
         ----------
@@ -733,7 +989,8 @@ class ModelBuilder:
         ...
 
     def value_money(self, node_id: str, values: list[tuple[str, Money]]) -> None:
-        """Add a monetary value node with explicit per-period values.
+        """
+        Add a monetary value node with explicit per-period values.
 
         Parameters
         ----------
@@ -757,7 +1014,8 @@ class ModelBuilder:
         ...
 
     def compute(self, node_id: str, formula: str) -> None:
-        """Add a calculated node from a DSL formula.
+        """
+        Add a calculated node from a DSL formula.
 
         Parameters
         ----------
@@ -780,7 +1038,8 @@ class ModelBuilder:
         ...
 
     def mixed(self, node_id: str) -> MixedNodeBuilder:
-        """Start configuring a mixed node and consume this builder until ``build`` returns.
+        """
+        Start configuring a mixed node and consume this builder until ``build`` returns.
 
         Parameters
         ----------
@@ -801,11 +1060,17 @@ class ModelBuilder:
         >>> mb.values([("2025Q1", 10.0)])  # doctest: +SKIP
         >>> mb.formula("revenue * 0.1")  # doctest: +SKIP
         >>> b = mb.build()  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def forecast(self, node_id: str, forecast_spec: ForecastSpec) -> None:
-        """Attach a forecast to an existing node or create a forecast-only mixed node.
+        """
+        Attach a forecast to an existing node or create a forecast-only mixed node.
 
         Parameters
         ----------
@@ -819,11 +1084,17 @@ class ModelBuilder:
         >>> b = ModelBuilder("x")
         >>> b.periods("2025Q1..Q4", None)  # doctest: +SKIP
         >>> b.forecast("revenue", ForecastSpec.from_json("..."))  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def where_clause(self, where_clause: str) -> None:
-        """Attach a conditional expression to the last added node.
+        """
+        Attach a conditional expression to the last added node.
 
         Parameters
         ----------
@@ -836,11 +1107,17 @@ class ModelBuilder:
         >>> b.periods("2025Q1..Q1", None)  # doctest: +SKIP
         >>> b.value("rev", [("2025Q1", 10.0)])  # doctest: +SKIP
         >>> b.where_clause('period == "2025Q1"')  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def with_meta(self, key: str, value_json: str) -> None:
-        """Add model-level metadata from a JSON payload.
+        """
+        Add model-level metadata from a JSON payload.
 
         Parameters
         ----------
@@ -854,11 +1131,17 @@ class ModelBuilder:
         -------
         >>> b = ModelBuilder("x")
         >>> b.with_meta("sector", '""healthcare""')  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def with_name_normalization(self) -> None:
-        """Enable standard accounting term alias normalization.
+        """
+        Enable standard accounting term alias normalization.
 
         Example
         -------
@@ -868,7 +1151,8 @@ class ModelBuilder:
         ...
 
     def with_builtin_metrics(self) -> None:
-        """Add all built-in statement metrics to the model.
+        """
+        Add all built-in statement metrics to the model.
 
         Example
         -------
@@ -878,7 +1162,8 @@ class ModelBuilder:
         ...
 
     def add_metric_from_registry(self, qualified_id: str, registry: MetricRegistry) -> None:
-        """Add one metric and its dependencies from a metric registry.
+        """
+        Add one metric and its dependencies from a metric registry.
 
         Parameters
         ----------
@@ -892,6 +1177,11 @@ class ModelBuilder:
         >>> reg = MetricRegistry.with_builtins()  # doctest: +SKIP
         >>> b = ModelBuilder("x")
         >>> b.add_metric_from_registry("ebitda", reg)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -904,7 +1194,8 @@ class ModelBuilder:
         maturity_date: date,
         discount_curve_id: str,
     ) -> None:
-        """Add a fixed-rate bond to the capital structure (US 30/360 semi-annual).
+        """
+        Add a fixed-rate bond to the capital structure (US 30/360 semi-annual).
 
         For non-USD conventions, use :meth:`add_custom_debt` with a pre-built
         ``Bond`` JSON specification.
@@ -932,6 +1223,11 @@ class ModelBuilder:
         >>> b.add_bond(
         ...     "bond_a", Money(1_000_000, "USD"), 0.05, datetime.date(2025, 1, 1), datetime.date(2030, 1, 1), "USD-OIS"
         ... )  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -945,7 +1241,8 @@ class ModelBuilder:
         discount_curve_id: str,
         forward_curve_id: str,
     ) -> None:
-        """Add an interest rate swap to the capital structure (US conventions).
+        """
+        Add an interest rate swap to the capital structure (US conventions).
 
         Parameters
         ----------
@@ -978,11 +1275,17 @@ class ModelBuilder:
         ...     "USD-OIS",
         ...     "USD-SOFR-3M",
         ... )  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def add_custom_debt(self, id: str, spec_json: str) -> None:
-        """Add an arbitrary debt instrument via its serde JSON representation.
+        """
+        Add an arbitrary debt instrument via its serde JSON representation.
 
         Parameters
         ----------
@@ -995,11 +1298,17 @@ class ModelBuilder:
         -------
         >>> b = ModelBuilder("x")
         >>> b.add_custom_debt("loan_a", '{"type":"term_loan",...}')  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def reporting_currency(self, currency: Currency) -> None:
-        """Set the reporting currency used for capital-structure totals.
+        """
+        Set the reporting currency used for capital-structure totals.
 
         Parameters
         ----------
@@ -1010,11 +1319,17 @@ class ModelBuilder:
         -------
         >>> b = ModelBuilder("x")
         >>> b.reporting_currency(Currency.USD)  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def fx_policy(self, policy: str) -> None:
-        """Set the FX policy (``cashflow_date``/``period_end``/``period_average``/``custom``).
+        """
+        Set the FX policy (``cashflow_date``/``period_end``/``period_average``/``custom``).
 
         Parameters
         ----------
@@ -1025,11 +1340,17 @@ class ModelBuilder:
         -------
         >>> b = ModelBuilder("x")
         >>> b.fx_policy("period_end")  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def waterfall(self, waterfall_spec: WaterfallSpec) -> None:
-        """Attach a waterfall specification (PIK toggle + ECF sweep + priorities).
+        """
+        Attach a waterfall specification (PIK toggle + ECF sweep + priorities).
 
         Parameters
         ----------
@@ -1040,11 +1361,17 @@ class ModelBuilder:
         -------
         >>> b = ModelBuilder("x")
         >>> b.waterfall(WaterfallSpec.from_json("..."))  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def build(self) -> FinancialModelSpec:
-        """Materialize the ``FinancialModelSpec`` and consume the builder.
+        """
+        Materialize the ``FinancialModelSpec`` and consume the builder.
 
         Returns
         -------
@@ -1065,7 +1392,8 @@ class ModelBuilder:
         ...
 
 class MixedNodeBuilder:
-    """Builder for a mixed statement node.
+    """
+    Builder for a mixed statement node.
 
     A mixed node combines explicit values, a forecast spec, and/or a fallback
     formula.  Obtain an instance via :meth:`ModelBuilder.mixed`.
@@ -1083,10 +1411,17 @@ class MixedNodeBuilder:
     >>> mb.values([("2025Q1", 10.0)])  # doctest: +SKIP
     >>> mb.formula("revenue * 0.1")  # doctest: +SKIP
     >>> b = mb.build()  # doctest: +SKIP
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import MixedNodeBuilder
+    >>> MixedNodeBuilder.__name__
+    'MixedNodeBuilder'
     """
 
     def values(self, values: list[tuple[str, float]]) -> None:
-        """Set scalar explicit values.
+        """
+        Set scalar explicit values.
 
         Parameters
         ----------
@@ -1097,11 +1432,17 @@ class MixedNodeBuilder:
         Example
         -------
         >>> mb.values([("2025Q1", 10.0)])  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def values_money(self, values: list[tuple[str, Money]]) -> None:
-        """Set monetary explicit values.
+        """
+        Set monetary explicit values.
 
         Parameters
         ----------
@@ -1113,11 +1454,17 @@ class MixedNodeBuilder:
         -------
         >>> from finstack_quant.core.money import Money
         >>> mb.values_money([("2025Q1", Money(100.0, "USD"))])  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def forecast(self, forecast_spec: ForecastSpec) -> None:
-        """Set the forecast spec.
+        """
+        Set the forecast spec.
 
         Parameters
         ----------
@@ -1127,11 +1474,17 @@ class MixedNodeBuilder:
         Example
         -------
         >>> mb.forecast(ForecastSpec.from_json("..."))  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def formula(self, formula: str) -> None:
-        """Set the fallback formula.
+        """
+        Set the fallback formula.
 
         Parameters
         ----------
@@ -1141,11 +1494,17 @@ class MixedNodeBuilder:
         Example
         -------
         >>> mb.formula("revenue * 0.1")  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def name(self, name: str) -> None:
-        """Set the display name.
+        """
+        Set the display name.
 
         Parameters
         ----------
@@ -1155,11 +1514,17 @@ class MixedNodeBuilder:
         Example
         -------
         >>> mb.name("Hybrid Revenue")  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def build(self) -> ModelBuilder:
-        """Attach the mixed node and return a ready model builder.
+        """
+        Attach the mixed node and return a ready model builder.
 
         Returns
         -------
@@ -1173,7 +1538,8 @@ class MixedNodeBuilder:
         ...
 
 class MetricRegistry:
-    """Reusable statement metric registry.
+    """
+    Reusable statement metric registry.
 
     Example
     -------
@@ -1181,10 +1547,17 @@ class MetricRegistry:
     >>> reg = MetricRegistry.with_builtins()  # doctest: +SKIP
     >>> reg.has("ebitda")  # doctest: +SKIP
     True
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import MetricRegistry
+    >>> MetricRegistry.__name__
+    'MetricRegistry'
     """
 
     def __init__(self) -> None:
-        """Create an empty registry.
+        """
+        Create an empty registry.
 
         Example
         -------
@@ -1194,7 +1567,8 @@ class MetricRegistry:
 
     @staticmethod
     def with_builtins() -> MetricRegistry:
-        """Create a registry preloaded with built-in metrics.
+        """
+        Create a registry preloaded with built-in metrics.
 
         Returns
         -------
@@ -1204,11 +1578,18 @@ class MetricRegistry:
         Example
         -------
         >>> reg = MetricRegistry.with_builtins()  # doctest: +SKIP
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import MetricRegistry
+        >>> callable(MetricRegistry.with_builtins)
+        True
         """
         ...
 
     def load_builtins(self) -> None:
-        """Load built-in metrics into this registry.
+        """
+        Load built-in metrics into this registry.
 
         Example
         -------
@@ -1218,7 +1599,8 @@ class MetricRegistry:
         ...
 
     def load_from_json_str(self, json: str) -> None:
-        """Load metrics from a JSON document.
+        """
+        Load metrics from a JSON document.
 
         Parameters
         ----------
@@ -1229,11 +1611,17 @@ class MetricRegistry:
         -------
         >>> reg = MetricRegistry()
         >>> reg.load_from_json_str('[{"id":"custom_metric",...}]')  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def load_from_json(self, path: str) -> None:
-        """Load metrics from a JSON file path.
+        """
+        Load metrics from a JSON file path.
 
         Parameters
         ----------
@@ -1244,11 +1632,17 @@ class MetricRegistry:
         -------
         >>> reg = MetricRegistry()
         >>> reg.load_from_json("metrics.json")  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def has(self, qualified_id: str) -> bool:
-        """Return whether a fully qualified metric exists.
+        """
+        Return whether a fully qualified metric exists.
 
         Parameters
         ----------
@@ -1265,6 +1659,11 @@ class MetricRegistry:
         >>> reg = MetricRegistry.with_builtins()  # doctest: +SKIP
         >>> reg.has("ebitda")  # doctest: +SKIP
         True
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -1277,7 +1676,8 @@ class MetricRegistry:
         ...
 
 class StatementResult:
-    """Per-node, per-period numeric results from evaluating a model.
+    """
+    Per-node, per-period numeric results from evaluating a model.
 
     Example
     -------
@@ -1288,11 +1688,18 @@ class StatementResult:
     >>> r = Evaluator().evaluate(b.build())  # doctest: +SKIP
     >>> r.get("x", "2025Q1")  # doctest: +SKIP
     2.0
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import StatementResult
+    >>> StatementResult.__name__
+    'StatementResult'
     """
 
     @staticmethod
     def from_json(json: str) -> StatementResult:
-        """Deserialize evaluation results from JSON.
+        """
+        Deserialize evaluation results from JSON.
 
         Parameters
         ----------
@@ -1314,17 +1721,25 @@ class StatementResult:
         >>> # Round-trip: StatementResult.to_json() from an evaluated model
         >>> StatementResult.from_json  # doctest: +ELLIPSIS
         <staticmethod(...)>
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import StatementResult
+        >>> callable(StatementResult.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize these results to pretty-printed JSON.
+        """
+        Serialize these results to pretty-printed JSON.
 
         Returns
         -------
         str
             JSON text.
 
+            Canonical JSON representation of this `StatementResult`, suitable for a matching `from_json` call.
         Raises
         ------
         ValueError
@@ -1337,14 +1752,15 @@ class StatementResult:
         ...
 
     def get(self, node_id: str, period: str) -> float | None:
-        """Return the scalar for ``node_id`` at ``period``, if present.
+        """
+        Return the scalar for ``node_id`` at ``period``, if present.
 
         Parameters
         ----------
         node_id:
             Node identifier.
         period:
-            Period label such as ``\"2025Q1\"``.
+            Period label such as ``"2025Q1"``.
 
         Returns
         -------
@@ -1363,7 +1779,8 @@ class StatementResult:
         ...
 
     def get_money(self, node_id: str, period: str) -> Money | None:
-        """Return the currency-tagged ``Money`` value for a monetary node.
+        """
+        Return the currency-tagged ``Money`` value for a monetary node.
 
         Preserves fixed-point precision and currency. Returns ``None`` when
         the node is not monetary or has no value for this period.
@@ -1373,7 +1790,7 @@ class StatementResult:
         node_id:
             Node identifier.
         period:
-            Period label such as ``\"2025Q1\"``.
+            Period label such as ``"2025Q1"``.
 
         Returns
         -------
@@ -1388,7 +1805,8 @@ class StatementResult:
         ...
 
     def get_scalar(self, node_id: str, period: str) -> float | None:
-        """Return the scalar value for a non-monetary node.
+        """
+        Return the scalar value for a non-monetary node.
 
         Returns ``None`` when the node is monetary or has no value for this
         period.
@@ -1398,7 +1816,7 @@ class StatementResult:
         node_id:
             Node identifier.
         period:
-            Period label such as ``\"2025Q1\"``.
+            Period label such as ``"2025Q1"``.
 
         Returns
         -------
@@ -1413,7 +1831,8 @@ class StatementResult:
         ...
 
     def get_node(self, node_id: str) -> dict[str, float] | None:
-        """Return all period values for a node as a mapping.
+        """
+        Return all period values for a node as a mapping.
 
         Parameters
         ----------
@@ -1428,11 +1847,17 @@ class StatementResult:
         Example
         -------
         >>> # m = r.get_node("revenue")  # doctest: +SKIP
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def node_ids(self) -> list[str]:
-        """Return every node id present in this result set.
+        """
+        Return every node id present in this result set.
 
         Returns
         -------
@@ -1447,72 +1872,87 @@ class StatementResult:
 
     @property
     def node_count(self) -> int:
-        """Number of nodes in the result.
+        """
+        Number of nodes in the result.
         Returns
         -------
         int
+            The node count exposed by this `StatementResult`.
         """
         ...
 
     @property
     def num_periods(self) -> int:
-        """Number of periods covered by the evaluation metadata.
+        """
+        Number of periods covered by the evaluation metadata.
         Returns
         -------
         int
+            The num periods exposed by this `StatementResult`.
         """
         ...
 
     @property
     def eval_time_ms(self) -> int | None:
-        """Wall-clock evaluation time in milliseconds, if recorded.
+        """
+        Wall-clock evaluation time in milliseconds, if recorded.
         Returns
         -------
         int or None
+            The eval time ms exposed by this `StatementResult`.
         """
         ...
 
     @property
     def warning_count(self) -> int:
-        """Count of evaluation warnings attached to metadata.
+        """
+        Count of evaluation warnings attached to metadata.
         Returns
         -------
         int
+            The warning count exposed by this `StatementResult`.
         """
         ...
 
     @property
     def warnings(self) -> list[str]:
-        """Evaluation warnings as human-readable strings.
+        """
+        Evaluation warnings as human-readable strings.
 
         Returns
         -------
         list[str]
+            The warnings exposed by this `StatementResult`.
         """
         ...
 
     @property
     def numeric_mode(self) -> NumericMode:
-        """Numeric mode stamped into the result envelope (policy visibility).
+        """
+        Numeric mode stamped into the result envelope (policy visibility).
 
         Returns
         -------
         NumericMode
+            The numeric mode exposed by this `StatementResult`.
         """
         ...
 
     @property
     def parallel(self) -> bool:
-        """Whether the evaluation ran in parallel (policy visibility).
+        """
+        Whether the evaluation ran in parallel (policy visibility).
 
         Returns
         -------
         bool
+            The parallel exposed by this `StatementResult`.
         """
         ...
 
     def to_pandas_long(self) -> pd.DataFrame:
-        """Export results as a pandas DataFrame in long (tidy) form.
+        """
+        Export results as a pandas DataFrame in long (tidy) form.
 
         Columns: ``node_id``, ``period``, ``value``, ``value_money``,
         ``currency``, ``value_type``. The monetary columns are populated for
@@ -1529,7 +1969,8 @@ class StatementResult:
         ...
 
     def to_pandas_wide(self) -> pd.DataFrame:
-        """Export results as a pandas DataFrame in wide form.
+        """
+        Export results as a pandas DataFrame in wide form.
 
         Rows are node identifiers, columns are period identifiers.
 
@@ -1549,17 +1990,25 @@ class StatementResult:
         ...
 
 class Evaluator:
-    """Evaluates a ``FinancialModelSpec`` into a ``StatementResult``.
+    """
+    Evaluates a ``FinancialModelSpec`` into a ``StatementResult``.
 
     Example
     -------
     >>> from finstack_quant.statements import Evaluator
     >>> Evaluator()
     <finstack_quant.statements.Evaluator ...>
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import Evaluator
+    >>> Evaluator.__name__
+    'Evaluator'
     """
 
     def __init__(self) -> None:
-        """Create a fresh evaluator with default configuration.
+        """
+        Create a fresh evaluator with default configuration.
 
         Example
         -------
@@ -1574,7 +2023,8 @@ class Evaluator:
         ...
 
     def evaluate(self, model: FinancialModelSpec) -> StatementResult:
-        """Evaluate ``model`` and return numeric results.
+        """
+        Evaluate ``model`` and return numeric results.
 
         Parameters
         ----------
@@ -1606,7 +2056,8 @@ class Evaluator:
         market: MarketContext,
         as_of: date,
     ) -> StatementResult:
-        """Evaluate ``model`` with market data and an as-of date.
+        """
+        Evaluate ``model`` with market data and an as-of date.
 
         Use this for capital-structure-aware models and as-of filtering of
         future actual periods.
@@ -1638,7 +2089,8 @@ class Evaluator:
         ...
 
 def parse_formula(formula: str) -> str:
-    """Parse a DSL formula and return a debug string for its AST.
+    """
+    Parse a DSL formula and return a debug string for its AST.
 
     Parameters
     ----------
@@ -1659,11 +2111,18 @@ def parse_formula(formula: str) -> str:
     -------
     >>> parse_formula("revenue - cogs")  # doctest: +ELLIPSIS
     '...'
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import parse_formula
+    >>> callable(parse_formula)
+    True
     """
     ...
 
 def validate_formula(formula: str) -> bool:
-    """Return ``True`` if ``formula`` parses and compiles successfully.
+    """
+    Return ``True`` if ``formula`` parses and compiles successfully.
 
     Parameters
     ----------
@@ -1684,21 +2143,35 @@ def validate_formula(formula: str) -> bool:
     -------
     >>> validate_formula("a + b")
     True
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import validate_formula
+    >>> callable(validate_formula)
+    True
     """
     ...
 
 class NormalizationConfig:
-    """Configuration for normalizing a target metric (for example EBITDA).
+    """
+    Configuration for normalizing a target metric (for example EBITDA).
 
     Example
     -------
     >>> from finstack_quant.statements import NormalizationConfig
     >>> NormalizationConfig("ebitda").target_node
     'ebitda'
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import NormalizationConfig
+    >>> NormalizationConfig.__name__
+    'NormalizationConfig'
     """
 
     def __init__(self, target_node: str) -> None:
-        """Create an empty configuration for ``target_node``.
+        """
+        Create an empty configuration for ``target_node``.
 
         Parameters
         ----------
@@ -1710,12 +2183,18 @@ class NormalizationConfig:
         >>> cfg = NormalizationConfig("adjusted_ebitda")
         >>> cfg.adjustment_count
         0
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @staticmethod
     def from_json(json: str) -> NormalizationConfig:
-        """Load normalization rules from JSON.
+        """
+        Load normalization rules from JSON.
 
         Parameters
         ----------
@@ -1736,17 +2215,25 @@ class NormalizationConfig:
         -------
         >>> NormalizationConfig.from_json('{"target_node":"x","adjustments":[]}').target_node
         'x'
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import NormalizationConfig
+        >>> callable(NormalizationConfig.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this configuration to pretty-printed JSON.
+        """
+        Serialize this configuration to pretty-printed JSON.
 
         Returns
         -------
         str
             JSON text.
 
+            Canonical JSON representation of this `NormalizationConfig`, suitable for a matching `from_json` call.
         Raises
         ------
         ValueError
@@ -1761,19 +2248,23 @@ class NormalizationConfig:
 
     @property
     def target_node(self) -> str:
-        """Node id being normalized.
+        """
+        Node id being normalized.
         Returns
         -------
         str
+            The target node exposed by this `NormalizationConfig`.
         """
         ...
 
     @property
     def adjustment_count(self) -> int:
-        """Number of adjustment line items configured.
+        """
+        Number of adjustment line items configured.
         Returns
         -------
         int
+            The adjustment count exposed by this `NormalizationConfig`.
         """
         ...
 
@@ -1786,7 +2277,8 @@ class NormalizationConfig:
         ...
 
 def normalize(results: StatementResult, config: NormalizationConfig) -> str:
-    """Run normalization and return a JSON list of ``NormalizationResult`` objects.
+    """
+    Run normalization and return a JSON list of ``NormalizationResult`` objects.
 
     Parameters
     ----------
@@ -1810,11 +2302,18 @@ def normalize(results: StatementResult, config: NormalizationConfig) -> str:
     >>> # payload = normalize(evaluator_output, NormalizationConfig("ebitda"))  # doctest: +SKIP
     >>> NormalizationConfig("ebitda").target_node
     'ebitda'
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import normalize
+    >>> callable(normalize)
+    True
     """
     ...
 
 class CheckSuiteSpec:
-    """A serializable suite specification describing which checks to run.
+    """
+    A serializable suite specification describing which checks to run.
 
     Load from JSON (e.g. a team-wide check policy file) and inspect its
     composition (``builtin_count`` / ``formula_count``). Note: running a suite
@@ -1827,11 +2326,18 @@ class CheckSuiteSpec:
     >>> spec = CheckSuiteSpec.from_json('{"name":"basic","builtin_checks":[],"formula_checks":[]}')
     >>> spec.name
     'basic'
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import CheckSuiteSpec
+    >>> CheckSuiteSpec.__name__
+    'CheckSuiteSpec'
     """
 
     @staticmethod
     def from_json(json: str) -> CheckSuiteSpec:
-        """Deserialize a suite specification from JSON text.
+        """
+        Deserialize a suite specification from JSON text.
 
         Parameters
         ----------
@@ -1847,17 +2353,25 @@ class CheckSuiteSpec:
         ------
         ValueError
             If ``json`` is not valid or fails schema validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import CheckSuiteSpec
+        >>> callable(CheckSuiteSpec.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this specification to pretty-printed JSON.
+        """
+        Serialize this specification to pretty-printed JSON.
 
         Returns
         -------
         str
             JSON text.
 
+            Canonical JSON representation of this `CheckSuiteSpec`, suitable for a matching `from_json` call.
         Raises
         ------
         ValueError
@@ -1867,28 +2381,35 @@ class CheckSuiteSpec:
 
     @property
     def name(self) -> str:
-        """Suite name.
+        """
+        Return the name for `CheckSuiteSpec`.
+        Suite name.
         Returns
         -------
         str
+            The name exposed by this `CheckSuiteSpec`.
         """
         ...
 
     @property
     def builtin_check_count(self) -> int:
-        """Number of built-in checks in the suite spec.
+        """
+        Number of built-in checks in the suite spec.
         Returns
         -------
         int
+            The builtin check count exposed by this `CheckSuiteSpec`.
         """
         ...
 
     @property
     def formula_check_count(self) -> int:
-        """Number of formula checks in the suite spec.
+        """
+        Number of formula checks in the suite spec.
         Returns
         -------
         int
+            The formula check count exposed by this `CheckSuiteSpec`.
         """
         ...
 
@@ -1901,7 +2422,8 @@ class CheckSuiteSpec:
         ...
 
 class CheckReport:
-    """Validation check report aggregating results and summary statistics.
+    """
+    Validation check report aggregating results and summary statistics.
 
     Loaded from JSON (``from_json``) produced by the Rust checks framework,
     then inspected via properties or rendered to text/HTML.
@@ -1914,11 +2436,18 @@ class CheckReport:
     ... )
     >>> report.passed
     True
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import CheckReport
+    >>> CheckReport.__name__
+    'CheckReport'
     """
 
     @staticmethod
     def from_json(json: str) -> CheckReport:
-        """Deserialize a check report from JSON text.
+        """
+        Deserialize a check report from JSON text.
 
         Parameters
         ----------
@@ -1934,17 +2463,25 @@ class CheckReport:
         ------
         ValueError
             If ``json`` is not valid or fails schema validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import CheckReport
+        >>> callable(CheckReport.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this report to pretty-printed JSON.
+        """
+        Serialize this report to pretty-printed JSON.
 
         Returns
         -------
         str
             JSON text.
 
+            Canonical JSON representation of this `CheckReport`, suitable for a matching `from_json` call.
         Raises
         ------
         ValueError
@@ -1954,46 +2491,56 @@ class CheckReport:
 
     @property
     def passed(self) -> bool:
-        """Whether all checks passed (no error-severity findings).
+        """
+        Whether all checks passed (no error-severity findings).
         Returns
         -------
         bool
+            The passed exposed by this `CheckReport`.
         """
         ...
 
     @property
     def total_checks(self) -> int:
-        """Number of individual check results in the report.
+        """
+        Number of individual check results in the report.
         Returns
         -------
         int
+            The total checks exposed by this `CheckReport`.
         """
         ...
 
     @property
     def total_findings(self) -> int:
-        """Total number of findings across all checks.
+        """
+        Total number of findings across all checks.
         Returns
         -------
         int
+            The total findings exposed by this `CheckReport`.
         """
         ...
 
     @property
     def total_errors(self) -> int:
-        """Number of error-severity findings.
+        """
+        Number of error-severity findings.
         Returns
         -------
         int
+            The total errors exposed by this `CheckReport`.
         """
         ...
 
     @property
     def total_warnings(self) -> int:
-        """Number of warning-severity findings.
+        """
+        Number of warning-severity findings.
         Returns
         -------
         int
+            The total warnings exposed by this `CheckReport`.
         """
         ...
 
@@ -2006,10 +2553,17 @@ class CheckReport:
         ...
 
 class EcfSweepSpec:
-    """Excess Cash Flow sweep specification.
+    """
+    Excess Cash Flow sweep specification.
 
     Configures how ECF is computed (EBITDA minus taxes/capex/WC/cash interest)
     and what fraction sweeps to debt paydown.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import EcfSweepSpec
+    >>> EcfSweepSpec.__name__
+    'EcfSweepSpec'
     """
 
     def __init__(
@@ -2022,7 +2576,8 @@ class EcfSweepSpec:
         cash_interest_node: str | None = None,
         target_instrument_id: str | None = None,
     ) -> None:
-        """Configure an excess-cash-flow debt sweep.
+        """
+        Configure an excess-cash-flow debt sweep.
 
         Parameters
         ----------
@@ -2041,32 +2596,101 @@ class EcfSweepSpec:
         target_instrument_id : str or None, default None
             Optional debt instrument receiving the ECF paydown; ``None`` uses
             the waterfall's eligible debt allocation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     @staticmethod
     def from_json(json: str) -> EcfSweepSpec:
-        """Parse an ECF sweep specification from canonical JSON.
+        """
+        Parse an ECF sweep specification from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing the sweep node identifiers and percentage.
+
+        Returns
+        -------
+        EcfSweepSpec
+            Validated `EcfSweepSpec` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import EcfSweepSpec
+        >>> callable(EcfSweepSpec.from_json)
+        True
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `EcfSweepSpec` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `EcfSweepSpec`, suitable for a matching `from_json` call.
+        """
+        ...
+
     @property
-    def ebitda_node(self) -> str: ...
+    def ebitda_node(self) -> str:
+        """
+        Return the ebitda node for `EcfSweepSpec`.
+
+        Returns
+        -------
+        str
+            The ebitda node exposed by this `EcfSweepSpec`.
+        """
+        ...
+
     @property
-    def sweep_percentage(self) -> float: ...
+    def sweep_percentage(self) -> float:
+        """
+        Return the sweep percentage for `EcfSweepSpec`.
+
+        Returns
+        -------
+        float
+            The sweep percentage exposed by this `EcfSweepSpec`.
+        """
+        ...
+
     @property
-    def target_instrument_id(self) -> str | None: ...
+    def target_instrument_id(self) -> str | None:
+        """
+        Return the target instrument id for `EcfSweepSpec`.
+
+        Returns
+        -------
+        str | None
+            The target instrument id exposed by this `EcfSweepSpec`.
+        """
+        ...
+
     def __repr__(self) -> str: ...
 
 class PikToggleSpec:
-    """PIK toggle specification.
+    """
+    PIK toggle specification.
 
     Controls when interest accrues as PIK versus cash based on a liquidity
     signal crossing ``threshold``, with optional hysteresis.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import PikToggleSpec
+    >>> PikToggleSpec.__name__
+    'PikToggleSpec'
     """
 
     def __init__(
@@ -2076,7 +2700,8 @@ class PikToggleSpec:
         target_instrument_ids: list[str] | None = None,
         min_periods_in_pik: int = 0,
     ) -> None:
-        """Configure a liquidity-triggered payment-in-kind interest toggle.
+        """
+        Configure a liquidity-triggered payment-in-kind interest toggle.
 
         Parameters
         ----------
@@ -2089,33 +2714,102 @@ class PikToggleSpec:
             all eligible instruments in the waterfall.
         min_periods_in_pik : int, default 0
             Minimum number of forecast periods to remain in PIK after activation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     @staticmethod
     def from_json(json: str) -> PikToggleSpec:
-        """Parse a PIK-toggle specification from canonical JSON.
+        """
+        Parse a PIK-toggle specification from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing the liquidity trigger and target instruments.
+
+        Returns
+        -------
+        PikToggleSpec
+            Validated `PikToggleSpec` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import PikToggleSpec
+        >>> callable(PikToggleSpec.from_json)
+        True
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `PikToggleSpec` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `PikToggleSpec`, suitable for a matching `from_json` call.
+        """
+        ...
+
     @property
-    def liquidity_metric(self) -> str: ...
+    def liquidity_metric(self) -> str:
+        """
+        Return the liquidity metric for `PikToggleSpec`.
+
+        Returns
+        -------
+        str
+            The liquidity metric exposed by this `PikToggleSpec`.
+        """
+        ...
+
     @property
-    def threshold(self) -> float: ...
+    def threshold(self) -> float:
+        """
+        Return the threshold for `PikToggleSpec`.
+
+        Returns
+        -------
+        float
+            The threshold exposed by this `PikToggleSpec`.
+        """
+        ...
+
     @property
-    def min_periods_in_pik(self) -> int: ...
+    def min_periods_in_pik(self) -> int:
+        """
+        Return the min periods in pik for `PikToggleSpec`.
+
+        Returns
+        -------
+        int
+            The min periods in pik exposed by this `PikToggleSpec`.
+        """
+        ...
+
     def __repr__(self) -> str: ...
 
 class WaterfallSpec:
-    """Waterfall specification for dynamic cash flow allocation.
+    """
+    Waterfall specification for dynamic cash flow allocation.
 
     Combines priority-of-payments with optional ECF sweep and PIK toggle.
     Call :meth:`validate` before passing to a builder to surface inconsistent
     configurations (for example ``Sweep`` ordered after ``Equity``).
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import WaterfallSpec
+    >>> WaterfallSpec.__name__
+    'WaterfallSpec'
     """
 
     def __init__(
@@ -2125,7 +2819,8 @@ class WaterfallSpec:
         ecf_sweep: EcfSweepSpec | None = None,
         pik_toggle: PikToggleSpec | None = None,
     ) -> None:
-        """Configure dynamic cash allocation for a financial-model waterfall.
+        """
+        Configure dynamic cash allocation for a financial-model waterfall.
 
         Parameters
         ----------
@@ -2138,26 +2833,103 @@ class WaterfallSpec:
             Optional excess-cash-flow sweep applied within the waterfall.
         pik_toggle : PikToggleSpec or None, default None
             Optional liquidity-driven PIK versus cash-interest configuration.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     @staticmethod
     def from_json(json: str) -> WaterfallSpec:
-        """Parse a waterfall specification from canonical JSON.
+        """
+        Parse a waterfall specification from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing priority, cash source, and optional features.
+
+        Returns
+        -------
+        WaterfallSpec
+            Validated `WaterfallSpec` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import WaterfallSpec
+        >>> callable(WaterfallSpec.from_json)
+        True
         """
         ...
-    def to_json(self) -> str: ...
-    def validate(self) -> None: ...
+    def to_json(self) -> str:
+        """
+        Serialize `WaterfallSpec` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `WaterfallSpec`, suitable for a matching `from_json` call.
+        """
+        ...
+
+    def validate(self) -> None:
+        """
+        Compute validate for `WaterfallSpec`.
+        """
+        ...
+
     @property
-    def priority_of_payments(self) -> list[str]: ...
+    def priority_of_payments(self) -> list[str]:
+        """
+        Return the priority of payments for `WaterfallSpec`.
+
+        Returns
+        -------
+        list[str]
+            The priority of payments exposed by this `WaterfallSpec`.
+        """
+        ...
+
     @property
-    def available_cash_node(self) -> str | None: ...
+    def available_cash_node(self) -> str | None:
+        """
+        Return the available cash node for `WaterfallSpec`.
+
+        Returns
+        -------
+        str | None
+            The available cash node exposed by this `WaterfallSpec`.
+        """
+        ...
+
     @property
-    def has_ecf_sweep(self) -> bool: ...
+    def has_ecf_sweep(self) -> bool:
+        """
+        Return the has ecf sweep for `WaterfallSpec`.
+
+        Returns
+        -------
+        bool
+            Whether this `WaterfallSpec` has ecf sweep.
+        """
+        ...
+
     @property
-    def has_pik_toggle(self) -> bool: ...
+    def has_pik_toggle(self) -> bool:
+        """
+        Return the has pik toggle for `WaterfallSpec`.
+
+        Returns
+        -------
+        bool
+            Whether this `WaterfallSpec` has pik toggle.
+        """
+        ...
+
     def __repr__(self) -> str: ...

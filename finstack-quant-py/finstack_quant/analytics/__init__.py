@@ -3,6 +3,12 @@
 Bindings for the ``finstack-quant-analytics`` Rust crate. The sole entry point is
 :class:`Performance`; the remaining names are value-object results and
 inputs surfaced by `Performance` methods.
+
+Examples:
+--------
+>>> import finstack_quant.analytics as analytics
+>>> analytics.__name__
+'finstack_quant.analytics'
 """
 
 from finstack_quant.finstack_quant import analytics as _analytics

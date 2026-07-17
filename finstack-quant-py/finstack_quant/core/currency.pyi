@@ -1,4 +1,5 @@
-"""ISO-4217 currency bindings from ``finstack-quant-core``.
+"""
+ISO-4217 currency bindings from ``finstack-quant-core``.
 
 Provides the :class:`Currency` type for representing ISO-4217 currencies with
 numeric codes and minor-unit precision. Module-level constants are provided for
@@ -14,6 +15,12 @@ Example::
     840
     >>> usd == USD
     True
+
+Examples
+--------
+>>> import finstack_quant.core.currency as currency
+>>> currency.__name__
+'finstack_quant.core.currency'
 """
 
 from __future__ import annotations
@@ -179,7 +186,8 @@ __all__ = [
 ]
 
 class Currency:
-    """An ISO-4217 currency.
+    """
+    An ISO-4217 currency.
 
     Immutable, hashable value type representing a single ISO-4217 currency.
     Supports comparison with other ``Currency`` instances and with ISO
@@ -210,7 +218,8 @@ class Currency:
     """
 
     def __init__(self, code: str) -> None:
-        """Parse an ISO-4217 alphabetic code (case-insensitive).
+        """
+        Parse an ISO-4217 alphabetic code (case-insensitive).
 
         Parameters
         ----------
@@ -226,7 +235,8 @@ class Currency:
 
     @classmethod
     def from_numeric(cls, code: int) -> Currency:
-        """Construct from an ISO-4217 numeric code.
+        """
+        Construct from an ISO-4217 numeric code.
 
         Parameters
         ----------
@@ -242,41 +252,54 @@ class Currency:
         ------
         ValueError
             If *code* does not map to a known currency.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.currency import Currency
+        >>> callable(Currency.from_numeric)
+        True
         """
         ...
 
     @property
     def code(self) -> str:
-        """Three-letter ISO-4217 alphabetic code (uppercase).
+        """
+        Three-letter ISO-4217 alphabetic code (uppercase).
 
         Returns
         -------
         str
+            The code exposed by this `Currency`.
         """
         ...
 
     @property
     def numeric(self) -> int:
-        """ISO-4217 numeric identifier.
+        """
+        ISO-4217 numeric identifier.
 
         Returns
         -------
         int
+            The numeric exposed by this `Currency`.
         """
         ...
 
     @property
     def decimals(self) -> int:
-        """Typical number of decimal places (minor units) for this currency.
+        """
+        Typical number of decimal places (minor units) for this currency.
 
         Returns
         -------
         int
+            The decimals exposed by this `Currency`.
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this currency to a JSON string.
+        """
+        Serialize this currency to a JSON string.
 
         Returns
         -------
@@ -292,7 +315,8 @@ class Currency:
 
     @classmethod
     def from_json(cls, json: str) -> Currency:
-        """Deserialize a currency from a JSON string.
+        """
+        Deserialize a currency from a JSON string.
 
         Parameters
         ----------
@@ -308,6 +332,12 @@ class Currency:
         ------
         ValueError
             If *json* is not valid or does not represent a known currency.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.currency import Currency
+        >>> callable(Currency.from_json)
+        True
         """
         ...
 

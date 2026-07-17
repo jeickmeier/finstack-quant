@@ -1,4 +1,5 @@
-"""Dynamic term-structure model bindings: Diebold-Li and yield-curve PCA.
+"""
+Dynamic term-structure model bindings: Diebold-Li and yield-curve PCA.
 
 Function-based API for:
 
@@ -9,6 +10,12 @@ Function-based API for:
 Rates in ``yields_matrix`` are continuously compounded zero yields in decimal
 form (e.g. ``0.045`` for 4.5%). Tenors are in years unless you also rescale
 ``lambda_decay`` to a months convention.
+
+Examples
+--------
+>>> import finstack_quant.core.market_data.dtsm as dtsm
+>>> dtsm.__name__
+'finstack_quant.core.market_data.dtsm'
 """
 
 from __future__ import annotations
@@ -28,7 +35,8 @@ def diebold_li_fit_factors(
     lambda_decay: float = 0.7308,
     /,
 ) -> dict[str, Any]:
-    """Extract Nelson-Siegel factors from a yield panel via Diebold-Li (2006).
+    """
+    Extract Nelson-Siegel factors from a yield panel via Diebold-Li (2006).
 
     Parameters
     ----------
@@ -77,7 +85,8 @@ def diebold_li_forecast(
     lambda_decay: float = 0.7308,
     /,
 ) -> dict[str, Any]:
-    """VAR(1) forecast of Diebold-Li factors and yields out to ``horizon`` periods.
+    """
+    VAR(1) forecast of Diebold-Li factors and yields out to ``horizon`` periods.
 
     Fits factors on the panel, estimates VAR(1) dynamics, and forecasts
     ``horizon`` observation steps ahead.
@@ -127,7 +136,8 @@ def yield_pca_fit(
     yield_changes: list[list[float]],
     n_components: int = 3,
 ) -> dict[str, Any]:
-    """PCA decomposition of a yield-change panel.
+    """
+    PCA decomposition of a yield-change panel.
 
     Parameters
     ----------
@@ -161,7 +171,8 @@ def yield_pca_scenario(
     sigma_shock: float,
     n_components: int = 3,
 ) -> list[float]:
-    """Apply a single-component N-sigma PCA shock to the mean yield curve.
+    """
+    Apply a single-component N-sigma PCA shock to the mean yield curve.
 
     Parameters
     ----------

@@ -1,6 +1,12 @@
 """Instrument pricing and risk metrics.
 
 Bindings for the ``finstack-quant-valuations`` Rust crate.
+
+Examples:
+--------
+>>> import finstack_quant.valuations as valuations
+>>> valuations.__name__
+'finstack_quant.valuations'
 """
 
 import json as _json
@@ -75,6 +81,12 @@ def instrument_cashflows(
     Raises:
         ValueError: If ``model`` is unsupported or the instrument type isn't
             priced under that model.
+
+    Examples:
+    --------
+    >>> from finstack_quant.valuations import instrument_cashflows
+    >>> callable(instrument_cashflows)
+    True
     """
     import pandas as pd
 

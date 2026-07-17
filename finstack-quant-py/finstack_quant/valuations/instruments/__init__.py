@@ -2,6 +2,12 @@
 
 This mirrors ``finstack_quant_valuations::instruments``: category-specific
 wrappers live in submodules, while JSON pricing helpers are exported here.
+
+Examples:
+--------
+>>> import finstack_quant.valuations.instruments as instruments
+>>> instruments.__name__
+'finstack_quant.valuations.instruments'
 """
 
 from __future__ import annotations

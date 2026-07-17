@@ -8,6 +8,12 @@ Pure presentation — every input is a pre-built shape (tornado entries, a
 ``{scenario: value}`` dict, a Monte-Carlo fan dict, a ``run_variance`` dict).
 No engine wiring or financial calculation; the only transforms are a magnitude
 sort key and display-unit percent scaling.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.scenario as scenario
+>>> scenario.__name__
+'finstack_quant.reporting.scenario'
 """
 
 from __future__ import annotations
@@ -125,6 +131,17 @@ def scenario_tearsheet(
 
     Raises:
         ValueError: If ``sections`` contains an unknown section name.
+
+    Returns:
+    -------
+    TearSheet
+        Result of scenario tearsheet for the binding in the annotated representation.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.scenario import scenario_tearsheet
+    >>> callable(scenario_tearsheet)
+    True
     """
     wanted = sections if sections is not None else ALL_SECTIONS
     unknown = set(wanted) - set(ALL_SECTIONS)

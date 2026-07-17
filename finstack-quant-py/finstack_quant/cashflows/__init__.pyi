@@ -1,8 +1,15 @@
-"""Cashflow schedule JSON construction and validation.
+"""
+Cashflow schedule JSON construction and validation.
 
 JSON-first bindings for ``finstack-quant-cashflows``. Build schedules from a
 ``CashflowScheduleBuildSpec``, validate canonical payloads, extract dated flows,
 and compute accrued interest.
+
+Examples
+--------
+>>> import finstack_quant.cashflows as cashflows
+>>> cashflows.__name__
+'finstack_quant.cashflows'
 """
 
 from __future__ import annotations
@@ -15,7 +22,8 @@ __all__ = [
 ]
 
 def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None) -> str:
-    """Build a cashflow schedule from a JSON spec and return canonical schedule JSON.
+    """
+    Build a cashflow schedule from a JSON spec and return canonical schedule JSON.
 
     Parameters
     ----------
@@ -47,7 +55,8 @@ def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None)
     """
 
 def validate_cashflow_schedule_json(schedule_json: str) -> str:
-    """Validate and canonicalize a ``CashFlowSchedule`` JSON payload.
+    """
+    Validate and canonicalize a ``CashFlowSchedule`` JSON payload.
 
     Parameters
     ----------
@@ -71,7 +80,8 @@ def validate_cashflow_schedule_json(schedule_json: str) -> str:
     """
 
 def dated_flows_json(schedule_json: str) -> str:
-    """Extract settlement-dated cashflows from a schedule as a compact JSON array.
+    """
+    Extract settlement-dated cashflows from a schedule as a compact JSON array.
 
     Parameters
     ----------
@@ -97,7 +107,8 @@ def dated_flows_json(schedule_json: str) -> str:
     """
 
 def accrued_interest_json(schedule_json: str, as_of: str, config_json: str | None = None) -> float:
-    """Compute accrued interest for a schedule as of a valuation date.
+    """
+    Compute accrued interest for a schedule as of a valuation date.
 
     Parameters
     ----------

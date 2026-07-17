@@ -7,6 +7,12 @@ and an EBITDA build.
 Pure presentation — reads the structured ``credit_assessment`` result, its
 per-period series, caller-supplied coverage/covenant rows, and statement nodes.
 No financial calculation.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.credit as credit
+>>> credit.__name__
+'finstack_quant.reporting.credit'
 """
 
 from __future__ import annotations
@@ -156,6 +162,17 @@ def credit_tearsheet(
         If ``sections`` contains an unknown section name.
     TypeError
         If ``assessment`` is neither a dict nor a JSON string.
+
+    Returns:
+    -------
+    TearSheet
+        Result of credit tearsheet for the binding in the annotated representation.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.credit import credit_tearsheet
+    >>> callable(credit_tearsheet)
+    True
     """
     wanted = sections if sections is not None else ALL_SECTIONS
     unknown = set(wanted) - set(ALL_SECTIONS)

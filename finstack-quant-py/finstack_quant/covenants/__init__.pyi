@@ -1,8 +1,15 @@
-"""Covenant package JSON validation, templates, and map-backed evaluation.
+"""
+Covenant package JSON validation, templates, and map-backed evaluation.
 
 Bindings for ``finstack-quant-covenants``. Validate covenant specs, reports, and
 engines; evaluate an engine against a metric map; or instantiate standard
 covenant packages (LBO, covenant-lite, real estate, project finance) as JSON.
+
+Examples
+--------
+>>> import finstack_quant.covenants as covenants
+>>> covenants.__name__
+'finstack_quant.covenants'
 """
 
 from __future__ import annotations
@@ -19,7 +26,8 @@ __all__ = [
 ]
 
 def validate_covenant_spec(spec_json: str) -> str:
-    """Validate and canonicalize a covenant specification JSON string.
+    """
+    Validate and canonicalize a covenant specification JSON string.
 
     Parameters
     ----------
@@ -43,7 +51,8 @@ def validate_covenant_spec(spec_json: str) -> str:
     """
 
 def validate_covenant_report(report_json: str) -> str:
-    """Validate and canonicalize a covenant evaluation report JSON string.
+    """
+    Validate and canonicalize a covenant evaluation report JSON string.
 
     Parameters
     ----------
@@ -67,7 +76,8 @@ def validate_covenant_report(report_json: str) -> str:
     """
 
 def validate_covenant_engine(engine_json: str) -> str:
-    """Validate and canonicalize a covenant engine JSON string.
+    """
+    Validate and canonicalize a covenant engine JSON string.
 
     Parameters
     ----------
@@ -92,7 +102,8 @@ def validate_covenant_engine(engine_json: str) -> str:
     """
 
 def evaluate_engine(engine_json: str, metrics_json: str, as_of: str) -> str:
-    """Evaluate a covenant engine against a JSON metric map.
+    """
+    Evaluate a covenant engine against a JSON metric map.
 
     Parameters
     ----------
@@ -126,7 +137,8 @@ def lbo_standard(
     fixed_charge_coverage: float,
     max_capex: float,
 ) -> str:
-    """Return a standard leveraged-buyout covenant package as JSON.
+    """
+    Return a standard leveraged-buyout covenant package as JSON.
 
     Parameters
     ----------
@@ -156,7 +168,8 @@ def lbo_standard(
     """
 
 def cov_lite(max_leverage: float, max_senior_leverage: float) -> str:
-    """Return a covenant-lite package as JSON.
+    """
+    Return a covenant-lite package as JSON.
 
     Parameters
     ----------
@@ -182,7 +195,8 @@ def cov_lite(max_leverage: float, max_senior_leverage: float) -> str:
     """
 
 def real_estate(min_dscr: float, min_debt_yield: float, max_ltv: float) -> str:
-    """Return a real-estate covenant package as JSON.
+    """
+    Return a real-estate covenant package as JSON.
 
     Parameters
     ----------
@@ -215,7 +229,8 @@ def project_finance(
     min_liquidity: float,
     max_net_leverage: float,
 ) -> str:
-    """Return a project-finance covenant package as JSON.
+    """
+    Return a project-finance covenant package as JSON.
 
     Parameters
     ----------

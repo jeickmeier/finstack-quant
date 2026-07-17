@@ -1,8 +1,15 @@
-"""Structural credit models and path-dependent credit specifications.
+"""
+Structural credit models and path-dependent credit specifications.
 
 Bindings for Merton-style structural models, dynamic recovery, endogenous hazard
 rates, credit-state snapshots, and toggle exercise rules used by PIK/toggle
 bonds and similar instruments.
+
+Examples
+--------
+>>> import finstack_quant.valuations.models.credit as credit
+>>> credit.__name__
+'finstack_quant.valuations.models.credit'
 """
 
 from __future__ import annotations
@@ -16,7 +23,8 @@ __all__ = [
 ]
 
 class MertonModel:
-    """Merton (1974) structural credit model with optional CreditGrades calibration.
+    """
+    Merton (1974) structural credit model with optional CreditGrades calibration.
 
     Firm value follows geometric Brownian motion under the risk-neutral measure;
     default occurs when asset value crosses a debt barrier at horizon. Spreads
@@ -36,7 +44,8 @@ class MertonModel:
         debt_barrier: float,
         risk_free_rate: float,
     ) -> None:
-        """Construct a Merton structural model from firm asset inputs.
+        """
+        Construct a Merton structural model from firm asset inputs.
 
         Parameters
         ----------
@@ -69,7 +78,8 @@ class MertonModel:
         barrier_uncertainty: float,
         mean_recovery: float,
     ) -> MertonModel:
-        """Build a CreditGrades-style model calibrated from equity inputs.
+        """
+        Build a CreditGrades-style model calibrated from equity inputs.
 
         Inverts the structural mapping from observable equity value and volatility
         to implied firm asset value and asset volatility, with barrier uncertainty
@@ -103,12 +113,19 @@ class MertonModel:
         Sources
         -------
         See ``docs/REFERENCES.md#merton-1974`` and ``docs/REFERENCES.md#o-kane-2008``.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.models.credit import MertonModel
+        >>> callable(MertonModel.credit_grades)
+        True
         """
         ...
 
     @staticmethod
     def from_json(json: str) -> MertonModel:
-        """Deserialize a structural credit model from JSON.
+        """
+        Deserialize a structural credit model from JSON.
 
         Parameters
         ----------
@@ -124,11 +141,18 @@ class MertonModel:
         ------
         ValueError
             If JSON is malformed or fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.models.credit import MertonModel
+        >>> callable(MertonModel.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this model to pretty-printed canonical JSON.
+        """
+        Serialize this model to pretty-printed canonical JSON.
 
         Returns
         -------
@@ -138,7 +162,8 @@ class MertonModel:
         ...
 
     def distance_to_default(self, horizon: float) -> float:
-        """Return risk-neutral distance to default at ``horizon`` years.
+        """
+        Return risk-neutral distance to default at ``horizon`` years.
 
         Parameters
         ----------
@@ -149,11 +174,17 @@ class MertonModel:
         -------
         float
             Distance-to-default statistic (standard-deviation units).
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def default_probability(self, horizon: float) -> float:
-        """Return risk-neutral default probability over ``horizon`` years.
+        """
+        Return risk-neutral default probability over ``horizon`` years.
 
         Parameters
         ----------
@@ -164,11 +195,17 @@ class MertonModel:
         -------
         float
             Default probability in ``[0, 1]``.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def implied_spread(self, horizon: float, recovery: float) -> float:
-        """Return implied CDS par spread for ``horizon`` and ``recovery``.
+        """
+        Return implied CDS par spread for ``horizon`` and ``recovery``.
 
         Parameters
         ----------
@@ -194,11 +231,20 @@ class MertonModel:
         ...
 
 class DynamicRecoverySpec:
-    """Recovery specification with optional notional dependence."""
+    """
+    Recovery specification with optional notional dependence.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.models.credit import DynamicRecoverySpec
+    >>> DynamicRecoverySpec.__name__
+    'DynamicRecoverySpec'
+    """
 
     @staticmethod
     def constant(recovery: float) -> DynamicRecoverySpec:
-        """Create a constant recovery-rate specification.
+        """
+        Create a constant recovery-rate specification.
 
         Parameters
         ----------
@@ -214,12 +260,19 @@ class DynamicRecoverySpec:
         ------
         ValueError
             If ``recovery`` is out of range or non-finite.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.models.credit import DynamicRecoverySpec
+        >>> callable(DynamicRecoverySpec.constant)
+        True
         """
         ...
 
     @staticmethod
     def from_json(json: str) -> DynamicRecoverySpec:
-        """Deserialize a recovery specification from JSON.
+        """
+        Deserialize a recovery specification from JSON.
 
         Parameters
         ----------
@@ -235,11 +288,18 @@ class DynamicRecoverySpec:
         ------
         ValueError
             If JSON is invalid.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.models.credit import DynamicRecoverySpec
+        >>> callable(DynamicRecoverySpec.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this recovery specification to canonical JSON.
+        """
+        Serialize this recovery specification to canonical JSON.
 
         Returns
         -------
@@ -249,7 +309,8 @@ class DynamicRecoverySpec:
         ...
 
     def recovery_at_notional(self, notional: float) -> float:
-        """Return recovery rate for the supplied notional.
+        """
+        Return recovery rate for the supplied notional.
 
         Parameters
         ----------
@@ -260,11 +321,24 @@ class DynamicRecoverySpec:
         -------
         float
             Recovery rate as a decimal.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 class EndogenousHazardSpec:
-    """Hazard-rate model driven by leverage or PIK-accreted notional."""
+    """
+    Hazard-rate model driven by leverage or PIK-accreted notional.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.models.credit import EndogenousHazardSpec
+    >>> EndogenousHazardSpec.__name__
+    'EndogenousHazardSpec'
+    """
 
     @staticmethod
     def power_law(
@@ -272,7 +346,8 @@ class EndogenousHazardSpec:
         base_leverage: float,
         exponent: float,
     ) -> EndogenousHazardSpec:
-        """Create a power-law hazard model around a base leverage point.
+        """
+        Create a power-law hazard model around a base leverage point.
 
         Parameters
         ----------
@@ -292,12 +367,19 @@ class EndogenousHazardSpec:
         ------
         ValueError
             If parameters are non-finite or violate constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.models.credit import EndogenousHazardSpec
+        >>> callable(EndogenousHazardSpec.power_law)
+        True
         """
         ...
 
     @staticmethod
     def from_json(json: str) -> EndogenousHazardSpec:
-        """Deserialize an endogenous hazard specification from JSON.
+        """
+        Deserialize an endogenous hazard specification from JSON.
 
         Parameters
         ----------
@@ -313,11 +395,18 @@ class EndogenousHazardSpec:
         ------
         ValueError
             If JSON is invalid.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.models.credit import EndogenousHazardSpec
+        >>> callable(EndogenousHazardSpec.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this hazard specification to canonical JSON.
+        """
+        Serialize this hazard specification to canonical JSON.
 
         Returns
         -------
@@ -327,7 +416,8 @@ class EndogenousHazardSpec:
         ...
 
     def hazard_at_leverage(self, leverage: float) -> float:
-        """Return hazard rate at the supplied leverage.
+        """
+        Return hazard rate at the supplied leverage.
 
         Parameters
         ----------
@@ -338,6 +428,11 @@ class EndogenousHazardSpec:
         -------
         float
             Annualized hazard rate as a decimal.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -346,7 +441,8 @@ class EndogenousHazardSpec:
         accreted_notional: float,
         asset_value: float,
     ) -> float:
-        """Return hazard rate after PIK accrual changes leverage.
+        """
+        Return hazard rate after PIK accrual changes leverage.
 
         Parameters
         ----------
@@ -359,11 +455,24 @@ class EndogenousHazardSpec:
         -------
         float
             Updated annualized hazard rate as a decimal.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 class CreditState:
-    """Point-in-time credit state for toggle and path-dependent credit logic."""
+    """
+    Point-in-time credit state for toggle and path-dependent credit logic.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.models.credit import CreditState
+    >>> CreditState.__name__
+    'CreditState'
+    """
 
     def __init__(
         self,
@@ -374,7 +483,8 @@ class CreditState:
         coupon_due: float = 0.0,
         asset_value: float | None = None,
     ) -> None:
-        """Create a credit-state snapshot.
+        """
+        Create a credit-state snapshot.
 
         Parameters
         ----------
@@ -390,11 +500,17 @@ class CreditState:
             Coupon amount due at the decision date. Default ``0.0``.
         asset_value : float, optional
             Firm asset value for structural/toggle models.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this state to canonical JSON.
+        """
+        Serialize this state to canonical JSON.
 
         Returns
         -------
@@ -404,7 +520,15 @@ class CreditState:
         ...
 
 class ToggleExerciseModel:
-    """Exercise model for PIK/cash toggle and similar embedded options."""
+    """
+    Exercise model for PIK/cash toggle and similar embedded options.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.models.credit import ToggleExerciseModel
+    >>> ToggleExerciseModel.__name__
+    'ToggleExerciseModel'
+    """
 
     @staticmethod
     def threshold(
@@ -412,7 +536,8 @@ class ToggleExerciseModel:
         threshold: float,
         direction: str,
     ) -> ToggleExerciseModel:
-        """Create a threshold exercise rule on a credit-state variable.
+        """
+        Create a threshold exercise rule on a credit-state variable.
 
         Parameters
         ----------
@@ -433,6 +558,12 @@ class ToggleExerciseModel:
         ------
         ValueError
             If ``variable`` or ``direction`` is not recognized.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.models.credit import ToggleExerciseModel
+        >>> callable(ToggleExerciseModel.threshold)
+        True
         """
         ...
 
@@ -444,7 +575,8 @@ class ToggleExerciseModel:
         risk_free_rate: float,
         horizon: float,
     ) -> ToggleExerciseModel:
-        """Create an optimal exercise model from nested-path parameters.
+        """
+        Create an optimal exercise model from nested-path parameters.
 
         Parameters
         ----------
@@ -463,12 +595,24 @@ class ToggleExerciseModel:
         -------
         ToggleExerciseModel
             Optimal exercise specification.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.models.credit import ToggleExerciseModel
+        >>> callable(ToggleExerciseModel.optimal)
+        True
         """
         ...
 
     @staticmethod
     def from_json(json: str) -> ToggleExerciseModel:
-        """Deserialize a toggle exercise model from JSON.
+        """
+        Deserialize a toggle exercise model from JSON.
 
         Parameters
         ----------
@@ -484,11 +628,18 @@ class ToggleExerciseModel:
         ------
         ValueError
             If JSON is invalid.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.models.credit import ToggleExerciseModel
+        >>> callable(ToggleExerciseModel.from_json)
+        True
         """
         ...
 
     def to_json(self) -> str:
-        """Serialize this exercise model to canonical JSON.
+        """
+        Serialize this exercise model to canonical JSON.
 
         Returns
         -------

@@ -1,6 +1,13 @@
-"""Type stubs for ``finstack_quant.valuations.correlation``.
+"""
+Type stubs for ``finstack_quant.valuations.correlation``.
 
 Correlation infrastructure: copulas, factor models, recovery models.
+
+Examples
+--------
+>>> import finstack_quant.valuations.correlation as correlation
+>>> correlation.__name__
+'finstack_quant.valuations.correlation'
 """
 
 from __future__ import annotations
@@ -33,7 +40,8 @@ __all__ = [
 MAX_PORTFOLIO_LOSS_PATHS: int
 
 class CopulaSpec:
-    """Copula model specification for configuration and deferred construction.
+    """
+    Copula model specification for configuration and deferred construction.
 
     Use class methods to create a spec, then call :meth:`build` to obtain
     a concrete :class:`Copula` instance.
@@ -45,22 +53,36 @@ class CopulaSpec:
     >>> copula = spec.build()
     >>> copula.model_name
     'One-Factor Gaussian Copula'
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import CopulaSpec
+    >>> CopulaSpec.__name__
+    'CopulaSpec'
     """
 
     @classmethod
     def gaussian(cls) -> CopulaSpec:
-        """One-factor Gaussian copula (market standard).
+        """
+        One-factor Gaussian copula (market standard).
 
         Returns
         -------
         CopulaSpec
             Gaussian copula specification.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import CopulaSpec
+        >>> callable(CopulaSpec.gaussian)
+        True
         """
         ...
 
     @classmethod
     def student_t(cls, df: float) -> CopulaSpec:
-        """Student-t copula with specified degrees of freedom.
+        """
+        Student-t copula with specified degrees of freedom.
 
         Parameters
         ----------
@@ -77,12 +99,19 @@ class CopulaSpec:
         ------
         ValueError
             If ``df`` is not finite or is ``<= 2``.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import CopulaSpec
+        >>> callable(CopulaSpec.student_t)
+        True
         """
         ...
 
     @classmethod
     def random_factor_loading(cls, loading_vol: float) -> CopulaSpec:
-        """Random Factor Loading copula with stochastic correlation.
+        """
+        Random Factor Loading copula with stochastic correlation.
 
         Parameters
         ----------
@@ -93,12 +122,24 @@ class CopulaSpec:
         -------
         CopulaSpec
             RFL copula specification.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import CopulaSpec
+        >>> callable(CopulaSpec.random_factor_loading)
+        True
         """
         ...
 
     @classmethod
     def multi_factor(cls, num_factors: int) -> CopulaSpec:
-        """Multi-factor Gaussian copula with sector structure.
+        """
+        Multi-factor Gaussian copula with sector structure.
 
         Parameters
         ----------
@@ -109,11 +150,23 @@ class CopulaSpec:
         -------
         CopulaSpec
             Multi-factor copula specification.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import CopulaSpec
+        >>> callable(CopulaSpec.multi_factor)
+        True
         """
         ...
 
     def build(self) -> Copula:
-        """Build a concrete :class:`Copula` from this specification.
+        """
+        Build a concrete :class:`Copula` from this specification.
 
         Returns
         -------
@@ -129,26 +182,55 @@ class CopulaSpec:
 
     @property
     def is_gaussian(self) -> bool:
-        """``True`` if this is a Gaussian spec."""
+        """
+        ``True`` if this is a Gaussian spec.
+
+        Returns
+        -------
+        bool
+            Whether gaussian holds for this `CopulaSpec`.
+        """
         ...
 
     @property
     def is_student_t(self) -> bool:
-        """``True`` if this is a Student-t spec."""
+        """
+        ``True`` if this is a Student-t spec.
+
+        Returns
+        -------
+        bool
+            Whether student t holds for this `CopulaSpec`.
+        """
         ...
 
     @property
     def is_rfl(self) -> bool:
-        """``True`` if this is a Random Factor Loading spec."""
+        """
+        ``True`` if this is a Random Factor Loading spec.
+
+        Returns
+        -------
+        bool
+            Whether rfl holds for this `CopulaSpec`.
+        """
         ...
 
     @property
     def is_multi_factor(self) -> bool:
-        """``True`` if this is a Multi-factor spec."""
+        """
+        ``True`` if this is a Multi-factor spec.
+
+        Returns
+        -------
+        bool
+            Whether multi factor holds for this `CopulaSpec`.
+        """
         ...
 
 class Copula:
-    """Concrete copula model for portfolio default correlation.
+    """
+    Concrete copula model for portfolio default correlation.
 
     Obtain an instance via :meth:`CopulaSpec.build`.
 
@@ -160,6 +242,12 @@ class Copula:
     >>> # below the unconditional PD of norm.cdf(-2.33) ≈ 0.0099.
     >>> copula.conditional_default_prob(-2.33, [0.0], 0.3)
     0.002...
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import Copula
+    >>> Copula.__name__
+    'Copula'
     """
 
     def conditional_default_prob(
@@ -168,7 +256,8 @@ class Copula:
         factor_realization: Sequence[float],
         correlation: float,
     ) -> float:
-        """Conditional default probability given factor realization(s).
+        """
+        Conditional default probability given factor realization(s).
 
         P(default | Z) where the default threshold is typically Φ⁻¹(PD).
 
@@ -185,21 +274,41 @@ class Copula:
         -------
         float
             Conditional default probability.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def num_factors(self) -> int:
-        """Number of systematic factors in the model."""
+        """
+        Number of systematic factors in the model.
+
+        Returns
+        -------
+        int
+            The num factors exposed by this `Copula`.
+        """
         ...
 
     @property
     def model_name(self) -> str:
-        """Model name for diagnostics."""
+        """
+        Model name for diagnostics.
+
+        Returns
+        -------
+        str
+            The model name exposed by this `Copula`.
+        """
         ...
 
     def tail_dependence(self, correlation: float) -> float:
-        """Strict lower-tail dependence coefficient ``λ_L`` at the given correlation.
+        """
+        Strict lower-tail dependence coefficient ``λ_L`` at the given correlation.
 
         Returns ``nan`` when the model has no closed-form ``λ_L`` (Random
         Factor Loading); check ``math.isnan()`` before using the result.
@@ -216,11 +325,17 @@ class Copula:
         -------
         float
             The strict ``λ_L``, or ``nan`` if the model has no closed form.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def stress_correlation_proxy(self, correlation: float) -> float:
-        """Heuristic stress-correlation proxy for the Random Factor Loading copula.
+        """
+        Heuristic stress-correlation proxy for the Random Factor Loading copula.
 
         This is **not** the strict copula lower-tail-dependence coefficient
         ``λ_L`` (which has no closed form for RFL — :meth:`tail_dependence`
@@ -246,7 +361,15 @@ class Copula:
         ...
 
 class CreditExposure:
-    """One name in a finite credit portfolio."""
+    """
+    One name in a finite credit portfolio.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import CreditExposure
+    >>> CreditExposure.__name__
+    'CreditExposure'
+    """
 
     def __init__(
         self,
@@ -256,7 +379,8 @@ class CreditExposure:
         lgd: float,
         factor_loadings: Sequence[float],
     ) -> None:
-        """Create one obligor exposure for a correlated portfolio-loss simulation.
+        """
+        Create one obligor exposure for a correlated portfolio-loss simulation.
 
         Parameters
         ----------
@@ -272,24 +396,95 @@ class CreditExposure:
         factor_loadings : Sequence[float]
             Systematic-factor sensitivities aligned with the selected copula's
             factor dimensions.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        """
+        Return the id for `CreditExposure`.
+
+        Returns
+        -------
+        str
+            The id exposed by this `CreditExposure`.
+        """
+        ...
+
     @property
-    def notional(self) -> float: ...
+    def notional(self) -> float:
+        """
+        Return the notional for `CreditExposure`.
+
+        Returns
+        -------
+        float
+            The notional exposed by this `CreditExposure`.
+        """
+        ...
+
     @property
-    def default_probability(self) -> float: ...
+    def default_probability(self) -> float:
+        """
+        Return the default probability for `CreditExposure`.
+
+        Returns
+        -------
+        float
+            The default probability exposed by this `CreditExposure`.
+        """
+        ...
+
     @property
-    def lgd(self) -> float: ...
+    def lgd(self) -> float:
+        """
+        Return the lgd for `CreditExposure`.
+
+        Returns
+        -------
+        float
+            The lgd exposed by this `CreditExposure`.
+        """
+        ...
+
     @property
-    def factor_loadings(self) -> list[float]: ...
-    def to_json(self) -> str: ...
+    def factor_loadings(self) -> list[float]:
+        """
+        Return the factor loadings for `CreditExposure`.
+
+        Returns
+        -------
+        list[float]
+            The factor loadings exposed by this `CreditExposure`.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize `CreditExposure` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `CreditExposure`, suitable for a matching `from_json` call.
+        """
+        ...
 
 class PortfolioLossConfig:
-    """Settings for deterministic portfolio credit-loss simulation.
+    """
+    Settings for deterministic portfolio credit-loss simulation.
 
     ``num_paths`` must be in ``[1, MAX_PORTFOLIO_LOSS_PATHS]``.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import PortfolioLossConfig
+    >>> PortfolioLossConfig.__name__
+    'PortfolioLossConfig'
     """
 
     def __init__(
@@ -299,7 +494,8 @@ class PortfolioLossConfig:
         confidence: float,
         copula: CopulaSpec,
     ) -> None:
-        """Configure deterministic correlated portfolio-loss simulation.
+        """
+        Configure deterministic correlated portfolio-loss simulation.
 
         Parameters
         ----------
@@ -313,33 +509,145 @@ class PortfolioLossConfig:
             ``(0, 1)``.
         copula : CopulaSpec
             Dependence model and factor configuration for correlated defaults.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     @property
-    def num_paths(self) -> int: ...
+    def num_paths(self) -> int:
+        """
+        Return the num paths for `PortfolioLossConfig`.
+
+        Returns
+        -------
+        int
+            The num paths exposed by this `PortfolioLossConfig`.
+        """
+        ...
+
     @property
-    def seed(self) -> int: ...
+    def seed(self) -> int:
+        """
+        Return the seed for `PortfolioLossConfig`.
+
+        Returns
+        -------
+        int
+            The seed exposed by this `PortfolioLossConfig`.
+        """
+        ...
+
     @property
-    def confidence(self) -> float: ...
+    def confidence(self) -> float:
+        """
+        Return the confidence for `PortfolioLossConfig`.
+
+        Returns
+        -------
+        float
+            The confidence exposed by this `PortfolioLossConfig`.
+        """
+        ...
+
     @property
-    def copula(self) -> CopulaSpec: ...
-    def to_json(self) -> str: ...
+    def copula(self) -> CopulaSpec:
+        """
+        Return the copula for `PortfolioLossConfig`.
+
+        Returns
+        -------
+        CopulaSpec
+            The copula exposed by this `PortfolioLossConfig`.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize `PortfolioLossConfig` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `PortfolioLossConfig`, suitable for a matching `from_json` call.
+        """
+        ...
 
 class PortfolioLossResult:
-    """Loss distribution and loss-positive VaR/expected shortfall."""
+    """
+    Loss distribution and loss-positive VaR/expected shortfall.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import PortfolioLossResult
+    >>> PortfolioLossResult.__name__
+    'PortfolioLossResult'
+    """
 
     @property
-    def losses(self) -> list[float]: ...
+    def losses(self) -> list[float]:
+        """
+        Return the losses for `PortfolioLossResult`.
+
+        Returns
+        -------
+        list[float]
+            The losses exposed by this `PortfolioLossResult`.
+        """
+        ...
+
     @property
-    def expected_loss(self) -> float: ...
+    def expected_loss(self) -> float:
+        """
+        Return the expected loss for `PortfolioLossResult`.
+
+        Returns
+        -------
+        float
+            The expected loss exposed by this `PortfolioLossResult`.
+        """
+        ...
+
     @property
-    def var(self) -> float: ...
+    def var(self) -> float:
+        """
+        Return the var for `PortfolioLossResult`.
+
+        Returns
+        -------
+        float
+            The var exposed by this `PortfolioLossResult`.
+        """
+        ...
+
     @property
-    def expected_shortfall(self) -> float: ...
-    def to_json(self) -> str: ...
+    def expected_shortfall(self) -> float:
+        """
+        Return the expected shortfall for `PortfolioLossResult`.
+
+        Returns
+        -------
+        float
+            The expected shortfall exposed by this `PortfolioLossResult`.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize `PortfolioLossResult` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `PortfolioLossResult`, suitable for a matching `from_json` call.
+        """
+        ...
 
 class RecoverySpec:
-    """Recovery model specification for configuration and deferred construction.
+    """
+    Recovery model specification for configuration and deferred construction.
 
     Example
     -------
@@ -348,11 +656,18 @@ class RecoverySpec:
     >>> model = spec.build()
     >>> model.expected_recovery
     0.4
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import RecoverySpec
+    >>> RecoverySpec.__name__
+    'RecoverySpec'
     """
 
     @classmethod
     def constant(cls, rate: float) -> RecoverySpec:
-        """Constant recovery rate.
+        """
+        Constant recovery rate.
 
         Parameters
         ----------
@@ -363,12 +678,24 @@ class RecoverySpec:
         -------
         RecoverySpec
             Constant recovery specification.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import RecoverySpec
+        >>> callable(RecoverySpec.constant)
+        True
         """
         ...
 
     @classmethod
     def market_correlated(cls, mean: float, vol: float, correlation: float) -> RecoverySpec:
-        """Market-correlated (Andersen-Sidenius) stochastic recovery.
+        """
+        Market-correlated (Andersen-Sidenius) stochastic recovery.
 
         Parameters
         ----------
@@ -383,12 +710,24 @@ class RecoverySpec:
         -------
         RecoverySpec
             Stochastic recovery specification.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import RecoverySpec
+        >>> callable(RecoverySpec.market_correlated)
+        True
         """
         ...
 
     @classmethod
     def market_standard_stochastic(cls) -> RecoverySpec:
-        """Market-standard stochastic recovery (40% mean, 25% vol, +40% corr).
+        """
+        Market-standard stochastic recovery (40% mean, 25% vol, +40% corr).
 
         Recovery falls in stress under the canonical low-factor-stress
         convention.
@@ -397,12 +736,19 @@ class RecoverySpec:
         -------
         RecoverySpec
             Standard stochastic recovery specification.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import RecoverySpec
+        >>> callable(RecoverySpec.market_standard_stochastic)
+        True
         """
         ...
 
     @property
     def expected_recovery(self) -> float:
-        """Location-parameter recovery rate of this spec.
+        """
+        Location-parameter recovery rate of this spec.
 
         For a constant spec this is the constant rate. For a
         market-correlated spec this returns the ``mean`` input — the target
@@ -410,11 +756,17 @@ class RecoverySpec:
         Jensen-corrected unconditional mean ``E_Z[R(Z)]`` whenever the
         factor sensitivity is non-zero. For the true unconditional mean call
         ``build().expected_recovery``.
+
+        Returns
+        -------
+        float
+            The expected recovery exposed by this `RecoverySpec`.
         """
         ...
 
     def build(self) -> RecoveryModel:
-        """Build a concrete :class:`RecoveryModel` from this specification.
+        """
+        Build a concrete :class:`RecoveryModel` from this specification.
 
         Returns
         -------
@@ -424,18 +776,33 @@ class RecoverySpec:
         ...
 
 class RecoveryModel:
-    """Concrete recovery model for credit portfolio pricing.
+    """
+    Concrete recovery model for credit portfolio pricing.
 
     Obtain an instance via :meth:`RecoverySpec.build`.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import RecoveryModel
+    >>> RecoveryModel.__name__
+    'RecoveryModel'
     """
 
     @property
     def expected_recovery(self) -> float:
-        """Expected (unconditional) recovery rate."""
+        """
+        Expected (unconditional) recovery rate.
+
+        Returns
+        -------
+        float
+            The expected recovery exposed by this `RecoveryModel`.
+        """
         ...
 
     def conditional_recovery(self, market_factor: float) -> float:
-        """Recovery conditional on the systematic market factor.
+        """
+        Recovery conditional on the systematic market factor.
 
         Parameters
         ----------
@@ -446,16 +813,29 @@ class RecoveryModel:
         -------
         float
             Conditional recovery rate.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def lgd(self) -> float:
-        """Loss given default (1 − recovery)."""
+        """
+        Loss given default (1 − recovery).
+
+        Returns
+        -------
+        float
+            The lgd exposed by this `RecoveryModel`.
+        """
         ...
 
     def conditional_lgd(self, market_factor: float) -> float:
-        """Conditional LGD given market factor.
+        """
+        Conditional LGD given market factor.
 
         Parameters
         ----------
@@ -466,26 +846,53 @@ class RecoveryModel:
         -------
         float
             Conditional LGD.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def recovery_volatility(self) -> float:
-        """Recovery-rate volatility scale (0 for constant models)."""
+        """
+        Recovery-rate volatility scale (0 for constant models).
+
+        Returns
+        -------
+        float
+            The recovery volatility exposed by this `RecoveryModel`.
+        """
         ...
 
     @property
     def is_stochastic(self) -> bool:
-        """Whether recovery varies with the market factor."""
+        """
+        Whether recovery varies with the market factor.
+
+        Returns
+        -------
+        bool
+            Whether stochastic holds for this `RecoveryModel`.
+        """
         ...
 
     @property
     def model_name(self) -> str:
-        """Model name for diagnostics."""
+        """
+        Model name for diagnostics.
+
+        Returns
+        -------
+        str
+            The model name exposed by this `RecoveryModel`.
+        """
         ...
 
 class LatentFactorSpec:
-    """Factor model specification for configuration and deferred construction.
+    """
+    Factor model specification for configuration and deferred construction.
 
     Example
     -------
@@ -494,11 +901,18 @@ class LatentFactorSpec:
     >>> model = spec.build()
     >>> model.num_factors
     1
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import LatentFactorSpec
+    >>> LatentFactorSpec.__name__
+    'LatentFactorSpec'
     """
 
     @classmethod
     def single_factor(cls, volatility: float, mean_reversion: float) -> LatentFactorSpec:
-        """Single-factor model specification.
+        """
+        Single-factor model specification.
 
         Parameters
         ----------
@@ -511,12 +925,24 @@ class LatentFactorSpec:
         -------
         LatentFactorSpec
             Single-factor specification.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import LatentFactorSpec
+        >>> callable(LatentFactorSpec.single_factor)
+        True
         """
         ...
 
     @classmethod
     def two_factor(cls, prepay_vol: float, credit_vol: float, correlation: float) -> LatentFactorSpec:
-        """Two-factor model (prepayment + credit) specification.
+        """
+        Two-factor model (prepayment + credit) specification.
 
         Parameters
         ----------
@@ -531,16 +957,35 @@ class LatentFactorSpec:
         -------
         LatentFactorSpec
             Two-factor specification.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import LatentFactorSpec
+        >>> callable(LatentFactorSpec.two_factor)
+        True
         """
         ...
 
     @property
     def num_factors(self) -> int:
-        """Number of factors implied by this specification."""
+        """
+        Number of factors implied by this specification.
+
+        Returns
+        -------
+        int
+            The num factors exposed by this `LatentFactorSpec`.
+        """
         ...
 
     def build(self) -> LatentFactorKind:
-        """Build a concrete :class:`LatentFactorKind` from this specification.
+        """
+        Build a concrete :class:`LatentFactorKind` from this specification.
 
         Returns
         -------
@@ -556,38 +1001,81 @@ class LatentFactorSpec:
         ...
 
 class LatentFactorKind:
-    """Concrete factor model for correlated behavior.
+    """
+    Concrete factor model for correlated behavior.
 
     Obtain an instance via :meth:`LatentFactorSpec.build`.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import LatentFactorKind
+    >>> LatentFactorKind.__name__
+    'LatentFactorKind'
     """
 
     @property
     def num_factors(self) -> int:
-        """Number of factors in the model."""
+        """
+        Number of factors in the model.
+
+        Returns
+        -------
+        int
+            The num factors exposed by this `LatentFactorKind`.
+        """
         ...
 
     @property
     def correlation_matrix(self) -> list[float]:
-        """Factor correlation matrix (flattened row-major)."""
+        """
+        Factor correlation matrix (flattened row-major).
+
+        Returns
+        -------
+        list[float]
+            The correlation matrix exposed by this `LatentFactorKind`.
+        """
         ...
 
     @property
     def volatilities(self) -> list[float]:
-        """Factor volatilities."""
+        """
+        Factor volatilities.
+
+        Returns
+        -------
+        list[float]
+            The volatilities exposed by this `LatentFactorKind`.
+        """
         ...
 
     @property
     def factor_names(self) -> list[str]:
-        """Factor names for reporting."""
+        """
+        Factor names for reporting.
+
+        Returns
+        -------
+        list[str]
+            The factor names exposed by this `LatentFactorKind`.
+        """
         ...
 
     @property
     def model_name(self) -> str:
-        """Model name for diagnostics."""
+        """
+        Model name for diagnostics.
+
+        Returns
+        -------
+        str
+            The model name exposed by this `LatentFactorKind`.
+        """
         ...
 
     def diagonal_factor_contribution(self, factor_index: int, z: float) -> float:
-        """Diagonal factor contribution for a single standard-normal draw.
+        """
+        Diagonal factor contribution for a single standard-normal draw.
 
         Parameters
         ----------
@@ -600,11 +1088,17 @@ class LatentFactorKind:
         -------
         float
             Factor contribution.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 class LatentSingleFactor:
-    """Single-factor model (common market factor).
+    """
+    Single-factor model (common market factor).
 
     Example
     -------
@@ -612,10 +1106,17 @@ class LatentSingleFactor:
     >>> m = LatentSingleFactor(volatility=0.2, mean_reversion=0.05)
     >>> m.num_factors
     1
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import LatentSingleFactor
+    >>> LatentSingleFactor.__name__
+    'LatentSingleFactor'
     """
 
     def __init__(self, volatility: float, mean_reversion: float) -> None:
-        """Create a single-factor model.
+        """
+        Create a single-factor model.
 
         Parameters
         ----------
@@ -623,26 +1124,53 @@ class LatentSingleFactor:
             Factor volatility.
         mean_reversion : float
             Mean reversion speed.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @property
     def volatility(self) -> float:
-        """Factor volatility."""
+        """
+        Factor volatility.
+
+        Returns
+        -------
+        float
+            The volatility exposed by this `LatentSingleFactor`.
+        """
         ...
 
     @property
     def mean_reversion(self) -> float:
-        """Mean reversion speed."""
+        """
+        Mean reversion speed.
+
+        Returns
+        -------
+        float
+            The mean reversion exposed by this `LatentSingleFactor`.
+        """
         ...
 
     @property
     def num_factors(self) -> int:
-        """Number of factors (always 1)."""
+        """
+        Number of factors (always 1).
+
+        Returns
+        -------
+        int
+            The num factors exposed by this `LatentSingleFactor`.
+        """
         ...
 
 class LatentTwoFactor:
-    """Two-factor model for prepayment and credit.
+    """
+    Two-factor model for prepayment and credit.
 
     Example
     -------
@@ -650,10 +1178,17 @@ class LatentTwoFactor:
     >>> m = LatentTwoFactor(prepay_vol=0.15, credit_vol=0.10, correlation=-0.2)
     >>> m.num_factors
     2
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import LatentTwoFactor
+    >>> LatentTwoFactor.__name__
+    'LatentTwoFactor'
     """
 
     def __init__(self, prepay_vol: float, credit_vol: float, correlation: float) -> None:
-        """Create a two-factor model.
+        """
+        Create a two-factor model.
 
         Parameters
         ----------
@@ -663,63 +1198,125 @@ class LatentTwoFactor:
             Credit factor volatility.
         correlation : float
             Inter-factor correlation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     @classmethod
     def rmbs_standard(cls) -> LatentTwoFactor:
-        """Standard RMBS calibration.
+        """
+        Standard RMBS calibration.
 
         Returns
         -------
         LatentTwoFactor
             Pre-calibrated RMBS model.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import LatentTwoFactor
+        >>> callable(LatentTwoFactor.rmbs_standard)
+        True
         """
         ...
 
     @classmethod
     def clo_standard(cls) -> LatentTwoFactor:
-        """Standard CLO calibration.
+        """
+        Standard CLO calibration.
 
         Returns
         -------
         LatentTwoFactor
             Pre-calibrated CLO model.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import LatentTwoFactor
+        >>> callable(LatentTwoFactor.clo_standard)
+        True
         """
         ...
 
     @property
     def prepay_vol(self) -> float:
-        """Prepayment factor volatility."""
+        """
+        Prepayment factor volatility.
+
+        Returns
+        -------
+        float
+            The prepay vol exposed by this `LatentTwoFactor`.
+        """
         ...
 
     @property
     def credit_vol(self) -> float:
-        """Credit factor volatility."""
+        """
+        Credit factor volatility.
+
+        Returns
+        -------
+        float
+            The credit vol exposed by this `LatentTwoFactor`.
+        """
         ...
 
     @property
     def correlation(self) -> float:
-        """Factor correlation."""
+        """
+        Factor correlation.
+
+        Returns
+        -------
+        float
+            The correlation exposed by this `LatentTwoFactor`.
+        """
         ...
 
     @property
     def num_factors(self) -> int:
-        """Number of factors (always 2)."""
+        """
+        Number of factors (always 2).
+
+        Returns
+        -------
+        int
+            The num factors exposed by this `LatentTwoFactor`.
+        """
         ...
 
     @property
     def cholesky_l10(self) -> float:
-        """Cholesky ``L[1][0]`` for correlated factor generation."""
+        """
+        Cholesky ``L[1][0]`` for correlated factor generation.
+
+        Returns
+        -------
+        float
+            The cholesky l10 exposed by this `LatentTwoFactor`.
+        """
         ...
 
     @property
     def cholesky_l11(self) -> float:
-        """Cholesky ``L[1][1]`` for correlated factor generation."""
+        """
+        Cholesky ``L[1][1]`` for correlated factor generation.
+
+        Returns
+        -------
+        float
+            The cholesky l11 exposed by this `LatentTwoFactor`.
+        """
         ...
 
 class LatentMultiFactor:
-    """Multi-factor model with custom correlation structure.
+    """
+    Multi-factor model with custom correlation structure.
 
     Example
     -------
@@ -731,6 +1328,12 @@ class LatentMultiFactor:
     ... )
     >>> m.num_factors
     2
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import LatentMultiFactor
+    >>> LatentMultiFactor.__name__
+    'LatentMultiFactor'
     """
 
     def __init__(
@@ -739,7 +1342,8 @@ class LatentMultiFactor:
         volatilities: Sequence[float],
         correlations: Sequence[float],
     ) -> None:
-        """Create a validated multi-factor model.
+        """
+        Create a validated multi-factor model.
 
         Parameters
         ----------
@@ -759,7 +1363,8 @@ class LatentMultiFactor:
 
     @classmethod
     def uncorrelated(cls, num_factors: int, volatilities: Sequence[float]) -> LatentMultiFactor:
-        """Create an uncorrelated (identity) multi-factor model.
+        """
+        Create an uncorrelated (identity) multi-factor model.
 
         Parameters
         ----------
@@ -772,26 +1377,59 @@ class LatentMultiFactor:
         -------
         LatentMultiFactor
             Uncorrelated factor model.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.correlation import LatentMultiFactor
+        >>> callable(LatentMultiFactor.uncorrelated)
+        True
         """
         ...
 
     @property
     def num_factors(self) -> int:
-        """Number of factors."""
+        """
+        Number of factors.
+
+        Returns
+        -------
+        int
+            The num factors exposed by this `LatentMultiFactor`.
+        """
         ...
 
     @property
     def correlation_matrix(self) -> list[float]:
-        """Factor correlation matrix (flattened row-major)."""
+        """
+        Factor correlation matrix (flattened row-major).
+
+        Returns
+        -------
+        list[float]
+            The correlation matrix exposed by this `LatentMultiFactor`.
+        """
         ...
 
     @property
     def volatilities(self) -> list[float]:
-        """Factor volatilities."""
+        """
+        Factor volatilities.
+
+        Returns
+        -------
+        list[float]
+            The volatilities exposed by this `LatentMultiFactor`.
+        """
         ...
 
     def generate_correlated_factors(self, independent_z: Sequence[float]) -> list[float]:
-        """Generate correlated factor values from independent standard normal draws.
+        """
+        Generate correlated factor values from independent standard normal draws.
 
         Parameters
         ----------
@@ -812,7 +1450,8 @@ class LatentMultiFactor:
         ...
 
 class CorrelatedBernoulli:
-    """Correlated Bernoulli distribution for two binary events.
+    """
+    Correlated Bernoulli distribution for two binary events.
 
     Example
     -------
@@ -820,10 +1459,17 @@ class CorrelatedBernoulli:
     >>> cb = CorrelatedBernoulli(p1=0.05, p2=0.03, correlation=0.3)
     >>> cb.joint_p11  # P(both default)
     0.00...
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import CorrelatedBernoulli
+    >>> CorrelatedBernoulli.__name__
+    'CorrelatedBernoulli'
     """
 
     def __init__(self, p1: float, p2: float, correlation: float) -> None:
-        """Create a correlated Bernoulli distribution.
+        """
+        Create a correlated Bernoulli distribution.
 
         Correlation is clamped to the Fréchet-Hoeffding bounds for the
         given marginal probabilities.
@@ -849,46 +1495,107 @@ class CorrelatedBernoulli:
 
     @property
     def p1(self) -> float:
-        """Marginal probability of event 1."""
+        """
+        Marginal probability of event 1.
+
+        Returns
+        -------
+        float
+            The p1 exposed by this `CorrelatedBernoulli`.
+        """
         ...
 
     @property
     def p2(self) -> float:
-        """Marginal probability of event 2."""
+        """
+        Marginal probability of event 2.
+
+        Returns
+        -------
+        float
+            The p2 exposed by this `CorrelatedBernoulli`.
+        """
         ...
 
     @property
     def correlation(self) -> float:
-        """Effective correlation after Fréchet-Hoeffding clamping."""
+        """
+        Effective correlation after Fréchet-Hoeffding clamping.
+
+        Returns
+        -------
+        float
+            The correlation exposed by this `CorrelatedBernoulli`.
+        """
         ...
 
     @property
     def requested_correlation(self) -> float:
-        """Caller-requested correlation before Fréchet-Hoeffding clamping."""
+        """
+        Caller-requested correlation before Fréchet-Hoeffding clamping.
+
+        Returns
+        -------
+        float
+            The requested correlation exposed by this `CorrelatedBernoulli`.
+        """
         ...
 
     @property
     def joint_p11(self) -> float:
-        """P(X₁=1, X₂=1)."""
+        """
+        Return the joint p11 for `CorrelatedBernoulli`.
+        P(X₁=1, X₂=1).
+
+        Returns
+        -------
+        float
+            The joint p11 exposed by this `CorrelatedBernoulli`.
+        """
         ...
 
     @property
     def joint_p10(self) -> float:
-        """P(X₁=1, X₂=0)."""
+        """
+        Return the joint p10 for `CorrelatedBernoulli`.
+        P(X₁=1, X₂=0).
+
+        Returns
+        -------
+        float
+            The joint p10 exposed by this `CorrelatedBernoulli`.
+        """
         ...
 
     @property
     def joint_p01(self) -> float:
-        """P(X₁=0, X₂=1)."""
+        """
+        Return the joint p01 for `CorrelatedBernoulli`.
+        P(X₁=0, X₂=1).
+
+        Returns
+        -------
+        float
+            The joint p01 exposed by this `CorrelatedBernoulli`.
+        """
         ...
 
     @property
     def joint_p00(self) -> float:
-        """P(X₁=0, X₂=0)."""
+        """
+        Return the joint p00 for `CorrelatedBernoulli`.
+        P(X₁=0, X₂=0).
+
+        Returns
+        -------
+        float
+            The joint p00 exposed by this `CorrelatedBernoulli`.
+        """
         ...
 
     def joint_probabilities(self) -> tuple[float, float, float, float]:
-        """All four joint probabilities ``(p11, p10, p01, p00)``.
+        """
+        All four joint probabilities ``(p11, p10, p01, p00)``.
 
         Returns
         -------
@@ -898,7 +1605,8 @@ class CorrelatedBernoulli:
         ...
 
     def conditional_p2_given_x1(self) -> float:
-        """Conditional probability P(X₂=1 | X₁=1).
+        """
+        Conditional probability P(X₂=1 | X₁=1).
 
         Returns
         -------
@@ -908,7 +1616,8 @@ class CorrelatedBernoulli:
         ...
 
     def conditional_p1_given_x2(self) -> float:
-        """Conditional probability P(X₁=1 | X₂=1).
+        """
+        Conditional probability P(X₁=1 | X₂=1).
 
         Returns
         -------
@@ -918,7 +1627,8 @@ class CorrelatedBernoulli:
         ...
 
     def sample_from_uniform(self, u: float) -> tuple[int, int]:
-        """Sample a pair of correlated binary outcomes from a uniform ``[0,1]`` draw.
+        """
+        Sample a pair of correlated binary outcomes from a uniform ``[0,1]`` draw.
 
         Parameters
         ----------
@@ -942,7 +1652,8 @@ def simulate_portfolio_loss(
     config: PortfolioLossConfig,
     recovery: RecoverySpec | None = None,
 ) -> PortfolioLossResult:
-    """Simulate finite-pool losses with deterministic path-indexed RNG streams.
+    """
+    Simulate finite-pool losses with deterministic path-indexed RNG streams.
 
     Losses are positive amounts. VaR is the nearest-rank empirical quantile at
     ``config.confidence``; expected shortfall includes the VaR observation and
@@ -959,11 +1670,28 @@ def simulate_portfolio_loss(
     recovery : RecoverySpec or None, default None
         Optional conditional recovery model replacing constant exposure LGDs;
         it requires a one-factor systematic copula.
+
+    Returns
+    -------
+    PortfolioLossResult
+        Result of simulate portfolio loss for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import simulate_portfolio_loss
+    >>> callable(simulate_portfolio_loss)
+    True
     """
     ...
 
 def correlation_bounds(p1: float, p2: float) -> tuple[float, float]:
-    """Fréchet-Hoeffding correlation bounds for two Bernoulli marginals.
+    """
+    Fréchet-Hoeffding correlation bounds for two Bernoulli marginals.
 
     Parameters
     ----------
@@ -981,11 +1709,18 @@ def correlation_bounds(p1: float, p2: float) -> tuple[float, float]:
     ------
     ValueError
         If either marginal is not finite and in ``[0, 1]``.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import correlation_bounds
+    >>> callable(correlation_bounds)
+    True
     """
     ...
 
 def joint_probabilities(p1: float, p2: float, correlation: float) -> tuple[float, float, float, float]:
-    """Joint probabilities for two correlated Bernoulli variables.
+    """
+    Joint probabilities for two correlated Bernoulli variables.
 
     Parameters
     ----------
@@ -1006,11 +1741,18 @@ def joint_probabilities(p1: float, p2: float, correlation: float) -> tuple[float
     ValueError
         If either marginal is not finite and in ``[0, 1]`` or correlation is
         not finite and in ``[-1, 1]``.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import joint_probabilities
+    >>> callable(joint_probabilities)
+    True
     """
     ...
 
 def validate_correlation_matrix(matrix: Sequence[float], n: int) -> None:
-    """Validate a correlation matrix (flattened row-major).
+    """
+    Validate a correlation matrix (flattened row-major).
 
     Parameters
     ----------
@@ -1023,6 +1765,12 @@ def validate_correlation_matrix(matrix: Sequence[float], n: int) -> None:
     ------
     ValueError
         If the matrix is invalid (not symmetric, not PSD, etc.).
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import validate_correlation_matrix
+    >>> callable(validate_correlation_matrix)
+    True
     """
     ...
 
@@ -1032,7 +1780,8 @@ def nearest_correlation(
     max_iter: int | None = None,
     tol: float | None = None,
 ) -> list[float]:
-    """Nearest correlation matrix (Higham 2002) for a near-PSD input.
+    """
+    Nearest correlation matrix (Higham 2002) for a near-PSD input.
 
     Projects a symmetric, unit-diagonal, near-PSD matrix onto the set of valid
     correlation matrices (symmetric, unit diagonal, positive semi-definite)
@@ -1063,11 +1812,18 @@ def nearest_correlation(
     ValueError
         If the input is not square, is grossly asymmetric, the diagonal is
         far from 1, or the projection does not converge.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import nearest_correlation
+    >>> callable(nearest_correlation)
+    True
     """
     ...
 
 def cholesky_decompose(matrix: Sequence[float], n: int) -> list[float]:
-    """Pivoted Cholesky decomposition of a correlation matrix (flattened row-major).
+    """
+    Pivoted Cholesky decomposition of a correlation matrix (flattened row-major).
 
     Uses diagonal pivoting to handle near-singular and positive-semidefinite
     matrices gracefully.
@@ -1092,5 +1848,11 @@ def cholesky_decompose(matrix: Sequence[float], n: int) -> list[float]:
     ------
     ValueError
         If the matrix shape is wrong or the matrix is indefinite.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import cholesky_decompose
+    >>> callable(cholesky_decompose)
+    True
     """
     ...

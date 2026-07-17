@@ -40,13 +40,25 @@
   example, decimal rate versus percentage or basis points, date/day-count
   convention, currency, curve role, and bump unit). Document identifier and
   optional-input fallback behavior where it changes the result.
-- The same bar applies to host-language APIs: Python stub and pure-Python
-  docstrings must document every parameter, and WASM-exposed APIs must preserve
-  equivalent input guidance in Rustdoc/TypeScript-facing documentation.
+- The same bar applies to host-language APIs. Python `.pyi` stubs and
+  pure-Python modules must give every public class, classmethod, free function,
+  method, and property a substantive summary. Document each parameter, every
+  non-``None`` return value, and the exception types a caller should catch,
+  including the conditions that raise them. A module example plus a runnable
+  doctest for every public class, classmethod, and free function is required;
+  class examples may cover ordinary instance accessors. State units,
+  conventions, accepted strings, shapes, missing-data behavior, defaults, and
+  host-language differences where they affect use. WASM-exposed APIs must
+  preserve equivalent input guidance in Rustdoc/TypeScript-facing
+  documentation.
+- Python errors must name the mapped public exception (`ValueError`, `KeyError`,
+  `RuntimeError`, or a documented domain-specific subclass) rather than a
+  generic "error". Confirm the mapping in `finstack-quant-py/src/errors.rs`
+  before documenting it.
 - `mise run rust-doc`, `mise run python-doc`, and `mise run wasm-doc` enforce
-  the exact-parameter, substantive-description standard for public Rust,
-  Python, and WASM callables. Update documentation in the same change as any
-  public signature.
+  the exact-parameter and substantive-description standard; `python-doc` also
+  enforces summaries, return descriptions, error behavior, and required usage
+  examples. Update documentation in the same change as any public signature.
 
 ## Architecture: Binding Layer
 

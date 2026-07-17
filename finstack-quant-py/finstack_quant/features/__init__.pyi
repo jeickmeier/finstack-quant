@@ -1,9 +1,16 @@
-"""Feature engineering: panel-data transformations for signal research.
+"""
+Feature engineering: panel-data transformations for signal research.
 
 Bindings for ``finstack_quant_core::features``. Provides time-series,
 cross-sectional, and pairwise transforms (z-score, rank, rolling mean,
 neutralization, risk-scaled weights) plus a general panel dispatcher
 :func:`transform_panel`.
+
+Examples
+--------
+>>> import finstack_quant.features as features
+>>> features.__name__
+'finstack_quant.features'
 """
 
 from __future__ import annotations
@@ -38,7 +45,8 @@ def transform_timeseries(
     op: str,
     params: TransformParams | None = None,
 ) -> list[float | None]:
-    """Transform a panel value column within each entity over time.
+    """
+    Transform a panel value column within each entity over time.
 
     The input is a flat panel column. Rows are grouped by ``entity``, sorted by
     ``order`` within each group, transformed, and returned in the original input
@@ -91,6 +99,12 @@ def transform_timeseries(
     missing or has magnitude at or below ``1e-12``. ``rolling_std`` and
     ``rolling_zscore`` use sample standard deviation and require at least
     two finite observations.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import transform_timeseries
+    >>> callable(transform_timeseries)
+    True
     """
     ...
 
@@ -100,7 +114,8 @@ def transform_cross_sectional(
     op: str,
     params: TransformParams | None = None,
 ) -> list[float | None]:
-    """Transform a panel value column across entities at each timestamp.
+    """
+    Transform a panel value column across entities at each timestamp.
 
     Rows are partitioned by ``time_key`` and the selected operation is applied
     independently within each partition. Results are returned in the original
@@ -151,6 +166,12 @@ def transform_cross_sectional(
     ``rank`` returns percentile ranks in ``[0, 1]``; ties share the lowest
     tied rank and a single finite row maps to ``0.0``. ``percentile_rank``
     returns open-interval ranks using average tied positions.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import transform_cross_sectional
+    >>> callable(transform_cross_sectional)
+    True
     """
     ...
 
@@ -161,7 +182,8 @@ def transform_cross_sectional_grouped(
     op: str,
     params: TransformParams | None = None,
 ) -> list[float | None]:
-    """Transform a panel value column within each timestamp/group sub-partition.
+    """
+    Transform a panel value column within each timestamp/group sub-partition.
 
     Rows are partitioned by the ``(time_key, groups)`` pair and the selected
     cross-sectional operation is applied independently within each
@@ -194,6 +216,12 @@ def transform_cross_sectional_grouped(
     ValueError
         If lengths differ, ``op`` is unsupported, or params are
         malformed.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import transform_cross_sectional_grouped
+    >>> callable(transform_cross_sectional_grouped)
+    True
     """
     ...
 
@@ -203,7 +231,8 @@ def neutralize(
     exposures: list[list[float | None]],
     params: TransformParams | None = None,
 ) -> list[float | None]:
-    """Return cross-sectional OLS residuals after regressing on exposures.
+    """
+    Return cross-sectional OLS residuals after regressing on exposures.
 
     Within each ``time_key`` partition, ``values`` is regressed on the exposure
     columns by ordinary least squares and the residuals are returned. Rows whose
@@ -235,6 +264,12 @@ def neutralize(
     ValueError
         If lengths differ, an exposure column has the wrong length,
         or params are malformed.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import neutralize
+    >>> callable(neutralize)
+    True
     """
     ...
 
@@ -246,7 +281,8 @@ def transform_timeseries_pairwise(
     op: str,
     params: TransformParams | None = None,
 ) -> list[float | None]:
-    """Transform two panel columns per entity with a rolling pairwise operation.
+    """
+    Transform two panel columns per entity with a rolling pairwise operation.
 
     Rows are grouped by ``entity`` and sorted by ``order`` within each group.
     Each output row is computed from the trailing ``window`` of paired finite
@@ -286,6 +322,12 @@ def transform_timeseries_pairwise(
     -----
     At least two paired finite observations are always required, regardless
     of ``min_periods``.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import transform_timeseries_pairwise
+    >>> callable(transform_timeseries_pairwise)
+    True
     """
     ...
 
@@ -296,7 +338,8 @@ def rolling_regression_residual(
     order: list[str],
     params: TransformParams | None = None,
 ) -> list[float | None]:
-    """Return rolling per-entity OLS residuals against exposure columns.
+    """
+    Return rolling per-entity OLS residuals against exposure columns.
 
     Rows are grouped by ``entity`` and sorted by ``order``. For each row, an OLS
     fit of ``values`` on the exposure columns is computed over the trailing
@@ -331,6 +374,12 @@ def rolling_regression_residual(
     ValueError
         If lengths differ, an exposure column has the wrong length,
         or params are malformed.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import rolling_regression_residual
+    >>> callable(rolling_regression_residual)
+    True
     """
     ...
 
@@ -340,7 +389,8 @@ def risk_scaled_weights(
     volatility: list[float | None],
     params: TransformParams | None = None,
 ) -> list[float | None]:
-    """Convert a signal to inverse-risk-scaled weights within each timestamp.
+    """
+    Convert a signal to inverse-risk-scaled weights within each timestamp.
 
     Within each ``time_key`` partition, finite rows are scaled as
     ``signal / volatility`` and then normalized so the sum of absolute weights
@@ -375,6 +425,12 @@ def risk_scaled_weights(
     Rows with missing ``values`` or non-positive ``volatility`` map to
     ``None``. A partition whose gross (summed absolute) weight is at or below
     ``1e-12`` produces ``None`` for every row.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import risk_scaled_weights
+    >>> callable(risk_scaled_weights)
+    True
     """
     ...
 
@@ -383,7 +439,8 @@ def clean_signal(
     time_key: list[str],
     params: TransformParams | None = None,
 ) -> list[float | None]:
-    """Apply the default cross-sectional signal-cleaning pass.
+    """
+    Apply the default cross-sectional signal-cleaning pass.
 
     Delegates to :func:`transform_cross_sectional` with the
     ``"clip_by_quantile"`` operation, clamping each timestamp partition to its
@@ -411,6 +468,12 @@ def clean_signal(
     ValueError
         If lengths differ or quantile bounds do not satisfy
         ``0 <= lower <= upper <= 1``.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import clean_signal
+    >>> callable(clean_signal)
+    True
     """
     ...
 
@@ -419,7 +482,8 @@ def normalize_signal(
     time_key: list[str],
     params: TransformParams | None = None,
 ) -> list[float | None]:
-    """Normalize a signal cross-sectionally with a selected method.
+    """
+    Normalize a signal cross-sectionally with a selected method.
 
     Applies a single-column cross-sectional operation independently within each
     ``time_key`` partition.
@@ -447,6 +511,12 @@ def normalize_signal(
     ValueError
         If lengths differ, ``method`` is unsupported, or params are
         malformed.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import normalize_signal
+    >>> callable(normalize_signal)
+    True
     """
     ...
 
@@ -455,7 +525,8 @@ def rank_to_weights(
     time_key: list[str],
     params: TransformParams | None = None,
 ) -> list[float | None]:
-    """Convert cross-sectional ranks into gross-normalized long/short weights.
+    """
+    Convert cross-sectional ranks into gross-normalized long/short weights.
 
     Within each ``time_key`` partition, values are ranked, demeaned, and scaled
     so the sum of absolute weights is ``1``, yielding a dollar-neutral long/short
@@ -481,6 +552,12 @@ def rank_to_weights(
     ------
     ValueError
         If lengths differ.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import rank_to_weights
+    >>> callable(rank_to_weights)
+    True
     """
     ...
 
@@ -490,7 +567,8 @@ def neutralize_and_zscore(
     exposures: list[list[float | None]],
     params: TransformParams | None = None,
 ) -> list[float | None]:
-    """Neutralize a signal against exposures, then cross-sectional z-score.
+    """
+    Neutralize a signal against exposures, then cross-sectional z-score.
 
     Runs :func:`neutralize` to residualize ``values`` on the exposure columns
     within each ``time_key`` partition, then applies a ``"zscore"`` transform to
@@ -521,11 +599,18 @@ def neutralize_and_zscore(
     ValueError
         If lengths differ, an exposure column has the wrong length,
         or params are malformed.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import neutralize_and_zscore
+    >>> callable(neutralize_and_zscore)
+    True
     """
     ...
 
 def transform_panel(spec_json: str) -> str:
-    """Apply a JSON panel transform pipeline and return JSON result columns.
+    """
+    Apply a JSON panel transform pipeline and return JSON result columns.
 
     ``spec_json`` is a JSON object with:
 
@@ -558,5 +643,11 @@ def transform_panel(spec_json: str) -> str:
         If the JSON is malformed, required keys are missing,
         operation names are duplicated or empty, or an operation fails
         validation.
+
+    Examples
+    --------
+    >>> from finstack_quant.features import transform_panel
+    >>> callable(transform_panel)
+    True
     """
     ...

@@ -4,6 +4,12 @@
 A :class:`TearSheet` renders a scoped fragment for Jupyter (``_repr_html_``) and a
 standalone document (``to_html`` / ``save``). Output is fully deterministic: the
 CSS scope class is constant and the ``generated`` stamp is caller-injectable.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.document as document
+>>> document.__name__
+'finstack_quant.reporting.document'
 """
 
 from __future__ import annotations
@@ -50,7 +56,14 @@ _TOOLTIP_JS = """<script>
 
 @dataclass
 class KPI:
-    """A single headline statistic in the KPI strip."""
+    """A single headline statistic in the KPI strip.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.document import KPI
+    >>> KPI.__name__
+    'KPI'
+    """
 
     label: str
     value: str
@@ -59,7 +72,14 @@ class KPI:
 
 @dataclass
 class Section:
-    """A titled block of body HTML, optionally with a subtitle line."""
+    """A titled block of body HTML, optionally with a subtitle line.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.document import Section
+    >>> Section.__name__
+    'Section'
+    """
 
     title: str
     body: str
@@ -68,7 +88,14 @@ class Section:
 
 @dataclass
 class TearSheet:
-    """A composed report. Renders to scoped-fragment or standalone HTML."""
+    """A composed report. Renders to scoped-fragment or standalone HTML.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.document import TearSheet
+    >>> TearSheet.__name__
+    'TearSheet'
+    """
 
     theme: Theme
     title: str
@@ -135,7 +162,13 @@ class TearSheet:
         return self.theme.to_css(_SCOPE) + self._body_fragment() + _TOOLTIP_JS
 
     def to_html(self) -> str:
-        """Full standalone HTML document."""
+        """Full standalone HTML document.
+
+        Returns:
+        -------
+        str
+            Result of to html for this `TearSheet` in the annotated representation.
+        """
         return (
             "<!DOCTYPE html>\n"
             '<html lang="en"><head><meta charset="utf-8">'
@@ -152,6 +185,11 @@ class TearSheet:
         ----------
         path : str or os.PathLike[str]
             Destination HTML file path; existing content is replaced.
+
+        Raises:
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         with Path(path).open("w", encoding="utf-8") as fh:
             fh.write(self.to_html())

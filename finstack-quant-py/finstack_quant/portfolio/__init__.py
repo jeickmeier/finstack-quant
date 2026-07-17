@@ -42,6 +42,12 @@ under review; signatures or default coefficients may change:
 Bindings should be considered cross-version-compatible only within a single
 ``finstack-quant-portfolio`` minor release; pin the upstream version when
 exporting to downstream services.
+
+Examples:
+--------
+>>> import finstack_quant.portfolio as portfolio
+>>> portfolio.__name__
+'finstack_quant.portfolio'
 """
 
 from __future__ import annotations

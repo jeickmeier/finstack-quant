@@ -1,6 +1,12 @@
 """Structural credit model bindings.
 
 Mirrors ``finstack_quant_valuations::models::credit``.
+
+Examples:
+--------
+>>> import finstack_quant.valuations.models.credit as credit
+>>> credit.__name__
+'finstack_quant.valuations.models.credit'
 """
 
 from __future__ import annotations

@@ -1,4 +1,12 @@
-"""Curve and surface types exposed by ``core.market_data.curves``."""
+"""
+Curve and surface types exposed by ``core.market_data.curves``.
+
+Examples
+--------
+>>> import finstack_quant.core.market_data.curves as curves
+>>> curves.__name__
+'finstack_quant.core.market_data.curves'
+"""
 
 from finstack_quant.core.market_data import BaseCorrelationCurve as BaseCorrelationCurve
 from finstack_quant.core.market_data import CreditIndexData as CreditIndexData

@@ -5,6 +5,12 @@ Pure presentation over ``analytics.Performance`` (the engine computes; this
 formats). Decimal metrics are scaled x100 only for percent display, matching the
 ``performance.py`` idiom. Mirrors ``performance_tearsheet``: pass a ``Performance``
 built with a benchmark column and select the fund with ``ticker``.
+
+Examples:
+--------
+>>> import finstack_quant.reporting.benchmark as benchmark
+>>> benchmark.__name__
+'finstack_quant.reporting.benchmark'
 """
 
 from __future__ import annotations
@@ -185,6 +191,17 @@ def benchmark_tearsheet(
     ------
     ValueError
         If ``sections`` contains an unknown section name.
+
+    Returns:
+    -------
+    TearSheet
+        Result of benchmark tearsheet for the binding in the annotated representation.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.benchmark import benchmark_tearsheet
+    >>> callable(benchmark_tearsheet)
+    True
     """
     wanted = sections if sections is not None else ALL_SECTIONS
     unknown = set(wanted) - set(ALL_SECTIONS)

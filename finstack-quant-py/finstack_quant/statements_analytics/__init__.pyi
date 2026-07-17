@@ -1,4 +1,12 @@
-"""Statement analysis: sensitivity, variance, scenarios, backtesting, goal seek, DCF, corporate, Monte Carlo, reports, introspection."""
+"""
+Statement analysis: sensitivity, variance, scenarios, backtesting, goal seek, DCF, corporate, Monte Carlo, reports, introspection.
+
+Examples
+--------
+>>> import finstack_quant.statements_analytics as statements_analytics
+>>> statements_analytics.__name__
+'finstack_quant.statements_analytics'
+"""
 
 from __future__ import annotations
 
@@ -86,7 +94,8 @@ __all__ = [
 ]
 
 class SensitivityConfig:
-    """Configure deterministic sensitivity scenarios for a statement model.
+    """
+    Configure deterministic sensitivity scenarios for a statement model.
 
     Parameters
     ----------
@@ -98,34 +107,116 @@ class SensitivityConfig:
     target_metrics : list[str]
         Output node IDs to collect for every generated scenario; defaults to
         an empty result selection.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import SensitivityConfig
+    >>> SensitivityConfig.__name__
+    'SensitivityConfig'
     """
     def __init__(
         self,
         mode: str,
         parameters: list[tuple[str, str, float, list[float]]] = ...,
         target_metrics: list[str] = ...,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `SensitivityConfig`.
+
+        Parameters
+        ----------
+        mode : object
+            Supported selector string or enum value controlling the documented behavior.
+        parameters : object
+            Value supplied for `parameters` to the documented binding operation.
+        target_metrics : object
+            Value supplied for `target_metrics` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> SensitivityConfig:
-        """Deserialize a sensitivity configuration from canonical JSON.
+        """
+        Deserialize a sensitivity configuration from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload produced by ``to_json`` or following the
             ``SensitivityConfig`` schema.
+
+        Returns
+        -------
+        SensitivityConfig
+            Validated `SensitivityConfig` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import SensitivityConfig
+        >>> callable(SensitivityConfig.from_json)
+        True
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `SensitivityConfig` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `SensitivityConfig`, suitable for a matching `from_json` call.
+        """
+        ...
+
     @property
-    def mode(self) -> str: ...
+    def mode(self) -> str:
+        """
+        Return the mode for `SensitivityConfig`.
+
+        Returns
+        -------
+        str
+            The mode exposed by this `SensitivityConfig`.
+        """
+        ...
+
     @property
-    def target_metrics(self) -> list[str]: ...
+    def target_metrics(self) -> list[str]:
+        """
+        Return the target metrics for `SensitivityConfig`.
+
+        Returns
+        -------
+        list[str]
+            The target metrics exposed by this `SensitivityConfig`.
+        """
+        ...
+
     @property
-    def parameter_count(self) -> int: ...
+    def parameter_count(self) -> int:
+        """
+        Return the parameter count for `SensitivityConfig`.
+
+        Returns
+        -------
+        int
+            The parameter count exposed by this `SensitivityConfig`.
+        """
+        ...
 
 class VarianceConfig:
-    """Define the labels, metrics, and periods for a variance comparison.
+    """
+    Define the labels, metrics, and periods for a variance comparison.
 
     Parameters
     ----------
@@ -137,6 +228,12 @@ class VarianceConfig:
         Statement node IDs whose absolute and percentage variances are shown.
     periods : list[str]
         Model period labels to include in the variance report, in report order.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import VarianceConfig
+    >>> VarianceConfig.__name__
+    'VarianceConfig'
     """
     def __init__(
         self,
@@ -144,30 +241,118 @@ class VarianceConfig:
         comparison_label: str,
         metrics: list[str],
         periods: list[str],
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `VarianceConfig`.
+
+        Parameters
+        ----------
+        baseline_label : object
+            Value supplied for `baseline_label` to the documented binding operation.
+        comparison_label : object
+            Value supplied for `comparison_label` to the documented binding operation.
+        metrics : object
+            Value supplied for `metrics` to the documented binding operation.
+        periods : object
+            Value supplied for `periods` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> VarianceConfig:
-        """Deserialize a variance configuration from canonical JSON.
+        """
+        Deserialize a variance configuration from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload describing the baseline, comparison, metrics, and
             periods to report.
+
+        Returns
+        -------
+        VarianceConfig
+            Validated `VarianceConfig` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import VarianceConfig
+        >>> callable(VarianceConfig.from_json)
+        True
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `VarianceConfig` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `VarianceConfig`, suitable for a matching `from_json` call.
+        """
+        ...
+
     @property
-    def baseline_label(self) -> str: ...
+    def baseline_label(self) -> str:
+        """
+        Return the baseline label for `VarianceConfig`.
+
+        Returns
+        -------
+        str
+            The baseline label exposed by this `VarianceConfig`.
+        """
+        ...
+
     @property
-    def comparison_label(self) -> str: ...
+    def comparison_label(self) -> str:
+        """
+        Return the comparison label for `VarianceConfig`.
+
+        Returns
+        -------
+        str
+            The comparison label exposed by this `VarianceConfig`.
+        """
+        ...
+
     @property
-    def metrics(self) -> list[str]: ...
+    def metrics(self) -> list[str]:
+        """
+        Return the metrics for `VarianceConfig`.
+
+        Returns
+        -------
+        list[str]
+            The metrics exposed by this `VarianceConfig`.
+        """
+        ...
+
     @property
-    def periods(self) -> list[str]: ...
+    def periods(self) -> list[str]:
+        """
+        Return the periods for `VarianceConfig`.
+
+        Returns
+        -------
+        list[str]
+            The periods exposed by this `VarianceConfig`.
+        """
+        ...
 
 class ScenarioSet:
-    """Name statement-model scenarios and optional parent/model relationships.
+    """
+    Name statement-model scenarios and optional parent/model relationships.
 
     Parameters
     ----------
@@ -179,29 +364,91 @@ class ScenarioSet:
         scenarios have no parent.
     model_ids : dict[str, str] or None
         Optional mapping from scenario name to the model ID it targets.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import ScenarioSet
+    >>> ScenarioSet.__name__
+    'ScenarioSet'
     """
     def __init__(
         self,
         scenarios: dict[str, dict[str, float]],
         parents: dict[str, str] | None = ...,
         model_ids: dict[str, str] | None = ...,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `ScenarioSet`.
+
+        Parameters
+        ----------
+        scenarios : object
+            Value supplied for `scenarios` to the documented binding operation.
+        parents : object
+            Value supplied for `parents` to the documented binding operation.
+        model_ids : object
+            Value supplied for `model_ids` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> ScenarioSet:
-        """Deserialize a named scenario set from canonical JSON.
+        """
+        Deserialize a named scenario set from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing scenario overrides and optional hierarchy.
+
+        Returns
+        -------
+        ScenarioSet
+            Validated `ScenarioSet` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import ScenarioSet
+        >>> callable(ScenarioSet.from_json)
+        True
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `ScenarioSet` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `ScenarioSet`, suitable for a matching `from_json` call.
+        """
+        ...
+
     @property
-    def names(self) -> list[str]: ...
+    def names(self) -> list[str]:
+        """
+        Return the names for `ScenarioSet`.
+
+        Returns
+        -------
+        list[str]
+            The names exposed by this `ScenarioSet`.
+        """
+        ...
 
 class MonteCarloConfig:
-    """Set reproducible Monte Carlo sampling and retained-output options.
+    """
+    Set reproducible Monte Carlo sampling and retained-output options.
 
     Parameters
     ----------
@@ -215,6 +462,12 @@ class MonteCarloConfig:
         ``None`` uses the engine defaults.
     include_path_data : bool
         Whether to retain individual path data in addition to summary outputs.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import MonteCarloConfig
+    >>> MonteCarloConfig.__name__
+    'MonteCarloConfig'
     """
     def __init__(
         self,
@@ -222,46 +475,181 @@ class MonteCarloConfig:
         seed: int,
         percentiles: list[float] | None = ...,
         include_path_data: bool = ...,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `MonteCarloConfig`.
+
+        Parameters
+        ----------
+        n_paths : object
+            Value supplied for `n_paths` to the documented binding operation.
+        seed : object
+            Value supplied for `seed` to the documented binding operation.
+        percentiles : object
+            Value supplied for `percentiles` to the documented binding operation.
+        include_path_data : object
+            Value supplied for `include_path_data` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> MonteCarloConfig:
-        """Deserialize Monte Carlo sampling settings from canonical JSON.
+        """
+        Deserialize Monte Carlo sampling settings from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload describing paths, seed, percentile levels, and output
             retention.
+
+        Returns
+        -------
+        MonteCarloConfig
+            Validated `MonteCarloConfig` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import MonteCarloConfig
+        >>> callable(MonteCarloConfig.from_json)
+        True
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `MonteCarloConfig` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `MonteCarloConfig`, suitable for a matching `from_json` call.
+        """
+        ...
+
     @property
-    def n_paths(self) -> int: ...
+    def n_paths(self) -> int:
+        """
+        Return the n paths for `MonteCarloConfig`.
+
+        Returns
+        -------
+        int
+            The n paths exposed by this `MonteCarloConfig`.
+        """
+        ...
+
     @property
-    def seed(self) -> int: ...
+    def seed(self) -> int:
+        """
+        Return the seed for `MonteCarloConfig`.
+
+        Returns
+        -------
+        int
+            The seed exposed by this `MonteCarloConfig`.
+        """
+        ...
+
     @property
-    def percentiles(self) -> list[float]: ...
+    def percentiles(self) -> list[float]:
+        """
+        Return the percentiles for `MonteCarloConfig`.
+
+        Returns
+        -------
+        list[float]
+            The percentiles exposed by this `MonteCarloConfig`.
+        """
+        ...
+
     @property
-    def include_path_data(self) -> bool: ...
+    def include_path_data(self) -> bool:
+        """
+        Return the include path data for `MonteCarloConfig`.
+
+        Returns
+        -------
+        bool
+            The include path data exposed by this `MonteCarloConfig`.
+        """
+        ...
 
 class SensitivityResult:
+    """
+    Compute SensitivityResult.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import SensitivityResult
+    >>> SensitivityResult.__name__
+    'SensitivityResult'
+    """
+
     @staticmethod
     def from_json(json: str) -> SensitivityResult:
-        """Deserialize a sensitivity-analysis result from canonical JSON.
+        """
+        Deserialize a sensitivity-analysis result from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload returned by ``run_sensitivity`` or an equivalent
             serialized Rust result.
+
+        Returns
+        -------
+        SensitivityResult
+            Validated `SensitivityResult` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import SensitivityResult
+        >>> callable(SensitivityResult.from_json)
+        True
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `SensitivityResult` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `SensitivityResult`, suitable for a matching `from_json` call.
+        """
+        ...
+
     def __len__(self) -> int: ...
     @property
-    def target_metrics(self) -> list[str]: ...
+    def target_metrics(self) -> list[str]:
+        """
+        Return the target metrics for `SensitivityResult`.
+
+        Returns
+        -------
+        list[str]
+            The target metrics exposed by this `SensitivityResult`.
+        """
+        ...
+
     def get_parameter_value(self, scenario_index: int, parameter: str) -> float | None:
-        """Return one shocked parameter value for a generated scenario.
+        """
+        Return one shocked parameter value for a generated scenario.
 
         Parameters
         ----------
@@ -269,10 +657,21 @@ class SensitivityResult:
             Zero-based position of the generated scenario in result order.
         parameter : str
             Parameter identifier configured in the sensitivity specification.
+
+        Returns
+        -------
+        float | None
+            Requested parameter value resolved from this `SensitivityResult` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     def get_value(self, scenario_index: int, node_id: str, period: str) -> float | None:
-        """Return one scenario output value when it is available.
+        """
+        Return one scenario output value when it is available.
 
         Parameters
         ----------
@@ -282,87 +681,358 @@ class SensitivityResult:
             Statement node ID whose simulated value is requested.
         period : str
             Model period label for the requested node value.
+
+        Returns
+        -------
+        float | None
+            Requested value resolved from this `SensitivityResult` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 class VarianceRow:
+    """
+    Compute VarianceRow.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import VarianceRow
+    >>> VarianceRow.__name__
+    'VarianceRow'
+    """
+
     @property
-    def period(self) -> str: ...
+    def period(self) -> str:
+        """
+        Return the period for `VarianceRow`.
+
+        Returns
+        -------
+        str
+            The period exposed by this `VarianceRow`.
+        """
+        ...
+
     @property
-    def metric(self) -> str: ...
+    def metric(self) -> str:
+        """
+        Return the metric for `VarianceRow`.
+
+        Returns
+        -------
+        str
+            The metric exposed by this `VarianceRow`.
+        """
+        ...
+
     @property
-    def baseline(self) -> float: ...
+    def baseline(self) -> float:
+        """
+        Return the baseline for `VarianceRow`.
+
+        Returns
+        -------
+        float
+            The baseline exposed by this `VarianceRow`.
+        """
+        ...
+
     @property
-    def comparison(self) -> float: ...
+    def comparison(self) -> float:
+        """
+        Return the comparison for `VarianceRow`.
+
+        Returns
+        -------
+        float
+            The comparison exposed by this `VarianceRow`.
+        """
+        ...
+
     @property
-    def abs_var(self) -> float: ...
+    def abs_var(self) -> float:
+        """
+        Return the abs var for `VarianceRow`.
+
+        Returns
+        -------
+        float
+            The abs var exposed by this `VarianceRow`.
+        """
+        ...
+
     @property
-    def pct_var(self) -> float | None: ...
+    def pct_var(self) -> float | None:
+        """
+        Return the pct var for `VarianceRow`.
+
+        Returns
+        -------
+        float | None
+            The pct var exposed by this `VarianceRow`.
+        """
+        ...
 
 class VarianceReport:
+    """
+    Compute VarianceReport.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import VarianceReport
+    >>> VarianceReport.__name__
+    'VarianceReport'
+    """
+
     @staticmethod
     def from_json(json: str) -> VarianceReport:
-        """Deserialize a variance report from canonical JSON.
+        """
+        Deserialize a variance report from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload returned by ``run_variance`` or a serialized report.
+
+        Returns
+        -------
+        VarianceReport
+            Validated `VarianceReport` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import VarianceReport
+        >>> callable(VarianceReport.from_json)
+        True
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `VarianceReport` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `VarianceReport`, suitable for a matching `from_json` call.
+        """
+        ...
+
     @property
-    def baseline_label(self) -> str: ...
+    def baseline_label(self) -> str:
+        """
+        Return the baseline label for `VarianceReport`.
+
+        Returns
+        -------
+        str
+            The baseline label exposed by this `VarianceReport`.
+        """
+        ...
+
     @property
-    def comparison_label(self) -> str: ...
+    def comparison_label(self) -> str:
+        """
+        Return the comparison label for `VarianceReport`.
+
+        Returns
+        -------
+        str
+            The comparison label exposed by this `VarianceReport`.
+        """
+        ...
+
     @property
-    def rows(self) -> list[VarianceRow]: ...
+    def rows(self) -> list[VarianceRow]:
+        """
+        Return the rows for `VarianceReport`.
+
+        Returns
+        -------
+        list[VarianceRow]
+            The rows exposed by this `VarianceReport`.
+        """
+        ...
 
 class ScenarioResultSet:
+    """
+    Compute ScenarioResultSet.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import ScenarioResultSet
+    >>> ScenarioResultSet.__name__
+    'ScenarioResultSet'
+    """
+
     @staticmethod
     def from_json(json: str) -> ScenarioResultSet:
-        """Deserialize evaluated scenario results from canonical JSON.
+        """
+        Deserialize evaluated scenario results from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload mapping scenario names to their statement results.
+
+        Returns
+        -------
+        ScenarioResultSet
+            Validated `ScenarioResultSet` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import ScenarioResultSet
+        >>> callable(ScenarioResultSet.from_json)
+        True
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `ScenarioResultSet` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `ScenarioResultSet`, suitable for a matching `from_json` call.
+        """
+        ...
+
     @property
-    def names(self) -> list[str]: ...
+    def names(self) -> list[str]:
+        """
+        Return the names for `ScenarioResultSet`.
+
+        Returns
+        -------
+        list[str]
+            The names exposed by this `ScenarioResultSet`.
+        """
+        ...
+
     def get(self, name: str) -> StatementResult | None:
-        """Return the statement result for one named scenario.
+        """
+        Return the statement result for one named scenario.
 
         Parameters
         ----------
         name : str
             Scenario name as defined in the input ``ScenarioSet``.
+
+        Returns
+        -------
+        StatementResult | None
+            Result of get for this `ScenarioResultSet` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 class MonteCarloResults:
+    """
+    Compute MonteCarloResults.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import MonteCarloResults
+    >>> MonteCarloResults.__name__
+    'MonteCarloResults'
+    """
+
     @staticmethod
     def from_json(json: str) -> MonteCarloResults:
-        """Deserialize Monte Carlo output from canonical JSON.
+        """
+        Deserialize Monte Carlo output from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload returned by ``run_monte_carlo`` or a serialized
             simulation result.
+
+        Returns
+        -------
+        MonteCarloResults
+            Validated `MonteCarloResults` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import MonteCarloResults
+        >>> callable(MonteCarloResults.from_json)
+        True
         """
         ...
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """
+        Serialize `MonteCarloResults` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `MonteCarloResults`, suitable for a matching `from_json` call.
+        """
+        ...
+
     @property
-    def n_paths(self) -> int: ...
+    def n_paths(self) -> int:
+        """
+        Return the n paths for `MonteCarloResults`.
+
+        Returns
+        -------
+        int
+            The n paths exposed by this `MonteCarloResults`.
+        """
+        ...
+
     @property
-    def percentiles(self) -> list[float]: ...
+    def percentiles(self) -> list[float]:
+        """
+        Return the percentiles for `MonteCarloResults`.
+
+        Returns
+        -------
+        list[float]
+            The percentiles exposed by this `MonteCarloResults`.
+        """
+        ...
+
     @property
-    def forecast_periods(self) -> list[str]: ...
+    def forecast_periods(self) -> list[str]:
+        """
+        Return the forecast periods for `MonteCarloResults`.
+
+        Returns
+        -------
+        list[str]
+            The forecast periods exposed by this `MonteCarloResults`.
+        """
+        ...
+
     def get_percentile_series(self, metric: str, percentile: float) -> dict[str, float] | None:
-        """Return the requested metric's values at one percentile level.
+        """
+        Return the requested metric's values at one percentile level.
 
         Parameters
         ----------
@@ -370,6 +1040,16 @@ class MonteCarloResults:
             Statement metric or node ID stored in the simulation result.
         percentile : float
             Percentile as a decimal probability, such as ``0.95`` for P95.
+
+        Returns
+        -------
+        dict[str, float] | None
+            Requested percentile series resolved from this `MonteCarloResults` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -377,7 +1057,8 @@ def run_sensitivity(
     model: FinancialModelSpec | str,
     config: SensitivityConfig | str,
 ) -> SensitivityResult:
-    """Run sensitivity analysis on a financial model.
+    """
+    Run sensitivity analysis on a financial model.
 
     Parameters
     ----------
@@ -395,6 +1076,11 @@ def run_sensitivity(
     --------
     >>> from finstack_quant.statements_analytics import run_sensitivity
     >>> out = run_sensitivity(model, config)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -403,7 +1089,8 @@ def generate_tornado_entries(
     metric_node: str,
     period: str | None = None,
 ) -> str:
-    """Build tornado chart entries from a sensitivity result (JSON in/out).
+    """
+    Build tornado chart entries from a sensitivity result (JSON in/out).
 
     Parameters
     ----------
@@ -423,6 +1110,11 @@ def generate_tornado_entries(
     --------
     >>> from finstack_quant.statements_analytics import generate_tornado_entries
     >>> entries_json = generate_tornado_entries(res_json, "ebitda", "2025Q4")  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -431,7 +1123,8 @@ def run_variance(
     comparison: StatementResult | str,
     config: VarianceConfig | str,
 ) -> VarianceReport:
-    """Run variance analysis comparing two statement results.
+    """
+    Run variance analysis comparing two statement results.
 
     Parameters
     ----------
@@ -451,6 +1144,11 @@ def run_variance(
     --------
     >>> from finstack_quant.statements_analytics import run_variance
     >>> report = run_variance(base, comparison, config)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -458,7 +1156,8 @@ def evaluate_scenario_set(
     model: FinancialModelSpec | str,
     scenario_set: ScenarioSet | str,
 ) -> ScenarioResultSet:
-    """Evaluate every scenario in a scenario set against a model.
+    """
+    Evaluate every scenario in a scenario set against a model.
 
     Parameters
     ----------
@@ -476,6 +1175,11 @@ def evaluate_scenario_set(
     --------
     >>> from finstack_quant.statements_analytics import evaluate_scenario_set
     >>> results = evaluate_scenario_set(model, scenario_set)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -483,7 +1187,8 @@ def run_monte_carlo(
     model: FinancialModelSpec | str,
     config: MonteCarloConfig | str,
 ) -> MonteCarloResults:
-    """Run Monte Carlo simulation on a financial model.
+    """
+    Run Monte Carlo simulation on a financial model.
 
     Parameters
     ----------
@@ -501,11 +1206,17 @@ def run_monte_carlo(
     --------
     >>> from finstack_quant.statements_analytics import run_monte_carlo
     >>> results = run_monte_carlo(model, config)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def backtest_forecast(actual: list[float], forecast: list[float]) -> dict[str, float | int]:
-    """Compute forecast accuracy metrics (MAE, MAPE, RMSE).
+    """
+    Compute forecast accuracy metrics (MAE, MAPE, RMSE).
 
     Parameters
     ----------
@@ -524,6 +1235,11 @@ def backtest_forecast(actual: list[float], forecast: list[float]) -> dict[str, f
     >>> from finstack_quant.statements_analytics import backtest_forecast
     >>> backtest_forecast([1.0, 2.0], [1.1, 1.9])["mae"]
     0.1
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -537,7 +1253,8 @@ def goal_seek(
     update_model: bool = True,
     bounds: tuple[float, float] | None = None,
 ) -> tuple[float, str | None]:
-    """Find the driver value that makes a target node hit a target value.
+    """
+    Find the driver value that makes a target node hit a target value.
 
     Parameters
     ----------
@@ -568,6 +1285,11 @@ def goal_seek(
     --------
     >>> from finstack_quant.statements_analytics import goal_seek
     >>> solved, new_model = goal_seek(mj, "ni", "2025", 10.0, "rev", "2025")  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -583,7 +1305,8 @@ def evaluate_dcf(
     valuation_discounts_json: str | None = None,
     market: MarketContext | str | None = None,
 ) -> dict[str, float | str]:
-    """Evaluate DCF valuation on a financial model.
+    """
+    Evaluate DCF valuation on a financial model.
 
     Parameters
     ----------
@@ -618,6 +1341,11 @@ def evaluate_dcf(
     --------
     >>> from finstack_quant.statements_analytics import evaluate_dcf
     >>> dcf = evaluate_dcf(mj, 0.09, tv_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -630,7 +1358,8 @@ def run_corporate_analysis(
     market: MarketContext | str | None = None,
     as_of: str | None = None,
 ) -> dict[str, Any]:
-    """Run statements plus optional DCF equity and credit context.
+    """
+    Run statements plus optional DCF equity and credit context.
 
     Parameters
     ----------
@@ -659,6 +1388,11 @@ def run_corporate_analysis(
     --------
     >>> from finstack_quant.statements_analytics import run_corporate_analysis
     >>> out = run_corporate_analysis(model_json, wacc=0.1, terminal_value_json=tv_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -667,7 +1401,8 @@ def pl_summary_report(
     line_items: list[str],
     periods: list[str],
 ) -> str:
-    """Render a P&L summary report as formatted text.
+    """
+    Render a P&L summary report as formatted text.
 
     Parameters
     ----------
@@ -687,11 +1422,17 @@ def pl_summary_report(
     --------
     >>> from finstack_quant.statements_analytics import pl_summary_report
     >>> text = pl_summary_report(res_json, ["rev", "cogs"], ["2025Q1"])  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def credit_assessment_report(results: StatementResult | str, as_of: str) -> str:
-    """Render a credit assessment report as formatted text.
+    """
+    Render a credit assessment report as formatted text.
 
     Parameters
     ----------
@@ -709,11 +1450,17 @@ def credit_assessment_report(results: StatementResult | str, as_of: str) -> str:
     --------
     >>> from finstack_quant.statements_analytics import credit_assessment_report
     >>> report = credit_assessment_report(res_json, "2025Q1")  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def credit_assessment(results: StatementResult | str, as_of: str) -> dict[str, Any]:
-    """Compute a structured credit assessment (leverage, coverage, FCF).
+    """
+    Compute a structured credit assessment (leverage, coverage, FCF).
 
     Parameters
     ----------
@@ -733,11 +1480,17 @@ def credit_assessment(results: StatementResult | str, as_of: str) -> dict[str, A
     --------
     >>> from finstack_quant.statements_analytics import credit_assessment
     >>> out = credit_assessment(res_json, "2025Q4")  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 class DependencyTracer:
-    """Reusable dependency tracer for a financial model.
+    """
+    Reusable dependency tracer for a financial model.
 
     Parameters
     ----------
@@ -751,16 +1504,23 @@ class DependencyTracer:
     """
 
     def __init__(self, model: FinancialModelSpec | str) -> None:
-        """Create a dependency tracer for the given model.
+        """
+        Create a dependency tracer for the given model.
 
         Parameters
         ----------
         model : FinancialModelSpec or str
             ``FinancialModelSpec`` object or JSON string.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     def dependency_tree(self, node_id: str) -> str:
-        """Return an ASCII dependency tree for ``node_id``.
+        """
+        Return an ASCII dependency tree for ``node_id``.
 
         Parameters
         ----------
@@ -770,11 +1530,18 @@ class DependencyTracer:
         Returns
         -------
         str
+            Result of dependency tree for this `DependencyTracer` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def dependency_tree_detailed(self, results: StatementResult | str, node_id: str, period: str) -> str:
-        """Return an ASCII dependency tree annotated with values for one period.
+        """
+        Return an ASCII dependency tree annotated with values for one period.
 
         Parameters
         ----------
@@ -788,11 +1555,18 @@ class DependencyTracer:
         Returns
         -------
         str
+            Result of dependency tree detailed for this `DependencyTracer` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
     def direct_dependencies(self, node_id: str) -> list[str]:
-        """List immediate dependencies of ``node_id``.
+        """
+        List immediate dependencies of ``node_id``.
 
         Parameters
         ----------
@@ -802,10 +1576,17 @@ class DependencyTracer:
         Returns
         -------
         list[str]
+            Result of direct dependencies for this `DependencyTracer` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     def all_dependencies(self, node_id: str) -> list[str]:
-        """List all transitive dependencies of ``node_id``.
+        """
+        List all transitive dependencies of ``node_id``.
 
         Parameters
         ----------
@@ -815,10 +1596,17 @@ class DependencyTracer:
         Returns
         -------
         list[str]
+            Result of all dependencies for this `DependencyTracer` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     def dependents(self, node_id: str) -> list[str]:
-        """List nodes that depend on ``node_id``.
+        """
+        List nodes that depend on ``node_id``.
 
         Parameters
         ----------
@@ -828,11 +1616,18 @@ class DependencyTracer:
         Returns
         -------
         list[str]
+            Result of dependents for this `DependencyTracer` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 def direct_dependencies(model: FinancialModelSpec | str, node_id: str) -> list[str]:
-    """List immediate dependencies of a node.
+    """
+    List immediate dependencies of a node.
 
     Parameters
     ----------
@@ -850,11 +1645,17 @@ def direct_dependencies(model: FinancialModelSpec | str, node_id: str) -> list[s
     --------
     >>> from finstack_quant.statements_analytics import direct_dependencies
     >>> deps = direct_dependencies(model_json, "ebitda")  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def all_dependencies(model: FinancialModelSpec | str, node_id: str) -> list[str]:
-    """List all transitive dependencies of a node in dependency order.
+    """
+    List all transitive dependencies of a node in dependency order.
 
     Parameters
     ----------
@@ -872,11 +1673,17 @@ def all_dependencies(model: FinancialModelSpec | str, node_id: str) -> list[str]
     --------
     >>> from finstack_quant.statements_analytics import all_dependencies
     >>> chain = all_dependencies(model_json, "ni")  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def dependents(model: FinancialModelSpec | str, node_id: str) -> list[str]:
-    """List nodes that depend on the given node (reverse dependencies).
+    """
+    List nodes that depend on the given node (reverse dependencies).
 
     Parameters
     ----------
@@ -894,6 +1701,11 @@ def dependents(model: FinancialModelSpec | str, node_id: str) -> list[str]:
     --------
     >>> from finstack_quant.statements_analytics import dependents
     >>> rev_deps = dependents(model_json, "rev")  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -903,7 +1715,8 @@ def explain_formula(
     node_id: str,
     period: str,
 ) -> dict[str, Any]:
-    """Structured formula explanation for a node and period.
+    """
+    Structured formula explanation for a node and period.
 
     Parameters
     ----------
@@ -926,6 +1739,11 @@ def explain_formula(
     --------
     >>> from finstack_quant.statements_analytics import explain_formula
     >>> detail = explain_formula(mj, rj, "rev", "2025Q1")  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -935,7 +1753,8 @@ def explain_formula_text(
     node_id: str,
     period: str,
 ) -> str:
-    """Human-readable multi-line formula explanation.
+    """
+    Human-readable multi-line formula explanation.
 
     Parameters
     ----------
@@ -957,6 +1776,11 @@ def explain_formula_text(
     --------
     >>> from finstack_quant.statements_analytics import explain_formula_text
     >>> text = explain_formula_text(mj, rj, "rev", "2025Q1")  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -965,7 +1789,8 @@ def run_checks(
     suite_spec_json: str,
     results: StatementResult | str | None = None,
 ) -> str:
-    """Run checks from a suite spec against a model (JSON in/out).
+    """
+    Run checks from a suite spec against a model (JSON in/out).
 
     Resolves both built-in and formula checks, evaluates the model,
     and returns a full check report.
@@ -989,6 +1814,11 @@ def run_checks(
     --------
     >>> from finstack_quant.statements_analytics import run_checks
     >>> report_json = run_checks(model_json, suite_spec_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -997,7 +1827,8 @@ def run_three_statement_checks(
     mapping_json: str,
     results: StatementResult | str | None = None,
 ) -> str:
-    """Run three-statement checks using a node mapping (JSON in/out).
+    """
+    Run three-statement checks using a node mapping (JSON in/out).
 
     Parameters
     ----------
@@ -1018,6 +1849,11 @@ def run_three_statement_checks(
     --------
     >>> from finstack_quant.statements_analytics import run_three_statement_checks
     >>> report_json = run_three_statement_checks(model_json, mapping_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -1026,7 +1862,8 @@ def run_credit_underwriting_checks(
     mapping_json: str,
     results: StatementResult | str | None = None,
 ) -> str:
-    """Run credit underwriting checks using a node mapping (JSON in/out).
+    """
+    Run credit underwriting checks using a node mapping (JSON in/out).
 
     Parameters
     ----------
@@ -1047,11 +1884,17 @@ def run_credit_underwriting_checks(
     --------
     >>> from finstack_quant.statements_analytics import run_credit_underwriting_checks
     >>> report_json = run_credit_underwriting_checks(model_json, mapping_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def render_check_report_text(report_json: str) -> str:
-    """Render a check report as plain text.
+    """
+    Render a check report as plain text.
 
     Parameters
     ----------
@@ -1067,11 +1910,17 @@ def render_check_report_text(report_json: str) -> str:
     --------
     >>> from finstack_quant.statements_analytics import render_check_report_text
     >>> text = render_check_report_text(report_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def render_check_report_html(report_json: str) -> str:
-    """Render a check report as HTML with inline styles.
+    """
+    Render a check report as HTML with inline styles.
 
     Parameters
     ----------
@@ -1087,11 +1936,17 @@ def render_check_report_html(report_json: str) -> str:
     --------
     >>> from finstack_quant.statements_analytics import render_check_report_html
     >>> html = render_check_report_html(report_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 class Exposure:
-    """A single credit exposure for ECL / IFRS 9 / CECL computation.
+    """
+    A single credit exposure for ECL / IFRS 9 / CECL computation.
 
     All monetary fields are in the exposure's base currency; all rates and
     probabilities are expressed as decimals (``0.05`` = 5%).
@@ -1140,7 +1995,35 @@ class Exposure:
         current_pd: float,
         origination_pd: float,
         dpd: int | None = None,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `Exposure`.
+
+        Parameters
+        ----------
+        id : object
+            Stable identifier used to select the required object or result entry.
+        ead : object
+            Value supplied for `ead` to the documented binding operation.
+        lgd : object
+            Value supplied for `lgd` to the documented binding operation.
+        eir : object
+            Value supplied for `eir` to the documented binding operation.
+        remaining_maturity : object
+            Value supplied for `remaining_maturity` to the documented binding operation.
+        current_pd : object
+            Value supplied for `current_pd` to the documented binding operation.
+        origination_pd : object
+            Value supplied for `origination_pd` to the documented binding operation.
+        dpd : object
+            Value supplied for `dpd` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
 
 def classify_stage(
     exposure: Exposure,
@@ -1148,7 +2031,8 @@ def classify_stage(
     dpd_30_trigger: bool | None = None,
     dpd_90_trigger: bool | None = None,
 ) -> tuple[str, str]:
-    """Classify an exposure into an IFRS 9 stage.
+    """
+    Classify an exposure into an IFRS 9 stage.
 
     Parameters
     ----------
@@ -1173,6 +2057,11 @@ def classify_stage(
     >>> exp = Exposure("loan_1", 1e6, 0.4, 0.05, 3.0, 0.02, 0.01)  # doctest: +SKIP
     >>> classify_stage(exp)  # doctest: +SKIP
     ('Stage 1', 'no_trigger')
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -1187,7 +2076,8 @@ def compute_ecl(
     ead_schedule: list[tuple[float, float]] | None = None,
     stage3_time_to_recovery_years: float | None = None,
 ) -> float:
-    """Compute single-scenario ECL for one exposure.
+    """
+    Compute single-scenario ECL for one exposure.
 
     Parameters
     ----------
@@ -1221,6 +2111,11 @@ def compute_ecl(
     --------
     >>> from finstack_quant.statements_analytics import compute_ecl
     >>> ecl = compute_ecl(1e6, [(1.0, 0.02), (3.0, 0.05)], 0.4, 0.05, 3.0)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -1234,7 +2129,8 @@ def compute_ecl_weighted(
     ead_schedule: list[tuple[float, float]] | None = None,
     stage3_time_to_recovery_years: float | None = None,
 ) -> float:
-    """Compute probability-weighted ECL across macro scenarios.
+    """
+    Compute probability-weighted ECL across macro scenarios.
 
     Parameters
     ----------
@@ -1267,6 +2163,11 @@ def compute_ecl_weighted(
     --------
     >>> from finstack_quant.statements_analytics import compute_ecl_weighted
     >>> ecl = compute_ecl_weighted(1e6, [(0.5, [(1.0, 0.01)]), (0.5, [(1.0, 0.03)])], 0.4, 0.05, 1.0)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -1275,7 +2176,8 @@ def compute_ecl_weighted(
 # ---------------------------------------------------------------------------
 
 def percentile_rank(value: float, peer_values: list[float]) -> float | None:
-    """Percentile rank of ``value`` within ``peer_values`` on a 0-1 scale.
+    """
+    Percentile rank of ``value`` within ``peer_values`` on a 0-1 scale.
 
     Parameters
     ----------
@@ -1294,11 +2196,17 @@ def percentile_rank(value: float, peer_values: list[float]) -> float | None:
     >>> from finstack_quant.statements_analytics import percentile_rank
     >>> percentile_rank(3.0, [1.0, 2.0, 3.0, 4.0, 5.0])
     0.5
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def z_score(value: float, peer_values: list[float]) -> float | None:
-    """Standard score of ``value`` within the peer distribution.
+    """
+    Standard score of ``value`` within the peer distribution.
 
     Parameters
     ----------
@@ -1317,11 +2225,17 @@ def z_score(value: float, peer_values: list[float]) -> float | None:
     >>> from finstack_quant.statements_analytics import z_score
     >>> round(z_score(3.0, [1.0, 2.0, 3.0, 4.0, 5.0]), 10)
     0.0
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
 def peer_stats(peer_values: list[float]) -> dict[str, float]:
-    """Descriptive statistics for a peer distribution.
+    """
+    Descriptive statistics for a peer distribution.
 
     Returns a dict with keys ``mean``, ``median``, ``q1``, ``q3``, ``iqr``,
     ``std_dev``, ``min``, ``max``, ``count`` (mirroring the Rust ``PeerStats``
@@ -1343,6 +2257,11 @@ def peer_stats(peer_values: list[float]) -> dict[str, float]:
     >>> stats = peer_stats([1.0, 2.0, 3.0, 4.0, 5.0])
     >>> stats["mean"]
     3.0
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -1352,7 +2271,8 @@ def regression_fair_value(
     subject_x: float,
     subject_y: float,
 ) -> dict[str, float]:
-    """Single-factor OLS regression fair value with canonical residual semantics.
+    """
+    Single-factor OLS regression fair value with canonical residual semantics.
 
     Parameters
     ----------
@@ -1374,6 +2294,11 @@ def regression_fair_value(
     --------
     >>> from finstack_quant.statements_analytics import regression_fair_value
     >>> result = regression_fair_value([1.0, 2.0, 3.0], [2.0, 4.0, 6.0], 2.5, 5.0)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -1381,7 +2306,8 @@ def compute_multiple(
     company_metrics: dict[str, float],
     multiple: str,
 ) -> float | None:
-    """Canonical multiple computation for one company.
+    """
+    Canonical multiple computation for one company.
 
     Parameters
     ----------
@@ -1400,6 +2326,11 @@ def compute_multiple(
     >>> from finstack_quant.statements_analytics import compute_multiple
     >>> compute_multiple({"ev": 100.0, "ebitda": 20.0}, "ev_ebitda")  # doctest: +SKIP
     5.0
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -1408,7 +2339,8 @@ def score_relative_value(
     peer_metrics: list[dict[str, float | None]],
     dimensions: list[tuple[str, float] | dict[str, Any]],
 ) -> dict[str, Any]:
-    """Composite relative-value score across weighted univariate or regression dimensions.
+    """
+    Composite relative-value score across weighted univariate or regression dimensions.
 
     Dimensions are ``(metric_name, weight)`` tuples or dicts with keys
     ``label``, ``y``, optional ``x`` (one selector or a list), optional
@@ -1440,6 +2372,11 @@ def score_relative_value(
     >>> result = score_relative_value(
     ...     {"ev_ebitda": 8.0}, [{"ev_ebitda": 6.0}, {"ev_ebitda": 10.0}], [("ev_ebitda", 1.0)]
     ... )  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
     """
     ...
 
@@ -1448,7 +2385,8 @@ def score_relative_value(
 # ---------------------------------------------------------------------------
 
 class ScorecardMetric:
-    """Define one weighted metric in a credit-rating scorecard.
+    """
+    Define one weighted metric in a credit-rating scorecard.
 
     Parameters
     ----------
@@ -1464,6 +2402,12 @@ class ScorecardMetric:
         defaults to an empty mapping.
     description : str or None
         Optional reader-facing explanation of the metric and its credit meaning.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import ScorecardMetric
+    >>> ScorecardMetric.__name__
+    'ScorecardMetric'
     """
 
     def __init__(
@@ -1473,72 +2417,125 @@ class ScorecardMetric:
         weight: float = 1.0,
         thresholds_json: str = "{}",
         description: str | None = None,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `ScorecardMetric`.
+
+        Parameters
+        ----------
+        name : object
+            Value supplied for `name` to the documented binding operation.
+        formula : object
+            Value supplied for `formula` to the documented binding operation.
+        weight : object
+            Portfolio weight expressed as a decimal fraction unless the API states otherwise.
+        thresholds_json : object
+            Canonical JSON payload parsed and validated by the underlying Rust API.
+        description : object
+            Value supplied for `description` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def name(self) -> str:
-        """Value of ``name``.
+        """
+        Value of ``name``.
 
         Returns
         -------
         str
+            The name exposed by this `ScorecardMetric`.
         """
         ...
     @property
     def formula(self) -> str:
-        """Value of ``formula``.
+        """
+        Value of ``formula``.
 
         Returns
         -------
         str
+            The formula exposed by this `ScorecardMetric`.
         """
         ...
     @property
     def weight(self) -> float:
-        """Value of ``weight``.
+        """
+        Value of ``weight``.
 
         Returns
         -------
         float
+            The weight exposed by this `ScorecardMetric`.
         """
         ...
     @property
     def description(self) -> str | None:
-        """Value of ``description``.
+        """
+        Value of ``description``.
 
         Returns
         -------
         str or None
+            The description exposed by this `ScorecardMetric`.
         """
         ...
     def thresholds_json(self) -> str:
-        """Value of ``thresholds_json``.
+        """
+        Value of ``thresholds_json``.
 
         Returns
         -------
         str
+            Result of thresholds json for this `ScorecardMetric` in the annotated representation.
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `ScorecardMetric`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> ScorecardMetric:
-        """Deserialize one scorecard metric from canonical JSON.
+        """
+        Deserialize one scorecard metric from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing metric formula, weight, and thresholds.
+
+        Returns
+        -------
+        ScorecardMetric
+            Validated `ScorecardMetric` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import ScorecardMetric
+        >>> callable(ScorecardMetric.from_json)
+        True
         """
         ...
 
 class ScorecardConfig:
-    """Configuration for credit scorecard analysis.
+    """
+    Configuration for credit scorecard analysis.
 
     ``period`` optionally pins the rated period (e.g. ``"2025Q4"``); when
     ``None`` the scorecard rates the last actual period in the model if any
@@ -1556,6 +2553,12 @@ class ScorecardConfig:
     period : str or None
         Optional model period to rate; ``None`` chooses the latest available
         actual or model period.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import ScorecardConfig
+    >>> ScorecardConfig.__name__
+    'ScorecardConfig'
     """
 
     def __init__(
@@ -1564,37 +2567,65 @@ class ScorecardConfig:
         metrics: list[ScorecardMetric] = ...,
         min_rating: str | None = None,
         period: str | None = None,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `ScorecardConfig`.
+
+        Parameters
+        ----------
+        rating_scale : object
+            Value supplied for `rating_scale` to the documented binding operation.
+        metrics : object
+            Value supplied for `metrics` to the documented binding operation.
+        min_rating : object
+            Value supplied for `min_rating` to the documented binding operation.
+        period : object
+            Value supplied for `period` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def rating_scale(self) -> str:
-        """Value of ``rating_scale``.
+        """
+        Value of ``rating_scale``.
 
         Returns
         -------
         str
+            The rating scale exposed by this `ScorecardConfig`.
         """
         ...
     @property
     def min_rating(self) -> str | None:
-        """Value of ``min_rating``.
+        """
+        Value of ``min_rating``.
 
         Returns
         -------
         str or None
+            The min rating exposed by this `ScorecardConfig`.
         """
         ...
     @property
     def period(self) -> str | None:
-        """Value of ``period``.
+        """
+        Value of ``period``.
 
         Returns
         -------
         str or None
+            The period exposed by this `ScorecardConfig`.
         """
         ...
     @property
     def metrics(self) -> list[ScorecardMetric]:
-        """Value of ``metrics``.
+        """
+        Value of ``metrics``.
 
         Returns
         -------
@@ -1602,7 +2633,8 @@ class ScorecardConfig:
         """
         ...
     def validate(self) -> None:
-        """Value of ``validate``.
+        """
+        Value of ``validate``.
 
         Returns
         -------
@@ -1610,100 +2642,164 @@ class ScorecardConfig:
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `ScorecardConfig`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> ScorecardConfig:
-        """Deserialize a credit-scorecard configuration from canonical JSON.
+        """
+        Deserialize a credit-scorecard configuration from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing scale, metrics, period selection, and
             optional minimum-rating policy.
+
+        Returns
+        -------
+        ScorecardConfig
+            Validated `ScorecardConfig` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import ScorecardConfig
+        >>> callable(ScorecardConfig.from_json)
+        True
         """
         ...
 
 class ScorecardReport:
-    """Report produced by ``CreditScorecardExtension.execute``.
+    """
+    Report produced by ``CreditScorecardExtension.execute``.
 
     ``data_json()`` includes the rated ``period``, the ``partial`` flag, and
     ``weight_coverage`` alongside the per-metric scores and rating.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import ScorecardReport
+    >>> ScorecardReport.__name__
+    'ScorecardReport'
     """
 
     @property
     def status(self) -> str:
-        """Value of ``status``.
+        """
+        Value of ``status``.
 
         Returns
         -------
         str
+            The status exposed by this `ScorecardReport`.
         """
         ...
     @property
     def message(self) -> str:
-        """Value of ``message``.
+        """
+        Value of ``message``.
 
         Returns
         -------
         str
+            The message exposed by this `ScorecardReport`.
         """
         ...
     @property
     def warnings(self) -> list[str]:
-        """Value of ``warnings``.
+        """
+        Value of ``warnings``.
 
         Returns
         -------
         list[str]
+            The warnings exposed by this `ScorecardReport`.
         """
         ...
     @property
     def errors(self) -> list[str]:
-        """Value of ``errors``.
+        """
+        Value of ``errors``.
 
         Returns
         -------
         list[str]
+            The errors exposed by this `ScorecardReport`.
         """
         ...
     def data_json(self) -> str:
-        """Value of ``data_json``.
+        """
+        Value of ``data_json``.
 
         Returns
         -------
         str
+            Result of data json for this `ScorecardReport` in the annotated representation.
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `ScorecardReport`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> ScorecardReport:
-        """Deserialize a credit-scorecard report from canonical JSON.
+        """
+        Deserialize a credit-scorecard report from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload returned by a scorecard extension execution.
+
+        Returns
+        -------
+        ScorecardReport
+            Validated `ScorecardReport` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import ScorecardReport
+        >>> callable(ScorecardReport.from_json)
+        True
         """
         ...
 
 class CreditScorecardExtension:
-    """Credit scorecard extension for rating assignment and stress testing."""
+    """
+    Credit scorecard extension for rating assignment and stress testing.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import CreditScorecardExtension
+    >>> CreditScorecardExtension.__name__
+    'CreditScorecardExtension'
+    """
 
     def __init__(self) -> None:
-        """Value of ``__init__``.
+        """
+        Value of ``__init__``.
 
         Returns
         -------
@@ -1712,25 +2808,49 @@ class CreditScorecardExtension:
         ...
     @staticmethod
     def with_config(config: ScorecardConfig) -> CreditScorecardExtension:
-        """Create a scorecard extension with a validated configuration.
+        """
+        Create a scorecard extension with a validated configuration.
 
         Parameters
         ----------
         config : ScorecardConfig
             Rating scale, weighted metrics, and period-selection policy to use.
+
+        Returns
+        -------
+        CreditScorecardExtension
+            Result of with config for this `CreditScorecardExtension` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import CreditScorecardExtension
+        >>> callable(CreditScorecardExtension.with_config)
+        True
         """
         ...
     def set_config(self, config: ScorecardConfig) -> None:
-        """Replace the extension's scorecard configuration.
+        """
+        Replace the extension's scorecard configuration.
 
         Parameters
         ----------
         config : ScorecardConfig
             New rating scale, metric set, and period-selection policy to apply.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     def config(self) -> ScorecardConfig | None:
-        """Value of ``config``.
+        """
+        Value of ``config``.
 
         Returns
         -------
@@ -1738,7 +2858,8 @@ class CreditScorecardExtension:
         """
         ...
     def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> ScorecardReport:
-        """Calculate a credit scorecard against evaluated statement results.
+        """
+        Calculate a credit scorecard against evaluated statement results.
 
         Parameters
         ----------
@@ -1746,16 +2867,38 @@ class CreditScorecardExtension:
             Model specification object or equivalent JSON used to resolve nodes.
         results : StatementResult or str
             Evaluated statement result object or equivalent JSON to rate.
+
+        Returns
+        -------
+        ScorecardReport
+            Result of execute for this `CreditScorecardExtension` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
 def validate_scorecard_config(config: ScorecardConfig) -> None:
-    """Validate a scorecard configuration without executing it.
+    """
+    Validate a scorecard configuration without executing it.
 
     Parameters
     ----------
     config : ScorecardConfig
         Rating scale, metrics, thresholds, and period policy to validate.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import validate_scorecard_config
+    >>> callable(validate_scorecard_config)
+    True
     """
     ...
 
@@ -1764,7 +2907,15 @@ def validate_scorecard_config(config: ScorecardConfig) -> None:
 # ---------------------------------------------------------------------------
 
 class AccountType:
-    """Balance-sheet account classifier: asset / liability / equity."""
+    """
+    Balance-sheet account classifier: asset / liability / equity.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import AccountType
+    >>> AccountType.__name__
+    'AccountType'
+    """
 
     Asset: AccountType
     Liability: AccountType
@@ -1772,25 +2923,45 @@ class AccountType:
 
     @staticmethod
     def from_str(value: str) -> AccountType:
-        """Parse a balance-sheet account classification.
+        """
+        Parse a balance-sheet account classification.
 
         Parameters
         ----------
         value : str
             Case-insensitive ``"asset"``, ``"liability"``, or ``"equity"`` value.
+
+        Returns
+        -------
+        AccountType
+            Result of from str for this `AccountType` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import AccountType
+        >>> callable(AccountType.from_str)
+        True
         """
         ...
     def value(self) -> str:
-        """Value of ``value``.
+        """
+        Value of ``value``.
 
         Returns
         -------
         str
+            Result of value for this `AccountType` in the annotated representation.
         """
         ...
 
 class CorkscrewAccount:
-    """Map one balance-sheet account to its corkscrew input nodes.
+    """
+    Map one balance-sheet account to its corkscrew input nodes.
 
     Parameters
     ----------
@@ -1803,6 +2974,12 @@ class CorkscrewAccount:
     beginning_balance_node : str or None
         Optional node ID supplying the opening balance instead of an inferred
         first-period balance.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import CorkscrewAccount
+    >>> CorkscrewAccount.__name__
+    'CorkscrewAccount'
     """
 
     def __init__(
@@ -1811,64 +2988,113 @@ class CorkscrewAccount:
         account_type: AccountType,
         changes: list[str] = ...,
         beginning_balance_node: str | None = None,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `CorkscrewAccount`.
+
+        Parameters
+        ----------
+        node_id : object
+            Stable identifier used to select the required object or result entry.
+        account_type : object
+            Value supplied for `account_type` to the documented binding operation.
+        changes : object
+            Value supplied for `changes` to the documented binding operation.
+        beginning_balance_node : object
+            Value supplied for `beginning_balance_node` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def node_id(self) -> str:
-        """Value of ``node_id``.
+        """
+        Value of ``node_id``.
 
         Returns
         -------
         str
+            The node id exposed by this `CorkscrewAccount`.
         """
         ...
     @property
     def account_type(self) -> AccountType:
-        """Value of ``account_type``.
+        """
+        Value of ``account_type``.
 
         Returns
         -------
         AccountType
+            The account type exposed by this `CorkscrewAccount`.
         """
         ...
     @property
     def changes(self) -> list[str]:
-        """Value of ``changes``.
+        """
+        Value of ``changes``.
 
         Returns
         -------
         list[str]
+            The changes exposed by this `CorkscrewAccount`.
         """
         ...
     @property
     def beginning_balance_node(self) -> str | None:
-        """Value of ``beginning_balance_node``.
+        """
+        Value of ``beginning_balance_node``.
 
         Returns
         -------
         str or None
+            The beginning balance node exposed by this `CorkscrewAccount`.
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `CorkscrewAccount`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> CorkscrewAccount:
-        """Deserialize an account mapping from canonical JSON.
+        """
+        Deserialize an account mapping from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload identifying the balance node, type, and change nodes.
+
+        Returns
+        -------
+        CorkscrewAccount
+            Validated `CorkscrewAccount` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import CorkscrewAccount
+        >>> callable(CorkscrewAccount.from_json)
+        True
         """
         ...
 
 class CorkscrewConfig:
-    """Configure corkscrew roll-forward validation across balance accounts.
+    """
+    Configure corkscrew roll-forward validation across balance accounts.
 
     Parameters
     ----------
@@ -1879,6 +3105,12 @@ class CorkscrewConfig:
         defaults to ``0.01``.
     fail_on_error : bool
         Whether reconciliation errors abort execution instead of being reported.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import CorkscrewConfig
+    >>> CorkscrewConfig.__name__
+    'CorkscrewConfig'
     """
 
     def __init__(
@@ -1886,10 +3118,30 @@ class CorkscrewConfig:
         accounts: list[CorkscrewAccount] = ...,
         tolerance: float = 0.01,
         fail_on_error: bool = False,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `CorkscrewConfig`.
+
+        Parameters
+        ----------
+        accounts : object
+            Value supplied for `accounts` to the documented binding operation.
+        tolerance : object
+            Value supplied for `tolerance` to the documented binding operation.
+        fail_on_error : object
+            Value supplied for `fail_on_error` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def accounts(self) -> list[CorkscrewAccount]:
-        """Value of ``accounts``.
+        """
+        Value of ``accounts``.
 
         Returns
         -------
@@ -1898,112 +3150,181 @@ class CorkscrewConfig:
         ...
     @property
     def tolerance(self) -> float:
-        """Value of ``tolerance``.
+        """
+        Value of ``tolerance``.
 
         Returns
         -------
         float
+            The tolerance exposed by this `CorkscrewConfig`.
         """
         ...
     @property
     def fail_on_error(self) -> bool:
-        """Value of ``fail_on_error``.
+        """
+        Value of ``fail_on_error``.
 
         Returns
         -------
         bool
+            The fail on error exposed by this `CorkscrewConfig`.
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `CorkscrewConfig`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> CorkscrewConfig:
-        """Deserialize corkscrew validation settings from canonical JSON.
+        """
+        Deserialize corkscrew validation settings from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing account mappings and reconciliation policy.
+
+        Returns
+        -------
+        CorkscrewConfig
+            Validated `CorkscrewConfig` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import CorkscrewConfig
+        >>> callable(CorkscrewConfig.from_json)
+        True
         """
         ...
 
 class CorkscrewReport:
-    """Report produced by ``CorkscrewExtension.execute``."""
+    """
+    Report produced by ``CorkscrewExtension.execute``.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import CorkscrewReport
+    >>> CorkscrewReport.__name__
+    'CorkscrewReport'
+    """
 
     @property
     def status(self) -> str:
-        """Value of ``status``.
+        """
+        Value of ``status``.
 
         Returns
         -------
         str
+            The status exposed by this `CorkscrewReport`.
         """
         ...
     @property
     def message(self) -> str:
-        """Value of ``message``.
+        """
+        Value of ``message``.
 
         Returns
         -------
         str
+            The message exposed by this `CorkscrewReport`.
         """
         ...
     @property
     def warnings(self) -> list[str]:
-        """Value of ``warnings``.
+        """
+        Value of ``warnings``.
 
         Returns
         -------
         list[str]
+            The warnings exposed by this `CorkscrewReport`.
         """
         ...
     @property
     def errors(self) -> list[str]:
-        """Value of ``errors``.
+        """
+        Value of ``errors``.
 
         Returns
         -------
         list[str]
+            The errors exposed by this `CorkscrewReport`.
         """
         ...
     def data_json(self) -> str:
-        """Value of ``data_json``.
+        """
+        Value of ``data_json``.
 
         Returns
         -------
         str
+            Result of data json for this `CorkscrewReport` in the annotated representation.
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `CorkscrewReport`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> CorkscrewReport:
-        """Deserialize a corkscrew validation report from canonical JSON.
+        """
+        Deserialize a corkscrew validation report from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload returned by a corkscrew extension execution.
+
+        Returns
+        -------
+        CorkscrewReport
+            Validated `CorkscrewReport` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import CorkscrewReport
+        >>> callable(CorkscrewReport.from_json)
+        True
         """
         ...
 
 class CorkscrewExtension:
-    """Corkscrew extension for balance-sheet roll-forward validation."""
+    """
+    Corkscrew extension for balance-sheet roll-forward validation.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import CorkscrewExtension
+    >>> CorkscrewExtension.__name__
+    'CorkscrewExtension'
+    """
 
     def __init__(self) -> None:
-        """Value of ``__init__``.
+        """
+        Value of ``__init__``.
 
         Returns
         -------
@@ -2012,25 +3333,49 @@ class CorkscrewExtension:
         ...
     @staticmethod
     def with_config(config: CorkscrewConfig) -> CorkscrewExtension:
-        """Create a corkscrew extension with reconciliation settings.
+        """
+        Create a corkscrew extension with reconciliation settings.
 
         Parameters
         ----------
         config : CorkscrewConfig
             Accounts, tolerance, and error policy used during reconciliation.
+
+        Returns
+        -------
+        CorkscrewExtension
+            Result of with config for this `CorkscrewExtension` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import CorkscrewExtension
+        >>> callable(CorkscrewExtension.with_config)
+        True
         """
         ...
     def set_config(self, config: CorkscrewConfig) -> None:
-        """Replace the extension's reconciliation configuration.
+        """
+        Replace the extension's reconciliation configuration.
 
         Parameters
         ----------
         config : CorkscrewConfig
             Accounts, tolerance, and error policy to apply on the next run.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
     def config(self) -> CorkscrewConfig | None:
-        """Value of ``config``.
+        """
+        Value of ``config``.
 
         Returns
         -------
@@ -2038,7 +3383,8 @@ class CorkscrewExtension:
         """
         ...
     def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> CorkscrewReport:
-        """Validate account roll-forwards against evaluated statement results.
+        """
+        Validate account roll-forwards against evaluated statement results.
 
         Parameters
         ----------
@@ -2046,6 +3392,16 @@ class CorkscrewExtension:
             Model specification object or JSON used to resolve configured nodes.
         results : StatementResult or str
             Evaluated statement results object or JSON to reconcile.
+
+        Returns
+        -------
+        CorkscrewReport
+            Result of execute for this `CorkscrewExtension` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
         """
         ...
 
@@ -2059,7 +3415,8 @@ def add_vintage_buildup(
     new_volume_node: str,
     decay_curve: list[float],
 ) -> str:
-    """Apply the vintage (cohort) buildup template to a model spec.
+    """
+    Apply the vintage (cohort) buildup template to a model spec.
 
     Returns a JSON-serialized ``FinancialModelSpec`` with the convolution
     node added.
@@ -2075,6 +3432,22 @@ def add_vintage_buildup(
     decay_curve : list[float]
         Ordered cohort-retention factors by elapsed period, expressed as decimal
         multipliers of original volume.
+
+    Returns
+    -------
+    str
+        Result of add vintage buildup for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import add_vintage_buildup
+    >>> callable(add_vintage_buildup)
+    True
     """
     ...
 
@@ -2088,7 +3461,8 @@ def add_roll_forward(
     increases: list[str],
     decreases: list[str],
 ) -> str:
-    """Apply the roll-forward template (Beginning + Increases - Decreases = Ending) to a model spec.
+    """
+    Apply the roll-forward template (Beginning + Increases - Decreases = Ending) to a model spec.
 
     Returns a JSON-serialized ``FinancialModelSpec`` with ``{name}_beg`` and
     ``{name}_end`` nodes added. The first period opens at zero; use
@@ -2104,6 +3478,22 @@ def add_roll_forward(
         Existing node IDs whose period values increase the ending balance.
     decreases : list[str]
         Existing node IDs whose period values decrease the ending balance.
+
+    Returns
+    -------
+    str
+        Result of add roll forward for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import add_roll_forward
+    >>> callable(add_roll_forward)
+    True
     """
     ...
 
@@ -2114,7 +3504,8 @@ def add_roll_forward_with_opening(
     decreases: list[str],
     opening: float,
 ) -> str:
-    """Apply the roll-forward template with an explicit first-period opening balance.
+    """
+    Apply the roll-forward template with an explicit first-period opening balance.
 
     Same as ``add_roll_forward`` except the first period's beginning balance
     is ``opening`` instead of zero. Returns a JSON-serialized
@@ -2132,6 +3523,22 @@ def add_roll_forward_with_opening(
         Existing node IDs whose period values decrease the ending balance.
     opening : float
         Beginning balance assigned to the first modeled period in model units.
+
+    Returns
+    -------
+    str
+        Result of add roll forward with opening for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import add_roll_forward_with_opening
+    >>> callable(add_roll_forward_with_opening)
+    True
     """
     ...
 
@@ -2140,7 +3547,8 @@ def add_roll_forward_with_opening(
 # ---------------------------------------------------------------------------
 
 class SimpleLeaseSpec:
-    """Describe a simple per-lease rent schedule for a property model.
+    """
+    Describe a simple per-lease rent schedule for a property model.
 
     Parameters
     ----------
@@ -2163,6 +3571,12 @@ class SimpleLeaseSpec:
     occupancy : float
         Decimal occupancy multiplier applied to scheduled rent; defaults to
         fully occupied ``1.0``.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import SimpleLeaseSpec
+    >>> SimpleLeaseSpec.__name__
+    'SimpleLeaseSpec'
     """
 
     def __init__(
@@ -2174,72 +3588,114 @@ class SimpleLeaseSpec:
         growth_rate: float = 0.0,
         free_rent_periods: int = 0,
         occupancy: float = 1.0,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `SimpleLeaseSpec`.
+
+        Parameters
+        ----------
+        node_id : object
+            Stable identifier used to select the required object or result entry.
+        start : object
+            Date used in the documented calculation or scheduling role.
+        base_rent : object
+            Value supplied for `base_rent` to the documented binding operation.
+        end : object
+            Date used in the documented calculation or scheduling role.
+        growth_rate : object
+            Rate or spread expressed in the convention documented for this API.
+        free_rent_periods : object
+            Value supplied for `free_rent_periods` to the documented binding operation.
+        occupancy : object
+            Value supplied for `occupancy` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def node_id(self) -> str:
-        """Value of ``node_id``.
+        """
+        Value of ``node_id``.
 
         Returns
         -------
         str
+            The node id exposed by this `SimpleLeaseSpec`.
         """
         ...
     @property
     def start(self) -> str:
-        """Value of ``start``.
+        """
+        Value of ``start``.
 
         Returns
         -------
         str
+            The start exposed by this `SimpleLeaseSpec`.
         """
         ...
     @property
     def end(self) -> str | None:
-        """Value of ``end``.
+        """
+        Value of ``end``.
 
         Returns
         -------
         str or None
+            The end exposed by this `SimpleLeaseSpec`.
         """
         ...
     @property
     def base_rent(self) -> float:
-        """Value of ``base_rent``.
+        """
+        Value of ``base_rent``.
 
         Returns
         -------
         float
+            The base rent exposed by this `SimpleLeaseSpec`.
         """
         ...
     @property
     def growth_rate(self) -> float:
-        """Value of ``growth_rate``.
+        """
+        Value of ``growth_rate``.
 
         Returns
         -------
         float
+            The growth rate exposed by this `SimpleLeaseSpec`.
         """
         ...
     @property
     def free_rent_periods(self) -> int:
-        """Value of ``free_rent_periods``.
+        """
+        Value of ``free_rent_periods``.
 
         Returns
         -------
         int
+            The free rent periods exposed by this `SimpleLeaseSpec`.
         """
         ...
     @property
     def occupancy(self) -> float:
-        """Value of ``occupancy``.
+        """
+        Value of ``occupancy``.
 
         Returns
         -------
         float
+            The occupancy exposed by this `SimpleLeaseSpec`.
         """
         ...
     def validate(self) -> None:
-        """Value of ``validate``.
+        """
+        Value of ``validate``.
 
         Returns
         -------
@@ -2247,26 +3703,46 @@ class SimpleLeaseSpec:
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `SimpleLeaseSpec`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> SimpleLeaseSpec:
-        """Deserialize a simple lease schedule from canonical JSON.
+        """
+        Deserialize a simple lease schedule from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing lease term, rent, growth, and occupancy.
+
+        Returns
+        -------
+        SimpleLeaseSpec
+            Validated `SimpleLeaseSpec` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import SimpleLeaseSpec
+        >>> callable(SimpleLeaseSpec.from_json)
+        True
         """
         ...
 
 class RentStepSpec:
-    """Reset a lease's base rent from one model period onward.
+    """
+    Reset a lease's base rent from one model period onward.
 
     Parameters
     ----------
@@ -2274,48 +3750,95 @@ class RentStepSpec:
         First model period label at which the stepped rent applies.
     rent : float
         Replacement periodic rent in the model's currency units.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import RentStepSpec
+    >>> RentStepSpec.__name__
+    'RentStepSpec'
     """
 
-    def __init__(self, start: str, rent: float) -> None: ...
+    def __init__(self, start: str, rent: float) -> None:
+        """
+        Compute   init for `RentStepSpec`.
+
+        Parameters
+        ----------
+        start : object
+            Date used in the documented calculation or scheduling role.
+        rent : object
+            Value supplied for `rent` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def start(self) -> str:
-        """Value of ``start``.
+        """
+        Value of ``start``.
 
         Returns
         -------
         str
+            The start exposed by this `RentStepSpec`.
         """
         ...
     @property
     def rent(self) -> float:
-        """Value of ``rent``.
+        """
+        Value of ``rent``.
 
         Returns
         -------
         float
+            The rent exposed by this `RentStepSpec`.
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `RentStepSpec`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> RentStepSpec:
-        """Deserialize a rent-step specification from canonical JSON.
+        """
+        Deserialize a rent-step specification from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing the step start period and replacement rent.
+
+        Returns
+        -------
+        RentStepSpec
+            Validated `RentStepSpec` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import RentStepSpec
+        >>> callable(RentStepSpec.from_json)
+        True
         """
         ...
 
 class FreeRentWindowSpec:
-    """Define a finite concession window that sets lease rent to zero.
+    """
+    Define a finite concession window that sets lease rent to zero.
 
     Parameters
     ----------
@@ -2323,48 +3846,95 @@ class FreeRentWindowSpec:
         First model period label affected by the free-rent concession.
     periods : int
         Number of consecutive modeled periods with rent set to zero.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import FreeRentWindowSpec
+    >>> FreeRentWindowSpec.__name__
+    'FreeRentWindowSpec'
     """
 
-    def __init__(self, start: str, periods: int) -> None: ...
+    def __init__(self, start: str, periods: int) -> None:
+        """
+        Compute   init for `FreeRentWindowSpec`.
+
+        Parameters
+        ----------
+        start : object
+            Date used in the documented calculation or scheduling role.
+        periods : object
+            Value supplied for `periods` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def start(self) -> str:
-        """Value of ``start``.
+        """
+        Value of ``start``.
 
         Returns
         -------
         str
+            The start exposed by this `FreeRentWindowSpec`.
         """
         ...
     @property
     def periods(self) -> int:
-        """Value of ``periods``.
+        """
+        Value of ``periods``.
 
         Returns
         -------
         int
+            The periods exposed by this `FreeRentWindowSpec`.
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `FreeRentWindowSpec`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> FreeRentWindowSpec:
-        """Deserialize a free-rent concession window from canonical JSON.
+        """
+        Deserialize a free-rent concession window from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing the concession start period and duration.
+
+        Returns
+        -------
+        FreeRentWindowSpec
+            Validated `FreeRentWindowSpec` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import FreeRentWindowSpec
+        >>> callable(FreeRentWindowSpec.from_json)
+        True
         """
         ...
 
 class RenewalSpec:
-    """Model a lease renewal in expected-value terms after the base term.
+    """
+    Model a lease renewal in expected-value terms after the base term.
 
     Parameters
     ----------
@@ -2379,6 +3949,12 @@ class RenewalSpec:
         defaults to ``1.0``.
     free_rent_periods : int
         Initial renewal periods with rent set to zero; defaults to no concession.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import RenewalSpec
+    >>> RenewalSpec.__name__
+    'RenewalSpec'
     """
 
     def __init__(
@@ -2388,54 +3964,88 @@ class RenewalSpec:
         downtime_periods: int = 0,
         rent_factor: float = 1.0,
         free_rent_periods: int = 0,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `RenewalSpec`.
+
+        Parameters
+        ----------
+        term_periods : object
+            Value supplied for `term_periods` to the documented binding operation.
+        probability : object
+            Value supplied for `probability` to the documented binding operation.
+        downtime_periods : object
+            Value supplied for `downtime_periods` to the documented binding operation.
+        rent_factor : object
+            Value supplied for `rent_factor` to the documented binding operation.
+        free_rent_periods : object
+            Value supplied for `free_rent_periods` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def term_periods(self) -> int:
-        """Value of ``term_periods``.
+        """
+        Value of ``term_periods``.
 
         Returns
         -------
         int
+            The term periods exposed by this `RenewalSpec`.
         """
         ...
     @property
     def probability(self) -> float:
-        """Value of ``probability``.
+        """
+        Value of ``probability``.
 
         Returns
         -------
         float
+            The probability exposed by this `RenewalSpec`.
         """
         ...
     @property
     def downtime_periods(self) -> int:
-        """Value of ``downtime_periods``.
+        """
+        Value of ``downtime_periods``.
 
         Returns
         -------
         int
+            The downtime periods exposed by this `RenewalSpec`.
         """
         ...
     @property
     def rent_factor(self) -> float:
-        """Value of ``rent_factor``.
+        """
+        Value of ``rent_factor``.
 
         Returns
         -------
         float
+            The rent factor exposed by this `RenewalSpec`.
         """
         ...
     @property
     def free_rent_periods(self) -> int:
-        """Value of ``free_rent_periods``.
+        """
+        Value of ``free_rent_periods``.
 
         Returns
         -------
         int
+            The free rent periods exposed by this `RenewalSpec`.
         """
         ...
     def validate(self) -> None:
-        """Value of ``validate``.
+        """
+        Value of ``validate``.
 
         Returns
         -------
@@ -2443,52 +4053,99 @@ class RenewalSpec:
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `RenewalSpec`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> RenewalSpec:
-        """Deserialize renewal assumptions from canonical JSON.
+        """
+        Deserialize renewal assumptions from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing renewal term, probability, downtime, and
             rent assumptions.
+
+        Returns
+        -------
+        RenewalSpec
+            Validated `RenewalSpec` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import RenewalSpec
+        >>> callable(RenewalSpec.from_json)
+        True
         """
         ...
 
 class LeaseGrowthConvention:
-    """Compounding convention for lease rent growth."""
+    """
+    Compounding convention for lease rent growth.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import LeaseGrowthConvention
+    >>> LeaseGrowthConvention.__name__
+    'LeaseGrowthConvention'
+    """
 
     PerPeriod: LeaseGrowthConvention
     AnnualEscalator: LeaseGrowthConvention
 
     @staticmethod
     def from_str(value: str) -> LeaseGrowthConvention:
-        """Parse a lease rent-growth compounding convention.
+        """
+        Parse a lease rent-growth compounding convention.
 
         Parameters
         ----------
         value : str
             Case-insensitive ``"per_period"`` or ``"annual_escalator"`` value.
+
+        Returns
+        -------
+        LeaseGrowthConvention
+            Result of from str for this `LeaseGrowthConvention` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import LeaseGrowthConvention
+        >>> callable(LeaseGrowthConvention.from_str)
+        True
         """
         ...
     def value(self) -> str:
-        """Value of ``value``.
+        """
+        Value of ``value``.
 
         Returns
         -------
         str
+            Result of value for this `LeaseGrowthConvention` in the annotated representation.
         """
         ...
 
 class LeaseSpec:
-    """Describe a rich lease schedule for rent-roll generation.
+    """
+    Describe a rich lease schedule for rent-roll generation.
 
     Parameters
     ----------
@@ -2515,6 +4172,12 @@ class LeaseSpec:
         Decimal occupancy multiplier applied to scheduled rent.
     renewal : RenewalSpec or None
         Optional expected-value renewal assumptions applied after the base term.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import LeaseSpec
+    >>> LeaseSpec.__name__
+    'LeaseSpec'
     """
 
     def __init__(
@@ -2530,55 +4193,101 @@ class LeaseSpec:
         free_rent_windows: list[FreeRentWindowSpec] = ...,
         occupancy: float = 1.0,
         renewal: RenewalSpec | None = None,
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `LeaseSpec`.
+
+        Parameters
+        ----------
+        node_id : object
+            Stable identifier used to select the required object or result entry.
+        start : object
+            Date used in the documented calculation or scheduling role.
+        base_rent : object
+            Value supplied for `base_rent` to the documented binding operation.
+        end : object
+            Date used in the documented calculation or scheduling role.
+        growth_rate : object
+            Rate or spread expressed in the convention documented for this API.
+        growth_convention : object
+            Value supplied for `growth_convention` to the documented binding operation.
+        rent_steps : object
+            Value supplied for `rent_steps` to the documented binding operation.
+        free_rent_periods : object
+            Value supplied for `free_rent_periods` to the documented binding operation.
+        free_rent_windows : object
+            Value supplied for `free_rent_windows` to the documented binding operation.
+        occupancy : object
+            Value supplied for `occupancy` to the documented binding operation.
+        renewal : object
+            Value supplied for `renewal` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def node_id(self) -> str:
-        """Value of ``node_id``.
+        """
+        Value of ``node_id``.
 
         Returns
         -------
         str
+            The node id exposed by this `LeaseSpec`.
         """
         ...
     @property
     def start(self) -> str:
-        """Value of ``start``.
+        """
+        Value of ``start``.
 
         Returns
         -------
         str
+            The start exposed by this `LeaseSpec`.
         """
         ...
     @property
     def end(self) -> str | None:
-        """Value of ``end``.
+        """
+        Value of ``end``.
 
         Returns
         -------
         str or None
+            The end exposed by this `LeaseSpec`.
         """
         ...
     @property
     def base_rent(self) -> float:
-        """Value of ``base_rent``.
+        """
+        Value of ``base_rent``.
 
         Returns
         -------
         float
+            The base rent exposed by this `LeaseSpec`.
         """
         ...
     @property
     def growth_rate(self) -> float:
-        """Value of ``growth_rate``.
+        """
+        Value of ``growth_rate``.
 
         Returns
         -------
         float
+            The growth rate exposed by this `LeaseSpec`.
         """
         ...
     @property
     def growth_convention(self) -> LeaseGrowthConvention:
-        """Value of ``growth_convention``.
+        """
+        Value of ``growth_convention``.
 
         Returns
         -------
@@ -2587,25 +4296,30 @@ class LeaseSpec:
         ...
     @property
     def free_rent_periods(self) -> int:
-        """Value of ``free_rent_periods``.
+        """
+        Value of ``free_rent_periods``.
 
         Returns
         -------
         int
+            The free rent periods exposed by this `LeaseSpec`.
         """
         ...
     @property
     def occupancy(self) -> float:
-        """Value of ``occupancy``.
+        """
+        Value of ``occupancy``.
 
         Returns
         -------
         float
+            The occupancy exposed by this `LeaseSpec`.
         """
         ...
     @property
     def renewal(self) -> RenewalSpec | None:
-        """Value of ``renewal``.
+        """
+        Value of ``renewal``.
 
         Returns
         -------
@@ -2613,7 +4327,8 @@ class LeaseSpec:
         """
         ...
     def validate(self) -> None:
-        """Value of ``validate``.
+        """
+        Value of ``validate``.
 
         Returns
         -------
@@ -2621,27 +4336,47 @@ class LeaseSpec:
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `LeaseSpec`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> LeaseSpec:
-        """Deserialize a rich lease schedule from canonical JSON.
+        """
+        Deserialize a rich lease schedule from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing term, rent, escalation, concession, and
             renewal assumptions.
+
+        Returns
+        -------
+        LeaseSpec
+            Validated `LeaseSpec` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import LeaseSpec
+        >>> callable(LeaseSpec.from_json)
+        True
         """
         ...
 
 class RentRollOutputNodes:
-    """Name the aggregate model nodes produced by a rent-roll template.
+    """
+    Name the aggregate model nodes produced by a rent-roll template.
 
     Parameters
     ----------
@@ -2653,6 +4388,12 @@ class RentRollOutputNodes:
         Node ID for the revenue reduction caused by vacancy or occupancy.
     rent_effective_node : str
         Node ID for effective rent after concessions and vacancy adjustments.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import RentRollOutputNodes
+    >>> RentRollOutputNodes.__name__
+    'RentRollOutputNodes'
     """
 
     def __init__(
@@ -2661,90 +4402,166 @@ class RentRollOutputNodes:
         free_rent_node: str = "free_rent",
         vacancy_loss_node: str = "vacancy_loss",
         rent_effective_node: str = "rent_effective",
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `RentRollOutputNodes`.
+
+        Parameters
+        ----------
+        rent_pgi_node : object
+            Value supplied for `rent_pgi_node` to the documented binding operation.
+        free_rent_node : object
+            Value supplied for `free_rent_node` to the documented binding operation.
+        vacancy_loss_node : object
+            Value supplied for `vacancy_loss_node` to the documented binding operation.
+        rent_effective_node : object
+            Value supplied for `rent_effective_node` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def rent_pgi_node(self) -> str:
-        """Value of ``rent_pgi_node``.
+        """
+        Value of ``rent_pgi_node``.
 
         Returns
         -------
         str
+            The rent pgi node exposed by this `RentRollOutputNodes`.
         """
         ...
     @property
     def free_rent_node(self) -> str:
-        """Value of ``free_rent_node``.
+        """
+        Value of ``free_rent_node``.
 
         Returns
         -------
         str
+            The free rent node exposed by this `RentRollOutputNodes`.
         """
         ...
     @property
     def vacancy_loss_node(self) -> str:
-        """Value of ``vacancy_loss_node``.
+        """
+        Value of ``vacancy_loss_node``.
 
         Returns
         -------
         str
+            The vacancy loss node exposed by this `RentRollOutputNodes`.
         """
         ...
     @property
     def rent_effective_node(self) -> str:
-        """Value of ``rent_effective_node``.
+        """
+        Value of ``rent_effective_node``.
 
         Returns
         -------
         str
+            The rent effective node exposed by this `RentRollOutputNodes`.
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `RentRollOutputNodes`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> RentRollOutputNodes:
-        """Deserialize rent-roll output-node names from canonical JSON.
+        """
+        Deserialize rent-roll output-node names from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload identifying potential, concession, vacancy, and
             effective-rent output nodes.
+
+        Returns
+        -------
+        RentRollOutputNodes
+            Validated `RentRollOutputNodes` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import RentRollOutputNodes
+        >>> callable(RentRollOutputNodes.from_json)
+        True
         """
         ...
 
 class ManagementFeeBase:
-    """Basis for management fee calculation."""
+    """
+    Basis for management fee calculation.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import ManagementFeeBase
+    >>> ManagementFeeBase.__name__
+    'ManagementFeeBase'
+    """
 
     Egi: ManagementFeeBase
     EffectiveRent: ManagementFeeBase
 
     @staticmethod
     def from_str(value: str) -> ManagementFeeBase:
-        """Parse a management-fee calculation basis.
+        """
+        Parse a management-fee calculation basis.
 
         Parameters
         ----------
         value : str
             Case-insensitive ``"egi"`` or ``"effective_rent"`` basis value.
+
+        Returns
+        -------
+        ManagementFeeBase
+            Result of from str for this `ManagementFeeBase` in the annotated representation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import ManagementFeeBase
+        >>> callable(ManagementFeeBase.from_str)
+        True
         """
         ...
     def value(self) -> str:
-        """Value of ``value``.
+        """
+        Value of ``value``.
 
         Returns
         -------
         str
+            Result of value for this `ManagementFeeBase` in the annotated representation.
         """
         ...
 
 class ManagementFeeSpec:
-    """Set a percentage management fee and the revenue base it applies to.
+    """
+    Set a percentage management fee and the revenue base it applies to.
 
     Parameters
     ----------
@@ -2753,21 +4570,47 @@ class ManagementFeeSpec:
     base : ManagementFeeBase
         Effective-rent or EGI base used to calculate the fee; defaults to the
         binding's standard basis.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import ManagementFeeSpec
+    >>> ManagementFeeSpec.__name__
+    'ManagementFeeSpec'
     """
 
-    def __init__(self, rate: float, base: ManagementFeeBase = ...) -> None: ...
+    def __init__(self, rate: float, base: ManagementFeeBase = ...) -> None:
+        """
+        Compute   init for `ManagementFeeSpec`.
+
+        Parameters
+        ----------
+        rate : object
+            Rate or spread expressed in the convention documented for this API.
+        base : object
+            Value supplied for `base` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def rate(self) -> float:
-        """Value of ``rate``.
+        """
+        Value of ``rate``.
 
         Returns
         -------
         float
+            The rate exposed by this `ManagementFeeSpec`.
         """
         ...
     @property
     def base(self) -> ManagementFeeBase:
-        """Value of ``base``.
+        """
+        Value of ``base``.
 
         Returns
         -------
@@ -2775,26 +4618,46 @@ class ManagementFeeSpec:
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `ManagementFeeSpec`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> ManagementFeeSpec:
-        """Deserialize management-fee assumptions from canonical JSON.
+        """
+        Deserialize management-fee assumptions from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload containing the decimal rate and revenue basis.
+
+        Returns
+        -------
+        ManagementFeeSpec
+            Validated `ManagementFeeSpec` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import ManagementFeeSpec
+        >>> callable(ManagementFeeSpec.from_json)
+        True
         """
         ...
 
 class PropertyTemplateNodes:
-    """Name generated node IDs for a property operating-statement template.
+    """
+    Name generated node IDs for a property operating-statement template.
 
     Parameters
     ----------
@@ -2814,6 +4677,12 @@ class PropertyTemplateNodes:
         Node ID aggregating capital-expenditure components.
     ncf_node : str
         Node ID for net cash flow after operating items and capital expenditure.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import PropertyTemplateNodes
+    >>> PropertyTemplateNodes.__name__
+    'PropertyTemplateNodes'
     """
 
     def __init__(
@@ -2826,10 +4695,40 @@ class PropertyTemplateNodes:
         noi_node: str = "noi",
         capex_total_node: str = "capex_total",
         ncf_node: str = "ncf",
-    ) -> None: ...
+    ) -> None:
+        """
+        Compute   init for `PropertyTemplateNodes`.
+
+        Parameters
+        ----------
+        rent_roll : object
+            Value supplied for `rent_roll` to the documented binding operation.
+        other_income_total_node : object
+            Value supplied for `other_income_total_node` to the documented binding operation.
+        egi_node : object
+            Value supplied for `egi_node` to the documented binding operation.
+        management_fee_node : object
+            Value supplied for `management_fee_node` to the documented binding operation.
+        opex_total_node : object
+            Value supplied for `opex_total_node` to the documented binding operation.
+        noi_node : object
+            Value supplied for `noi_node` to the documented binding operation.
+        capex_total_node : object
+            Value supplied for `capex_total_node` to the documented binding operation.
+        ncf_node : object
+            Value supplied for `ncf_node` to the documented binding operation.
+
+        Raises
+        ------
+        ValueError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
     @property
     def rent_roll(self) -> RentRollOutputNodes:
-        """Value of ``rent_roll``.
+        """
+        Value of ``rent_roll``.
 
         Returns
         -------
@@ -2838,84 +4737,117 @@ class PropertyTemplateNodes:
         ...
     @property
     def other_income_total_node(self) -> str:
-        """Value of ``other_income_total_node``.
+        """
+        Value of ``other_income_total_node``.
 
         Returns
         -------
         str
+            The other income total node exposed by this `PropertyTemplateNodes`.
         """
         ...
     @property
     def egi_node(self) -> str:
-        """Value of ``egi_node``.
+        """
+        Value of ``egi_node``.
 
         Returns
         -------
         str
+            The egi node exposed by this `PropertyTemplateNodes`.
         """
         ...
     @property
     def management_fee_node(self) -> str:
-        """Value of ``management_fee_node``.
+        """
+        Value of ``management_fee_node``.
 
         Returns
         -------
         str
+            The management fee node exposed by this `PropertyTemplateNodes`.
         """
         ...
     @property
     def opex_total_node(self) -> str:
-        """Value of ``opex_total_node``.
+        """
+        Value of ``opex_total_node``.
 
         Returns
         -------
         str
+            The opex total node exposed by this `PropertyTemplateNodes`.
         """
         ...
     @property
     def noi_node(self) -> str:
-        """Value of ``noi_node``.
+        """
+        Value of ``noi_node``.
 
         Returns
         -------
         str
+            The noi node exposed by this `PropertyTemplateNodes`.
         """
         ...
     @property
     def capex_total_node(self) -> str:
-        """Value of ``capex_total_node``.
+        """
+        Value of ``capex_total_node``.
 
         Returns
         -------
         str
+            The capex total node exposed by this `PropertyTemplateNodes`.
         """
         ...
     @property
     def ncf_node(self) -> str:
-        """Value of ``ncf_node``.
+        """
+        Value of ``ncf_node``.
 
         Returns
         -------
         str
+            The ncf node exposed by this `PropertyTemplateNodes`.
         """
         ...
     def to_json(self) -> str:
-        """Value of ``to_json``.
+        """
+        Value of ``to_json``.
 
         Returns
         -------
         str
+            Canonical JSON representation of this `PropertyTemplateNodes`, suitable for a matching `from_json` call.
         """
         ...
     @staticmethod
     def from_json(json: str) -> PropertyTemplateNodes:
-        """Deserialize property-template node names from canonical JSON.
+        """
+        Deserialize property-template node names from canonical JSON.
 
         Parameters
         ----------
         json : str
             JSON payload identifying rent, income, expense, NOI, capex, and NCF
             nodes.
+
+        Returns
+        -------
+        PropertyTemplateNodes
+            Validated `PropertyTemplateNodes` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload cannot be parsed or does not satisfy the `ValueError` schema and invariants.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import PropertyTemplateNodes
+        >>> callable(PropertyTemplateNodes.from_json)
+        True
         """
         ...
 
@@ -2927,7 +4859,8 @@ def add_noi_buildup(
     expense_nodes: list[str],
     noi_node: str,
 ) -> str:
-    """Apply the NOI buildup template and return JSON ``FinancialModelSpec``.
+    """
+    Apply the NOI buildup template and return JSON ``FinancialModelSpec``.
 
     Parameters
     ----------
@@ -2943,6 +4876,22 @@ def add_noi_buildup(
         Existing node IDs included as operating expenses in the NOI calculation.
     noi_node : str
         Output node ID for revenue less operating expenses.
+
+    Returns
+    -------
+    str
+        Result of add noi buildup for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import add_noi_buildup
+    >>> callable(add_noi_buildup)
+    True
     """
     ...
 
@@ -2952,7 +4901,8 @@ def add_ncf_buildup(
     capex_nodes: list[str],
     ncf_node: str,
 ) -> str:
-    """Apply the NCF buildup template and return JSON ``FinancialModelSpec``.
+    """
+    Apply the NCF buildup template and return JSON ``FinancialModelSpec``.
 
     Parameters
     ----------
@@ -2964,6 +4914,22 @@ def add_ncf_buildup(
         Existing node IDs whose values are deducted as capital expenditures.
     ncf_node : str
         Output node ID for net operating income less capital expenditures.
+
+    Returns
+    -------
+    str
+        Result of add ncf buildup for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import add_ncf_buildup
+    >>> callable(add_ncf_buildup)
+    True
     """
     ...
 
@@ -2972,7 +4938,8 @@ def add_rent_roll(
     leases: list[LeaseSpec],
     nodes: RentRollOutputNodes | None = None,
 ) -> str:
-    """Apply the rich rent-roll template and return JSON ``FinancialModelSpec``.
+    """
+    Apply the rich rent-roll template and return JSON ``FinancialModelSpec``.
 
     Parameters
     ----------
@@ -2982,6 +4949,22 @@ def add_rent_roll(
         Rich lease schedules to calculate and aggregate into the rent roll.
     nodes : RentRollOutputNodes or None
         Optional aggregate output-node names; ``None`` uses template defaults.
+
+    Returns
+    -------
+    str
+        Result of add rent roll for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import add_rent_roll
+    >>> callable(add_rent_roll)
+    True
     """
     ...
 
@@ -2990,7 +4973,8 @@ def add_rent_roll_rental_revenue(
     leases: list[SimpleLeaseSpec],
     total_rent_node: str,
 ) -> str:
-    """Apply the simple rent-roll template and return JSON ``FinancialModelSpec``.
+    """
+    Apply the simple rent-roll template and return JSON ``FinancialModelSpec``.
 
     Parameters
     ----------
@@ -3000,6 +4984,22 @@ def add_rent_roll_rental_revenue(
         Simple lease schedules to calculate and aggregate into rental revenue.
     total_rent_node : str
         Output node ID that sums all calculated simple-lease rent series.
+
+    Returns
+    -------
+    str
+        Result of add rent roll rental revenue for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import add_rent_roll_rental_revenue
+    >>> callable(add_rent_roll_rental_revenue)
+    True
     """
     ...
 
@@ -3012,7 +5012,8 @@ def add_property_operating_statement(
     management_fee: ManagementFeeSpec | None = None,
     nodes: PropertyTemplateNodes | None = None,
 ) -> str:
-    """Apply the full property operating-statement template and return JSON.
+    """
+    Apply the full property operating-statement template and return JSON.
 
     Parameters
     ----------
@@ -3030,5 +5031,21 @@ def add_property_operating_statement(
         Optional fee assumptions; ``None`` omits management-fee calculation.
     nodes : PropertyTemplateNodes or None
         Optional generated-node names; ``None`` uses the template defaults.
+
+    Returns
+    -------
+    str
+        Result of add property operating statement for the binding in the annotated representation.
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import add_property_operating_statement
+    >>> callable(add_property_operating_statement)
+    True
     """
     ...

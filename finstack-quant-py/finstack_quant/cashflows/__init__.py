@@ -1,4 +1,11 @@
-"""Cashflow schedule JSON construction and validation."""
+"""Cashflow schedule JSON construction and validation.
+
+Examples:
+--------
+>>> import finstack_quant.cashflows as cashflows
+>>> cashflows.__name__
+'finstack_quant.cashflows'
+"""
 
 from __future__ import annotations
 

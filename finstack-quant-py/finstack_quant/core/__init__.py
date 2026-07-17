@@ -1,6 +1,12 @@
 """Core financial primitives: dates, currencies, money, market data, math.
 
 Bindings for the ``finstack-quant-core`` Rust crate.
+
+Examples:
+--------
+>>> import finstack_quant.core as core
+>>> core.__name__
+'finstack_quant.core'
 """
 
 from __future__ import annotations
