@@ -9,12 +9,12 @@ use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
 /// Transform a time-series panel column per entity.
-#[wasm_bindgen(js_name = transformTimeseries)]
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
 /// @param entity - Entity identifier used to group ordered time-series observations.
 /// @param order - Observation-order key used to sort each entity time series.
 /// @param op - Transformation operation identifier supported by the feature-engineering API.
 /// @param params - Operation-specific parameter object defining transformation settings.
+#[wasm_bindgen(js_name = transformTimeseries)]
 pub fn transform_timeseries(
     values: JsValue,
     entity: JsValue,
@@ -38,11 +38,11 @@ pub fn transform_timeseries(
 }
 
 /// Transform a cross-section per timestamp.
-#[wasm_bindgen(js_name = transformCrossSectional)]
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
 /// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
 /// @param op - Transformation operation identifier supported by the feature-engineering API.
 /// @param params - Operation-specific parameter object defining transformation settings.
+#[wasm_bindgen(js_name = transformCrossSectional)]
 pub fn transform_cross_sectional(
     values: JsValue,
     time_key: JsValue,
@@ -59,12 +59,12 @@ pub fn transform_cross_sectional(
 }
 
 /// Transform a cross-section within each time/group sub-partition.
-#[wasm_bindgen(js_name = transformCrossSectionalGrouped)]
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
 /// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
 /// @param groups - Group labels aligned with values for within-group cross-sectional operations.
 /// @param op - Transformation operation identifier supported by the feature-engineering API.
 /// @param params - Operation-specific parameter object defining transformation settings.
+#[wasm_bindgen(js_name = transformCrossSectionalGrouped)]
 pub fn transform_cross_sectional_grouped(
     values: JsValue,
     time_key: JsValue,
@@ -88,11 +88,11 @@ pub fn transform_cross_sectional_grouped(
 }
 
 /// Remove cross-sectional exposure effects by OLS residualization.
-#[wasm_bindgen(js_name = neutralize)]
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
 /// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
 /// @param exposures - Factor-exposure matrix aligned with the supplied observations.
 /// @param params - Operation-specific parameter object defining transformation settings.
+#[wasm_bindgen(js_name = neutralize)]
 pub fn neutralize(
     values: JsValue,
     time_key: JsValue,
@@ -111,13 +111,13 @@ pub fn neutralize(
 }
 
 /// Transform two time-series panel columns per entity.
-#[wasm_bindgen(js_name = transformTimeseriesPairwise)]
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
 /// @param other - Second value series aligned with the primary series for a pairwise transformation.
 /// @param entity - Entity identifier used to group ordered time-series observations.
 /// @param order - Observation-order key used to sort each entity time series.
 /// @param op - Transformation operation identifier supported by the feature-engineering API.
 /// @param params - Operation-specific parameter object defining transformation settings.
+#[wasm_bindgen(js_name = transformTimeseriesPairwise)]
 pub fn transform_timeseries_pairwise(
     values: JsValue,
     other: JsValue,
@@ -144,12 +144,12 @@ pub fn transform_timeseries_pairwise(
 }
 
 /// Return rolling OLS residuals per entity.
-#[wasm_bindgen(js_name = rollingRegressionResidual)]
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
 /// @param exposures - Factor-exposure matrix aligned with the supplied observations.
 /// @param entity - Entity identifier used to group ordered time-series observations.
 /// @param order - Observation-order key used to sort each entity time series.
 /// @param params - Operation-specific parameter object defining transformation settings.
+#[wasm_bindgen(js_name = rollingRegressionResidual)]
 pub fn rolling_regression_residual(
     values: JsValue,
     exposures: JsValue,
@@ -175,11 +175,11 @@ pub fn rolling_regression_residual(
 }
 
 /// Convert a signal to inverse-risk-scaled weights per timestamp.
-#[wasm_bindgen(js_name = riskScaledWeights)]
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
 /// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
 /// @param volatility - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
 /// @param params - Operation-specific parameter object defining transformation settings.
+#[wasm_bindgen(js_name = riskScaledWeights)]
 pub fn risk_scaled_weights(
     values: JsValue,
     time_key: JsValue,
@@ -202,10 +202,10 @@ pub fn risk_scaled_weights(
 }
 
 /// Apply the default signal cleaning pass.
-#[wasm_bindgen(js_name = cleanSignal)]
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
 /// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
 /// @param params - Operation-specific parameter object defining transformation settings.
+#[wasm_bindgen(js_name = cleanSignal)]
 pub fn clean_signal(
     values: JsValue,
     time_key: JsValue,
@@ -220,10 +220,10 @@ pub fn clean_signal(
 }
 
 /// Normalize a signal cross-sectionally.
-#[wasm_bindgen(js_name = normalizeSignal)]
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
 /// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
 /// @param params - Operation-specific parameter object defining transformation settings.
+#[wasm_bindgen(js_name = normalizeSignal)]
 pub fn normalize_signal(
     values: JsValue,
     time_key: JsValue,
@@ -238,10 +238,10 @@ pub fn normalize_signal(
 }
 
 /// Convert ranks into long/short weights.
-#[wasm_bindgen(js_name = rankToWeights)]
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
 /// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
 /// @param params - Operation-specific parameter object defining transformation settings.
+#[wasm_bindgen(js_name = rankToWeights)]
 pub fn rank_to_weights(
     values: JsValue,
     time_key: JsValue,
@@ -256,11 +256,11 @@ pub fn rank_to_weights(
 }
 
 /// Neutralize a signal and z-score residuals.
-#[wasm_bindgen(js_name = neutralizeAndZscore)]
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
 /// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
 /// @param exposures - Factor-exposure matrix aligned with the supplied observations.
 /// @param params - Operation-specific parameter object defining transformation settings.
+#[wasm_bindgen(js_name = neutralizeAndZscore)]
 pub fn neutralize_and_zscore(
     values: JsValue,
     time_key: JsValue,
@@ -283,8 +283,8 @@ pub fn neutralize_and_zscore(
 }
 
 /// Apply a JSON panel transform pipeline.
-#[wasm_bindgen(js_name = transformPanel)]
 /// @param spec_json - Canonical panel-transformation JSON specifying input columns, operations, and parameters.
+#[wasm_bindgen(js_name = transformPanel)]
 pub fn transform_panel(spec_json: &str) -> Result<String, JsValue> {
     finstack_quant_features::transform_panel(spec_json).map_err(to_js_err)
 }

@@ -154,10 +154,15 @@ jobs:
           cache: true
           cache_save: false
 
+      - name: Install WASM dependencies
+        run: npm ci --ignore-scripts
+        working-directory: finstack-quant-wasm
+
       - name: Build and verify documentation
         run: |
           mise run rust-doc
           mise run python-doc
+          mise run wasm-doc
 
   # ============================================
   # Test Python — maturin build + pytest

@@ -25,13 +25,13 @@ pub struct WasmSabrParameters {
 
 #[wasm_bindgen(js_class = SabrParameters)]
 impl WasmSabrParameters {
-    #[wasm_bindgen(constructor)]
     /// Create the object from its inputs.
     /// @param alpha - Positive SABR initial volatility scale parameter.
     /// @param beta - SABR CEV elasticity parameter from 0 through 1.
     /// @param nu - Positive SABR volatility-of-volatility parameter.
     /// @param rho - Instantaneous correlation between the asset and variance shocks.
     /// @param shift - Additive SABR rate shift applied to forward and strike before modelling.
+    #[wasm_bindgen(constructor)]
     pub fn new(
         alpha: f64,
         beta: f64,
@@ -47,54 +47,54 @@ impl WasmSabrParameters {
         Ok(Self { inner })
     }
 
-    #[wasm_bindgen(js_name = equityDefault)]
     /// Default SABR parameters for equity underlyings.
+    #[wasm_bindgen(js_name = equityDefault)]
     pub fn equity_default() -> WasmSabrParameters {
         Self {
             inner: SABRParameters::equity_default(),
         }
     }
 
-    #[wasm_bindgen(js_name = ratesDefault)]
     /// Default SABR parameters for rates underlyings.
+    #[wasm_bindgen(js_name = ratesDefault)]
     pub fn rates_default() -> WasmSabrParameters {
         Self {
             inner: SABRParameters::rates_default(),
         }
     }
 
-    #[wasm_bindgen(getter)]
     /// SABR `alpha` (ATM volatility level).
+    #[wasm_bindgen(getter)]
     pub fn alpha(&self) -> f64 {
         self.inner.alpha
     }
 
-    #[wasm_bindgen(getter)]
     /// SABR `beta` (backbone exponent).
+    #[wasm_bindgen(getter)]
     pub fn beta(&self) -> f64 {
         self.inner.beta
     }
 
-    #[wasm_bindgen(getter)]
     /// SABR `nu` (vol-of-vol).
+    #[wasm_bindgen(getter)]
     pub fn nu(&self) -> f64 {
         self.inner.nu
     }
 
-    #[wasm_bindgen(getter)]
     /// SABR `rho` (spot/vol correlation).
+    #[wasm_bindgen(getter)]
     pub fn rho(&self) -> f64 {
         self.inner.rho
     }
 
-    #[wasm_bindgen(getter)]
     /// Displacement applied for shifted SABR, if any.
+    #[wasm_bindgen(getter)]
     pub fn shift(&self) -> Option<f64> {
         self.inner.shift
     }
 
-    #[wasm_bindgen(js_name = isShifted)]
     /// Whether a displacement (shift) is configured.
+    #[wasm_bindgen(js_name = isShifted)]
     pub fn is_shifted(&self) -> bool {
         self.inner.is_shifted()
     }
@@ -118,20 +118,20 @@ pub struct WasmSabrModel {
 
 #[wasm_bindgen(js_class = SabrModel)]
 impl WasmSabrModel {
-    #[wasm_bindgen(constructor)]
     /// Create the object from its inputs.
     /// @param params - SABR parameter object containing alpha, beta, nu, rho, and optional shift.
+    #[wasm_bindgen(constructor)]
     pub fn new(params: &WasmSabrParameters) -> WasmSabrModel {
         Self {
             inner: SABRModel::new(params.clone_inner()),
         }
     }
 
-    #[wasm_bindgen(js_name = impliedVol)]
     /// Black implied volatility for the given strike.
     /// @param forward - Forward price or rate in the same quote convention as the strike.
     /// @param strike - Option strike price in the same price units as the underlying.
     /// @param t - Time from the curve base date in years on the documented day-count basis.
+    #[wasm_bindgen(js_name = impliedVol)]
     pub fn implied_vol(&self, forward: f64, strike: f64, t: f64) -> Result<f64, JsValue> {
         self.inner
             .implied_volatility(forward, strike, t)
@@ -146,8 +146,8 @@ impl WasmSabrModel {
         }
     }
 
-    #[wasm_bindgen(js_name = supportsNegativeRates)]
     /// Whether the parameterization admits negative forwards.
+    #[wasm_bindgen(js_name = supportsNegativeRates)]
     pub fn supports_negative_rates(&self) -> bool {
         self.inner.supports_negative_rates()
     }
@@ -165,11 +165,11 @@ pub struct WasmSabrSmile {
 
 #[wasm_bindgen(js_class = SabrSmile)]
 impl WasmSabrSmile {
-    #[wasm_bindgen(constructor)]
     /// Create the object from its inputs.
     /// @param params - SABR parameter object containing alpha, beta, nu, rho, and optional shift.
     /// @param forward - Forward price or rate in the same quote convention as the strike.
     /// @param t - Time from the curve base date in years on the documented day-count basis.
+    #[wasm_bindgen(constructor)]
     pub fn new(params: &WasmSabrParameters, forward: f64, t: f64) -> WasmSabrSmile {
         let model = SABRModel::new(params.clone_inner());
         Self {
@@ -177,15 +177,15 @@ impl WasmSabrSmile {
         }
     }
 
-    #[wasm_bindgen(js_name = atmVol)]
     /// At-the-money implied volatility.
+    #[wasm_bindgen(js_name = atmVol)]
     pub fn atm_vol(&self) -> Result<f64, JsValue> {
         self.inner.atm_vol().map_err(to_js_err)
     }
 
-    #[wasm_bindgen(js_name = impliedVol)]
     /// Black implied volatility for the given strike.
     /// @param strike - Option strike price in the same price units as the underlying.
+    #[wasm_bindgen(js_name = impliedVol)]
     pub fn implied_vol(&self, strike: f64) -> Result<f64, JsValue> {
         self.inner
             .generate_smile(&[strike])
@@ -193,9 +193,9 @@ impl WasmSabrSmile {
             .map_err(to_js_err)
     }
 
-    #[wasm_bindgen(js_name = generateSmile)]
     /// Implied volatilities for a strike grid.
     /// @param strikes - Option strikes at which to evaluate the SABR volatility smile.
+    #[wasm_bindgen(js_name = generateSmile)]
     pub fn generate_smile(&self, strikes: Vec<f64>) -> Result<Vec<f64>, JsValue> {
         self.inner.generate_smile(&strikes).map_err(to_js_err)
     }
@@ -205,10 +205,10 @@ impl WasmSabrSmile {
     /// Returns a JSON object with `arbitrage_free`, `butterfly_violations`,
     /// and `monotonicity_violations` arrays (snake_case keys matching the Rust
     /// canonical fields and the Python binding).
-    #[wasm_bindgen(js_name = arbitrageDiagnostics)]
     /// @param strikes - Ordered option strikes used to test the calibrated smile for static arbitrage.
     /// @param r - Continuously compounded risk-free rate, expressed as a decimal.
     /// @param q - Continuous dividend yield or foreign rate, expressed as a decimal.
+    #[wasm_bindgen(js_name = arbitrageDiagnostics)]
     pub fn arbitrage_diagnostics(
         &self,
         strikes: Vec<f64>,
@@ -266,16 +266,16 @@ pub struct WasmSabrCalibrator {
 
 #[wasm_bindgen(js_class = SabrCalibrator)]
 impl WasmSabrCalibrator {
-    #[wasm_bindgen(constructor)]
     /// Create the object from its inputs.
+    #[wasm_bindgen(constructor)]
     pub fn new() -> WasmSabrCalibrator {
         Self {
             inner: SABRCalibrator::new(),
         }
     }
 
-    #[wasm_bindgen(js_name = highPrecision)]
     /// Calibrator preset with tighter convergence tolerances.
+    #[wasm_bindgen(js_name = highPrecision)]
     pub fn high_precision() -> WasmSabrCalibrator {
         Self {
             inner: SABRCalibrator::high_precision(),
@@ -285,8 +285,8 @@ impl WasmSabrCalibrator {
     /// Return a copy of this calibrator with an overridden convergence
     /// tolerance, preserving all other settings (e.g. the iteration cap from
     /// `highPrecision`).
-    #[wasm_bindgen(js_name = withTolerance)]
     /// @param tolerance - Non-negative numerical convergence tolerance for the calibration optimizer.
+    #[wasm_bindgen(js_name = withTolerance)]
     pub fn with_tolerance(&self, tolerance: f64) -> WasmSabrCalibrator {
         Self {
             inner: self.inner.clone().with_tolerance(tolerance),
@@ -319,12 +319,12 @@ impl WasmSabrCalibrator {
     /// When the forward or any strike is negative, a shifted-SABR fit is
     /// performed with an automatically chosen shift; otherwise this behaves
     /// like `calibrate`.
-    #[wasm_bindgen(js_name = calibrateAutoShift)]
     /// @param forward - Forward price or rate in the same quote convention as the strike.
     /// @param strikes - Option strikes aligned one-for-one with market_vols.
     /// @param market_vols - Market-implied annualized volatilities aligned one-for-one with strikes.
     /// @param t - Time from the curve base date in years on the documented day-count basis.
     /// @param beta - SABR CEV elasticity parameter held fixed during calibration.
+    #[wasm_bindgen(js_name = calibrateAutoShift)]
     pub fn calibrate_auto_shift(
         &self,
         forward: f64,

@@ -91,21 +91,20 @@ fn estimate_to_js(est: &MoneyEstimate) -> Result<JsValue, JsValue> {
 }
 
 /// Resolve the embedded binding defaults from the registry.
-fn binding_defaults(
-) -> Result<&'static finstack_quant_monte_carlo::registry::PythonBindingDefaults, JsValue> {
+fn binding_defaults()
+-> Result<&'static finstack_quant_monte_carlo::registry::PythonBindingDefaults, JsValue> {
     finstack_quant_monte_carlo::registry::embedded_defaults()
         .map(|defaults| &defaults.python_bindings)
         .map_err(to_js_err)
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Price a European call option via Monte Carlo under GBM dynamics.
 ///
 /// Returns a JSON object with `mean`, `currency`, `stderr`, `std_dev`,
 /// `ci_lower`, `ci_upper`, `num_paths`, `num_simulated_paths`, `num_skipped`,
 /// `median`, `percentile_25`, `percentile_75`, `min`, `max`, and
 /// `relative_stderr`.
-#[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = priceEuropeanCall)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -116,6 +115,7 @@ fn binding_defaults(
 /// @param seed - Deterministic random-number seed used to reproduce simulation output.
 /// @param num_steps - Number of time steps per simulated path.
 /// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+#[wasm_bindgen(js_name = priceEuropeanCall)]
 pub fn price_european_call(
     spot: f64,
     strike: f64,
@@ -133,14 +133,13 @@ pub fn price_european_call(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Price a European put option via Monte Carlo under GBM dynamics.
 ///
 /// Returns a JSON object with `mean`, `currency`, `stderr`, `std_dev`,
 /// `ci_lower`, `ci_upper`, `num_paths`, `num_simulated_paths`, `num_skipped`,
 /// `median`, `percentile_25`, `percentile_75`, `min`, `max`, and
 /// `relative_stderr`.
-#[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = priceEuropeanPut)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -151,6 +150,7 @@ pub fn price_european_call(
 /// @param seed - Deterministic random-number seed used to reproduce simulation output.
 /// @param num_steps - Number of time steps per simulated path.
 /// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+#[wasm_bindgen(js_name = priceEuropeanPut)]
 pub fn price_european_put(
     spot: f64,
     strike: f64,
@@ -197,9 +197,8 @@ fn price_european(
     estimate_to_js(&est)
 }
 
-/// Price a European call under Heston stochastic volatility.
 #[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = priceHestonCall)]
+/// Price a European call under Heston stochastic volatility.
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -214,6 +213,7 @@ fn price_european(
 /// @param seed - Deterministic random-number seed used to reproduce simulation output.
 /// @param num_steps - Number of time steps per simulated path.
 /// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+#[wasm_bindgen(js_name = priceHestonCall)]
 pub fn price_heston_call(
     spot: f64,
     strike: f64,
@@ -236,9 +236,8 @@ pub fn price_heston_call(
     )
 }
 
-/// Price a European put under Heston stochastic volatility.
 #[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = priceHestonPut)]
+/// Price a European put under Heston stochastic volatility.
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -253,6 +252,7 @@ pub fn price_heston_call(
 /// @param seed - Deterministic random-number seed used to reproduce simulation output.
 /// @param num_steps - Number of time steps per simulated path.
 /// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+#[wasm_bindgen(js_name = priceHestonPut)]
 pub fn price_heston_put(
     spot: f64,
     strike: f64,
@@ -280,13 +280,13 @@ pub fn price_heston_put(
 // ---------------------------------------------------------------------------
 
 /// Black-Scholes call price.
-#[wasm_bindgen(js_name = blackScholesCall)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
 /// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
 /// @param expiry - Time to option expiry in years on the model's annual time basis.
+#[wasm_bindgen(js_name = blackScholesCall)]
 pub fn black_scholes_call(
     spot: f64,
     strike: f64,
@@ -301,13 +301,13 @@ pub fn black_scholes_call(
 }
 
 /// Black-Scholes put price.
-#[wasm_bindgen(js_name = blackScholesPut)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
 /// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
 /// @param expiry - Time to option expiry in years on the model's annual time basis.
+#[wasm_bindgen(js_name = blackScholesPut)]
 pub fn black_scholes_put(
     spot: f64,
     strike: f64,
@@ -325,9 +325,8 @@ pub fn black_scholes_put(
 // Path-dependent pricing
 // ---------------------------------------------------------------------------
 
-/// Price an Asian call via Monte Carlo under GBM dynamics.
 #[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = priceAsianCall)]
+/// Price an Asian call via Monte Carlo under GBM dynamics.
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -338,6 +337,7 @@ pub fn black_scholes_put(
 /// @param seed - Deterministic random-number seed used to reproduce simulation output.
 /// @param num_steps - Number of time steps per simulated path.
 /// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+#[wasm_bindgen(js_name = priceAsianCall)]
 pub fn price_asian_call(
     spot: f64,
     strike: f64,
@@ -355,9 +355,8 @@ pub fn price_asian_call(
     )
 }
 
-/// Price an Asian put via Monte Carlo under GBM dynamics.
 #[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = priceAsianPut)]
+/// Price an Asian put via Monte Carlo under GBM dynamics.
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -368,6 +367,7 @@ pub fn price_asian_call(
 /// @param seed - Deterministic random-number seed used to reproduce simulation output.
 /// @param num_steps - Number of time steps per simulated path.
 /// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+#[wasm_bindgen(js_name = priceAsianPut)]
 pub fn price_asian_put(
     spot: f64,
     strike: f64,
@@ -400,7 +400,7 @@ fn price_asian(
     currency: Option<String>,
 ) -> Result<JsValue, JsValue> {
     use finstack_quant_monte_carlo::payoff::asian::{
-        default_fixing_steps, AsianCall, AsianPut, AveragingMethod,
+        AsianCall, AsianPut, AveragingMethod, default_fixing_steps,
     };
     use finstack_quant_monte_carlo::pricer::path_dependent::{
         PathDependentPricer, PathDependentPricerConfig,
@@ -429,6 +429,7 @@ fn price_asian(
     estimate_to_js(&est)
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Price an American put via LSMC under GBM dynamics.
 ///
 /// Optional knobs:
@@ -437,8 +438,6 @@ fn price_asian(
 ///   `"polynomial"`, or `"normalized_polynomial"`.
 /// - `basis_degree` (default `3`): polynomial/Laguerre degree. Must be
 ///   positive; `"laguerre"` additionally requires degree in `[1, 4]`.
-#[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = priceAmericanPut)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -452,6 +451,7 @@ fn price_asian(
 /// @param use_parallel - Whether simulation paths are evaluated in parallel when supported.
 /// @param basis - Regression basis family used by the American-option exercise estimator.
 /// @param basis_degree - Maximum polynomial degree used by the American-option exercise basis.
+#[wasm_bindgen(js_name = priceAmericanPut)]
 pub fn price_american_put(
     spot: f64,
     strike: f64,
@@ -488,11 +488,10 @@ pub fn price_american_put(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Price an American call via LSMC under GBM dynamics.
 ///
 /// Optional knobs match [`price_american_put`].
-#[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = priceAmericanCall)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -506,6 +505,7 @@ pub fn price_american_put(
 /// @param use_parallel - Whether simulation paths are evaluated in parallel when supported.
 /// @param basis - Regression basis family used by the American-option exercise estimator.
 /// @param basis_degree - Maximum polynomial degree used by the American-option exercise basis.
+#[wasm_bindgen(js_name = priceAmericanCall)]
 pub fn price_american_call(
     spot: f64,
     strike: f64,
@@ -542,9 +542,8 @@ pub fn price_american_call(
     )
 }
 
-/// Two-pass unbiased American put price (training fit + out-of-sample pricing).
 #[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = priceAmericanPutUnbiased)]
+/// Two-pass unbiased American put price (training fit + out-of-sample pricing).
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -559,6 +558,7 @@ pub fn price_american_call(
 /// @param use_parallel - Whether simulation paths are evaluated in parallel when supported.
 /// @param basis - Regression basis family used by the American-option exercise estimator.
 /// @param basis_degree - Maximum polynomial degree used by the American-option exercise basis.
+#[wasm_bindgen(js_name = priceAmericanPutUnbiased)]
 pub fn price_american_put_unbiased(
     spot: f64,
     strike: f64,
@@ -597,9 +597,8 @@ pub fn price_american_put_unbiased(
     )
 }
 
-/// Two-pass unbiased American call price (training fit + out-of-sample pricing).
 #[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = priceAmericanCallUnbiased)]
+/// Two-pass unbiased American call price (training fit + out-of-sample pricing).
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -614,6 +613,7 @@ pub fn price_american_put_unbiased(
 /// @param use_parallel - Whether simulation paths are evaluated in parallel when supported.
 /// @param basis - Regression basis family used by the American-option exercise estimator.
 /// @param basis_degree - Maximum polynomial degree used by the American-option exercise basis.
+#[wasm_bindgen(js_name = priceAmericanCallUnbiased)]
 pub fn price_american_call_unbiased(
     spot: f64,
     strike: f64,

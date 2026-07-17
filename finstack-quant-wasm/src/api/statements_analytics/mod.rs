@@ -17,9 +17,9 @@ use wasm_bindgen::prelude::*;
 ///
 /// Accepts JSON strings for the model spec and sensitivity configuration,
 /// evaluates all perturbation scenarios, and returns JSON results.
-#[wasm_bindgen(js_name = runSensitivity)]
 /// @param model_json - Canonical JSON payload representing the model consumed by this API.
 /// @param config_json - Canonical JSON payload representing the config consumed by this API.
+#[wasm_bindgen(js_name = runSensitivity)]
 pub fn run_sensitivity(model_json: &str, config_json: &str) -> Result<String, JsValue> {
     let model: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
@@ -36,10 +36,10 @@ pub fn run_sensitivity(model_json: &str, config_json: &str) -> Result<String, Js
 /// Run a variance analysis comparing two evaluated statement results.
 ///
 /// Returns JSON-serialized variance report.
-#[wasm_bindgen(js_name = runVariance)]
 /// @param base_json - Canonical JSON payload representing the base consumed by this API.
 /// @param comparison_json - Canonical JSON payload representing the comparison consumed by this API.
 /// @param config_json - Canonical JSON payload representing the config consumed by this API.
+#[wasm_bindgen(js_name = runVariance)]
 pub fn run_variance(
     base_json: &str,
     comparison_json: &str,
@@ -64,9 +64,9 @@ pub fn run_variance(
 /// Evaluate all scenarios in a scenario set against a base model.
 ///
 /// Returns a JSON object mapping scenario names to their statement results.
-#[wasm_bindgen(js_name = evaluateScenarioSet)]
 /// @param model_json - Canonical JSON payload representing the model consumed by this API.
 /// @param scenario_set_json - Canonical JSON payload representing the scenario set consumed by this API.
+#[wasm_bindgen(js_name = evaluateScenarioSet)]
 pub fn evaluate_scenario_set(model_json: &str, scenario_set_json: &str) -> Result<String, JsValue> {
     let model: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
@@ -85,9 +85,9 @@ pub fn evaluate_scenario_set(model_json: &str, scenario_set_json: &str) -> Resul
 ///
 /// Takes two float arrays (actual, forecast) and returns a JSON object
 /// with keys `mae`, `mape`, `rmse`, `n`.
-#[wasm_bindgen(js_name = backtestForecast)]
 /// @param actual - Actual realized values aligned one-for-one with the forecast series.
 /// @param forecast - Forecast values aligned one-for-one with the actual realized series.
+#[wasm_bindgen(js_name = backtestForecast)]
 pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, JsValue> {
     let actual_vec: Vec<f64> = serde_wasm_bindgen::from_value(actual).map_err(to_js_err)?;
     let forecast_vec: Vec<f64> = serde_wasm_bindgen::from_value(forecast).map_err(to_js_err)?;
@@ -108,10 +108,10 @@ pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, 
 }
 
 /// Generate tornado chart entries for a sensitivity result.
-#[wasm_bindgen(js_name = generateTornadoEntries)]
 /// @param result_json - Canonical JSON payload representing the result consumed by this API.
 /// @param metric_node - Statement metric node identifier selected for the requested analysis.
 /// @param period - Model period label for the requested statement value or calculation.
+#[wasm_bindgen(js_name = generateTornadoEntries)]
 pub fn generate_tornado_entries(
     result_json: &str,
     metric_node: &str,
@@ -130,9 +130,9 @@ pub fn generate_tornado_entries(
 }
 
 /// Run Monte Carlo simulation on a financial model (JSON in/out).
-#[wasm_bindgen(js_name = runMonteCarlo)]
 /// @param model_json - Canonical JSON payload representing the model consumed by this API.
 /// @param config_json - Canonical JSON payload representing the config consumed by this API.
+#[wasm_bindgen(js_name = runMonteCarlo)]
 pub fn run_monte_carlo(model_json: &str, config_json: &str) -> Result<String, JsValue> {
     let model: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
@@ -146,8 +146,6 @@ pub fn run_monte_carlo(model_json: &str, config_json: &str) -> Result<String, Js
 }
 
 /// Find the driver value that makes a target node reach a target value.
-#[wasm_bindgen(js_name = goalSeek)]
-#[allow(clippy::too_many_arguments)]
 /// @param model_json - Canonical JSON payload representing the model consumed by this API.
 /// @param target_node - Statement node identifier whose value is driven toward the target.
 /// @param target_period - Model period label in which the goal-seek target is evaluated.
@@ -157,6 +155,8 @@ pub fn run_monte_carlo(model_json: &str, config_json: &str) -> Result<String, Js
 /// @param update_model - Whether to return the model with the solved driver value applied.
 /// @param bounds_lo - Lower numeric bound allowed for the goal-seek driver.
 /// @param bounds_hi - Upper numeric bound allowed for the goal-seek driver.
+#[wasm_bindgen(js_name = goalSeek)]
+#[allow(clippy::too_many_arguments)]
 pub fn goal_seek(
     model_json: &str,
     target_node: &str,
@@ -221,9 +221,9 @@ fn goal_seek_bounds(
 }
 
 /// Trace dependencies for a node and return ASCII tree.
-#[wasm_bindgen(js_name = traceDependencies)]
 /// @param model_json - Canonical JSON payload representing the model consumed by this API.
 /// @param node_id - Stable node identifier used to select the required domain object.
+#[wasm_bindgen(js_name = traceDependencies)]
 pub fn trace_dependencies(model_json: &str, node_id: &str) -> Result<String, JsValue> {
     let model: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
@@ -236,11 +236,11 @@ pub fn trace_dependencies(model_json: &str, node_id: &str) -> Result<String, JsV
 }
 
 /// Explain a formula for a specific node and period (JSON in/out).
-#[wasm_bindgen(js_name = explainFormula)]
 /// @param model_json - Canonical JSON payload representing the model consumed by this API.
 /// @param results_json - Canonical JSON payload representing the results consumed by this API.
 /// @param node_id - Stable node identifier used to select the required domain object.
 /// @param period - Model period label for the requested statement value or calculation.
+#[wasm_bindgen(js_name = explainFormula)]
 pub fn explain_formula(
     model_json: &str,
     results_json: &str,
@@ -259,11 +259,11 @@ pub fn explain_formula(
 }
 
 /// Explain a formula for a specific node and period as formatted text.
-#[wasm_bindgen(js_name = explainFormulaText)]
 /// @param model_json - Canonical JSON payload representing the model consumed by this API.
 /// @param results_json - Canonical JSON payload representing the results consumed by this API.
 /// @param node_id - Stable node identifier used to select the required domain object.
 /// @param period - Model period label for the requested statement value or calculation.
+#[wasm_bindgen(js_name = explainFormulaText)]
 pub fn explain_formula_text(
     model_json: &str,
     results_json: &str,
@@ -282,10 +282,10 @@ pub fn explain_formula_text(
 }
 
 /// Generate a P&L summary report as formatted text.
-#[wasm_bindgen(js_name = plSummaryReport)]
 /// @param results_json - Canonical JSON payload representing the results consumed by this API.
 /// @param line_items - Ordered statement line-item definitions included in the summary report.
 /// @param periods - Ordered period labels or observations aligned with the supplied data.
+#[wasm_bindgen(js_name = plSummaryReport)]
 pub fn pl_summary_report(
     results_json: &str,
     line_items: JsValue,
@@ -308,9 +308,9 @@ pub fn pl_summary_report(
 }
 
 /// Generate a credit assessment report as formatted text.
-#[wasm_bindgen(js_name = creditAssessmentReport)]
 /// @param results_json - Canonical JSON payload representing the results consumed by this API.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+#[wasm_bindgen(js_name = creditAssessmentReport)]
 pub fn credit_assessment_report(results_json: &str, as_of: &str) -> Result<String, JsValue> {
     use finstack_quant_statements_analytics::analysis::Report;
 
@@ -324,9 +324,9 @@ pub fn credit_assessment_report(results_json: &str, as_of: &str) -> Result<Strin
 }
 
 /// Compute a structured credit assessment (leverage, coverage, FCF) as JSON.
-#[wasm_bindgen(js_name = creditAssessment)]
 /// @param results_json - Canonical JSON payload representing the results consumed by this API.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+#[wasm_bindgen(js_name = creditAssessment)]
 pub fn credit_assessment(results_json: &str, as_of: &str) -> Result<String, JsValue> {
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
@@ -341,10 +341,10 @@ pub fn credit_assessment(results_json: &str, as_of: &str) -> Result<String, JsVa
 /// Evaluates the model, resolves the suite spec into runnable checks
 /// (built-in **and** user-defined formula checks), and returns a JSON
 /// check report.
-#[wasm_bindgen(js_name = runChecks)]
 /// @param model_json - Canonical JSON payload representing the model consumed by this API.
 /// @param suite_spec_json - Canonical JSON payload representing the suite spec consumed by this API.
 /// @param results_json - Canonical JSON payload representing the results consumed by this API.
+#[wasm_bindgen(js_name = runChecks)]
 pub fn run_checks(
     model_json: &str,
     suite_spec_json: &str,
@@ -365,10 +365,10 @@ pub fn run_checks(
 ///
 /// Accepts a model and a mapping JSON, builds the appropriate check
 /// suite, evaluates the model, runs the checks, and returns the report.
-#[wasm_bindgen(js_name = runThreeStatementChecks)]
 /// @param model_json - Canonical JSON payload representing the model consumed by this API.
 /// @param mapping_json - Canonical JSON payload representing the mapping consumed by this API.
 /// @param results_json - Canonical JSON payload representing the results consumed by this API.
+#[wasm_bindgen(js_name = runThreeStatementChecks)]
 pub fn run_three_statement_checks(
     model_json: &str,
     mapping_json: &str,
@@ -385,10 +385,10 @@ pub fn run_three_statement_checks(
 }
 
 /// Run credit underwriting checks using credit-specific mappings.
-#[wasm_bindgen(js_name = runCreditUnderwritingChecks)]
 /// @param model_json - Canonical JSON payload representing the model consumed by this API.
 /// @param mapping_json - Canonical JSON payload representing the mapping consumed by this API.
 /// @param results_json - Canonical JSON payload representing the results consumed by this API.
+#[wasm_bindgen(js_name = runCreditUnderwritingChecks)]
 pub fn run_credit_underwriting_checks(
     model_json: &str,
     mapping_json: &str,
@@ -418,8 +418,8 @@ fn evaluate_or_parse_results(
 }
 
 /// Render a check report as plain text.
-#[wasm_bindgen(js_name = renderCheckReportText)]
 /// @param report_json - Canonical JSON payload representing the report consumed by this API.
+#[wasm_bindgen(js_name = renderCheckReportText)]
 pub fn render_check_report_text(report_json: &str) -> Result<String, JsValue> {
     let report: finstack_quant_statements::checks::CheckReport =
         serde_json::from_str(report_json).map_err(to_js_err)?;
@@ -427,8 +427,8 @@ pub fn render_check_report_text(report_json: &str) -> Result<String, JsValue> {
 }
 
 /// Render a check report as HTML.
-#[wasm_bindgen(js_name = renderCheckReportHtml)]
 /// @param report_json - Canonical JSON payload representing the report consumed by this API.
+#[wasm_bindgen(js_name = renderCheckReportHtml)]
 pub fn render_check_report_html(report_json: &str) -> Result<String, JsValue> {
     let report: finstack_quant_statements::checks::CheckReport =
         serde_json::from_str(report_json).map_err(to_js_err)?;

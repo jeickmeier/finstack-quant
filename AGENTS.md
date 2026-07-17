@@ -48,17 +48,25 @@
   doctest for every public class, classmethod, and free function is required;
   class examples may cover ordinary instance accessors. State units,
   conventions, accepted strings, shapes, missing-data behavior, defaults, and
-  host-language differences where they affect use. WASM-exposed APIs must
-  preserve equivalent input guidance in Rustdoc/TypeScript-facing
-  documentation.
+  host-language differences where they affect use. The published WASM
+  `index.d.ts` facade must give every exported function, constructor, method,
+  and property a substantive summary, every camelCase parameter, every
+  non-`void` return value, and thrown-error behavior. Namespace and constructor
+  interfaces need runnable TypeScript examples; class examples may cover
+  routine accessors. Preserve equivalent input guidance in the Rustdoc before each
+  `#[wasm_bindgen]` attribute, then run `mise run wasm-pkg`,
+  `node finstack-quant-wasm/scripts/sync-facade-jsdoc.mjs --write`, and
+  `node finstack-quant-wasm/scripts/complete-facade-jsdoc.mjs --write` to
+  update the published facade.
 - Python errors must name the mapped public exception (`ValueError`, `KeyError`,
   `RuntimeError`, or a documented domain-specific subclass) rather than a
   generic "error". Confirm the mapping in `finstack-quant-py/src/errors.rs`
   before documenting it.
 - `mise run rust-doc`, `mise run python-doc`, and `mise run wasm-doc` enforce
-  the exact-parameter and substantive-description standard; `python-doc` also
-  enforces summaries, return descriptions, error behavior, and required usage
-  examples. Update documentation in the same change as any public signature.
+  the exact-parameter and substantive-description standard. `python-doc` and
+  `wasm-doc` also enforce summaries, return descriptions, error behavior,
+  examples where required, and type-check their published declaration surfaces.
+  Update documentation in the same change as any public signature.
 
 ## Architecture: Binding Layer
 

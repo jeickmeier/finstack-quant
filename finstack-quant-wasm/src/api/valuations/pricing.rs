@@ -119,8 +119,8 @@ pub(super) fn standard_option_greeks_with_context(
 /// Deserialize a `ValuationResult` from JSON and return the canonical JSON.
 ///
 /// Validates the input conforms to the `ValuationResult` schema.
-#[wasm_bindgen(js_name = validateValuationResultJson)]
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+#[wasm_bindgen(js_name = validateValuationResultJson)]
 pub fn validate_valuation_result_json(json: &str) -> Result<String, JsValue> {
     let result: ValuationResult = serde_json::from_str(json).map_err(to_js_err)?;
     valuation_result_json(result)
@@ -130,18 +130,18 @@ pub fn validate_valuation_result_json(json: &str) -> Result<String, JsValue> {
 ///
 /// Deserializes the input against the known instrument schema and
 /// returns the canonical (re-serialized) JSON.
-#[wasm_bindgen(js_name = validateInstrumentJson)]
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+#[wasm_bindgen(js_name = validateInstrumentJson)]
 pub fn validate_instrument_json(json: &str) -> Result<String, JsValue> {
     finstack_quant_valuations::pricer::validate_instrument_json(json).map_err(|e| to_js_error(&e))
 }
 
 /// Construct tagged bond instrument JSON from a cashflow schedule.
-#[wasm_bindgen(js_name = bondFromCashflowsJson)]
 /// @param instrument_id - Stable instrument identifier used for pricing and metric keys.
 /// @param schedule_json - Canonical cashflow-schedule JSON used to construct the fixed-income instrument.
 /// @param discount_curve_id - Market-context discount-curve identifier for the instrument currency.
 /// @param quoted_clean - Optional observed clean bond price in the schedule's documented price quotation convention.
+#[wasm_bindgen(js_name = bondFromCashflowsJson)]
 pub fn bond_from_cashflows_json(
     instrument_id: &str,
     schedule_json: &str,
@@ -160,11 +160,11 @@ pub fn bond_from_cashflows_json(
 /// Price an instrument from its tagged JSON and return a ValuationResult JSON.
 ///
 /// Pass `model = "default"` to use the instrument-native default model.
-#[wasm_bindgen(js_name = priceInstrument)]
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param model - Pricing-model identifier; use `"default"` for the instrument-native model when supported.
+#[wasm_bindgen(js_name = priceInstrument)]
 pub fn price_instrument(
     instrument_json: &str,
     market_json: &str,
@@ -179,7 +179,6 @@ pub fn price_instrument(
 /// Price an instrument with explicit metric requests.
 ///
 /// Pass `model = "default"` to use the instrument-native default model.
-#[wasm_bindgen(js_name = priceInstrumentWithMetrics)]
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -187,6 +186,7 @@ pub fn price_instrument(
 /// @param metrics - Array of canonical metric identifiers to calculate with the instrument price.
 /// @param pricing_options - Optional JSON pricing overrides accepted by the canonical instrument validator.
 /// @param market_history - Optional serialized historical market snapshots required by historical pricing models.
+#[wasm_bindgen(js_name = priceInstrumentWithMetrics)]
 pub fn price_instrument_with_metrics(
     instrument_json: &str,
     market_json: &str,
@@ -215,11 +215,11 @@ pub fn price_instrument_with_metrics(
 /// `model` must be `"discounting"` or `"hazard_rate"`. Unsupported models or
 /// incompatible instrument types throw. For supported pairs, the envelope's
 /// `total_pv` matches the instrument's `base_value` within rounding.
-#[wasm_bindgen(js_name = instrumentCashflowsJson)]
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param model - Pricing-model identifier; use `"default"` for the instrument-native model when supported.
+#[wasm_bindgen(js_name = instrumentCashflowsJson)]
 pub fn instrument_cashflows_json(
     instrument_json: &str,
     market_json: &str,
@@ -262,11 +262,11 @@ pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
 /// Price an instrument using a pre-parsed [`Market`].
 ///
 /// Avoids the per-call market-parse overhead of `priceInstrument`.
-#[wasm_bindgen(js_name = priceInstrumentWithMarket)]
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param model - Pricing-model identifier; use `"default"` for the instrument-native model when supported.
+#[wasm_bindgen(js_name = priceInstrumentWithMarket)]
 pub fn price_instrument_with_market(
     instrument_json: &str,
     market: &Market,
@@ -278,7 +278,6 @@ pub fn price_instrument_with_market(
 }
 
 /// Price an instrument with explicit metric requests using a pre-parsed [`Market`].
-#[wasm_bindgen(js_name = priceInstrumentWithMetricsAndMarket)]
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -286,6 +285,7 @@ pub fn price_instrument_with_market(
 /// @param metrics - Array of canonical metric identifiers to calculate with the instrument price.
 /// @param pricing_options - Optional JSON pricing overrides accepted by the canonical instrument validator.
 /// @param market_history - Optional serialized historical market snapshots required by historical pricing models.
+#[wasm_bindgen(js_name = priceInstrumentWithMetricsAndMarket)]
 pub fn price_instrument_with_metrics_and_market(
     instrument_json: &str,
     market: &Market,
@@ -309,11 +309,11 @@ pub fn price_instrument_with_metrics_and_market(
 }
 
 /// Per-flow cashflow envelope using a pre-parsed [`Market`].
-#[wasm_bindgen(js_name = instrumentCashflowsWithMarket)]
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param model - Pricing-model identifier; use `"default"` for the instrument-native model when supported.
+#[wasm_bindgen(js_name = instrumentCashflowsWithMarket)]
 pub fn instrument_cashflows_with_market(
     instrument_json: &str,
     market: &Market,
@@ -369,8 +369,8 @@ mod tests {
     pub(crate) fn bond_instrument_json() -> String {
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::money::Money;
-        use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
         use finstack_quant_valuations::instruments::InstrumentJson;
+        use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
         let bond = Bond::fixed(
             "TEST-BOND",
@@ -385,8 +385,8 @@ mod tests {
     }
 
     pub(crate) fn bermudan_swaption_json() -> String {
-        use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
         use finstack_quant_valuations::instruments::InstrumentJson;
+        use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
 
         serde_json::to_string(&InstrumentJson::BermudanSwaption(
             BermudanSwaption::example(),

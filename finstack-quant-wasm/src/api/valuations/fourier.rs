@@ -9,15 +9,13 @@
 
 use crate::utils::to_js_err;
 use finstack_quant_valuations::pricer::cos::{
+    BlackScholesCosParams, MertonJumpCosParams, VarianceGammaCosParams,
     bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
-    vg_cos_price as rust_vg_cos_price, BlackScholesCosParams, MertonJumpCosParams,
-    VarianceGammaCosParams,
+    vg_cos_price as rust_vg_cos_price,
 };
 use wasm_bindgen::prelude::*;
 
 /// Price a European option under the Black-Scholes model using the COS method.
-#[wasm_bindgen(js_name = bsCosPrice)]
-#[allow(clippy::too_many_arguments)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -26,6 +24,8 @@ use wasm_bindgen::prelude::*;
 /// @param maturity - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`); defaults follow the callable's contract.
 /// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+#[wasm_bindgen(js_name = bsCosPrice)]
+#[allow(clippy::too_many_arguments)]
 pub fn bs_cos_price(
     spot: f64,
     strike: f64,
@@ -50,8 +50,6 @@ pub fn bs_cos_price(
 }
 
 /// Price a European option under the Variance Gamma model using the COS method.
-#[wasm_bindgen(js_name = vgCosPrice)]
-#[allow(clippy::too_many_arguments)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -62,6 +60,8 @@ pub fn bs_cos_price(
 /// @param maturity - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`); defaults follow the callable's contract.
 /// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+#[wasm_bindgen(js_name = vgCosPrice)]
+#[allow(clippy::too_many_arguments)]
 pub fn vg_cos_price(
     spot: f64,
     strike: f64,
@@ -90,8 +90,6 @@ pub fn vg_cos_price(
 }
 
 /// Price a European option under Merton (1976) jump-diffusion using the COS method.
-#[wasm_bindgen(js_name = mertonJumpCosPrice)]
-#[allow(clippy::too_many_arguments)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -103,6 +101,8 @@ pub fn vg_cos_price(
 /// @param maturity - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`); defaults follow the callable's contract.
 /// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+#[wasm_bindgen(js_name = mertonJumpCosPrice)]
+#[allow(clippy::too_many_arguments)]
 pub fn merton_jump_cos_price(
     spot: f64,
     strike: f64,

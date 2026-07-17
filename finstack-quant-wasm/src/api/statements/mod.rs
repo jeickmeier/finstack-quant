@@ -24,8 +24,8 @@ use wasm_bindgen::prelude::*;
 ///
 /// Deserializes the input against the model schema, runs semantic validation,
 /// and returns the canonical (re-serialized) JSON.
-#[wasm_bindgen(js_name = validateFinancialModelJson)]
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+#[wasm_bindgen(js_name = validateFinancialModelJson)]
 pub fn validate_financial_model_json(json: &str) -> Result<String, JsValue> {
     let mut model: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
@@ -36,8 +36,8 @@ pub fn validate_financial_model_json(json: &str) -> Result<String, JsValue> {
 /// Get the node identifiers from a model specification JSON.
 ///
 /// Returns a JS array of node ID strings in declaration order.
-#[wasm_bindgen(js_name = modelNodeIds)]
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+#[wasm_bindgen(js_name = modelNodeIds)]
 pub fn model_node_ids(json: &str) -> Result<JsValue, JsValue> {
     let model: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
@@ -49,8 +49,8 @@ pub fn model_node_ids(json: &str) -> Result<JsValue, JsValue> {
 ///
 /// Deserializes the spec, re-serializes to canonical form, and
 /// returns the JSON string. Useful for client-side validation.
-#[wasm_bindgen(js_name = validateCheckSuiteSpec)]
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+#[wasm_bindgen(js_name = validateCheckSuiteSpec)]
 pub fn validate_check_suite_spec(json: &str) -> Result<String, JsValue> {
     let spec: finstack_quant_statements::checks::CheckSuiteSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
@@ -58,8 +58,8 @@ pub fn validate_check_suite_spec(json: &str) -> Result<String, JsValue> {
 }
 
 /// Validate a `CapitalStructureSpec` JSON string.
-#[wasm_bindgen(js_name = validateCapitalStructureSpec)]
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+#[wasm_bindgen(js_name = validateCapitalStructureSpec)]
 pub fn validate_capital_structure_spec(json: &str) -> Result<String, JsValue> {
     let spec: finstack_quant_statements::types::CapitalStructureSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
@@ -71,8 +71,8 @@ pub fn validate_capital_structure_spec(json: &str) -> Result<String, JsValue> {
 /// Performs both serde deserialization and the waterfall's internal
 /// consistency check (for example rejecting `Sweep` ordered after `Equity`
 /// when an ECF sweep is configured).
-#[wasm_bindgen(js_name = validateWaterfallSpec)]
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+#[wasm_bindgen(js_name = validateWaterfallSpec)]
 pub fn validate_waterfall_spec(json: &str) -> Result<String, JsValue> {
     let spec: finstack_quant_statements::capital_structure::WaterfallSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
@@ -81,8 +81,8 @@ pub fn validate_waterfall_spec(json: &str) -> Result<String, JsValue> {
 }
 
 /// Validate an `EcfSweepSpec` JSON string.
-#[wasm_bindgen(js_name = validateEcfSweepSpec)]
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+#[wasm_bindgen(js_name = validateEcfSweepSpec)]
 pub fn validate_ecf_sweep_spec(json: &str) -> Result<String, JsValue> {
     let spec: finstack_quant_statements::capital_structure::EcfSweepSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
@@ -90,8 +90,8 @@ pub fn validate_ecf_sweep_spec(json: &str) -> Result<String, JsValue> {
 }
 
 /// Validate a `PikToggleSpec` JSON string.
-#[wasm_bindgen(js_name = validatePikToggleSpec)]
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+#[wasm_bindgen(js_name = validatePikToggleSpec)]
 pub fn validate_pik_toggle_spec(json: &str) -> Result<String, JsValue> {
     let spec: finstack_quant_statements::capital_structure::PikToggleSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
@@ -103,8 +103,8 @@ pub fn validate_pik_toggle_spec(json: &str) -> Result<String, JsValue> {
 // ---------------------------------------------------------------------------
 
 /// Evaluate a `FinancialModelSpec` and return the `StatementResult` JSON.
-#[wasm_bindgen(js_name = evaluateModel)]
 /// @param model_json - JSON-serialized FinancialModelSpec to evaluate across its statement periods.
+#[wasm_bindgen(js_name = evaluateModel)]
 pub fn evaluate_model(model_json: &str) -> Result<String, JsValue> {
     let mut model: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
@@ -121,10 +121,10 @@ pub fn evaluate_model(model_json: &str) -> Result<String, JsValue> {
 ///
 /// Required for capital-structure-aware models. The `as_of` argument is an
 /// ISO 8601 date string (e.g. `"2025-01-15"`).
-#[wasm_bindgen(js_name = evaluateModelWithMarket)]
 /// @param model_json - JSON-serialized FinancialModelSpec to evaluate across its statement periods.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+#[wasm_bindgen(js_name = evaluateModelWithMarket)]
 pub fn evaluate_model_with_market(
     model_json: &str,
     market_json: &str,
@@ -153,8 +153,8 @@ pub fn evaluate_model_with_market(
 ///
 /// Useful for previewing expression structure in UI tooling before
 /// committing a formula to a model.
-#[wasm_bindgen(js_name = parseFormula)]
 /// @param formula - Financial-model formula string to parse into its canonical expression representation.
+#[wasm_bindgen(js_name = parseFormula)]
 pub fn parse_formula(formula: &str) -> Result<String, JsValue> {
     let ast = finstack_quant_statements::dsl::parse_formula(formula).map_err(to_js_err)?;
     Ok(format!("{ast:?}"))
@@ -164,8 +164,8 @@ pub fn parse_formula(formula: &str) -> Result<String, JsValue> {
 ///
 /// Returns `true` when the formula is valid; throws a `FinstackError`
 /// otherwise. This mirrors the Python `validate_formula` API.
-#[wasm_bindgen(js_name = validateFormula)]
 /// @param formula - Financial-model formula string to parse and validate without evaluation.
+#[wasm_bindgen(js_name = validateFormula)]
 pub fn validate_formula(formula: &str) -> Result<bool, JsValue> {
     finstack_quant_statements::dsl::parse_and_compile(formula).map_err(to_js_err)?;
     Ok(true)

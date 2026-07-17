@@ -13,12 +13,12 @@ use wasm_bindgen::prelude::*;
 /// Discount margin (decimal) for a floating-rate tranche.
 ///
 /// `targetPv` is interpreted in the named tranche's currency.
-#[wasm_bindgen(js_name = structuredCreditTrancheDiscountMargin)]
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
 /// @param target_pv - Target tranche present value in the named tranche's currency.
+#[wasm_bindgen(js_name = structuredCreditTrancheDiscountMargin)]
 pub fn structured_credit_tranche_discount_margin(
     instrument_json: &str,
     market_json: &str,
@@ -40,11 +40,11 @@ pub fn structured_credit_tranche_discount_margin(
 
 /// Break-even constant default rate (CDR, decimal) for a tranche — the highest
 /// CDR at which the tranche takes no principal writedown.
-#[wasm_bindgen(js_name = structuredCreditTrancheBreakevenCdr)]
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
+#[wasm_bindgen(js_name = structuredCreditTrancheBreakevenCdr)]
 pub fn structured_credit_tranche_breakeven_cdr(
     instrument_json: &str,
     market_json: &str,
@@ -66,13 +66,13 @@ pub fn structured_credit_tranche_breakeven_cdr(
 ///
 /// `marketPricePct` is the quoted price as a percentage of original balance.
 /// `config`, when present, is a JSON `OasConfig`; the default is used otherwise.
-#[wasm_bindgen(js_name = structuredCreditTrancheOas)]
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
 /// @param market_price_pct - Tranche market price as a percentage of original balance.
 /// @param config - Optional OasConfig JSON; omit to use the default OAS solver configuration.
+#[wasm_bindgen(js_name = structuredCreditTrancheOas)]
 pub fn structured_credit_tranche_oas(
     instrument_json: &str,
     market_json: &str,
@@ -98,12 +98,12 @@ pub fn structured_credit_tranche_oas(
 /// Scenario (CPR x CDR x severity) table for a tranche; returns a JSON
 /// `ScenarioTable`. `grid` is a JSON `ScenarioGrid` (`cprs`, `cdrs`,
 /// `severities`).
-#[wasm_bindgen(js_name = structuredCreditTrancheScenarioTable)]
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
 /// @param grid - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.
+#[wasm_bindgen(js_name = structuredCreditTrancheScenarioTable)]
 pub fn structured_credit_tranche_scenario_table(
     instrument_json: &str,
     market_json: &str,
@@ -130,12 +130,12 @@ pub fn structured_credit_tranche_scenario_table(
 /// `marketPricePct`, when provided, is the quoted price (% of original balance)
 /// the z-spread and CS01 are solved against; otherwise the tranche's own model
 /// price is used (zero z-spread). Returns a JSON-serialized `TrancheMetrics`.
-#[wasm_bindgen(js_name = structuredCreditTrancheMetrics)]
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
 /// @param market_price_pct - Optional tranche market price as a percentage of original balance; omit for model price.
+#[wasm_bindgen(js_name = structuredCreditTrancheMetrics)]
 pub fn structured_credit_tranche_metrics(
     instrument_json: &str,
     market_json: &str,

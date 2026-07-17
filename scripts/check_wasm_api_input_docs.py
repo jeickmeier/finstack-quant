@@ -3,7 +3,8 @@
 Rustdoc attached to ``#[wasm_bindgen]`` exports is copied into the generated
 TypeScript declarations.  Every JavaScript-facing callable that accepts a
 caller-supplied input must therefore document each input with a substantive
-``@param`` entry in the source-of-truth Rust doc comment.
+``@param`` entry in the source-of-truth Rust doc comment. The comment must
+appear before its ``#[wasm_bindgen]`` attribute so wasm-bindgen can retain it.
 """
 
 from __future__ import annotations
@@ -48,6 +49,7 @@ class FunctionSignature:
     line: int
     parameters: list[str]
     docstring: str
+    docstring_below_wasm_bindgen: bool
 
 
 def strip_rust_comments(line: str) -> str:
@@ -95,18 +97,57 @@ def docstring_before(lines: list[str], index: int) -> str:
     """Collect Rustdoc immediately attached to an attributed public function."""
     fragments: list[str] = []
     cursor = index - 1
+    attribute_depth = 0
     while cursor >= 0:
         line = lines[cursor]
+        stripped = line.strip()
         match = DOC_COMMENT_RE.match(line)
         if match is not None:
             fragments.append(match.group(1))
             cursor -= 1
             continue
-        if not line.strip() or line.lstrip().startswith("#"):
+        if attribute_depth:
+            attribute_depth += stripped.count(")") - stripped.count("(")
+            cursor -= 1
+            continue
+        if stripped.endswith(")]"):
+            attribute_depth = stripped.count(")") - stripped.count("(")
+            cursor -= 1
+            continue
+        if not stripped or stripped.startswith("#"):
             cursor -= 1
             continue
         break
     return "\n".join(reversed(fragments)).strip()
+
+
+def docstring_below_wasm_bindgen(lines: list[str], index: int) -> bool:
+    """Return whether function Rustdoc sits between its binding attribute and body."""
+    cursor = index - 1
+    attribute_depth = 0
+    saw_docstring = False
+    while cursor >= 0:
+        line = lines[cursor]
+        stripped = line.strip()
+        if DOC_COMMENT_RE.match(line):
+            saw_docstring = True
+            cursor -= 1
+            continue
+        if attribute_depth:
+            attribute_depth += stripped.count(")") - stripped.count("(")
+            cursor -= 1
+            continue
+        if stripped.endswith(")]") and not stripped.startswith("#["):
+            attribute_depth = 1
+            cursor -= 1
+            continue
+        if WASM_BINDGEN_RE.search(line):
+            return saw_docstring
+        if not stripped or stripped.startswith("#"):
+            cursor -= 1
+            continue
+        break
+    return False
 
 
 def parameter_description(docstring: str, parameter: str) -> str | None:
@@ -197,6 +238,7 @@ def exported_functions(path: Path) -> list[FunctionSignature]:
                     line=index + 1,
                     parameters=user_parameters(signature),
                     docstring=docstring_before(lines, index),
+                    docstring_below_wasm_bindgen=docstring_below_wasm_bindgen(lines, index),
                 )
             )
         if match is not None:
@@ -213,6 +255,15 @@ def public_callable_errors(path: Path) -> list[DocumentationError]:
     """Return documentation diagnostics for one WASM API source file."""
     errors: list[DocumentationError] = []
     for function in exported_functions(path):
+        if function.docstring_below_wasm_bindgen:
+            errors.append(
+                DocumentationError(
+                    path,
+                    function.line,
+                    function.name,
+                    "Rustdoc must appear before #[wasm_bindgen] so wasm-bindgen retains it",
+                )
+            )
         if not function.parameters:
             continue
         symbol = function.name

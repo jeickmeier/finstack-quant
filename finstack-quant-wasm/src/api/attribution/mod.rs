@@ -31,8 +31,6 @@ pub struct AttributionParams {
 
 #[wasm_bindgen]
 impl AttributionParams {
-    #[wasm_bindgen(constructor)]
-    #[allow(clippy::too_many_arguments)]
     /// Bundle the attribution inputs (instrument / markets / dates / method
     /// JSON strings plus optional config and full-cross flag) for
     /// `attributePnl`.
@@ -44,6 +42,8 @@ impl AttributionParams {
     /// @param method_json - Attribution-method configuration JSON selecting the P-and-L decomposition.
     /// @param config_json - Optional attribution configuration JSON controlling calculation settings.
     /// @param full_cross_attribution - Whether to calculate all pairwise cross-factor attribution terms.
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         instrument_json: String,
         market_t0_json: String,
@@ -150,8 +150,8 @@ fn catch_attribution_panic<T>(
 /// snapshots, dates, and a method descriptor. Returns the `PnlAttribution`
 /// result as JSON. `config_json` may include `"execution_policy": "serial"`
 /// for hosts that already parallelize attribution at a higher level.
-#[wasm_bindgen(js_name = attributePnl)]
 /// @param params - Fully specified AttributionParams object containing instrument, markets, dates, and method.
+#[wasm_bindgen(js_name = attributePnl)]
 pub fn attribute_pnl(params: &AttributionParams) -> Result<String, JsValue> {
     // MI3 defense in depth: wrap input-parsing as well. `from_json_inputs`
     // funnels through serde + downstream constructors that should not panic,
@@ -179,8 +179,8 @@ pub fn attribute_pnl(params: &AttributionParams) -> Result<String, JsValue> {
 /// Run attribution from a full JSON `AttributionEnvelope` and return JSON.
 ///
 /// Power-user variant for full envelope round-trip workflows.
-#[wasm_bindgen(js_name = attributePnlFromSpec)]
 /// @param spec_json - JSON-serialized AttributionParams specification to validate and execute.
+#[wasm_bindgen(js_name = attributePnlFromSpec)]
 pub fn attribute_pnl_from_spec(spec_json: &str) -> Result<String, JsValue> {
     // MI3: wrap serde_json parse too. A JSON-parse panic would otherwise abort
     // the wasm module instance.
@@ -208,8 +208,8 @@ pub fn attribute_pnl_from_spec(spec_json: &str) -> Result<String, JsValue> {
 /// `schema` version tag (the same gate `execute` applies, so a payload that
 /// validates here cannot later be rejected at execution), and returns the
 /// canonical JSON.
-#[wasm_bindgen(js_name = validateAttributionJson)]
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+#[wasm_bindgen(js_name = validateAttributionJson)]
 pub fn validate_attribution_json(json: &str) -> Result<String, JsValue> {
     let raw: serde_json::Value = serde_json::from_str(json).map_err(to_js_err)?;
     if raw

@@ -77,7 +77,7 @@ depends = ["rust-fmt", "python-fmt", "wasm-fmt"]
 
 [tasks.all-lint]
 description = "Lint Rust + Python + WASM (check-only, non-mutating)"
-depends = ["rust-lint", "python-lint", "wasm-lint", "gen-check"]
+depends = ["rust-lint", "python-lint", "wasm-lint", "wasm-doc", "gen-check"]
 
 [tasks.all-audit]
 description = "Run security audits on Rust + Python"
@@ -292,8 +292,11 @@ run = [
 ]
 
 [tasks.wasm-doc]
-description = "Enforce substantive WASM export input documentation"
-run = "python3 scripts/check_wasm_api_input_docs.py"
+description = "Enforce complete WASM and TypeScript IntelliSense documentation"
+run = [
+  "python3 scripts/check_wasm_api_input_docs.py",
+  "npm --prefix finstack-quant-wasm run docs:check",
+]
 
 [tasks.wasm-pkg]
 description = "Build WASM package (web + node targets)"

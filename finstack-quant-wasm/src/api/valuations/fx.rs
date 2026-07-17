@@ -105,26 +105,26 @@ macro_rules! fx_class {
 
         #[wasm_bindgen(js_class = $js_name)]
         impl $rust_name {
-            #[wasm_bindgen(constructor)]
             /// Create the instrument from a JS spec object.
             /// @param spec - JavaScript object or JSON payload defining the canonical instrument or calculation specification.
+            #[wasm_bindgen(constructor)]
             pub fn new(spec: JsValue) -> Result<$rust_name, JsValue> {
                 Ok(Self {
                     json: from_spec($type_tag, spec)?,
                 })
             }
 
-            #[wasm_bindgen(js_name = fromJson)]
             /// Deserialize the instrument from a JSON spec string.
             /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+            #[wasm_bindgen(js_name = fromJson)]
             pub fn from_json(json: &str) -> Result<$rust_name, JsValue> {
                 Ok(Self {
                     json: from_json_payload($type_tag, json)?,
                 })
             }
 
-            #[wasm_bindgen(js_name = toJson)]
             /// Serialize the instrument spec to pretty JSON.
+            #[wasm_bindgen(js_name = toJson)]
             pub fn to_json(&self) -> Result<String, JsValue> {
                 pretty_json(&self.json)
             }
@@ -142,7 +142,6 @@ macro_rules! fx_class {
                 price_payload(&self.json, market_json, as_of, model)
             }
 
-            #[wasm_bindgen(js_name = priceWithMetrics)]
             /// Price the instrument and compute the requested metrics.
             ///
             /// WASM keeps optional arguments trailing for JavaScript callers,
@@ -154,6 +153,7 @@ macro_rules! fx_class {
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             /// @param pricing_options - Optional JSON pricing overrides accepted by the canonical instrument validator.
             /// @param market_history - Optional serialized historical market snapshots required by historical pricing models.
+            #[wasm_bindgen(js_name = priceWithMetrics)]
             pub fn price_with_metrics(
                 &self,
                 market_json: &str,
@@ -248,11 +248,11 @@ macro_rules! fx_option_class {
                 metric_value(&self.json, market_json, as_of, model, "rho")
             }
 
-            #[wasm_bindgen(js_name = foreignRho)]
             /// Foreign rate rho of the option.
             /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+            #[wasm_bindgen(js_name = foreignRho)]
             pub fn foreign_rho(
                 &self,
                 market_json: &str,

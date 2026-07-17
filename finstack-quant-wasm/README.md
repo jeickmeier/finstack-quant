@@ -42,6 +42,11 @@ the hand-maintained `index.d.ts`, supported by contract tests. Generated
 `types/generated/*` files are used only for JSON envelope shapes where Rust can
 own the schema directly.
 
+Hover any exported namespace, factory, class, or callable in a TypeScript IDE
+for its input shape, result, error behavior, financial conventions, and usage
+example. `index.d.ts` is the authoritative IntelliSense surface; use its
+camelCase parameter names when calling the JavaScript facade.
+
 ## Quick Start
 
 ```javascript
@@ -89,12 +94,14 @@ npm run test
 npm run test:browser
 npm run lint
 npm run format:check
+npm run docs:check
 ```
 
 Root-level equivalents:
 
 ```bash
 mise run wasm-test
+mise run wasm-doc
 mise run all-lint
 ```
 

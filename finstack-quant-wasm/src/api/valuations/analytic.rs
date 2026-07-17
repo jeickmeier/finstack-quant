@@ -164,13 +164,13 @@ pub fn bs_implied_vol(
 }
 
 /// Solve for Black-76 (forward-based) implied volatility.
-#[wasm_bindgen(js_name = black76ImpliedVol)]
 /// @param forward - Forward price or rate in the same quote convention as the strike.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param df - Discount factor from valuation to expiry, expressed as a positive decimal.
 /// @param t - Time from the curve base date in years on the documented day-count basis.
 /// @param price - Price in the documented quote convention for this instrument.
 /// @param is_call - Whether to value a call (`true`) or put (`false`); defaults follow the callable's contract.
+#[wasm_bindgen(js_name = black76ImpliedVol)]
 pub fn black76_implied_vol(
     forward: f64,
     strike: f64,
@@ -197,8 +197,6 @@ pub fn black76_implied_vol(
 /// Reiner-Rubinstein continuous-monitoring barrier call price.
 ///
 /// `direction` is `"up"` or `"down"`, `knock` is `"in"` or `"out"`.
-#[wasm_bindgen(js_name = barrierCall)]
-#[allow(clippy::too_many_arguments)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param barrier - Continuously monitored barrier level in the same price units as spot.
@@ -208,6 +206,8 @@ pub fn black76_implied_vol(
 /// @param t - Time from the curve base date in years on the documented day-count basis.
 /// @param direction - Barrier direction: `"up"` for an upper barrier or `"down"` for a lower barrier.
 /// @param knock - Barrier activation: `"in"` for knock-in or `"out"` for knock-out.
+#[wasm_bindgen(js_name = barrierCall)]
+#[allow(clippy::too_many_arguments)]
 pub fn barrier_call(
     spot: f64,
     strike: f64,
@@ -238,8 +238,6 @@ pub fn barrier_call(
 }
 
 /// Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option.
-#[wasm_bindgen(js_name = asianOptionPrice)]
-#[allow(clippy::too_many_arguments)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param r - Continuously compounded risk-free rate, expressed as a decimal.
@@ -249,6 +247,8 @@ pub fn barrier_call(
 /// @param num_fixings - Positive number of equally spaced averaging observations before expiry.
 /// @param averaging - Asian averaging convention: `"arithmetic"` (default) or `"geometric"`.
 /// @param is_call - Whether to value a call (`true`) or put (`false`); defaults follow the callable's contract.
+#[wasm_bindgen(js_name = asianOptionPrice)]
+#[allow(clippy::too_many_arguments)]
 pub fn asian_option_price(
     spot: f64,
     strike: f64,
@@ -280,8 +280,6 @@ pub fn asian_option_price(
 ///
 /// `strike_type` is `"fixed"` (default) or `"floating"`. For `"floating"`,
 /// `strike` is ignored and `extremum` is the observed min/max to date.
-#[wasm_bindgen(js_name = lookbackOptionPrice)]
-#[allow(clippy::too_many_arguments)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param r - Continuously compounded risk-free rate, expressed as a decimal.
@@ -291,6 +289,8 @@ pub fn asian_option_price(
 /// @param extremum - Observed running minimum for a call or maximum for a put, in spot-price units.
 /// @param strike_type - Lookback payoff convention: `"fixed"` (default) or `"floating"`.
 /// @param is_call - Whether to value a call (`true`) or put (`false`); defaults follow the callable's contract.
+#[wasm_bindgen(js_name = lookbackOptionPrice)]
+#[allow(clippy::too_many_arguments)]
 pub fn lookback_option_price(
     spot: f64,
     strike: f64,
@@ -321,8 +321,6 @@ pub fn lookback_option_price(
 /// Quanto option (FX-adjusted cross-currency) price in domestic currency.
 ///
 /// @throws If the inputs produce a non-finite price.
-#[wasm_bindgen(js_name = quantoOptionPrice)]
-#[allow(clippy::too_many_arguments)]
 /// @param spot - Current spot price or exchange rate in the documented quote convention.
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param t - Time from the curve base date in years on the documented day-count basis.
@@ -333,6 +331,8 @@ pub fn lookback_option_price(
 /// @param vol_fx - Annualized FX-rate volatility expressed as a decimal.
 /// @param correlation - Instantaneous correlation between the documented asset and FX-rate shocks, from -1 to 1.
 /// @param is_call - Whether to value a call (`true`) or put (`false`); defaults follow the callable's contract.
+#[wasm_bindgen(js_name = quantoOptionPrice)]
+#[allow(clippy::too_many_arguments)]
 pub fn quanto_option_price(
     spot: f64,
     strike: f64,
@@ -427,18 +427,20 @@ mod tests {
             "a non-finite quanto option price must produce an error"
         );
         // A well-posed input still returns a finite price.
-        assert!(quanto_option_price(
-            100.0,
-            100.0,
-            1.0,
-            0.03,
-            0.01,
-            0.0,
-            0.20,
-            0.10,
-            0.3,
-            Some(true)
-        )
-        .is_ok());
+        assert!(
+            quanto_option_price(
+                100.0,
+                100.0,
+                1.0,
+                0.03,
+                0.01,
+                0.0,
+                0.20,
+                0.10,
+                0.3,
+                Some(true)
+            )
+            .is_ok()
+        );
     }
 }
