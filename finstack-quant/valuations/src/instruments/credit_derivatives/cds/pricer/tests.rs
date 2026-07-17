@@ -1,3 +1,5 @@
+//! Configuration, integration, and metric helpers for CDS pricing.
+//!
 #![allow(clippy::expect_used, clippy::panic)]
 
 use super::helpers::{date_from_hazard_time, df_asof_to, haz_t, settlement_date, sp_cond_to};

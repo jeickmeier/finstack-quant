@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 #![cfg(test)]
 
 use finstack_quant_core::currency::Currency;

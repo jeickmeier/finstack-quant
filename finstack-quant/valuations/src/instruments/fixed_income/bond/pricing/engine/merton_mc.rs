@@ -1257,6 +1257,12 @@ pub mod calibration {
     }
 
     /// Create a cash-equivalent bond for calibration.
+    ///
+    /// # Arguments
+    ///
+    /// * `bond` - Source bond to clone. Fixed and step-up PIK coupons are
+    ///   converted to cash coupons on the clone; the caller's bond is never
+    ///   mutated and floating coupon specifications are rejected.
     pub fn cash_equivalent_bond(bond: &Bond) -> Result<Bond> {
         fn cashify_spec(spec: &CashflowSpec) -> Result<CashflowSpec> {
             Ok(match spec {
@@ -1376,6 +1382,21 @@ pub mod calibration {
     ///
     /// Uses bisection with common random numbers (deterministic per-path RNG streams)
     /// by reusing the same seed and simulation settings across iterations.
+    ///
+    /// # Arguments
+    ///
+    /// * `bond` - Bond whose cash-equivalent contractual flows are repriced
+    ///   under each candidate Merton parameter.
+    /// * `market` - Valuation market context used to convert `spec.target` into
+    ///   a currency present-value target.
+    /// * `as_of` - Valuation date at which both the market target and simulated
+    ///   cash-bond present values are compared.
+    /// * `discount_rate` - Annual discount rate passed to the Merton Monte
+    ///   Carlo cash-bond pricer for every bisection evaluation.
+    /// * `base_config` - Simulation settings and baseline Merton model; the
+    ///   selected calibration parameter is varied on cloned configurations.
+    /// * `spec` - Target quote, parameter choice, bracket, tolerance, seed,
+    ///   and low-path bisection controls for the calibration.
     pub fn calibrate_parameter_to_market(
         bond: &Bond,
         market: &MarketContext,

@@ -33,7 +33,13 @@ class Theme:
     grid: str
 
     def to_css(self, scope: str) -> str:
-        """Return a ``<style>`` block with every rule scoped under ``.scope``."""
+        """Return a ``<style>`` block with every rule scoped to one class.
+
+        Parameters
+        ----------
+        scope : str
+            CSS class name without the leading dot that namespaces all rules.
+        """
         s = f".{scope}"
         return f"""<style>
 {s} {{ background:{self.canvas}; color:#1c1c1e; font-family:{self.font_sans};

@@ -1,3 +1,4 @@
+// Shared risk-metric test helper fragment included by valuation source tests.
 use crate::instruments::Bond;
 use crate::metrics::risk::{MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType};
 use finstack_quant_core::currency::Currency;

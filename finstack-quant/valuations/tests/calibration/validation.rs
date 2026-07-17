@@ -1,3 +1,5 @@
+//! Shared runtime types and solver contracts for market calibration.
+//!
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_valuations::calibration::{

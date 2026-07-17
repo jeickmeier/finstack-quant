@@ -20,6 +20,13 @@ use finstack_quant_core::Result;
 /// Where:
 /// - Principal_i = principal payment at time i
 /// - Time_i = years from valuation date to payment date i
+///
+/// # Arguments
+///
+/// * `cashflows` - Projected cashflows for one tranche; only principal flows
+///   contribute to the balance-weighted repayment horizon.
+/// * `as_of` - Valuation date from which each principal payment time is
+///   measured in years.
 pub fn calculate_tranche_wal(cashflows: &TrancheCashflows, as_of: Date) -> Result<f64> {
     weighted_average_life_from_principal(cashflows.principal_flows.iter().copied(), as_of)
 }

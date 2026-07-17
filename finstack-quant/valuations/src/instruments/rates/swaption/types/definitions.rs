@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for interest-rate instruments.
+//!
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::Result;
 

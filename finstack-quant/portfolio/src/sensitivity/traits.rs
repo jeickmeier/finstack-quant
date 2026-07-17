@@ -1,3 +1,5 @@
+//! Finite-difference and repricing utilities for portfolio sensitivities.
+//!
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, Result};

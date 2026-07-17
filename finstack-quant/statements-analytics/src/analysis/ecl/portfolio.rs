@@ -250,8 +250,10 @@ pub struct ProvisionWaterfall {
 ///
 /// # Arguments
 ///
-/// * `previous` -- Previous period portfolio result
-/// * `current` -- Current period portfolio result
+/// * `previous` - Prior portfolio ECL result used as the opening provision
+///   balance and exposure population.
+/// * `current` - Current portfolio ECL result used as the closing provision
+///   balance and exposure population.
 pub fn compute_waterfall(
     previous: &PortfolioEclResult,
     current: &PortfolioEclResult,

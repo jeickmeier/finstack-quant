@@ -202,13 +202,15 @@ pub struct AsianGreeks {
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price
-/// * `strike` - Strike price
-/// * `time` - Time to maturity (years)
-/// * `rate` - Risk-free rate
-/// * `div_yield` - Dividend yield
-/// * `vol` - Volatility
-/// * `num_fixings` - Number of discrete fixings (use large number for continuous approximation)
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `rate` - Continuously compounded risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or carrying cost as
+///   a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `num_fixings` - Number of equally spaced observations; `0` selects the
+///   continuous-monitoring limit.
 ///
 /// # Returns
 ///
@@ -244,6 +246,18 @@ pub fn geometric_asian_call(
 /// date-based curve lookup). Derives `r_eff = -ln(df)/t` internally.
 ///
 /// See [`geometric_asian_call`] for formula details.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `df` - Positive discount factor from valuation date to maturity.
+/// * `div_yield` - Continuously compounded dividend yield or carry as a
+///   decimal annual rate.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `num_fixings` - Number of equally spaced observations; `0` selects the
+///   continuous-monitoring limit.
 ///
 /// # Errors
 ///
@@ -344,6 +358,18 @@ fn geometric_asian_call_core(
 /// Price a geometric average Asian put option (closed-form).
 ///
 /// Uses same parameter adjustments as geometric call.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `rate` - Continuously compounded risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or carry as a
+///   decimal annual rate.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `num_fixings` - Number of equally spaced observations; `0` selects the
+///   continuous-monitoring limit.
 pub fn geometric_asian_put(
     spot: f64,
     strike: f64,
@@ -363,6 +389,18 @@ pub fn geometric_asian_put(
 /// date-based curve lookup). Derives `r_eff = -ln(df)/t` internally.
 ///
 /// See [`geometric_asian_call`] for formula details.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `df` - Positive discount factor from valuation date to maturity.
+/// * `div_yield` - Continuously compounded dividend yield or carry as a
+///   decimal annual rate.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `num_fixings` - Number of equally spaced observations; `0` selects the
+///   continuous-monitoring limit.
 ///
 /// # Errors
 ///
@@ -442,13 +480,15 @@ fn geometric_asian_put_core(
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price
-/// * `strike` - Strike price
-/// * `time` - Time to maturity (years)
-/// * `rate` - Risk-free rate
-/// * `div_yield` - Dividend yield
-/// * `vol` - Volatility
-/// * `num_fixings` - Number of discrete fixings
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `rate` - Continuously compounded risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or carry as a
+///   decimal annual rate.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `num_fixings` - Number of equally spaced arithmetic-average observations;
+///   zero returns zero because no average can be formed.
 ///
 /// # Returns
 ///
@@ -474,6 +514,18 @@ fn geometric_asian_put_core(
 /// - d2 = d1 - σ*
 ///
 /// Price = df * (m1 * N(d1) - K * N(d2))
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `rate` - Continuously compounded risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or carry as a
+///   decimal annual rate.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `num_fixings` - Number of equally spaced arithmetic-average
+///   observations; zero has no valid average and returns zero.
 pub fn arithmetic_asian_call_tw(
     spot: f64,
     strike: f64,
@@ -494,6 +546,18 @@ pub fn arithmetic_asian_call_tw(
 /// calculations that require a rate.
 ///
 /// See [`arithmetic_asian_call_tw`] for formula details.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `df` - Positive discount factor from valuation date to maturity.
+/// * `div_yield` - Continuously compounded dividend yield or carry as a
+///   decimal annual rate.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `num_fixings` - Number of equally spaced arithmetic-average observations;
+///   zero returns zero because no average can be formed.
 ///
 /// # Errors
 ///
@@ -609,6 +673,18 @@ fn arithmetic_asian_call_tw_core(
 /// Price an arithmetic average Asian put option using Turnbull-Wakeman approximation.
 ///
 /// See [`arithmetic_asian_call_tw`] for formula details.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `rate` - Continuously compounded risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or carry as a
+///   decimal annual rate.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `num_fixings` - Number of equally spaced arithmetic-average observations;
+///   zero returns zero because no average can be formed.
 pub fn arithmetic_asian_put_tw(
     spot: f64,
     strike: f64,
@@ -629,6 +705,18 @@ pub fn arithmetic_asian_put_tw(
 /// calculations that require a rate.
 ///
 /// See [`arithmetic_asian_call_tw`] for formula details.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `df` - Positive discount factor from valuation date to maturity.
+/// * `div_yield` - Continuously compounded dividend yield or carry as a
+///   decimal annual rate.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `num_fixings` - Number of equally spaced arithmetic-average observations;
+///   zero returns zero because no average can be formed.
 ///
 /// # Errors
 ///
@@ -772,6 +860,20 @@ fn validate_fixing_times(fixing_times: &[f64]) -> Result<()> {
 ///
 /// Returns a validation error when `df` is not strictly positive/finite or
 /// the fixing schedule is empty / non-positive / unsorted.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `t_expiry` - Option expiry in years; every fixing time must be in its
+///   valid positive, sorted schedule.
+/// * `df` - Positive discount factor from valuation date to `t_expiry`.
+/// * `div_yield` - Continuously compounded dividend yield or carry as a
+///   decimal annual rate.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `fixing_times` - Strictly increasing fixing times in years, defining the
+///   geometric-average observation schedule.
+/// * `is_call` - `true` for a call payoff and `false` for a put payoff.
 // Closed-form pricer: the flat scalar argument list mirrors the sibling
 // equal-spacing pricers and the textbook formula inputs.
 #[allow(clippy::too_many_arguments)]
@@ -847,6 +949,20 @@ pub fn geometric_asian_price_times(
 ///
 /// Returns a validation error when `df` is not strictly positive/finite or
 /// the fixing schedule is empty / non-positive / unsorted.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `t_expiry` - Option expiry in years; every fixing time must be in its
+///   valid positive, sorted schedule.
+/// * `df` - Positive discount factor from valuation date to `t_expiry`.
+/// * `div_yield` - Continuously compounded dividend yield or carry as a
+///   decimal annual rate.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `fixing_times` - Strictly increasing fixing times in years, defining the
+///   arithmetic-average observation schedule.
+/// * `is_call` - `true` for a call payoff and `false` for a put payoff.
 // Closed-form pricer: the flat scalar argument list mirrors the sibling
 // equal-spacing pricers and the textbook formula inputs.
 #[allow(clippy::too_many_arguments)]

@@ -38,7 +38,7 @@ impl Money {
     /// recovered. Formatting does not mutate the stored amount.
     ///
     /// @param amount - Numeric amount in major units (must be finite).
-    /// @param currency - Currency tag.
+    /// @param currency - ISO-4217 Currency object that tags the amount and controls arithmetic compatibility.
     /// @returns The constructed `Money`.
     /// @throws If `amount` is non-finite (NaN, ±∞) or cannot be represented as a `Decimal`.
     ///
@@ -90,6 +90,8 @@ impl Money {
 
     /// Convert using an already-resolved positive FX rate.
     #[wasm_bindgen(js_name = convertAtRate)]
+    /// @param target - Target Currency for the converted monetary amount.
+    /// @param rate - FX conversion rate expressed as target-currency units per source-currency unit.
     pub fn convert_at_rate(&self, target: &Currency, rate: f64) -> Result<Money, JsValue> {
         self.inner
             .convert_at_rate(target.inner, rate)

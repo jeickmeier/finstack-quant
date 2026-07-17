@@ -297,6 +297,19 @@ impl PriceCurve {
     ///
     /// # Returns
     /// A new price curve with all prices shifted.
+    ///
+    /// Prices are bumped additively in the curve's native price unit (for
+    /// example, USD/bbl), including the stored spot. Finite negative prices are
+    /// valid for markets such as power; the bumped spot is nevertheless floored
+    /// at zero by this convenience shock, while knot prices retain the helper's
+    /// additive values. Use a custom rebuilt curve when a negative bumped spot
+    /// is economically required.
+    ///
+    /// # Errors
+    ///
+    /// Propagates reconstruction errors if `bump` produces non-finite knot
+    /// prices or an invalid interpolation configuration. A successful result
+    /// preserves base date, day count, interpolation, and extrapolation.
     pub fn with_parallel_bump(&self, bump: f64) -> crate::Result<Self> {
         let bumped_points = bump_knots_parallel(&self.knots, &self.prices, bump);
         let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bump * 100.0);
@@ -318,6 +331,19 @@ impl PriceCurve {
     ///
     /// # Returns
     /// A new price curve with all prices scaled.
+    ///
+    /// Each knot is multiplied by `1 + pct`; the stored spot uses the same
+    /// multiplier and is then floored at zero. Therefore a `-1.0` shock maps
+    /// spot to zero, while a larger negative shock does not create a negative
+    /// spot through this helper. The method changes price levels, not delivery
+    /// dates or interpolation mechanics.
+    ///
+    /// # Errors
+    ///
+    /// Propagates reconstruction errors if `pct` produces non-finite knot
+    /// prices or invalid interpolation inputs. No range is imposed on a finite
+    /// percentage bump because signed forward-price markets can require shocks
+    /// outside conventional equity-style bounds.
     pub fn with_percentage_bump(&self, pct: f64) -> crate::Result<Self> {
         let bumped_points = bump_knots_percentage(&self.knots, &self.prices, pct);
         let new_id = format!("{}+{:.2}%", self.id.as_str(), pct * 100.0);
@@ -342,6 +368,19 @@ impl PriceCurve {
     ///
     /// # Returns
     /// A new price curve with the triangular key-rate bump applied.
+    ///
+    /// The bump is zero outside the neighbor interval and reaches `bump` at
+    /// `target_bucket`; when the curve has fewer than two knots, this degrades
+    /// to [`with_parallel_bump`](Self::with_parallel_bump). Spot is deliberately
+    /// unchanged for a key-rate shock, reflecting a sensitivity to future
+    /// delivery buckets rather than a spot-price scenario.
+    ///
+    /// # Errors
+    ///
+    /// Propagates builder/interpolation validation errors after applying the
+    /// triangular knot shock, including non-finite resulting prices or invalid
+    /// interpolation input. A successful result retains all curve conventions
+    /// except for its bumped identifier and knot values.
     pub fn with_triangular_key_rate_bump_neighbors(
         &self,
         prev_bucket: Option<f64>,
@@ -485,6 +524,19 @@ impl PriceCurveBuilder {
     }
 
     /// Validate input and build the [`PriceCurve`].
+    ///
+    /// A base date is mandatory. Provide at least two strictly increasing,
+    /// finite time knots measured in years, and one finite forward price per
+    /// knot; prices may be signed because some commodity/power markets trade
+    /// through zero. If spot is omitted, the first knot must be exactly at
+    /// `t = 0` so the builder can infer it without extrapolation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an input or interpolation error if the base date was not set,
+    /// fewer than two points were supplied, knots are non-finite or not strictly
+    /// increasing, any price/spot is non-finite, spot cannot be inferred, or
+    /// the selected interpolation/extrapolation combination rejects the grid.
     pub fn build(self) -> crate::Result<PriceCurve> {
         if !self.base_is_set {
             return Err(InputError::Invalid.into());

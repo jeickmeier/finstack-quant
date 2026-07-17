@@ -610,6 +610,18 @@ impl InflationCurveBuilder {
     }
 
     /// Validate input and build the [`InflationCurve`].
+    ///
+    /// Knot times are years from `base_date`, and knot values are CPI index
+    /// levels rather than inflation rates. The selected interpolation and
+    /// extrapolation policies govern later CPI lookups; the indexation lag is
+    /// stored as metadata used by [`InflationCurve::cpi_with_lag`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the base date was not explicitly set, no knots are
+    /// supplied, knot times are invalid or not strictly increasing, a supplied
+    /// CPI knot is non-positive, or the selected interpolation strategy cannot
+    /// be built from the knot grid and CPI levels.
     pub fn build(self) -> crate::Result<InflationCurve> {
         if !self.base_date_set {
             return Err(InputError::Invalid.into());

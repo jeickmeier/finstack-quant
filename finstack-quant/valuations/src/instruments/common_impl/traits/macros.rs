@@ -1,3 +1,5 @@
+//! Macros implementation used by the traits subsystem.
+//!
 /// Implements the standard boilerplate methods for the [`Instrument`](super::Instrument) trait.
 ///
 /// Most instruments store their ID as `self.id` (an `InstrumentId`), attributes as

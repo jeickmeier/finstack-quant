@@ -16,6 +16,11 @@ use rust_decimal::Decimal;
 /// result in zero rates, strikes, or spreads that materially misprice
 /// instruments.
 ///
+/// # Arguments
+///
+/// * `value` - Finite floating-point amount, rate, price, or other decimal
+///   quantity to represent exactly where possible.
+///
 /// # Errors
 ///
 /// Returns [`InputError::NonFiniteValue`] for `NaN`, `+inf`, or `-inf`.
@@ -54,6 +59,10 @@ pub fn f64_to_decimal(value: f64) -> Result<Decimal> {
 /// While `Decimal` values are always finite, conversion to `f64` can fail for
 /// very large magnitudes that exceed `f64`'s representable range
 /// (~1.8 × 10^308).
+///
+/// # Arguments
+///
+/// * `value` - Decimal quantity to convert to the nearest representable `f64`.
 ///
 /// # Errors
 ///

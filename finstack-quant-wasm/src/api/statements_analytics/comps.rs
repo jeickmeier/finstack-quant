@@ -42,6 +42,8 @@ fn map_to_company_metrics(values: BTreeMap<String, f64>) -> fc::CompanyMetrics {
 ///
 /// Returns `null` when `data` is empty rather than a synthetic 0.5.
 #[wasm_bindgen(js_name = percentileRank)]
+/// @param value - Subject-company metric value to rank against the peer sample.
+/// @param data - Non-empty numeric observation array used by the requested statistic.
 pub fn percentile_rank(value: f64, data: JsValue) -> Result<JsValue, JsValue> {
     let d: Vec<f64> = serde_wasm_bindgen::from_value(data).map_err(to_js_err)?;
     match fc::percentile_rank(&d, value) {
@@ -55,6 +57,8 @@ pub fn percentile_rank(value: f64, data: JsValue) -> Result<JsValue, JsValue> {
 /// Returns `null` when fewer than two observations are provided or the
 /// peer variance is zero, instead of a synthetic zero.
 #[wasm_bindgen(js_name = zScore)]
+/// @param value - Subject-company metric value to standardize against the peer sample.
+/// @param data - Non-empty numeric observation array used by the requested statistic.
 pub fn z_score(value: f64, data: JsValue) -> Result<JsValue, JsValue> {
     let d: Vec<f64> = serde_wasm_bindgen::from_value(data).map_err(to_js_err)?;
     match fc::z_score(&d, value) {
@@ -67,6 +71,7 @@ pub fn z_score(value: f64, data: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Returns `null` (matching the other comps helpers) when `data` is empty.
 #[wasm_bindgen(js_name = peerStats)]
+/// @param data - Non-empty numeric observation array used by the requested statistic.
 pub fn peer_stats(data: JsValue) -> Result<JsValue, JsValue> {
     let d: Vec<f64> = serde_wasm_bindgen::from_value(data).map_err(to_js_err)?;
     match fc::peer_stats(&d) {
@@ -77,6 +82,10 @@ pub fn peer_stats(data: JsValue) -> Result<JsValue, JsValue> {
 
 /// Single-factor OLS fit of `y` on `x` evaluated at the subject observation.
 #[wasm_bindgen(js_name = regressionFairValue)]
+/// @param x_values - Comparable-company independent-variable values aligned with y_values.
+/// @param y_values - Comparable-company dependent-variable values aligned with x_values.
+/// @param subject_x - Subject company's independent-variable value for the fitted regression.
+/// @param subject_y - Subject company's observed dependent-variable value for relative-value comparison.
 pub fn regression_fair_value(
     x_values: JsValue,
     y_values: JsValue,
@@ -93,6 +102,8 @@ pub fn regression_fair_value(
 
 /// Compute a canonical valuation multiple for a company-metric bag.
 #[wasm_bindgen(js_name = computeMultiple)]
+/// @param company_metrics - Company financial-metric object supplying numerator and denominator inputs.
+/// @param multiple - Supported valuation multiple identifier, such as EV/EBITDA or P/E.
 pub fn compute_multiple(company_metrics: JsValue, multiple: &str) -> Result<JsValue, JsValue> {
     let metrics_map: BTreeMap<String, f64> =
         serde_wasm_bindgen::from_value(company_metrics).map_err(to_js_err)?;
@@ -106,6 +117,8 @@ pub fn compute_multiple(company_metrics: JsValue, multiple: &str) -> Result<JsVa
 
 /// Composite rich/cheap scoring across multiple dimensions.
 #[wasm_bindgen(js_name = scoreRelativeValue)]
+/// @param peer_set - Comparable-company metric records used to score relative value.
+/// @param dimensions - Metric dimensions and weights included in the relative-value score.
 pub fn score_relative_value(peer_set: JsValue, dimensions: JsValue) -> Result<JsValue, JsValue> {
     let ps: fc::PeerSet = serde_wasm_bindgen::from_value(peer_set).map_err(to_js_err)?;
     let dims: Vec<fc::ScoringDimension> =

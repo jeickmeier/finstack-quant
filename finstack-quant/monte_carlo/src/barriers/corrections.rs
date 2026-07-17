@@ -20,11 +20,7 @@
 /// # Numerical value
 ///
 /// Using `ζ(1/2) = -1.4603545088095868…` and `√(2π) = 2.5066282746310002…`
-/// gives `β ≈ 0.5825971579390106`, i.e. full f64 precision. Previously this
-/// constant was rounded to 4 decimal digits (`0.5826`), introducing a
-/// systematic bias of a few parts per 10⁴ in every barrier shift. The extra
-/// digits cost nothing at runtime and align the implementation with the
-/// published formula.
+/// gives `β ≈ 0.5825971579390106`, i.e. full f64 precision. 
 ///
 /// References:
 /// - Broadie, Glasserman & Kou (1997). "A Continuity Correction for Discrete
@@ -43,8 +39,9 @@ pub const GOBET_MIRI_BETA: f64 = 0.582_597_157_939_010_6;
 /// # Arguments
 ///
 /// * `barrier` - Original barrier level
-/// * `sigma` - Volatility
-/// * `dt` - Time step
+/// * `sigma` - Constant annualized volatility as a decimal over the monitoring
+///   interval.
+/// * `dt` - Positive monitoring-interval length in years.
 /// * `is_down_barrier` - true for down barrier, false for up barrier
 ///
 /// # Returns
@@ -81,6 +78,16 @@ pub fn gobet_miri_adjusted_barrier(
 /// This simpler method shifts the barrier by approximately `0.5 · σ · √Δt`
 /// *away* from spot, in the same direction as the Broadie–Glasserman–Kou
 /// shift in [`gobet_miri_adjusted_barrier`] but with a rounded coefficient.
+///
+/// # Arguments
+///
+/// * `barrier` - Original continuously monitored barrier level in underlying
+///   price units.
+/// * `sigma` - Constant annualized volatility as a decimal over the monitoring
+///   interval.
+/// * `dt` - Positive monitoring-interval length in years.
+/// * `is_down_barrier` - `true` to shift a down barrier lower, `false` to
+///   shift an up barrier higher.
 #[must_use]
 pub fn half_step_adjusted_barrier(barrier: f64, sigma: f64, dt: f64, is_down_barrier: bool) -> f64 {
     let shift = 0.5 * sigma * dt.sqrt();

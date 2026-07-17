@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use finstack_quant_valuations::calibration::api::market_datum::{
     CollateralEntry, DividendScheduleDatum, FxSpotDatum, MarketDatum, PriceDatum,
 };

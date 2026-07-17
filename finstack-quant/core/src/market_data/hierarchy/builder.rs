@@ -93,8 +93,18 @@ impl HierarchyBuilder {
 
     /// Finalize and validate the hierarchy.
     ///
-    /// Validates:
-    /// - No duplicate `CurveId` across different nodes (each curve has exactly one path).
+    /// Paths accumulated through [`Self::add_node`] are expanded into their
+    /// intermediate nodes in insertion order. The returned hierarchy has the
+    /// same root and child order, which is useful for stable UI or report
+    /// presentation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first invalid-path error deferred by [`Self::add_node`], or
+    /// a structural error from [`MarketDataHierarchy::validate`], including a
+    /// duplicate [`crate::types::CurveId`] assigned to multiple hierarchy paths. Builder
+    /// calls after an invalid path remain no-ops with respect to that path;
+    /// callers should treat an error from `build` as a failed construction.
     pub fn build(self) -> crate::Result<MarketDataHierarchy> {
         if let Some(err) = self.validation_error {
             return Err(err);

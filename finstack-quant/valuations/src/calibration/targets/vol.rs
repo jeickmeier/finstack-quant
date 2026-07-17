@@ -1,3 +1,5 @@
+//! Calibration target construction and shared input validation.
+//!
 use crate::calibration::api::schema::SurfaceExtrapolationPolicy;
 use crate::calibration::api::schema::VolSurfaceParams;
 use crate::calibration::config::CalibrationConfig;

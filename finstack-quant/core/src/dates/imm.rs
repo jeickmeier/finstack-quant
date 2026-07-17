@@ -102,6 +102,11 @@ where
 /// Delegates to the shared `nth_weekday_of_month` helper used by calendar rules
 /// to keep all "nth weekday" logic consistent.
 ///
+/// # Arguments
+///
+/// * `month` - Gregorian month for which to locate the third Wednesday.
+/// * `year` - Proleptic Gregorian calendar year accepted by the `time` crate.
+///
 /// # Panics
 /// Never panics for valid Gregorian years supported by the `time` crate.
 #[must_use]
@@ -112,12 +117,22 @@ pub fn third_wednesday(month: Month, year: i32) -> Date {
 
 /// Return the **next IMM date** (third Wednesday of Mar/Jun/Sep/Dec) **strictly
 /// after** `date`.
+///
+/// # Arguments
+///
+/// * `date` - Reference date to advance from. An IMM date supplied here returns
+///   the following quarterly IMM date rather than itself.
 #[must_use]
 pub fn next_imm(date: Date) -> Date {
     next_date_from_months(date, &QUARTERLY_MONTHS, third_wednesday)
 }
 
 /// Check if a date is a CDS roll date (20th of Mar/Jun/Sep/Dec).
+///
+/// # Arguments
+///
+/// * `date` - Calendar date to test against the standard quarterly CDS roll
+///   convention.
 #[must_use]
 pub fn is_cds_date(date: Date) -> bool {
     if date.day() != 20 {
@@ -146,6 +161,11 @@ pub fn is_cds_date(date: Date) -> bool {
 /// assert!(!is_imm_date(non_imm)); // Not a third Wednesday
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// # Arguments
+///
+/// * `date` - Calendar date to test against the quarterly third-Wednesday IMM
+///   convention.
 #[must_use]
 pub fn is_imm_date(date: Date) -> bool {
     // Must be a quarterly month
@@ -166,6 +186,11 @@ pub fn is_imm_date(date: Date) -> bool {
 
 /// Return the **next CDS roll date** (20-Mar/20-Jun/20-Sep/20-Dec) **strictly
 /// after** `date`.
+///
+/// # Arguments
+///
+/// * `date` - Reference date to advance from. A CDS roll date supplied here
+///   returns the next quarterly roll date rather than itself.
 #[must_use]
 pub fn next_cds_date(date: Date) -> Date {
     next_date_from_months(date, &QUARTERLY_MONTHS, |m, year| {
@@ -198,6 +223,11 @@ pub fn next_cds_date(date: Date) -> Date {
 /// );
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// # Arguments
+///
+/// * `date` - Reference date to step back from. A CDS roll date supplied here
+///   returns the preceding quarterly roll date rather than itself.
 #[must_use]
 pub fn prev_cds_date(date: Date) -> Date {
     let mut year = date.year();
@@ -225,6 +255,11 @@ pub fn prev_cds_date(date: Date) -> Date {
 /// (third Wednesday). This ensures options expire before the underlying futures
 /// contracts for orderly settlement.
 ///
+/// # Arguments
+///
+/// * `month` - Gregorian month whose third Wednesday anchors the option expiry.
+/// * `year` - Proleptic Gregorian calendar year accepted by the `time` crate.
+///
 /// # Panics
 /// Never panics for valid Gregorian years supported by the `time` crate.
 #[must_use]
@@ -239,6 +274,11 @@ pub fn imm_option_expiry(month: Month, year: i32) -> Date {
 /// Delegates to the shared `nth_weekday_of_month` helper used by calendar rules
 /// to keep all "nth weekday" logic consistent.
 ///
+/// # Arguments
+///
+/// * `month` - Gregorian month for which to locate the third Friday.
+/// * `year` - Proleptic Gregorian calendar year accepted by the `time` crate.
+///
 /// # Panics
 /// Never panics for valid Gregorian years supported by the `time` crate.
 #[must_use]
@@ -249,6 +289,11 @@ pub fn third_friday(month: Month, year: i32) -> Date {
 
 /// Return the **next IMM option expiry date** (Friday before third Wednesday of
 /// Mar/Jun/Sep/Dec) **strictly after** `date`.
+///
+/// # Arguments
+///
+/// * `date` - Reference date to advance from. An expiry date supplied here
+///   returns the following quarterly expiry rather than itself.
 #[must_use]
 pub fn next_imm_option_expiry(date: Date) -> Date {
     next_date_from_months(date, &QUARTERLY_MONTHS, imm_option_expiry)
@@ -259,6 +304,11 @@ pub fn next_imm_option_expiry(date: Date) -> Date {
 ///
 /// Equity options typically expire on the third Friday of each month, providing
 /// a monthly expiration cycle for equity derivatives.
+///
+/// # Arguments
+///
+/// * `date` - Reference date to advance from. A third-Friday expiry supplied
+///   here returns the next monthly expiry rather than itself.
 #[must_use]
 pub fn next_equity_option_expiry(date: Date) -> Date {
     const ALL_MONTHS: [Month; 12] = [
@@ -311,6 +361,13 @@ pub enum SifmaSettlementClass {
 
 impl SifmaSettlementClass {
     /// Infer the standard settlement class from agency program and original term.
+    ///
+    /// # Arguments
+    ///
+    /// * `agency` - Agency program label. Values containing `GNMA` or `GN` are
+    ///   treated as Ginnie Mae for the 30-year Class C convention.
+    /// * `term_years` - Original mortgage term in whole years. Fifteen-year
+    ///   pools map to Class B and conventional 30-year pools map to Class A.
     pub fn from_agency_term(agency: &str, term_years: u32) -> Self {
         let agency_upper = agency.to_uppercase();
         let is_gnma = agency_upper.contains("GNMA") || agency_upper.contains("GN");
@@ -372,6 +429,12 @@ fn estimated_sifma_base_date(month: Month, year: i32, class: SifmaSettlementClas
 /// accounting for the embedded SIFMA holiday calendar when available. It is
 /// suitable for long-dated cash-flow projections, but not for trade settlement
 /// or operational instructions.
+///
+/// # Arguments
+///
+/// * `month` - Settlement month to estimate.
+/// * `year` - Settlement year to estimate using the embedded SIFMA calendar.
+/// * `class` - Agency-MBS settlement class whose business-day anchor is used.
 #[must_use]
 pub fn estimated_sifma_settlement_date_for_class(
     month: Month,
@@ -390,6 +453,12 @@ include!(concat!(env!("OUT_DIR"), "/sifma_settlements_generated.rs"));
 /// Returns the exact date from the embedded published calendar when available.
 /// Returns `None` for uncovered year/class combinations; SIFMA settlement
 /// dates are not safely approximated by nth-weekday rules.
+///
+/// # Arguments
+///
+/// * `month` - Settlement month to look up in the embedded SIFMA schedule.
+/// * `year` - Settlement year to look up; uncovered years return `None`.
+/// * `class` - Agency-MBS settlement class whose published date is requested.
 #[must_use]
 pub fn sifma_settlement_date_for_class(
     month: Month,
@@ -429,6 +498,11 @@ pub fn sifma_settlement_date_for_class(
 ///     Some(Date::from_calendar_date(2027, Month::March, 11).expect("Valid date"))
 /// );
 /// ```
+///
+/// # Arguments
+///
+/// * `month` - Settlement month to look up for the conventional Class A cycle.
+/// * `year` - Settlement year to look up; uncovered years return `None`.
 #[must_use]
 pub fn sifma_settlement_date(month: Month, year: i32) -> Option<Date> {
     sifma_settlement_date_for_class(month, year, SifmaSettlementClass::A)
@@ -450,6 +524,11 @@ pub fn sifma_settlement_date(month: Month, year: i32) -> Option<Date> {
 /// let next = next_sifma_settlement(start);
 /// assert_eq!(next, Some(Date::from_calendar_date(2027, Month::April, 13).expect("Valid date")));
 /// ```
+///
+/// # Arguments
+///
+/// * `date` - Reference date after which to find the next Class A published
+///   settlement. A settlement on this date is not returned.
 #[must_use]
 pub fn next_sifma_settlement(date: Date) -> Option<Date> {
     let mut current_month = date.month();

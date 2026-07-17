@@ -174,6 +174,12 @@ pub struct RiskBudgetResultView {
 }
 
 /// Convert a full position risk decomposition into the legacy VaR view.
+///
+/// # Arguments
+///
+/// * `decomposition` - Position-level risk decomposition whose VaR
+///   contributions, confidence, and portfolio totals are copied into the
+///   binding-friendly representation.
 #[must_use]
 pub fn parametric_var_decomposition_view(
     decomposition: &PositionRiskDecomposition,
@@ -200,6 +206,14 @@ pub fn parametric_var_decomposition_view(
 }
 
 /// Convert a risk-budget result into the legacy binding view.
+///
+/// # Arguments
+///
+/// * `result` - Per-position risk-budget allocation result to expose.
+/// * `portfolio_var` - Signed portfolio VaR in reporting-currency amount
+///   units; its absolute magnitude scales each target percentage.
+/// * `utilization_threshold` - Dimensionless utilization ratio above which a
+///   position is flagged as breaching its risk budget.
 #[must_use]
 pub fn risk_budget_result_view(
     result: &RiskBudgetResult,
@@ -239,6 +253,12 @@ pub fn risk_budget_result_view(
 }
 
 /// Convert a full position risk decomposition into the legacy ES-only view.
+///
+/// # Arguments
+///
+/// * `decomposition` - Position-level risk decomposition whose expected
+///   shortfall contributions, confidence, and portfolio totals are copied into
+///   the binding-friendly representation.
 #[must_use]
 pub fn parametric_es_decomposition_view(
     decomposition: &PositionRiskDecomposition,
@@ -312,6 +332,13 @@ pub fn flatten_square_matrix(
 ///
 /// Returns [`finstack_quant_core::Error::Validation`] when the number of rows does
 /// not equal `n_positions` or when rows have inconsistent scenario counts.
+///
+/// # Arguments
+///
+/// * `position_pnls` - Position-major P&L matrix with one row per position
+///   and one same-ordered P&L amount per historical scenario.
+/// * `n_positions` - Expected number of position rows; zero accepts only an
+///   empty matrix and yields an empty buffer with zero scenarios.
 pub fn flatten_position_pnls(
     position_pnls: Vec<Vec<f64>>,
     n_positions: usize,

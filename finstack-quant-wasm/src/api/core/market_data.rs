@@ -103,6 +103,16 @@ impl DiscountCurve {
         clippy::too_many_arguments,
         reason = "preserves existing positional constructor arguments and appends validation options compatibly"
     )]
+    /// Construct a discount curve from calibrated pillar data and conventions.
+    ///
+    /// @param id - Stable identifier used to name and retrieve the supplied domain object.
+    /// @param base_date - ISO-8601 curve base date from which time coordinates are measured.
+    /// @param knots - Ordered curve-pillar time and value pairs used to calibrate the curve.
+    /// @param interp - Interpolation method used between calibrated curve or surface pillars.
+    /// @param extrapolation - Extrapolation policy applied outside the last calibrated curve pillar.
+    /// @param day_count - Day-count convention identifier used to convert dates into year fractions.
+    /// @param validation_mode - Curve-validation mode controlling admissible pillar and forward shapes.
+    /// @param forward_floor - Optional lower bound applied to implied instantaneous forward rates.
     pub fn new(
         id: &str,
         base_date: &str,
@@ -152,6 +162,11 @@ impl DiscountCurve {
 
     /// Construct a flat continuously-compounded discount curve.
     #[wasm_bindgen(js_name = flat)]
+    /// Construct a forward curve from calibrated pillar data and index conventions.
+    ///
+    /// @param id - Stable identifier used to name and retrieve the supplied domain object.
+    /// @param base_date - ISO-8601 curve base date from which time coordinates are measured.
+    /// @param continuous_rate - Flat continuously compounded zero rate expressed as a decimal.
     pub fn flat(id: &str, base_date: &str, continuous_rate: f64) -> Result<DiscountCurve, JsValue> {
         let curve = RustDiscountCurve::flat(id, parse_iso_date(base_date)?, continuous_rate)
             .map_err(to_js_err)?;
@@ -161,17 +176,21 @@ impl DiscountCurve {
     }
 
     /// Discount factor at year fraction `t`.
+    /// @param t - Time from the curve base date in years on the documented day-count basis.
     pub fn df(&self, t: f64) -> f64 {
         self.inner.df(t)
     }
 
     /// Continuously-compounded zero rate at year fraction `t`.
+    /// @param t - Time from the curve base date in years on the documented day-count basis.
     pub fn zero(&self, t: f64) -> f64 {
         self.inner.zero(t)
     }
 
     /// Continuously-compounded forward rate between `t1` and `t2`.
     #[wasm_bindgen(js_name = forward)]
+    /// @param t1 - Earlier curve time in years used as the start of the forward interval.
+    /// @param t2 - Later curve time in years used as the end of the forward interval.
     pub fn forward(&self, t1: f64, t2: f64) -> Result<f64, JsValue> {
         self.inner.forward(t1, t2).map_err(to_js_err)
     }
@@ -286,6 +305,17 @@ impl ForwardCurve {
         clippy::too_many_arguments,
         reason = "preserves existing positional constructor arguments and appends projectionGrid compatibly"
     )]
+    /// Construct a forward curve from calibrated pillar data and index conventions.
+    ///
+    /// @param id - Stable identifier used to name and retrieve the supplied domain object.
+    /// @param tenor - Underlying swap or index tenor measured in years for the quoted surface point.
+    /// @param base_date - ISO-8601 curve base date from which time coordinates are measured.
+    /// @param knots - Ordered curve-pillar time and value pairs used to calibrate the curve.
+    /// @param day_count - Day-count convention identifier used to convert dates into year fractions.
+    /// @param interp - Interpolation method used between calibrated curve or surface pillars.
+    /// @param extrapolation - Extrapolation policy applied outside the last calibrated curve pillar.
+    /// @param projection_grid - Optional projection-tenor grid used to derive forward-rate periods.
+    /// @param reset_lag - Reset lag applied between an index fixing date and its effective period.
     pub fn new(
         id: &str,
         tenor: f64,
@@ -312,6 +342,7 @@ impl ForwardCurve {
 
     /// Construct from a named JavaScript options object.
     #[wasm_bindgen(js_name = fromOptions)]
+    /// @param options - JavaScript options object defining the requested curve construction inputs.
     pub fn from_options(options: JsValue) -> Result<ForwardCurve, JsValue> {
         let options = serde_wasm_bindgen::from_value(options).map_err(to_js_err)?;
         Self::build(options)
@@ -319,12 +350,15 @@ impl ForwardCurve {
 
     /// Forward rate at year fraction `t`.
     #[wasm_bindgen(js_name = rate)]
+    /// @param t - Time from the curve base date in years on the documented day-count basis.
     pub fn rate(&self, t: f64) -> f64 {
         self.inner.rate(t)
     }
 
     /// Discount-factor-implied simple forward over `(t1, t2)`.
     #[wasm_bindgen(js_name = rateBetween)]
+    /// @param t1 - Earlier curve time in years used as the start of the forward interval.
+    /// @param t2 - Later curve time in years used as the end of the forward interval.
     pub fn rate_between(&self, t1: f64, t2: f64) -> Result<f64, JsValue> {
         self.inner.rate_between(t1, t2).map_err(to_js_err)
     }
@@ -403,6 +437,7 @@ impl FxConversionPolicy {
 
     /// Parse from a string label such as ``\"cashflow_date\"``.
     #[wasm_bindgen(js_name = fromName)]
+    /// @param name - Name supplied to from name; follow the type and convention required by the surrounding API.
     pub fn from_name(name: &str) -> Result<Self, JsValue> {
         Ok(Self {
             inner: name.parse().map_err(to_js_err)?,
@@ -483,6 +518,11 @@ impl FxMatrix {
 
     /// Set an authoritative quote scoped to one date and conversion policy.
     #[wasm_bindgen(js_name = setQuoteOn)]
+    /// @param base - Base currency code of the FX quote, where the rate is quote per base.
+    /// @param quote - Quote currency code of the FX rate, expressed per unit of base currency.
+    /// @param date - ISO-8601 date used by the calculation or market-data lookup.
+    /// @param policy - FX quote-selection policy for resolving direct, inverse, or triangulated rates.
+    /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
     pub fn set_quote_on(
         &self,
         base: &str,
@@ -523,6 +563,9 @@ impl FxMatrix {
 
     /// Look up an FX rate using cashflow-date conversion semantics.
     #[wasm_bindgen(js_name = rateDefault)]
+    /// @param base - Base currency code of the FX quote, where the rate is quote per base.
+    /// @param quote - Quote currency code of the FX rate, expressed per unit of base currency.
+    /// @param date - ISO-8601 date used by the calculation or market-data lookup.
     pub fn rate_default(
         &self,
         base: &str,
@@ -570,6 +613,7 @@ impl VolCube {
     ///   Pass `NaN` for the shift element of a node to omit the shift.
     /// * `forwards` - Row-major forward rates, one per grid node.
     #[wasm_bindgen(constructor)]
+    /// @param interpolation_mode - Volatility-surface interpolation mode used between quoted points.
     pub fn new(
         id: &str,
         expiries: &[f64],
@@ -621,6 +665,9 @@ impl VolCube {
     /// Implied volatility at `(expiry, tenor, strike)`.
     ///
     /// Returns `Err` if `expiry` or `tenor` falls outside the grid.
+    /// @param expiry - Time to option expiry in years on the model's annual time basis.
+    /// @param tenor - Underlying swap or index tenor measured in years for the quoted surface point.
+    /// @param strike - Option strike price in the same price units as the underlying.
     pub fn vol(&self, expiry: f64, tenor: f64, strike: f64) -> Result<f64, JsValue> {
         self.inner.vol(expiry, tenor, strike).map_err(to_js_err)
     }
@@ -630,6 +677,9 @@ impl VolCube {
     /// Clamps finite `expiry` and `tenor` values to the grid edges before
     /// interpolation. Non-finite inputs return `NaN`.
     #[wasm_bindgen(js_name = volClamped)]
+    /// @param expiry - Time to option expiry in years on the model's annual time basis.
+    /// @param tenor - Underlying swap or index tenor measured in years for the quoted surface point.
+    /// @param strike - Option strike price in the same price units as the underlying.
     pub fn vol_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
         self.inner.vol_clamped(expiry, tenor, strike)
     }
@@ -653,6 +703,9 @@ impl VolCube {
     /// expansion yields a non-finite volatility, or for cross-zero quotes
     /// (`(F+s)(K+s) <= 0`) with `beta > 0`, which require an explicit shift.
     #[wasm_bindgen(js_name = volNormal)]
+    /// @param expiry - Time to option expiry in years on the model's annual time basis.
+    /// @param tenor - Underlying swap or index tenor measured in years for the quoted surface point.
+    /// @param strike - Option strike price in the same price units as the underlying.
     pub fn vol_normal(&self, expiry: f64, tenor: f64, strike: f64) -> Result<f64, JsValue> {
         self.inner
             .vol_normal(expiry, tenor, strike)
@@ -665,6 +718,9 @@ impl VolCube {
     /// degenerate finite expansion is floored to a small positive normal vol
     /// (absolute rate units). Non-finite inputs return `NaN`.
     #[wasm_bindgen(js_name = volNormalClamped)]
+    /// @param expiry - Time to option expiry in years on the model's annual time basis.
+    /// @param tenor - Underlying swap or index tenor measured in years for the quoted surface point.
+    /// @param strike - Option strike price in the same price units as the underlying.
     pub fn vol_normal_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
         self.inner.vol_normal_clamped(expiry, tenor, strike)
     }
@@ -684,7 +740,7 @@ impl VolCube {
 /// 10-delta wings).
 ///
 /// Stores market-standard FX delta quotes (Wystup 2006, Clark 2011) and
-/// converts to a strike-axis [`VolSurface`] on demand via Garman-Kohlhagen.
+/// converts to a strike-axis volatility surface on demand via Garman-Kohlhagen.
 /// The delta convention is **forward delta (premium-unadjusted)**.
 #[wasm_bindgen(js_name = FxDeltaVolSurface)]
 pub struct FxDeltaVolSurface {
@@ -768,6 +824,7 @@ impl FxDeltaVolSurface {
 
     /// Pillar vols at the given expiry index as `[atm, put25d_vol, call25d_vol]`.
     #[wasm_bindgen(js_name = pillarVols)]
+    /// @param expiry_idx - Zero-based index of the requested expiry pillar in the volatility surface.
     pub fn pillar_vols(&self, expiry_idx: usize) -> Result<Vec<f64>, JsValue> {
         if expiry_idx >= self.inner.num_expiries() {
             return Err(JsValue::from_str(&format!(
@@ -782,6 +839,9 @@ impl FxDeltaVolSurface {
 
     /// Implied vol at `(expiry, strike)` for the supplied forward.
     #[wasm_bindgen(js_name = impliedVol)]
+    /// @param expiry - Time to option expiry in years on the model's annual time basis.
+    /// @param strike - Option strike price in the same price units as the underlying.
+    /// @param forward - Forward price or rate in the same quote convention as the strike.
     pub fn implied_vol(&self, expiry: f64, strike: f64, forward: f64) -> Result<f64, JsValue> {
         self.inner
             .implied_vol(expiry, strike, forward)
@@ -790,12 +850,20 @@ impl FxDeltaVolSurface {
 
     /// Convert a forward delta to a strike (Garman-Kohlhagen, premium-unadjusted).
     #[wasm_bindgen(js_name = deltaToStrike)]
+    /// @param delta - Option delta expressed under the surface's documented delta convention.
+    /// @param forward - Forward price or rate in the same quote convention as the strike.
+    /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+    /// @param expiry - Time to option expiry in years on the model's annual time basis.
     pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
         RustFxDeltaVolSurface::delta_to_strike(delta, forward, vol, expiry)
     }
 
     /// Convert a strike to forward delta (Garman-Kohlhagen call delta).
     #[wasm_bindgen(js_name = strikeToDelta)]
+    /// @param strike - Option strike price in the same price units as the underlying.
+    /// @param forward - Forward price or rate in the same quote convention as the strike.
+    /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+    /// @param expiry - Time to option expiry in years on the model's annual time basis.
     pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
         RustFxDeltaVolSurface::strike_to_delta(strike, forward, vol, expiry)
     }

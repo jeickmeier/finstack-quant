@@ -218,14 +218,22 @@ impl Default for StagingConfig {
 ///
 /// # Arguments
 ///
-/// * `exposure` -- The credit exposure to classify
-/// * `pd_source` -- PD term structure for computing lifetime PDs
-/// * `config` -- Staging configuration with thresholds
+/// * `exposure` - Credit exposure with DPD, ratings, qualitative flags, and
+///   prior-stage information used by the classification waterfall.
+/// * `pd_source` - PD term structure used to compare origination and current
+///   lifetime default risk when SICR testing is required.
+/// * `config` - Staging policy thresholds, backstops, and curing conditions.
 ///
 /// # Returns
 ///
 /// A [`StageResult`] containing the assigned stage, trigger reasons, and
 /// whether curing was applied.
+///
+/// # Errors
+///
+/// Propagates PD-term-structure lookup errors when both origination and
+/// current ratings are present and the SICR comparison requires cumulative
+/// probabilities.
 pub fn classify_stage(
     exposure: &Exposure,
     pd_source: &dyn PdTermStructure,

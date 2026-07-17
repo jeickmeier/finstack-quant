@@ -140,6 +140,12 @@ impl RiemannLiouvilleKernel {
 /// Covariance of fractional Brownian motion.
 ///
 /// $$\operatorname{Cov}(B_H(t), B_H(s)) = \tfrac{1}{2}\bigl(|t|^{2H} + |s|^{2H} - |t-s|^{2H}\bigr)$$
+///
+/// # Arguments
+///
+/// * `t` - First time coordinate in the model's chosen time unit.
+/// * `s` - Second time coordinate in the same time unit as `t`.
+/// * `h` - Hurst exponent controlling roughness and long-memory behavior.
 pub fn fbm_covariance(t: f64, s: f64, h: f64) -> f64 {
     let two_h = 2.0 * h;
     0.5 * (t.abs().powf(two_h) + s.abs().powf(two_h) - (t - s).abs().powf(two_h))
@@ -148,6 +154,11 @@ pub fn fbm_covariance(t: f64, s: f64, h: f64) -> f64 {
 /// Variance of fractional Brownian motion at time t.
 ///
 /// $$\operatorname{Var}(B_H(t)) = |t|^{2H}$$
+///
+/// # Arguments
+///
+/// * `t` - Time coordinate in the model's chosen time unit.
+/// * `h` - Hurst exponent controlling the variance scaling.
 pub fn fbm_variance(t: f64, h: f64) -> f64 {
     t.abs().powf(2.0 * h)
 }
@@ -157,6 +168,14 @@ pub fn fbm_variance(t: f64, h: f64) -> f64 {
 /// $$\operatorname{Cov}\bigl(B_H(t_{i+1}) - B_H(t_i),\; B_H(t_{j+1}) - B_H(t_j)\bigr)$$
 ///
 /// computed via the bilinearity relation on the fBM covariance function.
+///
+/// # Arguments
+///
+/// * `ti` - Start time of the first increment.
+/// * `ti1` - End time of the first increment, in the same time unit as `ti`.
+/// * `tj` - Start time of the second increment.
+/// * `tj1` - End time of the second increment, in the same time unit as `tj`.
+/// * `h` - Hurst exponent used by the fractional Brownian-motion covariance.
 pub fn fbm_increment_covariance(ti: f64, ti1: f64, tj: f64, tj1: f64, h: f64) -> f64 {
     fbm_covariance(ti1, tj1, h) - fbm_covariance(ti1, tj, h) - fbm_covariance(ti, tj1, h)
         + fbm_covariance(ti, tj, h)
@@ -165,6 +184,12 @@ pub fn fbm_increment_covariance(ti: f64, ti1: f64, tj: f64, tj1: f64, h: f64) ->
 /// Full n × n covariance matrix of fBM at times t₁, …, tₙ.
 ///
 /// Entry (i, j) = Cov(B_H(tᵢ), B_H(tⱼ)).
+///
+/// # Arguments
+///
+/// * `times` - Time coordinates defining matrix rows and columns, in the
+///   model's chosen time unit.
+/// * `h` - Hurst exponent used by the fractional Brownian-motion covariance.
 pub fn fbm_covariance_matrix(times: &[f64], h: f64) -> DMatrix<f64> {
     let n = times.len();
     DMatrix::from_fn(n, n, |i, j| fbm_covariance(times[i], times[j], h))
@@ -177,6 +202,12 @@ pub fn fbm_covariance_matrix(times: &[f64], h: f64) -> DMatrix<f64> {
 ///
 /// Requires at least two time points. Returns an empty 0 × 0 matrix
 /// when fewer than two points are supplied.
+///
+/// # Arguments
+///
+/// * `times` - Ordered grid of increment boundary times in the model's chosen
+///   time unit.
+/// * `h` - Hurst exponent used by the fractional Brownian-motion covariance.
 pub fn fbm_increment_covariance_matrix(times: &[f64], h: f64) -> DMatrix<f64> {
     if times.len() < 2 {
         return DMatrix::zeros(0, 0);

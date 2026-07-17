@@ -1,3 +1,5 @@
+//! Public query, policy, and result types for foreign-exchange conversion.
+//!
 use crate::currency::Currency;
 use crate::dates::Date;
 use serde::{Deserialize, Serialize};
@@ -59,13 +61,13 @@ impl std::str::FromStr for FxConversionPolicy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FxQuery {
-    /// Source currency
+    /// Currency being converted from.
     pub from: Currency,
-    /// Target currency
+    /// Currency being converted to.
     pub to: Currency,
-    /// Applicable date for the rate
+    /// Date on which the provider's rate must be applicable.
     pub on: Date,
-    /// Conversion policy (defaults to CashflowDate)
+    /// Rate-selection hint; deserialization defaults to CashflowDate.
     #[serde(default = "default_policy")]
     pub policy: FxConversionPolicy,
 }
@@ -75,7 +77,7 @@ fn default_policy() -> FxConversionPolicy {
 }
 
 impl FxQuery {
-    /// Create a new FX query with default policy.
+    /// Create a query using the CashflowDate policy.
     pub fn new(from: Currency, to: Currency, on: Date) -> Self {
         Self {
             from,
@@ -85,7 +87,7 @@ impl FxQuery {
         }
     }
 
-    /// Create a new FX query with specific policy.
+    /// Create a query with an explicit provider rate-selection policy.
     pub fn with_policy(from: Currency, to: Currency, on: Date, policy: FxConversionPolicy) -> Self {
         Self {
             from,
@@ -104,11 +106,11 @@ impl FxQuery {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FxPolicyMeta {
-    /// Strategy applied for the conversion.
+    /// Strategy the provider actually applied or was instructed to apply.
     pub strategy: FxConversionPolicy,
-    /// Optional declared target currency (for stamping).
+    /// Optional target currency stamped onto the resulting valuation.
     pub target_ccy: Option<Currency>,
-    /// Optional notes for auditability.
+    /// Free-form provenance or audit notes supplied by the provider.
     pub notes: String,
 }
 
@@ -142,7 +144,7 @@ pub struct FxConfig {
     /// When enabled, the matrix will attempt `from -> pivot -> to` and will not
     /// search multi-hop paths or alternative pivots.
     pub enable_triangulation: bool,
-    /// Maximum number of cached quotes to retain in an LRU
+    /// Maximum number of provider-observed quotes retained in the LRU cache.
     pub cache_capacity: usize,
 }
 
@@ -164,9 +166,9 @@ impl Default for FxConfig {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FxRateResult {
-    /// The final FX rate
+    /// Rate such that source amount multiplied by this value is target amount.
     pub rate: f64,
-    /// Whether this rate was obtained via triangulation
+    /// Whether this rate was constructed through the configured pivot currency.
     pub triangulated: bool,
 }
 
@@ -175,9 +177,9 @@ pub struct FxRateResult {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FxMatrixState {
-    /// FX configuration
+    /// Matrix configuration, including pivot and cache capacity.
     pub config: FxConfig,
-    /// Cached FX quotes as (from, to, rate) tuples
+    /// Pair-global quotes as source, target, rate tuples.
     pub quotes: Vec<(Currency, Currency, f64)>,
     /// Pinned, date/policy-scoped quotes as `(from, to, on, policy, rate)`.
     ///

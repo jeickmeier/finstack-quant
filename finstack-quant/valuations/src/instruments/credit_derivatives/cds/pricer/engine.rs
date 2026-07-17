@@ -1,3 +1,5 @@
+//! Configuration, integration, and metric helpers for CDS pricing.
+//!
 use super::config::CDSPricerConfig;
 use super::helpers::{
     date_from_hazard_time, df_asof_to, haz_t, isda_standard_model_boundaries, settlement_date,

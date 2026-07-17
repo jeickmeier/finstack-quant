@@ -182,11 +182,15 @@ fn money_from_expr(
 ///
 /// # Arguments
 ///
-/// * `period_id` - Current period being evaluated
-/// * `context` - Evaluation context with model results
-/// * `waterfall_spec` - Waterfall configuration
-/// * `state` - Current capital structure state (opening balances, etc.)
-/// * `contractual_flows` - Pre-calculated contractual flows by instrument
+/// * `_period_id` - Current model-period identifier; accepted for the
+///   period-level API contract but allocation derives timing from `context`.
+/// * `context` - Evaluation context providing statement values used by sweep,
+///   PIK, and payment-priority rules.
+/// * `waterfall_spec` - Validated priority-of-payments and allocation policy.
+/// * `state` - Mutable capital-structure state updated with period balances
+///   and cumulative tracking fields.
+/// * `contractual_flows` - Per-instrument contractual cashflow breakdowns to
+///   allocate under the waterfall.
 ///
 /// # Returns
 ///

@@ -18,9 +18,9 @@
 //!
 //! # Pricing Models
 //!
-//! [`CapFloorVolType::Lognormal`] uses Black (1976),
-//! [`CapFloorVolType::ShiftedLognormal`] applies Black to `F + shift` and
-//! `K + shift`, and [`CapFloorVolType::Normal`] uses Bachelier. Normal pricing
+//! `CapFloorVolType::Lognormal` uses Black (1976),
+//! `CapFloorVolType::ShiftedLognormal` applies Black to `F + shift` and `K + shift`,
+//! and `CapFloorVolType::Normal` uses Bachelier. Normal pricing
 //! supports zero and negative forwards.
 //!
 //! For Black (1976), each caplet/floorlet is priced as:

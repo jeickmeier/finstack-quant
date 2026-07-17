@@ -17,6 +17,21 @@ enum Dimension {
 ///
 /// Converts the statements DSL syntax into the shared expression engine
 /// representation used by the evaluator.
+/// Capital-structure references are checked against the fixed component
+/// vocabulary at this boundary and encoded as the core expression engine's
+/// dedicated `cs` reference form.
+///
+/// # Arguments
+///
+/// * `ast` - Parsed statements DSL expression to lower into the core expression
+///   representation.
+///
+/// # Errors
+///
+/// Returns an evaluation error when a capital-structure reference names an
+/// unsupported component, or when a nested operator/function expression is
+/// invalid for compilation. Parsing is a separate step; use
+/// [`crate::dsl::parse_and_compile`] when starting from source text.
 ///
 pub fn compile(ast: &StmtExpr) -> Result<Expr> {
     match ast {
@@ -66,7 +81,27 @@ pub fn compile(ast: &StmtExpr) -> Result<Expr> {
     }
 }
 
-/// Validate dimensional compatibility for a formula AST.
+/// Validate monetary/scalar dimensional compatibility for a formula AST.
+///
+/// `node_types` describes known model outputs. Unknown references remain
+/// dimension-unknown so they can be resolved later; known monetary operands
+/// must be compatible for addition, subtraction, comparison, and conditional
+/// branches. This catches currency-unit mistakes before numerical evaluation.
+///
+/// # Arguments
+///
+/// * `ast` - Parsed statements DSL expression whose known value dimensions are
+///   checked before evaluation.
+/// * `node_types` - Known node output types keyed by node ID; references absent
+///   from this map remain dimension-unknown.
+///
+/// # Errors
+///
+/// Returns an error when the expression combines incompatible known dimensions
+/// (for example, currencies that cannot be added), uses a monetary value where
+/// a scalar-only operation is required, or supplies an invalid function
+/// dimension. It does not prove the units of references absent from
+/// `node_types`.
 pub fn validate_dimensions(
     ast: &StmtExpr,
     node_types: &IndexMap<NodeId, NodeValueType>,

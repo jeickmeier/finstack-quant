@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 // Golden tests comparing Monte Carlo results against Black-Scholes analytical prices.
 //
 // These tests serve as regression tests to ensure Monte Carlo pricing maintains

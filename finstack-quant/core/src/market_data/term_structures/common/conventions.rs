@@ -1,3 +1,5 @@
+//! Shared defaults and calculations used by term-structure implementations.
+//!
 use crate::dates::DayCount;
 
 /// Convention defaults inferred from a forward-curve identifier.

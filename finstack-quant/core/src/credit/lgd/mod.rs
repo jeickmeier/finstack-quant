@@ -26,6 +26,13 @@ pub use workout::{CollateralPiece, CollateralType, WorkoutCosts, WorkoutLgd, Wor
 
 /// Return historical recovery distribution parameters for a seniority class.
 ///
+/// # Arguments
+///
+/// * `seniority` - Debt-seniority label accepted by [`SeniorityClass`], such as
+///   `senior-secured`.
+/// * `rating_agency` - Calibration-provider name accepted by
+///   [`SeniorityCalibration::from_agency`].
+///
 /// # Errors
 /// Returns an error if the seniority class or rating agency name is unknown.
 pub fn seniority_recovery_stats(
@@ -42,6 +49,11 @@ pub fn seniority_recovery_stats(
 
 /// Return recovery distribution parameters from the registry default seniority calibration.
 ///
+/// # Arguments
+///
+/// * `seniority` - Debt-seniority label accepted by [`SeniorityClass`], such as
+///   `senior-secured`.
+///
 /// # Errors
 /// Returns an error if the seniority class is unknown or absent from the
 /// registry default calibration.
@@ -55,6 +67,15 @@ pub fn seniority_recovery_stats_default(seniority: &str) -> crate::Result<BetaRe
 }
 
 /// Draw recovery rates from a Beta distribution with a deterministic seed.
+///
+/// # Arguments
+///
+/// * `mean` - Target recovery-rate mean as a decimal fraction in `(0, 1)`.
+/// * `std` - Target recovery-rate standard deviation as a decimal fraction
+///   compatible with `mean` for a Beta distribution.
+/// * `n_samples` - Number of simulated recovery rates to return.
+/// * `seed` - Deterministic random seed; equal inputs and seed produce the
+///   same sample sequence.
 ///
 /// # Errors
 /// Returns an error if the mean or standard deviation cannot parameterize a
@@ -70,6 +91,13 @@ pub fn beta_recovery_sample(
 
 /// Return the value at quantile `q` for a Beta recovery distribution.
 ///
+/// # Arguments
+///
+/// * `mean` - Target recovery-rate mean as a decimal fraction in `(0, 1)`.
+/// * `std` - Target recovery-rate standard deviation as a decimal fraction
+///   compatible with `mean` for a Beta distribution.
+/// * `q` - Cumulative probability in the inclusive `0.0..=1.0` range.
+///
 /// # Errors
 /// Returns an error if the mean or standard deviation cannot parameterize a
 /// valid Beta recovery distribution, or if the quantile evaluation fails.
@@ -80,6 +108,18 @@ pub fn beta_recovery_quantile(mean: f64, std: f64, q: f64) -> crate::Result<f64>
 /// Compute workout net recovery and LGD from collateral specs.
 ///
 /// Each collateral tuple is `(type_name, book_value, haircut)`.
+///
+/// # Arguments
+///
+/// * `ead` - Exposure at default in the same monetary units as collateral book
+///   values. It must be valid for the selected workout model.
+/// * `collateral` - Owned collateral specifications of `(type_name, book_value,
+///   haircut)`, where `haircut` is a decimal fraction deducted from value.
+/// * `direct_cost_pct` - Direct workout costs as a decimal fraction of EAD.
+/// * `indirect_cost_pct` - Indirect workout costs as a decimal fraction of EAD.
+/// * `time_to_resolution_years` - Expected workout horizon in years.
+/// * `discount_rate` - Annual decimal rate used to discount recoveries over the
+///   workout horizon.
 ///
 /// # Errors
 /// Returns an error if any collateral type or model input is invalid.
@@ -143,6 +183,12 @@ pub fn downturn_lgd_stressed(
 
 /// Apply a regulatory-floor downturn adjustment to base LGD.
 ///
+/// # Arguments
+///
+/// * `base_lgd` - Through-the-cycle loss-given-default as a decimal fraction.
+/// * `add_on` - Downturn add-on expressed as a decimal LGD increment.
+/// * `floor` - Minimum permitted downturn LGD as a decimal fraction.
+///
 /// # Errors
 /// Returns an error if the downturn model parameters or base LGD are invalid.
 pub fn downturn_lgd_regulatory_floor(base_lgd: f64, add_on: f64, floor: f64) -> crate::Result<f64> {
@@ -151,6 +197,11 @@ pub fn downturn_lgd_regulatory_floor(base_lgd: f64, add_on: f64, floor: f64) -> 
 
 /// Exposure at default for a fully drawn term loan.
 ///
+/// # Arguments
+///
+/// * `principal` - Outstanding drawn principal in the facility's monetary
+///   units; it is fully included in exposure at default.
+///
 /// # Errors
 /// Returns an error if the principal is invalid.
 pub fn ead_term_loan(principal: f64) -> crate::Result<f64> {
@@ -158,6 +209,14 @@ pub fn ead_term_loan(principal: f64) -> crate::Result<f64> {
 }
 
 /// Exposure at default for a revolving facility.
+///
+/// # Arguments
+///
+/// * `drawn` - Currently drawn facility amount in the facility's monetary
+///   units.
+/// * `undrawn` - Remaining undrawn commitment in the same monetary units.
+/// * `ccf` - Credit-conversion factor as a decimal fraction applied to the
+///   undrawn amount.
 ///
 /// # Errors
 /// Returns an error if drawn, undrawn, or CCF inputs are invalid.

@@ -157,6 +157,11 @@ struct BrinsonGroup {
 
 /// Compute return contribution attribution from a JSON specification.
 ///
+/// # Arguments
+///
+/// * `spec_json` - UTF-8 JSON document encoding return-contribution positions,
+///   weights, returns, and optional benchmark inputs.
+///
 /// # Errors
 ///
 /// Returns a validation error when the JSON is malformed or violates the
@@ -169,6 +174,11 @@ pub fn attribute_return_contribution(spec_json: &str) -> Result<String> {
 }
 
 /// Validate a return contribution JSON specification.
+///
+/// # Arguments
+///
+/// * `spec_json` - UTF-8 JSON document to parse and execute for structural and
+///   weighting-invariant validation.
 ///
 /// # Errors
 ///

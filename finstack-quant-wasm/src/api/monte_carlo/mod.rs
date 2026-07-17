@@ -106,6 +106,16 @@ fn binding_defaults(
 /// `relative_stderr`.
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = priceEuropeanCall)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
+/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param seed - Deterministic random-number seed used to reproduce simulation output.
+/// @param num_steps - Number of time steps per simulated path.
+/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
 pub fn price_european_call(
     spot: f64,
     strike: f64,
@@ -131,6 +141,16 @@ pub fn price_european_call(
 /// `relative_stderr`.
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = priceEuropeanPut)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
+/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param seed - Deterministic random-number seed used to reproduce simulation output.
+/// @param num_steps - Number of time steps per simulated path.
+/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
 pub fn price_european_put(
     spot: f64,
     strike: f64,
@@ -180,6 +200,20 @@ fn price_european(
 /// Price a European call under Heston stochastic volatility.
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = priceHestonCall)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param kappa - Mean-reversion speed of variance in the Heston stochastic-volatility model.
+/// @param theta - Long-run variance level in the Heston stochastic-volatility model.
+/// @param vol_of_vol - Annualized volatility of variance in the Heston stochastic-volatility model.
+/// @param rho - Instantaneous correlation between the asset and variance shocks.
+/// @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
+/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param seed - Deterministic random-number seed used to reproduce simulation output.
+/// @param num_steps - Number of time steps per simulated path.
+/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
 pub fn price_heston_call(
     spot: f64,
     strike: f64,
@@ -205,6 +239,20 @@ pub fn price_heston_call(
 /// Price a European put under Heston stochastic volatility.
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = priceHestonPut)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param kappa - Mean-reversion speed of variance in the Heston stochastic-volatility model.
+/// @param theta - Long-run variance level in the Heston stochastic-volatility model.
+/// @param vol_of_vol - Annualized volatility of variance in the Heston stochastic-volatility model.
+/// @param rho - Instantaneous correlation between the asset and variance shocks.
+/// @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
+/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param seed - Deterministic random-number seed used to reproduce simulation output.
+/// @param num_steps - Number of time steps per simulated path.
+/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
 pub fn price_heston_put(
     spot: f64,
     strike: f64,
@@ -233,6 +281,12 @@ pub fn price_heston_put(
 
 /// Black-Scholes call price.
 #[wasm_bindgen(js_name = blackScholesCall)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
 pub fn black_scholes_call(
     spot: f64,
     strike: f64,
@@ -248,6 +302,12 @@ pub fn black_scholes_call(
 
 /// Black-Scholes put price.
 #[wasm_bindgen(js_name = blackScholesPut)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
 pub fn black_scholes_put(
     spot: f64,
     strike: f64,
@@ -268,6 +328,16 @@ pub fn black_scholes_put(
 /// Price an Asian call via Monte Carlo under GBM dynamics.
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = priceAsianCall)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
+/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param seed - Deterministic random-number seed used to reproduce simulation output.
+/// @param num_steps - Number of time steps per simulated path.
+/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
 pub fn price_asian_call(
     spot: f64,
     strike: f64,
@@ -288,6 +358,16 @@ pub fn price_asian_call(
 /// Price an Asian put via Monte Carlo under GBM dynamics.
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = priceAsianPut)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
+/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param seed - Deterministic random-number seed used to reproduce simulation output.
+/// @param num_steps - Number of time steps per simulated path.
+/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
 pub fn price_asian_put(
     spot: f64,
     strike: f64,
@@ -359,6 +439,19 @@ fn price_asian(
 ///   positive; `"laguerre"` additionally requires degree in `[1, 4]`.
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = priceAmericanPut)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
+/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param seed - Deterministic random-number seed used to reproduce simulation output.
+/// @param num_steps - Number of time steps per simulated path.
+/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+/// @param use_parallel - Whether simulation paths are evaluated in parallel when supported.
+/// @param basis - Regression basis family used by the American-option exercise estimator.
+/// @param basis_degree - Maximum polynomial degree used by the American-option exercise basis.
 pub fn price_american_put(
     spot: f64,
     strike: f64,
@@ -400,6 +493,19 @@ pub fn price_american_put(
 /// Optional knobs match [`price_american_put`].
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = priceAmericanCall)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
+/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param seed - Deterministic random-number seed used to reproduce simulation output.
+/// @param num_steps - Number of time steps per simulated path.
+/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+/// @param use_parallel - Whether simulation paths are evaluated in parallel when supported.
+/// @param basis - Regression basis family used by the American-option exercise estimator.
+/// @param basis_degree - Maximum polynomial degree used by the American-option exercise basis.
 pub fn price_american_call(
     spot: f64,
     strike: f64,
@@ -439,6 +545,20 @@ pub fn price_american_call(
 /// Two-pass unbiased American put price (training fit + out-of-sample pricing).
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = priceAmericanPutUnbiased)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
+/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param seed - Deterministic random-number seed used to reproduce simulation output.
+/// @param pricing_seed - Independent deterministic seed used for unbiased-pricing sampling.
+/// @param num_steps - Number of time steps per simulated path.
+/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+/// @param use_parallel - Whether simulation paths are evaluated in parallel when supported.
+/// @param basis - Regression basis family used by the American-option exercise estimator.
+/// @param basis_degree - Maximum polynomial degree used by the American-option exercise basis.
 pub fn price_american_put_unbiased(
     spot: f64,
     strike: f64,
@@ -480,6 +600,20 @@ pub fn price_american_put_unbiased(
 /// Two-pass unbiased American call price (training fit + out-of-sample pricing).
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = priceAmericanCallUnbiased)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param expiry - Time to option expiry in years on the model's annual time basis.
+/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param seed - Deterministic random-number seed used to reproduce simulation output.
+/// @param pricing_seed - Independent deterministic seed used for unbiased-pricing sampling.
+/// @param num_steps - Number of time steps per simulated path.
+/// @param currency - ISO-4217 currency code for the monetary amount or market convention.
+/// @param use_parallel - Whether simulation paths are evaluated in parallel when supported.
+/// @param basis - Regression basis family used by the American-option exercise estimator.
+/// @param basis_degree - Maximum polynomial degree used by the American-option exercise basis.
 pub fn price_american_call_unbiased(
     spot: f64,
     strike: f64,

@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 mod engine_edge_cases_test;
 mod error_handling_test;
 mod invariants_test;

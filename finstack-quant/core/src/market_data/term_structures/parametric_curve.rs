@@ -239,7 +239,17 @@ impl NelsonSiegelModel {
         }
     }
 
-    /// Validate parameter constraints.
+    /// Validate the model's time-scale constraints.
+    ///
+    /// The beta coefficients are unconstrained decimal continuous zero-rate
+    /// loadings. For Nelson-Siegel, `tau` controls the decay horizon; for
+    /// Nelson-Siegel-Svensson, `tau1` and `tau2` control the two independent
+    /// curvature horizons.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a time-scale parameter is non-positive or, for
+    /// the Svensson variant, the two time scales differ by less than `1e-10`.
     pub fn validate(&self) -> crate::Result<()> {
         match self {
             Self::Ns { tau, .. } => {
@@ -441,6 +451,16 @@ impl ParametricCurveBuilder {
     }
 
     /// Build the parametric curve.
+    ///
+    /// The resulting curve evaluates continuous zero and instantaneous forward
+    /// rates directly from the supplied Nelson-Siegel or Nelson-Siegel-Svensson
+    /// parameters; it has no interpolation knot grid.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `base_date` or `model` was not supplied, or the
+    /// model fails [`NelsonSiegelModel::validate`] because its decay horizons
+    /// are non-positive or indistinguishable.
     pub fn build(self) -> crate::Result<ParametricCurve> {
         let base_date = self
             .base_date

@@ -45,6 +45,12 @@ impl AttributionEnvelope {
     }
 
     /// Execute the attribution and return the result envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for an unsupported envelope schema and
+    /// propagates all instrument, market-data, pricing, and method-specific
+    /// errors from [`AttributionSpec::execute`].
     pub fn execute(&self) -> Result<AttributionResultEnvelope> {
         if self.schema != ATTRIBUTION_SCHEMA_V1 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -156,6 +162,15 @@ pub struct AttributionConfig {
 
 impl AttributionSpec {
     /// Build an attribution spec from the JSON-friendly inputs used by bindings.
+    ///
+    /// `as_of_t0` and `as_of_t1` must use ISO-8601 calendar-date syntax. When
+    /// present, `config_json` supplies the complete serialized attribution
+    /// configuration; it is not merged with caller state.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when any JSON payload
+    /// has the wrong schema or either as-of date cannot be parsed.
     pub fn from_json_inputs(
         instrument_json: &str,
         market_t0_json: &str,

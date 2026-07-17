@@ -193,6 +193,16 @@ pub fn apply_and_revalue(
 ///
 /// Returns any scenario-application or valuation error raised by
 /// [`apply_and_revalue`].
+///
+/// # Arguments
+///
+/// * `portfolio` - Base portfolio whose positions and base currency are
+///   copied before scenario operations are applied.
+/// * `scenario` - Ordered shock and transformation specification to apply.
+/// * `market` - Unshocked market snapshot used as the scenario-application
+///   source and subsequent valuation context.
+/// * `config` - Library valuation configuration, including market-data and
+///   convention resolution policy.
 pub fn apply_and_revalue_envelope(
     portfolio: &Portfolio,
     scenario: &ScenarioSpec,

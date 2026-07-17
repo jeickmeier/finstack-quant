@@ -1,3 +1,5 @@
+//! Portfolio-level factor assignment, decomposition, and what-if analysis.
+//!
 use crate::types::PositionId;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_factor_model::matching::FactorMatcher;

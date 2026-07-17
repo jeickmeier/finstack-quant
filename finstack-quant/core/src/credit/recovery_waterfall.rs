@@ -95,6 +95,13 @@ pub struct RecoveryWaterfallResult {
 /// Returns [`Error::Validation`] when an amount is negative or non-finite, an
 /// identifier or seniority label is empty, a haircut lies outside `[0, 1]`,
 /// claim totals overflow, or net collateral exceeds the inclusive estate.
+///
+/// # Arguments
+///
+/// * `estate_value` - Total distributable estate in the claims' monetary
+///   units, before collateral and priority allocations.
+/// * `claims` - Recovery claims with identifiers, seniority, exposure, and
+///   collateral data. Claims at equal priority share a shortfall pro rata.
 pub fn allocate_recovery(
     estate_value: f64,
     claims: &[RecoveryClaim],

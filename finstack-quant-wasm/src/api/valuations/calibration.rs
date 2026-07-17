@@ -57,6 +57,7 @@ fn validate_calibration_json_inner(json: &str) -> Result<String, ExecuteError> {
 
 /// Validate a calibration plan JSON and return the canonical (pretty-printed) form.
 #[wasm_bindgen(js_name = validateCalibrationJson)]
+/// @param json - Canonical JSON string defining the object to deserialize or normalize.
 pub fn validate_calibration_json(json: &str) -> Result<String, JsValue> {
     validate_calibration_json_inner(json).map_err(execute_error_to_js)
 }
@@ -84,6 +85,7 @@ fn calibrate_inner(envelope_json: &str) -> Result<String, ExecuteError> {
 /// flat `market_data` / `prior_market` lists) and returns a serialized
 /// `CalibrationResultEnvelope`.
 #[wasm_bindgen(js_name = calibrate)]
+/// @param envelope_json - CalibrationEnvelope JSON containing targets, parameters, bounds, and dependencies.
 pub fn calibrate(envelope_json: &str) -> Result<String, JsValue> {
     calibrate_inner(envelope_json).map_err(execute_error_to_js)
 }
@@ -93,12 +95,14 @@ pub fn calibrate(envelope_json: &str) -> Result<String, JsValue> {
 /// Returns a JSON-serialized `ValidationReport` listing every error found
 /// plus the dependency graph. Microseconds.
 #[wasm_bindgen(js_name = dryRun)]
+/// @param envelope_json - CalibrationEnvelope JSON containing targets, parameters, bounds, and dependencies.
 pub fn dry_run(envelope_json: &str) -> Result<String, JsValue> {
     validate::dry_run(envelope_json).map_err(|e| envelope_error_to_js(&e))
 }
 
 /// Returns the static dependency graph of a calibration plan as JSON.
 #[wasm_bindgen(js_name = dependencyGraphJson)]
+/// @param envelope_json - CalibrationEnvelope JSON containing targets, parameters, bounds, and dependencies.
 pub fn dependency_graph_json(envelope_json: &str) -> Result<String, JsValue> {
     validate::dependency_graph_json(envelope_json).map_err(|e| envelope_error_to_js(&e))
 }

@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use finstack_quant_core::math::{
     erf, gauss_legendre_integrate, gauss_legendre_integrate_adaptive,
     gauss_legendre_integrate_composite,

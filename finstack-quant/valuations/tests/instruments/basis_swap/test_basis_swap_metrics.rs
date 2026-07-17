@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};

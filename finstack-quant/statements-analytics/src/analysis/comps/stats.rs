@@ -38,6 +38,11 @@ pub struct PeerStats {
 ///
 /// Returns `None` if no finite values remain. The slice is not modified;
 /// an internal sorted copy is used for percentile computations.
+///
+/// # Arguments
+///
+/// * `values` - Peer metric observations; NaN and infinite entries are ignored
+///   before calculating descriptive statistics.
 pub fn peer_stats(values: &[f64]) -> Option<PeerStats> {
     let finite: Vec<f64> = values.iter().copied().filter(|v| v.is_finite()).collect();
     if finite.is_empty() {
@@ -80,6 +85,11 @@ pub fn peer_stats(values: &[f64]) -> Option<PeerStats> {
 /// are ignored.
 ///
 /// Returns `None` if no finite peer values remain or `value` is non-finite.
+///
+/// # Arguments
+///
+/// * `values` - Peer observations used as the finite comparison universe.
+/// * `value` - Subject value whose inclusive percentile rank is required.
 pub fn percentile_rank(values: &[f64], value: f64) -> Option<f64> {
     if !value.is_finite() {
         return None;
@@ -102,6 +112,12 @@ pub fn percentile_rank(values: &[f64], value: f64) -> Option<f64> {
 ///
 /// Returns `None` if fewer than 2 finite values, standard deviation is
 /// zero, or `value` is non-finite.
+///
+/// # Arguments
+///
+/// * `values` - Peer observations used to calculate finite mean and sample
+///   standard deviation.
+/// * `value` - Subject value to standardize against the peer distribution.
 pub fn z_score(values: &[f64], value: f64) -> Option<f64> {
     if !value.is_finite() {
         return None;
@@ -149,6 +165,15 @@ pub struct RegressionResult {
 ///
 /// Requires at least 3 data points. Returns `None` if the regression
 /// cannot be computed (e.g., zero variance in x).
+///
+/// # Arguments
+///
+/// * `x` - Peer explanatory-variable observations, aligned by index with `y`.
+/// * `y` - Peer dependent-variable observations, aligned by index with `x`.
+/// * `subject_x` - Subject explanatory-variable value at which the fair value
+///   is fitted.
+/// * `subject_y` - Observed subject dependent-variable value used to calculate
+///   the rich/cheap residual.
 pub fn regression_fair_value(
     x: &[f64],
     y: &[f64],

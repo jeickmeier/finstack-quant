@@ -392,6 +392,13 @@ pub const FBM_AUTO_CHOLESKY_MAX_STEPS: usize = 199;
 /// [`FBM_AUTO_CHOLESKY_MAX_STEPS`] steps and [`HybridFbm`] otherwise. Use the
 /// concrete constructors directly when an explicit algorithm is required.
 ///
+/// # Arguments
+///
+/// * `times` - Strictly increasing, finite, non-negative time grid in years;
+///   at least two nodes are required.
+/// * `hurst` - Fractional-Brownian-motion Hurst exponent in `(0, 1)` that
+///   controls path roughness and increment dependence.
+///
 /// # Errors
 ///
 /// Returns [`Error::Validation`] if the time grid or Hurst exponent is invalid.

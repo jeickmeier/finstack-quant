@@ -54,6 +54,12 @@ use super::{
 /// let p1 = projection::project(&gen, 1.0).expect("valid projection");
 /// assert!(p1.probability("AAA", "D").unwrap() > 0.0);
 /// ```
+///
+/// # Arguments
+///
+/// * `generator` - Valid continuous-time rating-transition generator whose
+///   scale determines the output state ordering.
+/// * `t` - Positive projection horizon in years used in `exp(Q * t)`.
 pub fn project(generator: &GeneratorMatrix, t: f64) -> Result<TransitionMatrix, MigrationError> {
     if !t.is_finite() || t <= 0.0 {
         return Err(MigrationError::InvalidHorizon(t));
@@ -73,6 +79,12 @@ pub fn project(generator: &GeneratorMatrix, t: f64) -> Result<TransitionMatrix, 
 /// Compute P(t) = exp(Q · t) using the \[13/13\] Padé scaling-and-squaring method.
 ///
 /// Explicit algorithm selection; equivalent to [`project`].
+///
+/// # Arguments
+///
+/// * `generator` - Valid continuous-time rating-transition generator whose
+///   scale determines the output state ordering.
+/// * `t` - Positive projection horizon in years used in `exp(Q * t)`.
 ///
 /// # Errors
 ///

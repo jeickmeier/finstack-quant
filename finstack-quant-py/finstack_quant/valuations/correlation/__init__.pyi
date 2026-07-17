@@ -255,7 +255,25 @@ class CreditExposure:
         default_probability: float,
         lgd: float,
         factor_loadings: Sequence[float],
-    ) -> None: ...
+    ) -> None:
+        """Create one obligor exposure for a correlated portfolio-loss simulation.
+
+        Parameters
+        ----------
+        id : str
+            Stable obligor or position identifier retained in simulation output.
+        notional : float
+            Positive exposure-at-default amount in the portfolio loss currency.
+        default_probability : float
+            Marginal default probability over the simulation horizon in ``[0, 1]``.
+        lgd : float
+            Constant loss-given-default fraction in ``[0, 1]`` when no recovery
+            model overrides it.
+        factor_loadings : Sequence[float]
+            Systematic-factor sensitivities aligned with the selected copula's
+            factor dimensions.
+        """
+        ...
     @property
     def id(self) -> str: ...
     @property
@@ -280,7 +298,23 @@ class PortfolioLossConfig:
         seed: int,
         confidence: float,
         copula: CopulaSpec,
-    ) -> None: ...
+    ) -> None:
+        """Configure deterministic correlated portfolio-loss simulation.
+
+        Parameters
+        ----------
+        num_paths : int
+            Number of deterministic Monte Carlo paths, bounded by the library
+            safety limit for finite-pool loss simulation.
+        seed : int
+            Random seed used to derive stable path-indexed RNG streams.
+        confidence : float
+            VaR and expected-shortfall confidence level in the open interval
+            ``(0, 1)``.
+        copula : CopulaSpec
+            Dependence model and factor configuration for correlated defaults.
+        """
+        ...
     @property
     def num_paths(self) -> int: ...
     @property
@@ -914,6 +948,17 @@ def simulate_portfolio_loss(
     ``config.confidence``; expected shortfall includes the VaR observation and
     every worse path. If ``recovery`` is provided, its conditional LGD replaces
     each exposure's constant LGD and exactly one systematic factor is required.
+
+    Parameters
+    ----------
+    exposures : Sequence[CreditExposure]
+        Obligors to simulate, each with exposure, marginal PD, LGD, and factor
+        loadings compatible with ``config.copula``.
+    config : PortfolioLossConfig
+        Path count, RNG seed, confidence level, and dependence-model settings.
+    recovery : RecoverySpec or None, default None
+        Optional conditional recovery model replacing constant exposure LGDs;
+        it requires a one-factor systematic copula.
     """
     ...
 
@@ -996,14 +1041,14 @@ def nearest_correlation(
 
     Parameters
     ----------
-    matrix
+    matrix : Sequence[float]
         Flattened row-major ``n x n`` input matrix.
-    n
+    n : int
         Matrix dimension.
-    max_iter
+    max_iter : int or None
         Maximum alternating-projection iterations. Defaults to the Rust
         ``NearestCorrelationOpts::default()`` value (currently ``200``).
-    tol
+    tol : float or None
         Frobenius-norm tolerance between successive iterates. Defaults to
         the Rust ``NearestCorrelationOpts::default()`` value (currently
         ``1e-10``).

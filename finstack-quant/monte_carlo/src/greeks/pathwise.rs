@@ -15,7 +15,8 @@ use crate::online_stats::OnlineStats;
 ///
 /// * `terminal_spots` - Terminal spot prices from MC paths
 /// * `initial_spot` - Initial spot price
-/// * `strike` - Strike price
+/// * `strike` - Option exercise price in the same price units as
+///   `terminal_spots`.
 /// * `discount_factor` - Discount factor e^(-rT)
 ///
 /// # Returns
@@ -45,6 +46,20 @@ pub fn pathwise_delta_call(
 }
 
 /// Compute pathwise delta for European put under GBM.
+///
+/// # Arguments
+///
+/// * `terminal_spots` - Simulated terminal underlying spots, one observation
+///   per Monte Carlo path.
+/// * `initial_spot` - Positive initial underlying spot in the same price units
+///   as `terminal_spots` and `strike`.
+/// * `strike` - Option exercise price in the same price units as the spot.
+/// * `discount_factor` - Discount factor from maturity to valuation, applied
+///   to each pathwise payoff derivative.
+///
+/// # Returns
+///
+/// Returns the put delta estimate and its Monte Carlo standard error.
 #[must_use]
 pub fn pathwise_delta_put(
     terminal_spots: &[f64],
@@ -87,9 +102,10 @@ pub fn pathwise_delta_put(
 /// # Arguments
 ///
 /// * `terminal_spots` - Terminal spot prices
-/// * `initial_spot` - Initial spot price (unused for the payoff derivative; kept
+/// * `_initial_spot` - Initial spot price (unused for the payoff derivative; kept
 ///   for API symmetry with the delta helpers)
-/// * `strike` - Strike price
+/// * `strike` - Option exercise price in the same price units as
+///   `terminal_spots`.
 /// * `time_to_maturity` - Time to maturity T
 /// * `volatility` - Current volatility σ
 /// * `discount_factor` - Discount factor e^(-rT)

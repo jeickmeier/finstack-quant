@@ -1,3 +1,5 @@
+//! Pricing-engine components for fixed-income bonds.
+//!
 #![allow(clippy::expect_used, clippy::panic)]
 
 use super::bond_valuator::BondValuator;

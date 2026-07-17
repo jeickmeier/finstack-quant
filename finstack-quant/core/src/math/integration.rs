@@ -454,8 +454,10 @@ impl GaussHermiteQuadrature {
 /// # Arguments
 ///
 /// * `f` - Function to integrate
-/// * `a` - Lower bound
-/// * `b` - Upper bound
+/// * `a` - Lower endpoint of the integration interval, in the domain units
+///   accepted by `f`.
+/// * `b` - Upper endpoint of the integration interval, in the domain units
+///   accepted by `f`; values below `a` produce a signed integral.
 /// * `n` - Number of intervals (must be even and > 0)
 ///
 /// # Returns
@@ -517,8 +519,10 @@ where
 /// # Arguments
 ///
 /// * `f` - Function to integrate (must implement `Copy` for recursive calls)
-/// * `a` - Lower bound
-/// * `b` - Upper bound
+/// * `a` - Lower endpoint of the integration interval, in the domain units
+///   accepted by `f`.
+/// * `b` - Upper endpoint of the integration interval, in the domain units
+///   accepted by `f`; values below `a` produce a signed integral.
 /// * `tol` - Error tolerance for adaptive refinement
 /// * `max_depth` - Maximum recursion depth to prevent infinite refinement
 ///
@@ -973,8 +977,10 @@ where
 /// # Arguments
 ///
 /// * `f` - Function to integrate
-/// * `a` - Lower bound
-/// * `b` - Upper bound
+/// * `a` - Lower endpoint of the integration interval, in the domain units
+///   accepted by `f`.
+/// * `b` - Upper endpoint of the integration interval, in the domain units
+///   accepted by `f`; values below `a` produce a signed integral.
 /// * `n` - Number of intervals (must be > 0)
 ///
 /// # Returns

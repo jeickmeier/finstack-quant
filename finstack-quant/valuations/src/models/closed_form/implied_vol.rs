@@ -56,6 +56,18 @@ const MIN_VEGA: f64 = 1e-15;
 /// - Returns `Ok(0.0)` when `t <= 0` (expired; volatility is moot).
 /// - Returns `Err` for non-finite inputs, non-positive `spot`/`strike`/`target_price`,
 ///   or when the target cannot be bracketed.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `r` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `q` - Continuously compounded dividend yield or foreign-rate carry as a
+///   decimal.
+/// * `t` - Remaining time to expiry in years.
+/// * `option_type` - Call or put payoff convention to invert.
+/// * `target_price` - Observed per-unit option premium to match, excluding
+///   any contract multiplier.
 #[allow(clippy::too_many_arguments)]
 pub fn bs_implied_vol(
     spot: f64,
@@ -216,6 +228,15 @@ pub fn bs_implied_vol(
 /// - Returns `Ok(0.0)` when `t <= 0` (expired; volatility is moot).
 /// - Returns `Err` for non-finite inputs, non-positive `forward`/`strike`/`df`/`target_price`,
 ///   or when the target cannot be bracketed.
+///
+/// # Arguments
+///
+/// * `forward` - Forward price or rate at expiry in the option's quote units.
+/// * `strike` - Exercise price or rate in the same units as `forward`.
+/// * `df` - Discount factor from valuation date to expiry.
+/// * `t` - Remaining time to expiry in years.
+/// * `option_type` - Call or put payoff convention to invert.
+/// * `target_price` - Observed discounted per-unit option premium to match.
 pub fn black76_implied_vol(
     forward: f64,
     strike: f64,

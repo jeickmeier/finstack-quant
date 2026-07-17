@@ -13,7 +13,7 @@
 //! ## API
 //!
 //! - [`project_floating_rate`]: Primary function taking a resolved forward curve and params
-//! - [`project_floating_rate_from_market`]: Convenience wrapper that looks up the curve
+//! - A test-only market-context wrapper exercises the same projection path after curve lookup.
 //!
 //! ## Formulas
 //!
@@ -367,11 +367,14 @@ pub(crate) fn project_fallback_rate(params: &FloatingRateParams) -> f64 {
 ///
 /// # Arguments
 ///
-/// * `reset_date` - The rate fixing/reset date
-/// * `reset_period_end` - Retained for compatibility; a term index projection
+/// * `reset_date` - Rate fixing date used to locate the term-index forward on
+///   `fwd`.
+/// * `_reset_period_end` - Retained for compatibility; a term index projection
 ///   uses the curve tenor and the reset date, not this date
-/// * `fwd` - Resolved forward curve
-/// * `params` - Floating rate parameters (spread, gearing, floors, caps)
+/// * `fwd` - Resolved forward curve supplying the underlying index rate at the
+///   reset date.
+/// * `params` - Floating-rate adjustments: spread and gearing plus index and
+///   all-in floors or caps, quoted in the documented parameter units.
 ///
 /// # Returns
 ///

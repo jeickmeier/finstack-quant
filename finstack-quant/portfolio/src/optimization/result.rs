@@ -1,3 +1,5 @@
+//! Problem, decision-space, constraint, and solver types for portfolio optimization.
+//!
 use super::problem::PortfolioOptimizationProblem;
 use super::tolerances::{SLACK_TOL, WEIGHT_TOL};
 use crate::error::{Error, Result};

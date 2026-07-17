@@ -107,6 +107,7 @@ macro_rules! fx_class {
         impl $rust_name {
             #[wasm_bindgen(constructor)]
             /// Create the instrument from a JS spec object.
+            /// @param spec - JavaScript object or JSON payload defining the canonical instrument or calculation specification.
             pub fn new(spec: JsValue) -> Result<$rust_name, JsValue> {
                 Ok(Self {
                     json: from_spec($type_tag, spec)?,
@@ -115,6 +116,7 @@ macro_rules! fx_class {
 
             #[wasm_bindgen(js_name = fromJson)]
             /// Deserialize the instrument from a JSON spec string.
+            /// @param json - Canonical JSON string defining the object to deserialize or normalize.
             pub fn from_json(json: &str) -> Result<$rust_name, JsValue> {
                 Ok(Self {
                     json: from_json_payload($type_tag, json)?,
@@ -128,6 +130,9 @@ macro_rules! fx_class {
             }
 
             /// Price the instrument against a market JSON snapshot.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             pub fn price(
                 &self,
                 market_json: &str,
@@ -143,6 +148,12 @@ macro_rules! fx_class {
             /// WASM keeps optional arguments trailing for JavaScript callers,
             /// so the order is `(marketJson, asOf, metrics, model?, ...)`.
             /// Python uses `(market, as_of, model="default", metrics=...)`.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param metrics - Array of canonical metric identifiers to calculate with the instrument price.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+            /// @param pricing_options - Optional JSON pricing overrides accepted by the canonical instrument validator.
+            /// @param market_history - Optional serialized historical market snapshots required by historical pricing models.
             pub fn price_with_metrics(
                 &self,
                 market_json: &str,
@@ -173,6 +184,9 @@ macro_rules! fx_option_class {
         #[wasm_bindgen(js_class = $js_name)]
         impl $rust_name {
             /// Spot delta of the option.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             pub fn delta(
                 &self,
                 market_json: &str,
@@ -183,6 +197,9 @@ macro_rules! fx_option_class {
             }
 
             /// Spot gamma of the option.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             pub fn gamma(
                 &self,
                 market_json: &str,
@@ -193,6 +210,9 @@ macro_rules! fx_option_class {
             }
 
             /// Vega of the option.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             pub fn vega(
                 &self,
                 market_json: &str,
@@ -203,6 +223,9 @@ macro_rules! fx_option_class {
             }
 
             /// Theta of the option.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             pub fn theta(
                 &self,
                 market_json: &str,
@@ -213,6 +236,9 @@ macro_rules! fx_option_class {
             }
 
             /// Domestic rate rho of the option.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             pub fn rho(
                 &self,
                 market_json: &str,
@@ -224,6 +250,9 @@ macro_rules! fx_option_class {
 
             #[wasm_bindgen(js_name = foreignRho)]
             /// Foreign rate rho of the option.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             pub fn foreign_rho(
                 &self,
                 market_json: &str,
@@ -234,6 +263,9 @@ macro_rules! fx_option_class {
             }
 
             /// Vanna of the option.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             pub fn vanna(
                 &self,
                 market_json: &str,
@@ -244,6 +276,9 @@ macro_rules! fx_option_class {
             }
 
             /// Volga of the option.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             pub fn volga(
                 &self,
                 market_json: &str,
@@ -254,6 +289,9 @@ macro_rules! fx_option_class {
             }
 
             /// Compute standard FX option Greeks as a JavaScript object.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             pub fn greeks(
                 &self,
                 market_json: &str,
@@ -297,6 +335,9 @@ macro_rules! fx_option_subset_class {
             )+
 
             /// Compute all Greeks supported by this instrument as a JavaScript object.
+            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             pub fn greeks(
                 &self,
                 market_json: &str,

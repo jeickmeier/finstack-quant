@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 mod complex_scenarios_test;
 mod fx_and_bindings_test;
 mod integration_test;

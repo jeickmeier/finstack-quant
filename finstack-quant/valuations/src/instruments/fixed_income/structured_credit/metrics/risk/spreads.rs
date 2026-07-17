@@ -462,7 +462,8 @@ pub fn calculate_tranche_cs01(
 /// * `deal` - The structured-credit deal owning the tranche.
 /// * `tranche_id` - Identifier of the floating-rate tranche to solve for.
 /// * `context` - Market context (discount curve plus any index forwards).
-/// * `as_of` - Valuation date.
+/// * `as_of` - Valuation date used to project floating coupon resets and
+///   discount the tranche cashflows.
 /// * `target_pv` - The observed/target present value (price) to match.
 ///
 /// # Returns

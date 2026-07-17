@@ -400,6 +400,30 @@ pub fn value_portfolio(
 /// This is useful for replay and historical what-if workflows where the
 /// portfolio definition has a static book date but each market snapshot must
 /// be priced and FX-converted at the snapshot date.
+///
+/// The result is stamped with `as_of`; `options.strict_risk` determines whether
+/// a failed risk-metric calculation aborts the valuation or is recorded while
+/// retaining a PV-only position value.
+///
+/// # Arguments
+///
+/// * `portfolio` - Portfolio to price, including positions, base currency, and
+///   static book metadata.
+/// * `market` - Market snapshot supplying curves, quotes, FX, and other data
+///   required by each instrument valuation.
+/// * `config` - Library configuration controlling market-data lookup and
+///   financial-convention behavior.
+/// * `options` - Valuation and risk-metric selection; `strict_risk` controls
+///   whether an unavailable requested metric invalidates the full valuation.
+/// * `as_of` - Explicit valuation date stamped on the result and used for
+///   pricing, cashflow eligibility, and FX conversion.
+///
+/// # Errors
+///
+/// Returns a position valuation error when pricing fails (or metric pricing
+/// fails in strict-risk mode), and propagates missing/invalid FX data needed to
+/// convert a native PV to the portfolio base currency. It also returns errors
+/// while assembling the portfolio-level totals.
 pub fn value_portfolio_at(
     portfolio: &Portfolio,
     market: &MarketContext,

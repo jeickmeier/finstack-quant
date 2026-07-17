@@ -165,6 +165,18 @@ impl SabrParams {
     ///
     /// This is the canonical constructor for deserialization and bindings so
     /// that shift validation cannot drift across host languages.
+    ///
+    /// `alpha` is the initial volatility level, `beta` is the CEV exponent,
+    /// `rho` is the forward/volatility Brownian correlation, and `nu` is
+    /// vol-of-vol. `shift`, when present, is an additive rate/price shift used
+    /// by shifted-lognormal SABR conventions; it is stored unchanged and is
+    /// not a volatility percentage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `alpha` or `nu` is non-finite or not strictly
+    /// positive, `beta` is non-finite or outside `[0, 1]`, `rho` is non-finite
+    /// or outside `(-1, 1)`, or an optional shift is non-finite.
     pub fn new_with_shift(
         alpha: f64,
         beta: f64,
@@ -618,12 +630,17 @@ fn chi(z: f64, rho: f64) -> crate::Result<f64> {
 ///
 /// # Arguments
 ///
-/// * `forward` - Forward rate
-/// * `expiry` - Time to expiry in years
-/// * `beta` - Fixed CEV exponent (typically 0.5 for CMS, 0.0 for normal)
-/// * `strikes` - Array of option strikes
-/// * `market_vols` - Array of market-implied Black-76 volatilities
-/// * `weights` - Optional weights for each strike (default: equal weights)
+/// * `forward` - Forward rate or price at the calibration date; each strike
+///   must use the same quote units and it must be positive for lognormal SABR.
+/// * `expiry` - Time from calibration to option expiry, measured in years.
+/// * `beta` - Fixed CEV exponent in `[0, 1]`; market practice commonly uses
+///   0.5 for CMS and 0.0 for normal-style quoting.
+/// * `strikes` - Option strikes, in the same units as `forward`, ordered to
+///   correspond one-for-one with `market_vols`.
+/// * `market_vols` - Black-76 implied volatilities as annual decimal values,
+///   aligned one-for-one with `strikes`.
+/// * `weights` - Optional non-negative relative weights aligned with
+///   `strikes`; `None` gives every quote equal weight.
 ///
 /// # Returns
 ///

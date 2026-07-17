@@ -317,6 +317,13 @@ fn resolve_swaption_surface_params(
 ///
 /// `market` is consulted for pre-calibrated κ/σ scalars (precedence step 2)
 /// when no explicit overrides are supplied.
+///
+/// # Arguments
+///
+/// * `req` - Requested curve IDs, optional JSON overrides, and optional market
+///   volatility surface used by the documented HW1F precedence ladder.
+/// * `market` - Market context supplying pre-calibrated scalars or inputs for
+///   surface-based calibration when overrides are absent.
 pub fn resolve_hw1f_params(
     req: &Hw1fResolveRequest<'_>,
     market: &MarketContext,

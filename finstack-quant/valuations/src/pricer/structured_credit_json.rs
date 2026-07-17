@@ -69,6 +69,16 @@ fn tranche_currency(deal: &StructuredCredit, tranche_id: &str) -> Result<Currenc
 ///
 /// Returns an error if the JSON is not a structured-credit deal, the as-of date
 /// is malformed, the tranche is missing or fixed-rate, or the solve fails.
+///
+/// # Arguments
+///
+/// * `instrument_json` - UTF-8 tagged structured-credit instrument JSON.
+/// * `tranche_id` - Identifier of the floating-rate tranche whose margin is
+///   solved.
+/// * `market` - Market context supplying the discount curve and index forwards.
+/// * `as_of` - ISO-8601 valuation date used for cashflow projection.
+/// * `target_pv` - Observed present-value amount in the named tranche's
+///   currency to match with a total discount margin.
 pub fn structured_credit_tranche_discount_margin_json(
     instrument_json: &str,
     tranche_id: &str,
@@ -102,6 +112,14 @@ fn discount_margin_target_money(
 ///
 /// Returns an error if the JSON is not a structured-credit deal, the as-of date
 /// is malformed, or the tranche is missing.
+///
+/// # Arguments
+///
+/// * `instrument_json` - UTF-8 tagged structured-credit instrument JSON.
+/// * `tranche_id` - Identifier of the tranche whose break-even default rate is
+///   solved.
+/// * `market` - Market context used to project tranche cashflows.
+/// * `as_of` - ISO-8601 valuation date used for cashflow projection.
 pub fn structured_credit_tranche_breakeven_cdr_json(
     instrument_json: &str,
     tranche_id: &str,
@@ -124,6 +142,19 @@ pub fn structured_credit_tranche_breakeven_cdr_json(
 /// Returns an error if the JSON (instrument or config) is invalid, the as-of
 /// date is malformed, the tranche or discount curve is missing, or the solve
 /// fails.
+///
+/// # Arguments
+///
+/// * `instrument_json` - UTF-8 tagged structured-credit instrument JSON.
+/// * `tranche_id` - Identifier of the tranche whose option-adjusted spread is
+///   solved.
+/// * `market_price_pct` - Observed clean price as a percentage of original
+///   tranche balance.
+/// * `market` - Market context supplying discounting and stochastic-pricing
+///   dependencies.
+/// * `as_of` - ISO-8601 valuation date used for cashflow projection.
+/// * `config_json` - Optional UTF-8 serialized [`OasConfig`]; `None` selects
+///   the canonical OAS simulation and solver defaults.
 pub fn structured_credit_tranche_oas_json(
     instrument_json: &str,
     tranche_id: &str,
@@ -155,6 +186,17 @@ pub fn structured_credit_tranche_oas_json(
 /// Returns an error if the JSON is not a structured-credit deal, the as-of date
 /// is malformed, the tranche or discount curve is missing, or a metric fails to
 /// compute.
+///
+/// # Arguments
+///
+/// * `instrument_json` - UTF-8 tagged structured-credit instrument JSON.
+/// * `tranche_id` - Identifier of the tranche whose own projected flows are
+///   used for all metrics.
+/// * `market` - Market context supplying the discount curve and required
+///   projection dependencies.
+/// * `as_of` - ISO-8601 valuation date used for projection and discounting.
+/// * `market_price_pct` - Optional observed price as a percentage of original
+///   balance; `None` uses model price and yields a zero z-spread.
 pub fn structured_credit_tranche_metrics_json(
     instrument_json: &str,
     tranche_id: &str,
@@ -174,6 +216,16 @@ pub fn structured_credit_tranche_metrics_json(
 ///
 /// Returns an error if the JSON (instrument or grid) is invalid, the as-of date
 /// is malformed, or a scenario fails to evaluate.
+///
+/// # Arguments
+///
+/// * `instrument_json` - UTF-8 tagged structured-credit instrument JSON.
+/// * `tranche_id` - Identifier of the tranche evaluated at every scenario grid
+///   point.
+/// * `market` - Market context used for projection and discounting.
+/// * `as_of` - ISO-8601 valuation date used for all scenario valuations.
+/// * `grid_json` - UTF-8 serialized [`ScenarioGrid`] of CPR, CDR, and
+///   recovery-severity assumptions to sweep.
 pub fn structured_credit_tranche_scenario_table_json(
     instrument_json: &str,
     tranche_id: &str,

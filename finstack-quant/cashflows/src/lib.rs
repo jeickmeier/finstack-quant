@@ -133,6 +133,12 @@ pub mod primitives {
     ///
     /// PIK is a capitalization event and `DefaultedNotional` is a write-down;
     /// neither should be emitted by APIs whose contract is dated cash.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - Classified cashflow kind to test; `PIK` and
+    ///   `DefaultedNotional` return `false`, while all settlement kinds return
+    ///   `true`.
     pub fn is_cash_settlement_kind(kind: CFKind) -> bool {
         !matches!(kind, CFKind::PIK | CFKind::DefaultedNotional)
     }

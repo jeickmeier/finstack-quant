@@ -18,12 +18,26 @@ def _esc(x: Any) -> str:
 
 
 def scroll(inner_html: str) -> str:
-    """Wrap a (tall) table in a fixed-height vertical scroll container."""
+    """Wrap tall HTML in a fixed-height vertical scroll container.
+
+    Parameters
+    ----------
+    inner_html : str
+        Already escaped and rendered HTML content, normally a report table.
+    """
     return f'<div class="fq-scroll">{inner_html}</div>'
 
 
 def kv_table(rows: list[tuple[str, str, str]], *, theme: Theme) -> str:  # noqa: ARG001
-    """Render key/value rows. Each row is ``(label, value_str, value_css_class)``."""
+    """Render a key/value HTML table.
+
+    Parameters
+    ----------
+    rows : list[tuple[str, str, str]]
+        ``(label, display_value, CSS_class)`` rows in desired display order.
+    theme : Theme
+        Report theme retained for a consistent chart/table helper interface.
+    """
     body = "".join(f'<tr><td class="k">{_esc(k)}</td><td class="v {cls}">{_esc(v)}</td></tr>' for k, v, cls in rows)
     return f'<table class="kv"><tbody>{body}</tbody></table>'
 
@@ -36,7 +50,21 @@ def data_table(
     formats: dict[str, Callable[[Any], str]] | None = None,
     neg_columns: set[str] | None = None,
 ) -> str:
-    """Render a generic table from row dicts, applying per-column formatters."""
+    """Render a generic HTML table from row dictionaries.
+
+    Parameters
+    ----------
+    rows : list[dict[str, Any]]
+        Display rows whose keys are selected by ``columns``.
+    columns : list[str]
+        Ordered column names to render from every row dictionary.
+    theme : Theme
+        Report theme retained for a consistent chart/table helper interface.
+    formats : dict[str, Callable[[Any], str]] or None
+        Optional per-column display functions; unlisted values are HTML escaped.
+    neg_columns : set[str] or None
+        Columns whose negative numeric values receive the ``neg`` CSS class.
+    """
     formats = formats or {}
     neg_columns = neg_columns or set()
     head = "".join(f"<th>{_esc(c)}</th>" for c in columns)
@@ -58,6 +86,14 @@ def heatmap(rows: list[tuple[int, list[Any], Any]], *, theme: Theme) -> str:
     ``rows`` is ``[(year, [12 month values in percent], year_total_in_percent), ...]``;
     values may be ``None`` for missing months. Magnitude shading via
     :func:`charts.color_scale`.
+
+    Parameters
+    ----------
+    rows : list[tuple[int, list[Any], Any]]
+        ``(year, monthly_percentage_points, annual_percentage_points)`` rows;
+        each monthly series has twelve entries and may contain missing values.
+    theme : Theme
+        Report palette used to shade positive and negative performance cells.
     """
     head = '<tr><th class="yr"></th>' + "".join(f"<th>{m}</th>" for m in _MONTHS) + '<th class="ytd">Year</th></tr>'
     body_rows = []

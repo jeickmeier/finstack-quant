@@ -140,6 +140,12 @@ impl Default for CeclConfig {
 
 impl CeclConfig {
     /// Validate the configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] for an invalid bucket width, forecast
+    /// horizon, historical annual PD, impaired recovery horizon, scenario
+    /// weights, or linear-reversion horizon.
     pub fn validate(&self) -> Result<()> {
         if self.bucket_width_years <= 0.0 {
             return Err(Error::Validation(
@@ -252,6 +258,12 @@ impl<'a> CeclEngine<'a> {
     /// with the running survival `S` carried across the forecast → historical
     /// boundary so the reverted portion remains properly conditional on
     /// surviving the R&S window.
+    ///
+    /// # Errors
+    ///
+    /// Propagates exposure validation and PD-term-structure lookup errors for
+    /// the exposure rating. Errors from the configured PD sources are surfaced
+    /// before calculating lifetime loss.
     pub fn compute_cecl(&self, exposure: &Exposure) -> Result<CeclResult> {
         exposure.validate()?;
         let horizon = exposure.remaining_maturity_years;

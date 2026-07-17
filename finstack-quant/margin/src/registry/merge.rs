@@ -1,3 +1,5 @@
+//! Loading, merging, and wire-format support for margin registry data.
+//!
 use serde_json::Value;
 
 /// Recursively merge `overlay` into `base` (object-wise). Arrays and

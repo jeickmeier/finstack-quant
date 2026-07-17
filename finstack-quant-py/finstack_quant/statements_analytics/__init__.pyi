@@ -86,6 +86,19 @@ __all__ = [
 ]
 
 class SensitivityConfig:
+    """Configure deterministic sensitivity scenarios for a statement model.
+
+    Parameters
+    ----------
+    mode : str
+        Scenario-construction mode accepted by the Rust sensitivity engine.
+    parameters : list[tuple[str, str, float, list[float]]]
+        Node-and-period shock specifications, including the base value and
+        ordered values to evaluate; defaults to no parameter shocks.
+    target_metrics : list[str]
+        Output node IDs to collect for every generated scenario; defaults to
+        an empty result selection.
+    """
     def __init__(
         self,
         mode: str,
@@ -93,7 +106,16 @@ class SensitivityConfig:
         target_metrics: list[str] = ...,
     ) -> None: ...
     @staticmethod
-    def from_json(json: str) -> SensitivityConfig: ...
+    def from_json(json: str) -> SensitivityConfig:
+        """Deserialize a sensitivity configuration from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload produced by ``to_json`` or following the
+            ``SensitivityConfig`` schema.
+        """
+        ...
     def to_json(self) -> str: ...
     @property
     def mode(self) -> str: ...
@@ -103,6 +125,19 @@ class SensitivityConfig:
     def parameter_count(self) -> int: ...
 
 class VarianceConfig:
+    """Define the labels, metrics, and periods for a variance comparison.
+
+    Parameters
+    ----------
+    baseline_label : str
+        Reader-facing label for the baseline statement result.
+    comparison_label : str
+        Reader-facing label for the statement result compared with baseline.
+    metrics : list[str]
+        Statement node IDs whose absolute and percentage variances are shown.
+    periods : list[str]
+        Model period labels to include in the variance report, in report order.
+    """
     def __init__(
         self,
         baseline_label: str,
@@ -111,7 +146,16 @@ class VarianceConfig:
         periods: list[str],
     ) -> None: ...
     @staticmethod
-    def from_json(json: str) -> VarianceConfig: ...
+    def from_json(json: str) -> VarianceConfig:
+        """Deserialize a variance configuration from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload describing the baseline, comparison, metrics, and
+            periods to report.
+        """
+        ...
     def to_json(self) -> str: ...
     @property
     def baseline_label(self) -> str: ...
@@ -123,6 +167,19 @@ class VarianceConfig:
     def periods(self) -> list[str]: ...
 
 class ScenarioSet:
+    """Name statement-model scenarios and optional parent/model relationships.
+
+    Parameters
+    ----------
+    scenarios : dict[str, dict[str, float]]
+        Mapping from scenario name to node-ID overrides expressed as numeric
+        model values.
+    parents : dict[str, str] or None
+        Optional mapping from scenario to inherited parent scenario; omitted
+        scenarios have no parent.
+    model_ids : dict[str, str] or None
+        Optional mapping from scenario name to the model ID it targets.
+    """
     def __init__(
         self,
         scenarios: dict[str, dict[str, float]],
@@ -130,12 +187,35 @@ class ScenarioSet:
         model_ids: dict[str, str] | None = ...,
     ) -> None: ...
     @staticmethod
-    def from_json(json: str) -> ScenarioSet: ...
+    def from_json(json: str) -> ScenarioSet:
+        """Deserialize a named scenario set from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing scenario overrides and optional hierarchy.
+        """
+        ...
     def to_json(self) -> str: ...
     @property
     def names(self) -> list[str]: ...
 
 class MonteCarloConfig:
+    """Set reproducible Monte Carlo sampling and retained-output options.
+
+    Parameters
+    ----------
+    n_paths : int
+        Number of stochastic paths to simulate; larger values improve sampling
+        precision at greater runtime and memory cost.
+    seed : int
+        Deterministic random-number seed used to reproduce the simulation.
+    percentiles : list[float] or None
+        Requested percentile levels as decimal probabilities, such as ``0.95``;
+        ``None`` uses the engine defaults.
+    include_path_data : bool
+        Whether to retain individual path data in addition to summary outputs.
+    """
     def __init__(
         self,
         n_paths: int,
@@ -144,7 +224,16 @@ class MonteCarloConfig:
         include_path_data: bool = ...,
     ) -> None: ...
     @staticmethod
-    def from_json(json: str) -> MonteCarloConfig: ...
+    def from_json(json: str) -> MonteCarloConfig:
+        """Deserialize Monte Carlo sampling settings from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload describing paths, seed, percentile levels, and output
+            retention.
+        """
+        ...
     def to_json(self) -> str: ...
     @property
     def n_paths(self) -> int: ...
@@ -157,13 +246,44 @@ class MonteCarloConfig:
 
 class SensitivityResult:
     @staticmethod
-    def from_json(json: str) -> SensitivityResult: ...
+    def from_json(json: str) -> SensitivityResult:
+        """Deserialize a sensitivity-analysis result from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload returned by ``run_sensitivity`` or an equivalent
+            serialized Rust result.
+        """
+        ...
     def to_json(self) -> str: ...
     def __len__(self) -> int: ...
     @property
     def target_metrics(self) -> list[str]: ...
-    def get_parameter_value(self, scenario_index: int, parameter: str) -> float | None: ...
-    def get_value(self, scenario_index: int, node_id: str, period: str) -> float | None: ...
+    def get_parameter_value(self, scenario_index: int, parameter: str) -> float | None:
+        """Return one shocked parameter value for a generated scenario.
+
+        Parameters
+        ----------
+        scenario_index : int
+            Zero-based position of the generated scenario in result order.
+        parameter : str
+            Parameter identifier configured in the sensitivity specification.
+        """
+        ...
+    def get_value(self, scenario_index: int, node_id: str, period: str) -> float | None:
+        """Return one scenario output value when it is available.
+
+        Parameters
+        ----------
+        scenario_index : int
+            Zero-based position of the generated scenario in result order.
+        node_id : str
+            Statement node ID whose simulated value is requested.
+        period : str
+            Model period label for the requested node value.
+        """
+        ...
 
 class VarianceRow:
     @property
@@ -181,7 +301,15 @@ class VarianceRow:
 
 class VarianceReport:
     @staticmethod
-    def from_json(json: str) -> VarianceReport: ...
+    def from_json(json: str) -> VarianceReport:
+        """Deserialize a variance report from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload returned by ``run_variance`` or a serialized report.
+        """
+        ...
     def to_json(self) -> str: ...
     @property
     def baseline_label(self) -> str: ...
@@ -192,15 +320,40 @@ class VarianceReport:
 
 class ScenarioResultSet:
     @staticmethod
-    def from_json(json: str) -> ScenarioResultSet: ...
+    def from_json(json: str) -> ScenarioResultSet:
+        """Deserialize evaluated scenario results from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload mapping scenario names to their statement results.
+        """
+        ...
     def to_json(self) -> str: ...
     @property
     def names(self) -> list[str]: ...
-    def get(self, name: str) -> StatementResult | None: ...
+    def get(self, name: str) -> StatementResult | None:
+        """Return the statement result for one named scenario.
+
+        Parameters
+        ----------
+        name : str
+            Scenario name as defined in the input ``ScenarioSet``.
+        """
+        ...
 
 class MonteCarloResults:
     @staticmethod
-    def from_json(json: str) -> MonteCarloResults: ...
+    def from_json(json: str) -> MonteCarloResults:
+        """Deserialize Monte Carlo output from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload returned by ``run_monte_carlo`` or a serialized
+            simulation result.
+        """
+        ...
     def to_json(self) -> str: ...
     @property
     def n_paths(self) -> int: ...
@@ -208,7 +361,17 @@ class MonteCarloResults:
     def percentiles(self) -> list[float]: ...
     @property
     def forecast_periods(self) -> list[str]: ...
-    def get_percentile_series(self, metric: str, percentile: float) -> dict[str, float] | None: ...
+    def get_percentile_series(self, metric: str, percentile: float) -> dict[str, float] | None:
+        """Return the requested metric's values at one percentile level.
+
+        Parameters
+        ----------
+        metric : str
+            Statement metric or node ID stored in the simulation result.
+        percentile : float
+            Percentile as a decimal probability, such as ``0.95`` for P95.
+        """
+        ...
 
 def run_sensitivity(
     model: FinancialModelSpec | str,
@@ -631,6 +794,11 @@ class DependencyTracer:
     def direct_dependencies(self, node_id: str) -> list[str]:
         """List immediate dependencies of ``node_id``.
 
+        Parameters
+        ----------
+        node_id : str
+            Statement node ID whose directly referenced inputs are requested.
+
         Returns
         -------
         list[str]
@@ -639,6 +807,11 @@ class DependencyTracer:
     def all_dependencies(self, node_id: str) -> list[str]:
         """List all transitive dependencies of ``node_id``.
 
+        Parameters
+        ----------
+        node_id : str
+            Statement node ID whose complete upstream dependency set is requested.
+
         Returns
         -------
         list[str]
@@ -646,6 +819,11 @@ class DependencyTracer:
         ...
     def dependents(self, node_id: str) -> list[str]:
         """List nodes that depend on ``node_id``.
+
+        Parameters
+        ----------
+        node_id : str
+            Statement node ID whose downstream dependents are requested.
 
         Returns
         -------
@@ -1270,7 +1448,23 @@ def score_relative_value(
 # ---------------------------------------------------------------------------
 
 class ScorecardMetric:
-    """A single scorecard metric (name, formula, weight, rating thresholds)."""
+    """Define one weighted metric in a credit-rating scorecard.
+
+    Parameters
+    ----------
+    name : str
+        Stable metric label used in scorecard reports and validation errors.
+    formula : str
+        Statement-model formula or node expression used to calculate the metric.
+    weight : float
+        Non-negative contribution weight for the composite rating; defaults to
+        ``1.0`` before normalization across usable metrics.
+    thresholds_json : str
+        JSON mapping that defines rating thresholds for the calculated metric;
+        defaults to an empty mapping.
+    description : str or None
+        Optional reader-facing explanation of the metric and its credit meaning.
+    """
 
     def __init__(
         self,
@@ -1333,7 +1527,15 @@ class ScorecardMetric:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> ScorecardMetric: ...
+    def from_json(json: str) -> ScorecardMetric:
+        """Deserialize one scorecard metric from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing metric formula, weight, and thresholds.
+        """
+        ...
 
 class ScorecardConfig:
     """Configuration for credit scorecard analysis.
@@ -1341,6 +1543,19 @@ class ScorecardConfig:
     ``period`` optionally pins the rated period (e.g. ``"2025Q4"``); when
     ``None`` the scorecard rates the last actual period in the model if any
     exists, otherwise the last model period.
+
+    Parameters
+    ----------
+    rating_scale : str
+        Rating-scale identifier used to interpret metric thresholds; defaults
+        to the ``"S&P"`` scale.
+    metrics : list[ScorecardMetric]
+        Weighted metric definitions used to calculate the composite rating.
+    min_rating : str or None
+        Optional minimum acceptable rating used by downstream validation.
+    period : str or None
+        Optional model period to rate; ``None`` chooses the latest available
+        actual or model period.
     """
 
     def __init__(
@@ -1403,7 +1618,16 @@ class ScorecardConfig:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> ScorecardConfig: ...
+    def from_json(json: str) -> ScorecardConfig:
+        """Deserialize a credit-scorecard configuration from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing scale, metrics, period selection, and
+            optional minimum-rating policy.
+        """
+        ...
 
 class ScorecardReport:
     """Report produced by ``CreditScorecardExtension.execute``.
@@ -1465,7 +1689,15 @@ class ScorecardReport:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> ScorecardReport: ...
+    def from_json(json: str) -> ScorecardReport:
+        """Deserialize a credit-scorecard report from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload returned by a scorecard extension execution.
+        """
+        ...
 
 class CreditScorecardExtension:
     """Credit scorecard extension for rating assignment and stress testing."""
@@ -1479,8 +1711,24 @@ class CreditScorecardExtension:
         """
         ...
     @staticmethod
-    def with_config(config: ScorecardConfig) -> CreditScorecardExtension: ...
-    def set_config(self, config: ScorecardConfig) -> None: ...
+    def with_config(config: ScorecardConfig) -> CreditScorecardExtension:
+        """Create a scorecard extension with a validated configuration.
+
+        Parameters
+        ----------
+        config : ScorecardConfig
+            Rating scale, weighted metrics, and period-selection policy to use.
+        """
+        ...
+    def set_config(self, config: ScorecardConfig) -> None:
+        """Replace the extension's scorecard configuration.
+
+        Parameters
+        ----------
+        config : ScorecardConfig
+            New rating scale, metric set, and period-selection policy to apply.
+        """
+        ...
     def config(self) -> ScorecardConfig | None:
         """Value of ``config``.
 
@@ -1489,10 +1737,26 @@ class CreditScorecardExtension:
         ScorecardConfig or None
         """
         ...
-    def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> ScorecardReport: ...
+    def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> ScorecardReport:
+        """Calculate a credit scorecard against evaluated statement results.
+
+        Parameters
+        ----------
+        model : FinancialModelSpec or str
+            Model specification object or equivalent JSON used to resolve nodes.
+        results : StatementResult or str
+            Evaluated statement result object or equivalent JSON to rate.
+        """
+        ...
 
 def validate_scorecard_config(config: ScorecardConfig) -> None:
-    """Validate a scorecard configuration without executing."""
+    """Validate a scorecard configuration without executing it.
+
+    Parameters
+    ----------
+    config : ScorecardConfig
+        Rating scale, metrics, thresholds, and period policy to validate.
+    """
     ...
 
 # ---------------------------------------------------------------------------
@@ -1507,7 +1771,15 @@ class AccountType:
     Equity: AccountType
 
     @staticmethod
-    def from_str(value: str) -> AccountType: ...
+    def from_str(value: str) -> AccountType:
+        """Parse a balance-sheet account classification.
+
+        Parameters
+        ----------
+        value : str
+            Case-insensitive ``"asset"``, ``"liability"``, or ``"equity"`` value.
+        """
+        ...
     def value(self) -> str:
         """Value of ``value``.
 
@@ -1518,7 +1790,20 @@ class AccountType:
         ...
 
 class CorkscrewAccount:
-    """Single corkscrew account: balance node + change nodes + optional beginning override."""
+    """Map one balance-sheet account to its corkscrew input nodes.
+
+    Parameters
+    ----------
+    node_id : str
+        Statement node ID receiving the period-end account balance.
+    account_type : AccountType
+        Asset, liability, or equity classification controlling change signs.
+    changes : list[str]
+        Statement node IDs whose values are added or subtracted each period.
+    beginning_balance_node : str or None
+        Optional node ID supplying the opening balance instead of an inferred
+        first-period balance.
+    """
 
     def __init__(
         self,
@@ -1572,10 +1857,29 @@ class CorkscrewAccount:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> CorkscrewAccount: ...
+    def from_json(json: str) -> CorkscrewAccount:
+        """Deserialize an account mapping from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload identifying the balance node, type, and change nodes.
+        """
+        ...
 
 class CorkscrewConfig:
-    """Configuration for corkscrew (roll-forward) validation."""
+    """Configure corkscrew roll-forward validation across balance accounts.
+
+    Parameters
+    ----------
+    accounts : list[CorkscrewAccount]
+        Account mappings to reconcile; defaults to an empty validation set.
+    tolerance : float
+        Absolute currency-unit tolerance allowed for reconciliation differences;
+        defaults to ``0.01``.
+    fail_on_error : bool
+        Whether reconciliation errors abort execution instead of being reported.
+    """
 
     def __init__(
         self,
@@ -1619,7 +1923,15 @@ class CorkscrewConfig:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> CorkscrewConfig: ...
+    def from_json(json: str) -> CorkscrewConfig:
+        """Deserialize corkscrew validation settings from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing account mappings and reconciliation policy.
+        """
+        ...
 
 class CorkscrewReport:
     """Report produced by ``CorkscrewExtension.execute``."""
@@ -1677,7 +1989,15 @@ class CorkscrewReport:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> CorkscrewReport: ...
+    def from_json(json: str) -> CorkscrewReport:
+        """Deserialize a corkscrew validation report from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload returned by a corkscrew extension execution.
+        """
+        ...
 
 class CorkscrewExtension:
     """Corkscrew extension for balance-sheet roll-forward validation."""
@@ -1691,8 +2011,24 @@ class CorkscrewExtension:
         """
         ...
     @staticmethod
-    def with_config(config: CorkscrewConfig) -> CorkscrewExtension: ...
-    def set_config(self, config: CorkscrewConfig) -> None: ...
+    def with_config(config: CorkscrewConfig) -> CorkscrewExtension:
+        """Create a corkscrew extension with reconciliation settings.
+
+        Parameters
+        ----------
+        config : CorkscrewConfig
+            Accounts, tolerance, and error policy used during reconciliation.
+        """
+        ...
+    def set_config(self, config: CorkscrewConfig) -> None:
+        """Replace the extension's reconciliation configuration.
+
+        Parameters
+        ----------
+        config : CorkscrewConfig
+            Accounts, tolerance, and error policy to apply on the next run.
+        """
+        ...
     def config(self) -> CorkscrewConfig | None:
         """Value of ``config``.
 
@@ -1701,7 +2037,17 @@ class CorkscrewExtension:
         CorkscrewConfig or None
         """
         ...
-    def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> CorkscrewReport: ...
+    def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> CorkscrewReport:
+        """Validate account roll-forwards against evaluated statement results.
+
+        Parameters
+        ----------
+        model : FinancialModelSpec or str
+            Model specification object or JSON used to resolve configured nodes.
+        results : StatementResult or str
+            Evaluated statement results object or JSON to reconcile.
+        """
+        ...
 
 # ---------------------------------------------------------------------------
 # Vintage template
@@ -1717,6 +2063,18 @@ def add_vintage_buildup(
 
     Returns a JSON-serialized ``FinancialModelSpec`` with the convolution
     node added.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        Model specification object or JSON to augment with the cohort schedule.
+    name : str
+        Prefix used to name the generated vintage buildup nodes.
+    new_volume_node : str
+        Existing node ID that supplies new volume for each cohort period.
+    decay_curve : list[float]
+        Ordered cohort-retention factors by elapsed period, expressed as decimal
+        multipliers of original volume.
     """
     ...
 
@@ -1735,6 +2093,17 @@ def add_roll_forward(
     Returns a JSON-serialized ``FinancialModelSpec`` with ``{name}_beg`` and
     ``{name}_end`` nodes added. The first period opens at zero; use
     ``add_roll_forward_with_opening`` for an explicit opening balance.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        Model specification object or JSON to augment with roll-forward nodes.
+    name : str
+        Prefix used to name the generated beginning and ending balance nodes.
+    increases : list[str]
+        Existing node IDs whose period values increase the ending balance.
+    decreases : list[str]
+        Existing node IDs whose period values decrease the ending balance.
     """
     ...
 
@@ -1750,6 +2119,19 @@ def add_roll_forward_with_opening(
     Same as ``add_roll_forward`` except the first period's beginning balance
     is ``opening`` instead of zero. Returns a JSON-serialized
     ``FinancialModelSpec``.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        Model specification object or JSON to augment with roll-forward nodes.
+    name : str
+        Prefix used to name the generated beginning and ending balance nodes.
+    increases : list[str]
+        Existing node IDs whose period values increase the ending balance.
+    decreases : list[str]
+        Existing node IDs whose period values decrease the ending balance.
+    opening : float
+        Beginning balance assigned to the first modeled period in model units.
     """
     ...
 
@@ -1758,7 +2140,30 @@ def add_roll_forward_with_opening(
 # ---------------------------------------------------------------------------
 
 class SimpleLeaseSpec:
-    """Lightweight per-lease rent schedule (period strings + base rent + growth + occupancy)."""
+    """Describe a simple per-lease rent schedule for a property model.
+
+    Parameters
+    ----------
+    node_id : str
+        Statement node ID receiving the lease's rental-revenue series.
+    start : str
+        First included model period label for the lease term.
+    base_rent : float
+        Contractual rent per modeled period before growth, concessions, and
+        occupancy scaling, in the model's currency units.
+    end : str or None
+        Optional final included model period; ``None`` extends through the
+        model horizon.
+    growth_rate : float
+        Periodic decimal rent-growth rate, such as ``0.03`` for 3%; defaults
+        to zero growth.
+    free_rent_periods : int
+        Number of initial included periods with rent set to zero; defaults to
+        no concession.
+    occupancy : float
+        Decimal occupancy multiplier applied to scheduled rent; defaults to
+        fully occupied ``1.0``.
+    """
 
     def __init__(
         self,
@@ -1850,10 +2255,26 @@ class SimpleLeaseSpec:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> SimpleLeaseSpec: ...
+    def from_json(json: str) -> SimpleLeaseSpec:
+        """Deserialize a simple lease schedule from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing lease term, rent, growth, and occupancy.
+        """
+        ...
 
 class RentStepSpec:
-    """Rent step that resets the base rent starting at ``start``."""
+    """Reset a lease's base rent from one model period onward.
+
+    Parameters
+    ----------
+    start : str
+        First model period label at which the stepped rent applies.
+    rent : float
+        Replacement periodic rent in the model's currency units.
+    """
 
     def __init__(self, start: str, rent: float) -> None: ...
     @property
@@ -1883,10 +2304,26 @@ class RentStepSpec:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> RentStepSpec: ...
+    def from_json(json: str) -> RentStepSpec:
+        """Deserialize a rent-step specification from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing the step start period and replacement rent.
+        """
+        ...
 
 class FreeRentWindowSpec:
-    """Free rent (concession) window that zeros out rent for ``periods`` starting at ``start``."""
+    """Define a finite concession window that sets lease rent to zero.
+
+    Parameters
+    ----------
+    start : str
+        First model period label affected by the free-rent concession.
+    periods : int
+        Number of consecutive modeled periods with rent set to zero.
+    """
 
     def __init__(self, start: str, periods: int) -> None: ...
     @property
@@ -1916,10 +2353,33 @@ class FreeRentWindowSpec:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> FreeRentWindowSpec: ...
+    def from_json(json: str) -> FreeRentWindowSpec:
+        """Deserialize a free-rent concession window from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing the concession start period and duration.
+        """
+        ...
 
 class RenewalSpec:
-    """Renewal specification modeled in expected-value terms."""
+    """Model a lease renewal in expected-value terms after the base term.
+
+    Parameters
+    ----------
+    term_periods : int
+        Number of modeled periods in the renewal term when the tenant renews.
+    probability : float
+        Decimal probability of renewal from zero through one.
+    downtime_periods : int
+        Vacancy periods between the original lease and renewal; defaults to zero.
+    rent_factor : float
+        Multiplier applied to the ending scheduled rent for the renewal term;
+        defaults to ``1.0``.
+    free_rent_periods : int
+        Initial renewal periods with rent set to zero; defaults to no concession.
+    """
 
     def __init__(
         self,
@@ -1991,7 +2451,16 @@ class RenewalSpec:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> RenewalSpec: ...
+    def from_json(json: str) -> RenewalSpec:
+        """Deserialize renewal assumptions from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing renewal term, probability, downtime, and
+            rent assumptions.
+        """
+        ...
 
 class LeaseGrowthConvention:
     """Compounding convention for lease rent growth."""
@@ -2000,7 +2469,15 @@ class LeaseGrowthConvention:
     AnnualEscalator: LeaseGrowthConvention
 
     @staticmethod
-    def from_str(value: str) -> LeaseGrowthConvention: ...
+    def from_str(value: str) -> LeaseGrowthConvention:
+        """Parse a lease rent-growth compounding convention.
+
+        Parameters
+        ----------
+        value : str
+            Case-insensitive ``"per_period"`` or ``"annual_escalator"`` value.
+        """
+        ...
     def value(self) -> str:
         """Value of ``value``.
 
@@ -2011,7 +2488,34 @@ class LeaseGrowthConvention:
         ...
 
 class LeaseSpec:
-    """Rich lease specification for rent-roll generation."""
+    """Describe a rich lease schedule for rent-roll generation.
+
+    Parameters
+    ----------
+    node_id : str
+        Statement node ID receiving the lease's rental-revenue series.
+    start : str
+        First included model period label for the lease term.
+    base_rent : float
+        Contractual periodic rent before escalators, concessions, and occupancy
+        scaling, in the model's currency units.
+    end : str or None
+        Optional final included model period; ``None`` extends through horizon.
+    growth_rate : float
+        Decimal rent-growth rate interpreted by ``growth_convention``.
+    growth_convention : LeaseGrowthConvention
+        Whether rent growth compounds every model period or as an annual step.
+    rent_steps : list[RentStepSpec]
+        Explicit rent resets applied from each step's start period onward.
+    free_rent_periods : int
+        Number of initial included periods with rent set to zero.
+    free_rent_windows : list[FreeRentWindowSpec]
+        Additional dated rent-free concession windows within the lease term.
+    occupancy : float
+        Decimal occupancy multiplier applied to scheduled rent.
+    renewal : RenewalSpec or None
+        Optional expected-value renewal assumptions applied after the base term.
+    """
 
     def __init__(
         self,
@@ -2125,10 +2629,31 @@ class LeaseSpec:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> LeaseSpec: ...
+    def from_json(json: str) -> LeaseSpec:
+        """Deserialize a rich lease schedule from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing term, rent, escalation, concession, and
+            renewal assumptions.
+        """
+        ...
 
 class RentRollOutputNodes:
-    """Aggregated output node ids for a rent roll."""
+    """Name the aggregate model nodes produced by a rent-roll template.
+
+    Parameters
+    ----------
+    rent_pgi_node : str
+        Node ID for potential gross rent before concessions and vacancy.
+    free_rent_node : str
+        Node ID for rent waived through free-rent concessions.
+    vacancy_loss_node : str
+        Node ID for the revenue reduction caused by vacancy or occupancy.
+    rent_effective_node : str
+        Node ID for effective rent after concessions and vacancy adjustments.
+    """
 
     def __init__(
         self,
@@ -2182,7 +2707,16 @@ class RentRollOutputNodes:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> RentRollOutputNodes: ...
+    def from_json(json: str) -> RentRollOutputNodes:
+        """Deserialize rent-roll output-node names from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload identifying potential, concession, vacancy, and
+            effective-rent output nodes.
+        """
+        ...
 
 class ManagementFeeBase:
     """Basis for management fee calculation."""
@@ -2191,7 +2725,15 @@ class ManagementFeeBase:
     EffectiveRent: ManagementFeeBase
 
     @staticmethod
-    def from_str(value: str) -> ManagementFeeBase: ...
+    def from_str(value: str) -> ManagementFeeBase:
+        """Parse a management-fee calculation basis.
+
+        Parameters
+        ----------
+        value : str
+            Case-insensitive ``"egi"`` or ``"effective_rent"`` basis value.
+        """
+        ...
     def value(self) -> str:
         """Value of ``value``.
 
@@ -2202,7 +2744,16 @@ class ManagementFeeBase:
         ...
 
 class ManagementFeeSpec:
-    """Management fee specification (rate + base)."""
+    """Set a percentage management fee and the revenue base it applies to.
+
+    Parameters
+    ----------
+    rate : float
+        Decimal fee rate, such as ``0.03`` for a 3% management fee.
+    base : ManagementFeeBase
+        Effective-rent or EGI base used to calculate the fee; defaults to the
+        binding's standard basis.
+    """
 
     def __init__(self, rate: float, base: ManagementFeeBase = ...) -> None: ...
     @property
@@ -2232,10 +2783,38 @@ class ManagementFeeSpec:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> ManagementFeeSpec: ...
+    def from_json(json: str) -> ManagementFeeSpec:
+        """Deserialize management-fee assumptions from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload containing the decimal rate and revenue basis.
+        """
+        ...
 
 class PropertyTemplateNodes:
-    """Standard node ids for the full property operating-statement template."""
+    """Name generated node IDs for a property operating-statement template.
+
+    Parameters
+    ----------
+    rent_roll : RentRollOutputNodes or None
+        Optional rent-roll output names; ``None`` uses the template defaults.
+    other_income_total_node : str
+        Node ID aggregating other-income components.
+    egi_node : str
+        Node ID for effective gross income after rent and other income.
+    management_fee_node : str
+        Node ID for the management-fee expense series.
+    opex_total_node : str
+        Node ID aggregating operating-expense components.
+    noi_node : str
+        Node ID for net operating income before capital expenditures.
+    capex_total_node : str
+        Node ID aggregating capital-expenditure components.
+    ncf_node : str
+        Node ID for net cash flow after operating items and capital expenditure.
+    """
 
     def __init__(
         self,
@@ -2329,7 +2908,16 @@ class PropertyTemplateNodes:
         """
         ...
     @staticmethod
-    def from_json(json: str) -> PropertyTemplateNodes: ...
+    def from_json(json: str) -> PropertyTemplateNodes:
+        """Deserialize property-template node names from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload identifying rent, income, expense, NOI, capex, and NCF
+            nodes.
+        """
+        ...
 
 def add_noi_buildup(
     model: FinancialModelSpec | str,
@@ -2339,7 +2927,23 @@ def add_noi_buildup(
     expense_nodes: list[str],
     noi_node: str,
 ) -> str:
-    """Apply the NOI buildup template to a model spec. Returns JSON ``FinancialModelSpec``."""
+    """Apply the NOI buildup template and return JSON ``FinancialModelSpec``.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        Model specification object or JSON to augment with NOI calculations.
+    total_revenue_node : str
+        Output node ID that sums the selected revenue nodes.
+    revenue_nodes : list[str]
+        Existing node IDs included as revenue in the NOI calculation.
+    total_expenses_node : str
+        Output node ID that sums the selected operating-expense nodes.
+    expense_nodes : list[str]
+        Existing node IDs included as operating expenses in the NOI calculation.
+    noi_node : str
+        Output node ID for revenue less operating expenses.
+    """
     ...
 
 def add_ncf_buildup(
@@ -2348,7 +2952,19 @@ def add_ncf_buildup(
     capex_nodes: list[str],
     ncf_node: str,
 ) -> str:
-    """Apply the NCF buildup template to a model spec. Returns JSON ``FinancialModelSpec``."""
+    """Apply the NCF buildup template and return JSON ``FinancialModelSpec``.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        Model specification object or JSON to augment with NCF calculations.
+    noi_node : str
+        Existing node ID supplying net operating income before capital spending.
+    capex_nodes : list[str]
+        Existing node IDs whose values are deducted as capital expenditures.
+    ncf_node : str
+        Output node ID for net operating income less capital expenditures.
+    """
     ...
 
 def add_rent_roll(
@@ -2356,7 +2972,17 @@ def add_rent_roll(
     leases: list[LeaseSpec],
     nodes: RentRollOutputNodes | None = None,
 ) -> str:
-    """Apply the rich rent-roll template to a model spec. Returns JSON ``FinancialModelSpec``."""
+    """Apply the rich rent-roll template and return JSON ``FinancialModelSpec``.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        Model specification object or JSON to augment with rental-revenue nodes.
+    leases : list[LeaseSpec]
+        Rich lease schedules to calculate and aggregate into the rent roll.
+    nodes : RentRollOutputNodes or None
+        Optional aggregate output-node names; ``None`` uses template defaults.
+    """
     ...
 
 def add_rent_roll_rental_revenue(
@@ -2364,7 +2990,17 @@ def add_rent_roll_rental_revenue(
     leases: list[SimpleLeaseSpec],
     total_rent_node: str,
 ) -> str:
-    """Apply the simple rent-roll rental-revenue template. Returns JSON ``FinancialModelSpec``."""
+    """Apply the simple rent-roll template and return JSON ``FinancialModelSpec``.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        Model specification object or JSON to augment with rental-revenue nodes.
+    leases : list[SimpleLeaseSpec]
+        Simple lease schedules to calculate and aggregate into rental revenue.
+    total_rent_node : str
+        Output node ID that sums all calculated simple-lease rent series.
+    """
     ...
 
 def add_property_operating_statement(
@@ -2376,5 +3012,23 @@ def add_property_operating_statement(
     management_fee: ManagementFeeSpec | None = None,
     nodes: PropertyTemplateNodes | None = None,
 ) -> str:
-    """Apply the full property operating-statement template. Returns JSON ``FinancialModelSpec``."""
+    """Apply the full property operating-statement template and return JSON.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        Model specification object or JSON to augment with property statements.
+    leases : list[LeaseSpec]
+        Rich lease schedules used to build rental-revenue and rent-roll outputs.
+    other_income_nodes : list[str]
+        Existing node IDs aggregated as other income; defaults to an empty list.
+    opex_nodes : list[str]
+        Existing node IDs aggregated as operating expenses; defaults to empty.
+    capex_nodes : list[str]
+        Existing node IDs aggregated as capital expenditures; defaults to empty.
+    management_fee : ManagementFeeSpec or None
+        Optional fee assumptions; ``None`` omits management-fee calculation.
+    nodes : PropertyTemplateNodes or None
+        Optional generated-node names; ``None`` uses the template defaults.
+    """
     ...

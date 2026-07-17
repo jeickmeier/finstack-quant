@@ -142,6 +142,16 @@ pub fn snowball_coupon_profile(
 /// Compute the path-independent inverse-floater coupon schedule.
 ///
 /// `c_i = clip(fixed_rate - leverage * L_i, floor, cap)`.
+///
+/// # Arguments
+///
+/// * `fixed_rate` - Fixed coupon component as a decimal annual rate.
+/// * `floating_fixings` - Reset rates in coupon-period order, as decimal
+///   annual rates.
+/// * `floor` - Inclusive lower coupon bound as a decimal annual rate.
+/// * `cap` - Inclusive upper coupon bound as a decimal annual rate.
+/// * `leverage` - Floating-rate multiplier subtracted from `fixed_rate` at
+///   each reset.
 pub fn inverse_floater_coupon_profile(
     fixed_rate: f64,
     floating_fixings: &[f64],

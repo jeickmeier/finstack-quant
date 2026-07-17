@@ -108,6 +108,38 @@ pub fn fallible_function() -> Result<T, Error> {
 }
 ```
 
+### Callable input documentation (required)
+
+Every public Rust function, associated function, trait method, and constructor
+that accepts a caller-supplied input must have a `# Arguments` section. Use the
+exact Rust parameter names and give each entry a substantive description:
+
+```rust
+/// Reprice a bond at a settlement date.
+///
+/// # Arguments
+///
+/// * `bond` - Instrument whose contractual cashflows and conventions are used.
+/// * `settlement` - Settlement date; cashflows before this date are excluded.
+/// * `discount_curve` - Curve supplying discount factors in the bond's payment
+///   currency. Its curve ID must match the valuation context lookup.
+///
+/// # Errors
+///
+/// Returns an error when the required discount curve is unavailable.
+pub fn price(bond: &Bond, settlement: Date, discount_curve: &DiscountCurve) -> Result<f64> {
+    // ...
+}
+```
+
+Do not substitute a type repetition (for example, "the input value") for an
+explanation. State units and representation for numerical values, market
+conventions for financial values, accepted shapes and alignment for collections,
+and the fallback behavior of `Option` inputs. Document mutation, ownership, or
+lookup effects when they are visible to the caller. The public-API verifier
+checks that every documented callable has a substantive entry for each input;
+reviewers remain responsible for the semantic accuracy of those entries.
+
 ## Python documentation conventions
 
 ### `.pyi` stub completeness

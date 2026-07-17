@@ -132,9 +132,12 @@ pub fn periods_per_year(
 ///
 /// # Arguments
 ///
-/// * `disc` - Discount curve for discount factor calculations
-/// * `dc` - Day count convention for year fraction calculations
-/// * `schedule` - Schedule of coupon payment dates (must start at `as_of`)
+/// * `disc` - Discount curve supplying date-based fixed-leg discount factors.
+/// * `dc` - Fixed-leg accrual day-count convention.
+/// * `frequency` - Optional coupon frequency required by conventions such as
+///   ACT/ACT (ICMA); `None` is valid for conventions without it.
+/// * `schedule` - Ordered coupon boundary/payment dates; adjacent pairs form
+///   accrual periods and the first date anchors the leg.
 ///
 /// # Returns
 ///
@@ -196,9 +199,12 @@ pub fn fixed_leg_annuity(
 ///
 /// # Arguments
 ///
-/// * `disc` - Discount curve for discount factor calculations
-/// * `dc` - Day count convention for year fraction calculations
-/// * `schedule` - Schedule of coupon payment dates
+/// * `disc` - Discount curve supplying date-based fixed-leg discount factors.
+/// * `dc` - Fixed-leg accrual day-count convention.
+/// * `frequency` - Optional coupon frequency required by conventions such as
+///   ACT/ACT (ICMA); `None` is valid for conventions without it.
+/// * `schedule` - Ordered coupon boundary/payment dates; the first and last
+///   dates define the discount-ratio numerator.
 ///
 /// # Returns
 ///
@@ -247,6 +253,19 @@ pub fn par_rate_and_annuity_from_discount(
 }
 
 /// Forward-projected par rate and fixed-leg annuity for an asset-swap schedule.
+///
+/// # Arguments
+///
+/// * `disc` - Discount curve supplying fixed-leg and projected floating-coupon
+///   present-value discount factors.
+/// * `fwd` - Forward curve supplying date-based floating reference rates.
+/// * `fixed_dc` - Fixed-leg accrual day-count convention.
+/// * `fixed_frequency` - Optional fixed coupon frequency required by
+///   ACT/ACT-style accrual calculations.
+/// * `schedule` - Ordered swap coupon boundary/payment dates shared by both
+///   legs.
+/// * `float_spread_bp` - Contractual floating-leg spread in basis points,
+///   added to each forward rate.
 pub fn par_rate_and_annuity_from_forward(
     disc: &finstack_quant_core::market_data::term_structures::DiscountCurve,
     fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
@@ -276,6 +295,18 @@ pub fn par_rate_and_annuity_from_forward(
 }
 
 /// Asset-swap forward leg PV and fixed/floating annuities per unit notional.
+///
+/// # Arguments
+///
+/// * `disc` - Discount curve supplying present-value factors for both legs.
+/// * `fwd` - Forward curve supplying date-based floating reference rates.
+/// * `fixed_dc` - Fixed-leg accrual day-count convention.
+/// * `fixed_frequency` - Optional fixed coupon frequency required by
+///   ACT/ACT-style accrual calculations.
+/// * `schedule` - Ordered swap coupon boundary/payment dates shared by both
+///   legs.
+/// * `float_spread_bp` - Contractual floating-leg spread in basis points,
+///   added to every projected forward.
 pub fn asset_swap_forward_components(
     disc: &finstack_quant_core::market_data::term_structures::DiscountCurve,
     fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
@@ -670,6 +701,19 @@ fn df_treasury_actual_with_first_period(
 /// This keeps the YTM↔price conversion correct for new issues with long first
 /// coupons, where the time-based `t <= 1/m` heuristic in [`df_from_yield`] would
 /// misapply simple interest to the wrong horizon.
+///
+/// # Arguments
+///
+/// * `day_count` - Bond coupon day-count convention used to measure settlement-
+///   to-cashflow time.
+/// * `freq` - Contractual coupon frequency, including ACT/ACT reference-period
+///   context and periodic compounding frequency.
+/// * `flows` - Dated signed bond cashflows in payment-date order; flows on or
+///   before `as_of` are excluded.
+/// * `as_of` - Yield settlement/valuation date from which cashflows discount.
+/// * `ytm` - Annual yield to maturity as a decimal under `comp`.
+/// * `comp` - Yield compounding convention used to turn `ytm` into discount
+///   factors.
 #[inline]
 pub fn price_from_ytm_compounded_params(
     day_count: finstack_quant_core::dates::DayCount,
@@ -731,6 +775,16 @@ pub fn price_from_ytm_compounded_params(
 }
 
 /// Price from ytm compounded.
+///
+/// # Arguments
+///
+/// * `bond` - Bond supplying coupon day count and frequency conventions.
+/// * `flows` - Dated signed bond cashflows to discount; flows on or before
+///   `as_of` are excluded.
+/// * `as_of` - Yield settlement/valuation date from which cashflows discount.
+/// * `ytm` - Annual yield to maturity as a decimal under `comp`.
+/// * `comp` - Yield compounding convention used to turn `ytm` into discount
+///   factors.
 pub fn price_from_ytm_compounded(
     bond: &Bond,
     flows: &[(
@@ -752,6 +806,14 @@ pub fn price_from_ytm_compounded(
 }
 
 /// Price from ytm (using Street convention).
+///
+/// # Arguments
+///
+/// * `bond` - Bond supplying coupon day count and frequency conventions.
+/// * `flows` - Dated signed bond cashflows to discount; flows on or before
+///   `as_of` are excluded.
+/// * `as_of` - Yield settlement/valuation date from which cashflows discount.
+/// * `ytm` - Annual Street-compounded yield to maturity as a decimal.
 pub fn price_from_ytm(
     bond: &Bond,
     flows: &[(
@@ -1036,6 +1098,15 @@ pub(crate) fn solve_ytw_from_flows(
 }
 
 /// Price from Yield-To-Worst by scanning call/put candidates and selecting the lowest yield path.
+///
+/// # Arguments
+///
+/// * `bond` - Callable or puttable bond whose cashflow schedule and exercise
+///   candidates define the yield-to-worst paths.
+/// * `curves` - Market context supplying curve and schedule dependencies.
+/// * `as_of` - Valuation date from which candidate cashflows are generated.
+/// * `dirty_price_target` - Target dirty price in the bond notional currency
+///   used to solve each candidate Street yield.
 pub fn price_from_ytw(
     bond: &Bond,
     curves: &MarketContext,
@@ -1080,6 +1151,16 @@ pub fn price_from_ytw(
 /// `as_of`; the settlement offset is handled here.
 ///
 /// [`ZSpreadCalculator`]: crate::instruments::fixed_income::bond::ZSpreadCalculator
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose future pricing cashflows, settlement convention, and
+///   z-spread compounding frequency are used.
+/// * `curves` - Market context supplying the bond discount curve and schedule
+///   dependencies.
+/// * `as_of` - Valuation/trade date; the helper derives settlement internally.
+/// * `z` - Annual z-spread as a decimal zero-rate shift under the bond's
+///   contractual compounding convention.
 pub fn price_from_z_spread(
     bond: &Bond,
     curves: &MarketContext,
@@ -1138,6 +1219,15 @@ pub fn price_from_z_spread(
 /// This keeps all bond spread-style metrics on a consistent decimal
 /// convention at the API surface while preserving existing internal
 /// tree semantics.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose embedded tree-pricing configuration and contractual
+///   cashflows are used for OAS valuation.
+/// * `curves` - Market context supplying the discount curve and tree inputs.
+/// * `as_of` - Valuation date supplied to the short-rate tree pricer.
+/// * `oas_decimal` - Option-adjusted spread as a decimal, such as `0.01` for
+///   100 basis points.
 pub fn price_from_oas(
     bond: &Bond,
     curves: &MarketContext,
@@ -1158,6 +1248,16 @@ pub fn price_from_oas(
 /// This helper prices against the model PV, independent of any price-from-quote
 /// override on the bond. It is used by the DM metric solver that seeks a DM
 /// reproducing a quoted price, so it must not short-circuit via the quote.
+///
+/// # Arguments
+///
+/// * `bond` - Floating-rate bond whose contractual reference coupon is shifted
+///   by the supplied discount margin.
+/// * `curves` - Market context supplying discounting and floating-rate reset
+///   data.
+/// * `as_of` - Valuation date used for schedule construction and discounting.
+/// * `dm` - Annual discount margin as a decimal added to the floating coupon
+///   margin for model pricing.
 pub fn price_from_dm(
     bond: &Bond,
     curves: &MarketContext,
@@ -1215,10 +1315,15 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 ///
 /// # Arguments
 ///
-/// * `bond` - The bond to compute quotes for
-/// * `curves` - Market context with discount and forward curves
-/// * `as_of` - Valuation date
-/// * `quote_input` - One quote input (price, yield, or spread) to normalize from
+/// * `bond` - Bond to normalize and value. The function clones it before
+///   applying the derived clean-price override, so the caller's instance is
+///   unchanged.
+/// * `curves` - Market context supplying the bond schedule, discount curves,
+///   forward curves, and other metric dependencies.
+/// * `as_of` - Valuation or trade date from which settlement-aware accrued
+///   interest and clean/dirty conversion are determined.
+/// * `quote_input` - One observed clean/dirty price, yield, or spread quote
+///   used to seed the internally consistent quote set.
 ///
 /// # Returns
 ///
@@ -1246,6 +1351,7 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 /// // quotes contains YTM, Z-spread, OAS, etc.
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
 pub fn compute_quotes(
     bond: &Bond,
     curves: &MarketContext,

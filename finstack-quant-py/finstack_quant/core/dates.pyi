@@ -66,16 +66,92 @@ class SifmaSettlementClass:
     D: SifmaSettlementClass
 
     @classmethod
-    def from_agency_term(cls, agency: str, term_years: int) -> SifmaSettlementClass: ...
+    def from_agency_term(cls, agency: str, term_years: int) -> SifmaSettlementClass:
+        """Infer the SIFMA good-delivery class from an agency and term.
 
-def sifma_settlement_date(month: int, year: int) -> datetime.date | None: ...
+        Parameters
+        ----------
+        agency : str
+            Agency or program label, such as ``"FNMA"``, ``"FHLMC"``, or
+            ``"GNMA"``, interpreted using the library's settlement table.
+        term_years : int
+            Original mortgage term in whole years, normally ``15`` or ``30``.
+
+        Returns
+        -------
+        SifmaSettlementClass
+            Settlement class used to select the monthly SIFMA delivery date.
+        """
+        ...
+
+def sifma_settlement_date(month: int, year: int) -> datetime.date | None:
+    """Return the published SIFMA settlement date for a month when available.
+
+    Parameters
+    ----------
+    month : int
+        Delivery month number from ``1`` through ``12``.
+    year : int
+        Four-digit delivery calendar year.
+
+    Returns
+    -------
+    datetime.date or None
+        Published settlement date, or ``None`` when the month is not listed.
+    """
+    ...
+
 def sifma_settlement_date_for_class(
     month: int, year: int, settlement_class: SifmaSettlementClass
-) -> datetime.date | None: ...
+) -> datetime.date | None:
+    """Return the SIFMA settlement date for a specified delivery class.
+
+    Parameters
+    ----------
+    month : int
+        Delivery month number from ``1`` through ``12``.
+    year : int
+        Four-digit delivery calendar year.
+    settlement_class : SifmaSettlementClass
+        Good-delivery class inferred from the agency/program and mortgage term.
+    """
+    ...
+
 def estimated_sifma_settlement_date_for_class(
     month: int, year: int, settlement_class: SifmaSettlementClass
-) -> datetime.date: ...
-def next_sifma_settlement(date: datetime.date) -> datetime.date | None: ...
+) -> datetime.date:
+    """Estimate a class-specific SIFMA settlement date when no calendar is published.
+
+    Parameters
+    ----------
+    month : int
+        Delivery month number from ``1`` through ``12``.
+    year : int
+        Four-digit delivery calendar year.
+    settlement_class : SifmaSettlementClass
+        Good-delivery class whose conventional estimated date is required.
+
+    Returns
+    -------
+    datetime.date
+        Deterministic estimated settlement date for the requested class.
+    """
+    ...
+
+def next_sifma_settlement(date: datetime.date) -> datetime.date | None:
+    """Return the next published SIFMA settlement date on or after a date.
+
+    Parameters
+    ----------
+    date : datetime.date
+        Calendar date from which to search the published settlement calendar.
+
+    Returns
+    -------
+    datetime.date or None
+        Earliest available settlement date not before ``date``, or ``None``.
+    """
+    ...
 
 # ---------------------------------------------------------------------------
 # Day-count conventions
@@ -797,7 +873,7 @@ class PeriodId:
         year : int
             Calendar year.
         month : int
-            Month (1-12).
+            Calendar month number from ``1`` through ``12`` for the period.
 
         Returns
         -------
@@ -978,11 +1054,24 @@ class PeriodId:
 
         Weekly fiscal IDs can advance through a partial week 53 even when the
         same-numbered ISO Gregorian year has only 52 weeks.
+
+        Parameters
+        ----------
+        fiscal_config : FiscalConfig
+            Fiscal-year start month and day used to determine the next fiscal
+            week, month, quarter, or year boundary.
         """
         ...
 
     def prev_fiscal(self, fiscal_config: FiscalConfig) -> PeriodId:
-        """Previous period using fiscal-year week/day capacity."""
+        """Previous period using fiscal-year week/day capacity.
+
+        Parameters
+        ----------
+        fiscal_config : FiscalConfig
+            Fiscal-year start month and day used to determine the preceding
+            fiscal week, month, quarter, or year boundary.
+        """
         ...
 
     def __repr__(self) -> str: ...
@@ -1081,9 +1170,11 @@ class FiscalConfig:
         Parameters
         ----------
         start_month : int
-            Month (1-12).
+            Calendar month number from ``1`` through ``12`` at which each
+            fiscal year begins.
         start_day : int
-            Day (1-31).
+            Calendar day from ``1`` through ``31`` at which each fiscal year
+            begins, subject to the selected start month's valid range.
 
         Raises
         ------
@@ -1740,7 +1831,7 @@ def create_date(year: int, month: int, day: int) -> datetime.date:
     year : int
         Calendar year.
     month : int
-        Month (1-12).
+        Calendar month number from ``1`` through ``12``.
     day : int
         Day of the month.
 

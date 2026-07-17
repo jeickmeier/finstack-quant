@@ -1,3 +1,5 @@
+//! Build-time generator for exchange and holiday calendar implementations.
+//!
 /// Generate calendar implementations from JSON definitions.
 use serde::{Deserialize, Deserializer};
 use std::collections::BTreeMap;
@@ -427,7 +429,7 @@ pub(crate) fn generate() -> io::Result<()> {
     // falls back to an ASCII-lowercased copy in a stack buffer for mixed-case
     // input. All built-in ids are short ASCII, so the 32-byte buffer never
     // truncates a known id.
-    output.push_str("/// Resolve a calendar by its identifier (ASCII case-insensitive).\npub fn calendar_by_id(id: &str) -> Option<&'static dyn HolidayCalendar> {\n");
+    output.push_str("/// Resolve a calendar by its identifier (ASCII case-insensitive).\n///\n/// # Arguments\n///\n/// * `id` - Built-in calendar identifier. Matching is ASCII case-insensitive;\n///   unknown or non-ASCII identifiers return `None`.\npub fn calendar_by_id(id: &str) -> Option<&'static dyn HolidayCalendar> {\n");
     output.push_str("    fn lookup(id: &str) -> Option<&'static dyn HolidayCalendar> {\n");
     output.push_str("        match id {\n");
     for (id, const_name) in &calendar_names {

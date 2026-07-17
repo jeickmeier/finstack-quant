@@ -74,6 +74,16 @@ impl ExactSchwartzSmith {
     /// # Arguments
     ///
     /// * `rho` - Correlation between X and Y Brownian motions
+    ///
+    /// The discretization stores a factorization of the two Brownian shocks and
+    /// applies the exact Gaussian transition for the mean-reverting short-term
+    /// factor and long-term equilibrium factor. It does not own the economic
+    /// process parameters; supply those to [`Discretization::step`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `rho` cannot form a positive-semidefinite 2×2
+    /// correlation matrix (including non-finite or out-of-range values).
     pub fn new(rho: f64) -> finstack_quant_core::Result<Self> {
         // Build 2x2 correlation matrix: [[1.0, rho], [rho, 1.0]]
         let corr_matrix = vec![1.0, rho, rho, 1.0];
@@ -94,6 +104,14 @@ impl ExactSchwartzSmith {
     }
 
     /// Create from Schwartz-Smith process (convenience method).
+    ///
+    /// Uses the process's `rho` and retains no reference to the process, so the
+    /// same discretization can be reused only with processes using compatible
+    /// two-factor shock conventions.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same correlation-factorization error as [`Self::new`].
     pub fn from_process(process: &SchwartzSmithProcess) -> finstack_quant_core::Result<Self> {
         Self::new(process.params().rho)
     }

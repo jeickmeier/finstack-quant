@@ -21,6 +21,11 @@ pub const FIXING_PREFIX: &str = "FIXING:";
 /// use finstack_quant_core::market_data::fixings::fixing_series_id;
 /// assert_eq!(fixing_series_id("USD-SOFR"), "FIXING:USD-SOFR");
 /// ```
+///
+/// # Arguments
+///
+/// * `forward_curve_id` - Identifier of the rate index or forward curve whose
+///   historical fixing series is required.
 pub fn fixing_series_id(forward_curve_id: &str) -> String {
     format!("{}{}", FIXING_PREFIX, forward_curve_id)
 }
@@ -39,6 +44,13 @@ pub fn fixing_series_id(forward_curve_id: &str) -> String {
 /// assert_eq!(cms_fixing_series_id("USD-SOFR", 10.0), "FIXING:CMS-10Y:USD-SOFR");
 /// assert_eq!(cms_fixing_series_id("USD-SOFR", 0.5), "FIXING:CMS-6M:USD-SOFR");
 /// ```
+///
+/// # Arguments
+///
+/// * `forward_curve_id` - Identifier of the curve or rate index used to
+///   project the CMS reference swap rate.
+/// * `tenor_years` - Reference swap tenor in years. Exact whole-month values
+///   are rendered in the canonical month or year form.
 pub fn cms_fixing_series_id(forward_curve_id: &str, tenor_years: f64) -> String {
     format!(
         "{FIXING_PREFIX}CMS-{}:{forward_curve_id}",
@@ -66,7 +78,23 @@ fn format_cms_tenor(tenor_years: f64) -> String {
 /// Look up the fixing series for a rate index in MarketContext.
 ///
 /// Returns a clear error when the series is missing, directing the user
-/// to provide the expected `ScalarTimeSeries`.
+/// to provide the expected `ScalarTimeSeries`. The lookup uses only the
+/// canonical `FIXING:{forward_curve_id}` ID; it does not fall back to an
+/// unqualified series, a forward curve projection, or a CMS fixing series.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] if `context` contains no scalar series
+/// with the canonical ID. The diagnostic includes both the requested index and
+/// expected series ID so a seasoned instrument can be supplied with the
+/// correct historical data.
+///
+/// # Arguments
+///
+/// * `context` - Market context containing scalar time series keyed by their
+///   canonical fixing IDs.
+/// * `forward_curve_id` - Rate-index or forward-curve identifier used to build
+///   the required `FIXING:{id}` series key.
 pub fn get_fixing_series<'a>(
     context: &'a MarketContext,
     forward_curve_id: &str,
@@ -89,7 +117,27 @@ pub fn get_fixing_series<'a>(
 /// limit is required (e.g. data-quality gates around long market closures),
 /// use [`require_fixing_value_bounded`] instead.
 ///
-/// Returns a clear error when the series is `None` or the date is missing.
+/// `date` is the contractual fixing date and `as_of` is included only in the
+/// diagnostic context; this helper does not itself prevent a caller from
+/// requesting a fixing later than the valuation date.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] when `series` is absent or cannot
+/// resolve a value on `date` under its interpolation policy. For an existing
+/// stepped series, this permits unbounded last-observation carry-forward;
+/// callers needing data freshness must use the bounded variant.
+///
+/// # Arguments
+///
+/// * `series` - Optional resolved historical fixing series. `None` produces a
+///   diagnostic that identifies the required canonical series ID.
+/// * `forward_curve_id` - Rate-index identifier included in returned error
+///   diagnostics and canonical-series guidance.
+/// * `date` - Contractual fixing date to retrieve using stepped
+///   last-observation-carried-forward interpolation.
+/// * `as_of` - Valuation date included in diagnostics only; it does not limit
+///   the lookup chronology.
 pub fn require_fixing_value(
     series: Option<&ScalarTimeSeries>,
     forward_curve_id: &str,
@@ -119,6 +167,27 @@ pub fn require_fixing_value(
 /// only accepted when it is at most `max_staleness_days` calendar days before
 /// `date`. Errors when the most recent observation is older than the bound
 /// (or when the series is `None` / has no observation on or before `date`).
+/// `as_of` is diagnostic context only; staleness is measured between the
+/// requested fixing date and the last observation, not from valuation date.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] when the series is absent, no
+/// observation exists on or before `date`, or the newest prior observation is
+/// more than `max_staleness_days` calendar days old. It also wraps any
+/// underlying time-series lookup failure with the index, date, and as-of date.
+///
+/// # Arguments
+///
+/// * `series` - Optional resolved historical fixing series. `None` produces a
+///   diagnostic that identifies the required canonical series ID.
+/// * `forward_curve_id` - Rate-index identifier included in returned error
+///   diagnostics and canonical-series guidance.
+/// * `date` - Contractual fixing date to retrieve from this series.
+/// * `as_of` - Valuation date included in diagnostics only; it does not affect
+///   the staleness calculation.
+/// * `max_staleness_days` - Maximum calendar-day age of a carried-forward
+///   observation relative to `date`.
 pub fn require_fixing_value_bounded(
     series: Option<&ScalarTimeSeries>,
     forward_curve_id: &str,
@@ -145,7 +214,26 @@ pub fn require_fixing_value_bounded(
 /// Require a fixing value using exact-date matching (no interpolation).
 ///
 /// Fails if no observation exists for the exact requested date.
-/// Appropriate for term rate fixings (e.g., 3M LIBOR resets).
+/// Appropriate for term rate fixings (e.g., 3M LIBOR resets), where carrying a
+/// previous publication forward would change the contractual reset. `as_of`
+/// is recorded only in failure diagnostics and does not impose a chronology
+/// check.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] when the series is absent or it lacks
+/// an observation exactly on `date`. It intentionally does not interpolate or
+/// fall back to a prior observation.
+///
+/// # Arguments
+///
+/// * `series` - Optional resolved historical fixing series. `None` produces a
+///   diagnostic that identifies the required canonical series ID.
+/// * `forward_curve_id` - Rate-index identifier included in returned error
+///   diagnostics and canonical-series guidance.
+/// * `date` - Contractual fixing date that must have an exact observation.
+/// * `as_of` - Valuation date included in diagnostics only; it does not limit
+///   the lookup chronology.
 pub fn require_fixing_value_exact(
     series: Option<&ScalarTimeSeries>,
     forward_curve_id: &str,

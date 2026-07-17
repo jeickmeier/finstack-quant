@@ -323,6 +323,15 @@ pub(crate) fn calculate_theta_date(
 /// Conversely, a flow at `end_date` is still inside PV(end), so it has not
 /// yet been received.
 ///
+/// # Arguments
+///
+/// * `instrument` - Instrument whose full cashflow schedule is queried.
+/// * `curves` - Market context used to construct the schedule and convert
+///   eligible receipts into `base_currency`.
+/// * `start_date` - Inclusive start of the half-open income interval.
+/// * `end_date` - Exclusive end of the half-open income interval.
+/// * `base_currency` - Reporting currency of the returned economic-income sum.
+///
 /// # Returns
 /// Sum of cashflow amounts in the period (converted to base currency)
 pub fn collect_cashflows_in_period(

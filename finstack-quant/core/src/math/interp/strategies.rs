@@ -960,6 +960,24 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
 
 impl MonotoneConvexStrategy {
     /// Construct with custom epsilon for near-zero slope detection.
+    ///
+    /// Implements Hagan-West monotone-convex interpolation of strictly
+    /// positive discount factors. Increasing discount factors (and therefore
+    /// negative forward rates) are allowed; monotonicity amelioration is only
+    /// applied when all inferred discrete forwards are non-negative. `epsilon`
+    /// controls near-zero slope handling and must lie in `(0, 1e-6]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `epsilon` is outside that range, consecutive knots
+    /// are too closely spaced for stable slope calculations, or any supplied
+    /// value is non-finite or not strictly positive.
+    ///
+    /// # Panics
+    ///
+    /// Panics if fewer than two knots are supplied or `values.len()` does not
+    /// match `knots.len()`. Callers needing input-shape validation should use
+    /// the generic [`Interpolator`](super::Interpolator) constructor instead.
     pub fn with_epsilon(knots: &[f64], values: &[f64], epsilon: f64) -> crate::Result<Self> {
         use crate::error::InputError;
 

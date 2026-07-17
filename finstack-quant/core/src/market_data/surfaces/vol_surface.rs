@@ -276,6 +276,11 @@ impl VolSurface {
     }
 
     /// Safe evaluation: returns `Err` if either coordinate is out of bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `expiry` or `strike` lies outside the stored grid,
+    /// or when the surface cannot determine interpolation segments.
     pub fn value_checked(&self, expiry: f64, strike: f64) -> crate::Result<f64> {
         let (ie0, exact_e) = self.value_indices(self.expiries.as_ref(), expiry)?;
         let (is0, exact_s) = self.value_indices(self.strikes.as_ref(), strike)?;
@@ -438,6 +443,11 @@ impl VolSurface {
     }
 
     /// Require the semantic axis before a caller uses the surface.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when this surface's secondary axis differs
+    /// from `expected`.
     pub fn require_secondary_axis(&self, expected: VolSurfaceAxis) -> crate::Result<()> {
         if self.secondary_axis == expected {
             return Ok(());
@@ -455,6 +465,11 @@ impl VolSurface {
     /// (normal/Bachelier vs Black/lognormal) should call this at the read site
     /// so a mis-tagged or mis-wired surface fails loudly instead of silently
     /// mis-pricing by an order of magnitude.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when this surface's quote convention differs
+    /// from `expected`.
     pub fn require_quote_type(&self, expected: VolQuoteType) -> crate::Result<()> {
         if self.quote_type == expected {
             return Ok(());
@@ -553,6 +568,14 @@ impl VolSurface {
     ///
     /// Avoids cloning the entire vols vector. Use with
     /// [`unbump_point_in_place`](Self::unbump_point_in_place) to restore.
+    ///
+    /// Coordinates are clamped to the nearest grid point, and `bump_pct` is a
+    /// relative bump (`0.01` raises the selected volatility by 1%). The updated
+    /// volatility is floored at zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::TooFewPoints` when either surface axis is empty.
     pub fn bump_point_in_place(
         &mut self,
         expiry: f64,
@@ -968,6 +991,12 @@ impl VolSurfaceBuilder {
 
     /// Finalise the surface and return an immutable [`VolSurface`] instance.
     /// Performs consistency checks on grid dimensions.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::DimensionMismatch` when the number of rows does
+    /// not match expiries or a row does not match strikes. It also propagates
+    /// axis and volatility validation failures from [`VolSurface::from_grid_opts`].
     pub fn build(self) -> crate::Result<VolSurface> {
         if self.vols.len() != self.expiries.len() {
             return Err(InputError::DimensionMismatch.into());
@@ -1027,6 +1056,17 @@ impl VolGridOpts {
 impl VolSurface {
     /// Canonical grid constructor for callers that need explicit construction
     /// options.
+    ///
+    /// `vols_row_major[expiry_idx * strikes.len() + secondary_idx]` supplies
+    /// the value for each grid point. Expiries and secondary-axis coordinates
+    /// must be strictly increasing and finite.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::TooFewPoints` for an empty axis,
+    /// `InputError::DimensionMismatch` when the flat grid has the wrong size,
+    /// an input-validation error for non-monotone or non-finite axes, and an
+    /// error for non-finite or negative volatility values.
     pub fn from_grid_opts(
         id: impl AsRef<str>,
         expiries: &[f64],
@@ -1066,6 +1106,11 @@ impl VolSurface {
     ///
     /// Equivalent to [`from_grid_opts`](Self::from_grid_opts) with
     /// [`VolGridOpts::default()`].
+    ///
+    /// # Errors
+    ///
+    /// Propagates the grid-shape, axis, and volatility validation errors from
+    /// [`Self::from_grid_opts`].
     pub fn from_grid(
         id: impl AsRef<str>,
         expiries: &[f64],
@@ -1138,6 +1183,12 @@ impl VolSurface {
     /// # Returns
     ///
     /// A new `VolSurface` with implied vols from SABR at each grid point.
+    ///
+    /// # Errors
+    ///
+    /// Propagates SABR implied-volatility failures for an invalid forward,
+    /// strike, expiry, or parameter combination, and the grid-validation
+    /// failures from [`VolSurfaceBuilder::build`].
     ///
     /// # Example
     ///

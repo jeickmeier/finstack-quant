@@ -154,6 +154,18 @@ impl Evaluator {
     /// # Returns
     ///
     /// Returns `StatementResult` containing the evaluated values for all nodes and periods.
+    /// The result includes capital-structure cashflows when the model defines
+    /// them, together with any attached check-suite report and evaluation
+    /// warnings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if model formulas cannot be parsed or compiled, its
+    /// dependency graph is invalid or cyclic, a required value or forecast
+    /// cannot be resolved, capital-structure instruments cannot be built or
+    /// priced from `market_ctx`, or final checks fail. Any explicit values in
+    /// actual periods after `as_of` are intentionally hidden rather than used
+    /// as known data.
     pub fn evaluate_with_market(
         &mut self,
         model: &FinancialModelSpec,
@@ -370,6 +382,15 @@ impl Evaluator {
     /// # Returns
     ///
     /// Returns `StatementResult` containing the evaluated values for all nodes and periods.
+    /// Capital-structure references require [`Evaluator::evaluate_with_market`]
+    /// instead; this method has no market context from which to price them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if formulas cannot be parsed or compiled, the model's
+    /// dependency graph is invalid or cyclic, a required input/forecast cannot
+    /// be resolved, a `cs.*` reference is evaluated without market-backed
+    /// cashflows, or final model checks fail.
     pub fn evaluate(&mut self, model: &FinancialModelSpec) -> Result<StatementResult> {
         self.evaluate_inner(model, None, None).inspect_err(|err| {
             tracing::error!(
@@ -388,7 +409,15 @@ impl Evaluator {
     /// order so that subsequent calls to [`evaluate_prepared`](Self::evaluate_prepared)
     /// skip all structural analysis. Use this when running sensitivity analysis,
     /// goal seek, or any workflow that re-evaluates the same model with different
-    /// input values.
+    /// input values. The returned plan snapshots compiled expressions; retain
+    /// it only for models with the same node identities and formulas.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a formula cannot be parsed or compiled, model
+    /// dependencies cannot be resolved, or the dependency graph contains a
+    /// cycle. A successful plan is structural only and performs no period
+    /// evaluation.
     pub fn prepare(&mut self, model: &FinancialModelSpec) -> Result<PreparedEvaluation> {
         self.init_eval_plan(model)
     }
@@ -398,7 +427,19 @@ impl Evaluator {
     /// The model must have the same structure (same nodes and formulas) as the one
     /// passed to [`prepare`](Self::prepare); only node *values* may differ. This
     /// avoids formula recompilation, DAG construction, and cycle detection on every
-    /// call — typically saving 30-50 % of total evaluation time.
+    /// call — typically saving 30-50 % of total evaluation time. Prepared
+    /// evaluation has no as-of visibility cutoff and does not initialize
+    /// capital-structure market state; use [`evaluate_with_market`](Self::evaluate_with_market)
+    /// for market-aware valuation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an evaluation error if `prepared` does not cover exactly the
+    /// model's current node set; rebuild it with [`prepare`](Self::prepare)
+    /// after any structural change. It also propagates ordinary evaluation
+    /// errors for missing inputs, failed forecasts, formulas, and final checks.
+    /// Callers must rebuild after formula changes as well: the plan deliberately
+    /// reuses the compiled expressions captured at preparation time.
     pub fn evaluate_prepared(
         &mut self,
         model: &FinancialModelSpec,
@@ -528,6 +569,17 @@ impl Evaluator {
     ///
     /// Monte Carlo evaluation currently focuses on statement forecasts and
     /// does not support capital structure (`capital_structure`) integration.
+    /// The same configuration seed produces reproducible path draws across
+    /// runs. The returned distribution aggregates node-by-period results into
+    /// percentile bands rather than returning every raw path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an evaluation error when `config.n_paths` is zero, the model
+    /// contains capital structure, model compilation or dependency analysis
+    /// fails, or any simulated path cannot resolve a required formula, input,
+    /// or forecast. Use the valuations crate for instrument-level Monte Carlo
+    /// analysis when capital structure is required.
     pub fn evaluate_monte_carlo(
         &mut self,
         model: &FinancialModelSpec,

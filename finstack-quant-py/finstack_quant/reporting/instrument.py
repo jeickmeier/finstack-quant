@@ -87,6 +87,12 @@ def recommended_metrics(instrument_type: str) -> list[str]:
     """Metric IDs to pass to ``price_instrument_with_metrics`` for a full sheet of ``instrument_type``.
 
     Returns ``[]`` for unrecognised types (the sheet then renders whatever metrics are present).
+
+    Parameters
+    ----------
+    instrument_type : str
+        Canonical instrument type tag, such as ``"bond"`` or ``"swap"``, used
+        to select metrics supported by the pricing model.
     """
     return list(_RECOMMENDED.get(instrument_type, []))
 
@@ -650,6 +656,34 @@ def instrument_tearsheet(
     pass ``market=`` and ``as_of=``; the instrument is priced with
     :func:`recommended_metrics` (plus ``oas``/``ytw`` when ``market_price`` is
     given) and its cashflows fetched, then rendered.
+
+    Parameters
+    ----------
+    result : Any
+        Priced valuation result, or instrument JSON/object that should be priced
+        through the supplied market context.
+    market : Any
+        Market context or JSON required when ``result`` is an instrument spec.
+    as_of : str or None
+        ISO-8601 valuation date required when pricing an instrument spec.
+    model : str
+        Pricing-model key used for the instrument-spec pricing path.
+    market_price : float or None
+        Optional observed price used to calculate quote-dependent metrics.
+    cashflows : Any
+        Optional precomputed cashflow payload; otherwise fetched when possible.
+    definition : Any
+        Optional instrument-definition payload used to enrich the rendered sheet.
+    title : str or None
+        Optional main report heading; ``None`` uses the instrument identifier.
+    subtitle : str or None
+        Optional secondary heading; ``None`` derives type, currency, and date.
+    sections : list[str] or None
+        Optional subset of supported sections; ``None`` renders the full sheet.
+    theme : Theme
+        Report palette and typography used for the rendered tear sheet.
+    generated : datetime.date or None
+        Optional generated date; supply a fixed date for reproducible output.
     """
     if isinstance(result, (str, dict)):
         result, cashflows, definition = _price_path(result, market, as_of, model, market_price, cashflows)

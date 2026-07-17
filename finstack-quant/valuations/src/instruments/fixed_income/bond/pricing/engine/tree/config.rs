@@ -1,3 +1,5 @@
+//! Pricing-engine components for fixed-income bonds.
+//!
 use super::super::super::super::types::Bond;
 use crate::instruments::pricing_overrides::{OasPriceBasis, OasQuoteCompounding};
 use crate::models::trees::TreeCompounding;

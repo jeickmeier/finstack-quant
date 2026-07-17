@@ -1,3 +1,5 @@
+//! Execution, configuration, and diagnostics for Monte Carlo pricing.
+//!
 use super::config::{McEngineBuilder, McEngineConfig, MAX_CAPTURED_PATHS, MAX_NUM_PATHS};
 use super::path_capture::PathCaptureMode;
 use crate::captured_path_stats::apply_captured_path_statistics;

@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 // Unit tests for Hull-White tree construction and calibration.
 
 use crate::models::trees::{HullWhiteTree, HullWhiteTreeConfig};

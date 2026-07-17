@@ -1,3 +1,5 @@
+//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
+//!
 use super::config::CDSTranchePricer;
 use crate::instruments::common_impl::traits::Instrument;
 use finstack_quant_core::market_data::context::MarketContext;

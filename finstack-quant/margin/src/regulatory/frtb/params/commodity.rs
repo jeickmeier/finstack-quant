@@ -41,6 +41,11 @@ pub const COMMODITY_VEGA_RISK_WEIGHT: f64 = 1.00;
 pub const COMMODITY_CURVATURE_RISK_WEIGHT: f64 = 0.5;
 
 /// Look up a commodity risk weight by bucket.
+///
+/// # Arguments
+///
+/// * `bucket` - FRTB commodity risk bucket number; unmapped buckets use the
+///   regulatory fallback risk weight of 20.0.
 #[must_use]
 pub fn commodity_risk_weight(bucket: u8) -> f64 {
     COMMODITY_RISK_WEIGHTS

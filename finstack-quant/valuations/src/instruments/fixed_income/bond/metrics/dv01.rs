@@ -1,3 +1,5 @@
+//! Bond price, yield, spread, duration, and risk metric calculations.
+//!
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::metrics::effective::{
     option_risk_bond_and_base_price, option_risk_curve_id,

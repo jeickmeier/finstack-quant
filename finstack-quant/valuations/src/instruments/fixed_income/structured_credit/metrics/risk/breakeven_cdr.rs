@@ -42,7 +42,8 @@ const WRITEDOWN_EPS: f64 = 1.0;
 /// * `deal` - The structured-credit deal owning the tranche.
 /// * `tranche_id` - Identifier of the tranche to solve for.
 /// * `context` - Market context for cashflow projection.
-/// * `as_of` - Valuation date.
+/// * `as_of` - Valuation date used to project the tranche waterfall at each
+///   probed constant-default-rate assumption.
 ///
 /// # Returns
 ///

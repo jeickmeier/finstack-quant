@@ -464,6 +464,20 @@ impl VolCube {
     /// SABR expansion yields a non-finite volatility (e.g. a χ(z) breakdown).
     /// Guarding here stops a silent `NaN` from poisoning Black-76 pricing or a
     /// compensated aggregation downstream.
+    ///
+    /// `expiry` and `tenor` are year fractions and must lie within their
+    /// respective axes; unlike [`vol_clamped`](Self::vol_clamped), this method
+    /// never extrapolates. `strike` is a rate in the same convention as the
+    /// node forwards. The output is annualized lognormal volatility (for
+    /// example, `0.20` for 20%); use [`vol_normal`](Self::vol_normal) for a
+    /// Bachelier quote.
+    ///
+    /// # Errors
+    ///
+    /// Returns an input error for non-finite strike or out-of-grid coordinates.
+    /// It propagates SABR errors for an invalid shifted lognormal domain or a
+    /// non-finite expansion, and returns a validation error if total-variance
+    /// interpolation produces non-positive or non-finite variance.
     pub fn vol(&self, expiry: f64, tenor: f64, strike: f64) -> crate::Result<f64> {
         // Validate coordinates are within grid bounds
         locate_segment(&self.expiries, expiry)?;
@@ -604,7 +618,16 @@ impl VolCube {
     ///
     /// The resulting surface has the cube's expiry axis on one dimension and the
     /// supplied strikes on the other. Each vol is computed by interpolating the
-    /// SABR parameters at `(expiry_i, tenor)` and evaluating the smile.
+    /// SABR parameters at `(expiry_i, tenor)` and evaluating the smile. `tenor`
+    /// may fall outside the cube axis because evaluation clamps finite tenor
+    /// inputs to the nearest edge. Output vols are lognormal and the values are
+    /// row-major by `(expiry, strike)` as required by [`VolSurface::from_grid`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an input error if `strikes` is empty, `tenor` is non-finite, or
+    /// any strike is non-finite. It also propagates surface-construction errors
+    /// if the materialized grid violates the surface contract.
     pub fn materialize_tenor_slice(
         &self,
         tenor: f64,
@@ -634,7 +657,15 @@ impl VolCube {
     /// but each vol comes from Hagan's normal expansion, degenerate values are
     /// floored in normal-vol units (`1e-8 * max(|forward|, 1)`), and the
     /// resulting surface is tagged [`VolQuoteType::Normal`] so consumers can
-    /// enforce the quoting convention.
+    /// enforce the quoting convention. `tenor` is clamped at finite cube-axis
+    /// boundaries and values are row-major by `(expiry, strike)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an input error if `strikes` is empty, `tenor` is non-finite, or
+    /// any strike is non-finite. It also propagates surface-construction errors
+    /// after materialization. A finite degeneracy in the SABR normal expansion
+    /// is floored with a warning rather than returned as an error.
     pub fn materialize_tenor_slice_normal(
         &self,
         tenor: f64,
@@ -668,7 +699,15 @@ impl VolCube {
     /// interpolating the SABR parameters at `(expiry, tenor_j)`. Because that
     /// first axis represents tenor rather than time-to-expiry, interpolation
     /// between materialized tenor pillars is always linear in volatility,
-    /// never total variance.
+    /// never total variance. `expiry` may fall outside the cube axis because
+    /// finite coordinates are clamped for the smile evaluation. Values are
+    /// lognormal and row-major by `(tenor, strike)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an input error if `strikes` is empty, `expiry` is non-finite, or
+    /// any strike is non-finite. It also propagates surface-construction errors
+    /// if the materialized grid cannot satisfy the [`VolSurface`] contract.
     pub fn materialize_expiry_slice(
         &self,
         expiry: f64,
@@ -696,7 +735,17 @@ impl VolCube {
     /// Same construction as [`materialize_expiry_slice`](Self::materialize_expiry_slice)
     /// but each vol comes from Hagan's normal expansion, degenerate values are
     /// floored in normal-vol units (`1e-8 * max(|forward|, 1)`), and the
-    /// resulting surface is tagged [`VolQuoteType::Normal`].
+    /// resulting surface is tagged [`VolQuoteType::Normal`]. Values are
+    /// row-major by `(tenor, strike)`; finite expiry coordinates outside the
+    /// cube are clamped before normal-vol evaluation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an input error if `strikes` is empty, `expiry` is non-finite, or
+    /// any strike is non-finite. It also propagates surface-construction errors.
+    /// A finite degenerate SABR normal expansion is floored and warned about;
+    /// cross-zero normal-SABR inputs yield `NaN` in the clamped evaluation and
+    /// are consequently rejected by surface construction.
     pub fn materialize_expiry_slice_normal(
         &self,
         expiry: f64,
@@ -722,7 +771,18 @@ impl VolCube {
 
     /// Materialize the full grid as a flat vector in `(expiry, tenor, strike)` order.
     ///
-    /// The returned vector has length `n_expiries * n_tenors * n_strikes`.
+    /// The returned vector has length `n_expiries * n_tenors * n_strikes`, with
+    /// strike varying fastest. Each value is a clamped, lognormal SABR smile
+    /// evaluation at an existing expiry/tenor pillar; therefore coordinate
+    /// extrapolation does not occur, although a degenerate expansion is floored
+    /// by the clamped-vol policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an input error if `strikes` is empty or any strike is non-finite.
+    /// Valid finite strikes otherwise produce one value per grid combination;
+    /// expansion degeneracies are represented by the documented positive floor
+    /// and warning rather than an error.
     pub fn materialize_grid(&self, strikes: &[f64]) -> crate::Result<Vec<f64>> {
         if strikes.is_empty() {
             return Err(InputError::TooFewPoints.into());
@@ -801,6 +861,18 @@ impl VolCubeBuilder {
     }
 
     /// Finalise and validate the cube.
+    ///
+    /// Nodes must supply exactly one `(SabrParams, forward)` pair for every
+    /// expiry-tenor combination, in the row-major order documented on
+    /// [`VolCubeBuilder`]. The default interpolation mode is pointwise SABR
+    /// volatility interpolation; change it on the returned cube when
+    /// total-variance interpolation across expiries is required.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same construction errors as [`VolCube::from_grid`]: empty,
+    /// non-finite, non-positive, or unsorted axes; incorrect node count;
+    /// non-finite forwards; or invalid SABR parameters and shifts.
     pub fn build(self) -> crate::Result<VolCube> {
         VolCube::from_grid(
             self.id.as_str(),

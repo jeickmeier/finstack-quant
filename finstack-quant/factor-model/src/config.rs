@@ -102,6 +102,16 @@ pub enum RiskMeasure {
 
 impl RiskMeasure {
     /// Validate any embedded confidence levels before downstream risk calculations use them.
+    ///
+    /// Variance and volatility carry no additional parameters. Parametric VaR
+    /// and expected shortfall require a finite one-sided loss confidence in
+    /// `(0.5, 1)`; their negative P&L sign convention is described on the enum
+    /// variants.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a VaR or expected-shortfall confidence is NaN,
+    /// infinite, less than or equal to `0.5`, or greater than or equal to `1`.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         match self {
             Self::Variance | Self::Volatility => Ok(()),

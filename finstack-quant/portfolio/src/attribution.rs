@@ -591,6 +591,13 @@ fn attribute_single_position(
 ///
 /// - Parametric risk-reporting background:
 ///   `docs/REFERENCES.md#jpmorgan1996RiskMetrics`
+///
+/// # Errors
+///
+/// Propagates per-position valuation and attribution errors. For a position
+/// outside the base currency, both market contexts must provide an FX matrix
+/// and a conversion rate to the base currency at their respective as-of dates;
+/// otherwise the call returns missing-market-data or FX-conversion errors.
 pub fn attribute_portfolio_pnl(
     portfolio: &Portfolio,
     market_t0: &MarketContext,

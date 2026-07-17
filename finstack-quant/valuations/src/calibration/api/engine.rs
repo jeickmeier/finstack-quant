@@ -521,6 +521,11 @@ fn bad_fit_envelope_error(step_id: &str, report: &CalibrationReport) -> Envelope
 /// [`finstack_quant_core::Error`] for backwards-compatible callers. Bindings that
 /// want full structured detail (e.g., `worst_quote_id` on solver
 /// non-convergence) should call [`execute_with_diagnostics`] directly.
+///
+/// # Arguments
+///
+/// * `envelope` - Typed calibration plan, inputs, quote sets, and solver
+///   settings to execute in declared dependency order.
 pub fn execute(envelope: &CalibrationEnvelope) -> Result<CalibrationResultEnvelope> {
     execute_with_diagnostics(envelope).map_err(Into::into)
 }
@@ -532,6 +537,11 @@ pub fn execute(envelope: &CalibrationEnvelope) -> Result<CalibrationResultEnvelo
 /// `worst_quote_id`, `tolerance`, etc.) and [`ExecuteError::Other`] for the
 /// remaining stringly-typed failures from the engine pipeline. Callers that
 /// don't need the structured detail can use [`execute`] instead.
+///
+/// # Arguments
+///
+/// * `envelope` - Typed calibration plan, inputs, quote sets, and solver
+///   settings to execute in declared dependency order.
 pub fn execute_with_diagnostics(
     envelope: &CalibrationEnvelope,
 ) -> std::result::Result<CalibrationResultEnvelope, ExecuteError> {

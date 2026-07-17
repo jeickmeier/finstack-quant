@@ -18,6 +18,14 @@ use wasm_bindgen::prelude::*;
 /// Price a European option under the Black-Scholes model using the COS method.
 #[wasm_bindgen(js_name = bsCosPrice)]
 #[allow(clippy::too_many_arguments)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param dividend - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param maturity - Time to option expiry in years.
+/// @param is_call - Whether to value a call (`true`) or put (`false`); defaults follow the callable's contract.
+/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
 pub fn bs_cos_price(
     spot: f64,
     strike: f64,
@@ -44,6 +52,16 @@ pub fn bs_cos_price(
 /// Price a European option under the Variance Gamma model using the COS method.
 #[wasm_bindgen(js_name = vgCosPrice)]
 #[allow(clippy::too_many_arguments)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param dividend - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param sigma - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param theta - Variance-Gamma drift parameter controlling skew in log returns.
+/// @param nu - Variance-Gamma variance-rate parameter; larger values increase tail thickness.
+/// @param maturity - Time to option expiry in years.
+/// @param is_call - Whether to value a call (`true`) or put (`false`); defaults follow the callable's contract.
+/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
 pub fn vg_cos_price(
     spot: f64,
     strike: f64,
@@ -74,6 +92,17 @@ pub fn vg_cos_price(
 /// Price a European option under Merton (1976) jump-diffusion using the COS method.
 #[wasm_bindgen(js_name = mertonJumpCosPrice)]
 #[allow(clippy::too_many_arguments)]
+/// @param spot - Current spot price or exchange rate in the documented quote convention.
+/// @param strike - Option strike price in the same price units as the underlying.
+/// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+/// @param dividend - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
+/// @param sigma - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
+/// @param mu_jump - Mean log jump size in the Merton jump-diffusion model.
+/// @param sigma_jump - Standard deviation of log jump sizes in the Merton jump-diffusion model.
+/// @param lambda - Annual jump-arrival intensity in the Merton jump-diffusion model.
+/// @param maturity - Time to option expiry in years.
+/// @param is_call - Whether to value a call (`true`) or put (`false`); defaults follow the callable's contract.
+/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
 pub fn merton_jump_cos_price(
     spot: f64,
     strike: f64,

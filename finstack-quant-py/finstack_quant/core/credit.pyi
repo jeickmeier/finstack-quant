@@ -23,7 +23,29 @@ class recovery_waterfall:
             accrued: float = 0.0,
             penalties: float = 0.0,
             collateral: tuple[float, float] | None = None,
-        ) -> None: ...
+        ) -> None:
+            """Create a claim for absolute-priority recovery allocation.
+
+            Parameters
+            ----------
+            id : str
+                Stable claim identifier retained on the resulting allocation.
+            seniority : str
+                Human-readable seniority label used in recovery reporting.
+            priority : int
+                Absolute-priority rank; lower values receive estate proceeds
+                before higher values.
+            principal : float
+                Outstanding principal claim in the estate's monetary units.
+            accrued : float, default 0.0
+                Unpaid accrued interest added to the claim amount.
+            penalties : float, default 0.0
+                Contractual penalty or default-interest claim added to the total.
+            collateral : tuple[float, float] or None, default None
+                Optional ``(market_value, haircut)`` collateral tuple. The
+                haircut is a decimal fraction deducted before estate allocation.
+            """
+            ...
         @property
         def id(self) -> str: ...
         @property
@@ -77,7 +99,24 @@ class recovery_waterfall:
     def allocate_recovery(
         estate_value: float,
         claims: list[recovery_waterfall.RecoveryClaim],
-    ) -> recovery_waterfall.RecoveryWaterfallResult: ...
+    ) -> recovery_waterfall.RecoveryWaterfallResult:
+        """Allocate an insolvent estate under absolute priority.
+
+        Parameters
+        ----------
+        estate_value : float
+            Cash estate available for distribution after any external costs,
+            expressed in the same monetary units as each claim.
+        claims : list[RecoveryClaim]
+            Claims to rank by ``priority``. Collateral recovery is applied to
+            each claim before general estate proceeds are distributed.
+
+        Returns
+        -------
+        RecoveryWaterfallResult
+            Per-claim recoveries, undistributed estate, and APR satisfaction.
+        """
+        ...
 
 class scoring:
     """Academic credit scoring: Altman Z-Score family, Ohlson O-Score, Zmijewski."""
@@ -152,11 +191,20 @@ class scoring:
 
         Parameters
         ----------
-        working_capital_to_total_assets, retained_earnings_to_total_assets,
-        ebit_to_total_assets, book_equity_to_total_liabilities,
+        working_capital_to_total_assets : float
+            Working capital divided by total assets (Altman X1).
+        retained_earnings_to_total_assets : float
+            Cumulative retained earnings divided by total assets (X2).
+        ebit_to_total_assets : float
+            Earnings before interest and tax divided by total assets (X3).
+        book_equity_to_total_liabilities : float
+            Book value of equity divided by total liabilities, replacing the
+            original public-company market-equity ratio (X4).
         sales_to_total_assets : float
-            Balance-sheet ratios as in Altman (1983); book equity replaces
-            market equity versus the original Z-Score.
+            Sales divided by total assets, the private-firm turnover ratio (X5).
+        pd_calibration : AltmanPdCalibration or None, default None
+            Optional explicit score-to-PD heuristic. ``None`` returns no
+            implied PD rather than applying an undocumented mapping.
 
         Returns
         -------
@@ -188,6 +236,20 @@ class scoring:
     ) -> tuple[float, str, float | None]:
         """Altman Z''-Score for non-manufacturing firms (non-EM model, no constant).
 
+        Parameters
+        ----------
+        working_capital_to_total_assets : float
+            Working capital divided by total assets (Altman X1).
+        retained_earnings_to_total_assets : float
+            Cumulative retained earnings divided by total assets (X2).
+        ebit_to_total_assets : float
+            Earnings before interest and tax divided by total assets (X3).
+        book_equity_to_total_liabilities : float
+            Book value of equity divided by total liabilities (X4).
+        pd_calibration : AltmanPdCalibration or None, default None
+            Optional explicit score-to-PD heuristic; ``None`` leaves the
+            implied-PD component absent.
+
         Returns ``(score, zone, implied_pd)``; PD is ``None`` unless an
         explicit versioned heuristic is supplied.
 
@@ -214,6 +276,31 @@ class scoring:
     ) -> tuple[float, str, float]:
         """Ohlson O-Score (1980) logistic bankruptcy model.
 
+        Parameters
+        ----------
+        log_total_assets_adjusted : float
+            Natural log of inflation-adjusted total assets, the Ohlson size
+            variable.
+        total_liabilities_to_total_assets : float
+            Total liabilities divided by total assets.
+        working_capital_to_total_assets : float
+            Working capital divided by total assets.
+        current_liabilities_to_current_assets : float
+            Current liabilities divided by current assets.
+        liabilities_exceed_assets : float
+            Indicator equal to ``1.0`` when liabilities exceed assets and
+            ``0.0`` otherwise.
+        net_income_to_total_assets : float
+            Net income divided by total assets.
+        funds_from_operations_to_total_liabilities : float
+            Funds from operations divided by total liabilities.
+        negative_net_income_two_years : float
+            Indicator equal to ``1.0`` when net income was negative in both
+            the current and prior year, otherwise ``0.0``.
+        net_income_change : float
+            Ohlson CHIN variable describing the scaled change in net income
+            between the current and prior year.
+
         Returns ``(score, zone, implied_pd)``.
 
         Examples
@@ -232,6 +319,15 @@ class scoring:
         current_assets_to_current_liabilities: float,
     ) -> tuple[float, str, float]:
         """Zmijewski (1984) probit bankruptcy score.
+
+        Parameters
+        ----------
+        net_income_to_total_assets : float
+            Net income divided by total assets, the profitability predictor.
+        total_liabilities_to_total_assets : float
+            Total liabilities divided by total assets, the leverage predictor.
+        current_assets_to_current_liabilities : float
+            Current assets divided by current liabilities, the liquidity ratio.
 
         Returns ``(score, zone, implied_pd)``.
 
@@ -550,7 +646,7 @@ class lgd:
         Parameters
         ----------
         drawn:
-            Drawn amount.
+            Current funded balance in the facility's monetary units.
         undrawn:
             Undrawn commitment.
         ccf:
@@ -1001,7 +1097,8 @@ class migration:
             Parameters
             ----------
             state:
-                Rating label.
+                Rating-scale label whose total off-diagonal migration intensity
+                is returned; the default absorbing state has zero exit rate.
 
             Returns
             -------

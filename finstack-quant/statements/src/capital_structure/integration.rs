@@ -33,6 +33,11 @@ pub use crate::capital_structure::period_flows::calculate_period_flows;
 /// Delegates to the canonical valuations instrument registry. The `spec`
 /// payload must be the registry's tagged form (`{"type": "...", "spec": {...}}`).
 ///
+/// # Arguments
+///
+/// * `spec` - Debt-instrument specification with an ID and a registry-tagged
+///   JSON payload used to construct the runtime cashflow provider.
+///
 /// # Errors
 ///
 /// Returns an error when the payload does not match a registered instrument
@@ -59,10 +64,15 @@ pub fn build_any_instrument_from_spec(
 /// consume totals or per-instrument breakdowns.
 ///
 /// # Arguments
-/// * `instruments` - Map of instrument IDs to `CashflowProvider` trait objects
-/// * `periods` - Ordered list of model periods used for bucketing cashflows
-/// * `market_ctx` - Market context containing curves and other pricing data
-/// * `as_of` - Valuation date used when generating cashflows
+///
+/// * `spec` - Capital-structure configuration that supplies reporting currency
+///   and FX policy for aggregating the provided instruments.
+/// * `instruments` - Map of instrument IDs to runtime cashflow providers; it
+///   must contain every instrument to aggregate.
+/// * `periods` - Ordered model periods used to bucket emitted cashflows.
+/// * `market_ctx` - Market context containing curves, FX, and other pricing
+///   inputs required to generate schedules.
+/// * `as_of` - Valuation date used when generating each instrument schedule.
 ///
 /// # Example
 ///
@@ -93,6 +103,23 @@ pub fn build_any_instrument_from_spec(
 /// # Ok(())
 /// # }
 /// ```
+///
+/// Instrument-level values are always retained in their native currency. For
+/// reporting totals, the currency is selected in this order: explicit
+/// `spec.reporting_currency`, the market FX matrix pivot, or inferred later
+/// for a single-currency structure. Cross-currency amounts use `spec.fx_policy`
+/// or `CashflowDate` by default. Interest legs in one instrument are netted by
+/// signed amount before being recorded as a magnitude, preventing two-leg
+/// swaps from double-counting pay and receive coupons.
+///
+/// # Errors
+///
+/// Propagates cashflow-schedule and FX conversion errors from each instrument.
+/// Returns a currency-mismatch error if one instrument emits cashflows in more
+/// than its schedule currency, and returns an error when required reporting FX
+/// data or conversion policy cannot produce a valid amount. Instruments absent
+/// from `instruments` are not synthesized from `spec`; callers must construct
+/// and supply every instrument they want aggregated.
 pub fn aggregate_instrument_cashflows(
     spec: &crate::types::CapitalStructureSpec,
     instruments: &IndexMap<String, Arc<dyn CashflowProvider + Send + Sync>>,

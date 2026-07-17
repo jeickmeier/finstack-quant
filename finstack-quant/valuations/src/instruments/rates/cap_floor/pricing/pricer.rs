@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for interest-rate instruments.
+//!
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
 use crate::instruments::rates::cap_floor::pricing::projection::resolve_optioned_caplet_inputs;

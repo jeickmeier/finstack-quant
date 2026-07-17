@@ -1,3 +1,5 @@
+//! Valuation result schema, measures, explanations, and serialization.
+//!
 use crate::metrics::MetricId;
 use finstack_quant_core::config::{results_meta_now, FinstackConfig, ResultsMeta};
 use finstack_quant_core::dates::Date;

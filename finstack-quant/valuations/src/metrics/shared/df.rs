@@ -1,3 +1,5 @@
+//! Df implementation used by the shared subsystem.
+//!
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::dates::Date;
 

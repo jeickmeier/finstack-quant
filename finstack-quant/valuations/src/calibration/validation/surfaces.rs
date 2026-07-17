@@ -5,6 +5,13 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::{Error, Result};
 
 /// Validate all volatility-surface constraints.
+///
+/// # Arguments
+///
+/// * `surface` - Volatility surface whose expiry/strike grid and quoted
+///   annualized volatilities are checked.
+/// * `config` - Validation tolerances, volatility cap, and strict-versus-
+///   lenient arbitrage policy.
 pub fn validate_surface(surface: &VolSurface, config: &ValidationConfig) -> Result<()> {
     validate_calendar_spread(surface, config)?;
     validate_butterfly_spread(surface, config)?;
@@ -16,6 +23,13 @@ pub fn validate_surface(surface: &VolSurface, config: &ValidationConfig) -> Resu
 ///
 /// Checks that total variance (sigma^2 T) is monotonically increasing with expiry,
 /// ensuring that longer-dated options are not cheaper than shorter-dated ones.
+///
+/// # Arguments
+///
+/// * `surface` - Volatility surface tested along every strike across increasing
+///   expiry nodes.
+/// * `config` - Arbitrage-check toggle, numerical tolerance, and policy that
+///   turns violations into errors or warnings.
 pub fn validate_calendar_spread(surface: &VolSurface, config: &ValidationConfig) -> Result<()> {
     if !config.check_arbitrage {
         return Ok(());
@@ -94,6 +108,13 @@ pub fn validate_calendar_spread(surface: &VolSurface, config: &ValidationConfig)
 ///
 /// Checks that total variance (sigma^2 T) is convex in strike, ensuring that
 /// butterfly spreads have non-negative value.
+///
+/// # Arguments
+///
+/// * `surface` - Volatility surface tested along every expiry across ordered
+///   strike nodes.
+/// * `config` - Arbitrage-check toggle and allowed convexity-ratio band used
+///   to classify butterfly violations.
 pub fn validate_butterfly_spread(surface: &VolSurface, config: &ValidationConfig) -> Result<()> {
     if !config.check_arbitrage {
         return Ok(());
@@ -192,6 +213,12 @@ pub fn validate_butterfly_spread(surface: &VolSurface, config: &ValidationConfig
 /// Validate volatility bounds.
 ///
 /// Ensures volatility is positive and within reasonable financial limits.
+///
+/// # Arguments
+///
+/// * `surface` - Volatility surface whose annualized values are inspected.
+/// * `config` - Validation configuration supplying the maximum permissible
+///   annualized volatility and other surface policy controls.
 pub fn validate_vol_bounds(surface: &VolSurface, config: &ValidationConfig) -> Result<()> {
     let strikes = surface.strikes();
     let expiries = surface.expiries();

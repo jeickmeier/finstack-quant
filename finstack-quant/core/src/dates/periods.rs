@@ -249,6 +249,11 @@ pub struct PeriodId {
 
 impl PeriodId {
     /// Build a daily identifier from an ordinal day (1..=366).
+    ///
+    /// # Panics
+    ///
+    /// Panics when `ordinal` is outside the actual Gregorian-year range. Use
+    /// [`Self::try_day`] for external or unchecked input.
     pub fn day(year: i32, ordinal: u16) -> Self {
         assert!(
             (1..=days_in_year(year)).contains(&ordinal),
@@ -262,10 +267,19 @@ impl PeriodId {
         }
     }
     /// Try to build a daily identifier from an ordinal day (1..=366).
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::Invalid` when `ordinal` is not valid for `year`.
     pub fn try_day(year: i32, ordinal: u16) -> crate::Result<Self> {
         Self::try_new(year, ordinal, PeriodKind::Daily, days_in_year(year))
     }
     /// Build a quarterly identifier.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `q` is not in `1..=4`. Use [`Self::try_quarter`] for
+    /// external or unchecked input.
     pub fn quarter(year: i32, q: u8) -> Self {
         assert!((1..=4).contains(&q), "quarter must be in 1..=4");
         Self {
@@ -276,10 +290,19 @@ impl PeriodId {
         }
     }
     /// Try to build a quarterly identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::Invalid` when `q` is outside `1..=4`.
     pub fn try_quarter(year: i32, q: u8) -> crate::Result<Self> {
         Self::try_new(year, u16::from(q), PeriodKind::Quarterly, 4)
     }
     /// Build a monthly identifier.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `m` is not in `1..=12`. Use [`Self::try_month`] for
+    /// external or unchecked input.
     pub fn month(year: i32, m: u8) -> Self {
         assert!((1..=12).contains(&m), "month must be in 1..=12");
         Self {
@@ -290,10 +313,22 @@ impl PeriodId {
         }
     }
     /// Try to build a monthly identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::Invalid` when `m` is outside `1..=12`.
     pub fn try_month(year: i32, m: u8) -> crate::Result<Self> {
         Self::try_new(year, u16::from(m), PeriodKind::Monthly, 12)
     }
     /// Build a weekly identifier.
+    ///
+    /// Week numbers follow ISO week-year rules, so the valid upper bound is
+    /// 52 or 53 depending on `year`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `w` is not a valid ISO week for `year`. Use
+    /// [`Self::try_week`] for external or unchecked input.
     pub fn week(year: i32, w: u8) -> Self {
         assert!(
             (1..=iso_weeks_in_year(year)).contains(&w),
@@ -307,6 +342,11 @@ impl PeriodId {
         }
     }
     /// Try to build a weekly identifier for a Gregorian ISO week-year.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::Invalid` when `w` is not a valid ISO week number
+    /// for `year`.
     pub fn try_week(year: i32, w: u8) -> crate::Result<Self> {
         Self::try_new(
             year,
@@ -316,6 +356,11 @@ impl PeriodId {
         )
     }
     /// Build a semi-annual identifier.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `h` is not `1` or `2`. Use [`Self::try_half`] for external
+    /// or unchecked input.
     pub fn half(year: i32, h: u8) -> Self {
         assert!((1..=2).contains(&h), "half must be in 1..=2");
         Self {
@@ -326,6 +371,10 @@ impl PeriodId {
         }
     }
     /// Try to build a semi-annual identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::Invalid` when `h` is outside `1..=2`.
     pub fn try_half(year: i32, h: u8) -> crate::Result<Self> {
         Self::try_new(year, u16::from(h), PeriodKind::SemiAnnual, 2)
     }
@@ -451,6 +500,11 @@ impl PeriodId {
     /// This differs from [`Self::next`] for weekly and daily identifiers:
     /// fiscal years may contain a partial week 53 or a leap-day ordinal even
     /// when the corresponding Gregorian/ISO year does not.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `config` has an invalid fiscal start date or the
+    /// next fiscal-year boundary cannot be represented by `time::Date`.
     pub fn next_fiscal(self, config: FiscalConfig) -> crate::Result<Self> {
         let mut next = step_with_calendar(self, &FiscalCalendar { config }, true)?;
         next.fiscal = true;
@@ -460,6 +514,11 @@ impl PeriodId {
     /// Step backward using the capacity of the supplied fiscal calendar.
     ///
     /// This is the inverse of [`Self::next_fiscal`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `config` has an invalid fiscal start date or the
+    /// preceding fiscal-year boundary cannot be represented by `time::Date`.
     pub fn prev_fiscal(self, config: FiscalConfig) -> crate::Result<Self> {
         let mut prev = step_with_calendar(self, &FiscalCalendar { config }, false)?;
         prev.fiscal = true;
@@ -478,6 +537,15 @@ pub struct FiscalConfig {
 
 impl FiscalConfig {
     /// Create a new fiscal configuration.
+    ///
+    /// This validates the independent month and day ranges. It does not reject
+    /// a day such as February 31 until that configuration is applied to a
+    /// concrete fiscal year, because leap-year validity is year-dependent.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::Invalid` when `start_month` is outside `1..=12` or
+    /// `start_day` is outside `1..=31`.
     pub fn new(start_month: u8, start_day: u8) -> crate::Result<Self> {
         if !(1..=12).contains(&start_month) {
             return Err(crate::error::InputError::Invalid.into());

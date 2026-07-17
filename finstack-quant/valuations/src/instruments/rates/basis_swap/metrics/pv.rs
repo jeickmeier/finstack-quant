@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for interest-rate instruments.
+//!
 use crate::instruments::rates::basis_swap::types::BasisSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::{Error, Result};

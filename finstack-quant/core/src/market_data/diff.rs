@@ -159,6 +159,19 @@ fn values_are_effectively_equal(a: f64, b: f64) -> bool {
 }
 
 /// Measure average parallel rate shift in discount curve (basis points).
+///
+/// # Arguments
+///
+/// * `curve_id` - Identifier of the discount curve to retrieve from both market
+///   contexts. The same ID must resolve in each context.
+/// * `market_t0` - Baseline market context representing the earlier state.
+/// * `market_t1` - Comparison market context representing the later state.
+/// * `method` - Tenor-sampling policy used to average zero-rate differences.
+///   `Dynamic` samples the baseline curve's knots.
+///
+/// # Errors
+///
+/// Returns an error if `curve_id` is absent from either market context.
 pub fn measure_discount_curve_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -178,6 +191,19 @@ pub fn measure_discount_curve_shift(
 }
 
 /// Measure average parallel spread shift in hazard curve (basis points).
+///
+/// # Arguments
+///
+/// * `curve_id` - Identifier of the hazard curve to retrieve from both market
+///   contexts. The same ID must resolve in each context.
+/// * `market_t0` - Baseline market context representing the earlier state.
+/// * `market_t1` - Comparison market context representing the later state.
+/// * `method` - Tenor-sampling policy used to average hazard-rate differences.
+///   `Dynamic` samples the baseline hazard curve's knots.
+///
+/// # Errors
+///
+/// Returns an error if `curve_id` is absent from either market context.
 pub fn measure_hazard_curve_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -209,6 +235,19 @@ pub fn measure_hazard_curve_shift(
 /// of **par-spread** move, so attribution must pair them with this — pairing a
 /// par-spread CS01 with a hazard-rate move overstates credit P&L by a factor of
 /// `1 / (1 - recovery)`.
+///
+/// # Arguments
+///
+/// * `curve_id` - Identifier of the hazard curve to retrieve from both market
+///   contexts. The same ID must resolve in each context.
+/// * `market_t0` - Baseline market context representing the earlier state.
+/// * `market_t1` - Comparison market context representing the later state.
+/// * `method` - Tenor-sampling policy used to average par-CDS-spread changes.
+///   `Dynamic` samples the baseline hazard curve's knots.
+///
+/// # Errors
+///
+/// Returns an error if `curve_id` is absent from either market context.
 pub fn measure_par_spread_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -242,6 +281,19 @@ pub fn measure_par_spread_shift(
 /// returns the shift at each requested tenor so callers can pair it with a
 /// per-tenor (key-rate) `BucketedCs01`, attributing non-parallel (twisted)
 /// credit-curve moves correctly. Returns one entry per input tenor, in order.
+///
+/// # Arguments
+///
+/// * `curve_id` - Identifier of the hazard curve to retrieve from both market
+///   contexts. The same ID must resolve in each context.
+/// * `market_t0` - Baseline market context representing the earlier state.
+/// * `market_t1` - Comparison market context representing the later state.
+/// * `tenors` - Year-fraction maturities at which to measure the par-CDS-spread
+///   change. Output positions match this input order.
+///
+/// # Errors
+///
+/// Returns an error if `curve_id` is absent from either market context.
 pub fn measure_per_tenor_par_spread_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -278,6 +330,20 @@ pub fn measure_per_tenor_par_spread_shift(
 /// instrument's own CS01. Used by P&L attribution so credit-spread P&L from a
 /// convertible's risky discount curve is attributed to the credit factor
 /// rather than leaking into the residual.
+///
+/// # Arguments
+///
+/// * `curve_id` - Identifier that resolves to a hazard curve or risky discount
+///   curve in both market contexts.
+/// * `market_t0` - Baseline market context representing the earlier state.
+/// * `market_t1` - Comparison market context representing the later state.
+/// * `method` - Tenor-sampling policy used for the averaged move. It is passed
+///   to the selected hazard- or discount-curve measurement.
+///
+/// # Errors
+///
+/// Returns an error when `curve_id` is neither a hazard curve nor a discount
+/// curve in both market contexts.
 pub fn measure_credit_curve_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -300,6 +366,20 @@ pub fn measure_credit_curve_shift(
 /// falls back to the per-tenor discount zero-rate shift. Returns one entry per
 /// input tenor, in order, so callers can pair it with a per-tenor (key-rate)
 /// `BucketedCs01`.
+///
+/// # Arguments
+///
+/// * `curve_id` - Identifier that resolves to a hazard curve or risky discount
+///   curve in both market contexts.
+/// * `market_t0` - Baseline market context representing the earlier state.
+/// * `market_t1` - Comparison market context representing the later state.
+/// * `tenors` - Year-fraction maturities at which to measure the selected
+///   credit-curve move. Output positions match this input order.
+///
+/// # Errors
+///
+/// Returns an error when `curve_id` is neither a hazard curve nor a discount
+/// curve in both market contexts.
 pub fn measure_per_tenor_credit_curve_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -319,6 +399,17 @@ pub fn measure_per_tenor_credit_curve_shift(
 }
 
 /// Measure average inflation rate shift (basis points).
+///
+/// # Arguments
+///
+/// * `curve_id` - Identifier of the projected inflation curve to retrieve from
+///   both market contexts.
+/// * `market_t0` - Baseline market context representing the earlier state.
+/// * `market_t1` - Comparison market context representing the later state.
+///
+/// # Errors
+///
+/// Returns an error if `curve_id` is absent from either market context.
 pub fn measure_inflation_curve_shift(
     curve_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -350,6 +441,18 @@ pub fn measure_inflation_curve_shift(
 
 /// Measure the change between the latest published index levels, in basis points.
 /// This is a level move, not an annualized growth rate over the full history.
+///
+/// # Errors
+///
+/// Returns an error if `index_id` is absent, has no observations, cannot be
+/// queried at its latest date, or has a non-finite or non-positive latest level.
+///
+/// # Arguments
+///
+/// * `index_id` - Identifier of the published inflation index to retrieve from
+///   both market contexts.
+/// * `market_t0` - Baseline market context representing the earlier state.
+/// * `market_t1` - Comparison market context representing the later state.
 pub fn measure_inflation_index_shift(
     index_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -373,6 +476,19 @@ pub fn measure_inflation_index_shift(
 /// When a projected curve is available, use its parallel-rate move. Published
 /// index levels are used only for index-only sources; adding both would apply a
 /// single Inflation01 to two different risk factors.
+///
+/// # Errors
+///
+/// Returns an error when the selected curve or index source is unavailable or
+/// when its latest values fail the validation performed by the delegated
+/// measurement.
+///
+/// # Arguments
+///
+/// * `source_id` - Shared identifier of an inflation curve or published index.
+///   A curve is preferred when both source forms are available.
+/// * `market_t0` - Baseline market context representing the earlier state.
+/// * `market_t1` - Comparison market context representing the later state.
 pub fn measure_inflation_source_shift(
     source_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -498,10 +614,13 @@ pub fn measure_vol_surface_shift(
 ///
 /// # Arguments
 ///
-/// * `base_ccy` - Base currency
-/// * `quote_ccy` - Quote currency
-/// * `market_t0` - Market context at T₀
-/// * `market_t1` - Market context at T₁
+/// * `base_ccy` - Base currency of the FX quote; the measured rate is units
+///   of `quote_ccy` received for one unit of this currency.
+/// * `quote_ccy` - Quote currency of the FX quote whose change is measured.
+/// * `market_t0` - Baseline market context supplying the earlier FX matrix.
+/// * `market_t1` - Comparison market context supplying the later FX matrix.
+/// * `as_of_t0` - Valuation date used to query the baseline FX matrix.
+/// * `as_of_t1` - Valuation date used to query the comparison FX matrix.
 ///
 /// # Returns
 ///
@@ -642,6 +761,13 @@ pub fn measure_scalar_shift(
 ///
 /// Returns `Err` if either market lacks the scalar or the computed shift is
 /// non-finite.
+///
+/// # Arguments
+///
+/// * `scalar_id` - Identifier of the unitless scalar or money-denominated
+///   price to compare in both market contexts.
+/// * `market_t0` - Baseline market context representing the earlier state.
+/// * `market_t1` - Comparison market context representing the later state.
 pub fn measure_scalar_absolute_shift(
     scalar_id: impl AsRef<str>,
     market_t0: &MarketContext,

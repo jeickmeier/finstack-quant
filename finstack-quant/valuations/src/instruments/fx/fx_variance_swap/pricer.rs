@@ -1,3 +1,5 @@
+//! Shared pricing and metric helpers for FX instruments.
+//!
 use crate::instruments::common_impl::helpers::zero_rate_from_df;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::pricing::variance_replication::carr_madan_forward_variance;

@@ -218,6 +218,18 @@ fn unit_betas(num_levels: usize) -> IssuerBetas {
 /// The §5.4 "β=0 fallback for empty bucket" applies at attribution time
 /// (PR-7/8), not here.
 ///
+/// # Arguments
+///
+/// * `model` - Calibrated credit-factor model that defines hierarchy buckets,
+///   factor loadings, issuer tags, and anchor state.
+/// * `observed_spreads` - Current issuer spread observations, keyed by issuer;
+///   all values must be finite and use the model's spread units.
+/// * `observed_generic` - Current generic principal-component factor value in
+///   the same spread units as `observed_spreads`.
+/// * `as_of` - Observation date attached to the resulting factor snapshot.
+/// * `runtime_tags` - Optional tags for issuers absent from `model`; supplied
+///   issuers use unit betas and model-resident issuer tags remain authoritative.
+///
 /// # Errors
 ///
 /// - [`DecompositionError::ModelInconsistent`] when an issuer's `betas.levels`
@@ -400,6 +412,12 @@ pub fn decompose_levels(
 /// bucket membership, so this function cannot detect migration itself;
 /// callers attributing across a re-tagging event must split the period at
 /// the migration date.
+///
+/// # Arguments
+///
+/// * `from` - Earlier levels snapshot produced by the applicable model vintage.
+/// * `to` - Later levels snapshot from the same model vintage and unchanged
+///   issuer tag assignments.
 ///
 /// # Errors
 ///

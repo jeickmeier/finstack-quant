@@ -270,6 +270,15 @@ fn dimension_path(spec: &CreditHierarchySpec, level_idx: usize) -> String {
 
 /// Builds the canonical factor ID `credit::level{idx}::{dim_path}::{val_path}`
 /// for the given hierarchy level. Returns `None` if any required tag is missing.
+///
+/// # Arguments
+///
+/// * `spec` - Credit hierarchy that determines the ordered dimensions and
+///   canonical dimension names in the factor identifier.
+/// * `tags` - Issuer tag map containing a value for every dimension through
+///   `level_idx`; a missing value returns `None`.
+/// * `level_idx` - Zero-based hierarchy level to encode; an index outside the
+///   specification returns `None`.
 #[must_use]
 pub fn bucket_factor_id(
     spec: &CreditHierarchySpec,

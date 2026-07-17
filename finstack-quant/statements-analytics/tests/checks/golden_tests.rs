@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 #![allow(clippy::unwrap_used)]
 
 use std::path::Path;

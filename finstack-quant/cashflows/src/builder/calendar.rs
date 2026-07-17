@@ -62,7 +62,8 @@ pub fn resolve_calendar_strict(
 ///
 /// # Arguments
 ///
-/// * `date` - Date to adjust.
+/// * `date` - Unadjusted contractual date to roll under the selected
+///   business-day convention.
 /// * `bdc` - Business-day convention to apply when `date` is not a business
 ///   day in the resolved calendar.
 /// * `calendar_id` - Calendar identifier used for holiday lookup.

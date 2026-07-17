@@ -295,6 +295,19 @@ impl VolatilityIndexCurve {
     ///
     /// # Returns
     /// A new volatility index curve with all levels shifted.
+    ///
+    /// `bump` is expressed in index points, not a percentage or implied-vol
+    /// decimal. It shifts every forward level and the spot level; spot is
+    /// floored at zero, while the rebuilt curve also rejects any negative knot
+    /// level. This is a level scenario for VIX-like indices, not a shock to an
+    /// option-implied volatility surface.
+    ///
+    /// # Errors
+    ///
+    /// Propagates reconstruction errors if the shock produces a negative or
+    /// non-finite forward level, invalid knots, or an interpolation failure.
+    /// The returned curve otherwise preserves the base date, day count, and
+    /// interpolation/extrapolation conventions.
     pub fn with_parallel_bump(&self, bump: f64) -> crate::Result<Self> {
         let bumped_points = bump_knots_parallel(&self.knots, &self.levels, bump);
         let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bump * 100.0);
@@ -316,6 +329,18 @@ impl VolatilityIndexCurve {
     ///
     /// # Returns
     /// A new volatility index curve with all levels scaled.
+    ///
+    /// Each forward level is multiplied by `1 + pct`; spot uses the same
+    /// multiplier and is floored at zero. A finite shock below `-100%` can make
+    /// knot levels negative and is therefore rejected during rebuilding rather
+    /// than silently converted to a valid but different curve.
+    ///
+    /// # Errors
+    ///
+    /// Propagates reconstruction errors if `pct` produces negative/non-finite
+    /// levels, invalid knots, or an interpolation failure. No separate range is
+    /// imposed on `pct`; the non-negative-level invariant is the authoritative
+    /// validation boundary.
     pub fn with_percentage_bump(&self, pct: f64) -> crate::Result<Self> {
         let bumped_points = bump_knots_percentage(&self.knots, &self.levels, pct);
         let new_id = format!("{}+{:.2}%", self.id.as_str(), pct * 100.0);
@@ -340,6 +365,18 @@ impl VolatilityIndexCurve {
     ///
     /// # Returns
     /// A new volatility index curve with the triangular key-rate bump applied.
+    ///
+    /// The shock reaches `bump` at `target_bucket`, fades linearly to zero at
+    /// the neighbor buckets, and is zero outside that interval. It leaves spot
+    /// unchanged because this is a forward-bucket sensitivity. With fewer than
+    /// two knots it falls back to [`with_parallel_bump`](Self::with_parallel_bump).
+    ///
+    /// # Errors
+    ///
+    /// Propagates reconstruction errors if the triangular shock creates a
+    /// negative/non-finite level, invalid interpolation input, or other builder
+    /// failure. The result uses a bumped identifier and retains all other curve
+    /// conventions.
     pub fn with_triangular_key_rate_bump_neighbors(
         &self,
         prev_bucket: Option<f64>,
@@ -483,6 +520,20 @@ impl VolatilityIndexCurveBuilder {
     }
 
     /// Validate input and build the [`VolatilityIndexCurve`].
+    ///
+    /// A valid curve needs an explicit base date, at least two strictly
+    /// increasing finite time knots in years, and a finite non-negative level
+    /// at every knot. If spot is omitted, the first knot must be exactly zero
+    /// so it can be inferred without extrapolation. The builder permits zero
+    /// levels but not negative levels, reflecting an index-level—not a signed
+    /// commodity-price—contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns an input, validation, or interpolation error if the base date is
+    /// absent, fewer than two points are supplied, knots are invalid, a level
+    /// or spot is non-finite/negative, spot cannot be inferred, or the selected
+    /// interpolation/extrapolation combination rejects the grid.
     pub fn build(self) -> crate::Result<VolatilityIndexCurve> {
         if !self.base_is_set {
             return Err(InputError::Invalid.into());

@@ -448,10 +448,13 @@ pub struct ExposureEclResult {
 ///
 /// # Arguments
 ///
-/// * `exposure` -- The credit exposure
-/// * `stage` -- Assigned IFRS 9 stage (determines ECL horizon)
-/// * `pd_source` -- PD term structure for the exposure's rating
-/// * `config` -- ECL calculation parameters
+/// * `exposure` - Validated credit exposure providing EAD, LGD, EIR, maturity,
+///   rating, and any EAD schedule for the expected-loss calculation.
+/// * `stage` - Assigned IFRS 9 stage that selects the 12-month, lifetime, or
+///   credit-impaired calculation horizon.
+/// * `pd_source` - Term structure supplying cumulative default probabilities
+///   for the exposure's current rating.
+/// * `config` - ECL bucketing, scenarios, and stage-3 recovery-time policy.
 ///
 /// # Returns
 ///
@@ -498,6 +501,16 @@ pub struct ExposureEclResult {
 ///
 /// - IFRS 9 B5.5.28-33 -- Measurement of expected credit losses.
 /// - Duffie & Singleton (2003), *Credit Risk: Pricing, Measurement and Management*.
+///
+/// # Arguments
+///
+/// * `exposure` - Validated credit exposure providing EAD, LGD, EIR, maturity,
+///   rating, and any EAD schedule for the expected-loss calculation.
+/// * `stage` - Assigned IFRS 9 stage that selects the 12-month, lifetime, or
+///   credit-impaired calculation horizon.
+/// * `pd_source` - Term structure supplying cumulative default probabilities
+///   for the exposure's current rating.
+/// * `config` - ECL bucketing, scenarios, and stage-3 recovery-time policy.
 pub fn compute_ecl_single(
     exposure: &Exposure,
     stage: Stage,
@@ -598,10 +611,12 @@ pub fn compute_ecl_single(
 ///
 /// # Arguments
 ///
-/// * `exposure` -- The credit exposure
-/// * `stage` -- Assigned IFRS 9 stage
-/// * `pd_sources` -- Slice of (scenario, PD source) pairs
-/// * `config` -- ECL calculation parameters
+/// * `exposure` - Credit exposure to value; scenario LGD overrides apply to a
+///   cloned copy and do not mutate this input.
+/// * `stage` - Assigned IFRS 9 stage used by every scenario calculation.
+/// * `pd_sources` - Non-empty scenario and PD-term-structure pairs; scenario
+///   weights must satisfy the configured probability validation.
+/// * `config` - ECL bucketing and recovery-time calculation parameters.
 ///
 /// # Returns
 ///
@@ -696,6 +711,15 @@ pub fn compute_ecl_weighted(
 /// (`current_rating`, or `"NR"` when unrated) so the lookup performed by
 /// [`compute_ecl_single`] matches without requiring any magic rating label
 /// on the exposure.
+///
+/// # Arguments
+///
+/// * `exposure` - Credit exposure providing EAD, LGD, EIR, maturity, and the
+///   rating used to label each generated raw PD curve.
+/// * `stage` - Assigned IFRS 9 stage used for every scenario calculation.
+/// * `scenarios` - Non-empty `(weight, raw_pd_curve)` pairs; each curve holds
+///   `(time_years, cumulative_pd)` knots and weights must be valid probabilities.
+/// * `config` - ECL bucketing and recovery-time calculation parameters.
 ///
 /// # Errors
 ///

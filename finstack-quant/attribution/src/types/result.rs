@@ -599,6 +599,11 @@ impl PnlAttribution {
     /// # Returns
     ///
     /// Ok(()) if all currencies match, Err otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] if any factor P&L or
+    /// optional detail amount uses a currency different from `total_pnl`.
     pub fn validate_currencies(&self) -> Result<()> {
         let expected = self.total_pnl.currency();
 
@@ -639,6 +644,13 @@ impl PnlAttribution {
     /// # Notes
     ///
     /// On error, sets residual to zero and adds a diagnostic note to metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns the currency-validation or monetary-addition error. Before a
+    /// currency error is returned, the method marks the result invalid, resets
+    /// the residual to zero in the report currency, and records a diagnostic
+    /// note; zero-valued legacy USD defaults are recurrencyed first.
     pub fn compute_residual(&mut self) -> Result<()> {
         // payloads predating `fx_translation_pnl` /
         // `curve_shape_pnl` deserialize those fields with the `zero_money_usd`

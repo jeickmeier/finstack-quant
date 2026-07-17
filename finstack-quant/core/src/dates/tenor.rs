@@ -96,6 +96,11 @@ impl TenorUnit {
     ///
     /// # Returns
     /// The parsed `TenorUnit` or an error if the character is invalid.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::InvalidTenor` unless `c` is `D`, `W`, `M`, or `Y`,
+    /// case-insensitively.
     pub fn from_char(c: char) -> crate::Result<Self> {
         match c.to_ascii_uppercase() {
             'D' => Ok(Self::Days),
@@ -187,6 +192,11 @@ impl Tenor {
     /// let quarterly = Tenor::new(3, TenorUnit::Months);
     /// let annual = Tenor::new(1, TenorUnit::Years);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics when `count` is zero or exceeds the unit-specific maximum. Use
+    /// [`Self::try_new`] for data supplied by users, files, or external APIs.
     #[inline]
     pub const fn new(count: u32, unit: TenorUnit) -> Self {
         let max_count = match unit {
@@ -214,6 +224,12 @@ impl Tenor {
     /// This is the canonical constructor for external input. It rejects zero
     /// counts, unsupported lengths, and counts whose unit conversion would
     /// overflow.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::InvalidTenor` when `count` is zero, exceeds the
+    /// supported range for `unit`, or cannot be converted safely between weeks
+    /// and days or years and months.
     pub fn try_new(count: u32, unit: TenorUnit) -> crate::Result<Self> {
         let max_count = match unit {
             TenorUnit::Days => MAX_TENOR_DAYS,
@@ -279,6 +295,11 @@ impl Tenor {
     /// # Arguments
     /// * `years` - The time period in years
     /// * `day_count` - The day count convention to use for day conversion
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::InvalidTenor` when `years` is non-positive,
+    /// non-finite, or converts to a tenor outside the supported range.
     pub fn from_years(years: f64, day_count: DayCount) -> crate::Result<Self> {
         if years <= 0.0 || !years.is_finite() {
             return Err(InputError::InvalidTenor {
@@ -339,6 +360,12 @@ impl Tenor {
     /// assert!(Tenor::parse("").is_err());
     /// assert!(Tenor::parse("XY").is_err());
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::InvalidTenor` when the string is empty, lacks a
+    /// positive integer count, has more than one unit character, uses an
+    /// unsupported unit, or exceeds the supported tenor range.
     pub fn parse(s: &str) -> crate::Result<Self> {
         let s = s.trim();
 
@@ -525,6 +552,12 @@ impl Tenor {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::InvalidTenor` when a month or year count cannot be
+    /// represented for date arithmetic. When `calendar` is supplied, it also
+    /// propagates the calendar's business-day adjustment error.
     pub fn add_to_date(
         &self,
         date: Date,
@@ -609,6 +642,11 @@ impl Tenor {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Propagates failures from date addition, optional business-day
+    /// adjustment, or the selected day-count calculation.
     pub fn to_years_with_context(
         &self,
         as_of: Date,
@@ -679,7 +717,13 @@ impl Tenor {
 
     /// Create a Tenor from payments per year.
     ///
-    /// Returns an error if payments_per_year is 0 or does not divide 12 evenly.
+    /// This maps only regular month-based schedules: `12` is monthly, `4` is
+    /// quarterly, and `2` is semi-annual.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::InvalidTenor` when `payments` is zero or does not
+    /// divide twelve months evenly.
     pub fn from_payments_per_year(payments: u32) -> crate::Result<Self> {
         if payments == 0 {
             return Err(InputError::InvalidTenor {

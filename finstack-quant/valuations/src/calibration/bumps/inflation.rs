@@ -20,6 +20,11 @@ use finstack_quant_core::dates::Date;
 ///
 /// Best-effort fallback for callers that don't have explicit currency metadata.
 /// Returns USD if no known currency or benchmark-rate token appears in the ID.
+///
+/// # Arguments
+///
+/// * `curve` - Inflation curve whose identifier is tokenized for an inferred
+///   currency when explicit metadata is unavailable.
 pub fn infer_currency_from_curve_id(curve: &InflationCurve) -> Currency {
     infer_currency_from_id(curve.id().as_str())
 }
@@ -27,6 +32,11 @@ pub fn infer_currency_from_curve_id(curve: &InflationCurve) -> Currency {
 /// Derive the observation lag string from the curve's `indexation_lag_months`.
 ///
 /// Returns `"NONE"` when the lag is 0, otherwise formats as `"{n}M"`.
+///
+/// # Arguments
+///
+/// * `curve` - Inflation curve whose integer indexation lag is represented in
+///   the calibration schema's canonical string form.
 pub fn observation_lag_from_curve(curve: &InflationCurve) -> String {
     let months = curve.indexation_lag_months();
     if months == 0 {
@@ -42,8 +52,20 @@ pub fn observation_lag_from_curve(curve: &InflationCurve) -> String {
 /// applies shocks to those rates, and re-executes the inflation bootstrapper.
 ///
 /// # Arguments
-/// * `currency` - Currency of the inflation index (required; InflationCurve does not carry currency metadata).
-/// * `observation_lag` - Observation lag string (e.g. "3M", "NONE") matching the original calibration.
+///
+/// * `curve` - Existing inflation curve from which zero-coupon inflation swap
+///   rates are implied before re-bootstrap.
+/// * `context` - Market context supplying dependencies for the inflation
+///   calibration step.
+/// * `bump` - Parallel or tenor-specific inflation-rate shock in
+///   [`BumpRequest`] basis point units.
+/// * `discount_id` - Discount curve identifier used to present-value implied
+///   zero-coupon inflation swaps.
+/// * `as_of` - Valuation/base date used by the reconstructed calibration step.
+/// * `currency` - Inflation-index currency used to select conventions because
+///   `InflationCurve` lacks explicit currency metadata.
+/// * `observation_lag` - Original index observation lag, such as `"3M"` or
+///   `"NONE"`, preserved by the re-calibration.
 pub fn bump_inflation_rates(
     curve: &InflationCurve,
     context: &MarketContext,

@@ -36,6 +36,14 @@ impl AttributionParams {
     /// Bundle the attribution inputs (instrument / markets / dates / method
     /// JSON strings plus optional config and full-cross flag) for
     /// `attributePnl`.
+    /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
+    /// @param market_t0_json - Canonical MarketContext JSON at the attribution start date.
+    /// @param market_t1_json - Canonical MarketContext JSON at the attribution end date.
+    /// @param as_of_t0 - ISO-8601 valuation date for the start market snapshot.
+    /// @param as_of_t1 - ISO-8601 valuation date for the end market snapshot.
+    /// @param method_json - Attribution-method configuration JSON selecting the P-and-L decomposition.
+    /// @param config_json - Optional attribution configuration JSON controlling calculation settings.
+    /// @param full_cross_attribution - Whether to calculate all pairwise cross-factor attribution terms.
     pub fn new(
         instrument_json: String,
         market_t0_json: String,
@@ -143,6 +151,7 @@ fn catch_attribution_panic<T>(
 /// result as JSON. `config_json` may include `"execution_policy": "serial"`
 /// for hosts that already parallelize attribution at a higher level.
 #[wasm_bindgen(js_name = attributePnl)]
+/// @param params - Fully specified AttributionParams object containing instrument, markets, dates, and method.
 pub fn attribute_pnl(params: &AttributionParams) -> Result<String, JsValue> {
     // MI3 defense in depth: wrap input-parsing as well. `from_json_inputs`
     // funnels through serde + downstream constructors that should not panic,
@@ -171,6 +180,7 @@ pub fn attribute_pnl(params: &AttributionParams) -> Result<String, JsValue> {
 ///
 /// Power-user variant for full envelope round-trip workflows.
 #[wasm_bindgen(js_name = attributePnlFromSpec)]
+/// @param spec_json - JSON-serialized AttributionParams specification to validate and execute.
 pub fn attribute_pnl_from_spec(spec_json: &str) -> Result<String, JsValue> {
     // MI3: wrap serde_json parse too. A JSON-parse panic would otherwise abort
     // the wasm module instance.
@@ -199,6 +209,7 @@ pub fn attribute_pnl_from_spec(spec_json: &str) -> Result<String, JsValue> {
 /// validates here cannot later be rejected at execution), and returns the
 /// canonical JSON.
 #[wasm_bindgen(js_name = validateAttributionJson)]
+/// @param json - Canonical JSON string defining the object to deserialize or normalize.
 pub fn validate_attribution_json(json: &str) -> Result<String, JsValue> {
     let raw: serde_json::Value = serde_json::from_str(json).map_err(to_js_err)?;
     if raw

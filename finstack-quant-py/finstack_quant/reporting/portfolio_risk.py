@@ -119,8 +119,10 @@ def portfolio_risk_tearsheet(
         A ``*_es_decomposition`` result; enables the ES-contributions section.
     budget : dict | str, optional
         An ``evaluate_risk_budget`` result; enables the risk-budget section.
-    title, subtitle : str, optional
-        Header text.
+    title : str, optional
+        Optional main report heading for the portfolio-risk summary.
+    subtitle : str, optional
+        Optional secondary heading shown below ``title``.
     sections : list[str], optional
         Subset of :data:`ALL_SECTIONS` (default: all).
     theme : Theme

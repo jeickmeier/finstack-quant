@@ -111,7 +111,15 @@ pub struct SobolRng {
 impl SobolRng {
     /// Fallible constructor for a new Sobol sequence.
     ///
-    /// Returns an error if `dimension` is 0 or exceeds [`MAX_SOBOL_DIMENSION`].
+    /// The returned generator starts before the first point. A zero
+    /// `scramble_seed` disables Owen scrambling; any nonzero seed selects a
+    /// deterministic, dimension-specific scramble, so equal `(dimension,
+    /// scramble_seed)` inputs reproduce the same sequence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `dimension` is zero or exceeds
+    /// [`MAX_SOBOL_DIMENSION`].
     pub fn try_new(dimension: usize, scramble_seed: u64) -> crate::Result<Self> {
         if dimension == 0 || dimension > MAX_SOBOL_DIMENSION {
             return Err(crate::Error::Validation(format!(

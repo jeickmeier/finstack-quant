@@ -319,6 +319,11 @@ fn extract_sigma_and_seed(model: &FinancialModelSpec, node_id: &str) -> Option<(
 /// The resulting schema is:
 /// `(test_date, projected_value, threshold, headroom, breach_prob)`.
 ///
+/// # Arguments
+///
+/// * `forecast` - Covenant forecast containing aligned test dates, projected
+///   values, thresholds, headroom, and breach probabilities.
+///
 /// # Errors
 ///
 /// Returns a validation error if the table envelope invariants are broken.

@@ -157,7 +157,18 @@ class DiscountCurve:
         base_date: datetime.date,
         continuous_rate: float,
     ) -> DiscountCurve:
-        """Construct a flat continuously-compounded discount curve."""
+        """Construct a flat continuously-compounded discount curve.
+
+        Parameters
+        ----------
+        id : str
+            Unique market-context identifier for the constructed curve.
+        base_date : datetime.date
+            Date at which the curve has a discount factor of one.
+        continuous_rate : float
+            Flat annual continuously compounded zero rate as a decimal, such
+            as ``0.05`` for 5%.
+        """
         ...
 
     def df(self, t: float) -> float:
@@ -322,7 +333,29 @@ class ForwardCurve:
         projection_grid: list[float] | None = None,
         reset_lag: int | None = None,
     ) -> ForwardCurve:
-        """Construct from an unambiguous keyword-only specification."""
+        """Construct from an unambiguous keyword-only specification.
+
+        Parameters
+        ----------
+        id : str
+            Unique market-context identifier for the index forward curve.
+        tenor : float
+            Contractual floating-index tenor in years, such as ``0.25`` for 3M.
+        base_date : datetime.date
+            Curve valuation date corresponding to time zero.
+        knots : list[tuple[float, float]]
+            ``(time_years, forward_rate)`` pillars in ascending time order.
+        day_count : str or None, default None
+            Day-count convention; ``None`` applies the curve-ID market default.
+        interp : str, default "linear"
+            Interpolation method used between supplied forward-rate pillars.
+        extrapolation : str, default "flat_forward"
+            Policy applied before the first or after the last curve pillar.
+        projection_grid : list[float] or None, default None
+            Optional contractual reset/end-date boundaries in year fractions.
+        reset_lag : int or None, default None
+            Business days from fixing to spot; ``None`` uses curve-ID inference.
+        """
         ...
 
     def rate(self, t: float) -> float:
@@ -342,6 +375,13 @@ class ForwardCurve:
 
     def rate_between(self, t1: float, t2: float) -> float:
         """Discount-factor-implied simple forward rate over ``(t1, t2)``.
+
+        Parameters
+        ----------
+        t1 : float
+            Start of the accrual interval in year fractions from ``base_date``.
+        t2 : float
+            End of the accrual interval in year fractions; it must exceed ``t1``.
 
         Raises
         ------
@@ -497,7 +537,16 @@ class BaseCorrelationCurve:
     """Base-correlation curve for synthetic credit index tranche pricing."""
 
     def __init__(self, id: str, knots: list[tuple[float, float]]) -> None:
-        """Construct a base-correlation curve from knot points."""
+        """Construct a base-correlation curve from knot points.
+
+        Parameters
+        ----------
+        id : str
+            Unique market-context identifier for the tranche correlation curve.
+        knots : list[tuple[float, float]]
+            ``(detachment_percent, base_correlation)`` pillars ordered by
+            detachment, with correlations represented as decimal fractions.
+        """
         ...
 
     @property
@@ -510,7 +559,14 @@ class BaseCorrelationCurve:
         ...
 
     def correlation(self, detachment_pct: float) -> float:
-        """Interpolated base correlation at a detachment point."""
+        """Return interpolated base correlation at a tranche detachment point.
+
+        Parameters
+        ----------
+        detachment_pct : float
+            Tranche detachment expressed as a percentage of portfolio notional,
+            for example ``30.0`` for a 0-30% base-correlation point.
+        """
         ...
 
     def __repr__(self) -> str: ...
@@ -525,7 +581,19 @@ class CreditIndexData:
         index_credit_curve: HazardCurve,
         base_correlation_curve: BaseCorrelationCurve,
     ) -> None:
-        """Construct homogeneous credit index data."""
+        """Construct homogeneous credit index data for tranche pricing.
+
+        Parameters
+        ----------
+        num_constituents : int
+            Number of equal-name constituents in the synthetic credit index.
+        recovery_rate : float
+            Assumed recovery fraction as a decimal, such as ``0.4`` for 40%.
+        index_credit_curve : HazardCurve
+            Index-level default-intensity curve used to project portfolio loss.
+        base_correlation_curve : BaseCorrelationCurve
+            Detachment-dependent correlation curve used for tranche valuation.
+        """
         ...
 
     @property
@@ -683,19 +751,47 @@ class InflationCurve:
         interp: str = "log_linear",
     ) -> None: ...
     def cpi(self, t: float) -> float:
-        """CPI level at year fraction *t*, without indexation lag."""
+        """Return CPI level at a curve time without indexation lag.
+
+        Parameters
+        ----------
+        t : float
+            Year fraction from the curve base date at which CPI is requested.
+        """
         ...
 
     def cpi_with_lag(self, t: float) -> float:
-        """CPI level at year fraction *t*, with indexation lag applied."""
+        """Return CPI level at a curve time after the contractual observation lag.
+
+        Parameters
+        ----------
+        t : float
+            Year fraction from the curve base date before applying indexation lag.
+        """
         ...
 
     def inflation_rate(self, t1: float, t2: float) -> float:
-        """Annualized inflation rate between *t1* and *t2* using CAGR."""
+        """Return annualized compounded inflation between two curve times.
+
+        Parameters
+        ----------
+        t1 : float
+            Start time in year fractions from the inflation-curve base date.
+        t2 : float
+            End time in year fractions from the inflation-curve base date.
+        """
         ...
 
     def inflation_rate_simple(self, t1: float, t2: float) -> float:
-        """Simple non-compounded inflation rate between *t1* and *t2*."""
+        """Return simple non-compounded inflation between two curve times.
+
+        Parameters
+        ----------
+        t1 : float
+            Start time in year fractions from the inflation-curve base date.
+        t2 : float
+            End time in year fractions from the inflation-curve base date.
+        """
         ...
 
     @property
@@ -747,11 +843,27 @@ class VolSurface:
         quote_type: str = "black_lognormal",
     ) -> None: ...
     def value_checked(self, expiry: float, strike: float) -> float:
-        """Interpolated surface value with explicit bounds checking."""
+        """Return an interpolated volatility with explicit grid bounds checking.
+
+        Parameters
+        ----------
+        expiry : float
+            Option expiry in years, required to lie within the surface grid.
+        strike : float
+            Strike or configured secondary-axis coordinate to interpolate at.
+        """
         ...
 
     def value_clamped(self, expiry: float, strike: float) -> float:
-        """Interpolated surface value with flat extrapolation at the edges."""
+        """Return an interpolated volatility with flat edge extrapolation.
+
+        Parameters
+        ----------
+        expiry : float
+            Option expiry in years; values beyond the grid are clamped to an edge.
+        strike : float
+            Strike or configured secondary-axis coordinate, clamped at grid edges.
+        """
         ...
 
     @property
@@ -791,18 +903,20 @@ class FxDeltaVolSurface:
 
         Parameters
         ----------
-        id
+        id : str
             Unique surface identifier.
-        expiries
+        expiries : list[float]
             Strictly increasing positive expiry times (years).
-        atm_vols
+        atm_vols : list[float]
             ATM delta-neutral straddle vols per expiry (positive).
-        rr_25d
+        rr_25d : list[float]
             25-delta risk reversal per expiry (call vol − put vol).
-        bf_25d
+        bf_25d : list[float]
             25-delta butterfly per expiry (wing average − ATM).
-        rr_10d, bf_10d
-            Optional 10-delta wings; both required when either is set.
+        rr_10d : list[float] or None, default None
+            Optional 10-delta risk reversals; require ``bf_10d`` when supplied.
+        bf_10d : list[float] or None, default None
+            Optional 10-delta butterflies; require ``rr_10d`` when supplied.
 
         Raises
         ------
@@ -819,6 +933,11 @@ class FxDeltaVolSurface:
     def pillar_vols(self, expiry_idx: int) -> tuple[float, float, float]:
         """Pillar vols at ``expiry_idx`` as ``(atm, put_25d_vol, call_25d_vol)``.
 
+        Parameters
+        ----------
+        expiry_idx : int
+            Zero-based index into the surface's ordered expiry pillars.
+
         Raises
         ------
         IndexError
@@ -832,21 +951,65 @@ class FxDeltaVolSurface:
         strike: float,
         forward: float,
     ) -> float:
-        """Interpolated implied vol at the given ``(expiry, strike)``."""
+        """Return interpolated implied volatility at an FX strike.
+
+        Parameters
+        ----------
+        expiry : float
+            Option expiry in years, interpolated across the delta-surface pillars.
+        strike : float
+            FX strike quoted as units of quote currency per base currency.
+        forward : float
+            Positive FX forward for the same expiry and quotation direction.
+        """
         ...
 
     def to_vol_surface(self, spot: float, r_d: float, r_f: float) -> VolSurface:
-        """Materialize this delta-quoted surface as a strike-axis :class:`VolSurface`."""
+        """Materialize this delta surface as a strike-axis :class:`VolSurface`.
+
+        Parameters
+        ----------
+        spot : float
+            Positive FX spot in the surface's base/quote convention.
+        r_d : float
+            Domestic continuously compounded annual rate as a decimal.
+        r_f : float
+            Foreign continuously compounded annual rate as a decimal.
+        """
         ...
 
     @staticmethod
     def delta_to_strike(delta: float, forward: float, vol: float, expiry: float) -> float:
-        """Convert a forward delta to a strike (Garman-Kohlhagen, premium-unadjusted)."""
+        """Convert a forward delta to a premium-unadjusted Garman-Kohlhagen strike.
+
+        Parameters
+        ----------
+        delta : float
+            Forward call delta, with the sign selecting call or put convention.
+        forward : float
+            Positive FX forward in the chosen base/quote quotation direction.
+        vol : float
+            Annualized implied volatility as a positive decimal.
+        expiry : float
+            Positive option expiry in years.
+        """
         ...
 
     @staticmethod
     def strike_to_delta(strike: float, forward: float, vol: float, expiry: float) -> float:
-        """Convert a strike to forward call delta."""
+        """Convert a strike to premium-unadjusted forward call delta.
+
+        Parameters
+        ----------
+        strike : float
+            Positive FX strike in the selected base/quote quotation direction.
+        forward : float
+            Positive FX forward for the option expiry.
+        vol : float
+            Annualized implied volatility as a positive decimal.
+        expiry : float
+            Positive option expiry in years.
+        """
         ...
 
     def __repr__(self) -> str: ...
@@ -916,7 +1079,17 @@ class VolCube:
         ...
 
     def vol_clamped(self, expiry: float, tenor: float, strike: float) -> float:
-        """Implied volatility with clamped extrapolation; non-finite inputs return NaN."""
+        """Return Black implied volatility with clamped extrapolation.
+
+        Parameters
+        ----------
+        expiry : float
+            Option expiry in years, clamped to the nearest cube expiry when outside.
+        tenor : float
+            Underlying swap tenor in years, clamped to the nearest cube tenor.
+        strike : float
+            Strike rate in decimal rate units; non-finite inputs return ``NaN``.
+        """
         ...
 
     def vol_normal(self, expiry: float, tenor: float, strike: float) -> float:
@@ -952,6 +1125,15 @@ class VolCube:
 
         Degenerate finite expansions are floored to a small positive normal
         vol. Non-finite inputs return NaN.
+
+        Parameters
+        ----------
+        expiry : float
+            Option expiry in years, clamped to the nearest cube expiry when outside.
+        tenor : float
+            Underlying swap tenor in years, clamped to the nearest cube tenor.
+        strike : float
+            Strike rate in decimal rate units; non-finite inputs return ``NaN``.
         """
         ...
 
@@ -1250,7 +1432,21 @@ class FxMatrix:
         policy: Union[FxConversionPolicy, str],
         rate: float,
     ) -> None:
-        """Set an authoritative quote scoped to one date and policy."""
+        """Set an authoritative FX quote scoped to one date and conversion policy.
+
+        Parameters
+        ----------
+        base : Currency or str
+            Source currency to convert from, as a ``Currency`` or ISO-4217 code.
+        quote : Currency or str
+            Destination currency to convert to, as a ``Currency`` or ISO code.
+        date : datetime.date
+            Valuation date for which this quote is authoritative.
+        policy : FxConversionPolicy or str
+            Conversion policy key that selects this dated quote during lookup.
+        rate : float
+            Positive conversion rate satisfying ``1 base = rate quote``.
+        """
         ...
 
     def rate(
@@ -1307,7 +1503,22 @@ class ScalarTimeSeries:
         observations: list[tuple[datetime.date, float | int | Decimal]],
         currency: Currency | str | None = None,
         interpolation: str | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Create a date-indexed scalar market-data series.
+
+        Parameters
+        ----------
+        id : str
+            Stable market-context identifier for the observation series.
+        observations : list[tuple[datetime.date, float | int | Decimal]]
+            Dated scalar values, ordered or sortable by date; ``Decimal``
+            values must be exactly representable by the Rust float storage.
+        currency : Currency or str or None, default None
+            Optional currency tag for monetary observations; ``None`` is unitless.
+        interpolation : str or None, default None
+            Optional interpolation mode; ``None`` selects the binding default.
+        """
+        ...
     @property
     def id(self) -> str: ...
     @property
@@ -1316,10 +1527,27 @@ class ScalarTimeSeries:
     def interpolation(self) -> str: ...
     @property
     def observations(self) -> list[tuple[datetime.date, float]]: ...
-    def value_on(self, date: datetime.date) -> float: ...
+    def value_on(self, date: datetime.date) -> float:
+        """Return the interpolated scalar value on a requested date.
+
+        Parameters
+        ----------
+        date : datetime.date
+            Observation or interpolation date evaluated under this series mode.
+        """
+        ...
     def to_json(self) -> str: ...
     @staticmethod
-    def from_json(json: str) -> ScalarTimeSeries: ...
+    def from_json(json: str) -> ScalarTimeSeries:
+        """Parse a scalar series from its canonical JSON representation.
+
+        Parameters
+        ----------
+        json : str
+            Canonical serialized series JSON, including identifier, observations,
+            optional currency, and interpolation configuration.
+        """
+        ...
     def __len__(self) -> int: ...
     def __repr__(self) -> str: ...
 
@@ -1332,7 +1560,21 @@ class InflationIndex:
         observations: list[tuple[datetime.date, float | int]],
         currency: Currency | str,
         interpolation: str | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Create a date-indexed inflation-index observation series.
+
+        Parameters
+        ----------
+        id : str
+            Stable market-context identifier for the inflation index.
+        observations : list[tuple[datetime.date, float | int]]
+            Dated CPI or index levels, ordered or sortable by observation date.
+        currency : Currency or str
+            Currency or economic-area tag attached to the published index level.
+        interpolation : str or None, default None
+            Optional interpolation mode; ``None`` selects the binding default.
+        """
+        ...
     @property
     def id(self) -> str: ...
     @property
@@ -1341,10 +1583,27 @@ class InflationIndex:
     def interpolation(self) -> str: ...
     @property
     def observations(self) -> list[tuple[datetime.date, float]]: ...
-    def value_on(self, date: datetime.date) -> float: ...
+    def value_on(self, date: datetime.date) -> float:
+        """Return the interpolated index level on a requested date.
+
+        Parameters
+        ----------
+        date : datetime.date
+            Observation or interpolation date evaluated under this index mode.
+        """
+        ...
     def to_json(self) -> str: ...
     @staticmethod
-    def from_json(json: str) -> InflationIndex: ...
+    def from_json(json: str) -> InflationIndex:
+        """Parse an inflation index from its canonical JSON representation.
+
+        Parameters
+        ----------
+        json : str
+            Canonical serialized index JSON, including identifier, levels,
+            currency, and interpolation configuration.
+        """
+        ...
     def __len__(self) -> int: ...
     def __repr__(self) -> str: ...
 
@@ -1452,11 +1711,23 @@ class MarketContext:
         ...
 
     def insert_series(self, series: ScalarTimeSeries) -> None:
-        """Insert a scalar time series into the context."""
+        """Insert or replace a scalar time series using its own identifier.
+
+        Parameters
+        ----------
+        series : ScalarTimeSeries
+            Fully validated date-indexed series whose ``id`` becomes the lookup key.
+        """
         ...
 
     def insert_inflation_index(self, index: InflationIndex) -> None:
-        """Insert an inflation index into the context."""
+        """Insert or replace an inflation index using its own identifier.
+
+        Parameters
+        ----------
+        index : InflationIndex
+            Fully validated index observation series whose ``id`` becomes the lookup key.
+        """
         ...
 
     def get_discount(self, id: str) -> DiscountCurve:
@@ -1517,7 +1788,13 @@ class MarketContext:
         ...
 
     def get_base_correlation(self, id: str) -> BaseCorrelationCurve:
-        """Retrieve a base-correlation curve by identifier."""
+        """Retrieve a base-correlation curve by identifier.
+
+        Parameters
+        ----------
+        id : str
+            Market-context key of the base-correlation curve to retrieve.
+        """
         ...
 
     def get_inflation_curve(self, id: str) -> InflationCurve:
@@ -1564,15 +1841,32 @@ class MarketContext:
         Currency-tagged values use :class:`Decimal` to preserve their exact
         stored amount. Unitless values use ``float`` and return ``None`` for
         the currency.
+
+        Parameters
+        ----------
+        id : str
+            Market-context key of the scalar or currency-tagged price to retrieve.
         """
         ...
 
     def get_series(self, id: str) -> ScalarTimeSeries:
-        """Retrieve a scalar time series by identifier."""
+        """Retrieve a scalar time series by identifier.
+
+        Parameters
+        ----------
+        id : str
+            Market-context key assigned when the series was inserted.
+        """
         ...
 
     def get_inflation_index(self, id: str) -> InflationIndex:
-        """Retrieve an inflation index by identifier."""
+        """Retrieve an inflation index by identifier.
+
+        Parameters
+        ----------
+        id : str
+            Market-context key assigned when the inflation index was inserted.
+        """
         ...
 
     def get_surface(self, id: str) -> VolSurface:
@@ -1652,7 +1946,13 @@ class MarketContext:
         ...
 
     def get_credit_index(self, id: str) -> CreditIndexData:
-        """Retrieve credit-index data by identifier."""
+        """Retrieve credit-index data by identifier.
+
+        Parameters
+        ----------
+        id : str
+            Market-context key of the synthetic credit-index data bundle.
+        """
         ...
 
     @property

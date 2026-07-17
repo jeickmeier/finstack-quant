@@ -1,3 +1,5 @@
+//! Shared defaults and calculations used by term-structure implementations.
+//!
 use crate::dates::{Date, DayCount, DayCountContext};
 use crate::math::interp::types::Interp;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};

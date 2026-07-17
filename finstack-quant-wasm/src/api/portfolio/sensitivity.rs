@@ -12,6 +12,11 @@ use wasm_bindgen::prelude::*;
 /// JSON.  Returns a JSON object with `position_ids`, `factor_ids`, and a
 /// row-major `data` matrix.
 #[wasm_bindgen(js_name = computeFactorSensitivities)]
+/// @param positions_json - Canonical portfolio-positions JSON to bump and revalue.
+/// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
 pub fn compute_factor_sensitivities(
     positions_json: &str,
     factors_json: &str,
@@ -34,6 +39,11 @@ pub fn compute_factor_sensitivities(
 ///
 /// Avoids reparsing market JSON for repeated factor analytics calls.
 #[wasm_bindgen(js_name = computeFactorSensitivitiesWithMarket)]
+/// @param positions_json - Canonical portfolio-positions JSON to bump and revalue.
+/// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
+/// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
 pub fn compute_factor_sensitivities_with_market(
     positions_json: &str,
     factors_json: &str,
@@ -59,6 +69,12 @@ pub fn compute_factor_sensitivities_with_market(
 /// Same position/factor/market inputs as `computeFactorSensitivities`, plus
 /// an optional `n_scenario_points` integer.
 #[wasm_bindgen(js_name = computePnlProfiles)]
+/// @param positions_json - Canonical portfolio-positions JSON to bump and revalue.
+/// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
+/// @param n_scenario_points - Positive number of evenly spaced bump levels in each P-and-L profile.
 pub fn compute_pnl_profiles(
     positions_json: &str,
     factors_json: &str,
@@ -81,6 +97,12 @@ pub fn compute_pnl_profiles(
 
 /// Compute scenario P&L profiles using a pre-parsed [`Market`].
 #[wasm_bindgen(js_name = computePnlProfilesWithMarket)]
+/// @param positions_json - Canonical portfolio-positions JSON to bump and revalue.
+/// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
+/// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
+/// @param n_scenario_points - Positive number of evenly spaced bump levels in each P-and-L profile.
 pub fn compute_pnl_profiles_with_market(
     positions_json: &str,
     factors_json: &str,
@@ -117,6 +139,9 @@ pub fn compute_pnl_profiles_with_market(
 /// Returns a JSON object with `total_risk`, `measure`, `residual_risk`,
 /// `factor_contributions` (array), and `position_factor_contributions` (array).
 #[wasm_bindgen(js_name = decomposeFactorRisk)]
+/// @param sensitivities_json - Canonical factor-sensitivity result JSON to decompose.
+/// @param covariance_json - Factor covariance-matrix JSON aligned with the supplied sensitivities.
+/// @param risk_measure_json - Risk-measure configuration JSON selecting the decomposition metric.
 pub fn decompose_factor_risk(
     sensitivities_json: &str,
     covariance_json: &str,

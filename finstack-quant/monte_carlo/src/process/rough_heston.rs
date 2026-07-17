@@ -205,9 +205,20 @@ impl RoughHestonProcess {
         Self { params }
     }
 
-    /// Create with inline parameter construction.
+    /// Create a rough Heston process from annualized risk-neutral inputs.
     ///
-    /// Delegates to [`RoughHestonParams::new`] for validation.
+    /// `r` and `q` are continuously compounded annual rates; `theta` and `v0`
+    /// are variances; `kappa` is annual mean reversion; and `sigma_v` is the
+    /// volatility of variance. `hurst` controls the Volterra-kernel roughness
+    /// and `rho` the spot-variance correlation. Use `RoughHestonHybrid` to
+    /// evolve the history-dependent variance rather than a generic Euler scheme.
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`RoughHestonParams::new`] validation for non-finite rates,
+    /// non-positive or non-finite `kappa`, `theta`, `sigma_v`, or `v0`, and a
+    /// non-finite correlation outside `[-1, 1]`. A non-rough Hurst exponent is
+    /// accepted but logged as a model suitability warning.
     #[allow(clippy::too_many_arguments)]
     pub fn with_params(
         r: f64,

@@ -1,3 +1,5 @@
+//! Shared pricing and metric helpers for FX instruments.
+//!
 use crate::instruments::InstrumentPricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};

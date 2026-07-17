@@ -197,6 +197,19 @@ impl BasisSpreadCurve {
     ///
     /// The time shift uses the curve's own `day_count`, matching
     /// `DiscountCurve::roll_forward` and siblings.
+    ///
+    /// The result keeps the same continuously compounded spread values at
+    /// their surviving calendar dates, re-expresses their times from the new
+    /// base date, and preserves interpolation and extrapolation settings.
+    /// Knots at or before the new origin expire and are removed; unlike a
+    /// discount curve, no new zero-time anchor is inserted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the day-count calculation fails, every knot expires
+    /// after the roll, or the shifted points cannot rebuild a valid
+    /// interpolator. `days` is signed, so a negative value moves the base date
+    /// backward.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
         let new_base = self.base + time::Duration::days(days);
         let dt = year_fraction_to(self.base, new_base, self.day_count)?;
@@ -285,6 +298,17 @@ impl BasisSpreadCurveBuilder {
     }
 
     /// Build the curve, validating inputs.
+    ///
+    /// Spreads are continuously compounded decimal rates, so `0.001` denotes
+    /// 10 bp. Negative spreads are permitted. Knot times are measured in years
+    /// from the explicitly supplied base date and are passed to the selected
+    /// interpolation strategy without reordering.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no base date or no knots are supplied, or if the
+    /// supplied knot grid and values cannot construct the selected
+    /// interpolation/extrapolation strategy.
     pub fn build(self) -> crate::Result<BasisSpreadCurve> {
         if !self.base_is_set {
             return Err(InputError::Invalid.into());

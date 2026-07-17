@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use finstack_quant_core::math::stats::{
     log_returns, realized_variance, realized_variance_ohlc, RealizedVarMethod,
 };

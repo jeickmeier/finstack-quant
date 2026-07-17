@@ -17,6 +17,11 @@ use std::collections::HashSet;
 /// The engine emits an initial event at step `0` before any simulated move and
 /// then post-step events `1..=num_steps`. Binding-level convenience methods use
 /// the post-step schedule so the initial spot is not included as a fixing.
+///
+/// # Arguments
+///
+/// * `num_steps` - Number of simulated time-grid intervals; the returned
+///   fixing indices are `1..=num_steps` and exclude the time-zero spot.
 #[must_use]
 pub fn default_fixing_steps(num_steps: usize) -> Vec<usize> {
     (1..=num_steps).collect()
@@ -98,7 +103,17 @@ impl AsianCall {
         }
     }
 
-    /// Create with history
+    /// Resume an Asian call after historical fixings have already occurred.
+    ///
+    /// `initial_sum` is the sum of historical fixing levels and
+    /// `initial_product_log` is the sum of their natural logarithms. The latter
+    /// is used only for geometric averaging. `initial_count` is the number of
+    /// historical observations included in those aggregates; future simulated
+    /// fixing steps are appended to this state.
+    ///
+    /// The constructor does not validate that the aggregates, count, and
+    /// `fixing_steps` describe the same schedule, so callers restoring a
+    /// partially observed trade must preserve that invariant.
     pub fn with_history(
         strike: f64,
         notional: f64,
@@ -232,7 +247,12 @@ pub struct AsianPut {
 }
 
 impl AsianPut {
-    /// Create a new Asian put option.
+    /// Create an Asian put with no historical fixings.
+    ///
+    /// The payoff is `max(strike - average, 0) * notional`, where `average`
+    /// is computed over the supplied path-step indices using `averaging`.
+    /// Fixing indices are deduplicated for lookup while their original vector
+    /// is retained as contract metadata.
     pub fn new(
         strike: f64,
         notional: f64,
@@ -257,7 +277,17 @@ impl AsianPut {
         }
     }
 
-    /// Create with history
+    /// Resume an Asian put after historical fixings have already occurred.
+    ///
+    /// `initial_sum` is the sum of historical fixing levels and
+    /// `initial_product_log` is the sum of their natural logarithms. The latter
+    /// is used only for geometric averaging. `initial_count` is the number of
+    /// historical observations included in those aggregates; future simulated
+    /// fixing steps are appended to this state.
+    ///
+    /// The constructor does not validate that the aggregates, count, and
+    /// `fixing_steps` describe the same schedule, so callers restoring a
+    /// partially observed trade must preserve that invariant.
     pub fn with_history(
         strike: f64,
         notional: f64,
@@ -358,12 +388,13 @@ impl Payoff for AsianPut {
 ///
 /// # Arguments
 ///
-/// * `spot` - Initial spot
-/// * `strike` - Strike price
+/// * `spot` - Initial underlying spot in the same price units as `strike`.
+/// * `strike` - Option exercise price in the same price units as `spot`.
 /// * `time_to_maturity` - Time to maturity
-/// * `rate` - Risk-free rate
-/// * `dividend_yield` - Dividend yield
-/// * `volatility` - Volatility
+/// * `rate` - Continuously compounded annual risk-free rate as a decimal.
+/// * `dividend_yield` - Continuously compounded annual dividend or carry yield
+///   as a decimal.
+/// * `volatility` - Annualized lognormal volatility as a decimal.
 /// * `num_fixings` - Number of averaging points
 ///
 /// # Returns

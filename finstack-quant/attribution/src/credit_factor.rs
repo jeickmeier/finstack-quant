@@ -103,6 +103,11 @@ pub struct CreditAttributionInput {
 ///
 /// FNV-1a is used to avoid a new external crypto dependency; the id is for
 /// traceability, not security.
+///
+/// # Arguments
+///
+/// * `model` - Calibrated credit-factor model whose valuation date and stable
+///   serialized contents determine the traceability identifier.
 #[allow(clippy::expect_used)] // CreditFactorModel has no non-serializable fields
 pub fn credit_factor_model_id(model: &CreditFactorModel) -> String {
     const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
@@ -118,6 +123,17 @@ pub fn credit_factor_model_id(model: &CreditFactorModel) -> String {
 
 /// Compute hierarchy-level credit P&L from per-position CS01s and an already-
 /// decomposed period.
+///
+/// # Arguments
+///
+/// * `model` - Calibrated credit-factor model defining hierarchy levels and
+///   per-issuer factor loadings.
+/// * `options` - Detail-output policy controlling retained position and bucket
+///   attribution data.
+/// * `positions` - Position IDs, issuer IDs, CS01 amounts, and observed spread
+///   moves to aggregate; all non-zero CS01s must share a currency.
+/// * `period` - Decomposed credit-factor period whose changes are applied to
+///   the supplied risk positions.
 ///
 /// # Errors
 ///

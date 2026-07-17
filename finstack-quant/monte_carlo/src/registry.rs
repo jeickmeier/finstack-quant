@@ -313,7 +313,18 @@ struct PythonBindingDefaultsFile {
     greeks: PythonGreekDefaults,
 }
 
-/// Return the embedded Monte Carlo defaults.
+/// Return the validated, process-wide Monte Carlo defaults embedded in the crate.
+///
+/// The defaults are parsed from the compile-time `PRICER_DEFAULTS` asset on the
+/// first call and then cached. The returned reference is shared and must be
+/// treated as read-only; callers that need to modify settings should clone it
+/// or use [`defaults_from_config`] with a complete extension value.
+///
+/// # Errors
+///
+/// Returns an error when the embedded JSON cannot be deserialized or when its
+/// numeric and structural defaults fail the same validation applied to external
+/// configuration. A cached initialization error is cloned for later calls.
 pub fn embedded_defaults() -> Result<&'static MonteCarloDefaults> {
     match EMBEDDED_DEFAULTS.get_or_init(parse_embedded_defaults) {
         Ok(defaults) => Ok(defaults),
@@ -328,7 +339,24 @@ pub fn embedded_defaults_or_panic() -> &'static MonteCarloDefaults {
     embedded_defaults().expect("embedded Monte Carlo defaults are compile-time assets")
 }
 
-/// Loads Monte Carlo defaults from configuration or falls back to embedded defaults.
+/// Load a complete Monte Carlo defaults set from configuration or the embedded asset.
+///
+/// When `config.extensions` contains [`MONTE_CARLO_DEFAULTS_EXTENSION_KEY`],
+/// its value replaces the entire defaults set: it is deserialized with unknown
+/// fields rejected and validated before being returned. The extension is not a
+/// partial override or merge. When the key is absent, this returns a clone of
+/// [`embedded_defaults`].
+///
+/// # Arguments
+///
+/// * `config` - Finstack configuration whose extensions may contain a complete
+///   Monte Carlo defaults document under the documented extension key.
+///
+/// # Errors
+///
+/// Returns an error if the extension is not valid defaults JSON, contains
+/// unsupported fields, fails defaults validation, or the embedded fallback
+/// cannot be initialized.
 pub fn defaults_from_config(config: &FinstackConfig) -> Result<MonteCarloDefaults> {
     if let Some(value) = config.extensions.get(MONTE_CARLO_DEFAULTS_EXTENSION_KEY) {
         let file: DefaultsFile = serde_json::from_value(value.clone()).map_err(|err| {

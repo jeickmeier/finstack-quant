@@ -1,4 +1,15 @@
+//! Closed-form approximations and initial guesses used by volatility pricing and inversion.
+//!
 /// Brenner-Subrahmanyam approximation for Black-76 implied volatility.
+///
+/// # Arguments
+///
+/// * `forward` - Positive Black-76 forward rate or forward price `F`.
+/// * `strike` - Positive option strike `K` in the same units as `forward`.
+/// * `option_price` - Positive undiscounted, unit-annuity option price used to
+///   infer lognormal volatility.
+/// * `t` - Time to expiry in years. Invalid or non-positive inputs return the
+///   fallback volatility of `0.20`.
 #[inline]
 pub fn brenner_subrahmanyam_approx(forward: f64, strike: f64, option_price: f64, t: f64) -> f64 {
     const TWO_PI: f64 = 2.0 * std::f64::consts::PI;
@@ -14,6 +25,13 @@ pub fn brenner_subrahmanyam_approx(forward: f64, strike: f64, option_price: f64,
 }
 
 /// Manaster-Koehler approximation for Black-76 implied volatility.
+///
+/// # Arguments
+///
+/// * `forward` - Positive Black-76 forward rate or forward price `F`.
+/// * `strike` - Positive option strike `K` in the same units as `forward`.
+/// * `t` - Time to expiry in years. Invalid or non-positive inputs return the
+///   fallback volatility of `0.20`.
 #[inline]
 pub fn manaster_koehler_approx(forward: f64, strike: f64, t: f64) -> f64 {
     const DEFAULT_VOL: f64 = 0.2;
@@ -32,6 +50,15 @@ pub fn manaster_koehler_approx(forward: f64, strike: f64, t: f64) -> f64 {
 }
 
 /// Combined initial guess for implied volatility solvers.
+///
+/// # Arguments
+///
+/// * `forward` - Positive Black-76 forward rate or forward price `F`.
+/// * `strike` - Positive option strike `K` in the same units as `forward`.
+/// * `option_price` - Positive undiscounted, unit-annuity option price used to
+///   infer lognormal volatility.
+/// * `t` - Time to expiry in years. Invalid or non-positive inputs return the
+///   fallback volatility of `0.20`.
 #[inline]
 pub fn implied_vol_initial_guess(forward: f64, strike: f64, option_price: f64, t: f64) -> f64 {
     const DEFAULT_VOL: f64 = 0.2;

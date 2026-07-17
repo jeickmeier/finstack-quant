@@ -32,6 +32,7 @@ impl WasmCopulaSpec {
 
     /// Student-t copula with specified degrees of freedom (must be > 2).
     #[wasm_bindgen(js_name = studentT)]
+    /// @param df - Positive Student-t copula degrees of freedom controlling tail thickness.
     pub fn student_t(df: f64) -> Result<WasmCopulaSpec, JsValue> {
         CopulaSpec::student_t(df)
             .map(|inner| Self { inner })
@@ -40,6 +41,7 @@ impl WasmCopulaSpec {
 
     /// Random Factor Loading copula with stochastic correlation.
     #[wasm_bindgen(js_name = randomFactorLoading)]
+    /// @param loading_vol - Standard deviation used to randomize the factor loading.
     pub fn random_factor_loading(loading_vol: f64) -> Self {
         Self {
             inner: CopulaSpec::random_factor_loading(loading_vol),
@@ -48,6 +50,7 @@ impl WasmCopulaSpec {
 
     /// Multi-factor Gaussian copula with sector structure.
     #[wasm_bindgen(js_name = multiFactor)]
+    /// @param num_factors - Positive number of systematic factors in the Gaussian factor model.
     pub fn multi_factor(num_factors: usize) -> Self {
         Self {
             inner: CopulaSpec::multi_factor(num_factors),
@@ -110,6 +113,9 @@ pub struct WasmCopula {
 impl WasmCopula {
     /// Conditional default probability given factor realization(s).
     #[wasm_bindgen(js_name = conditionalDefaultProb)]
+    /// @param default_threshold - Latent-variable default threshold corresponding to the marginal default probability.
+    /// @param factor_realization - Realized systematic-factor value conditioning the default probability.
+    /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
     pub fn conditional_default_prob(
         &self,
         default_threshold: f64,
@@ -140,6 +146,7 @@ impl WasmCopula {
     /// Loading); check `Number.isNaN()` before using the result. For the
     /// RFL heuristic stress gauge use `stressCorrelationProxy` instead.
     #[wasm_bindgen(js_name = tailDependence)]
+    /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
     pub fn tail_dependence(&self, correlation: f64) -> f64 {
         self.inner.tail_dependence(correlation)
     }
@@ -154,6 +161,7 @@ impl WasmCopula {
     ///
     /// Throws for non-RFL copulas.
     #[wasm_bindgen(js_name = stressCorrelationProxy)]
+    /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
     pub fn stress_correlation_proxy(&self, correlation: f64) -> Result<f64, JsValue> {
         match &self.spec {
             CopulaSpec::RandomFactorLoading { loading_volatility } => {
@@ -186,6 +194,7 @@ impl WasmRecoverySpec {
     ///
     /// Throws if `rate` is not finite or lies outside `[0, 1]`.
     #[wasm_bindgen(js_name = constant)]
+    /// @param rate - Constant recovery rate expressed as a fraction from 0 through 1.
     pub fn constant(rate: f64) -> Result<WasmRecoverySpec, JsValue> {
         corr::RecoverySpec::constant(rate)
             .map(|inner| Self { inner })
@@ -197,6 +206,9 @@ impl WasmRecoverySpec {
     /// Throws if `mean` is not finite or lies outside `[0, 1]`, or if `vol` /
     /// `correlation` are not finite.
     #[wasm_bindgen(js_name = marketCorrelated)]
+    /// @param mean - Mean recovery rate expressed as a fraction from 0 through 1.
+    /// @param vol - Recovery-rate volatility scale in the correlated recovery model.
+    /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
     pub fn market_correlated(
         mean: f64,
         vol: f64,
@@ -260,6 +272,7 @@ impl WasmRecoveryModel {
 
     /// Recovery conditional on the systematic market factor.
     #[wasm_bindgen(js_name = conditionalRecovery)]
+    /// @param market_factor - Realized standardized market factor used to condition recovery or loss given default.
     pub fn conditional_recovery(&self, market_factor: f64) -> f64 {
         self.inner.conditional_recovery(market_factor)
     }
@@ -272,6 +285,7 @@ impl WasmRecoveryModel {
 
     /// Conditional LGD given market factor.
     #[wasm_bindgen(js_name = conditionalLgd)]
+    /// @param market_factor - Realized standardized market factor used to condition recovery or loss given default.
     pub fn conditional_lgd(&self, market_factor: f64) -> f64 {
         self.inner.conditional_lgd(market_factor)
     }
@@ -303,6 +317,8 @@ impl WasmRecoveryModel {
 ///
 /// Returns `[rho_min, rho_max]`.
 #[wasm_bindgen(js_name = correlationBounds)]
+/// @param p1 - First marginal default probability from 0 through 1.
+/// @param p2 - Second marginal default probability from 0 through 1.
 pub fn correlation_bounds(p1: f64, p2: f64) -> Result<Vec<f64>, JsValue> {
     let (lo, hi) = corr::correlation_bounds(p1, p2).map_err(to_js_err)?;
     Ok(vec![lo, hi])
@@ -312,6 +328,9 @@ pub fn correlation_bounds(p1: f64, p2: f64) -> Result<Vec<f64>, JsValue> {
 ///
 /// Returns `[p11, p10, p01, p00]`.
 #[wasm_bindgen(js_name = jointProbabilities)]
+/// @param p1 - First marginal default probability from 0 through 1.
+/// @param p2 - Second marginal default probability from 0 through 1.
+/// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
 pub fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> Result<Vec<f64>, JsValue> {
     let (p11, p10, p01, p00) = corr::joint_probabilities(p1, p2, correlation).map_err(to_js_err)?;
     Ok(vec![p11, p10, p01, p00])
@@ -324,6 +343,8 @@ pub fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> Result<Vec<f64
 /// semi-definiteness. Returns nothing on success; raises a descriptive error
 /// (including the failing dimension or constraint) otherwise.
 #[wasm_bindgen(js_name = validateCorrelationMatrix)]
+/// @param matrix - Square numeric matrix in the nested or row-major shape required by this callable.
+/// @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
 pub fn validate_correlation_matrix(matrix: &[f64], n: usize) -> Result<(), JsValue> {
     corr::validate_correlation_matrix(matrix, n).map_err(to_js_err)
 }
@@ -335,6 +356,10 @@ pub fn validate_correlation_matrix(matrix: &[f64], n: usize) -> Result<(), JsVal
 /// correlation matrix (symmetric, unit diagonal, PSD) in Frobenius norm.
 /// Gross input violations raise rather than being silently reshaped.
 #[wasm_bindgen(js_name = nearestCorrelation)]
+/// @param matrix - Square numeric matrix in the nested or row-major shape required by this callable.
+/// @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
+/// @param max_iter - Maximum number of Higham nearest-correlation projection iterations.
+/// @param tol - Positive convergence tolerance for the nearest-correlation projection.
 pub fn nearest_correlation(
     matrix: Vec<f64>,
     n: usize,

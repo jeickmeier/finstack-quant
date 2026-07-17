@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 // Property-based tests for Monte Carlo numerical invariants.
 //
 // These tests use proptest to verify mathematical properties hold across

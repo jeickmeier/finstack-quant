@@ -226,6 +226,16 @@ impl CorkscrewExtension {
     /// # Arguments
     /// * `model` - The evaluated financial model
     /// * `results` - Evaluation output to inspect
+    ///
+    /// With `fail_on_error = false`, account and articulation failures are
+    /// retained in the report. With it enabled, the first such data failure is
+    /// returned instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no configuration is supplied, or when strict mode
+    /// encounters a missing/invalid account, period value, change node, or
+    /// balance-sheet articulation input.
     pub fn execute(
         &mut self,
         model: &FinancialModelSpec,

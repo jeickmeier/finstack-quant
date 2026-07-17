@@ -1,3 +1,5 @@
+//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
+//!
 use super::config::{
     CDSTranchePricer, NUMERICAL_TOLERANCE, PAR_SPREAD_MAX_ITER, PAR_SPREAD_TOLERANCE,
 };

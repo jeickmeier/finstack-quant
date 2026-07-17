@@ -126,6 +126,18 @@ pub fn smm_to_cpr(smm: f64) -> finstack_quant_core::Result<f64> {
 /// Default and prepayment mortality rates use the same annual-to-monthly
 /// conversion. This named entry point keeps domain terminology explicit while
 /// delegating to the single checked kernel.
+///
+/// Computes `MDR = 1 - (1 - CDR)^(1/12)`, with rates represented as decimal
+/// probabilities (`0.06` means 6% annually).
+///
+/// # Arguments
+///
+/// * `cdr` - Constant annual default rate as a finite decimal probability in
+///   `[0, 1]`, where `0.06` represents 6% per year.
+///
+/// # Errors
+///
+/// Returns an error if `cdr` is non-finite or outside `[0, 1]`.
 pub fn cdr_to_mdr(cdr: f64) -> finstack_quant_core::Result<f64> {
     cpr_to_smm(cdr)
 }
@@ -135,6 +147,18 @@ pub fn cdr_to_mdr(cdr: f64) -> finstack_quant_core::Result<f64> {
 /// Default and prepayment mortality rates use the same monthly-to-annual
 /// conversion. This named entry point keeps domain terminology explicit while
 /// delegating to the single checked kernel.
+///
+/// Computes `CDR = 1 - (1 - MDR)^12`, with rates represented as decimal
+/// probabilities (`0.01` means 1% monthly).
+///
+/// # Arguments
+///
+/// * `mdr` - Monthly default rate as a finite decimal probability in `[0, 1]`,
+///   where `0.01` represents 1% for one month.
+///
+/// # Errors
+///
+/// Returns an error if `mdr` is non-finite or outside `[0, 1]`.
 pub fn mdr_to_cdr(mdr: f64) -> finstack_quant_core::Result<f64> {
     smm_to_cpr(mdr)
 }

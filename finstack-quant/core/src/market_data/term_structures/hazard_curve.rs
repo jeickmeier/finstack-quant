@@ -300,6 +300,11 @@ impl HazardCurve {
     ///
     /// # Arguments
     /// * `t` - Time in years
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the curve's internal invariant is violated and it has no
+    /// hazard-rate segment. Public constructors reject that state.
     #[must_use]
     pub fn hazard_rate(&self, t: f64) -> f64 {
         // A valid hazard curve always has at least one lambda.
@@ -371,7 +376,18 @@ impl HazardCurve {
         self.default_prob(t1, t2)
     }
 
-    /// Evaluate survival probabilities at the provided dates using this curve's time axis.
+    /// Evaluate survival probabilities at the provided calendar dates.
+    ///
+    /// Each date is converted to a year fraction from [`Self::base_date`] with
+    /// this curve's [`Self::day_count`], then evaluated with [`Self::sp`].
+    /// Results preserve the input order, and dates on or before the base date
+    /// therefore return `1.0`. Values are clamped to `[0, 1]` as a final
+    /// numerical safeguard.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected day-count convention cannot calculate
+    /// a year fraction for any supplied date. No partial vector is returned.
     #[must_use = "computed survival probabilities should not be discarded"]
     pub fn survival_at_dates(&self, dates: &[Date]) -> crate::Result<Vec<f64>> {
         let base = self.base_date();
@@ -387,7 +403,7 @@ impl HazardCurve {
         Ok(survival)
     }
 
-    /// Accessors
+    /// Unique identifier used to register and resolve this hazard curve.
     pub fn id(&self) -> &CurveId {
         &self.id
     }
@@ -610,6 +626,18 @@ impl HazardCurve {
     /// # Arguments
     /// * `shift` - Additive shift to all hazard rates (e.g., 0.0001 for +1bp).
     ///   Negative shifts that would make any hazard rate negative are rejected.
+    ///
+    /// The returned curve preserves the base date and all credit metadata, but
+    /// drops stored par-spread quotes because they describe the pre-bump
+    /// calibration. Consequently, [`Self::cds_quote_bp`] reports its
+    /// hazard-based approximation for the bumped curve.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shift makes a hazard rate negative or non-finite,
+    /// or makes it exceed the builder's maximum hazard-rate limit (10.0 unless
+    /// the source curve was built with a different limit, which is not retained
+    /// by this convenience method).
     pub fn with_parallel_bump(&self, shift: f64) -> crate::Result<HazardCurve> {
         let mut shifted_points = Vec::with_capacity(self.knots.len());
         for (t, lambda) in self.knot_points() {
@@ -649,7 +677,11 @@ impl HazardCurve {
     /// A new hazard curve with updated base date and shifted knots.
     ///
     /// # Errors
-    /// Returns an error if fewer than 2 knot points remain after filtering expired points.
+    ///
+    /// Returns an error if the day-count calculation fails, fewer than two
+    /// knot points remain after the roll, or the rebuilt curve violates a
+    /// construction invariant. `days` is signed; a negative value moves the
+    /// base date backward rather than rejecting the request.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
         let new_base = self.base + time::Duration::days(days);
         // Use consistent day count logic (same as DiscountCurve/ForwardCurve)
@@ -941,7 +973,22 @@ impl HazardCurveBuilder {
     /// - All hazard rates must be non-negative and finite
     /// - Hazard rates > `max_hazard_rate` (default 10.0) trigger an error
     /// - Recovery rate must be in [0, 1]
-    /// - Knot times must be strictly increasing
+    /// - Knot times must be strictly increasing after sorting by time
+    /// - Stored par-spread tenors must be finite and non-negative, and spreads
+    ///   must be finite; they are retained for reporting rather than used to
+    ///   re-bootstrap hazards
+    ///
+    /// The default survival interpolation is log-linear, which corresponds to
+    /// piecewise-constant hazards between pillars. A zero-time knot is allowed;
+    /// its hazard applies from the base date onward.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base date was not explicitly set, no knots
+    /// are supplied, a time, rate, recovery rate, or stored par spread is
+    /// invalid, knot times are duplicated, or a hazard rate exceeds the
+    /// configured maximum. Input points are sorted by time before the curve is
+    /// constructed; callers need not pre-sort them.
     pub fn build(self) -> crate::Result<HazardCurve> {
         // Require explicit base_date to avoid accidentally anchoring to 1970-01-01
         // unwrap_or provides defensive fallback - comparison still works correctly

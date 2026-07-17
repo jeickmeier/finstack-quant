@@ -1,3 +1,5 @@
+//! Calibration target construction and shared input validation.
+//!
 use crate::calibration::prepared::CalibrationQuote;
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::market::build::context::BuildCtx;

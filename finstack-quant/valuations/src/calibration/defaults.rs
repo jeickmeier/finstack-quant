@@ -47,6 +47,11 @@ pub fn embedded_defaults() -> Result<&'static CalibrationDefaults> {
 }
 
 /// Loads calibration defaults from configuration or falls back to embedded defaults.
+///
+/// # Arguments
+///
+/// * `config` - Library configuration whose `calibration_defaults` extension,
+///   when present, overrides the embedded validation and solver defaults.
 pub fn defaults_from_config(config: &FinstackConfig) -> Result<CalibrationDefaults> {
     if let Some(value) = config.extensions.get(CALIBRATION_DEFAULTS_EXTENSION_KEY) {
         let file: DefaultsFile = serde_json::from_value(value.clone()).map_err(|err| {

@@ -37,6 +37,13 @@ pub(crate) const CORRELATION_TOLERANCE: f64 = 1e-10;
 /// - All values within `[-1, 1]` (within `1e-10`)
 /// - Positive semi-definiteness (via Cholesky)
 ///
+/// # Arguments
+///
+/// * `matrix` - Correlation coefficients in row-major `n × n` order; each
+///   entry at row `i`, column `j` is stored at `i * n + j`.
+/// * `n` - Number of variables represented by each matrix dimension; `0`
+///   accepts an empty matrix.
+///
 /// # Errors
 ///
 /// Returns the first [`error::Error`] variant detected.

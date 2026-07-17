@@ -129,7 +129,20 @@ pub fn quanto_call(
 ///
 /// # Arguments
 ///
-/// Same as `quanto_call`.
+/// * `spot` - Current foreign underlying spot price in the option quote units.
+/// * `strike` - Domestic-currency exercise price in the same quote units as
+///   the converted payoff.
+/// * `time` - Remaining time to expiry in years.
+/// * `rate_domestic` - Continuously compounded domestic discount rate as a
+///   decimal annual rate.
+/// * `rate_foreign` - Continuously compounded foreign risk-free rate as a
+///   decimal annual rate.
+/// * `div_yield` - Continuously compounded underlying dividend yield as a
+///   decimal annual rate.
+/// * `vol_asset` - Annualized asset-price volatility as a decimal.
+/// * `vol_fx` - Annualized FX volatility for the conversion currency pair.
+/// * `correlation` - Instantaneous asset/FX return correlation, normally in
+///   the closed interval `[-1, 1]`.
 ///
 /// # Returns
 ///

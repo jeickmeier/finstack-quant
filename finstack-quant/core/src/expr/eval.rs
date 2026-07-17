@@ -194,6 +194,13 @@ impl CompiledExpr {
     /// scalar evaluator (i.e., not under the `statements` crate). Period-aware
     /// functions like `Ttm`/`Ytd`/`GrowthRate` etc. return a typed validation
     /// error instead of being silently accepted and rejected at eval time.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `ast` contains a statements-layer or other
+    /// period-aware operation that the scalar evaluator cannot execute. It
+    /// does not validate column names or data shapes; those are checked by
+    /// [`Self::eval`].
     pub fn try_new_scalar(ast: Expr) -> crate::Result<Self> {
         super::ast_walk::ensure_scalar_evaluable(&ast)?;
         Ok(Self::new(ast))
@@ -203,6 +210,17 @@ impl CompiledExpr {
     ///
     /// The provided `meta` is stored on the execution plan and stamped into
     /// each [`EvaluationResult`] produced by [`Self::eval`].
+    ///
+    /// The plan deduplicates structurally identical subexpressions and
+    /// evaluates each planned node once per call. Use [`Self::new`] when this
+    /// up-front planning cost is not appropriate; it builds and caches the
+    /// equivalent plan lazily on the first evaluation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the expression graph cannot be converted into a
+    /// valid execution plan, for example because planning detects an invalid
+    /// dependency structure.
     pub fn with_planning(ast: Expr, meta: crate::config::ResultsMeta) -> crate::Result<Self> {
         let mut builder = DagBuilder::new();
         let plan = builder.build_plan(vec![ast.clone()], meta)?;
@@ -251,6 +269,20 @@ impl CompiledExpr {
     /// Columns shorter than that are NaN-padded at the tail; columns longer
     /// than that are truncated. Missing tail values therefore propagate as
     /// NaN rather than being silently zero-filled.
+    ///
+    /// The context determines the column position for each named expression
+    /// reference. An explicit plan in `opts` takes precedence over a plan
+    /// attached to this instance; otherwise a plan is built once and retained
+    /// for subsequent calls. Returned metadata comes from that chosen plan.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when planning fails, a referenced column is absent
+    /// from `ctx` or `cols`, an expression operation is invalid for scalar
+    /// evaluation, a planned dependency is unavailable, or the scratch arena
+    /// would overflow or exceed `opts.max_arena_bytes`. A zero arena limit
+    /// disables only the configured size limit, not arithmetic-overflow
+    /// protection.
     pub fn eval(
         &self,
         ctx: &SimpleContext,

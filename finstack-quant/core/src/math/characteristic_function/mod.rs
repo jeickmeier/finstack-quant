@@ -89,6 +89,13 @@ pub trait CharacteristicFunction: Send + Sync {
 /// Uses centered differences at u = 0 with step h = 1e-4.
 /// Accurate for smooth characteristic functions; prefer closed-form
 /// expressions when available for better accuracy.
+///
+/// # Arguments
+///
+/// * `cf` - Risk-neutral characteristic function evaluated at complex Fourier
+///   frequencies and the requested maturity.
+/// * `t` - Time to maturity in years supplied to every characteristic-function
+///   evaluation.
 pub fn cumulants_from_cf(cf: &dyn CharacteristicFunction, t: f64) -> Cumulants {
     let h = 1e-4;
     let i = Complex64::i();

@@ -578,6 +578,12 @@ impl ForwardCurve {
     /// - Explicit contractual intervals come from `projection_grid`.
     /// - Curves without a grid, and times beyond an explicit grid, step by `tenor_years`.
     /// - This is a simple-rate chaining helper, not an overnight compounded-in-arrears engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `t` is non-finite or negative, the stored tenor
+    /// is invalid, a projection step cannot produce a finite positive discount
+    /// factor, or the final exponentiation is non-finite or non-positive.
     #[must_use = "computed discount factor should not be discarded"]
     pub fn df(&self, t: f64) -> crate::Result<f64> {
         let df = self.projection_log_df(t)?.exp();
@@ -800,11 +806,22 @@ impl ForwardCurve {
         Ok(())
     }
 
-    /// Create a new curve with a parallel rate bump applied in basis points (fallible).
+    /// Create a new curve with a parallel rate bump in basis points.
     ///
-    /// Adds the bump amount (converted from bp) to all forward rates uniformly.
+    /// Adds `bp / 10,000` to every stored simple forward rate, such that
+    /// `1.0` is a one-basis-point shock. The result retains the date, tenor,
+    /// reset-lag, interpolation, extrapolation, projection-grid, calibration,
+    /// and FX-policy metadata, but receives a derived identifier.
     ///
-    /// Returns an error if the bumped curve violates validation constraints.
+    /// This is a direct fitted-curve shock: attached calibration quotes and
+    /// recipes are metadata and are not re-bootstrapped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the rebuilt curve cannot validate its knots or
+    /// construct its interpolation. In particular, callers should supply a
+    /// finite bump and should not assume this method enforces a floor on
+    /// negative forward rates; negative rates are permitted by the curve type.
     pub fn with_parallel_bump(&self, bp: f64) -> crate::Result<Self> {
         let bump_rate = bp / 10_000.0;
         let bumped_points: Vec<(f64, f64)> = self
@@ -1037,6 +1054,24 @@ impl ForwardCurveBuilder {
     }
 
     /// Validate input and build the [`ForwardCurve`].
+    ///
+    /// The curve requires an explicit base date, a strictly positive finite
+    /// index tenor, a non-negative reset lag, and at least two strictly
+    /// increasing finite knot times. Forward rates may be negative to support
+    /// negative-rate markets. Set [`Self::min_forward_rate`] when a particular
+    /// application needs a lower bound.
+    ///
+    /// If supplied, `projection_grid` represents contractual reset/end
+    /// boundaries for projection-discount-factor chaining. It must start at
+    /// zero, be finite, non-negative, strictly increasing, contain at least
+    /// two boundaries, and reach at least the last interpolation knot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of those structural conditions fails, a forward
+    /// rate is below the optional minimum, the projection grid is invalid, or
+    /// the requested interpolation style cannot be built from the knots and
+    /// forward values.
     pub fn build(self) -> crate::Result<ForwardCurve> {
         if !self.base_is_set {
             return Err(InputError::Invalid.into());

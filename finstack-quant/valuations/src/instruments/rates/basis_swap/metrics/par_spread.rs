@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for interest-rate instruments.
+//!
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::rates::basis_swap::types::BasisSwap;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};

@@ -713,6 +713,11 @@ impl DiscountCurve {
     }
 
     /// Fallible: discount factor on a specific date `date` using explicit day-count `dc`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates a failure from `dc.signed_year_fraction` for the curve base
+    /// date and `date`.
     #[inline]
     #[must_use = "computed discount factor should not be discarded"]
     pub fn df_on_date(&self, date: Date, dc: crate::dates::DayCount) -> crate::Result<f64> {
@@ -725,6 +730,11 @@ impl DiscountCurve {
     }
 
     /// Fallible: discount factor on a specific date `date` using the curve's day-count.
+    ///
+    /// # Errors
+    ///
+    /// Propagates a failure while computing the curve day-count fraction from
+    /// the base date to `date`.
     #[inline]
     #[must_use = "computed discount factor should not be discarded"]
     pub fn df_on_date_curve(&self, date: Date) -> crate::Result<f64> {
@@ -739,6 +749,12 @@ impl DiscountCurve {
     ///
     /// Works for both forward and backward date order. Returns `1.0` when
     /// `from == to`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates failures while computing either date's curve year fraction,
+    /// and returns `Error::Validation` when an evaluated discount factor is
+    /// non-finite or non-positive.
     #[inline]
     #[must_use = "computed discount factor should not be discarded"]
     pub fn df_between_dates(&self, from: Date, to: Date) -> crate::Result<f64> {
@@ -964,7 +980,10 @@ impl DiscountCurve {
     ///
     /// Uses df_bumped(t) = df_original(t) * exp(-bump * t), where bump = bp / 10_000.
     ///
-    /// Returns an error if the bumped curve violates validation constraints.
+    /// # Errors
+    ///
+    /// Returns an error when the bumped knots violate this curve's interpolation,
+    /// discount-factor monotonicity, or forward-rate validation policy.
     pub fn with_parallel_bump(&self, bp: f64) -> crate::Result<Self> {
         let bump_rate = bp / 10_000.0;
         let bumped_points: Vec<(f64, f64)> = self
@@ -1271,6 +1290,11 @@ impl DiscountCurve {
     ///
     /// This retains interpolation, extrapolation, validation policy, calibration
     /// provenance, minimum forward tenor, and FX policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when replacement knots violate the preserved curve
+    /// validation, interpolation, or forward-rate constraints.
     pub fn rebuild_with_knots<I>(&self, knots: I) -> crate::Result<Self>
     where
         I: IntoIterator<Item = (f64, f64)>,
@@ -1307,6 +1331,13 @@ impl DiscountCurve {
     /// * `forward_id` - Identifier for the resulting forward curve
     /// * `tenor_years` - Tenor of the forward rate in years
     /// * `interp_style` - Optional interpolation style; defaults to `Linear` if `None`
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `tenor_years` is non-finite or not
+    /// strictly positive, `InputError::TooFewPoints` when the discount curve
+    /// has fewer than two knots, or an error when the derived forward curve
+    /// fails validation.
     pub fn to_forward_curve(
         &self,
         forward_id: impl Into<CurveId>,
@@ -1420,6 +1451,12 @@ impl ValidationMode {
     ///
     /// Bindings expose the two safe presets by name while keeping [`Self::Raw`]
     /// available only to canonical Rust callers.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` for an unsupported preset, a floor supplied
+    /// with `market_standard`, a missing floor for `negative_rate_friendly`, or
+    /// a non-finite floor.
     pub fn from_preset(name: &str, forward_floor: Option<f64>) -> crate::Result<Self> {
         match name {
             "market_standard" => {
@@ -1678,6 +1715,13 @@ impl DiscountCurveBuilder {
     ///
     /// If the first knot time is `> 0.0`, automatically prepends `(0.0, 1.0)` to
     /// ensure the round-trip invariant `DF(0) = 1.0` (ISDA/QuantLib standard).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base date is missing, fewer than two knots are
+    /// supplied after zero-time anchoring, a discount factor is non-positive,
+    /// knots are invalid, or the configured monotonicity, forward-rate, or
+    /// interpolation constraints are violated.
     pub fn build(mut self) -> crate::Result<DiscountCurve> {
         let base = self.base.ok_or(crate::error::InputError::Invalid)?;
         if !self.points.is_empty() {

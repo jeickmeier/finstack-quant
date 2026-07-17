@@ -23,7 +23,18 @@ def _missing(x: Any) -> bool:
 
 
 def pct(x: Any, dp: int = 1, signed: bool = False) -> str:
-    """Format a value already expressed in percent units (e.g. ``13.2`` → ``13.2%``)."""
+    """Format a value already expressed in percentage points.
+
+    Parameters
+    ----------
+    x : Any
+        Percentage-point value, such as ``13.2`` for ``13.2%``; missing values
+        render as the report placeholder.
+    dp : int
+        Number of digits after the decimal point; defaults to one.
+    signed : bool
+        Whether non-negative values receive an explicit ``+`` sign.
+    """
     if _missing(x):
         return _PLACEHOLDER
     sign = "+" if (signed and x >= 0) else ""
@@ -31,14 +42,32 @@ def pct(x: Any, dp: int = 1, signed: bool = False) -> str:
 
 
 def ratio(x: Any, dp: int = 2) -> str:
-    """Format a unitless ratio (e.g. Sharpe ``1.42``)."""
+    """Format a unitless ratio such as a Sharpe ratio.
+
+    Parameters
+    ----------
+    x : Any
+        Unitless numeric ratio; missing values render as the report placeholder.
+    dp : int
+        Number of digits after the decimal point; defaults to two.
+    """
     if _missing(x):
         return _PLACEHOLDER
     return f"{x:.{dp}f}"
 
 
 def money(amount: Any, currency: str | None = None, dp: int = 2) -> str:
-    """Format a monetary amount with thousands separators and optional currency code."""
+    """Format a monetary amount with grouping and an optional currency code.
+
+    Parameters
+    ----------
+    amount : Any
+        Monetary amount in the display currency; missing values use the placeholder.
+    currency : str or None
+        Optional ISO currency code appended after the formatted amount.
+    dp : int
+        Number of digits after the decimal point; defaults to two.
+    """
     if _missing(amount):
         return _PLACEHOLDER
     body = f"{amount:,.{dp}f}"
@@ -46,14 +75,26 @@ def money(amount: Any, currency: str | None = None, dp: int = 2) -> str:
 
 
 def sign_class(x: Any) -> str:
-    """Return ``"pos"`` / ``"neg"`` / ``""`` for CSS class selection."""
+    """Return a sign CSS class for a numeric value.
+
+    Parameters
+    ----------
+    x : Any
+        Numeric value whose sign selects ``"pos"``, ``"neg"``, or no class.
+    """
     if _missing(x) or x == 0:
         return ""
     return "pos" if x > 0 else "neg"
 
 
 def fmt_date(d: Any) -> str:
-    """Format a date-like object as ``"19 Jun 2026"``."""
+    """Format a date-like object as ``"19 Jun 2026"``.
+
+    Parameters
+    ----------
+    d : Any
+        Date-like object with ``strftime`` or a value convertible to string.
+    """
     if _missing(d):
         return _PLACEHOLDER
     if hasattr(d, "strftime"):

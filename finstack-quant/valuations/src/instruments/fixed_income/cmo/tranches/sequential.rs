@@ -67,10 +67,15 @@ pub fn average_life(principal_payments: &[(f64, f64)]) -> f64 {
 ///
 /// # Arguments
 ///
-/// * `tranche_size` - Size of this tranche
-/// * `preceding_balance` - Total balance of tranches ahead in sequence
-/// * `total_collateral` - Total collateral balance
-/// * `monthly_principal_rate` - Expected monthly principal rate (scheduled + prepay)
+/// * `tranche_size` - Principal balance of the sequential tranche whose
+///   expected payment window is estimated.
+/// * `preceding_balance` - Aggregate unpaid balance of tranches ahead of this
+///   tranche in the sequential principal-payment order.
+/// * `_total_collateral` - Total collateral balance retained for a common
+///   tranche-analysis interface. This simplified timing estimate does not use
+///   it directly because `preceding_balance` already determines the start.
+/// * `monthly_principal_rate` - Expected monthly scheduled-plus-prepayment
+///   principal amount available to the sequential waterfall.
 ///
 /// # Returns
 ///

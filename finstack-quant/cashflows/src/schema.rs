@@ -7,6 +7,11 @@ use serde_json::Value;
 pub const CASHFLOW_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/cashflow/1/";
 
 /// Return the canonical schema URI for a cashflow-owned schemars definition.
+///
+/// # Arguments
+///
+/// * `name` - Exact generated schemars definition name, such as
+///   `"ScheduleParams"`; unsupported names return `None`.
 #[must_use]
 pub fn definition_uri(name: &str) -> Option<String> {
     let filename = match name {

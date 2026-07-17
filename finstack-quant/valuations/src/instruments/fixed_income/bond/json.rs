@@ -6,6 +6,18 @@
 /// wraps it in [`crate::instruments::InstrumentJson::Bond`], and serializes the
 /// tagged instrument.
 ///
+/// # Arguments
+///
+/// * `instrument_id` - Stable caller-assigned identifier stored on the
+///   constructed bond and used by valuation and portfolio lookups.
+/// * `schedule_json` - JSON representation of a canonical
+///   `CashFlowSchedule`; it must contain a valid, internally consistent
+///   principal and coupon schedule.
+/// * `discount_curve_id` - Market-context key of the discount curve used to
+///   value the bond's cashflows.
+/// * `quoted_clean` - Optional clean market price expressed as a percentage of
+///   par. `None` leaves the bond without an explicit clean-price override.
+///
 /// # Errors
 ///
 /// Returns an error if the schedule JSON is invalid, bond construction fails, or

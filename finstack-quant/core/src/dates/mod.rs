@@ -137,6 +137,10 @@ pub use periods::{
 /// a structured [`crate::Error::Validation`] on failure with the offending
 /// input echoed in the message.
 ///
+/// # Arguments
+///
+/// * `s` - ISO 8601 extended date text, such as `2025-03-19`.
+///
 /// # Errors
 ///
 /// Returns [`crate::Error::Validation`] if `s` is not a valid ISO 8601 date.
@@ -220,6 +224,11 @@ const UNIX_EPOCH_JULIAN_DAY: i32 = 2_440_588;
 /// let day_after = Date::from_calendar_date(1970, Month::January, 2).expect("valid");
 /// assert_eq!(days_since_epoch(day_after), 1);
 /// ```
+///
+/// # Arguments
+///
+/// * `date` - Calendar date to express as a signed count of days from
+///   1970-01-01 UTC.
 pub fn days_since_epoch(date: Date) -> i32 {
     date.to_julian_day() - UNIX_EPOCH_JULIAN_DAY
 }
@@ -240,6 +249,11 @@ pub fn days_since_epoch(date: Date) -> i32 {
 /// let y2k = date_from_epoch_days(10957);
 /// assert_eq!(y2k, Some(Date::from_calendar_date(2000, Month::January, 1).expect("valid")));
 /// ```
+///
+/// # Arguments
+///
+/// * `days` - Signed number of calendar days from 1970-01-01 UTC. Values that
+///   exceed the `time` crate's date range return `None`.
 pub fn date_from_epoch_days(days: i32) -> Option<Date> {
     let julian_day = days.checked_add(UNIX_EPOCH_JULIAN_DAY)?;
     Date::from_julian_day(julian_day).ok()

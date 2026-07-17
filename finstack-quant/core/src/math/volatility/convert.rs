@@ -20,7 +20,9 @@ use crate::Result;
 /// * `vol` - Input volatility (must be positive and finite)
 /// * `from_convention` - Source convention
 /// * `to_convention` - Target convention
-/// * `forward_rate` - Forward rate
+/// * `forward_rate` - ATM forward rate or price used as both the forward and
+///   strike when equating prices; it must satisfy the target convention's
+///   domain, such as positivity for lognormal quotes.
 /// * `time_to_expiry` - Time to expiry in years (must be non-negative)
 ///
 /// # Errors

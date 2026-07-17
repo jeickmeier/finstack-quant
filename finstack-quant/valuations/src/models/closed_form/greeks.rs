@@ -135,7 +135,7 @@ use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
 /// # Arguments
 ///
 /// * `spot` - Current spot price S
-/// * `strike` - Strike price K
+/// * `strike` - Exercise price K in the same units as the underlying spot.
 /// * `time` - Time to expiration T (in years)
 /// * `rate` - Risk-free rate r (continuously compounded)
 /// * `div_yield` - Dividend yield q (continuously compounded)
@@ -198,7 +198,7 @@ pub fn bs_call_delta(
 /// # Arguments
 ///
 /// * `spot` - Current spot price S
-/// * `strike` - Strike price K
+/// * `strike` - Exercise price K in the same units as the underlying spot.
 /// * `time` - Time to expiration T (in years)
 /// * `rate` - Risk-free rate r (continuously compounded)
 /// * `div_yield` - Dividend yield q (continuously compounded)
@@ -257,7 +257,7 @@ pub fn bs_put_delta(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64
 /// # Arguments
 ///
 /// * `spot` - Current spot price S
-/// * `strike` - Strike price K
+/// * `strike` - Exercise price K in the same units as the underlying spot.
 /// * `time` - Time to expiration T (in years)
 /// * `rate` - Risk-free rate r (continuously compounded)
 /// * `div_yield` - Dividend yield q (continuously compounded)
@@ -322,7 +322,7 @@ pub fn bs_gamma(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64, vo
 /// # Arguments
 ///
 /// * `spot` - Current spot price S
-/// * `strike` - Strike price K
+/// * `strike` - Exercise price K in the same units as the underlying spot.
 /// * `time` - Time to expiration T (in years)
 /// * `rate` - Risk-free rate r (continuously compounded)
 /// * `div_yield` - Dividend yield q (continuously compounded)
@@ -374,6 +374,16 @@ pub fn bs_vega(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64, vol
 ///
 /// Returns theta per year. For **per-day** theta (divided by a day-count basis),
 /// use [`super::vanilla::bs_greeks`] which accepts a `theta_days_per_year` parameter.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to expiry in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 #[must_use]
 pub fn bs_call_theta(
     spot: f64,
@@ -403,6 +413,16 @@ pub fn bs_call_theta(
 ///
 /// Returns theta per year. For **per-day** theta (divided by a day-count basis),
 /// use [`super::vanilla::bs_greeks`] which accepts a `theta_days_per_year` parameter.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to expiry in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 #[must_use]
 pub fn bs_put_theta(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64, vol: f64) -> f64 {
     if time <= 0.0 {
@@ -427,6 +447,16 @@ pub fn bs_put_theta(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64
 ///
 /// Returns the PV change per 1% (100bp) parallel shift in the domestic rate,
 /// consistent with `BsGreeks::rho_r` and `vanilla::bs_greeks`.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to expiry in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 #[must_use]
 pub fn bs_call_rho(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64, vol: f64) -> f64 {
     if time <= 0.0 {
@@ -445,6 +475,16 @@ pub fn bs_call_rho(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64,
 ///
 /// Returns the PV change per 1% (100bp) parallel shift in the domestic rate,
 /// consistent with `BsGreeks::rho_r` and `vanilla::bs_greeks`.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to expiry in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 #[must_use]
 pub fn bs_put_rho(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64, vol: f64) -> f64 {
     if time <= 0.0 {
@@ -465,6 +505,16 @@ pub use super::vanilla::BsGreeks;
 ///
 /// Returns [`BsGreeks`] with `rho_r` set to the domestic rate sensitivity
 /// and `rho_q` set to the dividend yield sensitivity.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to expiry in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 #[must_use]
 pub fn bs_call_greeks(
     spot: f64,
@@ -530,6 +580,16 @@ pub fn bs_call_greeks(
 ///
 /// Returns [`BsGreeks`] with `rho_r` set to the domestic rate sensitivity
 /// and `rho_q` set to the dividend yield sensitivity.
+///
+/// # Arguments
+///
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Exercise price in the same units as `spot`.
+/// * `time` - Remaining time to expiry in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
 #[must_use]
 pub fn bs_put_greeks(
     spot: f64,

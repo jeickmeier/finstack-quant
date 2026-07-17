@@ -29,6 +29,14 @@ use super::helpers::{add_pik_flow_if_nonzero, compute_reset_date};
 /// [`CFKind::InflationCoupon`] for downstream valuation/reporting.
 ///
 /// Each tuple is `(payment_date, indexed_coupon_amount, accrual_factor, real_coupon_rate)`.
+///
+/// # Arguments
+///
+/// * `ccy` - Currency assigned to every emitted inflation-coupon cashflow.
+/// * `coupons` - Precomputed payment tuples of date, indexed amount, accrual
+///   factor in years, and annual real coupon rate as a decimal.
+/// * `out_flows` - Mutable schedule flow list to which one inflation-coupon
+///   row is appended for each supplied tuple.
 pub fn emit_inflation_coupons(
     ccy: Currency,
     coupons: &[(Date, f64, f64, f64)],

@@ -1,3 +1,5 @@
+//! Shared node, evolution, and backward-induction components for pricing trees.
+//!
 use finstack_quant_core::HashMap;
 
 /// Tree branching type for evolution

@@ -62,6 +62,15 @@ thread_local! {
 /// # Returns
 /// Parsed AST ready for compilation. On failure the returned [`Error`]
 /// includes the line and column where parsing stopped.
+/// The parser requires the entire input to form one expression and limits
+/// nesting to 64 levels to prevent pathological user-supplied formulas from
+/// exhausting parser recursion.
+///
+/// # Errors
+///
+/// Returns a formula-parse error for trailing tokens, malformed syntax, or
+/// nesting beyond 64 levels. The diagnostic includes a one-indexed line and
+/// column plus a short source snippet near the failure where available.
 pub fn parse_formula(input: &str) -> Result<StmtExpr> {
     PARSE_DEPTH.with(|depth| depth.set(0));
     TERM_COUNT.with(|count| count.set(0));

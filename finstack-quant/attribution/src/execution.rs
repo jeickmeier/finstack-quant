@@ -13,6 +13,13 @@ impl AttributionSpec {
     /// Execute the attribution specification.
     ///
     /// Returns a complete result with the P&L attribution and metadata.
+    ///
+    /// # Errors
+    ///
+    /// Propagates instrument and market reconstruction, configured rounding,
+    /// pricing, FX conversion, and method-specific attribution errors. For the
+    /// metrics-based method, unknown configured metric names are rejected
+    /// before valuation.
     pub fn execute(&self) -> Result<AttributionResult> {
         // Reconstruct instrument from JSON
         let instrument = self.instrument.clone().into_boxed()?;

@@ -1,3 +1,5 @@
+//! Finite-difference and repricing utilities for portfolio sensitivities.
+//!
 use super::traits::FactorSensitivityEngine;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, MarketBump};
@@ -88,6 +90,22 @@ impl DeltaBasedEngine {
 /// `EquitySpot` and `FxRate` do not carry `BumpUnits` and use
 /// `bump_unit.to_fraction(...)` to reduce any input unit to a common
 /// fractional form before applying the multiplier / fxpct shock.
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] if a supplied unit conflicts with a
+/// curve/vol mapping's declared units, or if a bucketed curve is not bumped in
+/// basis points. Invalid bump specifications produced by the underlying market
+/// types are also propagated.
+///
+/// # Arguments
+///
+/// * `mapping` - Factor-to-market mapping that selects the curve, surface, or
+///   scalar to bump and its declared bump convention.
+/// * `bump_size` - Requested bump magnitude expressed in `bump_unit`.
+/// * `bump_unit` - Unit of `bump_size`; it must match mappings that declare
+///   curve or volatility bump units.
+/// * `as_of` - Valuation date attached to generated dated market bumps.
 pub fn mapping_to_market_bumps(
     mapping: &MarketMapping,
     bump_size: f64,

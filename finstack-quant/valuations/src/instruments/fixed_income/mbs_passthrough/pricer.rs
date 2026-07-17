@@ -79,6 +79,15 @@ pub(crate) fn sifma_settlement_for_period(period_end: Date) -> Result<Date> {
 /// onto the canonical `CashFlowSchedule` rows). Internal details of
 /// [`MbsCashflow`] may evolve between minor releases; callers should treat the
 /// struct as a read-only diagnostic view.
+///
+/// # Arguments
+///
+/// * `mbs` - Agency passthrough definition and current pool state used to
+///   project scheduled amortization, prepayments, servicing, and payment dates.
+/// * `as_of` - Valuation date used to find the earliest unpaid accrual period;
+///   prior settled periods are omitted from the projection.
+/// * `max_periods` - Optional maximum number of monthly projection periods.
+///   `None` projects through the remaining weighted-average maturity.
 pub fn generate_cashflows(
     mbs: &AgencyMbsPassthrough,
     as_of: Date,

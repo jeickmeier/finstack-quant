@@ -26,6 +26,15 @@ use finstack_quant_core::math::{norm_cdf, norm_pdf};
 ///
 /// d = (F - K) / (σ * √T)
 ///
+/// # Arguments
+///
+/// * `forward` - Forward rate or price at expiry, in the same units as
+///   `strike` and normal volatility.
+/// * `strike` - Exercise rate or price in the same units as `forward`.
+/// * `sigma` - Annualized normal volatility in absolute rate/price units,
+///   rather than a percentage of the forward.
+/// * `t` - Remaining time to expiry in years.
+///
 /// # Edge Cases
 /// - At expiration (t ≤ 0) or zero volatility: returns appropriate limit
 #[inline]
@@ -49,8 +58,9 @@ pub fn d_bachelier(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 ///
 /// # Arguments
 /// * `option_type` - Call (payer) or Put (receiver)
-/// * `forward` - Forward rate
-/// * `strike` - Strike rate
+/// * `forward` - Forward rate or price at expiry, in the same units as the
+///   strike and normal volatility.
+/// * `strike` - Exercise rate or price in the same units as `forward`.
 /// * `sigma` - Normal volatility (in rate terms, not percentage)
 /// * `t` - Time to expiry in years
 /// * `annuity` - Present value of 1bp running (sum of discount factors × accrual fractions)

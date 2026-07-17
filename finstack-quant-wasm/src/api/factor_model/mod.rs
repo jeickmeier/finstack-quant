@@ -120,6 +120,7 @@ impl WasmCreditFactorModel {
     /// # Errors
     /// Throws if the JSON is malformed or fails validation.
     #[wasm_bindgen(js_name = fromJson)]
+    /// @param s - JSON-serialized CreditFactorModel to deserialize.
     pub fn from_json(s: &str) -> Result<WasmCreditFactorModel, JsValue> {
         let inner: finstack_quant_factor_model::credit::hierarchy::CreditFactorModel =
             serde_json::from_str(s).map_err(to_js_err)?;
@@ -153,6 +154,7 @@ impl WasmCreditCalibrator {
     /// # Errors
     /// Throws if `config_json` is not a valid `CreditCalibrationConfig`.
     #[wasm_bindgen(constructor)]
+    /// @param config_json - Credit-factor calibration configuration JSON controlling model fitting.
     pub fn new(config_json: &str) -> Result<WasmCreditCalibrator, JsValue> {
         let config: finstack_quant_factor_model::CreditCalibrationConfig =
             serde_json::from_str(config_json).map_err(to_js_err)?;
@@ -167,6 +169,7 @@ impl WasmCreditCalibrator {
     ///
     /// # Errors
     /// Throws if inputs are structurally invalid or calibration fails.
+    /// @param inputs_json - Credit-factor calibration input JSON containing issuers, spreads, and observations.
     pub fn calibrate(&self, inputs_json: &str) -> Result<WasmCreditFactorModel, JsValue> {
         let inputs: finstack_quant_factor_model::CreditCalibrationInputs =
             serde_json::from_str(inputs_json).map_err(to_js_err)?;
@@ -252,6 +255,11 @@ impl WasmPeriodDecomposition {
 /// Throws if an issuer has no model row and no `runtime_tags` entry, or if
 /// `as_of` cannot be parsed.
 #[wasm_bindgen(js_name = decomposeLevels)]
+/// @param model - Calibrated CreditFactorModel used to produce the covariance forecast.
+/// @param observed_spreads_json - JSON-serialized observed credit spreads used in the level decomposition.
+/// @param observed_generic - Observed generic-market spread component aligned with the model factors.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param runtime_tags_json - Optional runtime-tag JSON selecting the active factor-model configuration.
 pub fn decompose_levels(
     model: &WasmCreditFactorModel,
     observed_spreads_json: &str,
@@ -299,6 +307,8 @@ pub fn decompose_levels(
 /// Throws if `from_levels.date > to_levels.date` or the snapshots disagree
 /// on hierarchy depth.
 #[wasm_bindgen(js_name = decomposePeriod)]
+/// @param from_levels - Credit-factor levels at the start of the attribution period.
+/// @param to_levels - Credit-factor levels at the end of the attribution period.
 pub fn decompose_period(
     from_levels: &WasmLevelsAtDate,
     to_levels: &WasmLevelsAtDate,
@@ -326,6 +336,7 @@ pub struct WasmFactorCovarianceForecast {
 impl WasmFactorCovarianceForecast {
     /// Wrap a `CreditFactorModel` for vol forecasting.
     #[wasm_bindgen(constructor)]
+    /// @param model - Calibrated CreditFactorModel used to produce the covariance forecast.
     pub fn new(model: &WasmCreditFactorModel) -> WasmFactorCovarianceForecast {
         Self {
             model: model.inner.clone(),
@@ -343,6 +354,7 @@ impl WasmFactorCovarianceForecast {
     /// Throws if the horizon string is invalid or the model data is
     /// inconsistent.
     #[wasm_bindgen(js_name = covarianceAt)]
+    /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
     pub fn covariance_at(&self, horizon_json: &str) -> Result<String, JsValue> {
         let h = parse_vol_horizon(horizon_json)?;
         let forecast =
@@ -359,6 +371,8 @@ impl WasmFactorCovarianceForecast {
     /// Throws if the issuer is not present in the model's vol state or the
     /// calibrated variance is negative.
     #[wasm_bindgen(js_name = idiosyncraticVol)]
+    /// @param issuer_id - Stable issuer identifier used to select the required domain object.
+    /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
     pub fn idiosyncratic_vol(&self, issuer_id: &str, horizon_json: &str) -> Result<f64, JsValue> {
         let h = parse_vol_horizon(horizon_json)?;
         let id = finstack_quant_core::types::IssuerId::new(issuer_id);
@@ -378,6 +392,8 @@ impl WasmFactorCovarianceForecast {
     /// Throws if the horizon or risk measure is invalid, or the model builder
     /// rejects the assembled configuration.
     #[wasm_bindgen(js_name = factorModelAt)]
+    /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
+    /// @param risk_measure_json - Risk-measure configuration JSON applied when constructing the horizon factor model.
     pub fn factor_model_at(
         &self,
         horizon_json: &str,

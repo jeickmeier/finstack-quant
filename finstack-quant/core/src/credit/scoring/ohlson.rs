@@ -148,6 +148,11 @@ pub struct OhlsonOScoreInput {
 /// assert!(result.implied_pd.is_some_and(|pd| pd < 0.019));
 /// # Ok::<_, finstack_quant_core::credit::scoring::CreditScoringError>(())
 /// ```
+///
+/// # Arguments
+///
+/// * `input` - Finite accounting and binary-indicator inputs for the original
+///   Ohlson O-Score distress model.
 pub fn ohlson_o_score(input: &OhlsonOScoreInput) -> Result<ScoringResult, CreditScoringError> {
     check_finite("log_total_assets_adjusted", input.log_total_assets_adjusted)?;
     check_finite(

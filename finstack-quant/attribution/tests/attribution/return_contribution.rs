@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use finstack_quant_attribution::attribute_return_contribution;
 use serde_json::{json, Value};
 

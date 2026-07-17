@@ -1,3 +1,5 @@
+//! Mod implementation used by the sensitivities subsystem.
+//!
 pub(crate) mod breakeven;
 pub(crate) mod carry_decomposition;
 pub(crate) mod config;

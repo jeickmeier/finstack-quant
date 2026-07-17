@@ -180,6 +180,27 @@ pub(crate) fn evaluate_integer_arg(
 ///
 /// Handles both basic arithmetic operations (evaluated directly) and
 /// advanced financial/statistical functions (delegated to specialized handlers).
+/// Evaluation reads the current period and historical values from `context`;
+/// `node_id`, when supplied, is incorporated into diagnostics so formula
+/// failures can be traced back to the owning statement node.
+///
+/// # Arguments
+///
+/// * `expr` - Compiled DSL expression to evaluate for the context's current
+///   model period.
+/// * `context` - Mutable evaluation context providing current, historical, and
+///   capital-structure values; diagnostics may be recorded while evaluating.
+/// * `node_id` - Optional owning statement-node identifier included in
+///   diagnostics; `None` is appropriate for standalone expressions.
+///
+/// # Errors
+///
+/// Returns an evaluation error when an expression needs a missing node or
+/// capital-structure value, a function receives invalid arguments (for
+/// example, a non-integral lag window), a historical lookup is unavailable, or
+/// a delegated function cannot evaluate. IEEE non-finite arithmetic may still
+/// return `NaN` with a warning rather than an error where the DSL defines that
+/// as a propagating numerical result.
 pub fn evaluate_formula(
     expr: &Expr,
     context: &mut EvaluationContext,

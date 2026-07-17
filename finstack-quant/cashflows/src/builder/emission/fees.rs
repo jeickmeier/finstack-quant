@@ -294,6 +294,26 @@ pub struct RevolvingFeeEmissionConfig {
 }
 
 /// Emit all revolving-credit fee cashflows for a single accrual period.
+///
+/// Emits positive commitment, usage, and facility fee flows when their
+/// calculated amounts are nonzero. Balances are scalar currency amounts,
+/// fee quotes are annual basis points, and `year_fraction` is the accrual
+/// period in years, so each fee is `balance * bp * 1e-4 * year_fraction`.
+/// Flows are appended in commitment, usage, then facility order.
+///
+/// # Arguments
+///
+/// * `flows` - Mutable output flow list; successful fees append settlement
+///   cashflows in commitment, usage, then facility order.
+/// * `cfg` - Period balances, annual basis-point fee quotes, payment date,
+///   year fraction, and currency used to calculate the fee cashflows.
+///
+/// # Errors
+///
+/// Returns an error when a fee input cannot produce a valid cashflow, such as
+/// a non-finite rate, balance, or accrual factor. Earlier fee flows may already
+/// have been appended when a later fee fails; use a temporary vector when an
+/// atomic update is required.
 pub fn emit_revolving_credit_fees(
     flows: &mut Vec<CashFlow>,
     cfg: &RevolvingFeeEmissionConfig,

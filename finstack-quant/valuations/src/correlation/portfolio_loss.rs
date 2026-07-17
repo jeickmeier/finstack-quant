@@ -123,6 +123,30 @@ impl PortfolioLossResult {
 /// Native builds evaluate paths in parallel; path `i` always uses Philox
 /// substream `i`, so output is bit-identical to [`simulate_portfolio_loss_serial`].
 /// `wasm32` builds use the serial implementation.
+///
+/// Each path draws the configured Gaussian or Student-t copula, compares latent
+/// variables with the exposures' unconditional default-probability thresholds,
+/// and sums `notional * lgd` for defaults. Losses, expected loss, VaR, and
+/// expected shortfall are therefore in the same scalar currency/unit as the
+/// supplied notionals; callers must not mix currencies in one invocation.
+/// `config.seed` and path indexing make the result reproducible across native
+/// serial and parallel execution for the same inputs.
+///
+/// # Errors
+///
+/// Returns an error if the simulation configuration is invalid (including a
+/// zero or excessive path count, invalid confidence, or unsupported copula),
+/// any exposure has invalid/heterogeneous factor loadings, probability, LGD,
+/// notional, or identifier data, copula thresholds cannot be calculated,
+/// allocation fails, or a path loss overflows. No partial loss distribution is
+/// returned.
+///
+/// # Arguments
+///
+/// * `exposures` - Same-currency credit exposures with default probabilities,
+///   LGDs, notionals, and factor loadings used for every simulated path.
+/// * `config` - Copula, confidence, path count, random seed, and simulation
+///   policy; its seed produces deterministic path-indexed streams.
 pub fn simulate_portfolio_loss(
     exposures: &[CreditExposure],
     config: &PortfolioLossConfig,
@@ -131,6 +155,24 @@ pub fn simulate_portfolio_loss(
 }
 
 /// Simulate portfolio losses serially with the canonical path-indexed streams.
+///
+/// This uses the same model, seed, path-to-Philox-substream assignment, and
+/// loss conventions as [`simulate_portfolio_loss`], but evaluates paths in
+/// index order on one thread. Use it for debugging or environments where
+/// parallel execution is unavailable; given identical inputs it produces the
+/// same loss distribution and tail statistics as the native parallel variant.
+///
+/// # Errors
+///
+/// Returns the same validation, copula, allocation, and finite-loss errors as
+/// [`simulate_portfolio_loss`]. No partial result is returned.
+///
+/// # Arguments
+///
+/// * `exposures` - Same-currency credit exposures with default probabilities,
+///   LGDs, notionals, and factor loadings used for every simulated path.
+/// * `config` - Copula, confidence, path count, random seed, and simulation
+///   policy; its seed produces deterministic path-indexed streams.
 pub fn simulate_portfolio_loss_serial(
     exposures: &[CreditExposure],
     config: &PortfolioLossConfig,
@@ -143,6 +185,27 @@ pub fn simulate_portfolio_loss_serial(
 /// The recovery model's conditional LGD is evaluated on the first systematic
 /// factor, matching the one-factor recovery/correlation convention. This
 /// variant therefore requires exactly one factor loading per exposure.
+///
+/// For defaulted names, `recovery.conditional_lgd(factor)` replaces each
+/// exposure's stored `lgd`; notional, default probability, and all other
+/// exposure validation still apply. Outputs remain in the scalar units of the
+/// exposure notionals and use the parallel path-indexed Philox scheme.
+///
+/// # Errors
+///
+/// Returns an error if the recovery specification cannot build, the standard
+/// simulation configuration or exposures are invalid, any exposure does not
+/// have exactly one systematic factor loading, copula/threshold construction
+/// fails, allocation fails, or a simulated path loss becomes non-finite.
+///
+/// # Arguments
+///
+/// * `exposures` - Same-currency one-factor credit exposures; stored LGDs are
+///   replaced by conditional LGD from `recovery` for defaulted names.
+/// * `config` - Copula, confidence, path count, random seed, and simulation
+///   policy for deterministic parallel path simulation.
+/// * `recovery` - Conditional recovery/LGD specification evaluated against the
+///   first systematic factor on each simulated path.
 pub fn simulate_portfolio_loss_with_recovery(
     exposures: &[CreditExposure],
     config: &PortfolioLossConfig,

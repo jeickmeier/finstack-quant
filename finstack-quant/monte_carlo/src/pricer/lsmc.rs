@@ -127,6 +127,16 @@ pub struct AmericanPut {
 
 impl AmericanPut {
     /// Create a validated American put with a positive strike.
+    ///
+    /// The payoff is `max(strike - spot, 0)` in the same scalar unit as the
+    /// simulated spot. This constructor does not attach currency, discounting,
+    /// or exercise-date conventions; the LSMC pricer supplies those context
+    /// inputs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `strike <= 0`. NaN is not separately rejected by
+    /// this comparison and can therefore propagate through payoff evaluation.
     pub fn new(strike: f64) -> finstack_quant_core::Result<Self> {
         if strike <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
@@ -152,6 +162,15 @@ pub struct AmericanCall {
 
 impl AmericanCall {
     /// Create a validated American call with a positive strike.
+    ///
+    /// The payoff is `max(spot - strike, 0)` in the same scalar unit as the
+    /// simulated spot. Currency, discounting, and exercise-date conventions
+    /// are provided by the LSMC pricer rather than this payoff object.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `strike <= 0`. NaN is not separately rejected by
+    /// this comparison and can therefore propagate through payoff evaluation.
     pub fn new(strike: f64) -> finstack_quant_core::Result<Self> {
         if strike <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
@@ -195,6 +214,13 @@ impl LsmcConfig {
     /// (American boundary condition) whether or not it is listed — a
     /// Bermudan whose last exercise right ends strictly before maturity is
     /// not representable; set `num_steps` to the last exercise step instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `num_paths` is zero, no exercise date is supplied,
+    /// any date is zero, or any date exceeds `num_steps`. Duplicate dates are
+    /// accepted but removed after sorting, and the registry supplies the
+    /// default seed and parallel-execution setting.
     pub fn new(
         num_paths: usize,
         exercise_dates: Vec<usize>,

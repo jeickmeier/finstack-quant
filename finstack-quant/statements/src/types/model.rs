@@ -184,7 +184,21 @@ impl FinancialModelSpec {
     /// Validate model semantics that serde alone cannot enforce.
     ///
     /// This mirrors the terminal validation performed by the builder so JSON
-    /// entry points reject structurally invalid models before evaluation.
+    /// entry points reject structurally invalid models before evaluation. It
+    /// infers omitted node value types from explicit values, validates formula
+    /// syntax and known monetary/scalar dimensions, and validates the optional
+    /// capital-structure waterfall. This method may populate `value_type` on
+    /// nodes that have explicit values and no declared type.
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error for an empty period set, reserved node IDs,
+    /// incompatible node-type fields (such as a calculated node with values),
+    /// mixed scalar/monetary values or currencies within a node, invalid
+    /// formulas or known dimensions, or an invalid waterfall. Unknown formula
+    /// references are warned about and deferred to evaluation to allow optional
+    /// registry metrics; callers should treat that warning as a likely model
+    /// authoring error and resolve it before production use.
     pub fn validate_semantics(&mut self) -> Result<()> {
         if self.periods.is_empty() {
             return Err(Error::build("Model must have at least one period"));

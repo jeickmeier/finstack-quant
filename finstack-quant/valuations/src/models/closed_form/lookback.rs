@@ -66,13 +66,15 @@ const RATE_EQ_DIV_TOL: f64 = 1e-7;
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price
-/// * `strike` - Fixed strike price
-/// * `time` - Time to maturity (years)
-/// * `rate` - Risk-free rate
-/// * `div_yield` - Dividend yield
-/// * `vol` - Volatility
-/// * `spot_max` - Maximum spot observed so far (S_max up to now)
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Fixed exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `spot_max` - Highest observed underlying spot including the current
+///   observation, in the same units as `spot`.
 ///
 /// # Returns
 ///
@@ -169,13 +171,15 @@ pub fn fixed_strike_lookback_call(
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price
-/// * `strike` - Fixed strike price
-/// * `time` - Time to maturity (years)
-/// * `rate` - Risk-free rate
-/// * `div_yield` - Dividend yield
-/// * `vol` - Volatility
-/// * `spot_min` - Minimum spot observed so far (S_min up to now)
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `strike` - Fixed exercise price in the same units as `spot`.
+/// * `time` - Remaining time to maturity in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `spot_min` - Lowest observed underlying spot including the current
+///   observation, in the same units as `spot`.
 ///
 /// # Returns
 ///
@@ -267,12 +271,14 @@ pub fn fixed_strike_lookback_put(
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price
-/// * `time` - Time to maturity (years)
-/// * `rate` - Risk-free rate
-/// * `div_yield` - Dividend yield
-/// * `vol` - Volatility
-/// * `spot_min` - Minimum spot observed so far
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `time` - Remaining time to maturity in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `spot_min` - Lowest observed underlying spot including the current
+///   observation, in the same units as `spot`.
 ///
 /// # Returns
 ///
@@ -366,12 +372,14 @@ pub fn floating_strike_lookback_call(
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price
-/// * `time` - Time to maturity (years)
-/// * `rate` - Risk-free rate
-/// * `div_yield` - Dividend yield
-/// * `vol` - Volatility
-/// * `spot_max` - Maximum spot observed so far
+/// * `spot` - Current underlying spot price in the option's price units.
+/// * `time` - Remaining time to maturity in years.
+/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
+/// * `div_yield` - Continuously compounded dividend yield or foreign-rate
+///   carry as a decimal.
+/// * `vol` - Annualized lognormal volatility as a decimal.
+/// * `spot_max` - Highest observed underlying spot including the current
+///   observation, in the same units as `spot`.
 ///
 /// # Returns
 ///

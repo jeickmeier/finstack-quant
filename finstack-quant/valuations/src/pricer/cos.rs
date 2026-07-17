@@ -113,6 +113,12 @@ pub struct MertonJumpCosParams {
 }
 
 /// Price a European option under Black-Scholes using the COS method.
+///
+/// # Arguments
+///
+/// * `params` - Black-Scholes COS input bag containing spot, strike, maturity,
+///   continuous rates/carry, volatility, payoff direction, and optional term
+///   count; `None` uses [`CosConfig::default`].
 pub fn bs_cos_price(params: BlackScholesCosParams) -> std::result::Result<f64, PricingError> {
     let cf = BlackScholesCf {
         r: params.rate,
@@ -131,6 +137,12 @@ pub fn bs_cos_price(params: BlackScholesCosParams) -> std::result::Result<f64, P
 }
 
 /// Price a European option under Variance Gamma using the COS method.
+///
+/// # Arguments
+///
+/// * `params` - Variance-Gamma COS input bag containing option data, continuous
+///   rates/carry, process parameters, payoff direction, and optional term
+///   count; `None` uses [`CosConfig::default`].
 pub fn vg_cos_price(params: VarianceGammaCosParams) -> std::result::Result<f64, PricingError> {
     let cf = VarianceGammaCf {
         r: params.rate,
@@ -151,6 +163,12 @@ pub fn vg_cos_price(params: VarianceGammaCosParams) -> std::result::Result<f64, 
 }
 
 /// Price a European option under Merton jump-diffusion using the COS method.
+///
+/// # Arguments
+///
+/// * `params` - Merton jump-diffusion COS input bag containing option data,
+///   continuous rates/carry, diffusion and jump parameters, payoff direction,
+///   and optional term count; `None` uses [`CosConfig::default`].
 pub fn merton_jump_cos_price(
     params: MertonJumpCosParams,
 ) -> std::result::Result<f64, PricingError> {

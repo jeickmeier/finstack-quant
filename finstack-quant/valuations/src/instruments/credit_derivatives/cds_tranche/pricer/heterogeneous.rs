@@ -1,3 +1,5 @@
+//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
+//!
 use super::config::{
     CDSTranchePricer, HeteroMethod, PoolExposure, ADAPTIVE_INTEGRATION_HIGH,
     ADAPTIVE_INTEGRATION_LOW, CDF_CLIP, GRID_STEP_MIN, HOMOGENEITY_TOLERANCE, LGD_FLOOR,

@@ -426,6 +426,15 @@ pub struct PositionVolContribution {
 /// `by_position = true` populates [`CreditVolReport::by_position_optional`]
 /// from [`RiskDecomposition::position_factor_contributions`] and
 /// [`RiskDecomposition::position_residual_contributions`].
+///
+/// # Arguments
+///
+/// * `decomposition` - Portfolio risk decomposition with canonical credit
+///   factor IDs and residual contributions to group into volatility buckets.
+/// * `model` - Credit factor model whose hierarchy assigns level names to the
+///   recognized credit factor IDs.
+/// * `by_position` - Whether to include position-level factor and
+///   idiosyncratic allocations; `false` returns portfolio-level totals only.
 #[must_use]
 pub fn build_credit_vol_report(
     decomposition: &RiskDecomposition,

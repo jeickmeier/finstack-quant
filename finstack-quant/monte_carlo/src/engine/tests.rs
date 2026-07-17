@@ -1,3 +1,5 @@
+//! Execution, configuration, and diagnostics for Monte Carlo pricing.
+//!
 use super::*;
 use crate::paths::{CashflowType, ProcessParams};
 use crate::results::MonteCarloResult;

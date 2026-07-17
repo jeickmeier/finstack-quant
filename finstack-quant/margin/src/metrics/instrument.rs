@@ -388,6 +388,14 @@ impl TotalMarginMetric {
 /// Batch calculate margin for multiple instruments.
 ///
 /// Efficiently calculates margin requirements for a collection of instruments.
+///
+/// # Arguments
+///
+/// * `instruments` - Iterator of marginable instruments to value independently;
+///   each result remains aligned with its input iteration order.
+/// * `market` - Market context supplying pricing, collateral, and risk inputs
+///   used by each margin calculation.
+/// * `as_of` - Valuation date applied consistently to every instrument result.
 pub fn calculate_instrument_margins<'a>(
     instruments: impl Iterator<Item = &'a dyn Marginable>,
     market: &MarketContext,

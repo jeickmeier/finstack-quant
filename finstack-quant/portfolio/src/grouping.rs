@@ -67,6 +67,12 @@ pub fn group_by_attribute<'a>(
 /// # Returns
 ///
 /// [`Result`] with an [`IndexMap`] of attribute values to aggregated [`Money`].
+///
+/// # Errors
+///
+/// Returns an error when a requested position has no corresponding valuation
+/// or its base-currency amount cannot be added to `base_ccy` (including a
+/// currency mismatch or monetary overflow).
 pub fn aggregate_by_attribute(
     valuation: &PortfolioValuation,
     positions: &[Position],
@@ -112,6 +118,11 @@ pub fn aggregate_by_attribute(
 ///
 /// [`Result`] containing an [`IndexMap`] whose keys are the ordered attribute values
 /// and whose values are the aggregated [`Money`] totals.
+///
+/// # Errors
+///
+/// Returns an error when a requested position has no corresponding valuation
+/// or its base-currency amount cannot be added to `base_ccy`.
 pub fn aggregate_by_multiple_attributes(
     valuation: &PortfolioValuation,
     positions: &[Position],
@@ -166,6 +177,12 @@ pub fn aggregate_by_multiple_attributes(
 ///
 /// [`Result`] with an [`IndexMap`] of book IDs to aggregated [`Money`].
 /// Includes both direct and rolled-up values from child books.
+///
+/// # Errors
+///
+/// Returns an error for a missing referenced book or position valuation, a
+/// cycle or excessive depth in `child_book_ids`, or an incompatible/overflowing
+/// monetary addition.
 ///
 /// # Example
 ///

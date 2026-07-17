@@ -143,6 +143,17 @@ pub struct CashflowRow {
 /// `{"discounting", "hazard_rate"}`, if the `(instrument_type, model)` pair is
 /// not in the standard pricer registry, if required curves are missing from
 /// the market, or if the schedule mixes currencies.
+///
+/// # Arguments
+///
+/// * `instrument_json` - UTF-8 canonical tagged instrument JSON, either in a
+///   versioned envelope or bare registry-supported form.
+/// * `market` - Market context supplying discount, credit, index, and FX data
+///   required to build and value the cashflow schedule.
+/// * `as_of` - ISO-8601 valuation date used for schedule eligibility and
+///   cashflow present values.
+/// * `model` - Registered pricing-model name: `"discounting"` or
+///   `"hazard_rate"` when that instrument/model pair is supported.
 pub fn instrument_cashflows_json(
     instrument_json: &str,
     market: &MarketContext,

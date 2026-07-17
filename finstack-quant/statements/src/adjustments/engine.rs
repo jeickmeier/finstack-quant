@@ -14,7 +14,21 @@ use indexmap::IndexMap;
 pub struct NormalizationEngine;
 
 impl NormalizationEngine {
-    /// Normalize a target node across all periods in the results.
+    /// Normalize a target node across every period present in the results.
+    ///
+    /// Each result starts with the reported target value, applies configured
+    /// adjustments in their declaration order, then adds the capped adjustment
+    /// total. Fixed adjustments default to zero for periods not listed. A
+    /// percentage adjustment uses its referenced node's value for the same
+    /// period. Self-referential caps use either the reported base or the
+    /// progressively adjusted base according to [`CapBaseMode`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an evaluation error if `target_node` is absent, an adjustment's
+    /// referenced or cap-base node is missing, a percentage source lacks a
+    /// value for a target period, or a cap is negative. Results are returned
+    /// only after all periods are processed and are sorted chronologically.
     pub fn normalize(
         results: &StatementResult,
         config: &NormalizationConfig,

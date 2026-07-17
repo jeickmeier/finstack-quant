@@ -27,6 +27,27 @@
 - `doc_overindented_list_items`: list item continuations use 2-space indent, not aligned to preceding text
 - Fix lint/type/test errors before resorting to `#[allow(...)]` as last resort
 
+## Public API Documentation Contract
+
+- Every public Rust function, associated function, trait method, and constructor
+  with one or more caller-supplied inputs must include a `# Arguments` section.
+- Document every input by its exact Rust parameter name in a Markdown list. Each
+  entry must explain the value's purpose and, where applicable, its units,
+  conventions, accepted range or shape, defaults, lookup semantics, ownership,
+  and effects on state or calculation results. Do not use tautologies such as
+  "the input value" or merely repeat the parameter type.
+- Financial inputs must state their representation and market convention (for
+  example, decimal rate versus percentage or basis points, date/day-count
+  convention, currency, curve role, and bump unit). Document identifier and
+  optional-input fallback behavior where it changes the result.
+- The same bar applies to host-language APIs: Python stub and pure-Python
+  docstrings must document every parameter, and WASM-exposed APIs must preserve
+  equivalent input guidance in Rustdoc/TypeScript-facing documentation.
+- `mise run rust-doc`, `mise run python-doc`, and `mise run wasm-doc` enforce
+  the exact-parameter, substantive-description standard for public Rust,
+  Python, and WASM callables. Update documentation in the same change as any
+  public signature.
+
 ## Architecture: Binding Layer
 
 - Rust is the canonical API design. Type and function names in Python/WASM must match Rust exactly (exceptions only for documented host-language collisions)

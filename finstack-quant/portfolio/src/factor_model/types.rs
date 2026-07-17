@@ -1,3 +1,5 @@
+//! Portfolio-level factor assignment, decomposition, and what-if analysis.
+//!
 use crate::types::PositionId;
 use finstack_quant_core::types::IssuerId;
 use finstack_quant_factor_model::{FactorId, RiskMeasure};

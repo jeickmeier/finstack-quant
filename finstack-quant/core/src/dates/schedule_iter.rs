@@ -1047,6 +1047,23 @@ impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
 
 impl ScheduleSpec {
     /// Reconstruct a [`Schedule`] using the persisted configuration.
+    ///
+    /// This applies the same scheduling rules as [`ScheduleBuilder`], including
+    /// stub handling, end-of-month logic, standard or CDS IMM mode, and the
+    /// configured error policy. Business-day adjustment is enabled only when
+    /// both `business_day_convention` and `calendar_id` are present; either
+    /// value alone leaves dates unadjusted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if both IMM modes are selected, the date range or
+    /// frequency is invalid, a strict calendar lookup or business-day
+    /// adjustment fails, or schedule generation fails. With
+    /// [`ScheduleErrorPolicy::MissingCalendarWarning`], a missing calendar
+    /// produces an unadjusted schedule carrying a warning. With
+    /// [`ScheduleErrorPolicy::GracefulEmpty`], recoverable builder errors
+    /// instead produce an empty schedule with a graceful-fallback warning;
+    /// mutually exclusive IMM modes always remain errors.
     pub fn build(&self) -> crate::Result<Schedule> {
         if self.imm_mode && self.cds_imm_mode {
             return Err(crate::Error::Validation(

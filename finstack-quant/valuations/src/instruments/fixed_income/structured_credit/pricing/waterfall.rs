@@ -96,6 +96,17 @@ pub struct WaterfallContext<'a> {
 }
 
 /// Execute waterfall to distribute available cash.
+///
+/// # Arguments
+///
+/// * `waterfall` - Ordered payment rules, base currency, and diversion logic
+///   that control each allocation.
+/// * `tranches` - Tranche structure receiving interest, principal, fees, and
+///   other waterfall distributions.
+/// * `pool` - Asset pool supplying collateral balances and data for coverage
+///   tests and allocation calculations.
+/// * `context` - Period cash, dates, market data, dynamic balances, reserve,
+///   and deferred-interest state used for this payment date.
 pub fn execute_waterfall(
     waterfall: &Waterfall,
     tranches: &TrancheStructure,
@@ -350,6 +361,15 @@ fn execute_waterfall_core(
 }
 
 /// Execute waterfall with optional explanation trace.
+///
+/// # Arguments
+///
+/// * `waterfall` - Ordered payment rules, base currency, and diversion logic.
+/// * `tranches` - Tranche structure receiving the calculated distributions.
+/// * `pool` - Asset pool supplying collateral and coverage-test data.
+/// * `context` - Period cash, dates, market data, and dynamic balance state.
+/// * `explain` - Trace configuration; disabled tracing leaves the economic
+///   allocations unchanged while avoiding explanation records.
 pub fn execute_waterfall_with_explanation(
     waterfall: &Waterfall,
     tranches: &TrancheStructure,
@@ -361,6 +381,16 @@ pub fn execute_waterfall_with_explanation(
 }
 
 /// Execute waterfall using a pre-allocated workspace for zero-allocation hot paths.
+///
+/// # Arguments
+///
+/// * `waterfall` - Ordered payment rules, base currency, and diversion logic.
+/// * `tranches` - Tranche structure receiving the calculated distributions.
+/// * `pool` - Asset pool supplying collateral and coverage-test data.
+/// * `context` - Period cash, dates, market data, and dynamic balance state.
+/// * `explain` - Trace configuration for the resulting allocation explanation.
+/// * `workspace` - Caller-owned reusable buffers overwritten during execution
+///   and retained for subsequent zero-allocation waterfall calls.
 pub fn execute_waterfall_with_workspace(
     waterfall: &Waterfall,
     tranches: &TrancheStructure,

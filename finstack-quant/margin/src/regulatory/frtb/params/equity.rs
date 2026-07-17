@@ -46,6 +46,11 @@ static EQUITY_RW_BY_BUCKET: LazyLock<HashMap<u8, f64>> =
     LazyLock::new(|| EQUITY_RISK_WEIGHTS.iter().copied().collect());
 
 /// Look up an equity risk weight by bucket.
+///
+/// # Arguments
+///
+/// * `bucket` - FRTB equity risk bucket number; unmapped buckets use the
+///   regulatory fallback risk weight of 55.0.
 #[must_use]
 pub fn equity_risk_weight(bucket: u8) -> f64 {
     EQUITY_RW_BY_BUCKET.get(&bucket).copied().unwrap_or(55.0)

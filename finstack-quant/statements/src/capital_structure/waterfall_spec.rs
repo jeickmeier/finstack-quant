@@ -78,9 +78,24 @@ impl WaterfallSpec {
     /// - `ecf_sweep.sweep_percentage` (when configured) lies in `[0.0, 1.0]`.
     /// - When an ECF sweep with a positive `sweep_percentage` is configured,
     ///   at least one prepayment priority (`Sweep`, `MandatoryPrepayment`, or
-    ///   `VoluntaryPrepayment`) must be present, and `Sweep` MUST precede
-    ///   `Equity` in `priority_of_payments`. Otherwise the waterfall engine
-    ///   silently zeros or never applies the configured sweep.
+    ///   `VoluntaryPrepayment`) must be present. Any configured `Equity` entry
+    ///   is terminal, so every such prepayment priority necessarily precedes
+    ///   equity. Otherwise the waterfall engine silently zeros or never applies
+    ///   the configured sweep.
+    ///
+    /// When `available_cash_node` is set, the fees, interest, and amortization
+    /// priorities must all be listed so every cash-consuming category is capped
+    /// against the same available-cash source. Equity, if included, must be
+    /// terminal because the engine pays it from residual cash after the stack.
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error for duplicate priorities, a non-terminal equity
+    /// entry, incomplete cash-capping priorities, an empty PIK-toggle target
+    /// set, a sweep percentage outside `[0, 1]`, or a positive ECF sweep with
+    /// no prepayment priority. Validation does not confirm that referenced
+    /// model nodes or instruments exist; that requires the enclosing model and
+    /// evaluation context.
     pub fn validate(&self) -> Result<()> {
         for (idx, priority) in self.priority_of_payments.iter().enumerate() {
             if self.priority_of_payments[..idx].contains(priority) {

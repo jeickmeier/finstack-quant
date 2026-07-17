@@ -54,6 +54,21 @@ fn default_weighting() -> WeightingScheme {
 /// optimization problem, and returns the native
 /// [`PortfolioOptimizationResult`] — which serializes to the canonical JSON
 /// wire format via its `Serialize` impl.
+///
+/// # Arguments
+///
+/// * `spec` - Complete optimization specification containing portfolio,
+///   objective, constraints, weighting, and missing-metric policy.
+/// * `market` - Market context used to resolve any market-dependent metrics
+///   required by the objective or constraints.
+/// * `config` - Finstack configuration passed through to optimization and
+///   valuation helpers.
+///
+/// # Errors
+///
+/// Propagates invalid portfolio-spec, objective, constraint, weighting, and
+/// missing-metric-policy inputs, along with optimization and market-dependent
+/// valuation failures.
 pub fn optimize_from_spec(
     spec: &PortfolioOptimizationSpec,
     market: &MarketContext,

@@ -146,6 +146,12 @@ class TearSheet:
         )
 
     def save(self, path: str | os.PathLike[str]) -> None:
-        """Write the standalone document to ``path`` (UTF-8)."""
+        """Write the standalone document to a UTF-8 file.
+
+        Parameters
+        ----------
+        path : str or os.PathLike[str]
+            Destination HTML file path; existing content is replaced.
+        """
         with Path(path).open("w", encoding="utf-8") as fh:
             fh.write(self.to_html())

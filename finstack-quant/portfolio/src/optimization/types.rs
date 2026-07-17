@@ -1,3 +1,5 @@
+//! Problem, decision-space, constraint, and solver types for portfolio optimization.
+//!
 use crate::types::AttributeTest;
 use finstack_quant_valuations::metrics::MetricId;
 use serde::{Deserialize, Serialize};

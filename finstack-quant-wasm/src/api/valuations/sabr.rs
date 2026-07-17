@@ -27,6 +27,11 @@ pub struct WasmSabrParameters {
 impl WasmSabrParameters {
     #[wasm_bindgen(constructor)]
     /// Create the object from its inputs.
+    /// @param alpha - Positive SABR initial volatility scale parameter.
+    /// @param beta - SABR CEV elasticity parameter from 0 through 1.
+    /// @param nu - Positive SABR volatility-of-volatility parameter.
+    /// @param rho - Instantaneous correlation between the asset and variance shocks.
+    /// @param shift - Additive SABR rate shift applied to forward and strike before modelling.
     pub fn new(
         alpha: f64,
         beta: f64,
@@ -115,6 +120,7 @@ pub struct WasmSabrModel {
 impl WasmSabrModel {
     #[wasm_bindgen(constructor)]
     /// Create the object from its inputs.
+    /// @param params - SABR parameter object containing alpha, beta, nu, rho, and optional shift.
     pub fn new(params: &WasmSabrParameters) -> WasmSabrModel {
         Self {
             inner: SABRModel::new(params.clone_inner()),
@@ -123,6 +129,9 @@ impl WasmSabrModel {
 
     #[wasm_bindgen(js_name = impliedVol)]
     /// Black implied volatility for the given strike.
+    /// @param forward - Forward price or rate in the same quote convention as the strike.
+    /// @param strike - Option strike price in the same price units as the underlying.
+    /// @param t - Time from the curve base date in years on the documented day-count basis.
     pub fn implied_vol(&self, forward: f64, strike: f64, t: f64) -> Result<f64, JsValue> {
         self.inner
             .implied_volatility(forward, strike, t)
@@ -158,6 +167,9 @@ pub struct WasmSabrSmile {
 impl WasmSabrSmile {
     #[wasm_bindgen(constructor)]
     /// Create the object from its inputs.
+    /// @param params - SABR parameter object containing alpha, beta, nu, rho, and optional shift.
+    /// @param forward - Forward price or rate in the same quote convention as the strike.
+    /// @param t - Time from the curve base date in years on the documented day-count basis.
     pub fn new(params: &WasmSabrParameters, forward: f64, t: f64) -> WasmSabrSmile {
         let model = SABRModel::new(params.clone_inner());
         Self {
@@ -173,6 +185,7 @@ impl WasmSabrSmile {
 
     #[wasm_bindgen(js_name = impliedVol)]
     /// Black implied volatility for the given strike.
+    /// @param strike - Option strike price in the same price units as the underlying.
     pub fn implied_vol(&self, strike: f64) -> Result<f64, JsValue> {
         self.inner
             .generate_smile(&[strike])
@@ -182,6 +195,7 @@ impl WasmSabrSmile {
 
     #[wasm_bindgen(js_name = generateSmile)]
     /// Implied volatilities for a strike grid.
+    /// @param strikes - Option strikes at which to evaluate the SABR volatility smile.
     pub fn generate_smile(&self, strikes: Vec<f64>) -> Result<Vec<f64>, JsValue> {
         self.inner.generate_smile(&strikes).map_err(to_js_err)
     }
@@ -192,6 +206,9 @@ impl WasmSabrSmile {
     /// and `monotonicity_violations` arrays (snake_case keys matching the Rust
     /// canonical fields and the Python binding).
     #[wasm_bindgen(js_name = arbitrageDiagnostics)]
+    /// @param strikes - Ordered option strikes used to test the calibrated smile for static arbitrage.
+    /// @param r - Continuously compounded risk-free rate, expressed as a decimal.
+    /// @param q - Continuous dividend yield or foreign rate, expressed as a decimal.
     pub fn arbitrage_diagnostics(
         &self,
         strikes: Vec<f64>,
@@ -269,6 +286,7 @@ impl WasmSabrCalibrator {
     /// tolerance, preserving all other settings (e.g. the iteration cap from
     /// `highPrecision`).
     #[wasm_bindgen(js_name = withTolerance)]
+    /// @param tolerance - Non-negative numerical convergence tolerance for the calibration optimizer.
     pub fn with_tolerance(&self, tolerance: f64) -> WasmSabrCalibrator {
         Self {
             inner: self.inner.clone().with_tolerance(tolerance),
@@ -276,6 +294,11 @@ impl WasmSabrCalibrator {
     }
 
     /// Calibrate `(alpha, nu, rho)` to market vols with `beta` fixed.
+    /// @param forward - Forward price or rate in the same quote convention as the strike.
+    /// @param strikes - Option strikes aligned one-for-one with market_vols.
+    /// @param market_vols - Market-implied annualized volatilities aligned one-for-one with strikes.
+    /// @param t - Time from the curve base date in years on the documented day-count basis.
+    /// @param beta - SABR CEV elasticity parameter held fixed during calibration.
     pub fn calibrate(
         &self,
         forward: f64,
@@ -297,6 +320,11 @@ impl WasmSabrCalibrator {
     /// performed with an automatically chosen shift; otherwise this behaves
     /// like `calibrate`.
     #[wasm_bindgen(js_name = calibrateAutoShift)]
+    /// @param forward - Forward price or rate in the same quote convention as the strike.
+    /// @param strikes - Option strikes aligned one-for-one with market_vols.
+    /// @param market_vols - Market-implied annualized volatilities aligned one-for-one with strikes.
+    /// @param t - Time from the curve base date in years on the documented day-count basis.
+    /// @param beta - SABR CEV elasticity parameter held fixed during calibration.
     pub fn calibrate_auto_shift(
         &self,
         forward: f64,

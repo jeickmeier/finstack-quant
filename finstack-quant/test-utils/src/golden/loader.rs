@@ -20,6 +20,11 @@ use std::path::Path;
 /// - Array format: `[...]` (cases only, no metadata)
 /// - Single object format: `{...}` (single case, no metadata)
 ///
+/// # Arguments
+///
+/// * `path` - Filesystem path to a UTF-8 JSON fixture in any supported golden
+///   suite format.
+///
 /// # Errors
 ///
 /// Returns an error if the file cannot be read or parsed.
@@ -59,6 +64,16 @@ where
 /// Load a golden suite from a JSON string.
 ///
 /// Supports the same formats as [`load_suite_from_path`].
+///
+/// # Arguments
+///
+/// * `json` - UTF-8 JSON text containing a canonical suite, array of cases, or
+///   one case deserializable as `T`.
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] when `json` is neither a serialized
+/// [`GoldenSuite`] nor a JSON array of cases deserializable as `T`.
 pub fn load_suite_from_str<T>(json: &str) -> Result<GoldenSuite<T>, Error>
 where
     T: DeserializeOwned,
@@ -108,6 +123,11 @@ where
 ///
 /// let cases = load_cases_from_dir::<CdsVector>("tests/golden/cds/", Some("schema"))?;
 /// ```
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] if `dir` cannot be read, a selected entry
+/// cannot be read as UTF-8 text, or its JSON cannot deserialize as `T`.
 pub fn load_cases_from_dir<T>(
     dir: impl AsRef<Path>,
     exclude_pattern: Option<&str>,
@@ -163,6 +183,18 @@ where
 /// Load a golden suite from a directory where each file is a test case.
 ///
 /// Wraps the loaded cases in a `GoldenSuite` with default metadata.
+///
+/// # Arguments
+///
+/// * `dir` - Directory whose selected JSON files each contain one case of
+///   type `T`.
+/// * `exclude_pattern` - Optional filename substring used to skip matching JSON
+///   files, such as schema fixtures.
+///
+/// # Errors
+///
+/// Propagates the directory, file-read, and case-deserialization errors from
+/// [`load_cases_from_dir`].
 pub fn load_suite_from_dir<T>(
     dir: impl AsRef<Path>,
     exclude_pattern: Option<&str>,
@@ -185,6 +217,12 @@ where
 ///
 /// Returns `true` if status is "certified", `false` otherwise.
 /// Prints a message if the suite is skipped.
+///
+/// # Arguments
+///
+/// * `meta` - Suite metadata whose status is compared case-insensitively with
+///   `"certified"`.
+/// * `label` - Human-readable suite label included in the skip log message.
 pub fn is_suite_ready(meta: &SuiteMeta, label: &str) -> bool {
     let status = meta.status.to_ascii_lowercase();
     if status == "certified" {
@@ -210,6 +248,12 @@ pub fn is_suite_ready(meta: &SuiteMeta, label: &str) -> bool {
 /// ```ignore
 /// let path = golden_path(env!("CARGO_MANIFEST_DIR"), "data/my_suite.json");
 /// ```
+///
+/// # Arguments
+///
+/// * `manifest_dir` - Calling crate's manifest directory, normally
+///   `env!("CARGO_MANIFEST_DIR")`.
+/// * `relative_path` - Path relative to that crate's `tests/golden` directory.
 pub fn golden_path(manifest_dir: &str, relative_path: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(manifest_dir)
         .join("tests")
@@ -218,6 +262,11 @@ pub fn golden_path(manifest_dir: &str, relative_path: &str) -> std::path::PathBu
 }
 
 /// Construct a path to the golden data directory relative to CARGO_MANIFEST_DIR.
+///
+/// # Arguments
+///
+/// * `manifest_dir` - Calling crate's manifest directory, normally
+///   `env!("CARGO_MANIFEST_DIR")`.
 pub fn golden_data_dir(manifest_dir: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(manifest_dir)
         .join("tests")
@@ -226,6 +275,11 @@ pub fn golden_data_dir(manifest_dir: &str) -> std::path::PathBuf {
 }
 
 /// Construct a path to the golden root directory relative to CARGO_MANIFEST_DIR.
+///
+/// # Arguments
+///
+/// * `manifest_dir` - Calling crate's manifest directory, normally
+///   `env!("CARGO_MANIFEST_DIR")`.
 pub fn golden_dir(manifest_dir: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(manifest_dir)
         .join("tests")

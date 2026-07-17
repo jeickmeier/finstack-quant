@@ -147,18 +147,33 @@ static CSR_SEC_NONCTP_BY_BUCKET: LazyLock<HashMap<u8, f64>> =
     LazyLock::new(|| CSR_SEC_NONCTP_RISK_WEIGHTS.iter().copied().collect());
 
 /// Look up a CSR non-sec risk weight by bucket.
+///
+/// # Arguments
+///
+/// * `bucket` - FRTB CSR non-securitization bucket number; unmapped buckets
+///   use the regulatory fallback weight of 5.0.
 #[must_use]
 pub fn csr_nonsec_risk_weight(bucket: u8) -> f64 {
     CSR_NONSEC_BY_BUCKET.get(&bucket).copied().unwrap_or(5.0)
 }
 
 /// Look up a CSR sec CTP risk weight by bucket.
+///
+/// # Arguments
+///
+/// * `bucket` - FRTB CSR securitization-correlation-trading-portfolio bucket
+///   number; unmapped buckets use the fallback weight of 8.0.
 #[must_use]
 pub fn csr_sec_ctp_risk_weight(bucket: u8) -> f64 {
     CSR_SEC_CTP_BY_BUCKET.get(&bucket).copied().unwrap_or(8.0)
 }
 
 /// Look up a CSR sec non-CTP risk weight by bucket.
+///
+/// # Arguments
+///
+/// * `bucket` - FRTB CSR non-CTP securitization bucket number; unmapped
+///   buckets use the regulatory fallback weight of 5.0.
 #[must_use]
 pub fn csr_sec_nonctp_risk_weight(bucket: u8) -> f64 {
     CSR_SEC_NONCTP_BY_BUCKET

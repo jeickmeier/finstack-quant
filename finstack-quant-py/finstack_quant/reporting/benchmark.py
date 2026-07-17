@@ -170,8 +170,10 @@ def benchmark_tearsheet(
         A pre-computed ``multi_factor_greeks`` result; enables the multi-factor section.
     factor_names : list[str], optional
         Labels for the multi-factor betas (default ``Factor 1..n``).
-    title, subtitle : str, optional
-        Header text; defaults derive from the ticker names.
+    title : str, optional
+        Optional main report heading; defaults derive from the ticker names.
+    subtitle : str, optional
+        Optional secondary heading shown below ``title``.
     sections : list[str], optional
         Subset of :data:`ALL_SECTIONS` (default: all).
     theme : Theme

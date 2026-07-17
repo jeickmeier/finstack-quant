@@ -14,11 +14,11 @@ use serde::{Deserialize, Serialize};
 use super::enums::{TrancheSeniority, TriggerConsequence};
 use finstack_quant_core::types::CreditRating;
 
-/// Tranche behavioral types (simplified to standard only)
+/// Tranche behavioral type used by the structured-credit waterfall.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[non_exhaustive]
 pub enum TrancheBehaviorType {
-    /// Standard bond (pays interest and principal)
+    /// Standard debt tranche that receives interest and principal payments.
     Standard,
 }
 
@@ -26,22 +26,22 @@ fn default_behavior_type() -> TrancheBehaviorType {
     TrancheBehaviorType::Standard
 }
 
-/// Coverage test trigger specification
+/// Coverage-test trigger specification for a tranche or deal.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct CoverageTrigger {
-    /// Trigger threshold level (e.g., 1.20 for 120% OC)
+    /// Breach threshold, expressed as a coverage ratio (1.20 means 120%).
     pub trigger_level: f64,
-    /// Higher level required to cure breach
+    /// Optional higher coverage ratio required to cure a breach.
     pub cure_level: Option<f64>,
-    /// Date when breach occurred (if any)
+    /// Date on which the breach was recorded, if one has occurred.
     #[schemars(with = "Option<String>")]
     pub breach_date: Option<Date>,
-    /// What happens when triggered
+    /// Consequence applied while the trigger is breached.
     pub consequence: TriggerConsequence,
 }
 
 impl CoverageTrigger {
-    /// Create a new coverage trigger
+    /// Create a coverage trigger with no separate cure threshold.
     pub fn new(trigger_level: f64, consequence: TriggerConsequence) -> Self {
         Self {
             trigger_level,
@@ -51,18 +51,20 @@ impl CoverageTrigger {
         }
     }
 
-    /// With cure level (typically higher than trigger)
+    /// Set a separate cure threshold and return the updated trigger.
     pub fn with_cure_level(mut self, cure_level: f64) -> Self {
         self.cure_level = Some(cure_level);
         self
     }
 
-    /// Check if currently breached
+    /// Return whether current_level is below the breach threshold.
     pub fn is_breached(&self, current_level: f64) -> bool {
         current_level < self.trigger_level
     }
 
-    /// Check if breach is cured
+    /// Return whether current_level has reached the cure threshold.
+    ///
+    /// When no cure level is configured, the breach threshold itself is used.
     pub fn is_cured(&self, current_level: f64) -> bool {
         if let Some(cure) = self.cure_level {
             current_level >= cure
@@ -72,18 +74,18 @@ impl CoverageTrigger {
     }
 }
 
-/// Credit enhancement mechanisms for a tranche
+/// Credit-enhancement amounts and flags available to a tranche.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct CreditEnhancement {
-    /// Subordination amount (sum of junior tranches)
+    /// Principal subordination supplied by junior tranches.
     pub subordination: Money,
-    /// Overcollateralization amount
+    /// Collateral balance in excess of rated tranche balance.
     pub overcollateralization: Money,
-    /// Reserve account balance
+    /// Cash reserve balance available as credit enhancement.
     pub reserve_account: Money,
-    /// Available excess spread
+    /// Excess spread available to absorb losses, as an annual decimal rate.
     pub excess_spread: f64,
-    /// Cash trap/turbo active
+    /// Whether residual cash is currently trapped or turboed into principal.
     pub cash_trap_active: bool,
 }
 

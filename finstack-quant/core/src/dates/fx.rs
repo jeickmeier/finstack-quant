@@ -67,6 +67,11 @@ use time::Duration;
 /// let err = resolve_calendar(Some("unknown_cal"));
 /// assert!(err.is_err());
 /// ```
+///
+/// # Arguments
+///
+/// * `cal_id` - Optional canonical calendar ID. `None` explicitly selects the
+///   weekends-only calendar; an unrecognized ID returns an error.
 pub fn resolve_calendar(cal_id: Option<&str>) -> Result<&'static dyn HolidayCalendar> {
     if let Some(id) = cal_id {
         if let Some(resolved) = calendar_by_id(id) {
@@ -98,6 +103,16 @@ fn with_joint_calendar<R>(
 ///
 /// Applies the business day convention on the true union calendar, where a day
 /// is a holiday if either currency market is closed.
+///
+/// # Arguments
+///
+/// * `date` - Unadjusted settlement or payment date to normalize.
+/// * `bdc` - Business-day convention governing the roll direction and
+///   month-crossing behavior.
+/// * `base_cal_id` - Optional base-currency holiday calendar ID; `None` uses
+///   the weekends-only calendar.
+/// * `quote_cal_id` - Optional quote-currency holiday calendar ID; `None` uses
+///   the weekends-only calendar.
 ///
 /// # Errors
 ///
@@ -162,7 +177,8 @@ fn advance_business_days(
 ///
 /// # Arguments
 ///
-/// * `start` - Starting date
+/// * `start` - Trade or value date from which to advance; it is not counted as
+///   one of the requested business days.
 /// * `n_days` - Number of joint business days to add
 /// * `base_cal_id` - Optional calendar ID for the base currency
 /// * `quote_cal_id` - Optional calendar ID for the quote currency

@@ -354,6 +354,17 @@ pub struct TailScenarioBreakdown {
 /// Returns a validation error when dimensions do not match, confidence is not
 /// in `(0.5, 1)`, the requested tail has fewer than one scenario, or any P&L is
 /// non-finite.
+///
+/// # Arguments
+///
+/// * `position_ids` - Position identifiers in the same column order as each
+///   scenario row in `position_pnls`.
+/// * `position_pnls` - Scenario-major flat P&L buffer with shape
+///   `n_scenarios * position_ids.len()`; entries are reporting-currency P&L
+///   amounts.
+/// * `n_scenarios` - Number of scenario rows encoded in `position_pnls`.
+/// * `confidence` - Tail confidence level strictly between 0.5 and 1.0, such
+///   as `0.99` for a 99% stress-tail attribution.
 pub fn build_stress_attribution(
     position_ids: &[PositionId],
     position_pnls: &[f64],

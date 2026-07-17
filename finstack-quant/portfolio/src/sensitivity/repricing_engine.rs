@@ -1,3 +1,5 @@
+//! Finite-difference and repricing utilities for portfolio sensitivities.
+//!
 use super::delta_engine::mapping_to_market_bumps;
 use super::traits::FactorSensitivityEngine;
 use finstack_quant_core::dates::Date;
@@ -123,7 +125,18 @@ impl FullRepricingEngine {
         }
     }
 
-    /// Compute the full scenario P&L profile for each factor.
+    /// Compute full-repricing scenario P&L profiles for every factor.
+    ///
+    /// Each factor is evaluated over this engine's ordered scenario grid. A
+    /// profile row holds `weight * (PV_bumped - PV_base)` for each input
+    /// position, so rows retain position order and values use the positions'
+    /// common pricing currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns validation errors for mixed pricing currencies, non-finite base
+    /// or bumped PVs, or a non-finite/zero bump. Propagates market-bump and
+    /// instrument-pricing failures.
     pub fn compute_pnl_profiles(
         &self,
         positions: &[(String, &dyn Instrument, f64)],

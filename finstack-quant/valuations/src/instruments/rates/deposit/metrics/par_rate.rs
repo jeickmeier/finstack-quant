@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for interest-rate instruments.
+//!
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Minimum year fraction for par rate calculation.

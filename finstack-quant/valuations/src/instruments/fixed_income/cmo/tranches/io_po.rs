@@ -96,8 +96,11 @@ impl PoStripCharacteristics {
 ///
 /// # Arguments
 ///
-/// * `passthrough_coupon` - Pass-through rate of underlying MBS
-/// * `face_amount` - Face amount to split
+/// * `_passthrough_coupon` - Underlying MBS pass-through coupon retained for
+///   a uniform tranche-construction interface. It does not change the IO/PO
+///   face-notional split; coupon cashflows are calculated later.
+/// * `face_amount` - Underlying pool face amount assigned in full to both the
+///   IO interest notional and the PO principal claim.
 ///
 /// # Returns
 ///
@@ -137,11 +140,11 @@ fn scheduled_principal(remaining: f64, monthly_mortgage_rate: f64, remaining_mon
 ///
 /// # Arguments
 ///
-/// * `notional` - IO notional amount
-/// * `coupon` - IO coupon rate
-/// * `wam` - Remaining weighted average maturity
-/// * `discount_rate` - Discount rate (annual)
-/// * `psa` - Expected prepayment speed
+/// * `notional` - Original IO notional amount in the strip's cash currency.
+/// * `coupon` - Annual IO coupon rate as a decimal on outstanding notional.
+/// * `wam` - Remaining weighted-average maturity in whole months.
+/// * `discount_rate` - Annual discount rate as a decimal, compounded monthly.
+/// * `psa` - Expected prepayment speed in PSA units controlling monthly SMM.
 ///
 /// # Returns
 ///
@@ -216,7 +219,8 @@ pub fn theoretical_io_value_with_wac(
 ///
 /// # Arguments
 ///
-/// * `face` - PO face amount
+/// * `face` - Original PO face amount in the strip's cash currency, amortized
+///   by both scheduled principal and prepayments.
 /// * `wam` - Remaining weighted average maturity
 /// * `discount_rate` - Discount rate (annual)
 /// * `psa` - Expected prepayment speed
@@ -235,7 +239,8 @@ pub fn theoretical_po_value(face: f64, wam: u32, discount_rate: f64, psa: f64) -
 ///
 /// # Arguments
 ///
-/// * `face` - Face value
+/// * `face` - Original PO face amount in the strip's cash currency, amortized
+///   by both scheduled principal and prepayments.
 /// * `wam` - Weighted average maturity in months
 /// * `discount_rate` - Discount rate (annual)
 /// * `psa` - Expected prepayment speed

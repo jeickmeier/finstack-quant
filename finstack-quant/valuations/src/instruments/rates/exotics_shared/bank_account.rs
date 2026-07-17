@@ -22,6 +22,12 @@ use finstack_quant_monte_carlo::time_grid::TimeGrid;
 /// The cheap left-endpoint Riemann sum `exp(r(t)·dt)` leaves an avoidable
 /// O(Δt) bias on coarse event-aligned grids; the trapezoidal rule is O(Δt²)
 /// and uses only path values already simulated.
+///
+/// # Arguments
+///
+/// * `r_start` - Simulated instantaneous short rate at the start of the step.
+/// * `r_end` - Simulated instantaneous short rate at the end of the step.
+/// * `dt` - Positive step length in years.
 #[inline]
 pub fn bank_step_factor(r_start: f64, r_end: f64, dt: f64) -> f64 {
     (0.5 * (r_start + r_end) * dt).exp()
@@ -32,6 +38,13 @@ pub fn bank_step_factor(r_start: f64, r_end: f64, dt: f64) -> f64 {
 ///
 /// `rate_path` carries one short rate per grid point. Each step applies
 /// [`bank_step_factor`] over the corresponding grid interval.
+///
+/// # Arguments
+///
+/// * `rate_path` - Simulated short rates in grid-point order; consecutive
+///   pairs define trapezoidal bank-account growth steps.
+/// * `time_grid` - Time grid whose interval lengths are aligned with
+///   `rate_path`; callers should provide `num_steps + 1` rates.
 pub fn accumulate_bank_factors(rate_path: &[f64], time_grid: &TimeGrid) -> Vec<f64> {
     let num_steps = time_grid.num_steps();
     let mut bank = Vec::with_capacity(num_steps + 1);

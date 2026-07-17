@@ -78,6 +78,19 @@ pub struct AlmgrenChrissImpactView {
 
 /// Build and evaluate a uniform Almgren-Chriss market-impact estimate.
 ///
+/// # Arguments
+///
+/// * `position_size` - Signed quantity to execute; its sign determines trade
+///   direction while its magnitude determines participation.
+/// * `avg_daily_volume` - Positive average daily tradable volume in the same
+///   quantity units as `position_size`.
+/// * `volatility` - Positive daily volatility as a decimal fraction.
+/// * `execution_horizon_days` - Intended execution horizon in trading days.
+/// * `permanent_impact_coef` - Permanent-impact coefficient for the model.
+/// * `temporary_impact_coef` - Temporary-impact coefficient for the model.
+/// * `reference_price` - Optional positive mid price; `None` uses unit price
+///   and reports scale-free impact.
+///
 /// # Errors
 ///
 /// Returns an error when the liquidity inputs are not finite and positive, or

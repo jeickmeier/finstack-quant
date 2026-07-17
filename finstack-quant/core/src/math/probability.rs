@@ -57,6 +57,12 @@ const DEGENERATE_VARIANCE_THRESHOLD: f64 = 1e-10;
 ///
 /// # Returns
 /// Tuple (p11, p10, p01, p00) that sums to 1.0 and exactly preserves marginals.
+/// For a mathematically valid but infeasible requested correlation, the function
+/// uses the nearest Fréchet-Hoeffding bound; it therefore preserves marginals
+/// and probability non-negativity but may return an effective correlation
+/// different from the one requested. Degenerate marginals near zero or one
+/// produce the independent coupling because Pearson correlation is undefined
+/// when a Bernoulli variance vanishes.
 ///
 /// # Example
 /// ```
@@ -69,6 +75,13 @@ const DEGENERATE_VARIANCE_THRESHOLD: f64 = 1e-10;
 /// assert!((p11 + p01 - 0.4).abs() < 1e-10);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] if either marginal is `NaN`, infinite,
+/// or outside `[0, 1]`, or if `correlation` is non-finite or outside `[-1, 1]`.
+/// Correlations inside that mathematical range but outside the feasible range
+/// for the particular marginals are clamped rather than rejected.
 #[must_use = "joint probability validation errors must be handled"]
 pub fn joint_probabilities(
     p1: f64,
@@ -136,6 +149,19 @@ impl CorrelatedBernoulli {
     /// * `p1` - Finite marginal probability of first event in [0, 1]
     /// * `p2` - Finite marginal probability of second event in [0, 1]
     /// * `correlation` - Finite correlation in [-1, 1], clamped to feasible bounds
+    ///
+    /// [`correlation`](Self::correlation) exposes the effective correlation
+    /// after Fréchet-Hoeffding clamping, while
+    /// [`requested_correlation`](Self::requested_correlation) preserves the
+    /// caller input for audit/reporting. Degenerate marginals use the
+    /// independent coupling and report effective correlation `0.0`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] under the same input-domain rules
+    /// as [`joint_probabilities`]. A correlation that is in `[-1, 1]` but
+    /// infeasible for `p1` and `p2` is not an error; it is clamped to the
+    /// attainable interval.
     #[must_use = "construction validation errors must be handled"]
     pub fn new(p1: f64, p2: f64, correlation: f64) -> crate::Result<Self> {
         validate_inputs(p1, p2, Some(correlation))?;
@@ -161,6 +187,17 @@ impl CorrelatedBernoulli {
     ///
     /// # Arguments
     /// * `u` - Uniform random value in [0, 1]
+    ///
+    /// The half-open bucket comparisons map `u` deterministically to the
+    /// stored joint distribution. This is an inverse-CDF transform, not a
+    /// random-number generator; callers supply independent uniforms when they
+    /// need independent draws.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `u` is `NaN`, infinite, less
+    /// than zero, or greater than one. Both endpoints are valid: `0.0` selects
+    /// the first non-empty bucket and `1.0` selects `(0, 0)`.
     pub fn sample_from_uniform(&self, u: f64) -> crate::Result<(u8, u8)> {
         if !u.is_finite() || !(0.0..=1.0).contains(&u) {
             return Err(crate::Error::Validation(format!(
@@ -258,6 +295,15 @@ impl CorrelatedBernoulli {
 ///
 /// # Returns
 /// Tuple (ρ_min, ρ_max) of achievable correlation bounds
+/// for the supplied Bernoulli marginals. A degenerate marginal has zero
+/// variance, so the function returns `(0.0, 0.0)` instead of attempting an
+/// undefined correlation division.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] if either marginal is `NaN`, infinite,
+/// or outside `[0, 1]`. It does not take a requested correlation and therefore
+/// never clamps one.
 #[must_use = "correlation-bound validation errors must be handled"]
 pub fn correlation_bounds(p1: f64, p2: f64) -> crate::Result<(f64, f64)> {
     validate_inputs(p1, p2, None)?;

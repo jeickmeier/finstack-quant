@@ -354,6 +354,14 @@ pub(crate) fn bump_discount_curve_parallel(
 /// - Vega calculations near zero vol may exhibit non-linearity due to this floor
 ///
 /// Prefer this helper for market-standard vega/volga/vanna definitions (derivatives w.r.t. σ).
+///
+/// # Arguments
+///
+/// * `context` - Original market context cloned with one surface replaced by
+///   its bumped copy.
+/// * `vol_surface_id` - Identifier of the volatility surface to shock.
+/// * `bump_abs` - Additive annualized-volatility shift in absolute decimal
+///   units, such as `0.01` for one volatility point.
 pub fn bump_surface_vol_absolute(
     context: &finstack_quant_core::market_data::context::MarketContext,
     vol_surface_id: &str,

@@ -523,6 +523,12 @@ impl RatingFactorTable {
     ///
     /// Source: Moody's "Approach to Rating Collateralized Loan Obligations"
     ///
+    /// The table is loaded from the versioned embedded credit-assumptions
+    /// registry, rather than being hard-coded at the call site. WARF factors
+    /// are ordinal credit-quality inputs to CLO tests and analytics; they are
+    /// not probabilities and must not be averaged or annualized as if they
+    /// were PDs.
+    ///
     /// # Example
     /// ```rust
     /// use finstack_quant_core::types::{CreditRating, RatingFactorTable};
@@ -531,11 +537,31 @@ impl RatingFactorTable {
     /// assert_eq!(table.get_factor(CreditRating::AAA).unwrap(), 1.0);
     /// assert_eq!(table.get_factor(CreditRating::B).unwrap(), 2720.0);
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded credit registry cannot be loaded, its
+    /// configured default rating-factor-table ID is absent, or the stored table
+    /// fails registry validation. It does not fail merely because a particular
+    /// rating might be absent; use [`get_factor`](Self::get_factor) for that
+    /// per-rating lookup.
     pub fn moodys_standard() -> crate::Result<Self> {
         Self::from_registry_id(embedded_registry()?.default_rating_factor_table_id())
     }
 
-    /// Load a rating factor table from the credit assumptions registry.
+    /// Load a named rating-factor table from the embedded credit-assumptions registry.
+    ///
+    /// `id` identifies a versioned registry entry, allowing applications to
+    /// choose a methodology without coupling their code to a concrete map. The
+    /// returned table preserves the registry's agency, methodology description,
+    /// default factor, and rating-factor entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded registry cannot load or `id` is unknown
+    /// after its compatibility-alias resolution. It never falls back to the
+    /// default table for an unknown explicit ID, avoiding a silent methodology
+    /// change in a credit calculation.
     pub fn from_registry_id(id: &str) -> crate::Result<Self> {
         Ok(Self::from_registry_parts(
             embedded_registry()?.rating_factor_table(id)?,
@@ -554,7 +580,16 @@ impl RatingFactorTable {
     /// Get factor for a specific rating.
     ///
     /// If no entry exists, returns an error instead of silently substituting
-    /// the table default.
+    /// the table default. This is the safe choice for a mandated rating-factor
+    /// test because it makes an incomplete table or unsupported rating visible;
+    /// use [`get_factor_or_default`](Self::get_factor_or_default) only when the
+    /// governing methodology explicitly permits its fallback.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::error::InputError::NotFound`] if this table contains no
+    /// factor for `rating`. The error identifies the requested generic rating
+    /// label; it does not apply `default_factor` implicitly.
     pub fn get_factor(&self, rating: CreditRating) -> crate::Result<f64> {
         self.factors.get(&rating).copied().ok_or_else(|| {
             crate::Error::Input(crate::error::InputError::NotFound {
@@ -595,7 +630,9 @@ static MOODYS_WARF_TABLE: OnceLock<crate::Result<RatingFactorTable>> = OnceLock:
 ///
 /// This is the standard function that should be used throughout the codebase
 /// for consistent WARF calculations. The table is lazily initialized on first
-/// call and cached for subsequent calls.
+/// call and cached for subsequent calls. The cached initialization result is
+/// shared: an embedded-registry failure remains visible on later calls rather
+/// than repeatedly attempting to parse potentially corrupt package data.
 ///
 /// # Example
 /// ```rust
@@ -605,6 +642,18 @@ static MOODYS_WARF_TABLE: OnceLock<crate::Result<RatingFactorTable>> = OnceLock:
 /// assert_eq!(moodys_warf_factor(CreditRating::B).unwrap(), 2720.0);
 /// assert_eq!(moodys_warf_factor(CreditRating::BBBPlus).unwrap(), 260.0);
 /// ```
+///
+/// # Errors
+///
+/// Returns an error if the default Moody's table cannot be loaded from the
+/// embedded registry or if it has no factor for `rating`. It does not substitute
+/// the table's default factor; use [`RatingFactorTable::get_factor_or_default`]
+/// when a fallback is explicitly authorized by the relevant methodology.
+///
+/// # Arguments
+///
+/// * `rating` - Canonical credit rating for which to retrieve the Moody's WARF
+///   factor without applying a fallback rating.
 pub fn moodys_warf_factor(rating: CreditRating) -> crate::Result<f64> {
     match MOODYS_WARF_TABLE.get_or_init(RatingFactorTable::moodys_standard) {
         Ok(table) => table.get_factor(rating),

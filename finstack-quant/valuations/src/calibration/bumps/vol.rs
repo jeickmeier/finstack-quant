@@ -48,6 +48,13 @@ pub enum VolBumpRequest {
 ///
 /// Returns an error if the rebuilt surface fails validation (should not happen
 /// for well-formed inputs, since vols are floored at zero).
+///
+/// # Arguments
+///
+/// * `surface` - Original volatility surface whose expiry/strike grid is
+///   retained in the rebuilt surface.
+/// * `request` - Additive annualized-volatility shifts applied in absolute
+///   decimal units, either in parallel or at selected grid cells.
 pub fn bump_vol_surface(
     surface: &VolSurface,
     request: &VolBumpRequest,

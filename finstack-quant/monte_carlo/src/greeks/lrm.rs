@@ -36,9 +36,11 @@ use crate::online_stats::OnlineStats;
 /// * `payoffs` - Payoff values from MC paths
 /// * `terminal_shocks` - Standardized terminal shocks (Z = W_T / √T)
 /// * `initial_spot` - Initial spot price
-/// * `volatility` - Volatility
+/// * `volatility` - Annualized GBM volatility as a positive decimal, such as
+///   `0.20` for 20%.
 /// * `time_to_maturity` - Time to maturity
-/// * `discount_factor` - Discount factor
+/// * `discount_factor` - Discount factor from maturity to valuation, applied
+///   to each undiscounted path payoff.
 ///
 /// # Returns
 ///
@@ -78,6 +80,18 @@ pub fn lrm_delta(
 /// drift dependence `-(σ²/2)T` on σ.
 ///
 /// Returns Vega scaled by 0.01 (sensitivity per 1% volatility change).
+///
+/// # Arguments
+///
+/// * `payoffs` - Undiscounted terminal path payoffs, aligned one-for-one with
+///   `terminal_shocks`.
+/// * `terminal_shocks` - Standardized terminal Brownian shocks for the same
+///   paths, `Z = W_T / sqrt(T)`.
+/// * `volatility` - Annualized GBM volatility as a positive decimal.
+/// * `time_to_maturity` - Option maturity measured in years on the model time
+///   basis.
+/// * `discount_factor` - Discount factor from maturity to valuation, applied
+///   to each path payoff.
 ///
 /// # Payoff contract
 ///
@@ -131,6 +145,15 @@ pub fn lrm_vega(
 /// functional itself depends explicitly on σ (e.g. a barrier payoff using a
 /// σ-dependent Brownian-bridge crossing probability), the `E[∂f/∂σ]` term is
 /// not captured and must be handled separately.
+///
+/// # Arguments
+///
+/// * `payoffs` - Undiscounted path payoffs aligned one-for-one with
+///   `path_scores`.
+/// * `path_scores` - Precomputed per-path sums of volatility log-density
+///   scores over all simulated transitions.
+/// * `discount_factor` - Discount factor from payoff horizon to valuation,
+///   applied before estimating vega.
 #[must_use]
 pub fn lrm_vega_from_scores(
     payoffs: &[f64],

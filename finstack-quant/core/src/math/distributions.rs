@@ -324,6 +324,14 @@ pub fn binomial_pmf_all(n: usize, p: f64) -> Vec<f64> {
 /// factor-quadrature integrand, which calls this once per Gauss-Hermite node
 /// per payment date — can pass a reusable scratch buffer to avoid an
 /// allocation on every evaluation.
+///
+/// # Arguments
+///
+/// * `out` - Reusable output buffer cleared and resized to `n + 1`, then filled
+///   with probabilities for zero through `n` successes.
+/// * `n` - Number of independent Bernoulli trials.
+/// * `p` - Per-trial success probability. Values at or beyond `0.0` and `1.0`
+///   produce the corresponding degenerate distribution.
 pub fn binomial_pmf_all_into(out: &mut Vec<f64>, n: usize, p: f64) {
     out.clear();
     out.resize(n + 1, 0.0);

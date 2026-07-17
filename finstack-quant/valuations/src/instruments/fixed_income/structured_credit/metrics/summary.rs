@@ -59,8 +59,14 @@ pub struct TrancheMetrics {
 ///
 /// # Arguments
 ///
-/// * `deal`, `tranche_id` - the tranche to summarise.
-/// * `market`, `as_of` - market context (discount curve) and valuation date.
+/// * `deal` - Validated structured-credit deal owning the requested tranche,
+///   its waterfall, and the curve identifiers used for projection.
+/// * `tranche_id` - Identifier of the tranche to summarize from its own
+///   cashflows rather than a deal-level aggregate.
+/// * `market` - Market context supplying the deal's discount curve and any
+///   rate/index data needed for cashflow projection.
+/// * `as_of` - Valuation date used to determine projected cashflows and their
+///   discounting horizon.
 /// * `market_price_pct` - quoted price (% of original balance) the z-spread and
 ///   CS01 are solved against. When `None`, the tranche's own model price is used,
 ///   giving a zero z-spread (a useful round-trip check) while CS01, duration and

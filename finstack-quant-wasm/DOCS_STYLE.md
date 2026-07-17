@@ -15,8 +15,12 @@ to render well in generated `.d.ts` files.
 For every exported function/class/constructor/static factory/method:
 
 - **Summary**: 1–2 lines describing what the API does and when to use it.
-- **Parameters**: Use JSDoc tags:
-  - `@param <name> - description (include units + constraints)`
+- **Parameters**: Use JSDoc tags, or a Rustdoc `# Arguments` section when the
+  API already follows the canonical Rust documentation style. Both forms must:
+  - Name every caller-supplied parameter exactly (Rust or generated camelCase).
+  - Give a substantive description including units and constraints.
+  - JSDoc form: `@param <name> - description`.
+  - Rustdoc form: `* `<name>` - description`.
   - `@returns - description (include units)`
   - `@throws - when an error is thrown`
 - **Conventions** (when applicable):

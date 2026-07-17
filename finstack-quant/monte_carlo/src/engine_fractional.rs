@@ -51,7 +51,7 @@ use finstack_quant_core::Result;
 /// * `disc` — discretization scheme
 /// * `initial_state` — initial state vector (length = `process.dim()`)
 /// * `payoff` — payoff accumulator (must be pre-reset by caller)
-/// * `currency` — result currency
+/// * `currency` — Currency tag assigned to the resulting discounted payoff.
 /// * `fbm_increments` — pre-generated fractional increments (length = `num_steps`)
 /// * `fbm_z_index` — index in `z` where the fractional increment is injected
 /// * `aux` — optional second injection `(z_index, values)`; rBergomi uses it to

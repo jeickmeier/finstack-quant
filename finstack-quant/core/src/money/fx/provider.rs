@@ -1,3 +1,5 @@
+//! Provider traits and validation helpers for date-specific foreign-exchange rates.
+//!
 use crate::currency::Currency;
 use crate::dates::Date;
 

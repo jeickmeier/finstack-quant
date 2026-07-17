@@ -14,6 +14,10 @@ use wasm_bindgen::prelude::*;
 
 /// Build a structural Merton model JSON payload.
 #[wasm_bindgen(js_name = mertonModelJson)]
+/// @param asset_value - Current fair value of the firm's assets in monetary units.
+/// @param asset_vol - Annualized volatility of firm-asset returns, expressed as a decimal.
+/// @param debt_barrier - Positive debt face value defining the structural-model default barrier.
+/// @param risk_free_rate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
 pub fn merton_model_json(
     asset_value: f64,
     asset_vol: f64,
@@ -27,6 +31,12 @@ pub fn merton_model_json(
 
 /// Build a CreditGrades structural model JSON payload.
 #[wasm_bindgen(js_name = creditGradesModelJson)]
+/// @param equity_value - Current market value of equity in the firm's monetary units.
+/// @param equity_vol - Annualized equity-return volatility expressed as a decimal.
+/// @param total_debt - Total debt face value in the firm's monetary units.
+/// @param risk_free_rate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
+/// @param barrier_uncertainty - Lognormal dispersion of the CreditGrades default barrier, not a generic uncertainty score.
+/// @param mean_recovery - Mean recovery rate at default expressed as a fraction from 0 through 1.
 pub fn credit_grades_model_json(
     equity_value: f64,
     equity_vol: f64,
@@ -49,6 +59,8 @@ pub fn credit_grades_model_json(
 
 /// Compute structural default probability from model JSON.
 #[wasm_bindgen(js_name = mertonDefaultProbability)]
+/// @param model_json - Serialized Merton structural-credit model produced by this API's model builder.
+/// @param horizon - Forward-looking model horizon measured in years.
 pub fn merton_default_probability(model_json: &str, horizon: f64) -> Result<f64, JsValue> {
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
     Ok(model.default_probability(horizon))
@@ -59,6 +71,8 @@ pub fn merton_default_probability(model_json: &str, horizon: f64) -> Result<f64,
 /// Distance-to-default is `ln(V/B)/(sigma*sqrt(T))` plus drift adjustments.
 /// Lower values indicate higher default risk.
 #[wasm_bindgen(js_name = mertonDistanceToDefault)]
+/// @param model_json - Serialized Merton structural-credit model produced by this API's model builder.
+/// @param horizon - Forward-looking model horizon measured in years.
 pub fn merton_distance_to_default(model_json: &str, horizon: f64) -> Result<f64, JsValue> {
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
     Ok(model.distance_to_default(horizon))
@@ -68,6 +82,9 @@ pub fn merton_distance_to_default(model_json: &str, horizon: f64) -> Result<f64,
 /// payload, given a recovery rate. Matches the structural-model-implied
 /// spread used to back into a hazard curve.
 #[wasm_bindgen(js_name = mertonImpliedSpread)]
+/// @param model_json - Serialized Merton structural-credit model produced by this API's model builder.
+/// @param horizon - Forward-looking model horizon measured in years.
+/// @param recovery - Recovery rate at default expressed as a fraction of par from 0 through 1.
 pub fn merton_implied_spread(
     model_json: &str,
     horizon: f64,
@@ -81,6 +98,8 @@ pub fn merton_implied_spread(
 /// notional, returning the implied recovery rate. Result is clamped to
 /// `[0, base_recovery]`.
 #[wasm_bindgen(js_name = dynamicRecoveryAtNotional)]
+/// @param spec_json - Serialized DynamicRecoverySpec JSON defining the notional-to-recovery mapping.
+/// @param notional - Signed trade notional in the instrument's native currency units.
 pub fn dynamic_recovery_at_notional(spec_json: &str, notional: f64) -> Result<f64, JsValue> {
     let spec: DynamicRecoverySpec = serde_json::from_str(spec_json).map_err(to_js_err)?;
     Ok(spec.recovery_at_notional(notional))
@@ -89,6 +108,8 @@ pub fn dynamic_recovery_at_notional(spec_json: &str, notional: f64) -> Result<f6
 /// Evaluate an `EndogenousHazardSpec` JSON payload at a given leverage
 /// level, returning the implied hazard rate. Floored at 0.
 #[wasm_bindgen(js_name = endogenousHazardAtLeverage)]
+/// @param spec_json - Serialized EndogenousHazardSpec JSON defining the leverage-to-hazard mapping.
+/// @param leverage - Debt-to-assets leverage ratio used by the structural credit model.
 pub fn endogenous_hazard_at_leverage(spec_json: &str, leverage: f64) -> Result<f64, JsValue> {
     let spec: EndogenousHazardSpec = serde_json::from_str(spec_json).map_err(to_js_err)?;
     Ok(spec.hazard_at_leverage(leverage))
@@ -98,6 +119,9 @@ pub fn endogenous_hazard_at_leverage(spec_json: &str, leverage: f64) -> Result<f
 /// outstanding notional. Computes leverage = `accreted_notional / asset_value`
 /// then evaluates the hazard mapping.
 #[wasm_bindgen(js_name = endogenousHazardAfterPikAccrual)]
+/// @param spec_json - Serialized EndogenousHazardSpec JSON defining the leverage-to-hazard mapping.
+/// @param accreted_notional - Outstanding notional after PIK accrual, in the debt's monetary units.
+/// @param asset_value - Current fair value of the firm's assets in monetary units.
 pub fn endogenous_hazard_after_pik_accrual(
     spec_json: &str,
     accreted_notional: f64,
@@ -109,6 +133,7 @@ pub fn endogenous_hazard_after_pik_accrual(
 
 /// Build a constant dynamic-recovery spec JSON payload.
 #[wasm_bindgen(js_name = dynamicRecoveryConstantJson)]
+/// @param recovery - Recovery rate at default expressed as a fraction of par from 0 through 1.
 pub fn dynamic_recovery_constant_json(recovery: f64) -> Result<String, JsValue> {
     let spec = DynamicRecoverySpec::constant(recovery).map_err(to_js_err)?;
     serde_json::to_string(&spec).map_err(to_js_err)
@@ -116,6 +141,9 @@ pub fn dynamic_recovery_constant_json(recovery: f64) -> Result<String, JsValue> 
 
 /// Build an endogenous hazard power-law spec JSON payload.
 #[wasm_bindgen(js_name = endogenousHazardPowerLawJson)]
+/// @param base_hazard - Reference annual default intensity used by the leverage-to-hazard mapping.
+/// @param base_leverage - Positive reference debt-to-assets leverage ratio for the hazard mapping.
+/// @param exponent - Positive exponent controlling sensitivity in the documented power-law mapping.
 pub fn endogenous_hazard_power_law_json(
     base_hazard: f64,
     base_leverage: f64,
@@ -132,6 +160,12 @@ pub fn endogenous_hazard_power_law_json(
 /// (and the Python binding): `hazardRate`, `distanceToDefault`, `leverage`,
 /// `accretedNotional`, `couponDue`, `assetValue`.
 #[wasm_bindgen(js_name = creditStateJson)]
+/// @param hazard_rate - Annualized instantaneous default intensity, expressed as a decimal.
+/// @param distance_to_default - Optional distance to default, measured as standard deviations from the default point.
+/// @param leverage - Debt-to-assets leverage ratio used by the structural credit model.
+/// @param accreted_notional - Outstanding notional after PIK accrual, in the debt's monetary units.
+/// @param coupon_due - Cash coupon amount due at the toggle decision date, in debt monetary units.
+/// @param asset_value - Current fair value of the firm's assets in monetary units.
 pub fn credit_state_json(
     hazard_rate: f64,
     distance_to_default: Option<f64>,
@@ -153,6 +187,9 @@ pub fn credit_state_json(
 
 /// Build a threshold toggle-exercise model JSON payload.
 #[wasm_bindgen(js_name = toggleExerciseThresholdJson)]
+/// @param variable - Credit-state variable: `"hazard_rate"`, `"distance_to_default"`, or `"leverage"`.
+/// @param threshold - Threshold value in the units of the selected credit-state variable.
+/// @param direction - Threshold comparison: `"above"` selects PIK above the level and `"below"` below it.
 pub fn toggle_exercise_threshold_json(
     variable: &str,
     threshold: f64,
@@ -171,6 +208,11 @@ pub fn toggle_exercise_threshold_json(
 /// `usize` counts marshal across the wasm boundary as IEEE-754 doubles, so a
 /// larger value would round silently rather than fail loudly.
 #[wasm_bindgen(js_name = toggleExerciseOptimalJson)]
+/// @param nested_paths - Number of nested Monte Carlo paths for continuation-value estimation; must fit JavaScript's safe integer range.
+/// @param equity_discount_rate - Annual equity-holder discount rate used in the nested toggle decision.
+/// @param asset_vol - Annualized volatility of firm-asset returns, expressed as a decimal.
+/// @param risk_free_rate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
+/// @param horizon - Forward-looking model horizon measured in years.
 pub fn toggle_exercise_optimal_json(
     nested_paths: usize,
     equity_discount_rate: f64,

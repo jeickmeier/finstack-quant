@@ -92,6 +92,11 @@ pub struct GbmPathSummary {
 
 /// Simulate and capture GBM spot paths through the generic Rust engine.
 ///
+/// # Arguments
+///
+/// * `config` - GBM process, time-grid, RNG-seed, and path-count configuration;
+///   captured paths are returned in deterministic path-ID order.
+///
 /// # Errors
 ///
 /// Returns validation errors from the GBM process, time grid, or engine. Path

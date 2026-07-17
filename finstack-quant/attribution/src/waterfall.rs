@@ -96,6 +96,8 @@ pub fn default_waterfall_order() -> Vec<AttributionFactor> {
 /// * `config` - Finstack configuration
 /// * `factor_order` - Ordered list of factors to apply
 /// * `strict_validation` - If true, propagate errors instead of soft failures
+/// * `model_params_t0` - Optional opening model-parameter snapshot used to
+///   isolate parameter P&L; `None` omits that source detail.
 ///
 /// # Returns
 ///

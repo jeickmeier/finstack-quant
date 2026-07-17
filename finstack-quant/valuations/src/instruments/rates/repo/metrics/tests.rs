@@ -1,3 +1,5 @@
+//! Pricing and metric helpers for interest-rate instruments.
+//!
 use super::*;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::repo::{CollateralSpec, Repo};

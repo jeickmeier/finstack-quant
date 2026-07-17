@@ -1,3 +1,5 @@
+//! Bond price, yield, spread, duration, and risk metric calculations.
+//!
 use crate::cashflow::{builder::CashFlowSchedule, primitives::CFKind};
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
     asset_swap_forward_components, asset_swap_projection_rate, fixed_leg_annuity,
@@ -345,6 +347,19 @@ fn pv_coupon_from_custom_schedule(
 /// a swap market standard per currency), prefer
 /// [`asw_par_with_forward_config`], which accepts an optional fixed-leg
 /// day-count override.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose future fixed cashflows and contractual discount-curve
+///   identifier define the asset-swap fixed leg.
+/// * `curves` - Market context providing the bond's discount curve and the
+///   named forward curve.
+/// * `as_of` - Valuation date used to select future bond cashflows and build
+///   the mirrored fixed-leg schedule.
+/// * `fwd_curve_id` - Market-context identifier of the floating-leg forward
+///   curve.
+/// * `float_spread_bp` - Floating-leg contractual spread in basis points,
+///   added to projected forward coupons.
 pub fn asw_par_with_forward(
     bond: &Bond,
     curves: &finstack_quant_core::market_data::context::MarketContext,
@@ -362,6 +377,21 @@ pub fn asw_par_with_forward(
 ///   fixed-leg annuity, allowing callers to align with swap fixed-leg market
 ///   conventions (e.g., 30E/360) instead of the bond's coupon convention.
 /// - When `None`, this falls back to `bond.cashflow_spec.day_count()`.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose future fixed cashflows and contractual discount-curve
+///   identifier define the asset-swap fixed leg.
+/// * `curves` - Market context providing the bond's discount curve and the
+///   named forward curve.
+/// * `as_of` - Valuation date used to select future bond cashflows and build
+///   the mirrored fixed-leg schedule.
+/// * `fwd_curve_id` - Market-context identifier of the floating-leg forward
+///   curve.
+/// * `float_spread_bp` - Floating-leg contractual spread in basis points,
+///   added to projected forward coupons.
+/// * `fixed_leg_day_count` - Optional swap fixed-leg day-count convention for
+///   the annuity. `None` uses the bond's coupon day count.
 pub fn asw_par_with_forward_config(
     bond: &Bond,
     curves: &finstack_quant_core::market_data::context::MarketContext,
@@ -439,6 +469,22 @@ pub fn asw_par_with_forward_config(
 /// For explicit control over fixed-leg conventions (e.g., swap day-count),
 /// prefer [`asw_market_with_forward_config`], which accepts an optional
 /// fixed-leg day-count override.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose future fixed cashflows and contractual discount-curve
+///   identifier define the asset-swap fixed leg.
+/// * `curves` - Market context providing the bond's discount curve and the
+///   named forward curve.
+/// * `as_of` - Valuation date used to select future bond cashflows and build
+///   the mirrored fixed-leg schedule.
+/// * `fwd_curve_id` - Market-context identifier of the floating-leg forward
+///   curve.
+/// * `float_spread_bp` - Floating-leg contractual spread in basis points,
+///   added to projected forward coupons.
+/// * `dirty_price_ccy` - Required dirty market price in the bond currency.
+///   Pass `Some(bond.notional.amount())` to value a par market price; `None`
+///   is rejected rather than silently assuming par.
 pub fn asw_market_with_forward(
     bond: &Bond,
     curves: &finstack_quant_core::market_data::context::MarketContext,
@@ -466,6 +512,23 @@ pub fn asw_market_with_forward(
 ///   instead of silently assuming par.
 /// - `fixed_leg_day_count`: when `Some`, this day-count is used to build
 ///   the fixed-leg annuity; otherwise the bond's coupon day-count is used.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose future fixed cashflows and contractual discount-curve
+///   identifier define the asset-swap fixed leg.
+/// * `curves` - Market context providing the bond's discount curve and the
+///   named forward curve.
+/// * `as_of` - Valuation date used to select future bond cashflows and build
+///   the mirrored fixed-leg schedule.
+/// * `fwd_curve_id` - Market-context identifier of the floating-leg forward
+///   curve.
+/// * `float_spread_bp` - Floating-leg contractual spread in basis points,
+///   added to projected forward coupons.
+/// * `dirty_price_ccy` - Dirty market price in the bond currency. `None`
+///   returns `InputError::NotFound` instead of silently assuming par.
+/// * `fixed_leg_day_count` - Optional swap fixed-leg day-count convention for
+///   the annuity. `None` uses the bond's coupon day count.
 pub fn asw_market_with_forward_config(
     bond: &Bond,
     curves: &finstack_quant_core::market_data::context::MarketContext,

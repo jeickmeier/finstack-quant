@@ -51,6 +51,11 @@ impl ValuationResult {
 }
 
 /// Convert multiple valuation results to rows for DataFrame construction.
+///
+/// # Arguments
+///
+/// * `results` - Valuation results to flatten in input order; every result's
+///   PV, identity fields, and named measures become one [`ValuationRow`].
 pub fn results_to_rows(results: &[ValuationResult]) -> Vec<ValuationRow> {
     results.iter().map(ValuationResult::to_row).collect()
 }

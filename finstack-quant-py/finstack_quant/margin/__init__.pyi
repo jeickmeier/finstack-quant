@@ -267,7 +267,8 @@ class MarginTenor:
         Parameters
         ----------
         s : str
-            Tenor name.
+            Case-insensitive margin-frequency label such as ``"daily"``,
+            ``"weekly"``, or ``"on_demand"``.
 
         Returns
         -------
@@ -1360,11 +1361,13 @@ class VmCalculator:
         currency : str
             ISO currency code.
         year : int
-            As-of year.
+            Four-digit valuation year used with ``month`` and ``day`` to apply
+            the CSA calendar and collateral terms.
         month : int
             As-of month (1–12).
         day : int
-            As-of day.
+            Calendar day of month used with ``year`` and ``month`` for the
+            variation-margin calculation date.
 
         Returns
         -------
@@ -3863,10 +3866,18 @@ class SaCcrTrade:
         One of ``"ir"``, ``"fx"``, ``"credit"``, ``"equity"``, ``"commodity"``.
     notional : float
         Adjusted notional in reporting currency.
-    start_year, start_month, start_day : int
-        Trade start date.
-    end_year, end_month, end_day : int
-        Trade end / maturity date.
+    start_year : int
+        Four-digit calendar year of the trade start date.
+    start_month : int
+        Calendar month from ``1`` through ``12`` of the trade start date.
+    start_day : int
+        Calendar day of month for the trade start date.
+    end_year : int
+        Four-digit calendar year of the trade end or maturity date.
+    end_month : int
+        Calendar month from ``1`` through ``12`` of the trade end date.
+    end_day : int
+        Calendar day of month for the trade end or maturity date.
     underlier : str
         Underlier reference (e.g., currency pair, issuer, equity name).
     hedging_set : str

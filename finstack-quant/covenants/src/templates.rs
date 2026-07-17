@@ -32,6 +32,17 @@ fn incurrence(cov_type: CovenantType, freq: Tenor, metric: &str) -> CovenantSpec
 /// - Max Capex
 ///
 /// Consequences: rate increase on leverage breach, distribution block on coverage breach.
+///
+/// # Arguments
+///
+/// * `initial_leverage` - Maximum debt-to-EBITDA maintenance threshold in
+///   turns, where `5.0` means 5.0x.
+/// * `interest_coverage` - Minimum interest-coverage maintenance threshold in
+///   turns.
+/// * `fixed_charge_coverage` - Minimum fixed-charge-coverage maintenance
+///   threshold in turns.
+/// * `max_capex` - Maximum annual capital-expenditure amount in the caller's
+///   reporting-currency convention.
 pub fn lbo_standard(
     initial_leverage: f64,
     interest_coverage: f64,
@@ -92,6 +103,13 @@ pub fn lbo_standard(
 ///
 /// Post-2015 leveraged loan standard with no maintenance covenants.
 /// Only tested upon specific incurrence actions (new debt, acquisitions, dividends).
+///
+/// # Arguments
+///
+/// * `max_leverage` - Maximum total debt-to-EBITDA incurrence threshold in
+///   turns.
+/// * `max_senior_leverage` - Maximum senior-debt-to-EBITDA incurrence
+///   threshold in turns.
 pub fn cov_lite(max_leverage: f64, max_senior_leverage: f64) -> Vec<CovenantSpec> {
     vec![
         incurrence(
@@ -125,6 +143,14 @@ pub fn cov_lite(max_leverage: f64, max_senior_leverage: f64) -> Vec<CovenantSpec
 /// - Min Debt Yield (Net Operating Income / Loan Balance)
 /// - Max Loan-to-Value (custom metric)
 /// - Cash sweep triggered by DSCR breach
+///
+/// # Arguments
+///
+/// * `min_dscr` - Minimum debt-service-coverage maintenance ratio in turns.
+/// * `min_debt_yield` - Minimum debt yield as a decimal fraction, such as
+///   `0.10` for 10%.
+/// * `max_ltv` - Maximum loan-to-value ratio as a decimal fraction, such as
+///   `0.65` for 65%.
 pub fn real_estate(min_dscr: f64, min_debt_yield: f64, max_ltv: f64) -> Vec<CovenantSpec> {
     vec![
         {
@@ -189,6 +215,17 @@ pub fn real_estate(min_dscr: f64, min_debt_yield: f64, max_ltv: f64) -> Vec<Cove
 /// labels so their reports, breaches, and consequences never collide: a
 /// lock-up breach blocks distributions only and can never resolve to the
 /// primary covenant's Event-of-Default consequence.
+///
+/// # Arguments
+///
+/// * `min_dscr` - Minimum DSCR in turns that causes a default after its cure
+///   period when breached.
+/// * `distribution_lockup_dscr` - Higher DSCR threshold in turns that blocks
+///   distributions without an event of default.
+/// * `min_liquidity` - Minimum debt-service-reserve liquidity in the caller's
+///   reporting-currency convention.
+/// * `max_net_leverage` - Maximum net-debt-to-EBITDA maintenance threshold in
+///   turns.
 pub fn project_finance(
     min_dscr: f64,
     distribution_lockup_dscr: f64,

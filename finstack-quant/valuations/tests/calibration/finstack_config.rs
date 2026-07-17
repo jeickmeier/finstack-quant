@@ -1,3 +1,5 @@
+//! Shared runtime types and solver contracts for market calibration.
+//!
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_valuations::calibration::{
     CalibrationConfig, CalibrationMethod, RateBounds, RateBoundsPolicy, CALIBRATION_CONFIG_KEY,

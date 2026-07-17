@@ -224,6 +224,11 @@ impl<'a> VarianceAnalyzer<'a> {
     /// - `pct_var = abs_var / baseline` (`None` when baseline is ~0 so
     ///   callers can distinguish a truly 0% change from an undefined
     ///   ratio with a non-trivial absolute move)
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error for empty metric or period selections,
+    /// and a missing-data error when either scenario lacks a requested value.
     pub fn compute(&self, config: &VarianceConfig) -> Result<VarianceReport> {
         if config.metrics.is_empty() {
             return Err(Error::invalid_input(
@@ -296,6 +301,11 @@ impl<'a> VarianceAnalyzer<'a> {
     /// [`BridgeChart::unexplained`]. More sophisticated attribution schemes
     /// (including multiplicative drivers such as volume × price) can be
     /// layered on top.
+    ///
+    /// # Errors
+    ///
+    /// Returns a missing-data error when the target or any requested driver is
+    /// absent from either baseline or comparison at `period`.
     pub fn bridge_decomposition(
         &self,
         target_metric: &str,
@@ -372,6 +382,11 @@ impl VarianceReport {
     /// - `abs_var` (Float64)
     /// - `pct_var` (Float64, nullable)
     /// - `driver_contribution` (String, nullable)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the table envelope rejects the generated columns or
+    /// metadata.
     pub fn to_table(&self) -> Result<TableEnvelope> {
         let mut periods = Vec::with_capacity(self.rows.len());
         let mut metrics = Vec::with_capacity(self.rows.len());

@@ -48,6 +48,11 @@ use super::special_functions::standard_normal_inv_cdf;
 use super::summation::kahan_sum;
 
 /// Arithmetic mean.
+///
+/// # Arguments
+///
+/// * `xs` - Observations to average. Values are used as supplied; an empty
+///   slice returns `0.0`.
 pub fn mean(xs: &[f64]) -> f64 {
     if xs.is_empty() {
         return 0.0;
@@ -61,6 +66,11 @@ pub fn mean(xs: &[f64]) -> f64 {
 ///
 /// Matches Bloomberg, QuantLib, and the `OnlineStats::variance()` convention.
 /// Returns `0.0` for fewer than 2 observations.
+///
+/// # Arguments
+///
+/// * `xs` - Sample observations whose unbiased variance is required. Fewer
+///   than two observations produce `0.0`.
 pub fn variance(xs: &[f64]) -> f64 {
     if xs.len() < 2 {
         return 0.0;
@@ -77,6 +87,11 @@ pub fn variance(xs: &[f64]) -> f64 {
 /// Use this when computing moments for the full population rather than
 /// estimating from a sample (e.g., moment-matching for Monte Carlo).
 /// Returns `0.0` for an empty slice.
+///
+/// # Arguments
+///
+/// * `xs` - Complete population of observations. An empty slice produces
+///   `0.0` rather than an undefined value.
 pub fn population_variance(xs: &[f64]) -> f64 {
     if xs.is_empty() {
         return 0.0;
@@ -89,6 +104,11 @@ pub fn population_variance(xs: &[f64]) -> f64 {
 }
 
 /// Return (mean, variance) pair in a single Welford pass.
+///
+/// # Arguments
+///
+/// * `xs` - Sample observations used for both statistics. An empty slice
+///   returns the pair `(0.0, 0.0)`.
 pub fn mean_var(xs: &[f64]) -> (f64, f64) {
     if xs.is_empty() {
         return (0.0, 0.0);
@@ -101,6 +121,11 @@ pub fn mean_var(xs: &[f64]) -> (f64, f64) {
 }
 
 /// Arithmetic mean, returning [`f64::NAN`] for empty input.
+///
+/// # Arguments
+///
+/// * `xs` - Observations to average. Supply an empty slice only when `NaN` is
+///   the desired missing-statistic sentinel.
 pub fn mean_or_nan(xs: &[f64]) -> f64 {
     if xs.is_empty() {
         f64::NAN
@@ -110,6 +135,11 @@ pub fn mean_or_nan(xs: &[f64]) -> f64 {
 }
 
 /// Sample variance, returning [`f64::NAN`] for fewer than 2 observations.
+///
+/// # Arguments
+///
+/// * `xs` - Sample observations. Fewer than two values return `NaN` instead
+///   of the `0.0` fallback used by [`variance`].
 pub fn sample_variance_or_nan(xs: &[f64]) -> f64 {
     if xs.len() < 2 {
         f64::NAN
@@ -119,11 +149,21 @@ pub fn sample_variance_or_nan(xs: &[f64]) -> f64 {
 }
 
 /// Sample standard deviation, returning [`f64::NAN`] for fewer than 2 observations.
+///
+/// # Arguments
+///
+/// * `xs` - Sample observations. Fewer than two values return `NaN` rather
+///   than a zero standard deviation.
 pub fn sample_std_or_nan(xs: &[f64]) -> f64 {
     sample_variance_or_nan(xs).sqrt()
 }
 
 /// Median of the input values, returning [`f64::NAN`] for empty input.
+///
+/// # Arguments
+///
+/// * `xs` - Observations whose median is required. The input is copied before
+///   sorting, and an empty slice returns `NaN`.
 pub fn median_or_nan(xs: &[f64]) -> f64 {
     if xs.is_empty() {
         return f64::NAN;
@@ -141,6 +181,13 @@ pub fn median_or_nan(xs: &[f64]) -> f64 {
 /// Linear-interpolation quantile (R-7 / NumPy / Excel style), returning [`f64::NAN`] for
 /// empty input or when any input value is non-finite (matching the mutating
 /// [`quantile`] variant's NaN policy).
+///
+/// # Arguments
+///
+/// * `xs` - Observations whose order statistic is required. Values must be
+///   finite; the slice is copied before sorting.
+/// * `q` - Quantile probability. Values outside the inclusive `0.0..=1.0`
+///   range are clamped to the nearest endpoint.
 pub fn quantile_linear_or_nan(xs: &[f64], q: f64) -> f64 {
     if xs.is_empty() {
         return f64::NAN;
@@ -166,6 +213,11 @@ pub fn quantile_linear_or_nan(xs: &[f64], q: f64) -> f64 {
 }
 
 /// Minimum finite value, ignoring NaN / infinite entries. Returns [`f64::NAN`] if none are finite.
+///
+/// # Arguments
+///
+/// * `xs` - Observations to inspect. Non-finite values are ignored, and `NaN`
+///   is returned when no finite observation remains.
 pub fn finite_min_or_nan(xs: &[f64]) -> f64 {
     let mut min = f64::NAN;
     for &x in xs {
@@ -177,6 +229,11 @@ pub fn finite_min_or_nan(xs: &[f64]) -> f64 {
 }
 
 /// Maximum finite value, ignoring NaN / infinite entries. Returns [`f64::NAN`] if none are finite.
+///
+/// # Arguments
+///
+/// * `xs` - Observations to inspect. Non-finite values are ignored, and `NaN`
+///   is returned when no finite observation remains.
 pub fn finite_max_or_nan(xs: &[f64]) -> f64 {
     let mut max = f64::NAN;
     for &x in xs {
@@ -188,6 +245,11 @@ pub fn finite_max_or_nan(xs: &[f64]) -> f64 {
 }
 
 /// Count finite observations, excluding NaN / infinite entries.
+///
+/// # Arguments
+///
+/// * `xs` - Observations to inspect. Only finite floating-point values are
+///   counted.
 pub fn finite_count(xs: &[f64]) -> usize {
     xs.iter().copied().filter(|x| x.is_finite()).count()
 }
@@ -198,6 +260,13 @@ pub fn finite_count(xs: &[f64]) -> usize {
 /// fewer than 2 observations.
 ///
 /// Returns [`f64::NAN`] if slice lengths differ (pairing is undefined).
+///
+/// # Arguments
+///
+/// * `x` - First observation series. Each element is paired by index with the
+///   corresponding element in `y`.
+/// * `y` - Second observation series. It must have the same length as `x`;
+///   otherwise the result is `NaN`.
 pub fn covariance(x: &[f64], y: &[f64]) -> f64 {
     if x.len() != y.len() {
         return f64::NAN;
@@ -215,6 +284,12 @@ pub fn covariance(x: &[f64], y: &[f64]) -> f64 {
 /// Pearson correlation in a single Welford pass via `OnlineCovariance`.
 ///
 /// Returns [`f64::NAN`] if slice lengths differ (pairing is undefined).
+///
+/// # Arguments
+///
+/// * `x` - First observation series, paired element-by-element with `y`.
+/// * `y` - Second observation series. It must have the same length as `x`;
+///   unequal lengths return `NaN`.
 pub fn correlation(x: &[f64], y: &[f64]) -> f64 {
     if x.len() != y.len() {
         return f64::NAN;
@@ -350,6 +425,11 @@ impl std::str::FromStr for RealizedVarMethod {
 /// non-positive ratio (including total wipeout to a zero price) return
 /// [`f64::NAN`] so downstream variance estimates do not silently absorb
 /// infinities.
+///
+/// # Arguments
+///
+/// * `prices` - Chronologically ordered price levels. Adjacent prices must be
+///   finite and strictly positive to produce a finite return.
 pub fn log_returns(prices: &[f64]) -> Vec<f64> {
     if prices.len() < 2 {
         return vec![];
@@ -398,6 +478,13 @@ pub fn log_returns(prices: &[f64]) -> Vec<f64> {
 /// [`slice::select_nth_unstable_by`]) to avoid allocation. Cost is
 /// expected O(n). Returns [`f64::NAN`] if the slice is empty, `p` is
 /// outside `[0, 1]`, or any input value is non-finite.
+///
+/// # Arguments
+///
+/// * `data` - Finite observations to partially sort in place. The function
+///   mutates their order to avoid allocating a sorted copy.
+/// * `p` - Quantile probability in the inclusive `0.0..=1.0` range, using the
+///   R-7/NumPy linear interpolation convention.
 pub fn quantile(data: &mut [f64], p: f64) -> f64 {
     let n = data.len();
     if n == 0 || !(0.0..=1.0).contains(&p) {

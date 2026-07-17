@@ -1,3 +1,5 @@
+//! Tests for the surrounding crate component and its documented behavior.
+//!
 use super::fixtures::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::StubKind;

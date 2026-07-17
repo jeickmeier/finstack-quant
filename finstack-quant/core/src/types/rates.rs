@@ -228,18 +228,20 @@ impl Rate {
         Self::try_from_decimal(percent / 100.0)
     }
 
-    /// Create a rate from basis points (500 bps = 5%)
+    /// Create a rate from an integer basis-point quote (500 bps = 5%).
+    ///
+    /// Negative values are accepted because spreads and rates may be negative.
     pub fn from_bps(bps: i32) -> Self {
         Self(bps as f64 / 10_000.0)
     }
 
-    /// Get the rate as a decimal value
+    /// Return the internal decimal representation (0.05 for 5%).
     #[must_use]
     pub fn as_decimal(self) -> f64 {
         self.0
     }
 
-    /// Get the rate as a percentage value
+    /// Return the percentage representation (5.0 for 5%).
     #[must_use]
     pub fn as_percent(self) -> f64 {
         self.0 * 100.0
@@ -257,45 +259,63 @@ impl Rate {
         (self.0 * 10_000.0).round() as i32
     }
 
-    /// Zero rate constant
+    /// The zero rate, represented as decimal value 0.0.
     pub const ZERO: Self = Self(0.0);
 
-    /// Check if the rate is zero
+    /// Return true when the decimal rate is exactly zero.
     pub fn is_zero(self) -> bool {
         self.0 == 0.0
     }
 
-    /// Check if the rate is positive
+    /// Return true when the decimal rate is strictly greater than zero.
     pub fn is_positive(self) -> bool {
         self.0 > 0.0
     }
 
-    /// Check if the rate is negative
+    /// Return true when the decimal rate is strictly less than zero.
     pub fn is_negative(self) -> bool {
         self.0 < 0.0
     }
 
-    /// Get the absolute value of the rate
+    /// Return the rate's absolute value without changing its representation.
     pub fn abs(self) -> Self {
         Self(self.0.abs())
     }
 
-    /// Add two rates, rejecting non-finite results.
+    /// Add two decimal rates and reject a non-finite result.
+    ///
+    /// # Errors
+    ///
+    /// Returns NonFiniteValue if the sum overflows to infinity or is otherwise
+    /// non-finite.
     pub fn checked_add(self, rhs: Self) -> Result<Self> {
         Self::try_from_decimal(self.0 + rhs.0)
     }
 
-    /// Subtract two rates, rejecting non-finite results.
+    /// Subtract two decimal rates and reject a non-finite result.
+    ///
+    /// # Errors
+    ///
+    /// Returns NonFiniteValue if the difference is non-finite.
     pub fn checked_sub(self, rhs: Self) -> Result<Self> {
         Self::try_from_decimal(self.0 - rhs.0)
     }
 
-    /// Multiply by a scalar, rejecting non-finite results.
+    /// Scale the decimal rate by rhs and reject a non-finite result.
+    ///
+    /// # Errors
+    ///
+    /// Returns NonFiniteValue if rhs or the product is non-finite.
     pub fn checked_mul(self, rhs: f64) -> Result<Self> {
         Self::try_from_decimal(self.0 * rhs)
     }
 
-    /// Divide by a scalar, rejecting zero divisors and non-finite results.
+    /// Divide the decimal rate by rhs.
+    ///
+    /// # Errors
+    ///
+    /// Returns Invalid for a zero divisor or NonFiniteValue for a non-finite
+    /// quotient.
     pub fn checked_div(self, rhs: f64) -> Result<Self> {
         if rhs == 0.0 {
             return Err(InputError::Invalid.into());
@@ -303,7 +323,11 @@ impl Rate {
         Self::try_from_decimal(self.0 / rhs)
     }
 
-    /// Negate the rate, rejecting non-finite results.
+    /// Negate the decimal rate and reject a non-finite result.
+    ///
+    /// # Errors
+    ///
+    /// Returns NonFiniteValue if the stored value is non-finite.
     pub fn checked_neg(self) -> Result<Self> {
         Self::try_from_decimal(-self.0)
     }
@@ -410,7 +434,7 @@ impl Neg for Rate {
 pub struct Bps(i32);
 
 impl Bps {
-    /// Create a new Bps value
+    /// Create a basis-point value from an integer quote.
     pub fn new(bps: i32) -> Self {
         Self(bps)
     }
@@ -438,50 +462,55 @@ impl Bps {
         Ok(Self(rounded as i32))
     }
 
-    /// Get the basis points as an integer
+    /// Return the integer basis-point quote.
     pub fn as_bps(self) -> i32 {
         self.0
     }
 
-    /// Convert to decimal representation
+    /// Return the decimal-rate representation (100 bps = 0.01).
     pub fn as_decimal(self) -> f64 {
         self.0 as f64 / 10_000.0
     }
 
-    /// Convert to percentage representation
+    /// Return the percentage representation (100 bps = 1.0).
     pub fn as_percent(self) -> f64 {
         self.0 as f64 / 100.0
     }
 
-    /// Convert to Rate
+    /// Convert the basis-point quote to a Rate decimal wrapper.
     pub fn as_rate(self) -> Rate {
         Rate::from_bps(self.0)
     }
 
-    /// Zero basis points constant
+    /// The zero basis-point quote.
     pub const ZERO: Self = Self(0);
 
-    /// Check if zero
+    /// Return true when the quote is exactly zero basis points.
     pub fn is_zero(self) -> bool {
         self.0 == 0
     }
 
-    /// Check if positive
+    /// Return true when the quote is strictly positive.
     pub fn is_positive(self) -> bool {
         self.0 > 0
     }
 
-    /// Check if negative
+    /// Return true when the quote is strictly negative.
     pub fn is_negative(self) -> bool {
         self.0 < 0
     }
 
-    /// Get absolute value
+    /// Return the absolute basis-point quote.
     pub fn abs(self) -> Self {
         Self(self.0.abs())
     }
 
     /// Add two basis-point values, rejecting integer overflow.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::ConversionOverflow` when the sum cannot be
+    /// represented as an `i32` basis-point quote.
     pub fn checked_add(self, rhs: Self) -> Result<Self> {
         self.0
             .checked_add(rhs.0)
@@ -490,6 +519,11 @@ impl Bps {
     }
 
     /// Subtract two basis-point values, rejecting integer overflow.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::ConversionOverflow` when the difference cannot be
+    /// represented as an `i32` basis-point quote.
     pub fn checked_sub(self, rhs: Self) -> Result<Self> {
         self.0
             .checked_sub(rhs.0)
@@ -498,6 +532,11 @@ impl Bps {
     }
 
     /// Multiply by an integer scalar, rejecting integer overflow.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::ConversionOverflow` when the product cannot be
+    /// represented as an `i32` basis-point quote.
     pub fn checked_mul(self, rhs: i32) -> Result<Self> {
         self.0
             .checked_mul(rhs)
@@ -506,6 +545,12 @@ impl Bps {
     }
 
     /// Divide by an integer scalar, rejecting zero divisors.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::Invalid` for a zero divisor, or
+    /// `InputError::ConversionOverflow` for the unrepresentable
+    /// `i32::MIN / -1` quotient.
     pub fn checked_div(self, rhs: i32) -> Result<Self> {
         if rhs == 0 {
             return Err(InputError::Invalid.into());
@@ -517,6 +562,10 @@ impl Bps {
     }
 
     /// Negate the basis-point value, rejecting integer overflow.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::ConversionOverflow` when negating `i32::MIN`.
     pub fn checked_neg(self) -> Result<Self> {
         self.0
             .checked_neg()
@@ -669,65 +718,84 @@ impl Percentage {
         Ok(Self(pct))
     }
 
-    /// Get the percentage value
+    /// Return the stored percentage value (5.0 represents 5%).
     pub fn as_percent(self) -> f64 {
         self.0
     }
 
-    /// Convert to decimal representation
+    /// Return the decimal-rate representation (5.0% becomes 0.05).
     pub fn as_decimal(self) -> f64 {
         self.0 / 100.0
     }
 
-    /// Convert to Rate
+    /// Convert the percentage to a Rate decimal wrapper.
     pub fn as_rate(self) -> Rate {
         Rate::from_percent(self.0)
     }
 
-    /// Convert to basis points
+    /// Convert to integer basis points, rounding to the nearest basis point.
     pub fn as_bps(self) -> i32 {
         (self.0 * 100.0).round() as i32
     }
 
-    /// Zero percentage constant
+    /// The zero percentage value.
     pub const ZERO: Self = Self(0.0);
 
-    /// Check if zero
+    /// Return true when the percentage is exactly zero.
     pub fn is_zero(self) -> bool {
         self.0 == 0.0
     }
 
-    /// Check if positive
+    /// Return true when the percentage is strictly positive.
     pub fn is_positive(self) -> bool {
         self.0 > 0.0
     }
 
-    /// Check if negative
+    /// Return true when the percentage is strictly negative.
     pub fn is_negative(self) -> bool {
         self.0 < 0.0
     }
 
-    /// Get absolute value
+    /// Return the absolute percentage value.
     pub fn abs(self) -> Self {
         Self(self.0.abs())
     }
 
     /// Add two percentages, rejecting non-finite results.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::NonFiniteValue` when the sum is NaN or infinite.
     pub fn checked_add(self, rhs: Self) -> Result<Self> {
         Self::try_new(self.0 + rhs.0)
     }
 
     /// Subtract two percentages, rejecting non-finite results.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::NonFiniteValue` when the difference is NaN or
+    /// infinite.
     pub fn checked_sub(self, rhs: Self) -> Result<Self> {
         Self::try_new(self.0 - rhs.0)
     }
 
     /// Multiply by a scalar, rejecting non-finite results.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::NonFiniteValue` when `rhs` or the product is NaN
+    /// or infinite.
     pub fn checked_mul(self, rhs: f64) -> Result<Self> {
         Self::try_new(self.0 * rhs)
     }
 
     /// Divide by a scalar, rejecting zero divisors and non-finite results.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::Invalid` for a zero divisor or
+    /// `InputError::NonFiniteValue` for a non-finite quotient.
     pub fn checked_div(self, rhs: f64) -> Result<Self> {
         if rhs == 0.0 {
             return Err(InputError::Invalid.into());
@@ -736,6 +804,11 @@ impl Percentage {
     }
 
     /// Negate the percentage, rejecting non-finite results.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::NonFiniteValue` when the stored percentage is not
+    /// finite.
     pub fn checked_neg(self) -> Result<Self> {
         Self::try_new(-self.0)
     }

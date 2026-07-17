@@ -23,6 +23,17 @@ impl ThresholdSchedule {
     }
 
     /// Create a validated threshold schedule, sorting entries by date.
+    ///
+    /// A schedule is piecewise constant: each entry takes effect on its date
+    /// and remains in force until a later entry. Use this constructor for an
+    /// externally supplied schedule; unlike [`new`](Self::new), it rejects
+    /// non-finite thresholds and duplicate effective dates.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when a threshold is `NaN` or infinite, or
+    /// when two entries have the same effective date. The entries are sorted
+    /// before validation, so input ordering does not affect the result.
     pub fn try_new(entries: Vec<(Date, f64)>) -> finstack_quant_core::Result<Self> {
         let schedule = Self::new(entries);
         schedule.validate()?;
@@ -70,6 +81,13 @@ impl ThresholdSchedule {
 }
 
 /// Resolve threshold for a given test date from a piecewise-constant schedule.
+///
+/// # Arguments
+///
+/// * `schedule` - Effective-date threshold schedule sorted in ascending date
+///   order; an empty schedule returns `None`.
+/// * `test_date` - Covenant test date for which the latest threshold effective
+///   on or before that date is required.
 pub fn threshold_for_date(schedule: &ThresholdSchedule, test_date: Date) -> Option<f64> {
     if schedule.0.is_empty() {
         return None;

@@ -109,6 +109,13 @@ impl Default for ArbitrageCheckConfig {
 /// A single supplied value is broadcast across all expiries. Otherwise the
 /// length must match `expiry_count`.
 ///
+/// # Arguments
+///
+/// * `expiry_count` - Number of volatility-surface expiries requiring a
+///   forward price.
+/// * `forward_prices` - One forward price to broadcast, or one finite forward
+///   price per expiry in surface order.
+///
 /// # Errors
 /// Returns a validation error when the supplied vector has neither length one
 /// nor `expiry_count`.
@@ -165,8 +172,26 @@ fn local_vol_density_violations(
 ///
 /// # Arguments
 ///
-/// * `surface` -- the volatility surface to check
-/// * `config` -- which checks to run and their parameters
+/// * `surface` - Volatility surface whose strike and expiry grid is checked.
+/// * `config` - Check-selection, forward-price, tolerance, and severity
+///   settings applied without mutating `surface`.
+///
+/// Butterfly, calendar-spread, and local-vol-density checks require a forward
+/// price. `config.forward_prices` supplies one value for every surface expiry
+/// and takes precedence over `config.forward`; otherwise the scalar forward is
+/// broadcast. If neither is supplied, the enabled checks are skipped and the
+/// report contains no violations. Results below `config.min_severity` are
+/// filtered before the report is sorted from highest to lowest severity.
+///
+/// The tolerance is interpreted in total-variance units by the individual
+/// checks. This detector reports violations; it does not repair the surface or
+/// prove the absence of arbitrage between the sampled checks.
+///
+/// # Errors
+///
+/// Returns an error only if `config.forward_prices` is supplied with a length
+/// different from `surface.expiries().len()`. It does not validate the
+/// finiteness or positivity of forward prices or the tolerance.
 pub fn check_surface(
     surface: &VolSurface,
     config: &ArbitrageCheckConfig,
@@ -243,6 +268,15 @@ pub fn check_surface(
 
 /// Run a butterfly arbitrage check on volatility rows.
 ///
+/// # Arguments
+///
+/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
+/// * `expiries` - Strictly ordered expiry times in years, one per row in `vols`.
+/// * `vols` - Implied-volatility rows aligned with `expiries` and `strikes`.
+/// * `forward_prices` - One forward price to broadcast or one price per expiry.
+/// * `tolerance` - Non-negative numerical tolerance in total-variance units
+///   used when classifying violations.
+///
 /// # Errors
 /// Returns an error if the volatility grid or forward vector is invalid.
 pub fn check_butterfly_grid(
@@ -262,6 +296,15 @@ pub fn check_butterfly_grid(
 }
 
 /// Run a calendar-spread arbitrage check on volatility rows.
+///
+/// # Arguments
+///
+/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
+/// * `expiries` - Strictly ordered expiry times in years, one per row in `vols`.
+/// * `vols` - Implied-volatility rows aligned with `expiries` and `strikes`.
+/// * `forward_prices` - One forward price to broadcast or one price per expiry.
+/// * `tolerance` - Non-negative numerical tolerance in total-variance units
+///   used when classifying violations.
 ///
 /// # Errors
 /// Returns an error if the volatility grid or forward vector is invalid.
@@ -285,6 +328,14 @@ pub fn check_calendar_spread_grid(
 ///
 /// `forward_prices` must contain one value per expiry because the local-vol
 /// check is evaluated expiry by expiry when forwards differ.
+///
+/// # Arguments
+///
+/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
+/// * `expiries` - Strictly ordered expiry times in years, one per row in `vols`.
+/// * `vols` - Implied-volatility rows aligned with `expiries` and `strikes`.
+/// * `forward_prices` - One finite forward price for every expiry, in the same
+///   order as `expiries`.
 ///
 /// # Errors
 /// Returns an error if the volatility grid is invalid or the forward vector
@@ -314,6 +365,18 @@ pub fn check_local_vol_density_grid(
 ///
 /// `forward_prices`, when provided, may contain either one value to broadcast
 /// or one value per expiry.
+///
+/// # Arguments
+///
+/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
+/// * `expiries` - Strictly ordered expiry times in years, one per row in `vols`.
+/// * `vols` - Implied-volatility rows aligned with `expiries` and `strikes`.
+/// * `forward` - Optional scalar forward price broadcast across expiries when
+///   `forward_prices` is absent or constant.
+/// * `forward_prices` - Optional one-value broadcast or one forward price per
+///   expiry. A non-constant vector enables per-expiry local-vol checks.
+/// * `tolerance` - Non-negative numerical tolerance in total-variance units
+///   used when classifying violations.
 ///
 /// # Errors
 /// Returns an error if the volatility grid or forward-vector shape is invalid.

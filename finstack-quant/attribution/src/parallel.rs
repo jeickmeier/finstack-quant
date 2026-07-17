@@ -311,6 +311,8 @@ fn reprice_cross_factor(
 /// * `as_of_t0` - Valuation date at T₀
 /// * `as_of_t1` - Valuation date at T₁
 /// * `config` - Finstack configuration (for rounding, etc.)
+/// * `execution_policy` - Sequential or parallel execution policy recorded in
+///   the attribution metadata and used for factor repricing work.
 ///
 /// # Returns
 ///

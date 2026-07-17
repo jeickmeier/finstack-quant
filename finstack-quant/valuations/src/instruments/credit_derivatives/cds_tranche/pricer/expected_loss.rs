@@ -1,3 +1,5 @@
+//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
+//!
 use super::config::{
     CDSTranchePricer, ElWdPoint, PoolExposure, ADAPTIVE_INTEGRATION_HIGH, ADAPTIVE_INTEGRATION_LOW,
     NUMERICAL_TOLERANCE, PROBABILITY_CLIP,

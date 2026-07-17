@@ -469,6 +469,20 @@ impl DieboldLi {
     ///
     /// Since the forecast is already NS-shaped (by construction), this is a
     /// near-exact fit that reuses the forecast factor values directly.
+    ///
+    /// `forecast.factors` become the Nelson-Siegel level, slope, and curvature
+    /// loadings without refitting the point yields. The decay horizon is
+    /// `tau = 1 / self.lambda`; the resulting curve uses the parametric
+    /// builder's default Act/365F day count unless callers construct a curve
+    /// directly with a different convention. `forecast.yields` and confidence
+    /// bands are not used by this conversion.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error propagated by the parametric-curve builder when the
+    /// derived Nelson-Siegel model is invalid, including a non-positive decay
+    /// horizon. Callers should fit a positive, finite `lambda` before invoking
+    /// this conversion.
     pub fn to_parametric_curve(
         &self,
         id: impl Into<crate::types::CurveId>,
