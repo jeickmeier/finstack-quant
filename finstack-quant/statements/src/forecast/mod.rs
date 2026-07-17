@@ -164,6 +164,10 @@ fn apply_forecast_internal(
         stable_hash_u64,
     };
 
+    // Single dispatch point for every method, so an unknown key cannot slip
+    // through on any path.
+    validate_params(spec.method, &spec.params)?;
+
     match (spec.method, seed_ctx) {
         (ForecastMethod::Normal, Some((seed_offset, node_id))) => {
             let params = mix_node_seed(&spec.params, node_id, parse_seed_json, stable_hash_u64);
@@ -190,6 +194,56 @@ fn apply_forecast_internal(
             seasonal_forecast(base_value, forecast_periods, &spec.params)
         }
     }
+}
+
+/// Parameter keys each forecast method understands.
+///
+/// The single vocabulary for every method, so a key a method silently ignores
+/// cannot exist. Previously only TimeSeries and Seasonal rejected unknown keys,
+/// which meant a typo elsewhere — `sigma` beside a stale `std_dev`, say — ran
+/// clean at the wrong volatility with no diagnostic.
+pub(crate) fn allowed_params(method: crate::types::ForecastMethod) -> &'static [&'static str] {
+    use crate::types::ForecastMethod;
+    match method {
+        ForecastMethod::ForwardFill => &[],
+        ForecastMethod::GrowthPct => &["rate"],
+        ForecastMethod::CurvePct => &["curve"],
+        ForecastMethod::Override => &["overrides"],
+        // `correlation_with` / `correlation` are Monte Carlo-only but are
+        // legal to configure on any Normal / LogNormal node (the single-run
+        // path warns that it ignores them).
+        ForecastMethod::Normal | ForecastMethod::LogNormal => {
+            &["mean", "std_dev", "seed", "correlation_with", "correlation"]
+        }
+        ForecastMethod::TimeSeries => &["historical", "method", "alpha", "beta", "window"],
+        ForecastMethod::Seasonal => &["historical", "season_length", "mode", "growth"],
+    }
+}
+
+/// Reject parameter keys the method does not understand.
+///
+/// # Errors
+///
+/// Returns an error naming the offending key and listing the allowed set.
+pub(crate) fn validate_params(
+    method: crate::types::ForecastMethod,
+    params: &indexmap::IndexMap<String, serde_json::Value>,
+) -> Result<()> {
+    let allowed = allowed_params(method);
+    for key in params.keys() {
+        if !allowed.contains(&key.as_str()) {
+            let allowed_list = if allowed.is_empty() {
+                "(none)".to_string()
+            } else {
+                allowed.join(", ")
+            };
+            return Err(crate::error::Error::forecast(format!(
+                "Unknown parameter '{key}' for {method:?} forecast. \
+                 Allowed parameters: {allowed_list}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn mix_node_seed(

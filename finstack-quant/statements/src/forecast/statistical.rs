@@ -505,6 +505,10 @@ pub(crate) fn monte_carlo_correlated_series(
         mc_z_cache,
     } = input;
 
+    // This path is called directly from forecast evaluation, bypassing
+    // `apply_forecast_internal`'s dispatch, so it validates its own keys.
+    crate::forecast::validate_params(method, params)?;
+
     if !base_value.is_finite() {
         return Err(Error::forecast(format!(
             "Monte Carlo correlated forecast for '{node_id}' requires a finite base_value, \
@@ -650,6 +654,82 @@ mod tests {
         params.insert("std_dev".to_string(), serde_json::json!(0.1));
         params.insert("seed".to_string(), serde_json::json!(7));
         params
+    }
+
+    /// A misspelled parameter must fail loudly rather than be ignored.
+    ///
+    /// Only TimeSeries and Seasonal rejected unknown keys, so a statistical
+    /// node ran clean while silently ignoring the typo. The dangerous shape is
+    /// a rename left half-done: `sigma: 0.4` added beside a stale
+    /// `std_dev: 0.1` simulated at a quarter of the intended volatility, with
+    /// every downstream tail and breach probability wrong and no diagnostic.
+    #[test]
+    fn statistical_forecast_rejects_unknown_parameter_keys() {
+        let periods = vec![PeriodId::quarter(2025, 1)];
+        let mut params = lognormal_params();
+        params.insert("sigma".to_string(), serde_json::json!(0.4));
+
+        let spec = crate::types::ForecastSpec {
+            method: ForecastMethod::LogNormal,
+            params,
+        };
+        let err = crate::forecast::apply_forecast(&spec, 100.0, &periods)
+            .expect_err("an unknown parameter must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("sigma") && msg.contains("std_dev"),
+            "error should name the bad key and list the allowed set: {msg}"
+        );
+    }
+
+    /// The correlated Monte Carlo path bypasses the normal dispatch, so it
+    /// must validate its own keys too.
+    #[test]
+    fn correlated_forecast_rejects_unknown_parameter_keys() {
+        let periods = vec![PeriodId::quarter(2025, 1)];
+        let mut params = lognormal_params();
+        params.insert("correlation_with".to_string(), serde_json::json!("peer"));
+        params.insert("correlation".to_string(), serde_json::json!(0.5));
+        params.insert("vol_floor".to_string(), serde_json::json!(0.05));
+
+        let mut cache: IndexMap<NodeId, IndexMap<PeriodId, f64>> = IndexMap::new();
+        cache
+            .entry(NodeId::new("peer"))
+            .or_default()
+            .insert(periods[0], 0.5);
+
+        let err = monte_carlo_correlated_series(CorrelatedMonteCarloSeries {
+            method: ForecastMethod::LogNormal,
+            params: &params,
+            base_value: 100.0,
+            forecast_periods: &periods,
+            seed_offset: 1,
+            node_id: "node",
+            peer_id: "peer",
+            rho: 0.5,
+            mc_z_cache: &cache,
+        })
+        .expect_err("an unknown parameter must be rejected on the correlated path too");
+        assert!(
+            err.to_string().contains("vol_floor"),
+            "error should name the bad key: {err}"
+        );
+    }
+
+    /// Correlation keys stay legal on statistical methods.
+    #[test]
+    fn correlation_keys_are_allowed_on_statistical_methods() {
+        let periods = vec![PeriodId::quarter(2025, 1)];
+        let mut params = lognormal_params();
+        params.insert("correlation_with".to_string(), serde_json::json!("peer"));
+        params.insert("correlation".to_string(), serde_json::json!(0.5));
+
+        let spec = crate::types::ForecastSpec {
+            method: ForecastMethod::LogNormal,
+            params,
+        };
+        crate::forecast::apply_forecast(&spec, 100.0, &periods)
+            .expect("correlation parameters are legal to configure");
     }
 
     /// A `NaN` base must be rejected, not silently routed into the zero-base

@@ -38,26 +38,6 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use indexmap::IndexMap;
 
-/// Reject unknown parameter keys so typos (e.g. `seasonstart`) fail loudly
-/// instead of silently falling back to defaults.
-fn validate_param_keys(
-    params: &IndexMap<String, serde_json::Value>,
-    allowed: &[&str],
-    method: &str,
-) -> Result<()> {
-    for key in params.keys() {
-        if !allowed.contains(&key.as_str()) {
-            return Err(Error::forecast(format!(
-                "Unknown parameter '{}' for {} forecast. Allowed parameters: {}",
-                key,
-                method,
-                allowed.join(", ")
-            )));
-        }
-    }
-    Ok(())
-}
-
 fn parse_historical_series(historical: &[serde_json::Value], context: &str) -> Result<Vec<f64>> {
     let mut parsed = Vec::with_capacity(historical.len());
     for (idx, value) in historical.iter().enumerate() {
@@ -97,11 +77,9 @@ pub(super) fn timeseries_forecast(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    validate_param_keys(
-        params,
-        &["historical", "method", "alpha", "beta", "window"],
-        "time-series",
-    )?;
+    // Validated here as well as at dispatch: these entry points are reachable
+    // directly, and the vocabulary itself lives in one place.
+    crate::forecast::validate_params(crate::types::ForecastMethod::TimeSeries, params)?;
 
     // Get historical data
     let historical = params
@@ -384,6 +362,9 @@ pub(super) fn seasonal_forecast(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
 ) -> Result<IndexMap<PeriodId, f64>> {
+    // Validated here as well as at dispatch: this entry point is reachable
+    // directly, and the vocabulary itself lives in one place.
+    crate::forecast::validate_params(crate::types::ForecastMethod::Seasonal, params)?;
     // `base_value` is currently ignored for seasonal forecasts—historical data provides the level.
     seasonal_forecast_with_decomposition(base_value, forecast_periods, params)
 }
@@ -397,12 +378,6 @@ fn seasonal_forecast_with_decomposition(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    validate_param_keys(
-        params,
-        &["historical", "season_length", "mode", "growth"],
-        "seasonal",
-    )?;
-
     // Get historical data
     let historical = params
         .get("historical")

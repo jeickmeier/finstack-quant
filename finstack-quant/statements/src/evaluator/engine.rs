@@ -34,6 +34,30 @@ pub struct PreparedEvaluation {
     /// evaluations are independent of the evaluator's mutable compiled cache
     /// (which other `evaluate` calls may overwrite).
     compiled_cache: std::sync::Arc<IndexMap<NodeId, Expr>>,
+    /// Fingerprint of the formula / where-clause text this plan was compiled
+    /// from, used to reject a model whose formulas have since changed.
+    formula_fingerprint: u64,
+}
+
+/// Fingerprint the formula and where-clause text of every node.
+///
+/// `PreparedEvaluation` snapshots *compiled* expressions, so a model whose
+/// formulas changed after `prepare` would silently evaluate the stale code.
+/// Comparing the node set cannot catch that — the nodes are identical, only
+/// their formulas differ — so the text itself is fingerprinted.
+///
+/// `model.nodes` is an `IndexMap`, so iteration is insertion-ordered and the
+/// fingerprint is deterministic. It is only ever compared against another
+/// fingerprint from the same process, and never serialized.
+fn formula_fingerprint(model: &FinancialModelSpec) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    for (node_id, spec) in &model.nodes {
+        node_id.as_str().hash(&mut hasher);
+        spec.formula_text.hash(&mut hasher);
+        spec.where_text.hash(&mut hasher);
+    }
+    hasher.finish()
 }
 
 /// Evaluator for financial models.
@@ -437,6 +461,18 @@ impl Evaluator {
             }
         }
 
+        // The node set can match while the formulas differ. The plan holds
+        // *compiled* expressions, so evaluating would silently use the code the
+        // plan was built from and return a well-formed but wrong result.
+        if formula_fingerprint(model) != prepared.formula_fingerprint {
+            return Err(Error::eval(
+                "evaluate_prepared: a formula or where clause differs from the model the \
+                 prepared plan was built for. The plan holds compiled expressions, so \
+                 evaluating would silently use the old formula. Rebuild the plan with \
+                 `prepare` (only node *values* may differ between prepare and evaluate).",
+            ));
+        }
+
         let mut historical: std::sync::Arc<IndexMap<PeriodId, IndexMap<String, f64>>> =
             std::sync::Arc::new(IndexMap::new());
         let historical_cs: std::sync::Arc<
@@ -640,6 +676,7 @@ impl Evaluator {
             node_to_column,
             dag,
             compiled_cache: std::sync::Arc::clone(&self.compiled_cache),
+            formula_fingerprint: formula_fingerprint(model),
         })
     }
 
@@ -916,6 +953,49 @@ mod tests {
             results.get("guarded_metric", &PeriodId::quarter(2025, 1)),
             Some(0.0)
         );
+    }
+
+    /// Reusing a prepared plan after editing a formula must fail loudly.
+    ///
+    /// `PreparedEvaluation` snapshots the compiled expressions, and the
+    /// structural guard only compared the node *set*. Editing a formula and
+    /// re-using the plan therefore kept evaluating the stale compiled
+    /// expression and returned a well-formed result built from code the model
+    /// no longer contains — the exact misuse the guard exists for, but silent
+    /// and numerically wrong instead of an error.
+    #[test]
+    fn evaluate_prepared_rejects_a_model_whose_formula_changed() {
+        let period = PeriodId::quarter(2025, 1);
+        let build = |factor: &str| {
+            ModelBuilder::new("prepared-drift")
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods")
+                .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
+                .compute("scaled", &format!("revenue * {factor}"))
+                .expect("valid formula")
+                .build()
+                .expect("valid model")
+        };
+
+        let original = build("2");
+        let mut evaluator = Evaluator::new();
+        let prepared = evaluator.prepare(&original).expect("prepare");
+
+        // Same nodes, different formula: the node-set guard cannot see this.
+        let edited = build("3");
+        let err = evaluator
+            .evaluate_prepared(&edited, &prepared)
+            .expect_err("a changed formula must be rejected, not silently ignored");
+        assert!(
+            err.to_string().contains("formula"),
+            "error should point at the changed formula: {err}"
+        );
+
+        // The unedited model still evaluates against its own plan.
+        let results = evaluator
+            .evaluate_prepared(&original, &prepared)
+            .expect("the model the plan was built for still evaluates");
+        assert_eq!(results.get("scaled", &period), Some(200.0));
     }
 
     #[test]

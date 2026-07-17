@@ -156,51 +156,84 @@ impl DependencyGraph {
     /// `O(V + E)` rather than `O(V * (V + E))`.
     pub fn detect_cycles(&self) -> Result<()> {
         let mut visited: IndexSet<NodeId> = IndexSet::new();
-        let mut path: Vec<NodeId> = Vec::new();
         for node_id in self.dependencies.keys() {
-            if let Some(cycle) = self.dfs_cycle(node_id.as_str(), &mut visited, &mut path) {
+            if let Some(cycle) = self.dfs_cycle(node_id.as_str(), &mut visited) {
                 return Err(Error::circular_dependency(cycle));
             }
-            // A cycle-free DFS leaves `path` balanced; assert the invariant
-            // so a future change to `dfs_cycle` cannot silently corrupt it.
-            debug_assert!(path.is_empty());
         }
         Ok(())
     }
 
-    fn dfs_cycle(
-        &self,
-        node: &str,
-        visited: &mut IndexSet<NodeId>,
-        path: &mut Vec<NodeId>,
-    ) -> Option<Vec<String>> {
-        // If we've seen this node in the current path, we have a cycle
-        if let Some(cycle_start) = path.iter().position(|n| n.as_str() == node) {
-            let mut cycle: Vec<String> = path[cycle_start..]
-                .iter()
-                .map(|n| n.as_str().to_string())
-                .collect();
-            cycle.push(node.to_string());
-            return Some(cycle);
-        }
-
-        // If we've fully explored this node before, skip it
-        if visited.contains(node) {
+    /// Walk one node's subgraph, returning a representative cycle if found.
+    ///
+    /// The traversal is iterative with an explicit stack. A recursive walk goes
+    /// `V` frames deep on a chain of dependencies, and the graph comes from a
+    /// user-supplied model (JSON), so a deep chain overflows the stack — an
+    /// abort (SIGABRT) that the Python / WASM bindings cannot catch, not a
+    /// recoverable error. Whether it overflows depends on node *order*: the
+    /// shared `visited` set short-circuits a chain entered from its root, but a
+    /// chain entered from its deep end recurses its full length, and node order
+    /// in a JSON document is arbitrary.
+    ///
+    /// `on_path` mirrors `path` as a set so the cycle test is O(1) rather than
+    /// a linear scan of the path on every step (the scan made a deep walk
+    /// O(V²)). `path` is kept only to reconstruct the cycle for the diagnostic,
+    /// which happens at most once.
+    fn dfs_cycle(&self, start: &str, visited: &mut IndexSet<NodeId>) -> Option<Vec<String>> {
+        if visited.contains(start) {
             return None;
         }
 
-        path.push(NodeId::new(node));
+        // Each frame is (node, index of the next dependency to visit).
+        let mut stack: Vec<(NodeId, usize)> = vec![(NodeId::new(start), 0)];
+        let mut path: Vec<NodeId> = vec![NodeId::new(start)];
+        let mut on_path: IndexSet<NodeId> = IndexSet::new();
+        on_path.insert(NodeId::new(start));
 
-        if let Some(deps) = self.dependencies.get(node) {
-            for dep in deps {
-                if let Some(cycle) = self.dfs_cycle(dep.as_str(), visited, path) {
-                    return Some(cycle);
+        while let Some((node, dep_idx)) = stack.last().map(|(n, i)| (n.clone(), *i)) {
+            let next_dep = self
+                .dependencies
+                .get(node.as_str())
+                .and_then(|deps| deps.get_index(dep_idx))
+                .cloned();
+
+            match next_dep {
+                Some(dep) => {
+                    if let Some(frame) = stack.last_mut() {
+                        frame.1 += 1;
+                    }
+
+                    if on_path.contains(&dep) {
+                        // Back edge into the active path: report it from the
+                        // point the path first reached `dep`.
+                        let cycle_start = path.iter().position(|n| *n == dep).unwrap_or(0);
+                        let mut cycle: Vec<String> = path
+                            .get(cycle_start..)
+                            .unwrap_or_default()
+                            .iter()
+                            .map(|n| n.as_str().to_string())
+                            .collect();
+                        cycle.push(dep.as_str().to_string());
+                        return Some(cycle);
+                    }
+
+                    if !visited.contains(&dep) {
+                        stack.push((dep.clone(), 0));
+                        path.push(dep.clone());
+                        on_path.insert(dep);
+                    }
+                }
+                None => {
+                    // Every dependency explored: this node is fully done.
+                    if let Some((done, _)) = stack.pop() {
+                        path.pop();
+                        on_path.shift_remove(&done);
+                        visited.insert(done);
+                    }
                 }
             }
         }
 
-        path.pop();
-        visited.insert(NodeId::new(node));
         None
     }
 }
@@ -383,6 +416,60 @@ mod tests {
         assert!(
             err.contains("Circular dependency"),
             "expected circular dependency error, got: {err}"
+        );
+    }
+
+    /// Build a chain `a0 <- a1 <- ... <- a{n-1}`, inserted deepest-first.
+    ///
+    /// Insertion order matters: the shared `visited` set short-circuits a chain
+    /// entered from its root, so only a deep-end entry exercises full-length
+    /// traversal. Node order in a JSON model is arbitrary, so this order is
+    /// just as reachable as any other.
+    fn deep_chain_model(n: usize) -> crate::types::FinancialModelSpec {
+        use crate::types::{FinancialModelSpec, NodeSpec, NodeType};
+        let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
+            .expect("periods")
+            .periods;
+        let mut model = FinancialModelSpec::new("deep", periods);
+        for i in (1..n).rev() {
+            model.add_node(
+                NodeSpec::new(format!("a{i}"), NodeType::Mixed)
+                    .with_formula(format!("a{} + 1", i - 1)),
+            );
+        }
+        model.add_node(NodeSpec::new("a0", NodeType::Mixed).with_formula("1"));
+        model
+    }
+
+    /// Cycle detection must not overflow the stack on a deep dependency chain.
+    ///
+    /// The walk used to recurse once per node, so a 20k chain entered from its
+    /// deep end aborted the process (SIGABRT) — uncatchable by the bindings,
+    /// and reachable from a model spec supplied as JSON.
+    #[test]
+    fn deep_dependency_chain_does_not_overflow_the_stack() {
+        let model = deep_chain_model(20_000);
+        let graph = DependencyGraph::from_model(&model).expect("graph builds");
+        graph
+            .detect_cycles()
+            .expect("a 20k-node chain is acyclic and must not abort");
+    }
+
+    /// The iterative walk must still find a cycle, and report it.
+    #[test]
+    fn deep_chain_with_a_cycle_is_still_detected() {
+        use crate::types::{NodeSpec, NodeType};
+        let mut model = deep_chain_model(2_000);
+        // Close the loop: a0 now depends on the far end of the chain.
+        model.add_node(NodeSpec::new("a0", NodeType::Mixed).with_formula("a1999 + 1"));
+
+        let graph = DependencyGraph::from_model(&model).expect("graph builds");
+        let err = graph
+            .detect_cycles()
+            .expect_err("a closed loop must be reported");
+        assert!(
+            err.to_string().contains("Circular dependency"),
+            "expected a circular-dependency diagnostic, got: {err}"
         );
     }
 
