@@ -3,10 +3,11 @@
 //! These schemes produce numerically exact transitions (up to floating-point precision)
 //! without discretization error.
 
-use super::super::process::correlation::{cholesky_correlation, validate_correlation_matrix};
 use super::super::process::gbm::{GbmProcess, MultiGbmProcess};
 use super::super::traits::{Discretization, ProportionalDiffusion, StochasticProcess};
-use finstack_quant_core::math::linalg::CholeskyError;
+use finstack_quant_core::math::linalg::{
+    cholesky_correlation, validate_correlation_matrix, CholeskyError,
+};
 
 /// Exact discretization for Geometric Brownian Motion.
 ///

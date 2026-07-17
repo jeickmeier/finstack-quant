@@ -21,12 +21,14 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IssuerId};
+use finstack_quant_factor_model::credit::decomposition::{
+    decompose_levels, decompose_period, PeriodDecomposition,
+};
 use finstack_quant_factor_model::credit::hierarchy::{
     AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
     FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
 };
-use finstack_quant_factor_model::{decompose_levels, decompose_period, PeriodDecomposition};
 use finstack_quant_factor_model::{
     FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
 };

@@ -166,13 +166,13 @@ pub mod prelude {
     pub use super::process::bates::{BatesParams, BatesProcess};
     pub use super::process::brownian::{BrownianParams, BrownianProcess, MultiBrownianProcess};
     pub use super::process::cir::{CirParams, CirPlusPlusProcess, CirProcess};
-    pub use super::process::correlation::{apply_correlation, cholesky_decomposition};
     pub use super::process::gbm::{GbmParams, GbmProcess, MultiGbmProcess};
     pub use super::process::heston::{HestonParams, HestonProcess};
     pub use super::process::jump_diffusion::{MertonJumpParams, MertonJumpProcess};
     pub use super::process::multi_ou::MultiOuParams;
     pub use super::process::ou::{HullWhite1FParams, HullWhite1FProcess};
     pub use super::process::schwartz_smith::{SchwartzSmithParams, SchwartzSmithProcess};
+    pub use finstack_quant_core::math::linalg::{apply_correlation, cholesky_decomposition};
 
     // --- Discretization schemes ---
     //

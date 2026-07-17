@@ -187,7 +187,7 @@ impl PyCreditFactorModel {
 )]
 #[derive(Clone)]
 pub(crate) struct PyCreditCalibrator {
-    inner: finstack_quant_factor_model::CreditCalibrator,
+    inner: finstack_quant_factor_model::credit::calibration::CreditCalibrator,
 }
 
 #[pymethods]
@@ -201,10 +201,10 @@ impl PyCreditCalibrator {
     ///     ValueError: If ``config_json`` is not a valid ``CreditCalibrationConfig``.
     #[new]
     fn new(config_json: &str) -> PyResult<Self> {
-        let config: finstack_quant_factor_model::CreditCalibrationConfig =
+        let config: finstack_quant_factor_model::credit::calibration::CreditCalibrationConfig =
             serde_json::from_str(config_json).map_err(display_to_py)?;
         Ok(Self {
-            inner: finstack_quant_factor_model::CreditCalibrator::new(config),
+            inner: finstack_quant_factor_model::credit::calibration::CreditCalibrator::new(config),
         })
     }
 
@@ -221,7 +221,7 @@ impl PyCreditCalibrator {
     /// Raises:
     ///     ValueError: If inputs are structurally invalid or calibration fails.
     fn calibrate(&self, py: Python<'_>, inputs_json: &str) -> PyResult<PyCreditFactorModel> {
-        let inputs: finstack_quant_factor_model::CreditCalibrationInputs =
+        let inputs: finstack_quant_factor_model::credit::calibration::CreditCalibrationInputs =
             serde_json::from_str(inputs_json).map_err(display_to_py)?;
         let model = py
             .detach(|| self.inner.calibrate(inputs))
@@ -256,11 +256,11 @@ impl PyCreditCalibrator {
 )]
 #[derive(Clone)]
 pub(crate) struct PyLevelsAtDate {
-    inner: finstack_quant_factor_model::LevelsAtDate,
+    inner: finstack_quant_factor_model::credit::decomposition::LevelsAtDate,
 }
 
 impl PyLevelsAtDate {
-    fn from_inner(inner: finstack_quant_factor_model::LevelsAtDate) -> Self {
+    fn from_inner(inner: finstack_quant_factor_model::credit::decomposition::LevelsAtDate) -> Self {
         Self { inner }
     }
 }
@@ -367,11 +367,13 @@ impl PyLevelsAtDate {
 )]
 #[derive(Clone)]
 pub(crate) struct PyPeriodDecomposition {
-    inner: finstack_quant_factor_model::PeriodDecomposition,
+    inner: finstack_quant_factor_model::credit::decomposition::PeriodDecomposition,
 }
 
 impl PyPeriodDecomposition {
-    fn from_inner(inner: finstack_quant_factor_model::PeriodDecomposition) -> Self {
+    fn from_inner(
+        inner: finstack_quant_factor_model::credit::decomposition::PeriodDecomposition,
+    ) -> Self {
         Self { inner }
     }
 }
@@ -508,7 +510,7 @@ fn decompose_levels(
         None => None,
     };
 
-    let result = finstack_quant_factor_model::decompose_levels(
+    let result = finstack_quant_factor_model::credit::decomposition::decompose_levels(
         &model.inner,
         &observed_spreads,
         observed_generic,
@@ -552,9 +554,11 @@ fn decompose_period(
     from_levels: &PyLevelsAtDate,
     to_levels: &PyLevelsAtDate,
 ) -> PyResult<PyPeriodDecomposition> {
-    let result =
-        finstack_quant_factor_model::decompose_period(&from_levels.inner, &to_levels.inner)
-            .map_err(display_to_py)?;
+    let result = finstack_quant_factor_model::credit::decomposition::decompose_period(
+        &from_levels.inner,
+        &to_levels.inner,
+    )
+    .map_err(display_to_py)?;
     Ok(PyPeriodDecomposition::from_inner(result))
 }
 

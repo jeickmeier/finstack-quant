@@ -9,9 +9,8 @@
 //! correlated Brownian motions.
 
 use super::monte_carlo_process::{InterestRateSpec, RevolvingCreditProcess};
-use finstack_quant_core::math::linalg::CholeskyError;
+use finstack_quant_core::math::linalg::{cholesky_correlation, CholeskyError};
 use finstack_quant_monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
-use finstack_quant_monte_carlo::process::correlation::cholesky_correlation;
 use finstack_quant_monte_carlo::traits::Discretization;
 
 /// Discretization scheme for revolving credit process.

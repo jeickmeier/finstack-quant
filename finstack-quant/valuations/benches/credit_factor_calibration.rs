@@ -12,14 +12,12 @@
 #![allow(clippy::unwrap_used)]
 
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
+use finstack_quant_factor_model::credit::calibration::{
+    BetaShrinkage, BucketSizeThresholds, CovarianceStrategy, CreditCalibrationConfig,
+    CreditCalibrationInputs, CreditCalibrator, PanelSpace, VolModelChoice,
+};
 use finstack_quant_factor_model::credit::hierarchy::{
     CreditHierarchySpec, HierarchyDimension, IssuerBetaPolicy,
-};
-use finstack_quant_factor_model::{
-    BetaShrinkage, BucketSizeThresholds, CovarianceStrategy, PanelSpace, VolModelChoice,
-};
-use finstack_quant_factor_model::{
-    CreditCalibrationConfig, CreditCalibrationInputs, CreditCalibrator,
 };
 use serde_json::{json, Value};
 use time::{Date, Month};

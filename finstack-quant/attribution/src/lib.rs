@@ -356,12 +356,14 @@ pub use credit_factor::{
     compute_credit_factor_attribution, credit_factor_model_id, CreditAttributionInput,
     CreditFactorDetailOptions,
 };
-pub use types::{
-    AttributionFactor, AttributionMeta, AttributionMethod, CarryDetail, CorrelationsAttribution,
-    CreditCarryByLevel, CreditCarryDecomposition, CreditCurvesAttribution, CreditFactorAttribution,
-    CrossFactorDetail, ExecutionPolicy, FxAttribution, InflationCurvesAttribution, LevelCarry,
-    LevelPnl, ModelParamsAttribution, PnlAttribution, RatesCurvesAttribution, ScalarsAttribution,
-    SourceLine, VolAttribution,
+pub use types::detail::{
+    CarryDetail, CorrelationsAttribution, CreditCarryByLevel, CreditCarryDecomposition,
+    CreditCurvesAttribution, CreditFactorAttribution, CrossFactorDetail, FxAttribution,
+    InflationCurvesAttribution, LevelCarry, LevelPnl, ModelParamsAttribution,
+    RatesCurvesAttribution, ScalarsAttribution, SourceLine, VolAttribution,
+};
+pub use types::result::{
+    AttributionFactor, AttributionMeta, AttributionMethod, ExecutionPolicy, PnlAttribution,
 };
 
 // Re-export attribution functions

@@ -2,7 +2,8 @@
 //!
 //! Given a calibrated [`CreditFactorModel`], a per-position list of CS01s and
 //! issuer ids, and the per-period factor moves produced by
-//! [`finstack_quant_factor_model::decompose_period`], [`compute_credit_factor_attribution`]
+//! [`finstack_quant_factor_model::credit::decomposition::decompose_period`],
+//! [`compute_credit_factor_attribution`]
 //! returns a [`CreditFactorAttribution`] that obeys
 //!
 //! ```text
@@ -49,7 +50,7 @@ use super::credit_cascade::{
     bucket_amounts_to_money, hierarchy_level_name, optional_adder_amounts_by_issuer,
 };
 use super::types::{CreditFactorAttribution, LevelPnl};
-use finstack_quant_factor_model::PeriodDecomposition;
+use finstack_quant_factor_model::credit::decomposition::PeriodDecomposition;
 
 /// Options controlling the level of detail emitted by
 /// [`compute_credit_factor_attribution`].
@@ -368,12 +369,12 @@ mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::create_date;
+    use finstack_quant_factor_model::credit::decomposition::{decompose_levels, decompose_period};
     use finstack_quant_factor_model::credit::hierarchy::{
         AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
         FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
         IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
     };
-    use finstack_quant_factor_model::{decompose_levels, decompose_period};
     use finstack_quant_factor_model::{
         FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
     };

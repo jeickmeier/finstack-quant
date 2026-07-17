@@ -6,14 +6,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use finstack_quant_core::dates::{create_date, Date};
 use finstack_quant_core::types::IssuerId;
-use finstack_quant_factor_model::credit::hierarchy::{
-    AdderVolSource, CreditFactorModel, CreditHierarchySpec, FactorVolModel, GenericFactorSpec,
-    HierarchyDimension, IssuerBetaMode, IssuerBetaOverride, IssuerBetaPolicy, IssuerTags,
-};
-use finstack_quant_factor_model::{
+use finstack_quant_factor_model::credit::calibration::{
     BetaShrinkage, BucketSizeThresholds, CovarianceStrategy, CreditCalibrationConfig,
     CreditCalibrationInputs, CreditCalibrator, GenericFactorSeries, HistoryPanel, IssuerTagPanel,
     PanelSpace, VolModelChoice,
+};
+use finstack_quant_factor_model::credit::hierarchy::{
+    AdderVolSource, CreditFactorModel, CreditHierarchySpec, FactorVolModel, GenericFactorSpec,
+    HierarchyDimension, IssuerBetaMode, IssuerBetaOverride, IssuerBetaPolicy, IssuerTags,
 };
 use time::Month;
 

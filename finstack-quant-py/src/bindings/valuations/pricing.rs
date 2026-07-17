@@ -200,7 +200,7 @@ fn instrument_cashflows_json(
     let model = model.to_owned();
 
     py.detach(move || {
-        finstack_quant_valuations::pricer::instrument_cashflows_json(
+        finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows_json(
             &instrument_json,
             &market,
             &as_of,

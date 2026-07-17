@@ -88,8 +88,8 @@ pub(crate) mod parameters;
 pub(crate) mod pricer;
 mod types;
 
-pub use crate::correlation::copula::{Copula, CopulaSpec};
-pub use crate::correlation::recovery::{RecoveryModel, RecoverySpec};
+pub use crate::correlation::copula::CopulaSpec;
+pub use crate::correlation::recovery::RecoverySpec;
 pub use parameters::CDSTrancheParams;
 pub use types::{CDSTranche, TrancheSide};
 

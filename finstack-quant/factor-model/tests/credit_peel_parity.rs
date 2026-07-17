@@ -4,13 +4,14 @@ use std::collections::BTreeMap;
 
 use finstack_quant_core::dates::create_date;
 use finstack_quant_core::types::IssuerId;
+use finstack_quant_factor_model::credit::calibration::{
+    BetaShrinkage, BucketSizeThresholds, CovarianceStrategy, CreditCalibrationConfig,
+    CreditCalibrationInputs, CreditCalibrator, GenericFactorSeries, HistoryPanel, IssuerTagPanel,
+    PanelSpace, VolModelChoice,
+};
+use finstack_quant_factor_model::credit::decomposition::decompose_levels;
 use finstack_quant_factor_model::credit::hierarchy::{
     CreditHierarchySpec, GenericFactorSpec, HierarchyDimension, IssuerBetaPolicy, IssuerTags,
-};
-use finstack_quant_factor_model::{
-    decompose_levels, BetaShrinkage, BucketSizeThresholds, CovarianceStrategy,
-    CreditCalibrationConfig, CreditCalibrationInputs, CreditCalibrator, GenericFactorSeries,
-    HistoryPanel, IssuerTagPanel, PanelSpace, VolModelChoice,
 };
 use time::Month;
 

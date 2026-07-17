@@ -7,11 +7,11 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 
-mod detail;
-mod result;
+pub(crate) mod detail;
+pub(crate) mod result;
 
-pub use detail::*;
-pub use result::*;
+pub(crate) use detail::*;
+pub(crate) use result::*;
 
 /// Zero USD `Money` — serde default for [`CreditFactorAttribution::curve_shape_pnl`]
 /// so attributions serialized before that field was added still deserialize.

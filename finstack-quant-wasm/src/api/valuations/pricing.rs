@@ -228,7 +228,7 @@ pub fn instrument_cashflows_json(
 ) -> Result<String, JsValue> {
     validate_pricing_instrument_json(instrument_json, None)?;
     let market = parse_market_json(market_json)?;
-    finstack_quant_valuations::pricer::instrument_cashflows_json(
+    finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows_json(
         instrument_json,
         &market,
         as_of,
@@ -321,7 +321,7 @@ pub fn instrument_cashflows_with_market(
     model: &str,
 ) -> Result<String, JsValue> {
     validate_pricing_instrument_json(instrument_json, None)?;
-    finstack_quant_valuations::pricer::instrument_cashflows_json(
+    finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows_json(
         instrument_json,
         market.inner(),
         as_of,

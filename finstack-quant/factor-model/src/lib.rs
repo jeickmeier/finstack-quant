@@ -88,14 +88,8 @@ pub mod sensitivity_matrix;
 
 pub use config::{BumpSizeConfig, FactorBumpUnit, FactorModelConfig, PricingMode, RiskMeasure};
 pub use covariance::FactorCovarianceMatrix;
-pub use credit::{
-    decompose_levels, decompose_period, BetaShrinkage, BucketSizeThresholds, CovarianceStrategy,
-    CreditCalibrationConfig, CreditCalibrationInputs, CreditCalibrator, DecompositionError,
-    GenericFactorSeries, HistoryPanel, IssuerTagPanel, LevelValuesAtDate, LevelValuesDelta,
-    LevelsAtDate, PanelSpace, PeriodDecomposition, VolModelChoice,
-};
 pub use error::{FactorModelError, UnmatchedPolicy};
-pub use finstack_quant_core::{Error, InputError, Result};
+pub use finstack_quant_core::{Error, Result};
 pub use matching::{
     bucket_factor_id, AttributeFilter, CascadeMatcher, CreditHierarchicalConfig, DependencyFilter,
     FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode, HierarchicalConfig,

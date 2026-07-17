@@ -14,4 +14,4 @@ pub mod lsmc;
 pub mod lsq;
 pub mod path_dependent;
 
-pub use european::*;
+pub use european::EuropeanPricer;

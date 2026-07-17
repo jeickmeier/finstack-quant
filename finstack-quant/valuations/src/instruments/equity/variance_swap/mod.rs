@@ -76,7 +76,4 @@ pub(crate) mod types;
 
 pub use types::{PayReceive, VarianceSwap};
 
-// Re-export from core
-pub use finstack_quant_core::math::stats::{
-    realized_variance, realized_variance_ohlc, RealizedVarMethod,
-};
+pub use finstack_quant_core::math::stats::RealizedVarMethod;

@@ -104,7 +104,7 @@ per-issuer overrides.
 10. Bundle a [`CreditFactorModel`] and run its `validate()`.
 
 ```rust
-use finstack_quant_factor_model::{
+use finstack_quant_factor_model::credit::calibration::{
     CreditCalibrator, CreditCalibrationConfig, CreditCalibrationInputs,
     HistoryPanel, IssuerTagPanel, GenericFactorSeries,
     BucketSizeThresholds, CovarianceStrategy, PanelSpace, VolModelChoice,
@@ -161,7 +161,7 @@ preserves the linear reconciliation invariant on `ΔS_i` to absolute
 tolerance `1e-10` for every issuer present in both snapshots.
 
 ```rust
-use finstack_quant_factor_model::{decompose_levels, decompose_period};
+use finstack_quant_factor_model::credit::decomposition::{decompose_levels, decompose_period};
 
 let levels_t0 = decompose_levels(&model, &spreads_t0, generic_t0, t0, None)?;
 let levels_t1 = decompose_levels(&model, &spreads_t1, generic_t1, t1, None)?;

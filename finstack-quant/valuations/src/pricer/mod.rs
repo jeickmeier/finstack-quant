@@ -33,7 +33,6 @@ mod keys;
 mod registry;
 pub mod structured_credit_json;
 
-pub use crate::instruments::cashflow_export::instrument_cashflows_json;
 pub(crate) use errors::actionable_unknown_pricer_message;
 pub use errors::{PricingError, PricingErrorContext};
 pub use json::{

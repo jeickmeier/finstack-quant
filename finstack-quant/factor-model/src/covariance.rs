@@ -57,7 +57,7 @@ impl FactorCovarianceMatrix {
     pub fn new(factor_ids: Vec<FactorId>, data: Vec<f64>) -> finstack_quant_core::Result<Self> {
         let n = factor_ids.len();
         if data.len() != n * n {
-            return Err(crate::InputError::DimensionMismatch.into());
+            return Err(finstack_quant_core::InputError::DimensionMismatch.into());
         }
 
         let index = Self::build_index(&factor_ids)?;

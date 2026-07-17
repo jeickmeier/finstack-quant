@@ -61,7 +61,9 @@ fn ensure_covariance_finite(
 }
 
 /// Validate every numeric field of a `LevelsAtDate` snapshot is finite.
-fn ensure_levels_finite(levels: &finstack_quant_factor_model::LevelsAtDate) -> Result<(), JsValue> {
+fn ensure_levels_finite(
+    levels: &finstack_quant_factor_model::credit::decomposition::LevelsAtDate,
+) -> Result<(), JsValue> {
     ensure_finite("generic", levels.generic)?;
     for lev in &levels.by_level {
         for (bucket, v) in &lev.values {
@@ -79,7 +81,7 @@ fn ensure_levels_finite(levels: &finstack_quant_factor_model::LevelsAtDate) -> R
 
 /// Validate every numeric field of a `PeriodDecomposition` is finite.
 fn ensure_period_finite(
-    period: &finstack_quant_factor_model::PeriodDecomposition,
+    period: &finstack_quant_factor_model::credit::decomposition::PeriodDecomposition,
 ) -> Result<(), JsValue> {
     ensure_finite("d_generic", period.d_generic)?;
     for lev in &period.by_level {
@@ -144,7 +146,7 @@ impl WasmCreditFactorModel {
 /// Configuration and inputs are passed as JSON strings.
 #[wasm_bindgen(js_name = CreditCalibrator)]
 pub struct WasmCreditCalibrator {
-    inner: finstack_quant_factor_model::CreditCalibrator,
+    inner: finstack_quant_factor_model::credit::calibration::CreditCalibrator,
 }
 
 #[wasm_bindgen(js_class = CreditCalibrator)]
@@ -156,10 +158,10 @@ impl WasmCreditCalibrator {
     /// @param config_json - Credit-factor calibration configuration JSON controlling model fitting.
     #[wasm_bindgen(constructor)]
     pub fn new(config_json: &str) -> Result<WasmCreditCalibrator, JsValue> {
-        let config: finstack_quant_factor_model::CreditCalibrationConfig =
+        let config: finstack_quant_factor_model::credit::calibration::CreditCalibrationConfig =
             serde_json::from_str(config_json).map_err(to_js_err)?;
         Ok(Self {
-            inner: finstack_quant_factor_model::CreditCalibrator::new(config),
+            inner: finstack_quant_factor_model::credit::calibration::CreditCalibrator::new(config),
         })
     }
 
@@ -171,7 +173,7 @@ impl WasmCreditCalibrator {
     /// Throws if inputs are structurally invalid or calibration fails.
     /// @param inputs_json - Credit-factor calibration input JSON containing issuers, spreads, and observations.
     pub fn calibrate(&self, inputs_json: &str) -> Result<WasmCreditFactorModel, JsValue> {
-        let inputs: finstack_quant_factor_model::CreditCalibrationInputs =
+        let inputs: finstack_quant_factor_model::credit::calibration::CreditCalibrationInputs =
             serde_json::from_str(inputs_json).map_err(to_js_err)?;
         let model = self.inner.calibrate(inputs).map_err(to_js_err)?;
         Ok(WasmCreditFactorModel { inner: model })
@@ -190,7 +192,7 @@ impl WasmCreditCalibrator {
 pub struct WasmLevelsAtDate {
     #[wasm_bindgen(skip)]
     /// Underlying Rust value (not exposed to JS).
-    pub(crate) inner: finstack_quant_factor_model::LevelsAtDate,
+    pub(crate) inner: finstack_quant_factor_model::credit::decomposition::LevelsAtDate,
 }
 
 #[wasm_bindgen(js_class = LevelsAtDate)]
@@ -218,7 +220,7 @@ impl WasmLevelsAtDate {
 pub struct WasmPeriodDecomposition {
     #[wasm_bindgen(skip)]
     /// Underlying Rust value (not exposed to JS).
-    pub(crate) inner: finstack_quant_factor_model::PeriodDecomposition,
+    pub(crate) inner: finstack_quant_factor_model::credit::decomposition::PeriodDecomposition,
 }
 
 #[wasm_bindgen(js_class = PeriodDecomposition)]
@@ -282,7 +284,7 @@ pub fn decompose_levels(
         None => None,
     };
 
-    let inner = finstack_quant_factor_model::decompose_levels(
+    let inner = finstack_quant_factor_model::credit::decomposition::decompose_levels(
         &model.inner,
         &observed_spreads,
         observed_generic,
@@ -313,8 +315,11 @@ pub fn decompose_period(
     from_levels: &WasmLevelsAtDate,
     to_levels: &WasmLevelsAtDate,
 ) -> Result<WasmPeriodDecomposition, JsValue> {
-    let inner = finstack_quant_factor_model::decompose_period(&from_levels.inner, &to_levels.inner)
-        .map_err(to_js_err)?;
+    let inner = finstack_quant_factor_model::credit::decomposition::decompose_period(
+        &from_levels.inner,
+        &to_levels.inner,
+    )
+    .map_err(to_js_err)?;
     Ok(WasmPeriodDecomposition { inner })
 }
 
@@ -424,13 +429,13 @@ impl WasmFactorCovarianceForecast {
 mod tests {
     use finstack_quant_core::dates::create_date;
     use finstack_quant_core::types::IssuerId;
-    use finstack_quant_factor_model::credit::hierarchy::{
-        CreditFactorModel, CreditHierarchySpec, GenericFactorSpec, HierarchyDimension, IssuerTags,
-    };
-    use finstack_quant_factor_model::{
+    use finstack_quant_factor_model::credit::calibration::{
         BucketSizeThresholds, CovarianceStrategy, CreditCalibrationConfig, CreditCalibrationInputs,
         CreditCalibrator, GenericFactorSeries, HistoryPanel, IssuerTagPanel, PanelSpace,
         VolModelChoice,
+    };
+    use finstack_quant_factor_model::credit::hierarchy::{
+        CreditFactorModel, CreditHierarchySpec, GenericFactorSpec, HierarchyDimension, IssuerTags,
     };
     use std::collections::BTreeMap;
     use time::Month;
@@ -581,7 +586,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let levels_t0 = finstack_quant_factor_model::decompose_levels(
+        let levels_t0 = finstack_quant_factor_model::credit::decomposition::decompose_levels(
             &model,
             &spreads_t0,
             100.0,
@@ -590,7 +595,7 @@ mod tests {
         )
         .expect("decompose_levels t0");
 
-        let levels_t1 = finstack_quant_factor_model::decompose_levels(
+        let levels_t1 = finstack_quant_factor_model::credit::decomposition::decompose_levels(
             &model,
             &spreads_t1,
             100.5,
@@ -605,8 +610,10 @@ mod tests {
         assert_eq!(l0_val["date"].as_str().unwrap(), "2024-03-28");
 
         // decompose_period.
-        let period = finstack_quant_factor_model::decompose_period(&levels_t0, &levels_t1)
-            .expect("decompose_period");
+        let period = finstack_quant_factor_model::credit::decomposition::decompose_period(
+            &levels_t0, &levels_t1,
+        )
+        .expect("decompose_period");
         let p_val = serde_json::to_value(&period).expect("PeriodDecomposition serializes");
         assert!(p_val.is_object());
         assert!(p_val["d_generic"].as_f64().is_some());
@@ -668,7 +675,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let levels = finstack_quant_factor_model::decompose_levels(
+        let levels = finstack_quant_factor_model::credit::decomposition::decompose_levels(
             &model,
             &spreads,
             100.0,

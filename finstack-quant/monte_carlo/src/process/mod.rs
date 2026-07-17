@@ -20,7 +20,6 @@ pub mod bates;
 pub mod brownian;
 pub mod cheyette_rough;
 pub mod cir;
-pub mod correlation;
 pub mod gbm;
 pub mod gbm_dividends;
 pub mod heston;
@@ -34,10 +33,6 @@ pub mod rough_heston;
 pub mod schwartz_smith;
 
 pub use brownian::{BrownianParams, BrownianProcess, MultiBrownianProcess};
-pub use correlation::{
-    apply_correlation, build_correlation_matrix, cholesky_correlation, cholesky_decomposition,
-    validate_correlation_matrix, CholeskyError, CorrelationFactor,
-};
 pub use gbm::{GbmParams, GbmProcess, MultiGbmProcess};
 pub use gbm_dividends::{Dividend, GbmWithDividends};
 pub use metadata::ProcessMetadata;

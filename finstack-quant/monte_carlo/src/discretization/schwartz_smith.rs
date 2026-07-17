@@ -12,10 +12,9 @@
 //!
 //! With correlation ρ, the shocks Z_X and Z_Y are correlated.
 
-use super::super::process::correlation::cholesky_correlation;
 use super::super::process::schwartz_smith::SchwartzSmithProcess;
 use super::super::traits::Discretization;
-use finstack_quant_core::math::linalg::CholeskyError;
+use finstack_quant_core::math::linalg::{cholesky_correlation, CholeskyError};
 
 /// Exact discretization for Schwartz-Smith process.
 ///
