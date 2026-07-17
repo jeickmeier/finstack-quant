@@ -1558,8 +1558,13 @@ class MarketContext:
         """
         ...
 
-    def get_price(self, id: str) -> float | Money:
-        """Retrieve a unitless scalar or currency-tagged price."""
+    def get_price(self, id: str) -> tuple[float | Decimal, str | None]:
+        """Retrieve ``(value, currency)`` for a scalar market price.
+
+        Currency-tagged values use :class:`Decimal` to preserve their exact
+        stored amount. Unitless values use ``float`` and return ``None`` for
+        the currency.
+        """
         ...
 
     def get_series(self, id: str) -> ScalarTimeSeries:

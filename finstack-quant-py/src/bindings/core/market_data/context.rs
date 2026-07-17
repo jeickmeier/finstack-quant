@@ -10,7 +10,7 @@ use pyo3::types::{PyList, PyModule};
 use pyo3::IntoPyObjectExt;
 
 use crate::bindings::core::currency::extract_currency;
-use crate::bindings::core::money::{money_from_amount, PyMoney};
+use crate::bindings::core::money::{decimal_to_py, money_from_amount};
 use crate::errors::core_to_py;
 
 use super::curves::{
@@ -215,12 +215,18 @@ impl PyMarketContext {
         Ok(PyPriceCurve::from_inner(arc))
     }
 
-    /// Retrieve a scalar market price by identifier.
+    /// Retrieve a scalar market price as ``(value, currency)``.
+    ///
+    /// Currency-tagged values return a lossless Python ``Decimal`` and ISO
+    /// currency code. Unitless values return a ``float`` and ``None``.
     #[pyo3(text_signature = "(self, id)")]
-    fn get_price(&self, py: Python<'_>, id: &str) -> PyResult<Py<PyAny>> {
+    fn get_price(&self, py: Python<'_>, id: &str) -> PyResult<(Py<PyAny>, Option<String>)> {
         match self.inner.get_price(id).map_err(core_to_py)? {
-            MarketScalar::Unitless(value) => value.into_py_any(py),
-            MarketScalar::Price(money) => Ok(Py::new(py, PyMoney::from_inner(*money))?.into_any()),
+            MarketScalar::Unitless(value) => Ok((value.into_py_any(py)?, None)),
+            MarketScalar::Price(money) => Ok((
+                decimal_to_py(py, money.amount_decimal())?.unbind(),
+                Some(money.currency().to_string()),
+            )),
         }
     }
 

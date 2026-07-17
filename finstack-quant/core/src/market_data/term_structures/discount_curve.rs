@@ -329,7 +329,7 @@ impl DiscountCurve {
                 "DiscountCurve: flat continuous rate must be finite".to_string(),
             ));
         }
-        let one_year_df = (-continuous_rate).exp();
+        let one_year_df = crate::math::Compounding::Continuous.df_from_rate(continuous_rate, 1.0);
         if !one_year_df.is_finite() || one_year_df <= 0.0 {
             return Err(crate::Error::Validation(format!(
                 "DiscountCurve: flat continuous rate {continuous_rate} produces an invalid discount factor"
@@ -1807,6 +1807,45 @@ mod tests {
             assert!((curve.df(t) - (-0.04 * t).exp()).abs() < 1e-12);
         }
         assert!((curve.forward(2.0, 9.0).expect("flat forward") - 0.04).abs() < 1e-12);
+    }
+
+    #[test]
+    fn flat_curve_supports_zero_and_negative_continuous_rates() {
+        let base =
+            Date::from_calendar_date(2025, time::Month::January, 2).expect("valid base date");
+
+        for rate in [0.0, -0.01] {
+            let curve = DiscountCurve::flat("EUR-OIS", base, rate).expect("flat discount curve");
+            for t in [0.0_f64, 0.25, 1.0, 5.0, 30.0] {
+                let expected = crate::math::Compounding::Continuous.df_from_rate(rate, t);
+                assert!((curve.df(t) - expected).abs() < 1e-12);
+            }
+            assert!((curve.forward(2.0, 9.0).expect("flat forward") - rate).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn flat_curve_matches_manually_built_continuous_curve() {
+        let base =
+            Date::from_calendar_date(2025, time::Month::January, 2).expect("valid base date");
+        let rate = 0.04;
+        let one_year_df = crate::math::Compounding::Continuous.df_from_rate(rate, 1.0);
+        let flat = DiscountCurve::flat("USD-OIS", base, rate).expect("flat discount curve");
+        let manual = DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .knots([(0.0, 1.0), (1.0, one_year_df)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .validation(ValidationMode::Raw {
+                allow_non_monotonic: false,
+                forward_floor: None,
+            })
+            .build()
+            .expect("manual continuous curve");
+
+        for t in [0.0_f64, 0.25, 1.0, 5.0, 30.0] {
+            assert!((flat.df(t) - manual.df(t)).abs() < 1e-12);
+        }
     }
 
     #[test]

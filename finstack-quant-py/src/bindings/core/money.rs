@@ -60,6 +60,14 @@ pub(crate) fn decimal_from_py(obj: &Bound<'_, PyAny>) -> PyResult<rust_decimal::
         .map_err(|e| crate::errors::value_error(format!("Invalid Decimal value {s:?}: {e}")))
 }
 
+/// Convert a Rust decimal into Python ``decimal.Decimal`` without using `f64`.
+pub(crate) fn decimal_to_py<'py>(
+    py: Python<'py>,
+    value: rust_decimal::Decimal,
+) -> PyResult<Bound<'py, PyAny>> {
+    Ok(decimal_type(py)?.call1((value.to_string(),))?.into_any())
+}
+
 /// Return true if `obj` is an instance of `decimal.Decimal` (or any subclass).
 ///
 /// Uses the Python `isinstance` check rather than a string compare on
@@ -146,8 +154,7 @@ impl PyMoney {
     /// ``decimal.Decimal``, so no ``float`` round-trip occurs.
     #[getter]
     fn amount_decimal<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let s = self.inner.amount_decimal().to_string();
-        Ok(decimal_type(py)?.call1((s,))?.into_any())
+        decimal_to_py(py, self.inner.amount_decimal())
     }
 
     /// Currency tag.

@@ -600,18 +600,28 @@ class TestFxMatrixParity:
         with pytest.raises(KeyError, match="FX"):
             fx.rate(eur, usd, date(2024, 1, 3), FxConversionPolicy.CASHFLOW_DATE)
 
-    def test_explicit_quote_survives_market_context_json_roundtrip(self) -> None:
+    def test_explicit_and_pinned_quotes_survive_market_context_json_roundtrip(self) -> None:
         fx = FxMatrix()
-        eur, usd = Currency("EUR"), Currency("USD")
+        eur, gbp, usd = Currency("EUR"), Currency("GBP"), Currency("USD")
         fx.set_quote(eur, usd, 1.10)
+        pinned_date = date(2024, 1, 2)
+        fx.set_quote_on(gbp, usd, pinned_date, FxConversionPolicy.CASHFLOW_DATE, 1.25)
 
         context = MarketContext()
         context.insert_fx(fx)
         restored = MarketContext.from_json(context.to_json())
 
-        result = restored.fx.rate(eur, usd, date(2024, 1, 2), FxConversionPolicy.CASHFLOW_DATE)
-        assert result.rate == pytest.approx(1.10)
-        assert result.triangulated is False
+        pinned = restored.fx.rate(gbp, usd, pinned_date, FxConversionPolicy.CASHFLOW_DATE)
+        explicit = restored.fx.rate(
+            eur,
+            usd,
+            date(2024, 1, 3),
+            FxConversionPolicy.CASHFLOW_DATE,
+        )
+        assert pinned.rate == pytest.approx(1.25)
+        assert pinned.triangulated is False
+        assert explicit.rate == pytest.approx(1.10)
+        assert explicit.triangulated is False
 
 
 class TestMarketContextParity:
@@ -670,16 +680,17 @@ class TestMarketContextParity:
         assert retrieved.num_constituents == 125
         assert retrieved.recovery_rate == pytest.approx(0.40)
 
-    def test_insert_and_get_price_preserves_scalar_kind(self) -> None:
+    def test_insert_and_get_price_returns_value_and_optional_currency(self) -> None:
         mc = MarketContext()
         mc.insert_price("EQUITY-SPOT", 185.25, "USD")
         mc.insert_price("DIVIDEND-YIELD", 0.005)
 
-        spot = mc.get_price("EQUITY-SPOT")
-        assert isinstance(spot, Money)
-        assert spot.amount == pytest.approx(185.25)
-        assert spot.currency == Currency("USD")
-        assert mc.get_price("DIVIDEND-YIELD") == pytest.approx(0.005)
+        spot_value, spot_currency = mc.get_price("EQUITY-SPOT")
+        dividend_value, dividend_currency = mc.get_price("DIVIDEND-YIELD")
+        assert spot_value == Decimal("185.25")
+        assert spot_currency == "USD"
+        assert dividend_value == pytest.approx(0.005)
+        assert dividend_currency is None
 
     @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
     def test_insert_price_rejects_non_finite_values(self, value: float) -> None:
@@ -702,15 +713,14 @@ class TestMarketContextParity:
         mc.insert_price("EQUITY-SPOT", Decimal("185.2500000000000000001"), Currency("USD"))
 
         restored = MarketContext.from_json(mc.to_json())
-        spot = restored.get_price("EQUITY-SPOT")
-        assert isinstance(spot, Money)
-        assert spot.amount_decimal == Decimal("185.2500000000000000001")
-        assert spot.currency == Currency("USD")
+        value, currency = restored.get_price("EQUITY-SPOT")
+        assert value == Decimal("185.2500000000000000001")
+        assert currency == "USD"
 
     def test_unitless_price_accepts_only_exactly_representable_decimal(self) -> None:
         mc = MarketContext()
         mc.insert_price("EXACT", Decimal("0.5"))
-        assert mc.get_price("EXACT") == 0.5
+        assert mc.get_price("EXACT") == (0.5, None)
 
         with pytest.raises(ValueError, match="exactly representable"):
             mc.insert_price("INEXACT", Decimal("0.1"))
