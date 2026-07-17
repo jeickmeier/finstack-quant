@@ -10,3 +10,6 @@ mod real_estate_template_tests;
 
 #[path = "integration/patterns_tests.rs"]
 mod patterns_tests;
+
+#[path = "integration/real_estate_statements_e2e.rs"]
+mod real_estate_statements_e2e;

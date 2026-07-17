@@ -302,7 +302,6 @@ let sigma_loc = local_vol.get_vol(0.5, 105.0)?;
 ```python
 from finstack_quant.valuations import (
     SABRParameters, SABRModel, SABRCalibrator, SABRSmile,
-    HestonParameters, HestonModel,
 )
 
 # SABR: calibrate to market smile
@@ -319,10 +318,7 @@ params = calibrator.calibrate(
 model = SABRModel(params)
 vol = model.implied_volatility(forward=0.03, strike=0.035, time_to_expiry=1.0)
 
-# Heston pricing
-params = HestonParameters(v0=0.04, kappa=2.0, theta=0.04, sigma=0.3, rho=-0.5)
-heston = HestonModel(params)
-call_price = heston.price_european_call(S=100.0, K=100.0, T=1.0, r=0.05, q=0.02)
+# Heston pricing is currently Rust-only (no Python binding).
 ```
 
 ## Academic References

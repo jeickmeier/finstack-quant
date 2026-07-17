@@ -38,8 +38,6 @@ time = { workspace = true, features = ["macros"] }
 proptest = "1.11.0"
 criterion = { workspace = true }
 rust_decimal_macros = { workspace = true }
-finstack-quant-statements = { path = "../statements", version = "0.6.0" }
-finstack-quant-statements-analytics = { path = "../statements-analytics", version = "0.6.0" }
 
 
 
