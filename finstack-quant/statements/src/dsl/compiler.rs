@@ -35,6 +35,7 @@ pub fn compile(ast: &StmtExpr) -> Result<Expr> {
                 "interest_expense",
                 "interest_expense_cash",
                 "interest_expense_pik",
+                "interest_income",
                 "principal_payment",
                 "debt_balance",
                 "fees",

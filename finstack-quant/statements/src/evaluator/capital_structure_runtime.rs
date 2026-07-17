@@ -363,6 +363,9 @@ fn recompute_cs_totals(
         entry.fees += breakdown.fees;
         entry.debt_balance += breakdown.debt_balance;
         entry.accrued_interest += breakdown.accrued_interest;
+        let mut income = entry.interest_income_cash_or_zero();
+        income += breakdown.interest_income_cash_or_zero();
+        entry.interest_income_cash = Some(income);
     }
 
     for (currency, breakdown) in &totals_by_currency {
@@ -392,8 +395,9 @@ fn recompute_cs_totals(
                     breakdown.fees,
                     breakdown.debt_balance,
                     breakdown.accrued_interest,
+                    breakdown.interest_income_cash_or_zero(),
                 ];
-                let mut converted_fields = Vec::with_capacity(6);
+                let mut converted_fields = Vec::with_capacity(fields.len());
                 for money in &fields {
                     match convert_to_reporting(
                         *money,
@@ -419,6 +423,9 @@ fn recompute_cs_totals(
                 converted_total.fees += converted_fields[3];
                 converted_total.debt_balance += converted_fields[4];
                 converted_total.accrued_interest += converted_fields[5];
+                let mut income = converted_total.interest_income_cash_or_zero();
+                income += converted_fields[6];
+                converted_total.interest_income_cash = Some(income);
             }
             if all_converted {
                 cashflows.reporting_currency = Some(rc);

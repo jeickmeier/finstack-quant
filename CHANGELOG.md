@@ -11,6 +11,58 @@ stability contract and schema-version policy.
 
 ## [Unreleased]
 
+### Fixed
+- **`finstack-quant-statements` — swap net interest receipts were booked as
+  interest expense.** A two-leg instrument whose legs net to a receipt (a
+  pay-fixed swap is in the money whenever the floating leg exceeds the fixed
+  leg) had that receipt booked into `interest_expense_cash` via `net.abs()`,
+  overstating interest expense by twice the receipt and, under a waterfall,
+  consuming real cash to service a payment that was never made. Receipts are
+  now reported separately (see the additive `interest_income_cash` field
+  below). Single-leg debt is unaffected: bonds and loans emit positive coupons
+  meaning "issuer pays", so their behaviour is byte-for-byte unchanged.
+  Expense-vs-income is resolved from the schedule's leg structure rather than
+  from a flow's sign, because the sign convention differs by instrument
+  (INVARIANTS.md §3).
+- **`finstack-quant-statements` — waterfall inputs are validated as finite.**
+  A non-finite `available_cash_node` (e.g. a division by zero, which the DSL
+  produces by design) silently read as zero cash and shorted every creditor,
+  and a non-finite PIK liquidity metric silently read as "not triggered".
+  Amounts beyond `Decimal`'s range reached `Money::new` and panicked. All now
+  error, naming the offending expression.
+- **`finstack-quant-statements` — LogNormal forecasts reject invalid bases
+  consistently.** The independent path let `NaN` through and the correlated
+  path silently switched regime on a negative base, emitting plausible but
+  meaningless Monte Carlo paths. Both now error.
+- **`finstack-quant-statements` — duplicate IDs are rejected.** Duplicate
+  metric IDs inside one registry document were silently coalesced last-wins,
+  and duplicate adjustment IDs arriving via JSON bypassed the builder's guard
+  and double-counted an add-back into adjusted EBITDA.
+
+### Security
+- **`finstack-quant-statements` — formula parsing is bounded (stack-overflow
+  DoS).** A flat operator chain (`1+1+1+…`) bypassed the parser's nesting
+  limit, which only guards recursion, and produced an AST whose depth equalled
+  the operator count; compiling it overflowed the stack. That aborts the
+  process (SIGABRT) and cannot be caught by the Python/WASM bindings, and was
+  reachable from ~20 KB of untrusted registry or model-spec JSON. Formulas are
+  now capped at 256 terms; oversized ones return a parse error pointing at
+  intermediate model nodes.
+
+### Added
+- **`CashflowBreakdown::interest_income_cash`** (`Option<Money>`, additive per
+  [`docs/SERDE_STABILITY.md`](docs/SERDE_STABILITY.md)): net cash interest
+  received in a period, non-zero only for two-leg instruments that net to a
+  receipt. Exposed to the DSL as `cs.interest_income.{instrument|total}` and
+  reachable from Python/WASM through the existing JSON surface — no binding
+  signature changes. Payloads written before this field carry `None`, which
+  `interest_income_cash_or_zero()` resolves to a zero in the breakdown's own
+  currency; that is semantically identical to the previous behaviour (no
+  income was tracked), so no `schema_version` bump is required. The field is
+  omitted from output when absent. `CashflowBreakdown::net_interest_expense_cash()`
+  returns expense net of income, which may be negative when a hedge is in the
+  money.
+
 ### Changed
 - **`CapFloor` compounded-RFR contract (intentional pre-1.0 source break):**
   public `spread` and `overnight_coupon` fields now encode spread compounding,

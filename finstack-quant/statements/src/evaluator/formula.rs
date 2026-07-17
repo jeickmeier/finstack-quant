@@ -566,6 +566,7 @@ mod tests {
         let mut snapshot = CapitalStructureCashflows::new();
         let breakdown = CashflowBreakdown {
             interest_expense_cash: Money::new(interest, Currency::USD),
+            interest_income_cash: Some(Money::new(0.0, Currency::USD)),
             interest_expense_pik: Money::new(0.0, Currency::USD),
             principal_payment: Money::new(0.0, Currency::USD),
             fees: Money::new(0.0, Currency::USD),

@@ -125,6 +125,7 @@ fn test_context_get_cs_value_interest_total() {
             50_000.0,
             finstack_quant_core::currency::Currency::USD,
         ),
+        interest_income_cash: None,
         interest_expense_pik: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,
@@ -540,6 +541,7 @@ fn test_capital_structure_cashflows_accessors() {
             10_000.0,
             finstack_quant_core::currency::Currency::USD,
         ),
+        interest_income_cash: None,
         interest_expense_pik: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,

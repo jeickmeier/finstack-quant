@@ -202,11 +202,15 @@ pub fn aggregate_instrument_cashflows(
                     )?;
 
                     match cf.kind {
-                        CFKind::Fixed | CFKind::Stub | CFKind::FloatReset => {
+                        // Guarded on the shared predicate so this arm and
+                        // `schedule_is_two_leg` cannot disagree about what
+                        // counts as a cash-interest leg.
+                        kind if super::period_flows::is_cash_interest_kind(kind) => {
                             // Cash interest payments (coupons, floating resets).
-                            // Accumulate the *signed* value; the net magnitude is
-                            // booked after the flow loop. FX is linear, so the
-                            // signed reporting amount is `sign * |converted|`.
+                            // Accumulate the *signed* value; it is split into
+                            // expense / income legs after the flow loop. FX is
+                            // linear, so the signed reporting amount is
+                            // `sign * |converted|`.
                             let sign = if cf.amount.amount() < 0.0 { -1.0 } else { 1.0 };
                             *signed_interest_native.entry(period_id).or_insert(0.0) +=
                                 sign * abs_value.amount();
@@ -309,16 +313,36 @@ pub fn aggregate_instrument_cashflows(
         // Book the net interest magnitude per period. `instrument_periods` is
         // set (each period started at zero and only this instrument writes to
         // it); `reporting_totals` is added to (it aggregates across instruments).
+        // For a two-leg swap the net's sign carries meaning (negative = paid,
+        // positive = received); for single-leg debt the magnitude is the
+        // expense. See `schedule_is_two_leg` for why the sign alone cannot
+        // decide this.
+        let is_two_leg = super::period_flows::schedule_is_two_leg(&full_schedule);
+        let split = |net: f64| -> (f64, f64) {
+            if is_two_leg {
+                ((-net).max(0.0), net.max(0.0))
+            } else {
+                (net.abs(), 0.0)
+            }
+        };
+
         for (period_id, net) in &signed_interest_native {
             if let Some(breakdown) = instrument_periods.get_mut(period_id) {
-                breakdown.interest_expense_cash = Money::new(net.abs(), currency);
+                let (expense, income) = split(*net);
+                breakdown.interest_expense_cash = Money::new(expense, currency);
+                breakdown.interest_income_cash = Some(Money::new(income, currency));
             }
         }
         if let Some(map) = reporting_totals.as_mut() {
             for (period_id, net) in &signed_interest_reporting {
                 if let Some(total) = map.get_mut(period_id) {
                     let rc = total.interest_expense_cash.currency();
-                    total.interest_expense_cash += Money::new(net.abs(), rc);
+                    let (expense, income) = split(*net);
+                    total.interest_expense_cash += Money::new(expense, rc);
+                    let income_total = total
+                        .interest_income_cash_or_zero()
+                        .checked_add(Money::new(income, rc))?;
+                    total.interest_income_cash = Some(income_total);
                 }
             }
         }

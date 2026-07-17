@@ -60,6 +60,7 @@ fn test_capital_structure_cashflows_serialization() {
             5_000.0,
             finstack_quant_core::currency::Currency::USD,
         ),
+        interest_income_cash: None,
         interest_expense_pik: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,
@@ -334,6 +335,7 @@ fn test_capital_structure_json_roundtrip() {
             5_000.0,
             finstack_quant_core::currency::Currency::USD,
         ),
+        interest_income_cash: None,
         interest_expense_pik: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,

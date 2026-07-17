@@ -264,6 +264,7 @@ mod tests {
                 p.id,
                 CashflowBreakdown {
                     interest_expense_cash: Money::new(50_000.0, Currency::USD),
+                    interest_income_cash: None,
                     interest_expense_pik: Money::new(0.0, Currency::USD),
                     principal_payment: Money::new(100_000.0, Currency::USD),
                     fees: Money::new(0.0, Currency::USD),

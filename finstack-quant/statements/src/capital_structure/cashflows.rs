@@ -89,11 +89,34 @@ pub struct CapitalStructureCashflows {
 /// Interest expense is split into cash and PIK components for visibility
 /// into non-cash interest accrual. Use `interest_expense_total()` for the
 /// combined value. All monetary fields use the Money type for currency safety.
+///
+/// Interest *expense* and interest *income* are tracked separately rather than
+/// as one signed field: a two-leg instrument (an interest-rate swap) can net to
+/// a receipt in a period — a pay-fixed hedge is in the money whenever the
+/// floating leg exceeds the fixed leg — and a receipt is not debt service. The
+/// waterfall allocates cash against expense claims, so folding a receipt into
+/// `interest_expense_cash` as a negative claim would corrupt pro-rata
+/// allocation. See [`Self::net_interest_expense_cash`] for the combined view.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CashflowBreakdown {
     /// Cash interest payments (coupons, floating resets)
     pub interest_expense_cash: Money,
+
+    /// Net cash interest **received** during the period.
+    ///
+    /// Non-zero only for two-leg instruments whose legs net to a receipt (e.g.
+    /// an in-the-money pay-fixed swap). Stored as a positive amount, like the
+    /// outflow-oriented fields, and reported through the `cs.interest_income`
+    /// namespace.
+    ///
+    /// `None` in payloads written before this field existed, which is
+    /// semantically identical to the old behaviour (no income was tracked).
+    /// Read it via [`Self::interest_income_cash_or_zero`] rather than
+    /// unwrapping, so legacy payloads resolve to a zero in the correct
+    /// currency.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interest_income_cash: Option<Money>,
 
     /// PIK (payment-in-kind) interest accrued but not paid in cash
     pub interest_expense_pik: Money,
@@ -116,12 +139,41 @@ impl CashflowBreakdown {
     pub fn with_currency(currency: Currency) -> Self {
         Self {
             interest_expense_cash: Money::new(0.0, currency),
+            interest_income_cash: Some(Money::new(0.0, currency)),
             interest_expense_pik: Money::new(0.0, currency),
             principal_payment: Money::new(0.0, currency),
             fees: Money::new(0.0, currency),
             debt_balance: Money::new(0.0, currency),
             accrued_interest: Money::new(0.0, currency),
         }
+    }
+
+    /// Net cash interest received this period, resolving a legacy `None` to a
+    /// zero in this breakdown's currency.
+    ///
+    /// Payloads written before `interest_income_cash` existed carry `None`;
+    /// they tracked no income, so zero is the semantically equivalent value.
+    #[must_use]
+    pub fn interest_income_cash_or_zero(&self) -> Money {
+        self.interest_income_cash
+            .unwrap_or_else(|| Money::new(0.0, self.interest_expense_cash.currency()))
+    }
+
+    /// Cash interest expense net of cash interest received.
+    ///
+    /// This is the P&L-relevant view: a hedge receipt offsets the coupon it was
+    /// bought to offset. The result may be negative when receipts exceed
+    /// expense. Use [`Self::interest_expense_cash`] directly when you need the
+    /// gross claim the waterfall allocates cash against.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the expense and income legs are in different
+    /// currencies.
+    pub fn net_interest_expense_cash(&self) -> crate::error::Result<Money> {
+        Ok(self
+            .interest_expense_cash
+            .checked_sub(self.interest_income_cash_or_zero())?)
     }
 
     /// Get total interest expense (cash + PIK).
@@ -158,13 +210,19 @@ impl CashflowBreakdown {
     /// Validate that all `Money` fields share the same currency.
     pub fn validate_currency_invariant(&self) -> crate::Result<()> {
         let expected = self.interest_expense_cash.currency();
-        let fields = [
+        let mut fields = vec![
             ("interest_expense_pik", self.interest_expense_pik.currency()),
             ("principal_payment", self.principal_payment.currency()),
             ("debt_balance", self.debt_balance.currency()),
             ("fees", self.fees.currency()),
             ("accrued_interest", self.accrued_interest.currency()),
         ];
+        // Only check the income leg when present: a legacy `None` carries no
+        // currency to disagree with (`interest_income_cash_or_zero` derives it
+        // from the expense leg, so it can never mismatch).
+        if let Some(income) = self.interest_income_cash {
+            fields.push(("interest_income_cash", income.currency()));
+        }
         for (name, actual) in fields {
             if actual != expected {
                 return Err(crate::error::Error::capital_structure(format!(
@@ -303,6 +361,20 @@ impl CapitalStructureCashflows {
         })
     }
 
+    /// Get cash interest **received** for a specific instrument and period.
+    ///
+    /// Non-zero only for two-leg instruments whose legs net to a receipt (e.g.
+    /// an in-the-money pay-fixed swap).
+    ///
+    /// # Arguments
+    /// * `instrument_id` - Instrument identifier
+    /// * `period_id` - Period to inspect
+    pub fn get_interest_income(&self, instrument_id: &str, period_id: &PeriodId) -> Result<f64> {
+        self.get_instrument_field(instrument_id, period_id, "interest income", |cf| {
+            cf.interest_income_cash_or_zero().amount()
+        })
+    }
+
     /// Get PIK interest expense for a specific instrument and period.
     ///
     /// # Arguments
@@ -391,6 +463,17 @@ impl CapitalStructureCashflows {
     /// * `period_id` - Period to inspect
     pub fn get_total_interest_cash(&self, period_id: &PeriodId) -> Result<f64> {
         self.reporting_total(period_id, |cf| cf.interest_expense_cash.amount())
+    }
+
+    /// Get total cash interest **received** across all instruments for a period.
+    ///
+    /// Non-zero only when the structure holds two-leg instruments whose legs
+    /// net to a receipt (e.g. an in-the-money pay-fixed swap).
+    ///
+    /// # Arguments
+    /// * `period_id` - Period to inspect
+    pub fn get_total_interest_income(&self, period_id: &PeriodId) -> Result<f64> {
+        self.reporting_total(period_id, |cf| cf.interest_income_cash_or_zero().amount())
     }
 
     /// Get total PIK interest expense across all instruments for a period.
@@ -484,12 +567,65 @@ mod tests {
     fn test_cashflow_breakdown_interest_total() {
         let cf = CashflowBreakdown {
             interest_expense_cash: Money::new(10_000.0, Currency::USD),
+            interest_income_cash: Some(Money::new(0.0, Currency::USD)),
             interest_expense_pik: Money::new(2_500.0, Currency::USD),
             ..CashflowBreakdown::with_currency(Currency::USD)
         };
         assert_eq!(
             cf.interest_expense_total().expect("same currency").amount(),
             12_500.0
+        );
+    }
+
+    /// Payloads written before `interest_income_cash` existed must still
+    /// deserialize, and must behave exactly as they did before the field was
+    /// added (no income tracked). This is the additive-change contract in
+    /// `docs/SERDE_STABILITY.md`: an older payload has to produce a value
+    /// semantically equivalent to the pre-change behaviour.
+    #[test]
+    fn legacy_payload_without_interest_income_deserializes_as_zero_income() {
+        // Exactly the field set that existed before the change.
+        let legacy = r#"{
+            "interest_expense_cash": {"amount": "100.00", "currency": "EUR"},
+            "interest_expense_pik": {"amount": "0.00", "currency": "EUR"},
+            "principal_payment": {"amount": "0.00", "currency": "EUR"},
+            "fees": {"amount": "0.00", "currency": "EUR"},
+            "debt_balance": {"amount": "1000.00", "currency": "EUR"},
+            "accrued_interest": {"amount": "0.00", "currency": "EUR"}
+        }"#;
+
+        let breakdown: CashflowBreakdown =
+            serde_json::from_str(legacy).expect("a pre-change payload must still deserialize");
+
+        assert!(breakdown.interest_income_cash.is_none());
+        // Resolves to zero in the breakdown's own currency, not a hardcoded one.
+        let income = breakdown.interest_income_cash_or_zero();
+        assert_eq!(income.amount(), 0.0);
+        assert_eq!(income.currency(), Currency::EUR);
+        // Net equals gross when no income was tracked — the old behaviour.
+        assert_eq!(
+            breakdown
+                .net_interest_expense_cash()
+                .expect("same currency")
+                .amount(),
+            100.0
+        );
+        // A legacy `None` carries no currency, so it cannot trip the invariant.
+        breakdown
+            .validate_currency_invariant()
+            .expect("legacy payload must satisfy the currency invariant");
+    }
+
+    /// The field is omitted when absent, so a legacy reader is not handed a
+    /// key it would reject under `deny_unknown_fields`.
+    #[test]
+    fn absent_interest_income_is_omitted_from_serialized_output() {
+        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
+        breakdown.interest_income_cash = None;
+        let json = serde_json::to_string(&breakdown).expect("serializes");
+        assert!(
+            !json.contains("interest_income_cash"),
+            "an absent income leg must not be emitted: {json}"
         );
     }
 
@@ -526,6 +662,7 @@ mod tests {
         let period_id = PeriodId::quarter(2025, 1);
         let breakdown = CashflowBreakdown {
             interest_expense_cash: Money::new(45_000.0, Currency::USD),
+            interest_income_cash: Some(Money::new(0.0, Currency::USD)),
             interest_expense_pik: Money::new(5_000.0, Currency::USD),
             principal_payment: Money::new(100_000.0, Currency::USD),
             debt_balance: Money::new(1_000_000.0, Currency::USD),
@@ -598,6 +735,7 @@ mod tests {
     fn cashflow_breakdown_serde_round_trips_and_denies_unknown_fields() {
         let cf = CashflowBreakdown {
             interest_expense_cash: Money::new(10_000.0, Currency::USD),
+            interest_income_cash: Some(Money::new(0.0, Currency::USD)),
             interest_expense_pik: Money::new(2_500.0, Currency::USD),
             ..CashflowBreakdown::with_currency(Currency::USD)
         };

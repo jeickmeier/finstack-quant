@@ -286,6 +286,18 @@ impl EvaluationContext {
             .and_then(|period_results| period_results.get(node_id).copied())
     }
 
+    /// Shared diagnostic listing the `cs.*` component vocabulary.
+    ///
+    /// Kept in one place so the total and per-instrument arms cannot drift
+    /// apart as components are added.
+    fn unknown_component_message(component: &str) -> String {
+        format!(
+            "Unknown capital structure component: {component}. Expected: interest_expense, \
+             interest_expense_cash, interest_expense_pik, interest_income, principal_payment, \
+             debt_balance, fees, or accrued_interest"
+        )
+    }
+
     fn lookup_cs_value(
         cashflows: &crate::capital_structure::CapitalStructureCashflows,
         period_id: &PeriodId,
@@ -297,13 +309,13 @@ impl EvaluationContext {
                 "interest_expense" => cashflows.get_total_interest(period_id),
                 "interest_expense_cash" => cashflows.get_total_interest_cash(period_id),
                 "interest_expense_pik" => cashflows.get_total_interest_pik(period_id),
+                "interest_income" => cashflows.get_total_interest_income(period_id),
                 "principal_payment" => cashflows.get_total_principal(period_id),
                 "debt_balance" => cashflows.get_total_debt_balance(period_id),
                 "fees" => cashflows.get_total_fees(period_id),
                 "accrued_interest" => cashflows.get_total_accrued_interest(period_id),
-                _ => Err(Error::capital_structure(format!(
-                    "Unknown capital structure component: {}. Expected: interest_expense, interest_expense_cash, interest_expense_pik, principal_payment, debt_balance, fees, or accrued_interest",
-                    component
+                _ => Err(Error::capital_structure(Self::unknown_component_message(
+                    component,
                 ))),
             }
         } else {
@@ -312,16 +324,18 @@ impl EvaluationContext {
                 "interest_expense_cash" => {
                     cashflows.get_interest_cash(instrument_or_total, period_id)
                 }
-                "interest_expense_pik" => cashflows.get_interest_pik(instrument_or_total, period_id),
+                "interest_expense_pik" => {
+                    cashflows.get_interest_pik(instrument_or_total, period_id)
+                }
+                "interest_income" => cashflows.get_interest_income(instrument_or_total, period_id),
                 "principal_payment" => cashflows.get_principal(instrument_or_total, period_id),
                 "debt_balance" => cashflows.get_debt_balance(instrument_or_total, period_id),
                 "fees" => cashflows.get_fees(instrument_or_total, period_id),
                 "accrued_interest" => {
                     cashflows.get_accrued_interest(instrument_or_total, period_id)
                 }
-                _ => Err(Error::capital_structure(format!(
-                    "Unknown capital structure component: {}. Expected: interest_expense, interest_expense_cash, interest_expense_pik, principal_payment, debt_balance, fees, or accrued_interest",
-                    component
+                _ => Err(Error::capital_structure(Self::unknown_component_message(
+                    component,
                 ))),
             }
         }

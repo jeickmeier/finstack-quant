@@ -26,6 +26,50 @@ use finstack_quant_core::dates::{Date, Period};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
+/// True when `kind` is a cash-interest flow (the legs a swap nets).
+#[inline]
+pub(crate) fn is_cash_interest_kind(kind: CFKind) -> bool {
+    matches!(kind, CFKind::Fixed | CFKind::Stub | CFKind::FloatReset)
+}
+
+/// Detect whether a schedule carries two opposite-signed interest legs.
+///
+/// This distinguishes a swap from single-leg debt, which the sign of an
+/// individual flow cannot do: bonds and loans emit **positive** coupons meaning
+/// "issuer pays", while a `PayReceive::Pay` swap emits a negative fixed leg and
+/// a positive floating leg. A positive flow is therefore an expense on a bond
+/// but a receipt on a swap.
+///
+/// The whole schedule is inspected rather than one period's flows because swap
+/// legs routinely have different frequencies (semi-annual fixed against
+/// quarterly floating is the default), so a single period may contain only one
+/// leg and would be misread as single-leg debt.
+///
+/// This is a structural inference, not a declared property: `CashflowProvider`
+/// does not expose leg structure. It is exact for the instruments this module
+/// builds — single-leg schedules never mix interest signs, and a swap always
+/// emits both legs across its life.
+pub(crate) fn schedule_is_two_leg(
+    schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
+) -> bool {
+    let mut saw_positive = false;
+    let mut saw_negative = false;
+    for cf in schedule.get_flows() {
+        if !is_cash_interest_kind(cf.kind) {
+            continue;
+        }
+        if cf.amount.amount() > 0.0 {
+            saw_positive = true;
+        } else if cf.amount.amount() < 0.0 {
+            saw_negative = true;
+        }
+        if saw_positive && saw_negative {
+            return true;
+        }
+    }
+    false
+}
+
 /// Snapshot date used for "end of period" quantities under half-open period semantics `[start, end)`.
 ///
 /// We use `end - 1 day` so that cashflows dated exactly on `period.end` are attributed to the
@@ -166,12 +210,25 @@ pub fn calculate_period_flows(
         adjusted_ratio.clamp(0.0, SCALE_CLAMP_MAX) + pik_part
     };
 
-    // Interest is accumulated as a *signed* per-period sum and booked as its
-    // net magnitude after the loop. Two-leg instruments (swaps) emit both legs
-    // into one schedule as opposite-signed `Fixed`/`FloatReset` flows; booking
-    // each leg's absolute value would double-count (report gross ≈ pay + receive
-    // instead of the net coupon). Single-leg loans emit positive-magnitude
-    // coupons, so netting-then-abs preserves their behavior exactly.
+    // Interest is accumulated as a *signed* per-period sum and split into
+    // expense / income legs after the loop.
+    //
+    // The sign of an interest flow does not by itself say whether it is an
+    // expense: the schedule conventions differ by instrument (INVARIANTS.md §3
+    // — the statements sign-convention refactor is deferred).
+    //
+    // * Single-leg debt (bonds, loans) emits **positive** coupons that already
+    //   mean "issuer pays".
+    // * A two-leg swap emits opposite-signed legs — for `PayReceive::Pay`, the
+    //   fixed leg is negative (paid) and the floating leg positive (received).
+    //
+    // So a positive flow means *expense* on a bond but *receipt* on a swap's
+    // floating leg. `is_two_leg` resolves that ambiguity from the leg structure
+    // of the whole schedule, not from a single period: swap legs commonly have
+    // different frequencies (the default is semi-annual fixed vs quarterly
+    // floating), so an individual period can legitimately contain just one leg
+    // and would otherwise be misread as single-leg debt.
+    let is_two_leg = schedule_is_two_leg(&full_schedule);
     let mut net_interest_cash = 0.0_f64;
 
     // Extract flows that fall within this period
@@ -193,7 +250,10 @@ pub fn calculate_period_flows(
                 Money::new(cf.amount.amount().abs() * scale, cf.amount.currency());
 
             match cf.kind {
-                CFKind::Fixed | CFKind::Stub | CFKind::FloatReset => {
+                // Guarded on the shared predicate so this arm and
+                // `schedule_is_two_leg` can never disagree about what counts as
+                // a cash-interest leg.
+                kind if is_cash_interest_kind(kind) => {
                     net_interest_cash += cf.amount.amount() * scale;
                 }
                 CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment => {
@@ -250,8 +310,21 @@ pub fn calculate_period_flows(
         }
     }
 
-    // Book the net interest magnitude for the period (see `net_interest_cash`).
-    breakdown.interest_expense_cash = Money::new(net_interest_cash.abs(), currency);
+    // Book the netted interest (see `net_interest_cash` and `is_two_leg`).
+    //
+    // Two-leg: the net carries meaning — negative is paid (expense), positive
+    // is received (an in-the-money hedge). `.abs()` here would report a receipt
+    // as an expense, overstating P&L by twice the receipt and, under a
+    // waterfall, consuming real cash to service a payment never made.
+    //
+    // Single-leg: the magnitude is the expense, exactly as before.
+    let (expense, income) = if is_two_leg {
+        ((-net_interest_cash).max(0.0), net_interest_cash.max(0.0))
+    } else {
+        (net_interest_cash.abs(), 0.0)
+    };
+    breakdown.interest_expense_cash = Money::new(expense, currency);
+    breakdown.interest_income_cash = Some(Money::new(income, currency));
 
     // Get closing balance from outstanding_by_date.
     // Find the most recent outstanding balance at or before period end.
@@ -443,6 +516,139 @@ mod tests {
 
         assert!(warnings.is_empty());
         assert_eq!(breakdown.interest_expense_cash.amount(), 50_000.0);
+        // A single-leg loan receives nothing.
+        assert_eq!(breakdown.interest_income_cash_or_zero().amount(), 0.0);
+    }
+
+    /// A swap whose legs net to a *receipt* must not be booked as an expense.
+    ///
+    /// Two-leg instruments emit both legs into one schedule as opposite-signed
+    /// flows. Netting them is correct, but taking `.abs()` of the net turned an
+    /// in-the-money hedge (pay-fixed while floating is higher) into a phantom
+    /// expense: P&L overstated by twice the receipt, and under a waterfall the
+    /// phantom expense consumed real cash in the Interest category. The receipt
+    /// belongs in `interest_income_cash`.
+    #[test]
+    fn swap_net_receipt_is_booked_as_income_not_expense() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
+        let period = Period {
+            id: PeriodId::quarter(2025, 1),
+            start,
+            end,
+            is_actual: false,
+        };
+        let pay_date = Date::from_calendar_date(2025, Month::February, 15).expect("valid date");
+
+        // Pay fixed 4% (outflow), receive floating 5.3% (inflow) => net receipt.
+        let instrument = SignedFlowInstrument {
+            schedule: test_schedule(
+                vec![
+                    CashFlow::new(
+                        pay_date,
+                        None,
+                        Money::new(-40_000.0, Currency::USD),
+                        CFKind::Fixed,
+                        0.25,
+                        None,
+                    ),
+                    CashFlow::new(
+                        pay_date,
+                        None,
+                        Money::new(53_000.0, Currency::USD),
+                        CFKind::FloatReset,
+                        0.25,
+                        None,
+                    ),
+                ],
+                1_000_000.0,
+                start,
+            ),
+        };
+
+        let market_ctx = MarketContext::new();
+        let (breakdown, _, _, _) = calculate_period_flows(
+            &instrument,
+            &period,
+            Money::new(1_000_000.0, Currency::USD),
+            Money::new(0.0, Currency::USD),
+            &market_ctx,
+            start,
+        )
+        .expect("period flow calculation should succeed");
+
+        assert_eq!(
+            breakdown.interest_expense_cash.amount(),
+            0.0,
+            "a net receipt is not an interest expense"
+        );
+        assert_eq!(
+            breakdown.interest_income_cash_or_zero().amount(),
+            13_000.0,
+            "the 13k net receipt must be booked as interest income"
+        );
+        assert_eq!(
+            breakdown
+                .net_interest_expense_cash()
+                .expect("same currency")
+                .amount(),
+            -13_000.0,
+            "net interest expense is negative when the hedge is in the money"
+        );
+    }
+
+    /// A swap whose legs net to a payment stays an expense, with no income.
+    #[test]
+    fn swap_net_payment_is_booked_as_expense() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
+        let period = Period {
+            id: PeriodId::quarter(2025, 1),
+            start,
+            end,
+            is_actual: false,
+        };
+        let pay_date = Date::from_calendar_date(2025, Month::February, 15).expect("valid date");
+
+        // Pay fixed 4% (outflow), receive floating 1% (inflow) => net payment.
+        let instrument = SignedFlowInstrument {
+            schedule: test_schedule(
+                vec![
+                    CashFlow::new(
+                        pay_date,
+                        None,
+                        Money::new(-40_000.0, Currency::USD),
+                        CFKind::Fixed,
+                        0.25,
+                        None,
+                    ),
+                    CashFlow::new(
+                        pay_date,
+                        None,
+                        Money::new(10_000.0, Currency::USD),
+                        CFKind::FloatReset,
+                        0.25,
+                        None,
+                    ),
+                ],
+                1_000_000.0,
+                start,
+            ),
+        };
+
+        let market_ctx = MarketContext::new();
+        let (breakdown, _, _, _) = calculate_period_flows(
+            &instrument,
+            &period,
+            Money::new(1_000_000.0, Currency::USD),
+            Money::new(0.0, Currency::USD),
+            &market_ctx,
+            start,
+        )
+        .expect("period flow calculation should succeed");
+
+        assert_eq!(breakdown.interest_expense_cash.amount(), 30_000.0);
+        assert_eq!(breakdown.interest_income_cash_or_zero().amount(), 0.0);
     }
 
     #[test]
