@@ -17,8 +17,41 @@ use std::cell::Cell;
 
 const MAX_PARSE_DEPTH: usize = 64;
 
+/// Maximum number of terms (literals, identifiers, `cs.*` references, function
+/// calls, and conditionals) a single formula may contain.
+///
+/// [`MAX_PARSE_DEPTH`] bounds only *parser* recursion, which grows with
+/// parenthesised nesting. It does not bound a **flat** operator chain such as
+/// `1 + 1 + 1 + ...`: those levels parse iteratively (`many0` + `fold`), so an
+/// unbounded chain parses happily into a left-leaning AST whose *depth* equals
+/// the operator count. Every later consumer walks that AST recursively —
+/// [`crate::dsl::compile`], `validate_dimensions`, and even the derived `Drop`
+/// of the boxed tree — so the depth lands on the stack after parsing has
+/// already succeeded. A stack overflow aborts the process (SIGABRT) and cannot
+/// be caught by the Python/WASM bindings' unwind guards, so bounding this is a
+/// robustness requirement, not a nicety: formula text arrives from untrusted
+/// JSON via the registry and model-spec loaders.
+///
+/// Bounding terms bounds the whole tree: every operator needs operands that
+/// bottom out in terms, so an AST with `t` terms holds fewer than `2t` nodes
+/// and cannot be deeper than `2t`.
+///
+/// The value is chosen against the *smallest* stack the compiler might run on,
+/// not the main thread's: Monte Carlo evaluates formulas on rayon workers,
+/// which get Rust's 2 MiB default rather than the main thread's 8 MiB. Measured
+/// cost is roughly 1.3 KiB of stack per term, and `dsl::stack_safety` pins the
+/// limit by compiling a full-budget formula on a deliberately small 512 KiB
+/// stack — a 4× margin against that 2 MiB default, with room to spare for the
+/// evaluator frames already on the stack when `compile` is reached.
+///
+/// 256 terms is far beyond any legitimate formula (financial expressions run to
+/// a few dozen), and the diagnostic points oversized ones at intermediate
+/// model nodes.
+const MAX_FORMULA_TERMS: usize = 256;
+
 thread_local! {
     static PARSE_DEPTH: Cell<usize> = const { Cell::new(0) };
+    static TERM_COUNT: Cell<usize> = const { Cell::new(0) };
 }
 
 /// Parse a formula string into a [`StmtExpr`] AST.
@@ -31,12 +64,20 @@ thread_local! {
 /// includes the line and column where parsing stopped.
 pub fn parse_formula(input: &str) -> Result<StmtExpr> {
     PARSE_DEPTH.with(|depth| depth.set(0));
+    TERM_COUNT.with(|count| count.set(0));
     match expression(input) {
         Ok(("", expr)) => Ok(expr),
         Ok((remaining, _)) => {
             let (line, col) = offset_to_line_col(input, input.len() - remaining.len());
             Err(Error::formula_parse(format!(
                 "unexpected input at line {line} col {col}: '{remaining}'"
+            )))
+        }
+        Err(nom::Err::Failure(err)) if err.code == nom::error::ErrorKind::Count => {
+            let (line, col) = offset_to_line_col(input, input.len() - err.input.len());
+            Err(Error::formula_parse(format!(
+                "formula exceeds the maximum of {MAX_FORMULA_TERMS} terms at line {line} \
+                 col {col}. Split it into intermediate model nodes."
             )))
         }
         Err(nom::Err::Failure(err)) if err.code == nom::error::ErrorKind::TooLarge => {
@@ -217,7 +258,17 @@ fn unary(input: &str) -> IResult<&str, StmtExpr> {
 }
 
 // Primary expressions (literals, identifiers, function calls, parentheses)
+//
+// Every term in a formula is parsed here, so this is the single choke point
+// that charges the `MAX_FORMULA_TERMS` budget (see its docs for why bounding
+// terms bounds the whole AST).
 fn primary(input: &str) -> IResult<&str, StmtExpr> {
+    let (rest, expr) = primary_inner(input)?;
+    charge_term(input)?;
+    Ok((rest, expr))
+}
+
+fn primary_inner(input: &str) -> IResult<&str, StmtExpr> {
     delimited(
         multispace0,
         alt((
@@ -333,6 +384,31 @@ fn parenthesized(input: &str) -> IResult<&str, StmtExpr> {
     delimited(char('('), expression, char(')')).parse(input)
 }
 
+/// Charge one term against the formula's [`MAX_FORMULA_TERMS`] budget.
+///
+/// Called only after a term has parsed successfully, so `alt` branches that
+/// backtrack are not charged. The counter is reset per [`parse_formula`] call
+/// and is thread-local, so concurrent parses do not share a budget.
+fn charge_term(input: &str) -> IResult<&str, ()> {
+    TERM_COUNT.with(|count| {
+        let next = count.get() + 1;
+        if next > MAX_FORMULA_TERMS {
+            // `Count` is used purely as a sentinel code (no `count` combinator
+            // appears in this parser) so `parse_formula` can tell this apart
+            // from the depth limit's `TooLarge`. It is a `Failure`, not an
+            // `Error`, so `alt`/`many0` stop immediately instead of
+            // backtracking and retrying.
+            Err(nom::Err::Failure(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Count,
+            )))
+        } else {
+            count.set(next);
+            Ok((input, ()))
+        }
+    })
+}
+
 fn with_parse_depth<'a>(
     input: &'a str,
     parse: impl FnOnce(&'a str) -> IResult<&'a str, StmtExpr>,
@@ -356,6 +432,82 @@ fn with_parse_depth<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A flat operator chain must be rejected by the term budget.
+    ///
+    /// Regression lock for a stack-overflow DoS: `MAX_PARSE_DEPTH` guards only
+    /// parser recursion, so a chain like `1+1+1+...` parsed fine and produced a
+    /// left-leaning AST whose depth equalled the operator count. `compile()`
+    /// (and `validate_dimensions`, and the AST's own `Drop`) then recursed to
+    /// that depth and overflowed the stack — SIGABRT, not a catchable panic, so
+    /// the Python/WASM bindings could not contain it. Reachable from any
+    /// inbound formula: registry JSON, model-spec JSON, or the builder.
+    #[test]
+    fn flat_operator_chain_is_rejected_before_it_can_overflow_the_stack() {
+        let formula = std::iter::repeat_n("1", 10_000)
+            .collect::<Vec<_>>()
+            .join("+");
+        let err = parse_formula(&formula).expect_err("a 10k-term chain must be rejected");
+        assert!(
+            err.to_string().contains("maximum of"),
+            "expected the term-budget diagnostic, got: {err}"
+        );
+    }
+
+    /// The budget must hold on the path that actually overflowed: parsing
+    /// succeeded before, and `compile()` was the step that aborted.
+    #[test]
+    fn flat_operator_chain_is_rejected_by_parse_and_compile() {
+        let formula = std::iter::repeat_n("1", 10_000)
+            .collect::<Vec<_>>()
+            .join("+");
+        let err =
+            crate::dsl::parse_and_compile(&formula).expect_err("compile path must reject too");
+        assert!(
+            err.to_string().contains("maximum of"),
+            "expected the term-budget diagnostic, got: {err}"
+        );
+    }
+
+    /// The budget must not reject realistic formulas. Financial expressions run
+    /// to a few dozen terms; this exercises a comfortably larger one end-to-end
+    /// through compilation.
+    #[test]
+    fn realistic_formula_stays_within_the_term_budget() {
+        let formula = std::iter::repeat_n("revenue", 100)
+            .collect::<Vec<_>>()
+            .join(" + ");
+        crate::dsl::parse_and_compile(&formula)
+            .expect("a 100-term formula is legitimate and must still compile");
+    }
+
+    /// The budget resets per call: repeated parses of a within-budget formula
+    /// must not accumulate into a shared counter and start failing.
+    #[test]
+    fn term_budget_resets_between_parses() {
+        let formula = std::iter::repeat_n("1", MAX_FORMULA_TERMS)
+            .collect::<Vec<_>>()
+            .join("+");
+        for i in 0..3 {
+            parse_formula(&formula)
+                .unwrap_or_else(|e| panic!("parse {i} must get a fresh budget, got: {e}"));
+        }
+    }
+
+    /// The boundary is inclusive: exactly `MAX_FORMULA_TERMS` is accepted and
+    /// one more is rejected.
+    #[test]
+    fn term_budget_boundary_is_inclusive() {
+        let at_limit = std::iter::repeat_n("1", MAX_FORMULA_TERMS)
+            .collect::<Vec<_>>()
+            .join("+");
+        parse_formula(&at_limit).expect("a formula at exactly the budget is accepted");
+
+        let over_limit = std::iter::repeat_n("1", MAX_FORMULA_TERMS + 1)
+            .collect::<Vec<_>>()
+            .join("+");
+        parse_formula(&over_limit).expect_err("one term over the budget is rejected");
+    }
 
     #[test]
     fn test_parse_literal() {

@@ -102,13 +102,53 @@ pub struct WaterfallPeriodResult {
 }
 
 /// Evaluate a node reference or inline DSL expression against the current context.
+///
+/// The result is required to be finite. The evaluator deliberately produces
+/// `NaN` for division by zero and `±Inf` on overflow, and stores them so
+/// downstream formulas can guard them — but every waterfall input feeds a
+/// cash allocation, where a non-finite value degrades silently rather than
+/// loudly: `NaN.max(0.0)` is `0.0` (an empty cash pool that shorts every
+/// creditor) and `NaN < threshold` is `false` (a PIK toggle that never fires).
+/// Both surface only as misleading downstream shortfall warnings. Fail here
+/// instead, naming the expression that produced the value.
 fn eval_value_or_formula(context: &EvaluationContext, expr: &str) -> Result<f64> {
-    if let Ok(value) = context.get_value(expr) {
-        return Ok(value);
+    let value = if let Ok(value) = context.get_value(expr) {
+        value
+    } else {
+        let compiled = crate::dsl::parse_and_compile(expr)?;
+        let mut scratch = context.clone();
+        crate::evaluator::formula::evaluate_formula(&compiled, &mut scratch, None)?
+    };
+
+    if !value.is_finite() {
+        return Err(crate::error::Error::capital_structure(format!(
+            "waterfall input '{expr}' evaluated to the non-finite value {value} in period {}. \
+             Cash allocation requires finite inputs; a non-finite value would be silently \
+             read as zero cash (or as a PIK toggle that never fires). Check the expression \
+             for division by zero or overflow.",
+            context.period_id
+        )));
     }
-    let compiled = crate::dsl::parse_and_compile(expr)?;
-    let mut scratch = context.clone();
-    crate::evaluator::formula::evaluate_formula(&compiled, &mut scratch, None)
+
+    Ok(value)
+}
+
+/// Convert a waterfall-derived `f64` into `Money`, naming `expr` on failure.
+///
+/// `Money::new` panics on amounts outside `rust_decimal`'s representable range
+/// (~7.9e28), which a plain model value can reach. Library code must not panic
+/// on user input (INVARIANTS.md §5), so surface it as an error instead.
+fn money_from_expr(
+    amount: f64,
+    currency: finstack_quant_core::currency::Currency,
+    expr: &str,
+) -> Result<Money> {
+    Money::try_new(amount, currency).map_err(|e| {
+        crate::error::Error::capital_structure(format!(
+            "waterfall input '{expr}' produced the amount {amount}, which is not a \
+             representable {currency} value: {e}"
+        ))
+    })
 }
 
 /// Execute waterfall logic for a single period.
@@ -286,7 +326,11 @@ pub fn execute_waterfall(
     };
     let available_cash = if let Some(available_cash_node) = &waterfall_spec.available_cash_node {
         let cash = eval_value_or_formula(context, available_cash_node)?;
-        Some(Money::new(cash.max(0.0), cash_currency))
+        Some(money_from_expr(
+            cash.max(0.0),
+            cash_currency,
+            available_cash_node,
+        )?)
     } else {
         None
     };
@@ -917,6 +961,141 @@ mod tests {
                 .expect("cumulative principal")
                 .amount(),
             425_000.0
+        );
+    }
+
+    /// A non-finite `available_cash_node` must be a hard error, not a silent
+    /// zero. `NaN.max(0.0)` evaluates to 0.0, which would short every creditor
+    /// against an empty cash pool while reporting only downstream shortfall
+    /// warnings — no diagnostic pointing at the broken formula.
+    #[test]
+    fn available_cash_node_rejects_non_finite_value() {
+        let period = PeriodId::quarter(2025, 1);
+        // `0 / 0` is NaN under the DSL's documented division-by-zero policy.
+        let context = build_context(period, &[("cash", 0.0)]);
+
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
+        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        contractual_flows.insert("TL-1".to_string(), breakdown);
+
+        let mut state = CapitalStructureState::new();
+        state
+            .opening_balances
+            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+
+        let waterfall = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: Some("cash / 0".into()),
+            ecf_sweep: None,
+            pik_toggle: None,
+        };
+
+        let err = execute_waterfall(
+            &period,
+            &context,
+            &waterfall,
+            &mut state,
+            &contractual_flows,
+        )
+        .expect_err("non-finite available cash must error rather than coerce to zero");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("non-finite") && msg.contains("cash / 0"),
+            "error must name the offending expression: {msg}"
+        );
+    }
+
+    /// A finite-but-astronomical cash value must error rather than panic.
+    /// `Money::new` asserts a `rust_decimal`-representable amount (~7.9e28) and
+    /// panics beyond it, which would abort evaluation from ordinary model data.
+    #[test]
+    fn available_cash_node_rejects_amount_beyond_decimal_range() {
+        let period = PeriodId::quarter(2025, 1);
+        let context = build_context(period, &[("cash", 1e30)]);
+
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
+        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        contractual_flows.insert("TL-1".to_string(), breakdown);
+
+        let mut state = CapitalStructureState::new();
+        state
+            .opening_balances
+            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+
+        let waterfall = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: Some("cash".into()),
+            ecf_sweep: None,
+            pik_toggle: None,
+        };
+
+        let err = execute_waterfall(
+            &period,
+            &context,
+            &waterfall,
+            &mut state,
+            &contractual_flows,
+        )
+        .expect_err("out-of-range available cash must error rather than panic");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("1e30") || msg.contains("Decimal") || msg.contains("representable"),
+            "error must describe the out-of-range amount, not an unrelated spec problem: {msg}"
+        );
+    }
+
+    /// A non-finite PIK liquidity metric must error rather than silently
+    /// evaluate `NaN < threshold` as false (i.e. "PIK not triggered").
+    #[test]
+    fn pik_liquidity_metric_rejects_non_finite_value() {
+        let period = PeriodId::quarter(2025, 1);
+        let context = build_context(period, &[("liquidity", 0.0)]);
+
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
+        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        contractual_flows.insert("TL-1".to_string(), breakdown);
+
+        let mut state = CapitalStructureState::new();
+        state
+            .opening_balances
+            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+
+        let waterfall = WaterfallSpec {
+            priority_of_payments: vec![PaymentPriority::Interest, PaymentPriority::Equity],
+            available_cash_node: None,
+            ecf_sweep: None,
+            pik_toggle: Some(PikToggleSpec {
+                liquidity_metric: "liquidity / 0".into(),
+                threshold: 1.0,
+                min_periods_in_pik: 0,
+                target_instrument_ids: Some(vec!["TL-1".to_string()]),
+            }),
+        };
+
+        let err = execute_waterfall(
+            &period,
+            &context,
+            &waterfall,
+            &mut state,
+            &contractual_flows,
+        )
+        .expect_err("non-finite PIK metric must error rather than read as 'not triggered'");
+        assert!(
+            err.to_string().contains("non-finite"),
+            "error must flag the non-finite metric: {err}"
         );
     }
 

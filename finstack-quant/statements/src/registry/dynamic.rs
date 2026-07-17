@@ -271,12 +271,27 @@ impl Registry {
     ) -> Result<Vec<MetricDefinition>> {
         let namespace = &registry.namespace;
 
-        // Build map of metric_id -> MetricDefinition for lookup
-        let metric_map: IndexMap<String, MetricDefinition> = registry
-            .metrics
-            .iter()
-            .map(|m| (m.id.to_owned(), m.clone()))
-            .collect();
+        // Build map of metric_id -> MetricDefinition for lookup.
+        //
+        // Collision must be detected here rather than left to `IndexMap`'s
+        // last-wins insert: coalescing two same-id definitions into one entry
+        // would silently discard a metric *before* `load_registry`'s duplicate
+        // check runs, leaving that check able to catch only cross-document
+        // collisions.
+        let mut metric_map: IndexMap<String, MetricDefinition> =
+            IndexMap::with_capacity(registry.metrics.len());
+        for m in &registry.metrics {
+            if metric_map.contains_key(&m.id) {
+                return Err(Error::registry(format!(
+                    "Duplicate metric ID: '{}' is defined more than once in namespace '{}'. \
+                     Each metric ID must be unique within a document; keeping only one \
+                     definition would silently discard the other.",
+                    m.qualified_id(namespace),
+                    namespace
+                )));
+            }
+            metric_map.insert(m.id.to_owned(), m.clone());
+        }
 
         // Build dependency graph: metric_id -> set of metrics it depends on
         let mut dependencies: IndexMap<String, IndexSet<String>> = IndexMap::new();
@@ -394,5 +409,61 @@ impl Registry {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Two metrics sharing an `id` inside one document must be rejected.
+    ///
+    /// `sort_metrics_by_dependencies` builds its lookup with
+    /// `IndexMap::collect`, which overwrites on a duplicate key. That silently
+    /// coalesced the pair into a single last-wins entry *before* the duplicate
+    /// check ran, so the guard could only ever catch cross-document
+    /// collisions. For a financial metric registry, silently discarding one of
+    /// two conflicting definitions of the same metric is a data-integrity
+    /// hazard.
+    #[test]
+    fn intra_document_duplicate_metric_ids_are_rejected() {
+        let json = r#"{
+            "namespace": "custom",
+            "metrics": [
+                {"id": "m1", "name": "First", "formula": "revenue * 1"},
+                {"id": "m1", "name": "Second", "formula": "revenue * 2"}
+            ]
+        }"#;
+
+        let mut registry = Registry::new();
+        let err = registry
+            .load_from_json_str(json)
+            .expect_err("duplicate ids within one document must be rejected");
+        assert!(
+            err.to_string().contains("Duplicate metric ID"),
+            "expected a duplicate-id diagnostic, got: {err}"
+        );
+        assert!(
+            registry.is_empty(),
+            "a rejected document must not leave metrics behind"
+        );
+    }
+
+    /// The same id in *different* namespaces stays legal: the namespace is part
+    /// of a metric's identity.
+    #[test]
+    fn same_metric_id_in_different_namespaces_is_allowed() {
+        let mut registry = Registry::new();
+        registry
+            .load_from_json_str(
+                r#"{"namespace":"a","metrics":[{"id":"m1","name":"M","formula":"revenue * 1"}]}"#,
+            )
+            .expect("first namespace loads");
+        registry
+            .load_from_json_str(
+                r#"{"namespace":"b","metrics":[{"id":"m1","name":"M","formula":"revenue * 2"}]}"#,
+            )
+            .expect("same id in another namespace is a distinct metric");
+        assert_eq!(registry.len(), 2);
     }
 }

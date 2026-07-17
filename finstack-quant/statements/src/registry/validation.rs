@@ -130,3 +130,30 @@ mod tests {
         assert!(validate_metric_definition(&metric, "fin").is_err());
     }
 }
+
+#[cfg(test)]
+mod dos_regression_tests {
+    /// A crafted registry document must not be able to abort the process.
+    ///
+    /// Formula text arrives from untrusted JSON here. Before the parser's term
+    /// budget, a ~20 KB flat operator chain parsed fine and then overflowed the
+    /// stack inside `compile()` — SIGABRT, which the bindings' unwind guards
+    /// cannot catch.
+    #[test]
+    fn registry_json_rejects_stack_bombing_formula() {
+        let bomb = std::iter::repeat_n("1", 10_000)
+            .collect::<Vec<_>>()
+            .join("+");
+        let json = format!(
+            r#"{{"namespace":"custom","metrics":[{{"id":"m1","name":"M1","formula":"{bomb}"}}]}}"#
+        );
+        let mut registry = crate::registry::Registry::new();
+        let err = registry
+            .load_from_json_str(&json)
+            .expect_err("a stack-bombing formula must be rejected, not abort the process");
+        assert!(
+            err.to_string().contains("maximum of"),
+            "expected the term-budget diagnostic, got: {err}"
+        );
+    }
+}

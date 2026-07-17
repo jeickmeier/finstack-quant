@@ -267,6 +267,41 @@ pub(super) fn lognormal_forecast(
     lognormal_forecast_with_stream(base_value, forecast_periods, params, None)
 }
 
+/// Validate the anchor of a LogNormal path.
+///
+/// Every LogNormal entry point must apply this identically. Both halves of the
+/// guard matter, and each covers a case the other silently mis-handles:
+///
+/// * **Non-finite** — `NaN < 0.0` and `NaN > 0.0` are both false, so a bare
+///   sign test lets `NaN` through and the `base > 0.0` regime switch then
+///   routes it into the i.i.d. fallback, emitting a finite, plausible-looking
+///   level series with no relation to the model. Reachable in practice: the
+///   evaluator stores non-finite formula results by design and
+///   `determine_base_value` returns them.
+/// * **Negative** — a LogNormal level is non-negative by construction, so a
+///   negative base cannot anchor the geometric walk. Without this test the
+///   `base > 0.0` switch silently drops to the i.i.d. fallback and reports
+///   positive levels for a series whose last actual was a loss.
+///
+/// Only a base of exactly zero legitimately selects the documented i.i.d.
+/// `exp(N(mean, std_dev))` fallback.
+fn validate_lognormal_base(base_value: f64, context: &str) -> Result<()> {
+    if !base_value.is_finite() {
+        return Err(crate::error::Error::forecast(format!(
+            "{context} requires a finite base value; got {base_value}. A non-finite base \
+             cannot anchor a LogNormal path and would otherwise be silently simulated as an \
+             i.i.d. level series. Check the upstream formula for division by zero or overflow."
+        )));
+    }
+    if base_value < 0.0 {
+        return Err(crate::error::Error::forecast(format!(
+            "{context} requires a non-negative base value; got {base_value}. \
+             Use a Normal forecast for series that can go negative."
+        )));
+    }
+    Ok(())
+}
+
 pub(crate) fn lognormal_forecast_with_stream(
     base_value: f64,
     forecast_periods: &[PeriodId],
@@ -281,16 +316,7 @@ pub(crate) fn lognormal_forecast_with_stream(
         );
     }
 
-    // A LogNormal level is non-negative by construction; a negative base would
-    // produce strictly negative "LogNormal" paths (mirror-lognormal), which
-    // contradicts the documented positivity and silently flips percentile
-    // meaning. Reject it rather than emit meaningless paths.
-    if base_value < 0.0 {
-        return Err(crate::error::Error::forecast(format!(
-            "LogNormal forecast requires a non-negative base value; got {base_value}. \
-             Use a Normal forecast for series that can go negative."
-        )));
-    }
+    validate_lognormal_base(base_value, "LogNormal forecast")?;
 
     let mut rng = build_rng(p.seed, stream_id);
     let mut results = IndexMap::new();
@@ -349,7 +375,7 @@ pub(crate) fn lognormal_forecast_with_stream(
 ///
 /// - Normal (random walk): `v_t = v_{t-1} + mean + std_dev * z_t`
 ///   ⇒ `z_t = (v_t - v_{t-1} - mean) / std_dev`.
-/// - LogNormal with path (`|base_value| > EPSILON`, GBM):
+/// - LogNormal with path (`base_value > 0.0`, GBM):
 ///   `v_t = v_{t-1} * exp((mean - 0.5*std_dev²) + std_dev * z_t)`
 ///   ⇒ `z_t = (ln(v_t / v_{t-1}) - (mean - 0.5*std_dev²)) / std_dev`.
 /// - LogNormal zero-base fallback (i.i.d. `exp(N(mean, std_dev))`):
@@ -390,6 +416,14 @@ pub(crate) fn record_independent_z_scores_for_mc(
         }
         ForecastMethod::LogNormal => {
             let p = extract_distribution_params(params, "LogNormal")?;
+            // These Z-scores invert the generating recurrence, so they are only
+            // meaningful for a base the generator itself would accept. Apply the
+            // same guard rather than recording shocks that would silently
+            // propagate into every correlated peer.
+            validate_lognormal_base(
+                base_value,
+                &format!("Monte Carlo Z-score recording for '{node_id}'"),
+            )?;
             let entry = mc_z_cache.entry(node_id.clone()).or_default();
             // Must match `lognormal_forecast_with_stream`'s regime switch so the
             // recorded Z-scores invert the same recurrence.
@@ -448,9 +482,10 @@ pub(crate) struct CorrelatedMonteCarloSeries<'a> {
 ///
 /// - Normal: additive random walk `v_t = v_{t-1} + mean + std_dev * z_t`
 ///   anchored at `base_value`.
-/// - LogNormal (GBM) when `|base_value| > EPSILON`:
+/// - LogNormal (GBM) when `base_value > 0.0`:
 ///   `v_t = v_{t-1} * exp((mean - 0.5*std_dev²) + std_dev * z_t)`.
-/// - LogNormal zero-base fallback: i.i.d. `exp(mean + std_dev * z_t)`.
+/// - LogNormal zero-base fallback (`base_value == 0.0`): i.i.d.
+///   `exp(mean + std_dev * z_t)`. Negative and non-finite bases are rejected.
 ///
 /// Matches the shock convention recorded by
 /// [`record_independent_z_scores_for_mc`] so linear correlation of the
@@ -475,6 +510,15 @@ pub(crate) fn monte_carlo_correlated_series(
             "Monte Carlo correlated forecast for '{node_id}' requires a finite base_value, \
              got {base_value}"
         )));
+    }
+    if matches!(method, ForecastMethod::LogNormal) {
+        // Apply the identical guard the independent path uses, so toggling
+        // `correlation_with` on a node cannot change whether an invalid base is
+        // caught or silently simulated in a different regime.
+        validate_lognormal_base(
+            base_value,
+            &format!("Monte Carlo correlated LogNormal forecast for '{node_id}'"),
+        )?;
     }
 
     let peer_key = NodeId::new(peer_id);
@@ -598,6 +642,129 @@ mod tests {
     fn test_parse_seed_accepts_integer_like_json_float() {
         let v = serde_json::json!(42.0);
         assert_eq!(parse_seed_json(&v), Some(42));
+    }
+
+    fn lognormal_params() -> IndexMap<String, serde_json::Value> {
+        let mut params = IndexMap::new();
+        params.insert("mean".to_string(), serde_json::json!(0.02));
+        params.insert("std_dev".to_string(), serde_json::json!(0.1));
+        params.insert("seed".to_string(), serde_json::json!(7));
+        params
+    }
+
+    /// A `NaN` base must be rejected, not silently routed into the zero-base
+    /// i.i.d. fallback. `NaN < 0.0` is false, so a bare `< 0.0` guard lets NaN
+    /// through and `NaN > 0.0` is false too — the walk would emit a plausible
+    /// but meaningless `exp(N(mean, sigma))` level series. NaN bases are
+    /// reachable: the evaluator stores non-finite formula results and
+    /// `determine_base_value` hands them to the forecast.
+    #[test]
+    fn lognormal_rejects_non_finite_base_value() {
+        let periods = vec![PeriodId::quarter(2025, 1)];
+        let err = lognormal_forecast(f64::NAN, &periods, &lognormal_params())
+            .expect_err("NaN base must be rejected, not treated as a zero base");
+        assert!(
+            err.to_string().contains("finite"),
+            "error should flag the non-finite base: {err}"
+        );
+    }
+
+    /// The correlated path must reject a negative base exactly like the
+    /// independent path. Previously it rejected only non-finite bases, so a
+    /// negative base (e.g. an EBITDA loss as the last actual) silently
+    /// switched regime to the i.i.d. fallback and produced positive levels
+    /// disconnected from the base — with no diagnostic across every MC path.
+    #[test]
+    fn correlated_lognormal_rejects_negative_base_like_independent_path() {
+        let periods = vec![PeriodId::quarter(2025, 1)];
+        let params = lognormal_params();
+
+        // The independent path is the reference behaviour.
+        let independent_err = lognormal_forecast(-5.0, &periods, &params)
+            .expect_err("independent path must reject a negative base");
+
+        let mut cache: IndexMap<NodeId, IndexMap<PeriodId, f64>> = IndexMap::new();
+        cache
+            .entry(NodeId::new("peer"))
+            .or_default()
+            .insert(periods[0], 0.5);
+
+        let correlated_err = monte_carlo_correlated_series(CorrelatedMonteCarloSeries {
+            method: ForecastMethod::LogNormal,
+            params: &params,
+            base_value: -5.0,
+            forecast_periods: &periods,
+            seed_offset: 1,
+            node_id: "node",
+            peer_id: "peer",
+            rho: 0.5,
+            mc_z_cache: &cache,
+        })
+        .expect_err("correlated path must reject a negative base like the independent path");
+
+        for err in [&independent_err, &correlated_err] {
+            assert!(
+                err.to_string().contains("negative") || err.to_string().contains("non-negative"),
+                "both paths should reject a negative base for the same reason: {err}"
+            );
+        }
+    }
+
+    /// The correlated path must also reject a non-finite base.
+    #[test]
+    fn correlated_lognormal_rejects_non_finite_base() {
+        let periods = vec![PeriodId::quarter(2025, 1)];
+        let params = lognormal_params();
+
+        let mut cache: IndexMap<NodeId, IndexMap<PeriodId, f64>> = IndexMap::new();
+        cache
+            .entry(NodeId::new("peer"))
+            .or_default()
+            .insert(periods[0], 0.5);
+
+        let err = monte_carlo_correlated_series(CorrelatedMonteCarloSeries {
+            method: ForecastMethod::LogNormal,
+            params: &params,
+            base_value: f64::NAN,
+            forecast_periods: &periods,
+            seed_offset: 1,
+            node_id: "node",
+            peer_id: "peer",
+            rho: 0.5,
+            mc_z_cache: &cache,
+        })
+        .expect_err("correlated path must reject a non-finite base");
+        assert!(
+            err.to_string().contains("finite"),
+            "error should flag the non-finite base: {err}"
+        );
+    }
+
+    /// Z-score recording must apply the same guard: it inverts the generating
+    /// recurrence, so an invalid base means the recorded shocks are garbage
+    /// that would silently propagate into every correlated peer.
+    #[test]
+    fn z_score_recording_rejects_invalid_lognormal_base() {
+        let periods = vec![PeriodId::quarter(2025, 1)];
+        let params = lognormal_params();
+        let mut values = IndexMap::new();
+        values.insert(periods[0], 100.0);
+        let mut cache: IndexMap<NodeId, IndexMap<PeriodId, f64>> = IndexMap::new();
+
+        let err = record_independent_z_scores_for_mc(
+            ForecastMethod::LogNormal,
+            &params,
+            &periods,
+            &values,
+            -5.0,
+            &NodeId::new("node"),
+            &mut cache,
+        )
+        .expect_err("z-score recording must reject a negative LogNormal base");
+        assert!(
+            err.to_string().contains("negative") || err.to_string().contains("non-negative"),
+            "error should flag the negative base: {err}"
+        );
     }
 
     #[test]

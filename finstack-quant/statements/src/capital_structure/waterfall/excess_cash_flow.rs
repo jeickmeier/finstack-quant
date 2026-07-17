@@ -100,7 +100,9 @@ pub(super) fn calculate_ecf_sweep(
     let sweep_amount = ecf * ecf_spec.sweep_percentage;
     let currency = base_currency(contractual_flows)?;
 
-    Ok(Money::new(sweep_amount.max(0.0), currency))
+    // Every ECF input is finite (`eval_value_or_formula` enforces it), but the
+    // arithmetic above can still overflow `Decimal`'s range on extreme inputs.
+    super::money_from_expr(sweep_amount.max(0.0), currency, &ecf_spec.ebitda_node)
 }
 
 /// Get base currency from contractual flows (assumes all same currency).

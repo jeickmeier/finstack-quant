@@ -1,7 +1,7 @@
 //! Types for EBITDA Normalization & Adjustments.
 
 use finstack_quant_core::dates::PeriodId;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 
 /// Configuration for normalizing a financial metric (e.g., EBITDA).
@@ -157,6 +157,36 @@ impl NormalizationConfig {
         }
         self.adjustments.push(adjustment);
         Ok(self)
+    }
+
+    /// Check that the configuration holds no duplicate adjustment IDs.
+    ///
+    /// [`add_adjustment`](Self::add_adjustment) enforces this while building,
+    /// but a config can also arrive fully-formed from JSON, where the derived
+    /// `Deserialize` performs no such check. Since the normalization engine
+    /// applies every entry unconditionally, a duplicated add-back would be
+    /// silently counted twice and report a wrong adjusted value. This is
+    /// called by [`NormalizationEngine::normalize`], so every path is covered;
+    /// call it directly to reject a bad config earlier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error naming the first adjustment ID that appears more than
+    /// once.
+    ///
+    /// [`NormalizationEngine::normalize`]: crate::adjustments::NormalizationEngine::normalize
+    pub fn validate(&self) -> crate::error::Result<()> {
+        let mut seen: IndexSet<&str> = IndexSet::with_capacity(self.adjustments.len());
+        for adjustment in &self.adjustments {
+            if !seen.insert(adjustment.id.as_str()) {
+                return Err(crate::error::Error::invalid_input(format!(
+                    "Duplicate adjustment ID '{}' — each adjustment must have a unique id. \
+                     Applying both would double-count the adjustment.",
+                    adjustment.id
+                )));
+            }
+        }
+        Ok(())
     }
 }
 

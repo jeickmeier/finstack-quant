@@ -26,6 +26,11 @@ impl NormalizationEngine {
         )
         .entered();
 
+        // A config can arrive from JSON, which bypasses `add_adjustment`'s
+        // duplicate guard. Every adjustment below is applied unconditionally,
+        // so an unchecked duplicate would silently double-count.
+        config.validate()?;
+
         let mut normalization_results = Vec::new();
 
         // Get the target node values
@@ -204,6 +209,55 @@ mod tests {
         results.nodes.insert("Revenue".to_string(), revenue);
 
         results
+    }
+
+    /// Duplicate adjustment IDs arriving via JSON must be rejected.
+    ///
+    /// `NormalizationConfig::add_adjustment` guards against duplicates to
+    /// prevent accidental double-counting, but the derived `Deserialize` did
+    /// not, and the engine applies every entry unconditionally. That let
+    /// valid-looking JSON double-count an add-back and report a wrong adjusted
+    /// EBITDA — an accounting-grade output.
+    #[test]
+    fn duplicate_adjustment_ids_from_json_are_rejected() {
+        let json = r#"{
+            "target_node": "EBITDA",
+            "adjustments": [
+                {"id": "addback1", "name": "Synergies",
+                 "value": {"type": "fixed", "amounts": {"2025Q1": 10.0}}},
+                {"id": "addback1", "name": "Synergies (duplicate)",
+                 "value": {"type": "fixed", "amounts": {"2025Q1": 10.0}}}
+            ]
+        }"#;
+        let config: NormalizationConfig =
+            serde_json::from_str(json).expect("document is structurally valid JSON");
+
+        let results = mock_results();
+        let err = NormalizationEngine::normalize(&results, &config)
+            .expect_err("duplicate adjustment ids must be rejected, not double-counted");
+        assert!(
+            err.to_string().contains("Duplicate adjustment ID"),
+            "expected a duplicate-id diagnostic, got: {err}"
+        );
+    }
+
+    /// The builder guard and the JSON path must agree.
+    #[test]
+    fn add_adjustment_and_validate_agree_on_duplicates() {
+        let mut amounts = IndexMap::new();
+        amounts.insert(PeriodId::quarter(2025, 1), 10.0);
+
+        let config = NormalizationConfig::new("EBITDA")
+            .add_adjustment(Adjustment::fixed("a", "A", amounts.clone()))
+            .expect("first add succeeds");
+        assert!(
+            config
+                .clone()
+                .add_adjustment(Adjustment::fixed("a", "A dup", amounts))
+                .is_err(),
+            "builder must reject a duplicate id"
+        );
+        config.validate().expect("a unique-id config is valid");
     }
 
     #[test]
