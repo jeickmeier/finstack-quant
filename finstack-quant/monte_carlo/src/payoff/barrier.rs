@@ -170,15 +170,10 @@ impl BarrierOptionPayoff {
 
     /// Check if option is active based on barrier status.
     fn is_active(&self) -> bool {
-        match self.barrier_type {
-            BarrierType::UpAndOut | BarrierType::DownAndOut => {
-                // Knock-out: active if barrier NOT hit
-                !self.barrier_hit
-            }
-            BarrierType::UpAndIn | BarrierType::DownAndIn => {
-                // Knock-in: active if barrier WAS hit
-                self.barrier_hit
-            }
+        if self.barrier_type.is_knock_out() {
+            !self.barrier_hit
+        } else {
+            self.barrier_hit
         }
     }
 }
@@ -313,6 +308,47 @@ mod tests {
         state.set(state_keys::SPOT, spot);
         state.set_uniform_random(uniform_random);
         state
+    }
+
+    fn barrier_hit_at_initial_spot(barrier_type: BarrierType, spot: f64) -> bool {
+        let grid = TimeGrid::uniform(1.0, 1).expect("grid should build");
+        let mut payoff = BarrierOptionPayoff::new(
+            100.0,
+            100.0,
+            barrier_type,
+            OptionKind::Call,
+            None,
+            1.0,
+            1,
+            0.2,
+            &grid,
+            false,
+        );
+        payoff.on_event(&mut create_path_state(0, 0.0, spot, 0.5));
+        payoff.barrier_hit
+    }
+
+    #[test]
+    fn barrier_type_serde_uses_canonical_output_and_accepts_legacy_mc_input() {
+        let barrier_type: BarrierType =
+            serde_json::from_str("\"UpAndOut\"").expect("legacy MC spelling should deserialize");
+        assert_eq!(barrier_type, BarrierType::UpAndOut);
+        assert_eq!(
+            serde_json::to_string(&barrier_type).expect("barrier type should serialize"),
+            "\"up_and_out\""
+        );
+    }
+
+    #[test]
+    fn initial_barrier_touch_uses_non_strict_inequalities_for_all_variants() {
+        for barrier_type in [BarrierType::UpAndOut, BarrierType::UpAndIn] {
+            assert!(barrier_hit_at_initial_spot(barrier_type, 100.0));
+            assert!(!barrier_hit_at_initial_spot(barrier_type, 99.99));
+        }
+        for barrier_type in [BarrierType::DownAndOut, BarrierType::DownAndIn] {
+            assert!(barrier_hit_at_initial_spot(barrier_type, 100.0));
+            assert!(!barrier_hit_at_initial_spot(barrier_type, 100.01));
+        }
     }
 
     /// At-hit knock-out rebates are compounded forward from the hit time τ

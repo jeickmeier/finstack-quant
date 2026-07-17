@@ -2,9 +2,9 @@
 
 use crate::instruments::rates::deposit::Deposit;
 use crate::instruments::rates::fra::ForwardRateAgreement;
-use crate::instruments::rates::ir_future::{FutureContractSpecs, InterestRateFuture, Position};
+use crate::instruments::rates::ir_future::{FutureContractSpecs, InterestRateFuture};
 use crate::instruments::rates::irs::{InterestRateSwap, IrsLegConventions};
-use crate::instruments::Instrument;
+use crate::instruments::{Instrument, Position};
 use crate::market::build::helpers::{resolve_calendar, resolve_spot_date};
 use crate::market::conventions::defs::{RateIndexConventions, RateIndexKind};
 use crate::market::conventions::registry::ConventionRegistry;

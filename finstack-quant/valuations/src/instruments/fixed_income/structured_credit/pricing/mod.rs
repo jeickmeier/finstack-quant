@@ -33,8 +33,11 @@ pub fn run_simulation(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<HashMap<String, TrancheCashflows>> {
+    let lifecycle =
+        crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)?;
+    let effective_as_of = lifecycle.effective_as_of(context, as_of);
     let mut source = DeterministicPoolFlowSource;
-    simulation_engine::run_simulation_with_source(instrument, context, as_of, &mut source)
+    simulation_engine::run_simulation_with_source(instrument, context, effective_as_of, &mut source)
 }
 
 /// Generate aggregated deterministic cashflows for all tranches.

@@ -26,7 +26,7 @@ pub(crate) struct Severity01Calculator;
 
 impl MetricCalculator for Severity01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument: &StructuredCredit = context.instrument_as()?;
+        let instrument = context.instrument_as::<StructuredCredit>()?.clone();
         let as_of = context.as_of;
 
         use crate::cashflow::builder::RecoveryModelSpec;
@@ -52,12 +52,12 @@ impl MetricCalculator for Severity01Calculator {
         // Calculate up scenario (lower recovery = higher severity)
         let mut inst_up = instrument.clone();
         inst_up.credit_model.recovery_spec = recovery_up;
-        let pv_up = inst_up.price(context.curves.as_ref(), as_of)?.amount();
+        let pv_up = context.reprice_instrument_raw(&inst_up, context.curves.as_ref(), as_of)?;
 
         // Calculate down scenario (higher recovery = lower severity)
-        let mut inst_down = instrument.clone();
+        let mut inst_down = instrument;
         inst_down.credit_model.recovery_spec = recovery_down;
-        let pv_down = inst_down.price(context.curves.as_ref(), as_of)?.amount();
+        let pv_down = context.reprice_instrument_raw(&inst_down, context.curves.as_ref(), as_of)?;
 
         // Severity01 = (PV_up - PV_down) / achieved_bump
         // PV_up is with lower recovery (higher severity)

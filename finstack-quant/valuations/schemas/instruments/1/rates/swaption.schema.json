@@ -653,6 +653,11 @@
                     "required": [
                       "forward_curve_id"
                     ]
+                  },
+                  {
+                    "required": [
+                      "calendar_id"
+                    ]
                   }
                 ]
               },
@@ -663,50 +668,16 @@
               "title": "Canonical leg underlier"
             },
             {
-              "anyOf": [
-                {
-                  "required": [
-                    "strike"
-                  ]
-                },
-                {
-                  "required": [
-                    "swap_start"
-                  ]
-                },
-                {
-                  "required": [
-                    "swap_end"
-                  ]
-                },
-                {
-                  "required": [
-                    "fixed_freq"
-                  ]
-                },
-                {
-                  "required": [
-                    "float_freq"
-                  ]
-                },
-                {
-                  "required": [
-                    "day_count"
-                  ]
-                },
-                {
-                  "required": [
-                    "discount_curve_id"
-                  ]
-                },
-                {
-                  "required": [
-                    "forward_curve_id"
-                  ]
-                }
-              ],
-              "description": "Compatibility representation containing complete legs and matching legacy scalar fields.",
+              "description": "Compatibility representation containing complete legs and the complete matching legacy scalar underlier.",
               "required": [
+                "strike",
+                "swap_start",
+                "swap_end",
+                "fixed_freq",
+                "float_freq",
+                "day_count",
+                "discount_curve_id",
+                "forward_curve_id",
                 "underlying_fixed_leg",
                 "underlying_float_leg"
               ],

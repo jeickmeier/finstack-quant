@@ -14,7 +14,6 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
-use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -22,14 +21,15 @@ use finstack_quant_monte_carlo::process::lmm::LmmParams;
 
 /// Bermudan swaption pricer using LMM/BGM Monte Carlo with LSMC exercise.
 ///
-/// Builds [`LmmParams`] from the swaption's underlying swap schedule and
-/// market discount curve, then delegates to [`price_bermudan_lmm`] for
+/// Builds [`LmmParams`] from the swaption's canonical underlying fixed-leg
+/// schedule and projection/discount curves, then delegates to [`price_bermudan_lmm`] for
 /// LSMC-based Bermudan exercise valuation.
 ///
 /// # Parameter Construction
 ///
-/// Forward rates are bootstrapped from the discount curve at the swap's
-/// fixed-leg tenor schedule.  A flat 2-factor loading structure is used
+/// Forward rates come from the floating leg's projection curve when it differs
+/// from the discount curve; single-curve instruments use discount-implied
+/// forwards. A flat 2-factor loading structure is used
 /// (a linear-decay proxy for the first two principal components of the
 /// forward-rate correlation matrix). The *shape* of the loadings is fixed,
 /// but their overall scale (`base_vol`) is **calibrated** to the swaption
@@ -57,10 +57,11 @@ impl BermudanSwaptionLmmPricer {
         Self { config }
     }
 
-    /// Build LMM parameters from a Bermudan swaption and its discount curve.
+    /// Build LMM parameters from a Bermudan swaption and its market curves.
     ///
-    /// Constructs the tenor schedule from the fixed-leg frequency, bootstraps
-    /// forward rates from discount factors, and applies a flat 2-factor
+    /// Constructs the tenor schedule from the complete fixed-leg specification,
+    /// obtains forwards from the floating leg's projection role (or discount
+    /// factors for a single-curve instrument), and applies a flat 2-factor
     /// loading structure with linear decay. The loading *scale* (`base_vol`)
     /// is calibrated via the Rebonato shape factor so the LMM reprices the
     /// longest co-terminal European swaption of the Bermudan's exercise
@@ -81,30 +82,21 @@ impl BermudanSwaptionLmmPricer {
         .map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
-        // Build the underlying tenor schedule with calendar-month arithmetic.
-        // Incrementing a floating year fraction drifts on irregular months and
-        // cannot represent non-month tenors faithfully.
-        let mut tenor_dates = vec![swaption.get_swap_start()];
-        let mut current = swaption.get_swap_start();
-        while current < swaption.get_swap_end() {
-            let next = swaption
-                .get_fixed_freq()
-                .add_to_date(current, None, BusinessDayConvention::Unadjusted)
-                .map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        format!("LMM tenor schedule construction failed: {e}"),
-                        PricingErrorContext::default(),
-                    )
-                })?;
-            if next <= current {
-                return Err(PricingError::model_failure_with_context(
-                    "LMM fixed-leg frequency must advance the tenor schedule".to_string(),
-                    PricingErrorContext::default(),
-                ));
-            }
-            current = next.min(swaption.get_swap_end());
-            tenor_dates.push(current);
-        }
+        let periods = swaption.fixed_schedule_periods().map_err(|e| {
+            PricingError::model_failure_with_context(
+                format!("LMM tenor schedule construction failed: {e}"),
+                PricingErrorContext::default(),
+            )
+        })?;
+        let Some(first_period) = periods.first() else {
+            return Err(PricingError::model_failure_with_context(
+                "LMM requires at least one fixed-leg schedule period".to_string(),
+                PricingErrorContext::default(),
+            ));
+        };
+        let mut tenor_dates = Vec::with_capacity(periods.len() + 1);
+        tenor_dates.push(first_period.accrual_start);
+        tenor_dates.extend(periods.iter().map(|period| period.accrual_end));
 
         let tenors: Vec<f64> = tenor_dates
             .iter()
@@ -125,53 +117,83 @@ impl BermudanSwaptionLmmPricer {
             ));
         }
 
-        // Contractual accrual factors may differ from model-time differences.
-        let accrual_factors: Vec<f64> = tenor_dates
-            .windows(2)
-            .map(|dates| year_fraction(swaption.get_day_count(), dates[0], dates[1]))
-            .collect::<finstack_quant_core::Result<Vec<_>>>()
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        // Contractual accruals come from the canonical fixed-leg schedule and
+        // therefore retain its day count, stubs, EOM rule, and calendar policy.
+        let accrual_factors = periods
+            .iter()
+            .map(|period| period.accrual_year_fraction)
+            .collect::<Vec<_>>();
 
-        // Bootstrap forward rates from discount factors:
-        //   F_i = (DF(T_i) / DF(T_{i+1}) - 1) / tau_i
+        let projection = if swaption.get_forward_curve_id() == swaption.get_discount_curve_id() {
+            None
+        } else {
+            Some(
+                market
+                    .get_forward(swaption.get_forward_curve_id().as_ref())
+                    .map_err(|e| {
+                        PricingError::missing_market_data_with_context(
+                            e.to_string(),
+                            PricingErrorContext::default(),
+                        )
+                    })?,
+            )
+        };
+
+        // Initialize each LMM tenor forward from its canonical market role.
         let mut initial_forwards: Vec<f64> = Vec::with_capacity(num_forwards);
         for i in 0..num_forwards {
-            let df_start = disc.df_between_dates(as_of, tenor_dates[i]).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
+            let tau = accrual_factors[i];
+            if !tau.is_finite() || tau <= 0.0 {
+                return Err(PricingError::model_failure_with_context(
+                    format!("LMM schedule has invalid accrual in period {i}: {tau}"),
                     PricingErrorContext::default(),
+                ));
+            }
+            let fwd = if let Some(projection) = projection.as_deref() {
+                crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+                    projection,
+                    tenor_dates[i],
+                    tenor_dates[i + 1],
                 )
-            })?;
-            let df_end = disc
-                .df_between_dates(as_of, tenor_dates[i + 1])
                 .map_err(|e| {
                     PricingError::model_failure_with_context(
                         e.to_string(),
                         PricingErrorContext::default(),
                     )
+                })?
+            } else {
+                let df_start = disc.df_between_dates(as_of, tenor_dates[i]).map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        e.to_string(),
+                        PricingErrorContext::default(),
+                    )
                 })?;
-            let tau = accrual_factors[i];
-            if !df_start.is_finite()
-                || !df_end.is_finite()
-                || df_start <= 0.0
-                || df_end <= 0.0
-                || !tau.is_finite()
-                || tau <= 0.0
-            {
+                let df_end = disc
+                    .df_between_dates(as_of, tenor_dates[i + 1])
+                    .map_err(|e| {
+                        PricingError::model_failure_with_context(
+                            e.to_string(),
+                            PricingErrorContext::default(),
+                        )
+                    })?;
+                if !df_start.is_finite() || !df_end.is_finite() || df_start <= 0.0 || df_end <= 0.0
+                {
+                    return Err(PricingError::model_failure_with_context(
+                        format!(
+                            "LMM forward bootstrap has invalid discount factors in period {i}: \
+                             df_start={df_start}, df_end={df_end}"
+                        ),
+                        PricingErrorContext::default(),
+                    ));
+                }
+                (df_start / df_end - 1.0) / tau
+            };
+            if !fwd.is_finite() {
                 return Err(PricingError::model_failure_with_context(
-                    format!(
-                        "LMM forward bootstrap has invalid inputs in period {i}: \
-                         df_start={df_start}, df_end={df_end}, accrual={tau}"
-                    ),
+                    format!("LMM forward initialization is non-finite in period {i}: {fwd}"),
                     PricingErrorContext::default(),
                 ));
             }
-            let fwd = (df_start / df_end - 1.0) / tau;
             initial_forwards.push(fwd);
         }
 
@@ -509,10 +531,11 @@ mod tests {
     use crate::calibration::targets::lmm::{rebonato_shape_factor, CoTerminalSlice};
     use crate::instruments::rates::swaption::types::BermudanSchedule;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, Tenor};
+    use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
     use finstack_quant_core::market_data::surfaces::VolSurface;
-    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::CurveId;
     use time::Month;
 
     const SURFACE_VOL: f64 = 0.22;
@@ -595,6 +618,67 @@ mod tests {
         let first_ex = swaption.first_exercise().expect("first exercise");
         let ex_yf = year_fraction(swaption.get_day_count(), as_of, first_ex).expect("yf");
         params.tenors[..params.num_forwards].partition_point(|&t| t < ex_yf)
+    }
+
+    #[test]
+    fn lmm_params_use_canonical_fixed_leg_schedule() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("date");
+        let market = build_market(as_of);
+        let mut swaption = build_bermudan(as_of);
+        swaption.underlying_fixed_leg.frequency = Tenor::annual();
+        swaption.underlying_fixed_leg.day_count = DayCount::Act365F;
+        swaption.underlying_fixed_leg.bdc = BusinessDayConvention::Preceding;
+        swaption.underlying_fixed_leg.stub = StubKind::ShortBack;
+        swaption.underlying_fixed_leg.calendar_id =
+            Some(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string());
+        swaption.underlying_fixed_leg.end_of_month = true;
+        let expected = swaption
+            .fixed_schedule_periods()
+            .expect("canonical fixed schedule");
+        let disc = market.get_discount("USD-OIS").expect("discount");
+
+        let params =
+            BermudanSwaptionLmmPricer::build_lmm_params(&swaption, disc.as_ref(), &market, as_of)
+                .expect("build params");
+
+        assert_eq!(params.num_forwards, expected.len());
+        assert_eq!(
+            params.accrual_factors,
+            expected
+                .iter()
+                .map(|period| period.accrual_year_fraction)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn lmm_params_use_floating_leg_projection_curve_role() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("date");
+        let projection = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+            .base_date(as_of)
+            .knots([(0.0, 0.07), (12.0, 0.07)])
+            .build()
+            .expect("projection curve");
+        let market = build_market(as_of).insert(projection);
+        let mut swaption = build_bermudan(as_of);
+        swaption.underlying_float_leg.forward_curve_id = CurveId::new("USD-SOFR-3M");
+        let periods = swaption
+            .fixed_schedule_periods()
+            .expect("canonical fixed schedule");
+        let projection = market.get_forward("USD-SOFR-3M").expect("projection curve");
+        let expected_first = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+            projection.as_ref(),
+            periods[0].accrual_start,
+            periods[0].accrual_end,
+        )
+        .expect("projected first forward");
+        let disc = market.get_discount("USD-OIS").expect("discount");
+
+        let params =
+            BermudanSwaptionLmmPricer::build_lmm_params(&swaption, disc.as_ref(), &market, as_of)
+                .expect("build params");
+
+        assert!((params.initial_forwards[0] - expected_first).abs() < 1.0e-14);
     }
 
     /// W-17 verification: the calibrated LMM Bermudan reprices the input

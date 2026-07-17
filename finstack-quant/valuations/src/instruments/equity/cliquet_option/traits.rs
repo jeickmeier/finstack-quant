@@ -3,7 +3,6 @@
 use crate::instruments::equity::cliquet_option::CliquetOption;
 use crate::metrics::HasExpiry;
 
-crate::impl_equity_exotic_traits!(@mc_overrides CliquetOption);
 crate::impl_equity_exotic_traits!(@mc_daycount CliquetOption);
 
 impl HasExpiry for CliquetOption {

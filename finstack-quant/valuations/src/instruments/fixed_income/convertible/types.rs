@@ -689,20 +689,6 @@ impl ConvertibleBond {
         let greeks = self.greeks(curves, None, None, as_of)?;
         Ok(greeks.theta)
     }
-
-    fn vol_surface_dependency_ids(&self) -> Vec<String> {
-        let mut ids = Vec::new();
-        if let Some(id) = self.attributes.get_meta("vol_surface_id") {
-            ids.push(id.to_string());
-        }
-        if let Some(underlying_id) = &self.underlying_equity_id {
-            ids.push(format!("{underlying_id}-VOL"));
-            if let Some(stripped) = underlying_id.strip_suffix("-SPOT") {
-                ids.push(format!("{stripped}-VOL"));
-            }
-        }
-        ids
-    }
 }
 
 impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
@@ -723,7 +709,9 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
         }
         if let Some(floating_coupon) = &self.floating_coupon {
             deps.add_forward_curve(floating_coupon.rate_spec.index_id.clone());
-            deps.add_series_id(floating_coupon.rate_spec.index_id.as_str());
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                floating_coupon.rate_spec.index_id.as_str(),
+            ));
         }
         if let Some(call_put) = &self.call_put {
             for option in call_put.calls.iter().chain(&call_put.puts) {
@@ -739,7 +727,13 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
                 .effective_conversion_ratio()
                 .filter(|ratio| *ratio > 0.0)
                 .map(|ratio| self.notional.amount() / ratio);
-            for vol_surface_id in self.vol_surface_dependency_ids() {
+            for dividend_yield_id in super::market_inputs::dividend_yield_candidate_ids(self)? {
+                deps.add_spot_id(dividend_yield_id);
+            }
+            for vol_surface_id in super::market_inputs::volatility_candidate_ids(self)? {
+                // Convertible volatility may be supplied either as a unitless
+                // MarketScalar or as a full surface under the same candidate ID.
+                deps.add_spot_id(vol_surface_id.clone());
                 deps.add_volatility_dependency(VolatilityDependency::new(
                     vol_surface_id,
                     Some(price_id.clone()),
@@ -813,6 +807,58 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
 mod tests {
     use super::*;
     use crate::cashflow::CashflowProvider;
+
+    #[test]
+    fn market_dependencies_cover_convertible_equity_input_fallbacks() {
+        let mut bond = ConvertibleBond::example().expect("example");
+        bond.attributes
+            .meta
+            .insert("vol_surface_id".to_string(), "TECH-CUSTOM-VOL".to_string());
+
+        let dividend_ids = super::super::market_inputs::dividend_yield_candidate_ids(&bond)
+            .expect("dividend candidates");
+        let volatility_ids = super::super::market_inputs::volatility_candidate_ids(&bond)
+            .expect("volatility candidates");
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&bond).expect("dependencies");
+
+        assert!(deps
+            .spot_ids
+            .contains(bond.underlying_equity_id.as_ref().expect("underlying")));
+        assert!(dividend_ids.iter().all(|id| deps.spot_ids.contains(id)));
+        assert!(volatility_ids.iter().all(|id| deps.spot_ids.contains(id)));
+        assert_eq!(
+            deps.volatility_dependencies
+                .iter()
+                .map(|dependency| dependency.surface_id.as_str())
+                .collect::<Vec<_>>(),
+            volatility_ids
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn floating_convertible_uses_the_canonical_fixing_series_id() {
+        let mut bond = ConvertibleBond::example().expect("example");
+        let floating_bond = crate::instruments::fixed_income::bond::Bond::example_floating()
+            .expect("floating bond example");
+        let crate::instruments::fixed_income::bond::CashflowSpec::Floating(floating_coupon) =
+            floating_bond.cashflow_spec
+        else {
+            unreachable!("floating example must have a floating coupon")
+        };
+        let expected = finstack_quant_core::market_data::fixings::fixing_series_id(
+            floating_coupon.rate_spec.index_id.as_str(),
+        );
+        bond.fixed_coupon = None;
+        bond.floating_coupon = Some(floating_coupon);
+
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&bond).expect("dependencies");
+        assert!(deps.series_ids.contains(&expected));
+    }
 
     #[test]
     fn test_cashflow_provider_matches_convertible_schedule_builder() {

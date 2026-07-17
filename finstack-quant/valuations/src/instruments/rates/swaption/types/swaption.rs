@@ -10,8 +10,7 @@ use crate::instruments::rates::irs::{
 use crate::models::SABRModel;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar_by_id, BusinessDayConvention, Date, DayCount, HolidayCalendar, StubKind, Tenor,
-    WEEKENDS_ONLY,
+    BusinessDayConvention, Date, DayCount, HolidayCalendar, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -134,6 +133,69 @@ pub(super) struct LegacySwaptionUnderlier {
     pub calendar_id: Option<CalendarId>,
 }
 
+impl LegacySwaptionUnderlier {
+    fn is_empty(&self) -> bool {
+        self.strike.is_none()
+            && self.swap_start.is_none()
+            && self.swap_end.is_none()
+            && self.fixed_freq.is_none()
+            && self.float_freq.is_none()
+            && self.day_count.is_none()
+            && self.discount_curve_id.is_none()
+            && self.forward_curve_id.is_none()
+            && self.calendar_id.is_none()
+    }
+
+    fn require_complete(&self) -> Result<()> {
+        for (name, present) in [
+            ("strike", self.strike.is_some()),
+            ("swap_start", self.swap_start.is_some()),
+            ("swap_end", self.swap_end.is_some()),
+            ("fixed_freq", self.fixed_freq.is_some()),
+            ("float_freq", self.float_freq.is_some()),
+            ("day_count", self.day_count.is_some()),
+            ("discount_curve_id", self.discount_curve_id.is_some()),
+            ("forward_curve_id", self.forward_curve_id.is_some()),
+        ] {
+            if !present {
+                return Err(missing_legacy_field(name));
+            }
+        }
+        Ok(())
+    }
+
+    fn to_vanilla(&self) -> Result<VanillaSwaptionUnderlier> {
+        self.require_complete()?;
+        Ok(VanillaSwaptionUnderlier {
+            strike: self.strike.ok_or_else(|| missing_legacy_field("strike"))?,
+            swap_start: self
+                .swap_start
+                .ok_or_else(|| missing_legacy_field("swap_start"))?,
+            swap_end: self
+                .swap_end
+                .ok_or_else(|| missing_legacy_field("swap_end"))?,
+            fixed_freq: self
+                .fixed_freq
+                .ok_or_else(|| missing_legacy_field("fixed_freq"))?,
+            float_freq: self
+                .float_freq
+                .ok_or_else(|| missing_legacy_field("float_freq"))?,
+            day_count: self
+                .day_count
+                .ok_or_else(|| missing_legacy_field("day_count"))?,
+            discount_curve_id: self
+                .discount_curve_id
+                .clone()
+                .ok_or_else(|| missing_legacy_field("discount_curve_id"))?,
+            forward_curve_id: self
+                .forward_curve_id
+                .clone()
+                .ok_or_else(|| missing_legacy_field("forward_curve_id"))?,
+            calendar_id: self.calendar_id.clone(),
+        })
+    }
+}
+
 fn missing_legacy_field(name: &str) -> Error {
     Error::Validation(format!(
         "legacy swaption underlier requires `{name}` when complete legs are absent"
@@ -200,47 +262,15 @@ pub(super) fn normalize_underlier(
     float: Option<FloatLegSpec>,
     legacy: LegacySwaptionUnderlier,
 ) -> Result<(FixedLegSpec, FloatLegSpec)> {
+    let has_legacy_underlier = !legacy.is_empty();
     let (fixed, float) = match (fixed, float) {
-        (Some(fixed), Some(float)) => (fixed, float),
-        (None, None) => {
-            let strike = legacy
-                .strike
-                .ok_or_else(|| missing_legacy_field("strike"))?;
-            let swap_start = legacy
-                .swap_start
-                .ok_or_else(|| missing_legacy_field("swap_start"))?;
-            let swap_end = legacy
-                .swap_end
-                .ok_or_else(|| missing_legacy_field("swap_end"))?;
-            let fixed_freq = legacy
-                .fixed_freq
-                .ok_or_else(|| missing_legacy_field("fixed_freq"))?;
-            let float_freq = legacy
-                .float_freq
-                .ok_or_else(|| missing_legacy_field("float_freq"))?;
-            let day_count = legacy
-                .day_count
-                .ok_or_else(|| missing_legacy_field("day_count"))?;
-            let discount_curve_id = legacy
-                .discount_curve_id
-                .clone()
-                .ok_or_else(|| missing_legacy_field("discount_curve_id"))?;
-            let forward_curve_id = legacy
-                .forward_curve_id
-                .clone()
-                .ok_or_else(|| missing_legacy_field("forward_curve_id"))?;
-            vanilla_underlier(VanillaSwaptionUnderlier {
-                strike,
-                swap_start,
-                swap_end,
-                fixed_freq,
-                float_freq,
-                day_count,
-                discount_curve_id,
-                forward_curve_id,
-                calendar_id: legacy.calendar_id.clone(),
-            })
+        (Some(fixed), Some(float)) => {
+            if has_legacy_underlier {
+                legacy.require_complete()?;
+            }
+            (fixed, float)
         }
+        (None, None) => vanilla_underlier(legacy.to_vanilla()?),
         _ => {
             return Err(Error::Validation(
                 "swaption underlier must provide both fixed and floating leg specifications"
@@ -317,36 +347,23 @@ pub(super) fn normalize_underlier(
         }
     }
 
-    match (legacy.swap_start, legacy.swap_end) {
-        (Some(start), Some(end)) => {
-            let start_shift = (fixed.start - start).whole_days();
-            let end_shift = (fixed.end - end).whole_days();
-            let shift_matches = if start_shift == 0 && end_shift == 0 {
-                true
-            } else {
-                let calendar = fixed_leg_calendar(&fixed)?;
-                business_day_shift(start, fixed.start, calendar)
-                    .zip(business_day_shift(end, fixed.end, calendar))
-                    .is_some_and(|(start_shift, end_shift)| start_shift == end_shift)
-            };
-            if !shift_matches {
-                return Err(Error::Validation(
-                    "swaption legacy and leg spans must match or share one equal business-day adjustment"
-                        .to_string(),
-                ));
-            }
-        }
-        (Some(start), None) if start != fixed.start => {
+    if let (Some(start), Some(end)) = (legacy.swap_start, legacy.swap_end) {
+        let start_shift = (fixed.start - start).whole_days();
+        let end_shift = (fixed.end - end).whole_days();
+        let shift_matches = if start_shift == 0 && end_shift == 0 {
+            true
+        } else {
+            let calendar = fixed_leg_calendar(&fixed)?;
+            business_day_shift(start, fixed.start, calendar)
+                .zip(business_day_shift(end, fixed.end, calendar))
+                .is_some_and(|(start_shift, end_shift)| start_shift == end_shift)
+        };
+        if !shift_matches {
             return Err(Error::Validation(
-                "swaption legacy swap_start conflicts with leg start".to_string(),
-            ))
+                "swaption legacy and leg spans must match or share one equal business-day adjustment"
+                    .to_string(),
+            ));
         }
-        (None, Some(end)) if end != fixed.end => {
-            return Err(Error::Validation(
-                "swaption legacy swap_end conflicts with leg end".to_string(),
-            ))
-        }
-        _ => {}
     }
 
     Ok((fixed, float))
@@ -370,20 +387,15 @@ fn business_day_shift(from: Date, to: Date, calendar: &dyn HolidayCalendar) -> O
 }
 
 fn fixed_leg_calendar(fixed: &FixedLegSpec) -> Result<&'static dyn HolidayCalendar> {
-    match fixed.calendar_id.as_deref() {
-        Some(calendar_id) => calendar_by_id(calendar_id)
-            .map(|calendar| calendar as &dyn HolidayCalendar)
-            .ok_or_else(|| {
-                Error::Validation(format!(
-                    "swaption fixed-leg calendar `{calendar_id}` is not registered"
-                ))
-            }),
-        None => Ok(&WEEKENDS_ONLY),
-    }
+    let calendar_id = fixed
+        .calendar_id
+        .as_deref()
+        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+    crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)
 }
 
 pub(super) fn underlier_wire_schema(mut schema: schemars::Schema) -> schemars::Schema {
-    let scalar_fields = [
+    let required_scalar_fields = [
         "strike",
         "swap_start",
         "swap_end",
@@ -393,11 +405,16 @@ pub(super) fn underlier_wire_schema(mut schema: schemars::Schema) -> schemars::S
         "discount_curve_id",
         "forward_curve_id",
     ];
-    let scalar_required = scalar_fields
+    let scalar_required = required_scalar_fields
         .iter()
         .map(|field| serde_json::Value::String((*field).to_string()))
         .collect::<Vec<_>>();
-    let any_scalar = scalar_fields
+    let legacy_fields = required_scalar_fields
+        .iter()
+        .copied()
+        .chain(std::iter::once("calendar_id"))
+        .collect::<Vec<_>>();
+    let any_legacy_field = legacy_fields
         .iter()
         .map(|field| serde_json::json!({ "required": [field] }))
         .collect::<Vec<_>>();
@@ -420,15 +437,15 @@ pub(super) fn underlier_wire_schema(mut schema: schemars::Schema) -> schemars::S
                     "title": "Canonical leg underlier",
                     "description": "Canonical representation using complete fixed and floating legs.",
                     "required": legs_required,
-                    "not": { "anyOf": any_scalar }
+                    "not": { "anyOf": any_legacy_field }
                 },
                 {
                     "title": "Mixed compatibility underlier",
-                    "description": "Compatibility representation containing complete legs and matching legacy scalar fields.",
-                    "required": ["underlying_fixed_leg", "underlying_float_leg"],
-                    "anyOf": scalar_fields
+                    "description": "Compatibility representation containing complete legs and the complete matching legacy scalar underlier.",
+                    "required": required_scalar_fields
                         .iter()
-                        .map(|field| serde_json::json!({ "required": [field] }))
+                        .copied()
+                        .chain(["underlying_fixed_leg", "underlying_float_leg"])
                         .collect::<Vec<_>>()
                 }
             ]),
@@ -545,7 +562,7 @@ impl schemars::JsonSchema for Swaption {
 #[cfg(test)]
 mod wire_tests {
     use super::*;
-    use finstack_quant_core::dates::adjust;
+    use finstack_quant_core::dates::{adjust, WEEKENDS_ONLY};
     use serde_json::Value;
     use time::macros::date;
 
@@ -635,6 +652,16 @@ mod wire_tests {
             .expect_err("conflicting strike must be rejected")
             .to_string();
         assert!(conflict_error.contains("strike conflicts"));
+
+        let mut partial_mixed = canonical_and_legacy().0;
+        partial_mixed
+            .as_object_mut()
+            .expect("partial mixed JSON object")
+            .insert("strike".to_string(), serde_json::json!(0.03));
+        let partial_mixed_error = serde_json::from_value::<Swaption>(partial_mixed)
+            .expect_err("mixed input requires the complete legacy underlier")
+            .to_string();
+        assert!(partial_mixed_error.contains("requires `swap_start`"));
     }
 
     #[test]
@@ -689,6 +716,49 @@ mod wire_tests {
     }
 
     #[test]
+    fn shifted_mixed_input_accepts_explicit_weekends_only_calendar() {
+        let mut swaption =
+            Swaption::example().with_calendar(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+        swaption.expiry = date!(2026 - 12 - 31);
+        let legacy_start = date!(2027 - 01 - 02);
+        let legacy_end = legacy_start + time::Duration::days(7 * 260);
+        let adjusted_start = adjust(
+            legacy_start,
+            swaption.underlying_fixed_leg.bdc,
+            &WEEKENDS_ONLY,
+        )
+        .expect("adjusted start");
+        let adjusted_end = adjust(
+            legacy_end,
+            swaption.underlying_fixed_leg.bdc,
+            &WEEKENDS_ONLY,
+        )
+        .expect("adjusted end");
+        swaption.underlying_fixed_leg.start = adjusted_start;
+        swaption.underlying_float_leg.start = adjusted_start;
+        swaption.underlying_fixed_leg.end = adjusted_end;
+        swaption.underlying_float_leg.end = adjusted_end;
+
+        let mut mixed = serde_json::to_value(&swaption).expect("canonical JSON");
+        add_matching_legacy_underlier(&mut mixed);
+        let object = mixed.as_object_mut().expect("mixed JSON object");
+        object.insert(
+            "swap_start".to_string(),
+            serde_json::to_value(legacy_start).expect("legacy start"),
+        );
+        object.insert(
+            "swap_end".to_string(),
+            serde_json::to_value(legacy_end).expect("legacy end"),
+        );
+
+        let normalized: Swaption =
+            serde_json::from_value(mixed).expect("explicit weekends-only calendar");
+        assert_eq!(normalized.get_calendar_id(), Some("weekends_only"));
+        assert_eq!(normalized.get_swap_start(), adjusted_start);
+        assert_eq!(normalized.get_swap_end(), adjusted_end);
+    }
+
+    #[test]
     fn wire_schema_describes_legacy_canonical_and_mixed_forms() {
         let schema = schemars::schema_for!(Swaption);
         let variants = schema
@@ -700,6 +770,23 @@ mod wire_tests {
         assert_eq!(variants[0]["title"], "Legacy scalar underlier");
         assert_eq!(variants[1]["title"], "Canonical leg underlier");
         assert_eq!(variants[2]["title"], "Mixed compatibility underlier");
+        let mixed_required = variants[2]["required"]
+            .as_array()
+            .expect("mixed required fields");
+        for field in [
+            "strike",
+            "swap_start",
+            "swap_end",
+            "fixed_freq",
+            "float_freq",
+            "day_count",
+            "discount_curve_id",
+            "forward_curve_id",
+            "underlying_fixed_leg",
+            "underlying_float_leg",
+        ] {
+            assert!(mixed_required.contains(&Value::String(field.to_string())));
+        }
     }
 }
 
@@ -1019,27 +1106,6 @@ impl Swaption {
         self
     }
 
-    /// Fixed-leg convention used by every pricing path.
-    ///
-    pub(crate) fn underlying_fixed_frequency(&self) -> Tenor {
-        self.underlying_fixed_leg.frequency
-    }
-
-    /// Accrual convention used by every pricing path.
-    pub(crate) fn underlying_day_count(&self) -> DayCount {
-        self.underlying_fixed_leg.day_count
-    }
-
-    /// Discount curve selected by the canonical fixed leg.
-    pub(crate) fn underlying_discount_curve_id(&self) -> &CurveId {
-        &self.underlying_fixed_leg.discount_curve_id
-    }
-
-    /// Forward curve selected by the canonical floating leg.
-    pub(crate) fn underlying_forward_curve_id(&self) -> &CurveId {
-        &self.underlying_float_leg.forward_curve_id
-    }
-
     fn underlying_fixed_leg_with_rate(&self, rate: Decimal) -> FixedLegSpec {
         let mut fixed = self.underlying_fixed_leg.clone();
         fixed.rate = rate;
@@ -1091,7 +1157,7 @@ impl Swaption {
         // the vol-surface tenor axis, so it must be consistent with the rest
         // of the instrument's day-count conventions.
         year_fraction(
-            self.underlying_day_count(),
+            self.get_day_count(),
             self.get_swap_start(),
             self.get_swap_end(),
         )
@@ -1145,7 +1211,7 @@ impl Swaption {
             return Ok(Money::new(0.0, self.notional.currency()));
         }
 
-        let disc = curves.get_discount(self.underlying_discount_curve_id().as_ref())?;
+        let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
         let forward_rate = self.forward_swap_rate(curves, as_of)?;
         let annuity = self.annuity(disc.as_ref(), as_of, forward_rate)?;
         let strike = self.strike_f64()?;
@@ -1391,7 +1457,7 @@ impl Swaption {
     ///
     /// When `forward_rate ≈ 0`, uses L'Hôpital's limit: `A → N/m` (sum of accruals).
     pub fn cash_annuity_par_yield(&self, forward_rate: f64) -> Result<f64> {
-        let fixed_frequency = self.underlying_fixed_frequency();
+        let fixed_frequency = self.get_fixed_freq();
         let freq_per_year = match fixed_frequency.unit() {
             finstack_quant_core::dates::TenorUnit::Months if fixed_frequency.count() > 0 => {
                 12.0 / fixed_frequency.count() as f64
@@ -1416,7 +1482,7 @@ impl Swaption {
             // L'Hopital's limit for S -> 0: A = N/m (sum of accruals)
             // We need number of periods.
             let tenor = year_fraction(
-                self.underlying_day_count(),
+                self.get_day_count(),
                 self.get_swap_start(),
                 self.get_swap_end(),
             )?;
@@ -1425,7 +1491,7 @@ impl Swaption {
         }
 
         let tenor_years = year_fraction(
-            self.underlying_day_count(),
+            self.get_day_count(),
             self.get_swap_start(),
             self.get_swap_end(),
         )?;
@@ -1453,7 +1519,7 @@ impl Swaption {
         use crate::instruments::common_impl::pricing::time::relative_df_discounting;
 
         let tenor = year_fraction(
-            self.underlying_day_count(),
+            self.get_day_count(),
             self.get_swap_start(),
             self.get_swap_end(),
         )?;
@@ -1479,8 +1545,8 @@ impl Swaption {
     /// - PV_float = Σ (accrual_i × forward_i × DF_i)
     /// - Annuity = Σ (accrual_i × DF_i) for all fixed leg payments.
     pub fn forward_swap_rate(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
-        let disc = curves.get_discount(self.underlying_discount_curve_id().as_ref())?;
-        if self.underlying_forward_curve_id() == self.underlying_discount_curve_id() {
+        let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
+        if self.get_forward_curve_id() == self.get_discount_curve_id() {
             return self.single_curve_forward_from_fixed_schedule(disc.as_ref(), as_of);
         }
 
@@ -1617,7 +1683,7 @@ impl Swaption {
     /// `Some(GreekInputs)` containing forward, annuity, sigma, and time to expiry,
     /// or `None` if the option has expired.
     pub fn greek_inputs(&self, curves: &MarketContext, as_of: Date) -> Result<Option<GreekInputs>> {
-        let disc = curves.get_discount(self.underlying_discount_curve_id().as_ref())?;
+        let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
         if as_of >= self.expiry {
             return Ok(None);
         }
@@ -1707,8 +1773,8 @@ impl crate::instruments::common_impl::traits::Instrument for Swaption {
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
-        deps.add_discount_curve(self.underlying_discount_curve_id().clone());
-        deps.add_forward_curve(self.underlying_forward_curve_id().clone());
+        deps.add_discount_curve(self.get_discount_curve_id().clone());
+        deps.add_forward_curve(self.get_forward_curve_id().clone());
         deps.add_volatility_dependency(
             crate::instruments::common_impl::dependencies::VolatilityDependency::new(
                 self.vol_surface_id.clone(),

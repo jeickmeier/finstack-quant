@@ -227,14 +227,8 @@ impl BarrierOptionPdePricer {
 
         let barrier_level = inst.barrier.amount();
         let is_call = matches!(inst.option_type, crate::instruments::OptionType::Call);
-        let is_knock_out = matches!(
-            inst.barrier_type,
-            BarrierType::UpAndOut | BarrierType::DownAndOut
-        );
-        let barrier_is_upper = matches!(
-            inst.barrier_type,
-            BarrierType::UpAndOut | BarrierType::UpAndIn
-        );
+        let is_knock_out = inst.barrier_type.is_knock_out();
+        let barrier_is_upper = inst.barrier_type.is_up();
 
         let ko_inputs = KnockOutPdeInputs {
             spot,

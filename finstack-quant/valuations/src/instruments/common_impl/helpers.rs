@@ -1,11 +1,11 @@
 //! Utilities for instrument pricing and metrics assembly.
 //!
-//! Contains helpers shared across instrument implementations, notably the
-//! function to assemble a `ValuationResult` with computed metrics.
+//! Contains helpers shared across instrument implementations, notably metric
+//! context construction and deterministic measure assembly.
 
 use crate::metrics::risk::MarketHistory;
 use crate::metrics::{standard_registry, MetricContext, MetricId};
-use finstack_quant_core::config::{results_meta_now, FinstackConfig};
+use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::{
     context::MarketContext,
@@ -14,6 +14,44 @@ use finstack_quant_core::market_data::{
 use finstack_quant_core::money::Money;
 use indexmap::IndexMap;
 use std::sync::Arc;
+
+/// Validated pricing boundary shared by direct and registry-backed routes.
+///
+/// Construction performs the only mandatory invariant/override validation
+/// step. Callers may then resolve the effective date, run their chosen model
+/// kernel, and apply the instrument-owned scenario adjustment exactly once.
+pub(crate) struct ValidatedPricingLifecycle<'a, I>
+where
+    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+{
+    instrument: &'a I,
+}
+
+impl<'a, I> ValidatedPricingLifecycle<'a, I>
+where
+    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+{
+    /// Validate the complete instrument pricing boundary.
+    pub(crate) fn new(instrument: &'a I) -> finstack_quant_core::Result<Self> {
+        instrument.validate_for_pricing()?;
+        Ok(Self { instrument })
+    }
+
+    /// Resolve the instrument's effective valuation date after validation.
+    pub(crate) fn effective_as_of(&self, market: &MarketContext, requested: Date) -> Date {
+        self.instrument.resolve_pricing_as_of(market, requested)
+    }
+
+    /// Apply the instrument scenario to a model `Money` result exactly once.
+    pub(crate) fn apply_value(&self, base_value: Money) -> Money {
+        apply_scenario_value(self.instrument, base_value)
+    }
+
+    /// Apply the instrument scenario to a raw model result exactly once.
+    pub(crate) fn apply_raw_value(&self, base_value: f64) -> f64 {
+        apply_scenario_raw_value(self.instrument, base_value)
+    }
+}
 
 /// Apply an instrument's scenario price adjustment to a base present value.
 ///
@@ -27,6 +65,22 @@ where
     instrument
         .get_scenario_pricing_overrides()
         .map_or(base_value, |overrides| overrides.apply_to_value(base_value))
+}
+
+/// Apply an instrument's scenario price adjustment without currency rounding.
+///
+/// This is the raw-f64 counterpart to [`apply_scenario_value`]. Keeping the
+/// multiplier outside `Money` preserves the precision expected by finite-
+/// difference risk calculations.
+#[inline]
+pub(crate) fn apply_scenario_raw_value<I>(instrument: &I, base_value: f64) -> f64
+where
+    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+{
+    instrument
+        .get_scenario_pricing_overrides()
+        .and_then(|overrides| overrides.scenario_price_shock_pct)
+        .map_or(base_value, |shock| base_value * (1.0 + shock))
 }
 
 /// Convert a discount factor to an effective continuously-compounded zero rate.
@@ -384,10 +438,12 @@ pub fn get_unitless_scalar_strict(
     }
 }
 
-/// Shared helper to build a ValuationResult with a set of metrics.
+/// Compute requested metric measures for an already-priced instrument.
 ///
-/// Centralizes the repeated pattern across instruments to compute base value,
-/// build metric context, compute metrics and stamp a result.
+/// The caller owns the `ValuationResult` envelope and passes the final,
+/// scenario-adjusted base value. This helper only builds the metric context and
+/// returns deterministic measures, preventing metric attachment from replacing
+/// model details or metadata.
 ///
 /// This function uses trait objects to avoid generic monomorphization across
 /// compilation units, which can cause coverage metadata mismatches.
@@ -397,7 +453,7 @@ pub fn get_unitless_scalar_strict(
 /// * `instrument` - The instrument to price (wrapped in Arc for efficiency)
 /// * `curves` - Market data context (wrapped in Arc for efficiency)
 /// * `as_of` - Valuation date
-/// * `base_value` - Pre-computed base value (NPV)
+/// * `base_value` - Final scenario-adjusted base value (NPV)
 /// * `metrics` - List of metrics to compute
 /// * `cfg` - Optional FinstackConfig for user-tunable metric defaults (e.g., bump sizes).
 ///   When `None`, uses global defaults.
@@ -426,14 +482,14 @@ pub(crate) struct MetricBuildOptions {
     pub(crate) pricer_registry: Option<Arc<crate::pricer::PricerRegistry>>,
 }
 
-pub(crate) fn build_with_metrics_dyn(
+pub(crate) fn compute_metrics_dyn(
     instrument: Arc<dyn crate::instruments::common_impl::traits::Instrument>,
     curves: Arc<MarketContext>,
     as_of: Date,
     base_value: Money,
     metrics: &[crate::metrics::MetricId],
     options: MetricBuildOptions,
-) -> finstack_quant_core::Result<crate::results::ValuationResult> {
+) -> finstack_quant_core::Result<IndexMap<crate::metrics::MetricId, f64>> {
     let MetricBuildOptions {
         cfg,
         market_history,
@@ -445,7 +501,7 @@ pub(crate) fn build_with_metrics_dyn(
         Arc::clone(&instrument),
         curves,
         as_of,
-        apply_scenario_value(instrument.as_ref(), base_value),
+        base_value,
         finstack_config,
     );
 
@@ -458,7 +514,6 @@ pub(crate) fn build_with_metrics_dyn(
     // Preserve only the subsets consumed by the metric layer.
     context.set_instrument_overrides(instrument.get_instrument_pricing_overrides().cloned());
     context.set_metric_overrides(instrument.get_metric_pricing_overrides().cloned());
-    context.set_scenario_overrides(instrument.get_scenario_pricing_overrides().cloned());
 
     // Allow instruments to pre-seed the metric context with cached data (e.g., pre-computed
     // cashflows) to avoid redundant computation during metric calculation.
@@ -508,15 +563,35 @@ pub(crate) fn build_with_metrics_dyn(
         measures.insert(metric_id.clone(), value);
     }
 
-    let meta = results_meta_now(context.config());
-    let mut result = crate::results::ValuationResult::stamped_with_meta(
-        context.instrument.id(),
+    Ok(measures)
+}
+
+/// Test-only result builder for metric calculator unit fixtures.
+///
+/// Production pricing enriches the model-produced result envelope in the
+/// registry and must not construct a parallel `ValuationResult` here.
+#[cfg(test)]
+pub(crate) fn build_with_metrics_dyn(
+    instrument: Arc<dyn crate::instruments::common_impl::traits::Instrument>,
+    curves: Arc<MarketContext>,
+    as_of: Date,
+    base_value: Money,
+    metrics: &[crate::metrics::MetricId],
+    options: MetricBuildOptions,
+) -> finstack_quant_core::Result<crate::results::ValuationResult> {
+    let cfg = options
+        .cfg
+        .clone()
+        .unwrap_or_else(MetricContext::default_config);
+    let instrument_id = instrument.id().to_string();
+    let measures = compute_metrics_dyn(instrument, curves, as_of, base_value, metrics, options)?;
+    let mut result = crate::results::ValuationResult::stamped_with_config(
+        &instrument_id,
         as_of,
-        context.base_value,
-        meta,
+        base_value,
+        cfg.as_ref(),
     );
     result.measures = measures;
-
     Ok(result)
 }
 
@@ -685,7 +760,7 @@ mod tests {
             metrics: &[MetricId],
             options: crate::instruments::common_impl::traits::PricingOptions,
         ) -> finstack_quant_core::Result<crate::results::ValuationResult> {
-            let base = self.base_value(market, as_of)?;
+            let base = self.value(market, as_of)?;
             build_with_metrics_dyn(
                 Arc::from(self.clone_box()),
                 Arc::new(market.clone()),
@@ -736,8 +811,7 @@ mod tests {
     }
 
     #[test]
-    fn build_with_metrics_applies_scenario_price_shock_to_base_value(
-    ) -> finstack_quant_core::Result<()> {
+    fn metric_result_preserves_scenario_adjusted_base_value() -> finstack_quant_core::Result<()> {
         let mut instrument = StubInstrument::new("STUB-SHOCK");
         instrument.scenario_pricing_overrides = instrument
             .scenario_pricing_overrides

@@ -24,7 +24,8 @@ use finstack_quant_core::{Error, Result};
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::convertible::{
-    market_inputs::resolve_dividend_yield, ConversionEvent, ConversionPolicy, ConvertibleBond,
+    market_inputs::{resolve_dividend_yield, volatility_candidate_ids},
+    ConversionEvent, ConversionPolicy, ConvertibleBond,
 };
 use crate::metrics::bump_discount_curve_parallel;
 use crate::models::trees::tree_framework::map_date_to_step;
@@ -960,14 +961,7 @@ fn extract_equity_state(
     };
 
     // Resolve volatility
-    let mut vol_candidates: Vec<String> = Vec::new();
-    if let Some(id) = bond.attributes.get_meta("vol_surface_id") {
-        vol_candidates.push(id.to_string());
-    }
-    vol_candidates.push(format!("{}-VOL", underlying_id));
-    if let Some(stripped) = underlying_id.strip_suffix("-SPOT") {
-        vol_candidates.push(format!("{}-VOL", stripped));
-    }
+    let vol_candidates = volatility_candidate_ids(bond)?;
     let (volatility, resolved_vol_id) =
         resolve_volatility_with_id(ctx, &vol_candidates, time_to_maturity, spot)?;
 

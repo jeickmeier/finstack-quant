@@ -801,7 +801,6 @@ fn compute_taylor_sensitivities(
     );
     context.set_instrument_overrides(instrument.get_instrument_pricing_overrides().cloned());
     context.set_metric_overrides(instrument.get_metric_pricing_overrides().cloned());
-    context.set_scenario_overrides(instrument.get_scenario_pricing_overrides().cloned());
     context.set_pricer_dispatch(pricing_model, pricer_registry);
 
     let candidate_metrics = [

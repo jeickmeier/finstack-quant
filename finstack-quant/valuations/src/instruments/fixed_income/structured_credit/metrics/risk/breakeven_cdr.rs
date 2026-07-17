@@ -21,6 +21,7 @@
 
 use crate::cashflow::builder::DefaultModelSpec;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
+use crate::instruments::Instrument;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
@@ -59,6 +60,7 @@ pub fn calculate_tranche_breakeven_cdr(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
+    deal.validate_for_pricing()?;
     let writedown = |cdr: f64| -> Result<f64> {
         let mut bumped = deal.clone();
         bumped.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);

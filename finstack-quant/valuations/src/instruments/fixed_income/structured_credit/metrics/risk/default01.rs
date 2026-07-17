@@ -73,7 +73,7 @@ pub(crate) struct Default01Calculator;
 
 impl MetricCalculator for Default01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument: &StructuredCredit = context.instrument_as()?;
+        let instrument = context.instrument_as::<StructuredCredit>()?.clone();
         let as_of = context.as_of;
 
         let (default_up, default_down, achieved_bump) =
@@ -82,12 +82,12 @@ impl MetricCalculator for Default01Calculator {
         // Calculate up scenario
         let mut inst_up = instrument.clone();
         inst_up.credit_model.default_spec = default_up;
-        let pv_up = inst_up.price(context.curves.as_ref(), as_of)?.amount();
+        let pv_up = context.reprice_instrument_raw(&inst_up, context.curves.as_ref(), as_of)?;
 
         // Calculate down scenario
-        let mut inst_down = instrument.clone();
+        let mut inst_down = instrument;
         inst_down.credit_model.default_spec = default_down;
-        let pv_down = inst_down.price(context.curves.as_ref(), as_of)?.amount();
+        let pv_down = context.reprice_instrument_raw(&inst_down, context.curves.as_ref(), as_of)?;
 
         // Near CDR ≈ 0 the down bump clamps and the move becomes one-sided,
         // so divide by the achieved width rather than the nominal 2·bump.

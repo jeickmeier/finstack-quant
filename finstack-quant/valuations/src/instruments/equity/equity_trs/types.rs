@@ -455,7 +455,7 @@ impl crate::instruments::common_impl::traits::Instrument for EquityTotalReturnSw
         deps.add_forward_curve(self.financing.forward_curve_id.clone());
         deps.add_spot_id(self.underlying.spot_id.as_str());
         if let Some(dividend_yield) = &self.underlying.div_yield_id {
-            deps.add_series_id(dividend_yield.as_str());
+            deps.add_spot_id(dividend_yield.as_str());
         }
         Ok(deps)
     }
@@ -572,18 +572,15 @@ mod validation_tests {
             deps.curves.forward_curves.as_slice(),
             std::slice::from_ref(&trs.financing.forward_curve_id)
         );
-        assert_eq!(
-            deps.spot_ids,
-            vec![trs.underlying.spot_id.as_str().to_string()]
-        );
-        assert_eq!(
-            deps.series_ids,
+        let mut expected_spots = vec![trs.underlying.spot_id.as_str().to_string()];
+        expected_spots.extend(
             trs.underlying
                 .div_yield_id
                 .iter()
-                .map(|id| id.as_str().to_string())
-                .collect::<Vec<_>>()
+                .map(|id| id.as_str().to_string()),
         );
+        assert_eq!(deps.spot_ids, expected_spots);
+        assert!(deps.series_ids.is_empty());
     }
 
     #[test]

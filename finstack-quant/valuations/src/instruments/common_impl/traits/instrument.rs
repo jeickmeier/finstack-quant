@@ -44,7 +44,7 @@ use super::pricing_options::PricingOptions;
 /// Instruments should:
 /// - Return unique, stable identifiers from `id()`
 /// - Map to the correct `InstrumentType` variant in `key()`
-/// - Implement efficient `value()` for hot paths (portfolio aggregation)
+/// - Implement efficient `base_value()` kernels for hot paths
 /// - Compute metrics on-demand in `price_with_metrics()`
 /// - Support `clone_box()` for trait object cloning
 ///
@@ -505,15 +505,16 @@ pub trait Instrument: CashflowProvider + Send + Sync {
 
     // === Pricing Methods ===
 
-    /// Compute the present value only (fast path, no metrics).
+    /// Compute the unshocked present-value kernel used by canonical wrappers.
     ///
-    /// This is the performance-optimized method for obtaining just the NPV
-    /// without computing any risk metrics. Use this in hot paths like
-    /// portfolio aggregation where metrics are not needed.
+    /// This low-level extension hook assumes validation and effective-date
+    /// resolution have already completed. Implementations must not apply
+    /// scenario overrides. Public callers should use [`Instrument::value`],
+    /// [`Instrument::value_raw`], or [`Instrument::price_with_metrics`].
     ///
-    /// The returned [`Money`] is the canonical rounded pricing output. Callers
-    /// that need pre-rounding arithmetic for sensitivities should use
-    /// [`Instrument::value_raw`] rather than inferring precision from `Money`.
+    /// The returned [`Money`] is the model's rounded base result before scenario
+    /// application. Callers that need pre-rounding arithmetic should implement
+    /// or use the corresponding raw kernel through [`Instrument::value_raw`].
     ///
     /// # Arguments
     ///
@@ -527,10 +528,9 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns error if:
-    /// - Required market curves are missing
-    /// - Instrument parameters are invalid
-    /// - Numerical computation fails
+    /// Returns error if required market data is missing or the model calculation
+    /// fails. Implementations may defensively validate, but canonical validation
+    /// belongs to the public wrapper lifecycle.
     ///
     /// # Examples
     ///
@@ -559,19 +559,11 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// # Ok(())
     /// # }
     /// ```
-    //
-    // # Override Contract
-    //
-    // - `MarketQuoteOverrides` (e.g. `quoted_clean_price`, `quoted_ytm`,
-    //   `implied_volatility`): honored by `base_value` (instrument-specific).
-    // - `ModelConfig` (e.g. `tree_steps`, `mc_paths`, `vol_model`): honored by
-    //   the pricer implementing `base_value`.
-    // - `ScenarioPricingOverrides` (e.g. `scenario_price_shock_pct`): applied
-    //   automatically by the default [`Instrument::value`] wrapper; the
-    //   `base_value` implementation must not apply scenario shocks itself.
-    // - `MetricPricingOverrides` (bump sizes, `theta_period`, deterministic
-    //   MC seeds) are out of scope for `base_value`/`value`; they are consumed
-    //   by the metrics pipeline.
+    /// # Override contract
+    ///
+    /// - Market quotes and model configuration are consumed here when relevant.
+    /// - Scenario overrides are applied only by the canonical wrapper lifecycle.
+    /// - Metric overrides are consumed only by the metrics pipeline.
     fn base_value(&self, market: &MarketContext, as_of: Date)
         -> finstack_quant_core::Result<Money>;
 
@@ -585,8 +577,8 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// own state or market data and intentionally ignore the requested `as_of`
     /// (e.g. a private markets fund anchors valuation to its discount curve's
     /// base date, or to its last event date when undiscounted). Such instruments
-    /// override this method; the generic pricer then uses the returned date for
-    /// both the [`Instrument::base_value`] computation and the result stamp.
+    /// override this method; the canonical direct and registry wrappers then use
+    /// the returned date for both [`Instrument::base_value`] and result stamps.
     ///
     /// # Arguments
     ///
@@ -636,22 +628,25 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// Present value with scenario price shock applied (if any).
     fn value(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<Money> {
-        self.validate_for_pricing()?;
-        let base = self.base_value(market, as_of)?;
-        Ok(crate::instruments::common_impl::helpers::apply_scenario_value(self, base))
+        let lifecycle =
+            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
+        let effective_as_of = lifecycle.effective_as_of(market, as_of);
+        let base = self.base_value(market, effective_as_of)?;
+        Ok(lifecycle.apply_value(base))
     }
 
     /// Compute the base present value as raw f64, before scenario adjustments.
     ///
-    /// Default implementation delegates to [`Instrument::base_value`] and extracts
-    /// the amount. Override for high-precision pricers that want to avoid
-    /// Money rounding in intermediate calculations.
+    /// This is an unchecked, unshocked pricing kernel. The default delegates to
+    /// [`Instrument::base_value`] and extracts the amount. Override this method
+    /// for high-precision pricing logic; public callers must enter through
+    /// [`Instrument::value_raw`], which owns validation, effective-date
+    /// resolution, and scenario application.
     fn base_value_raw(
         &self,
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        self.validate_for_pricing()?;
         Ok(self.base_value(market, as_of)?.amount())
     }
 
@@ -673,9 +668,11 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// # Default Implementation
     ///
-    /// The default implementation delegates to `value()` and extracts the amount.
-    /// Instruments with internal high-precision pricing should override this method
-    /// to return the raw value before Money wrapping for better sensitivity accuracy.
+    /// The default implementation validates, resolves the effective valuation
+    /// date, invokes [`Instrument::base_value_raw`], and applies the scenario
+    /// price shock once without routing the value through `Money`. Instruments
+    /// must not override this lifecycle wrapper; high-precision implementations
+    /// belong in [`Instrument::base_value_raw`].
     ///
     /// `value_raw()` should represent the same economics as [`Instrument::value`]
     /// before currency rounding, not a different pricing convention.
@@ -714,7 +711,11 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// # }
     /// ```
     fn value_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
-        Ok(self.value(market, as_of)?.amount())
+        let lifecycle =
+            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
+        let effective_as_of = lifecycle.effective_as_of(market, as_of);
+        let base = self.base_value_raw(market, effective_as_of)?;
+        Ok(lifecycle.apply_raw_value(base))
     }
 
     /// Return the default pricing model for this instrument.

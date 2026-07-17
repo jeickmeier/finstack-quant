@@ -44,7 +44,7 @@ use super::pricer;
 use crate::contract_specs::{embedded_registry, ContractSpecRegistry};
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::rates::ir_future::Position;
+use crate::instruments::Position;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -63,7 +63,7 @@ use time::macros::date;
 /// use finstack_quant_valuations::instruments::equity::vol_index_future::{
 ///     VolatilityIndexFuture, VolIndexContractSpecs,
 /// };
-/// use finstack_quant_valuations::instruments::rates::ir_future::Position;
+/// use finstack_quant_valuations::instruments::Position;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::money::Money;
@@ -275,7 +275,11 @@ impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexFutu
         pricer::compute_pv(self, curves, as_of)
     }
 
-    fn value_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+    fn base_value_raw(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
         pricer::compute_pv_raw(self, curves, as_of)
     }
 

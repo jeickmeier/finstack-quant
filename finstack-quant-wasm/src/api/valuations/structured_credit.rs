@@ -6,7 +6,7 @@
 //! dispatch, and return JSON (or a scalar). The exported JS surface lives under
 //! `valuations.instruments`.
 
-use super::pricing::parse_market_json;
+use super::pricing::{parse_market_json, validate_pricing_instrument_json};
 use crate::utils::{to_js_err, to_js_error};
 use wasm_bindgen::prelude::*;
 
@@ -21,6 +21,7 @@ pub fn structured_credit_tranche_discount_margin(
     tranche_id: &str,
     target_pv: f64,
 ) -> Result<f64, JsValue> {
+    validate_pricing_instrument_json(instrument_json, None)?;
     let market = parse_market_json(market_json)?;
     finstack_quant_valuations::pricer::structured_credit_tranche_discount_margin_json(
         instrument_json,
@@ -41,6 +42,7 @@ pub fn structured_credit_tranche_breakeven_cdr(
     as_of: &str,
     tranche_id: &str,
 ) -> Result<f64, JsValue> {
+    validate_pricing_instrument_json(instrument_json, None)?;
     let market = parse_market_json(market_json)?;
     finstack_quant_valuations::pricer::structured_credit_tranche_breakeven_cdr_json(
         instrument_json,
@@ -64,6 +66,7 @@ pub fn structured_credit_tranche_oas(
     market_price_pct: f64,
     config: Option<String>,
 ) -> Result<String, JsValue> {
+    validate_pricing_instrument_json(instrument_json, None)?;
     let market = parse_market_json(market_json)?;
     let result = finstack_quant_valuations::pricer::structured_credit_tranche_oas_json(
         instrument_json,
@@ -88,6 +91,7 @@ pub fn structured_credit_tranche_scenario_table(
     tranche_id: &str,
     grid: &str,
 ) -> Result<String, JsValue> {
+    validate_pricing_instrument_json(instrument_json, None)?;
     let market = parse_market_json(market_json)?;
     let result = finstack_quant_valuations::pricer::structured_credit_tranche_scenario_table_json(
         instrument_json,
@@ -114,6 +118,7 @@ pub fn structured_credit_tranche_metrics(
     tranche_id: &str,
     market_price_pct: Option<f64>,
 ) -> Result<String, JsValue> {
+    validate_pricing_instrument_json(instrument_json, None)?;
     let market = parse_market_json(market_json)?;
     let result = finstack_quant_valuations::pricer::structured_credit_tranche_metrics_json(
         instrument_json,

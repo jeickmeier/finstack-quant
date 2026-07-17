@@ -25,7 +25,7 @@ pub(crate) fn validate_single_currency(
 ) -> Result<()> {
     let mut first: Option<(&str, finstack_quant_core::currency::Currency)> = None;
     for (position_id, instrument, _) in positions {
-        let currency = instrument.base_value(market, as_of)?.currency();
+        let currency = instrument.value(market, as_of)?.currency();
         match first {
             None => first = Some((position_id.as_str(), currency)),
             Some((first_id, first_currency)) if first_currency != currency => {

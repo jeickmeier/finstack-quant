@@ -188,7 +188,7 @@ Conversion Factors" (IR232):
 ### Position Types
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::bond_future::Position;
+use finstack_quant_valuations::instruments::Position;
 
 // Long position: benefits from price increase
 let long_future = BondFuture::ust_10y(
@@ -493,13 +493,13 @@ pub struct BondFutureSpecs {
 
 #### `Position`
 
-Position direction (re-exported from `ir_future` module).
+Canonical position direction from `finstack_quant_valuations::instruments`.
 
 ```rust
-pub enum Position {
-    Long,   // +1 multiplier
-    Short,  // -1 multiplier
-}
+use finstack_quant_valuations::instruments::Position;
+
+assert_eq!(Position::Long.sign(), 1.0);
+assert_eq!(Position::Short.sign(), -1.0);
 ```
 
 ### Methods

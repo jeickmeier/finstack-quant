@@ -33,6 +33,15 @@ pub(super) fn parse_market_json(market_json: &str) -> Result<MarketContext, JsVa
     serde_json::from_str(market_json).map_err(to_js_err)
 }
 
+pub(super) fn validate_pricing_instrument_json(
+    instrument_json: &str,
+    pricing_options: Option<&str>,
+) -> Result<(), JsValue> {
+    finstack_quant_valuations::pricer::parse_boxed_instrument_json(instrument_json, pricing_options)
+        .map(drop)
+        .map_err(|e| to_js_error(&e))
+}
+
 pub(super) fn valuation_result_json(result: ValuationResult) -> Result<String, JsValue> {
     serde_json::to_string(&result).map_err(to_js_err)
 }
@@ -152,6 +161,7 @@ pub fn price_instrument(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
+    validate_pricing_instrument_json(instrument_json, None)?;
     let market = parse_market_json(market_json)?;
     price_instrument_with_context(instrument_json, &market, as_of, model)
 }
@@ -169,6 +179,7 @@ pub fn price_instrument_with_metrics(
     pricing_options: Option<String>,
     market_history: Option<String>,
 ) -> Result<String, JsValue> {
+    validate_pricing_instrument_json(instrument_json, pricing_options.as_deref())?;
     let market = parse_market_json(market_json)?;
     let metric_strs: Vec<String> = serde_wasm_bindgen::from_value(metrics).map_err(to_js_err)?;
     price_instrument_with_metrics_context(
@@ -194,6 +205,7 @@ pub fn instrument_cashflows_json(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
+    validate_pricing_instrument_json(instrument_json, None)?;
     let market = parse_market_json(market_json)?;
     finstack_quant_valuations::pricer::instrument_cashflows_json(
         instrument_json,
@@ -236,6 +248,7 @@ pub fn price_instrument_with_market(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
+    validate_pricing_instrument_json(instrument_json, None)?;
     price_instrument_with_context(instrument_json, market.inner(), as_of, model)
 }
 
@@ -250,6 +263,7 @@ pub fn price_instrument_with_metrics_and_market(
     pricing_options: Option<String>,
     market_history: Option<String>,
 ) -> Result<String, JsValue> {
+    validate_pricing_instrument_json(instrument_json, pricing_options.as_deref())?;
     let metric_strs: Vec<String> = serde_wasm_bindgen::from_value(metrics).map_err(to_js_err)?;
     price_instrument_with_metrics_context(
         instrument_json,
@@ -270,6 +284,7 @@ pub fn instrument_cashflows_with_market(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
+    validate_pricing_instrument_json(instrument_json, None)?;
     finstack_quant_valuations::pricer::instrument_cashflows_json(
         instrument_json,
         market.inner(),

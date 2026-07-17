@@ -6,7 +6,7 @@
 use super::AgencyTba;
 use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::instruments::fixed_income::mbs_passthrough::{
-    pricer::price_mbs, AgencyMbsPassthrough, AgencyProgram, PoolType,
+    pricer::price_mbs, AgencyMbsPassthrough, PoolType,
 };
 use crate::instruments::fixed_income::tba::allocation::assumed_pool_assumptions;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
@@ -36,9 +36,10 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba, _as_of: Date) -> Result<Agenc
 
     // Standard servicing and g-fee assumptions
     let servicing_fee = defaults.servicing_fee_rate;
-    let guarantee_fee = match tba.agency {
-        AgencyProgram::GnmaI | AgencyProgram::GnmaII => defaults.gnma_guarantee_fee_rate,
-        _ => defaults.agency_guarantee_fee_rate,
+    let guarantee_fee = if tba.agency.is_gnma() {
+        defaults.gnma_guarantee_fee_rate
+    } else {
+        defaults.agency_guarantee_fee_rate
     };
 
     // WAC = pass-through + fees
@@ -140,6 +141,7 @@ pub(crate) fn estimate_fail_cost(position_value: f64, fail_rate: f64, fail_days:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::fixed_income::mbs_passthrough::AgencyProgram;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use time::Month;
@@ -171,6 +173,30 @@ mod tests {
         assert_eq!(pool.agency, tba.agency);
         assert!((pool.pass_through_rate - tba.coupon).abs() < 1e-10);
         assert!((pool.current_factor - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn assumed_pool_guarantee_fee_follows_agency_family() {
+        let defaults = assumed_pool_assumptions().expect("embedded TBA assumptions");
+        let as_of = Date::from_calendar_date(2027, Month::January, 15).expect("valid");
+        let cases = [
+            (AgencyProgram::Fnma, defaults.agency_guarantee_fee_rate),
+            (AgencyProgram::Fhlmc, defaults.agency_guarantee_fee_rate),
+            (AgencyProgram::GnmaI, defaults.gnma_guarantee_fee_rate),
+            (AgencyProgram::GnmaII, defaults.gnma_guarantee_fee_rate),
+        ];
+
+        for (agency, expected_fee) in cases {
+            let mut tba = AgencyTba::example().expect("AgencyTba example is valid");
+            tba.agency = agency;
+
+            let pool = create_assumed_pool(&tba, as_of).expect("should create pool");
+            assert_eq!(pool.guarantee_fee_rate, expected_fee);
+            assert_eq!(
+                pool.wac,
+                tba.coupon + defaults.servicing_fee_rate + expected_fee
+            );
+        }
     }
 
     #[test]

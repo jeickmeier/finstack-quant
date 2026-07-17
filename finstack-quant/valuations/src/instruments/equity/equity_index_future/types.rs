@@ -34,7 +34,7 @@ use super::pricer;
 use crate::contract_specs::{embedded_registry, ContractSpecRegistry};
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::rates::ir_future::Position;
+use crate::instruments::Position;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -176,7 +176,7 @@ impl EquityFutureSpecs {
 /// use finstack_quant_valuations::instruments::equity::equity_index_future::{
 ///     EquityIndexFuture, EquityFutureSpecs,
 /// };
-/// use finstack_quant_valuations::instruments::rates::ir_future::Position;
+/// use finstack_quant_valuations::instruments::Position;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::money::Money;
@@ -394,10 +394,7 @@ impl EquityIndexFuture {
 
     /// Get the position sign (+1 for Long, -1 for Short).
     pub fn position_sign(&self) -> f64 {
-        match self.position {
-            Position::Long => 1.0,
-            Position::Short => -1.0,
-        }
+        self.position.sign()
     }
 
     /// Calculate the current number of futures contracts implied by notional.
@@ -475,6 +472,9 @@ impl crate::instruments::common_impl::traits::Instrument for EquityIndexFuture {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_spot_id(self.spot_id.as_str());
+        if let Some(dividend_yield_id) = &self.div_yield_id {
+            deps.add_spot_id(dividend_yield_id.as_str());
+        }
         Ok(deps)
     }
 
@@ -486,7 +486,11 @@ impl crate::instruments::common_impl::traits::Instrument for EquityIndexFuture {
         pricer::compute_pv(self, curves, as_of)
     }
 
-    fn value_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+    fn base_value_raw(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
         pricer::compute_pv_raw(self, curves, as_of)
     }
 
@@ -566,6 +570,18 @@ mod tests {
         assert_eq!(future.underlying_ticker, "SPX");
         assert_eq!(future.notional.amount(), 2_250_000.0);
         assert_eq!(future.contract_specs.multiplier, 50.0);
+    }
+
+    #[test]
+    fn market_dependencies_include_optional_dividend_yield_scalar() {
+        let future = EquityIndexFuture::example().expect("example");
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&future).expect("dependencies");
+
+        let mut expected_spots = vec![future.spot_id.as_str().to_string()];
+        expected_spots.extend(future.div_yield_id.iter().map(|id| id.as_str().to_string()));
+        assert_eq!(deps.spot_ids, expected_spots);
+        assert!(deps.series_ids.is_empty());
     }
 
     #[test]

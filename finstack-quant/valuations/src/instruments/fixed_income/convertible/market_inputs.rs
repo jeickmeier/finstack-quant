@@ -3,6 +3,25 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::InputError;
 use finstack_quant_core::{Error, Result};
 
+/// Build volatility scalar/surface candidate IDs in pricing precedence order.
+pub(super) fn volatility_candidate_ids(bond: &ConvertibleBond) -> Result<Vec<String>> {
+    let underlying_id = bond.underlying_equity_id.as_ref().ok_or_else(|| {
+        finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
+            id: "underlying_equity_id".to_string(),
+        })
+    })?;
+
+    let mut candidate_ids = Vec::with_capacity(3);
+    if let Some(id) = bond.attributes.get_meta("vol_surface_id") {
+        candidate_ids.push(id.to_string());
+    }
+    candidate_ids.push(format!("{underlying_id}-VOL"));
+    if let Some(stripped) = underlying_id.strip_suffix("-SPOT") {
+        candidate_ids.push(format!("{stripped}-VOL"));
+    }
+    Ok(candidate_ids)
+}
+
 /// Build dividend-yield candidate IDs in the same order used by pricing and metrics.
 pub(super) fn dividend_yield_candidate_ids(bond: &ConvertibleBond) -> Result<Vec<String>> {
     let underlying_id = bond.underlying_equity_id.as_ref().ok_or_else(|| {

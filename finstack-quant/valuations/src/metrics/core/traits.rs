@@ -205,9 +205,6 @@ pub struct MetricContext {
     /// Optional metric-only overrides to control risk calculations (e.g., bumps, theta horizon).
     metric_overrides: Option<crate::instruments::MetricPricingOverrides>,
 
-    /// Optional scenario-only adjustments applied at the valuation boundary.
-    scenario_overrides: Option<crate::instruments::ScenarioPricingOverrides>,
-
     /// Finstack configuration (tolerances + versioned extensions).
     ///
     /// This is used by metric calculators to resolve user-facing defaults
@@ -260,7 +257,6 @@ impl MetricContext {
             notional: None,
             instrument_overrides: None,
             metric_overrides: None,
-            scenario_overrides: None,
             finstack_config,
         }
     }
@@ -371,25 +367,13 @@ impl MetricContext {
         self.metric_overrides = overrides;
     }
 
-    /// Set scenario-only adjustments used by valuation helpers.
-    pub fn set_scenario_overrides(
-        &mut self,
-        overrides: Option<crate::instruments::ScenarioPricingOverrides>,
-    ) {
-        self.scenario_overrides = overrides;
-    }
-
-    /// Value the instrument and apply any active scenario price shock.
+    /// Value the instrument through the active canonical dispatch path.
     pub fn instrument_value_with_scenario(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        let value = self.reprice_money(market, as_of)?;
-        Ok(self
-            .scenario_overrides
-            .as_ref()
-            .map_or(value, |overrides| overrides.apply_to_value(value)))
+        self.reprice_money(market, as_of)
     }
 
     /// Reprice the context instrument using the active dispatch path.

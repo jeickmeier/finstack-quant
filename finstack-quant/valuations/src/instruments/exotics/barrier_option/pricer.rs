@@ -3,7 +3,7 @@
 // Common imports for all pricers
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::common_impl::two_clock::TwoClockParams;
-use crate::instruments::exotics::barrier_option::types::{BarrierOption, BarrierType};
+use crate::instruments::exotics::barrier_option::types::BarrierOption;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -255,8 +255,6 @@ fn price_expired_barrier(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
-    use crate::instruments::exotics::barrier_option::types::BarrierType;
-
     let spot = if let Some(fixing) = inst.expiry_fixing {
         fixing.amount()
     } else if as_of == inst.expiry {
@@ -274,10 +272,7 @@ fn price_expired_barrier(
 
     let ccy = inst.notional.currency();
     let notional = inst.notional.amount();
-    let is_knock_out = matches!(
-        inst.barrier_type,
-        BarrierType::UpAndOut | BarrierType::DownAndOut
-    );
+    let is_knock_out = inst.barrier_type.is_knock_out();
 
     let barrier_breached = inst.observed_barrier_breached.ok_or_else(|| {
         finstack_quant_core::Error::Validation(
@@ -445,10 +440,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
 
         // Apply Broadie-Glasserman-Kou discrete monitoring correction when
         // monitoring_frequency is set.
-        let is_down = matches!(
-            barrier_opt.barrier_type,
-            BarrierType::DownAndIn | BarrierType::DownAndOut
-        );
+        let is_down = !barrier_opt.barrier_type.is_up();
         let raw_barrier = barrier_opt.barrier.amount();
         let effective_barrier = if let Some(dt) = barrier_opt.monitoring_frequency {
             let shift = BG_BETA * sigma * dt.sqrt();

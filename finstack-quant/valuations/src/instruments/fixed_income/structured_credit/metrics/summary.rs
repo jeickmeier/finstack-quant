@@ -12,6 +12,7 @@ use crate::instruments::fixed_income::structured_credit::metrics::{
     calculate_tranche_wal, calculate_tranche_z_spread,
 };
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
+use crate::instruments::Instrument;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -76,6 +77,7 @@ pub fn calculate_tranche_metrics(
     as_of: Date,
     market_price_pct: Option<f64>,
 ) -> Result<TrancheMetrics> {
+    deal.validate_for_pricing()?;
     let tranche = deal
         .tranches
         .tranches

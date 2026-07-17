@@ -197,7 +197,7 @@ impl<'a> WhatIfEngine<'a> {
         let compute_position_pnl = |position: &Position| -> Result<(PositionId, f64)> {
             let pricing_currency = position
                 .instrument
-                .base_value(self.market, self.as_of)?
+                .value(self.market, self.as_of)?
                 .currency();
             if pricing_currency != self.portfolio.base_ccy {
                 return Err(Error::validation(format!(

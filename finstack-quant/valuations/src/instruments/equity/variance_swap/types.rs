@@ -5,7 +5,7 @@ use finstack_quant_core::{
     market_data::context::MarketContext,
     math::stats::RealizedVarMethod,
     money::Money,
-    types::{CurveId, InstrumentId},
+    types::{CurveId, InstrumentId, PriceId},
     Result,
 };
 use time::macros::date;
@@ -206,6 +206,22 @@ impl VarianceSwap {
     /// Vega notional amount (P&L per 1 vol point move)
     pub fn variance_to_vega_notional(variance_notional: f64, strike_vol: f64) -> f64 {
         variance_notional * 2.0 * strike_vol * 0.01
+    }
+
+    pub(crate) fn volatility_candidate_ids(&self) -> [String; 3] {
+        [
+            self.underlying_ticker.clone(),
+            format!("{}_VOL", self.underlying_ticker),
+            self.implied_vol_scalar_id(),
+        ]
+    }
+
+    pub(crate) fn implied_vol_scalar_id(&self) -> String {
+        format!("{}_IMPL_VOL", self.underlying_ticker)
+    }
+
+    pub(crate) fn dividend_yield_scalar_id(&self) -> String {
+        format!("{}-DIVYIELD", self.underlying_ticker)
     }
 
     /// Create a canonical example equity variance swap (SPX, 1Y).
@@ -409,6 +425,19 @@ impl crate::instruments::common_impl::traits::Instrument for VarianceSwap {
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
+        let underlying_id = PriceId::new(self.underlying_ticker.as_str());
+        deps.add_spot_id(self.underlying_ticker.as_str());
+        deps.add_spot_id(self.dividend_yield_scalar_id());
+        deps.add_spot_id(self.implied_vol_scalar_id());
+        for surface_id in self.volatility_candidate_ids() {
+            deps.add_volatility_dependency(
+                crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                    surface_id,
+                    Some(underlying_id.clone()),
+                    None,
+                ),
+            );
+        }
         if self.realized_var_method.requires_ohlc() {
             for series_id in [
                 self.open_series_id.as_deref(),
@@ -452,5 +481,42 @@ impl finstack_quant_cashflows::CashflowScheduleSource for VarianceSwap {
                 },
             },
         ))
+    }
+}
+
+#[cfg(test)]
+mod dependency_tests {
+    use super::*;
+
+    #[test]
+    fn market_dependencies_cover_every_variance_swap_market_fallback() {
+        let swap = VarianceSwap::example().expect("example");
+        let deps =
+            crate::instruments::Instrument::market_dependencies(&swap).expect("dependencies");
+
+        assert_eq!(
+            deps.spot_ids,
+            vec![
+                swap.underlying_ticker.clone(),
+                swap.dividend_yield_scalar_id(),
+                swap.implied_vol_scalar_id(),
+            ]
+        );
+        assert_eq!(
+            deps.volatility_dependencies
+                .iter()
+                .map(|dependency| dependency.surface_id.as_str())
+                .collect::<Vec<_>>(),
+            swap.volatility_candidate_ids()
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        );
+        assert!(deps.volatility_dependencies.iter().all(|dependency| {
+            dependency.underlying_id.as_ref().map(|id| id.as_str())
+                == Some(swap.underlying_ticker.as_str())
+                && dependency.reference_strike.is_none()
+        }));
+        assert_eq!(deps.series_ids, vec![swap.underlying_ticker]);
     }
 }

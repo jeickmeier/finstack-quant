@@ -12,33 +12,14 @@
 //! - Cap/floor protection embedded in structures
 
 use super::StructuredCredit;
-use crate::cashflow::traits::CashflowProvider;
-use crate::metrics::{MetricContext, MetricId};
+use crate::instruments::{Instrument, PricingOptions};
+use crate::metrics::MetricId;
 use crate::results::ValuationResult;
-use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
 impl StructuredCredit {
-    /// Value the structured credit instrument using discounted cashflow analysis.
-    ///
-    /// This method generates cashflows through the waterfall engine and discounts
-    /// them back to present value using the instrument's discount curve.
-    ///
-    /// **Note**: This returns only the unhedged deal NPV. Use `price_with_hedges()`
-    /// for combined deal + hedge valuation.
-    pub(crate) fn price(
-        &self,
-        context: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<Money> {
-        let disc = context.get_discount(self.discount_curve_id.as_str())?;
-        let flows = self.dated_cashflows(context, as_of)?;
-
-        flows.npv(disc.as_ref(), as_of)
-    }
-
     /// Value the total hedge swap portfolio.
     ///
     /// Returns the net present value of all attached hedge swaps.
@@ -48,13 +29,21 @@ impl StructuredCredit {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
+        self.validate_for_pricing()?;
+        let effective_as_of = self.resolve_pricing_as_of(context, as_of);
+        self.hedge_npv_unchecked(context, effective_as_of)
+    }
+
+    fn hedge_npv_unchecked(
+        &self,
+        context: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
         let base_ccy = self.pool.base_currency();
         let mut total_hedge_npv = Money::new(0.0, base_ccy);
 
         for swap in &self.hedge_swaps {
-            // Use the IRS pricer to value each swap
-            let swap_npv =
-                crate::instruments::rates::irs::pricer::compute_pv(swap, context, as_of)?;
+            let swap_npv = swap.value(context, as_of)?;
 
             // Convert to deal currency if needed (simplified - assumes same currency)
             total_hedge_npv = total_hedge_npv.checked_add(swap_npv)?;
@@ -100,8 +89,9 @@ impl StructuredCredit {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<(Money, Money, Money)> {
-        let deal_npv = self.price(context, as_of)?;
-        let hedge_npv = self.hedge_npv(context, as_of)?;
+        let deal_npv = self.value(context, as_of)?;
+        let effective_as_of = self.resolve_pricing_as_of(context, as_of);
+        let hedge_npv = self.hedge_npv_unchecked(context, effective_as_of)?;
         let total_npv = deal_npv.checked_add(hedge_npv)?;
 
         Ok((deal_npv, hedge_npv, total_npv))
@@ -127,41 +117,18 @@ impl StructuredCredit {
         as_of: Date,
         metrics: &[MetricId],
     ) -> finstack_quant_core::Result<ValuationResult> {
-        let base_value = self.price(context, as_of)?;
-
-        if metrics.is_empty() && self.hedge_swaps.is_empty() {
-            return Ok(ValuationResult::stamped(
-                self.id.as_str(),
-                as_of,
-                base_value,
-            ));
-        }
-
-        let flows = self.dated_cashflows(context, as_of)?;
-        let mut metric_context = crate::metrics::MetricContext::new(
-            std::sync::Arc::new(self.clone())
-                as std::sync::Arc<dyn crate::instruments::common_impl::traits::Instrument>,
-            std::sync::Arc::new(context.clone()),
+        let mut result = Instrument::price_with_metrics(
+            self,
+            context,
             as_of,
-            base_value,
-            MetricContext::default_config(),
-        );
-        metric_context.cashflows = Some(flows);
-        metric_context.discount_curve_id = Some(self.discount_curve_id.to_owned());
-        metric_context.notional = self.pool.total_balance().ok();
-
-        let registry = crate::metrics::standard_registry();
-        let computed_metrics = registry.compute(metrics, &mut metric_context)?;
-
-        let mut result = ValuationResult::stamped(self.id.as_str(), as_of, base_value);
-        for (metric_id, value) in computed_metrics {
-            result.measures.insert(metric_id, value);
-        }
+            metrics,
+            PricingOptions::default(),
+        )?;
 
         // Add hedge metrics if swaps are attached
         if !self.hedge_swaps.is_empty() {
-            let hedge_npv = self.hedge_npv(context, as_of)?;
-            let total_npv = base_value.checked_add(hedge_npv)?;
+            let hedge_npv = self.hedge_npv_unchecked(context, result.as_of)?;
+            let total_npv = result.value.checked_add(hedge_npv)?;
 
             result.measures.insert(
                 crate::metrics::MetricId::custom("hedge_npv"),

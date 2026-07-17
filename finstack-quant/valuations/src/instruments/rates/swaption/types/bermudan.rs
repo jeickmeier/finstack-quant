@@ -1,9 +1,9 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::rates::irs::{FixedLegSpec, FloatLegSpec};
+use crate::instruments::rates::irs::{FixedLegSpec, FloatLegSpec, InterestRateSwap, PayReceive};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -223,6 +223,7 @@ impl schemars::JsonSchema for BermudanSwaption {
 mod wire_tests {
     use super::*;
     use crate::instruments::rates::irs::FloatingLegCompounding;
+    use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
     use serde_json::Value;
 
     fn add_matching_legacy_underlier(value: &mut Value) {
@@ -260,6 +261,165 @@ mod wire_tests {
         assert_eq!(
             serde_json::to_value(normalized).expect("canonical Bermudan output"),
             canonical
+        );
+    }
+
+    #[test]
+    fn mixed_bermudan_input_requires_complete_matching_representations() {
+        let canonical =
+            serde_json::to_value(BermudanSwaption::example()).expect("canonical Bermudan JSON");
+
+        let mut mixed = canonical.clone();
+        add_matching_legacy_underlier(&mut mixed);
+        let normalized: BermudanSwaption =
+            serde_json::from_value(mixed.clone()).expect("complete matching mixed input");
+        assert_eq!(
+            serde_json::to_value(normalized).expect("canonical Bermudan output"),
+            canonical
+        );
+
+        let mut incomplete_legacy = mixed.clone();
+        incomplete_legacy
+            .as_object_mut()
+            .expect("mixed object")
+            .remove("float_freq");
+        let incomplete_legacy_error = serde_json::from_value::<BermudanSwaption>(incomplete_legacy)
+            .expect_err("mixed input requires every legacy scalar field")
+            .to_string();
+        assert!(incomplete_legacy_error.contains("requires `float_freq`"));
+
+        let mut incomplete_legs = mixed.clone();
+        incomplete_legs
+            .as_object_mut()
+            .expect("mixed object")
+            .remove("underlying_float_leg");
+        let incomplete_legs_error = serde_json::from_value::<BermudanSwaption>(incomplete_legs)
+            .expect_err("mixed input requires both canonical legs")
+            .to_string();
+        assert!(incomplete_legs_error.contains("must provide both fixed and floating"));
+
+        let mut conflicting = mixed;
+        conflicting.as_object_mut().expect("mixed object").insert(
+            "fixed_freq".to_string(),
+            serde_json::to_value(Tenor::quarterly()).expect("quarterly tenor JSON"),
+        );
+        let conflict_error = serde_json::from_value::<BermudanSwaption>(conflicting)
+            .expect_err("mixed input requires matching representations")
+            .to_string();
+        assert!(conflict_error.contains("fixed_freq conflicts"));
+    }
+
+    #[test]
+    fn bermudan_schedule_uses_complete_fixed_leg_conventions() {
+        let mut bermudan = BermudanSwaption::example();
+        bermudan.underlying_fixed_leg.frequency = Tenor::annual();
+        bermudan.underlying_fixed_leg.day_count = DayCount::Act365F;
+        bermudan.underlying_fixed_leg.bdc = BusinessDayConvention::Preceding;
+        bermudan.underlying_fixed_leg.calendar_id =
+            Some(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string());
+        bermudan.underlying_fixed_leg.stub = StubKind::ShortBack;
+        bermudan.underlying_fixed_leg.payment_lag_days = 2;
+        bermudan.underlying_fixed_leg.end_of_month = true;
+        let fixed = bermudan.underlying_fixed_leg.clone();
+
+        let actual = bermudan
+            .fixed_schedule_periods()
+            .expect("canonical fixed-leg schedule");
+        let expected = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: fixed.start,
+                end: fixed.end,
+                frequency: fixed.frequency,
+                stub: fixed.stub,
+                bdc: fixed.bdc,
+                calendar_id: fixed.calendar_id.as_deref().expect("calendar"),
+                end_of_month: fixed.end_of_month,
+                day_count: fixed.day_count,
+                payment_lag_days: fixed.payment_lag_days,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
+        )
+        .expect("direct fixed-leg schedule");
+
+        let actual_dates = actual
+            .iter()
+            .map(|period| {
+                (
+                    period.accrual_start,
+                    period.accrual_end,
+                    period.payment_date,
+                    period.accrual_year_fraction,
+                )
+            })
+            .collect::<Vec<_>>();
+        let expected_dates = expected
+            .iter()
+            .map(|period| {
+                (
+                    period.accrual_start,
+                    period.accrual_end,
+                    period.payment_date,
+                    period.accrual_year_fraction,
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(actual_dates, expected_dates);
+
+        let (payment_dates, accruals) = bermudan
+            .build_swap_schedule(fixed.start)
+            .expect("public fixed-leg schedule");
+        assert_eq!(
+            payment_dates,
+            expected
+                .iter()
+                .map(|period| period.payment_date)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            accruals,
+            expected
+                .iter()
+                .map(|period| period.accrual_year_fraction)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn exercise_underlier_preserves_both_leg_conventions() {
+        let mut bermudan = BermudanSwaption::example();
+        bermudan.underlying_fixed_leg.frequency = Tenor::annual();
+        bermudan.underlying_fixed_leg.day_count = DayCount::Act365F;
+        bermudan.underlying_fixed_leg.bdc = BusinessDayConvention::Preceding;
+        bermudan.underlying_fixed_leg.stub = StubKind::LongBack;
+        bermudan.underlying_fixed_leg.payment_lag_days = 2;
+        bermudan.underlying_fixed_leg.end_of_month = true;
+        bermudan.underlying_float_leg.frequency = Tenor::semi_annual();
+        bermudan.underlying_float_leg.day_count = DayCount::Act360;
+        bermudan.underlying_float_leg.bdc = BusinessDayConvention::Following;
+        bermudan.underlying_float_leg.stub = StubKind::ShortBack;
+        bermudan.underlying_float_leg.reset_lag_days = 3;
+        bermudan.underlying_float_leg.payment_lag_days = 4;
+        bermudan.underlying_float_leg.end_of_month = true;
+        bermudan.underlying_float_leg.compounding = FloatingLegCompounding::sofr();
+
+        let exercise = bermudan.first_exercise().expect("first exercise");
+        let underlier = bermudan
+            .underlying_irs_at(exercise)
+            .expect("canonical exercise underlier");
+        let mut expected_fixed = bermudan.underlying_fixed_leg.clone();
+        expected_fixed.start = exercise;
+        expected_fixed.rate = Decimal::ZERO;
+        let mut expected_float = bermudan.underlying_float_leg;
+        expected_float.start = exercise;
+
+        assert_eq!(
+            serde_json::to_value(underlier.fixed).expect("fixed JSON"),
+            serde_json::to_value(expected_fixed).expect("expected fixed JSON")
+        );
+        assert_eq!(
+            serde_json::to_value(underlier.float).expect("float JSON"),
+            serde_json::to_value(expected_float).expect("expected float JSON")
         );
     }
 
@@ -528,14 +688,6 @@ impl BermudanSwaption {
         self
     }
 
-    /// Resolve the effective calendar ID for schedule generation.
-    fn effective_calendar_id(&self) -> &str {
-        self.underlying_fixed_leg
-            .calendar_id
-            .as_deref()
-            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
-    }
-
     /// Get the first exercise date.
     pub fn first_exercise(&self) -> Option<Date> {
         self.bermudan_schedule.effective_dates().first().copied()
@@ -590,21 +742,7 @@ impl BermudanSwaption {
     ///
     /// Returns (payment_dates, accrual_fractions) for the fixed leg.
     pub fn build_swap_schedule(&self, _as_of: Date) -> Result<(Vec<Date>, Vec<f64>)> {
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: self.get_swap_start(),
-                end: self.get_swap_end(),
-                frequency: self.get_fixed_freq(),
-                stub: StubKind::None,
-                bdc: BusinessDayConvention::ModifiedFollowing, // Market standard per ISDA
-                calendar_id: self.effective_calendar_id(),
-                end_of_month: false,
-                day_count: self.get_day_count(),
-                payment_lag_days: 0,
-                reset_lag_days: None,
-                adjust_accrual_dates: false,
-            },
-        )?;
+        let periods = self.fixed_schedule_periods()?;
 
         if periods.is_empty() {
             return Err(Error::Validation(
@@ -616,6 +754,56 @@ impl BermudanSwaption {
         let accruals: Vec<f64> = periods.iter().map(|p| p.accrual_year_fraction).collect();
 
         Ok((dates, accruals))
+    }
+
+    /// Build the canonical fixed-leg periods used by Bermudan pricing paths.
+    pub(crate) fn fixed_schedule_periods(
+        &self,
+    ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+        self.fixed_schedule_periods_at(self.get_swap_start())
+    }
+
+    fn fixed_schedule_periods_at(
+        &self,
+        start: Date,
+    ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+        let underlier = self.underlying_irs_at(start)?;
+        let fixed = underlier.resolved_fixed_leg()?;
+        crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: fixed.start,
+                end: fixed.end,
+                frequency: fixed.frequency,
+                stub: fixed.stub,
+                bdc: fixed.bdc,
+                calendar_id: fixed
+                    .calendar_id
+                    .as_deref()
+                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                end_of_month: fixed.end_of_month,
+                day_count: fixed.day_count,
+                payment_lag_days: fixed.payment_lag_days,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
+        )
+    }
+
+    fn underlying_irs_at(&self, start: Date) -> Result<InterestRateSwap> {
+        let mut fixed = self.underlying_fixed_leg.clone();
+        fixed.start = start;
+        fixed.rate = Decimal::ZERO;
+        let mut float = self.underlying_float_leg.clone();
+        float.start = start;
+        let underlier = InterestRateSwap::builder()
+            .id(InstrumentId::new(format!("{}:UNDERLIER", self.id.as_str())))
+            .notional(self.notional)
+            .side(PayReceive::Pay)
+            .fixed(fixed)
+            .float(float)
+            .build()?;
+        underlier.validate()?;
+        Ok(underlier)
     }
 
     /// Convert payment dates to year fractions.
@@ -650,10 +838,6 @@ impl BermudanSwaption {
         as_of: Date,
         exercise_date: Date,
     ) -> Result<f64> {
-        use crate::instruments::common_impl::pricing::time::{
-            rate_period_on_dates, relative_df_discounting,
-        };
-
         let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
         let annuity = self.remaining_annuity(disc.as_ref(), as_of, exercise_date)?;
 
@@ -661,40 +845,10 @@ impl BermudanSwaption {
             return Ok(0.0);
         }
 
-        // Single-curve optimization
-        if self.get_forward_curve_id() == self.get_discount_curve_id() {
-            let df_start = relative_df_discounting(disc.as_ref(), as_of, exercise_date)?;
-            let df_end = relative_df_discounting(disc.as_ref(), as_of, self.get_swap_end())?;
-            return Ok((df_start - df_end) / annuity);
-        }
-
-        let fwd = curves.get_forward(self.get_forward_curve_id().as_ref())?;
-        let fwd_dc = fwd.day_count();
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: exercise_date,
-                end: self.get_swap_end(),
-                frequency: self.get_float_freq(),
-                stub: StubKind::None,
-                bdc: BusinessDayConvention::ModifiedFollowing, // Market standard per ISDA
-                calendar_id: self.effective_calendar_id(),
-                end_of_month: false,
-                day_count: fwd_dc,
-                payment_lag_days: 0,
-                reset_lag_days: None,
-                adjust_accrual_dates: false,
-            },
-        )?;
-
-        let mut pv_float = 0.0;
-        for period in periods {
-            let fwd_rate =
-                rate_period_on_dates(fwd.as_ref(), period.accrual_start, period.accrual_end)?;
-            let df = relative_df_discounting(disc.as_ref(), as_of, period.payment_date)?;
-            pv_float += period.accrual_year_fraction * fwd_rate * df;
-        }
-
-        Ok(pv_float / annuity)
+        let underlier = self.underlying_irs_at(exercise_date)?;
+        let pv_float =
+            crate::instruments::rates::irs::pricer::compute_pv_raw(&underlier, curves, as_of)?;
+        Ok(pv_float / (self.notional.amount() * annuity))
     }
 
     /// Calculate annuity for remaining swap payments after exercise date.
@@ -713,13 +867,16 @@ impl BermudanSwaption {
     ) -> Result<f64> {
         use crate::instruments::common_impl::pricing::time::relative_df_discounting;
 
-        let (dates, accruals) = self.build_swap_schedule(as_of)?;
+        if exercise_date >= self.get_swap_end() {
+            return Ok(0.0);
+        }
+        let periods = self.fixed_schedule_periods_at(exercise_date)?;
 
         let mut annuity = 0.0;
-        for (d, tau) in dates.iter().zip(accruals.iter()) {
-            if *d > exercise_date {
-                let df = relative_df_discounting(disc, as_of, *d)?;
-                annuity += tau * df;
+        for period in periods {
+            if period.payment_date > exercise_date {
+                let df = relative_df_discounting(disc, as_of, period.payment_date)?;
+                annuity += period.accrual_year_fraction * df;
             }
         }
 

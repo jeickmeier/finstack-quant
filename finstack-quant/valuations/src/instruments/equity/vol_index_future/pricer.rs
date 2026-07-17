@@ -36,10 +36,7 @@ pub(crate) fn compute_pv_raw(
     } else {
         forward_vol(future, context)?
     };
-    let sign = match future.position {
-        crate::instruments::rates::ir_future::Position::Long => 1.0,
-        crate::instruments::rates::ir_future::Position::Short => -1.0,
-    };
+    let sign = future.position.sign();
     let contracts = future.num_contracts();
     let pv_per_contract = (forward_vol - future.quoted_price) * future.contract_specs.multiplier;
     Ok(sign * contracts * pv_per_contract)
@@ -62,10 +59,7 @@ pub(crate) fn forward_vol(
 }
 
 pub(crate) fn delta_vol(future: &VolatilityIndexFuture) -> f64 {
-    let sign = match future.position {
-        crate::instruments::rates::ir_future::Position::Long => 1.0,
-        crate::instruments::rates::ir_future::Position::Short => -1.0,
-    };
+    let sign = future.position.sign();
     sign * future.num_contracts() * future.contract_specs.multiplier
 }
 
@@ -73,7 +67,7 @@ pub(crate) fn delta_vol(future: &VolatilityIndexFuture) -> f64 {
 mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::{Attributes, Instrument};
-    use crate::instruments::rates::ir_future::Position;
+    use crate::instruments::Position;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, VolatilityIndexCurve};

@@ -6,7 +6,12 @@ import json
 
 import pytest
 
-from finstack_quant.valuations.instruments import price_instrument, validate_instrument_json
+from finstack_quant.valuations.instruments import (
+    instrument_cashflows_json,
+    price_instrument,
+    price_instrument_with_metrics,
+    validate_instrument_json,
+)
 
 
 def _money(amount: str) -> dict[str, str]:
@@ -468,6 +473,42 @@ def test_bermudan_swaption_json_validates() -> None:
     assert canonical["type"] == "bermudan_swaption"
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"unknown_override": 1},
+        {"instrument": {"rate_bump_bp": 3.0}},
+        {"metrics": {"quoted_clean_price": 99.0}},
+        {"scenario": {"mc_seed_scenario": "seed"}},
+    ],
+)
+def test_validate_instrument_json_rejects_invalid_override_ownership(
+    overrides: dict[str, object],
+) -> None:
+    instrument = json.loads(_structured_credit_json())
+    instrument["spec"]["pricing_overrides"] = overrides
+
+    with pytest.raises(ValueError, match="unknown field"):
+        validate_instrument_json(json.dumps(instrument))
+
+
+def test_validate_instrument_json_accepts_focused_nested_overrides() -> None:
+    instrument = json.loads(_structured_credit_json())
+    instrument["spec"]["pricing_overrides"] = {
+        "instrument": {"mc_paths": 2},
+        "metrics": {"rate_bump_bp": 3.0},
+        "scenario": {"scenario_price_shock_pct": -0.05},
+    }
+
+    canonical = json.loads(validate_instrument_json(json.dumps(instrument)))
+    overrides = canonical["spec"]["pricing_overrides"]
+
+    assert overrides["mc_paths"] == 2
+    assert overrides["rate_bump_bp"] == 3.0
+    assert overrides["scenario_price_shock_pct"] == -0.05
+    assert not {"instrument", "metrics", "scenario"} & overrides.keys()
+
+
 def test_tarn_json_prices_with_hull_white_mc() -> None:
     result = json.loads(
         price_instrument(
@@ -561,6 +602,29 @@ def test_structured_credit_stochastic_json_missing_market_data_raises() -> None:
             "2024-01-01",
             "structured_credit_stochastic",
         )
+
+
+def test_python_pricing_routes_validate_instrument_before_other_inputs() -> None:
+    payload = json.loads(_structured_credit_json())
+    payload["spec"]["cleanup_call_pct"] = -0.5
+    invalid = json.dumps(payload)
+    market = "not-market-json"
+
+    calls = [
+        lambda: price_instrument(invalid, market, "not-a-date", "not-a-model"),
+        lambda: price_instrument_with_metrics(
+            invalid,
+            market,
+            "not-a-date",
+            model="not-a-model",
+            metrics=["not-a-metric"],
+        ),
+        lambda: instrument_cashflows_json(invalid, market, "not-a-date", "not-a-model"),
+    ]
+
+    for call in calls:
+        with pytest.raises(ValueError, match="cleanup_call_pct"):
+            call()
 
 
 def test_structured_credit_waterfall_rules_prices_through_json() -> None:

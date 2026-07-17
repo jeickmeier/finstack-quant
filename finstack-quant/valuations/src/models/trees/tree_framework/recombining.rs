@@ -45,6 +45,20 @@ pub struct RecombiningInputs<'a, V: TreeValuator> {
     pub custom_rate_generator: Option<&'a dyn Fn(usize, usize) -> f64>,
 }
 
+/// Evaluate the canonical discrete barrier-touch predicate for one tree node.
+pub(super) fn evaluate_barrier_touch(
+    spec: Option<&BarrierSpec>,
+    spot: f64,
+) -> (bool, bool, bool, f64) {
+    let Some(spec) = spec else {
+        return (false, false, false, 0.0);
+    };
+    let touched_up = spec.up_level.is_some_and(|level| spot >= level);
+    let touched_down = spec.down_level.is_some_and(|level| spot <= level);
+    let breached = matches!(spec.style, BarrierStyle::KnockOut) && (touched_up || touched_down);
+    (touched_up, touched_down, breached, spec.rebate)
+}
+
 /// Price an option using a recombining tree with backward induction.
 ///
 /// Supports binomial and trinomial trees with optional barrier monitoring.
@@ -160,18 +174,7 @@ pub fn price_recombining_tree<V: TreeValuator>(inputs: RecombiningInputs<'_, V>)
         }
     };
 
-    // Helper: evaluate barrier touch at a given spot
-    let barrier_touch = |spot: f64| -> (bool, bool, bool, f64) {
-        if let Some(spec) = &inputs.barrier {
-            let touched_up = spec.up_level.map(|lvl| spot >= lvl).unwrap_or(false);
-            let touched_down = spec.down_level.map(|lvl| spot <= lvl).unwrap_or(false);
-            let breached =
-                matches!(spec.style, BarrierStyle::KnockOut) && (touched_up || touched_down);
-            (touched_up, touched_down, breached, spec.rebate)
-        } else {
-            (false, false, false, 0.0)
-        }
-    };
+    let barrier_touch = |spot: f64| evaluate_barrier_touch(inputs.barrier.as_ref(), spot);
 
     let barrier_is_knock_in = inputs
         .barrier

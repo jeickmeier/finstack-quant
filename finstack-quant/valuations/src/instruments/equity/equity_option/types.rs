@@ -670,7 +670,7 @@ impl crate::instruments::common_impl::traits::Instrument for EquityOption {
             ),
         );
         if let Some(dividend_yield) = &self.div_yield_id {
-            deps.add_series_id(dividend_yield.as_str());
+            deps.add_spot_id(dividend_yield.as_str());
         }
         Ok(deps)
     }
@@ -735,20 +735,15 @@ mod tests {
             deps.curves.discount_curves.as_slice(),
             std::slice::from_ref(&option.discount_curve_id)
         );
-        assert_eq!(deps.spot_ids, vec![option.spot_id.as_str().to_string()]);
+        let mut expected_spots = vec![option.spot_id.as_str().to_string()];
+        expected_spots.extend(option.div_yield_id.iter().map(|id| id.as_str().to_string()));
+        assert_eq!(deps.spot_ids, expected_spots);
         assert_eq!(deps.volatility_dependencies.len(), 1);
         let volatility = &deps.volatility_dependencies[0];
         assert_eq!(volatility.surface_id, option.vol_surface_id);
         assert_eq!(volatility.underlying_id.as_ref(), Some(&option.spot_id));
         assert_eq!(volatility.reference_strike, Some(option.strike));
-        assert_eq!(
-            deps.series_ids,
-            option
-                .div_yield_id
-                .iter()
-                .map(|id| id.as_str().to_string())
-                .collect::<Vec<_>>()
-        );
+        assert!(deps.series_ids.is_empty());
     }
     use test_utils::{date, flat_discount_with_tenor, flat_vol_surface};
 

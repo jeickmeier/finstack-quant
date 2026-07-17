@@ -160,7 +160,14 @@ fn build_envelope(
     as_of: &str,
     model: &str,
 ) -> Result<InstrumentCashflowEnvelope> {
-    // --- Parse inputs ---
+    // Validate the instrument before resolving model/date inputs or touching
+    // market data so every public valuation route reports malformed
+    // instruments consistently.
+    let instrument = InstrumentEnvelope::from_str(instrument_json)?;
+    let instrument_type = instrument.key();
+    let instrument_id = instrument.id().to_string();
+
+    // --- Parse remaining inputs ---
     let model_key: ModelKey = model.parse().map_err(|e: String| {
         Error::Validation(format!(
             "unknown model '{model}': {e}. Supported: 'discounting', 'hazard_rate'"
@@ -172,12 +179,8 @@ fn build_envelope(
         )));
     }
 
-    let as_of_date = finstack_quant_core::dates::parse_iso_date(as_of)
+    let requested_as_of = finstack_quant_core::dates::parse_iso_date(as_of)
         .map_err(|e| Error::Validation(format!("invalid as_of '{as_of}': {e}")))?;
-
-    let instrument = InstrumentEnvelope::from_str(instrument_json)?;
-    let instrument_type = instrument.key();
-    let instrument_id = instrument.id().to_string();
 
     // --- Pricer registry gate: ensure the (type, model) pair is supported ---
     let registry = shared_standard_registry();
@@ -188,6 +191,20 @@ fn build_envelope(
              this exporter supports only 'discounting' / 'hazard_rate' products where sum(pv) == base_value"
         )));
     }
+
+    // Enter the selected canonical pricing lifecycle once. Besides proving the
+    // requested model can actually price the instrument, this supplies the
+    // effective valuation date and the scenario-adjusted value used for honest
+    // reconciliation below.
+    let canonical_result = registry.price_with_metrics(
+        instrument.as_ref(),
+        model_key,
+        market,
+        requested_as_of,
+        &[],
+        crate::instruments::PricingOptions::default(),
+    )?;
+    let as_of_date = canonical_result.as_of;
 
     // --- Resolve curves ---
     let deps = instrument.market_dependencies()?;
@@ -356,13 +373,17 @@ fn build_envelope(
             recovery_rate,
             as_of_date,
         )?;
-        let pv = market
+        let base_pv = market
             .convert_money(
                 Money::new(native_pv, ccy),
                 envelope_currency.unwrap_or(ccy),
                 as_of_date,
             )?
             .amount();
+        let pv = crate::instruments::common_impl::helpers::apply_scenario_raw_value(
+            instrument.as_ref(),
+            base_pv,
+        );
 
         let mbs_row = mbs_state.as_ref().and_then(|m| m.get(&flow.date));
 
@@ -403,27 +424,15 @@ fn build_envelope(
 
     let total_pv = sum_pvs(rows.iter().map(|row| row.pv));
 
-    // Honest reconciliation flag: compare `total_pv` against the instrument's
-    // canonical `base_value` (`Instrument::value`) rather than asserting `true`
-    // unconditionally. The flag is only `true` when the per-flow PV sum
-    // actually agrees with `base_value` within rounding. This catches genuine
-    // mismatches — e.g. a model whose `base_value` pricer diverges from the
-    // discounting/hazard cashflow sum, or a future change that re-introduces a
-    // discounting bug — instead of silently claiming a reconciliation that
-    // does not hold.
-    let reconciles_with_base_value = match instrument.value(market, as_of_date) {
-        Ok(base_value) if base_value.currency() == currency => {
-            let base = base_value.amount();
-            // Relative tolerance with an absolute floor: per-flow PVs and
-            // `base_value` are summed by different (compensated) accumulators,
-            // so exact equality is not expected, but any real time-origin or
-            // model mismatch is orders of magnitude larger than this bound.
-            let tol = (base.abs() * 1e-6).max(1e-6);
-            (total_pv - base).abs() <= tol
-        }
-        // If the instrument cannot be priced via `Instrument::value` we cannot
-        // assert reconciliation; report `false` rather than an unverified `true`.
-        Ok(_) | Err(_) => false,
+    // Compare against the same selected registry result that supplied the
+    // effective date. Per-flow and model PVs use different compensated sums,
+    // so allow a small numerical tolerance while still catching real drift.
+    let reconciles_with_base_value = if canonical_result.value.currency() == currency {
+        let base = canonical_result.value.amount();
+        let tol = (base.abs() * 1e-6).max(1e-6);
+        (total_pv - base).abs() <= tol
+    } else {
+        false
     };
 
     Ok(InstrumentCashflowEnvelope {
@@ -466,8 +475,9 @@ where
 mod tests {
     use super::*;
     use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::fixed_income::structured_credit::StructuredCredit;
     use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-    use crate::instruments::Instrument;
+    use crate::instruments::{Instrument, ScenarioPricingOverrides};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
@@ -481,6 +491,23 @@ mod tests {
             instrument: InstrumentJson::Bond(bond.clone()),
         };
         serde_json::to_string(&envelope).expect("serialize bond envelope")
+    }
+
+    #[test]
+    fn malformed_instrument_precedes_model_and_date_errors() {
+        let mut deal = StructuredCredit::example();
+        deal.cleanup_call_pct = Some(-0.5);
+        let json = serde_json::to_string(&InstrumentJson::StructuredCredit(Box::new(deal)))
+            .expect("serialize structured credit");
+
+        let err =
+            instrument_cashflows_json(&json, &MarketContext::new(), "not-a-date", "not-a-model")
+                .expect_err("instrument validation must win");
+
+        assert!(
+            err.to_string().contains("cleanup_call_pct"),
+            "unexpected error ordering: {err}"
+        );
     }
 
     #[test]
@@ -592,6 +619,60 @@ mod tests {
         for row in &envelope.flows {
             assert!(row.survival_probability.is_none());
             assert!(row.discount_factor > 0.0);
+        }
+    }
+
+    #[test]
+    fn scenario_price_shock_scales_cashflow_rows_and_total_once() {
+        let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
+        let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
+        let mut bond = Bond::fixed(
+            "BOND-CASHFLOW-SCENARIO",
+            Money::new(1_000_000.0, Currency::USD),
+            0.05,
+            issue,
+            maturity,
+            "USD-OIS",
+        )
+        .expect("bond");
+        let as_of = Date::from_calendar_date(2025, Month::July, 1).expect("date");
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(issue)
+                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+                .build()
+                .expect("discount curve"),
+        );
+
+        let baseline: InstrumentCashflowEnvelope = serde_json::from_str(
+            &instrument_cashflows_json(
+                &serialize_bond(&bond),
+                &market,
+                "2025-07-01",
+                "discounting",
+            )
+            .expect("baseline cashflows"),
+        )
+        .expect("baseline envelope");
+
+        bond.scenario_pricing_overrides =
+            ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+        let shocked: InstrumentCashflowEnvelope = serde_json::from_str(
+            &instrument_cashflows_json(
+                &serialize_bond(&bond),
+                &market,
+                "2025-07-01",
+                "discounting",
+            )
+            .expect("shocked cashflows"),
+        )
+        .expect("shocked envelope");
+
+        assert_eq!(shocked.as_of, as_of);
+        assert!((shocked.total_pv - baseline.total_pv * 0.90).abs() < 1e-8);
+        assert!(shocked.reconciles_with_base_value);
+        for (baseline_row, shocked_row) in baseline.flows.iter().zip(&shocked.flows) {
+            assert!((shocked_row.pv - baseline_row.pv * 0.90).abs() < 1e-8);
         }
     }
 

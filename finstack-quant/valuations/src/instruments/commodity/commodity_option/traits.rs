@@ -1,13 +1,7 @@
 //! Trait implementations for CommodityOption.
 
 use crate::instruments::commodity::commodity_option::CommodityOption;
-use crate::metrics::{HasDayCount, HasExpiry, HasPricingOverrides};
-
-impl HasPricingOverrides for CommodityOption {
-    fn metric_pricing_overrides_mut(&mut self) -> &mut crate::instruments::MetricPricingOverrides {
-        &mut self.metric_pricing_overrides
-    }
-}
+use crate::metrics::{HasDayCount, HasExpiry};
 
 impl HasExpiry for CommodityOption {
     fn expiry(&self) -> finstack_quant_core::dates::Date {

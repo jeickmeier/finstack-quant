@@ -18,7 +18,7 @@ use smallvec::SmallVec;
 use finstack_quant_valuations::instruments::{EquityUnderlyingParams, FixedLegSpec, FloatLegSpec, FxUnderlyingParams};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::{
-    CDSConvention, CreditDefaultSwap, CreditDefaultSwapBuilder, PayReceive, PremiumLegSpec,
+    CDSConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec,
     ProtectionLegSpec,
 };
 use finstack_quant_valuations::instruments::rates::irs::{FloatingLegCompounding, InterestRateSwap};
@@ -670,22 +670,9 @@ pub mod calibration {
         // (`data`).
         let (prior, mut data) = split_market_context_state(MarketContextState::from(context))?;
 
-        // Build the `default` quote set: append each quote's `MarketDatum` to
-        // `market_data` and collect the `QuoteId`s by reference.
-        let ids: Vec<QuoteId> = quotes
-            .iter()
-            .map(|q| match q {
-                MarketQuote::Rates(q) => q.id().clone(),
-                MarketQuote::Cds(q) => q.id().clone(),
-                MarketQuote::CDSTranche(q) => q.id().clone(),
-                MarketQuote::Fx(q) => q.id().clone(),
-                MarketQuote::Inflation(q) => q.id().clone(),
-                MarketQuote::Vol(q) => q.id().clone(),
-                MarketQuote::Xccy(q) => q.id().clone(),
-                MarketQuote::Bond(q) => q.id().clone(),
-            })
-            .collect();
-        data.extend(quotes.iter().cloned().map(MarketDatum::from));
+        // Build the `default` quote set and flatten its quotes onto market data.
+        let ids = quote_set_ids(quotes);
+        extend_market_data(&mut data, quotes);
 
         let mut quote_sets = finstack_quant_core::HashMap::default();
         quote_sets.insert("default".to_string(), ids);

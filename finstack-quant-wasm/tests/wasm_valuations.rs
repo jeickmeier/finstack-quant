@@ -6,8 +6,10 @@
 #![cfg(target_arch = "wasm32")]
 
 use finstack_quant_wasm::api::valuations::pricing::{
-    list_standard_metrics, price_instrument, price_instrument_with_metrics,
+    instrument_cashflows_json, list_standard_metrics, price_instrument,
+    price_instrument_with_metrics,
 };
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::*;
 
 fn bond_instrument_json() -> String {
@@ -105,6 +107,29 @@ fn structured_credit_instrument_json() -> String {
     serde_json::to_string(&InstrumentJson::StructuredCredit(Box::new(sc))).unwrap()
 }
 
+fn invalid_structured_credit_instrument_json() -> String {
+    let mut value: serde_json::Value =
+        serde_json::from_str(&structured_credit_instrument_json()).unwrap();
+    value["spec"]["cleanup_call_pct"] = serde_json::json!(-0.5);
+    serde_json::to_string(&value).unwrap()
+}
+
+fn fx_option_instrument_json() -> String {
+    use finstack_quant_valuations::instruments::fx::FxOption;
+    use finstack_quant_valuations::instruments::InstrumentJson;
+
+    let option = FxOption::example().expect("fx option example");
+    serde_json::to_string(&InstrumentJson::FxOption(option)).unwrap()
+}
+
+fn error_message(error: JsValue) -> String {
+    error
+        .dyn_into::<js_sys::Error>()
+        .expect("binding errors should be JavaScript Error objects")
+        .message()
+        .into()
+}
+
 #[wasm_bindgen_test]
 fn list_standard_metrics_returns_non_empty_array() {
     let result = list_standard_metrics().unwrap();
@@ -150,6 +175,101 @@ fn price_instrument_with_metrics_accepts_pricing_options() {
     assert!(!result.is_empty());
     let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
     assert!(parsed.is_object());
+}
+
+#[wasm_bindgen_test]
+fn public_json_routes_validate_instrument_before_malformed_market() {
+    use finstack_quant_wasm::api::valuations::structured_credit::{
+        structured_credit_tranche_breakeven_cdr, structured_credit_tranche_discount_margin,
+        structured_credit_tranche_metrics, structured_credit_tranche_oas,
+        structured_credit_tranche_scenario_table,
+    };
+
+    let instrument = invalid_structured_credit_instrument_json();
+    let market = "not-market-json";
+    let metrics = serde_wasm_bindgen::to_value(&vec!["not-a-metric".to_string()]).unwrap();
+
+    let errors = [
+        price_instrument(&instrument, market, "not-a-date", "not-a-model").unwrap_err(),
+        price_instrument_with_metrics(
+            &instrument,
+            market,
+            "not-a-date",
+            "not-a-model",
+            metrics,
+            None,
+            None,
+        )
+        .unwrap_err(),
+        instrument_cashflows_json(&instrument, market, "not-a-date", "not-a-model").unwrap_err(),
+        structured_credit_tranche_discount_margin(
+            &instrument,
+            market,
+            "not-a-date",
+            "missing",
+            f64::NAN,
+        )
+        .unwrap_err(),
+        structured_credit_tranche_breakeven_cdr(&instrument, market, "not-a-date", "missing")
+            .unwrap_err(),
+        structured_credit_tranche_oas(
+            &instrument,
+            market,
+            "not-a-date",
+            "missing",
+            f64::NAN,
+            Some("not-json".to_string()),
+        )
+        .unwrap_err(),
+        structured_credit_tranche_scenario_table(
+            &instrument,
+            market,
+            "not-a-date",
+            "missing",
+            "not-json",
+        )
+        .unwrap_err(),
+        structured_credit_tranche_metrics(
+            &instrument,
+            market,
+            "not-a-date",
+            "missing",
+            Some(f64::NAN),
+        )
+        .unwrap_err(),
+    ];
+
+    for error in errors {
+        let message = error_message(error);
+        assert!(
+            message.contains("cleanup_call_pct"),
+            "instrument validation should win over malformed market input: {message}"
+        );
+    }
+}
+
+#[wasm_bindgen_test]
+fn fx_price_with_metrics_validates_merged_overrides_before_market() {
+    use finstack_quant_wasm::api::valuations::fx::WasmFxOption;
+
+    let option = WasmFxOption::from_json(&fx_option_instrument_json()).unwrap();
+    let metrics = serde_wasm_bindgen::to_value(&Vec::<String>::new()).unwrap();
+    let error = option
+        .price_with_metrics(
+            "not-market-json",
+            "not-a-date",
+            metrics,
+            Some("not-a-model".to_string()),
+            Some(r#"{"vol_bump_pct":-0.20}"#.to_string()),
+            None,
+        )
+        .unwrap_err();
+    let message = error_message(error);
+
+    assert!(
+        message.contains("NegativeValue") || message.contains("negative"),
+        "merged pricing-option validation should win over malformed market input: {message}"
+    );
 }
 
 #[wasm_bindgen_test]

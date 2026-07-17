@@ -4,6 +4,23 @@ use crate::bindings::extract::extract_market;
 use crate::errors::display_to_py;
 use pyo3::prelude::*;
 
+fn validate_pricing_instrument_json(
+    py: Python<'_>,
+    instrument_json: &str,
+    pricing_options: Option<&str>,
+) -> PyResult<()> {
+    let instrument_json = instrument_json.to_owned();
+    let pricing_options = pricing_options.map(str::to_owned);
+    py.detach(move || {
+        finstack_quant_valuations::pricer::parse_boxed_instrument_json(
+            &instrument_json,
+            pricing_options.as_deref(),
+        )
+        .map(drop)
+        .map_err(display_to_py)
+    })
+}
+
 /// Price an instrument from its tagged JSON and return a ``ValuationResult`` JSON.
 ///
 /// Parameters
@@ -32,6 +49,7 @@ fn price_instrument(
     as_of: &str,
     model: &str,
 ) -> PyResult<String> {
+    validate_pricing_instrument_json(py, instrument_json, None)?;
     let market = extract_market(market)?;
     let instrument_json = instrument_json.to_owned();
     let as_of = as_of.to_owned();
@@ -92,6 +110,7 @@ fn price_instrument_with_metrics(
     pricing_options: Option<&str>,
     market_history: Option<&str>,
 ) -> PyResult<String> {
+    validate_pricing_instrument_json(py, instrument_json, pricing_options)?;
     let market = extract_market(market)?;
     let instrument_json = instrument_json.to_owned();
     let as_of = as_of.to_owned();
@@ -174,6 +193,7 @@ fn instrument_cashflows_json(
     as_of: &str,
     model: &str,
 ) -> PyResult<String> {
+    validate_pricing_instrument_json(py, instrument_json, None)?;
     let market = extract_market(market)?;
     let instrument_json = instrument_json.to_owned();
     let as_of = as_of.to_owned();

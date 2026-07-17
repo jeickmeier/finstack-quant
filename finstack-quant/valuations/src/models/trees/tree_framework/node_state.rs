@@ -205,13 +205,10 @@ impl<'a> NodeState<'a> {
     pub fn update_barrier_state(&mut self, spot_price: f64) {
         if let Some(ref mut barrier_state) = self.barrier_state {
             if !barrier_state.barrier_hit {
-                let hit = match barrier_state.barrier_type {
-                    BarrierType::UpAndOut | BarrierType::UpAndIn => {
-                        spot_price >= barrier_state.barrier_level
-                    }
-                    BarrierType::DownAndOut | BarrierType::DownAndIn => {
-                        spot_price <= barrier_state.barrier_level
-                    }
+                let hit = if barrier_state.barrier_type.is_up() {
+                    spot_price >= barrier_state.barrier_level
+                } else {
+                    spot_price <= barrier_state.barrier_level
                 };
                 barrier_state.barrier_hit = hit;
             }
@@ -221,11 +218,7 @@ impl<'a> NodeState<'a> {
     /// Check if option should be knocked out (for barrier options)
     pub fn is_knocked_out(&self) -> bool {
         if let Some(ref barrier_state) = self.barrier_state {
-            barrier_state.barrier_hit
-                && matches!(
-                    barrier_state.barrier_type,
-                    BarrierType::UpAndOut | BarrierType::DownAndOut
-                )
+            barrier_state.barrier_hit && barrier_state.barrier_type.is_knock_out()
         } else {
             false
         }
@@ -234,11 +227,7 @@ impl<'a> NodeState<'a> {
     /// Check if option should be knocked in (for barrier options)
     pub fn is_knocked_in(&self) -> bool {
         if let Some(ref barrier_state) = self.barrier_state {
-            barrier_state.barrier_hit
-                && matches!(
-                    barrier_state.barrier_type,
-                    BarrierType::UpAndIn | BarrierType::DownAndIn
-                )
+            barrier_state.barrier_hit && barrier_state.barrier_type.is_knock_in()
         } else {
             true // If no barrier, always "knocked in"
         }

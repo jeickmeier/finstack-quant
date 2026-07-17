@@ -137,3 +137,78 @@ pub use types::{
     BermudanSchedule, BermudanSwaption, BermudanType, CashSettlementMethod, GreekInputs,
     SABRParameters, Swaption, SwaptionExercise, SwaptionSettlement, VolatilityModel,
 };
+
+/// Build the HW1F surface-calibration input from the normalized fixed-leg tenor.
+///
+/// The calibration engine supports annual, semiannual, and quarterly swap
+/// schedules. Month- and year-based spellings that represent the same period
+/// are normalized; other tenors fail instead of silently calibrating as 6M.
+pub(crate) fn hw1f_swaption_surface_calibration(
+    surface_id: &str,
+    max_expiry: Option<f64>,
+    fixed_frequency: finstack_quant_core::dates::Tenor,
+) -> finstack_quant_core::Result<
+    crate::instruments::rates::exotics_shared::Hw1fSurfaceCalibration<'_>,
+> {
+    use crate::calibration::hull_white::SwapFrequency;
+
+    let frequency = match fixed_frequency.months() {
+        Some(12) => SwapFrequency::Annual,
+        Some(6) => SwapFrequency::SemiAnnual,
+        Some(3) => SwapFrequency::Quarterly,
+        _ => {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "HW1F swaption surface calibration supports fixed-leg frequencies of 1Y, 6M, \
+                 or 3M; got {fixed_frequency}"
+            )))
+        }
+    };
+
+    Ok(
+        crate::instruments::rates::exotics_shared::Hw1fSurfaceCalibration::Swaption {
+            surface_id,
+            max_expiry,
+            frequency,
+        },
+    )
+}
+
+#[cfg(test)]
+mod calibration_frequency_tests {
+    use super::*;
+    use crate::calibration::hull_white::SwapFrequency;
+    use crate::instruments::rates::exotics_shared::Hw1fSurfaceCalibration;
+    use finstack_quant_core::dates::{Tenor, TenorUnit};
+
+    fn frequency_for(tenor: Tenor) -> SwapFrequency {
+        match hw1f_swaption_surface_calibration("VOL", Some(10.0), tenor)
+            .expect("supported fixed-leg tenor")
+        {
+            Hw1fSurfaceCalibration::Swaption { frequency, .. } => frequency,
+            Hw1fSurfaceCalibration::CapFloor { .. } => unreachable!("swaption helper variant"),
+        }
+    }
+
+    #[test]
+    fn hw1f_surface_calibration_uses_annual_fixed_leg_frequency() {
+        assert_eq!(frequency_for(Tenor::annual()), SwapFrequency::Annual);
+        assert_eq!(
+            frequency_for(Tenor::new(12, TenorUnit::Months)),
+            SwapFrequency::Annual
+        );
+    }
+
+    #[test]
+    fn hw1f_surface_calibration_uses_quarterly_fixed_leg_frequency() {
+        assert_eq!(frequency_for(Tenor::quarterly()), SwapFrequency::Quarterly);
+    }
+
+    #[test]
+    fn hw1f_surface_calibration_rejects_unsupported_fixed_leg_frequency() {
+        let error = match hw1f_swaption_surface_calibration("VOL", None, Tenor::monthly()) {
+            Err(error) => error.to_string(),
+            Ok(_) => panic!("monthly fixed-leg tenor must be unsupported"),
+        };
+        assert!(error.contains("got 1M"), "unexpected error: {error}");
+    }
+}

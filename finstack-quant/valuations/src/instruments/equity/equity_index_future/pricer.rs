@@ -180,7 +180,7 @@ pub(crate) fn fair_forward(
 mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
-    use crate::instruments::rates::ir_future::Position;
+    use crate::instruments::Position;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;

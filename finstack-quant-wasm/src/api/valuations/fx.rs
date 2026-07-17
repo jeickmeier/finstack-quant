@@ -14,6 +14,7 @@
 use super::pricing::{
     metric_value_with_context, parse_market_json, price_instrument_with_context,
     price_instrument_with_metrics_context, standard_option_greeks_with_context,
+    validate_pricing_instrument_json,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::pricer::{
@@ -48,6 +49,7 @@ fn price_payload(
     as_of: &str,
     model: Option<String>,
 ) -> Result<String, JsValue> {
+    validate_pricing_instrument_json(json, None)?;
     let market = parse_market_json(market_json)?;
     price_instrument_with_context(json, &market, as_of, model.as_deref().unwrap_or("default"))
 }
@@ -61,6 +63,7 @@ fn price_payload_with_metrics(
     pricing_options: Option<String>,
     market_history: Option<String>,
 ) -> Result<String, JsValue> {
+    validate_pricing_instrument_json(json, pricing_options.as_deref())?;
     let market = parse_market_json(market_json)?;
     let metrics: Vec<String> = serde_wasm_bindgen::from_value(metrics).map_err(to_js_err)?;
     price_instrument_with_metrics_context(
@@ -81,6 +84,7 @@ fn metric_value(
     model: Option<String>,
     metric: &str,
 ) -> Result<f64, JsValue> {
+    validate_pricing_instrument_json(json, None)?;
     let market = parse_market_json(market_json)?;
     metric_value_with_context(
         json,
@@ -256,6 +260,7 @@ macro_rules! fx_option_class {
                 as_of: &str,
                 model: Option<String>,
             ) -> Result<JsValue, JsValue> {
+                validate_pricing_instrument_json(&self.json, None)?;
                 let market = parse_market_json(market_json)?;
                 let pairs = standard_option_greeks_with_context(
                     &self.json,
@@ -298,6 +303,7 @@ macro_rules! fx_option_subset_class {
                 as_of: &str,
                 model: Option<String>,
             ) -> Result<JsValue, JsValue> {
+                validate_pricing_instrument_json(&self.json, None)?;
                 let market = parse_market_json(market_json)?;
                 let pairs = standard_option_greeks_with_context(
                     &self.json,

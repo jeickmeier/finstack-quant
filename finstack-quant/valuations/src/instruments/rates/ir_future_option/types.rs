@@ -327,7 +327,11 @@ impl crate::instruments::common_impl::traits::Instrument for IrFutureOption {
         Ok(Money::new(pv, self.notional.currency()))
     }
 
-    fn value_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+    fn base_value_raw(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
         self.npv(curves, as_of)
     }
 

@@ -6,9 +6,7 @@
 //! a four-corner central mixed difference.
 
 use crate::instruments::common_impl::dependencies::FxPair;
-use crate::metrics::core::finite_difference::{
-    bump_scalar_price, bump_surface_vol_absolute, central_mixed,
-};
+use crate::metrics::core::finite_difference::{bump_scalar_price, central_mixed};
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::dates::Date;
@@ -136,7 +134,7 @@ impl FactorBumper for ParallelCurveBumper {
 
 #[derive(Debug, Clone)]
 struct VolParallelBumper {
-    surface_id: CurveId,
+    surface_ids: Vec<CurveId>,
     bump_abs: f64,
 }
 
@@ -147,7 +145,20 @@ impl FactorBumper for VolParallelBumper {
         _as_of: Date,
         direction: f64,
     ) -> Result<MarketContext> {
-        bump_surface_vol_absolute(market, self.surface_id.as_str(), self.bump_abs * direction)
+        market.bump(
+            self.surface_ids
+                .iter()
+                .cloned()
+                .map(|id| MarketBump::Curve {
+                    id,
+                    spec: BumpSpec {
+                        mode: finstack_quant_core::market_data::bumps::BumpMode::Additive,
+                        units: finstack_quant_core::market_data::bumps::BumpUnits::Fraction,
+                        value: self.bump_abs * direction,
+                        bump_type: finstack_quant_core::market_data::bumps::BumpType::Parallel,
+                    },
+                }),
+        )
     }
 
     fn bump_size(&self) -> f64 {
@@ -155,7 +166,9 @@ impl FactorBumper for VolParallelBumper {
     }
 
     fn is_applicable(&self, market: &MarketContext, _as_of: Date) -> bool {
-        market.get_surface(self.surface_id.as_str()).is_ok()
+        self.surface_ids
+            .iter()
+            .all(|surface_id| market.get_surface(surface_id.as_str()).is_ok())
     }
 }
 
@@ -270,20 +283,19 @@ pub(crate) fn make_credit_bumper(context: &MetricContext) -> Result<Option<Box<d
 /// Create a volatility bumper from runtime instrument dependencies.
 pub(crate) fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
     let deps = context.instrument.market_dependencies()?;
-    let surface_ids = deps.unique_vol_surface_ids();
-    let Some(surface_id) = surface_ids
-        .iter()
-        .find(|surface_id| context.curves.get_surface(surface_id.as_str()).is_ok())
-        .cloned()
-        .or_else(|| surface_ids.first().cloned())
-    else {
+    let surface_ids: Vec<_> = deps
+        .unique_vol_surface_ids()
+        .into_iter()
+        .filter(|surface_id| context.curves.get_surface(surface_id.as_str()).is_ok())
+        .collect();
+    if surface_ids.is_empty() {
         return Ok(None);
-    };
+    }
 
     let defaults =
         sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
     Ok(Some(Box::new(VolParallelBumper {
-        surface_id,
+        surface_ids,
         bump_abs: defaults.vol_bump_pct,
     })))
 }
@@ -414,8 +426,49 @@ fn reprice_corner(
 #[cfg(test)]
 mod tests {
     use crate::metrics::MetricId;
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::types::CurveId;
 
-    use super::CrossFactorPair;
+    use super::{CrossFactorPair, FactorBumper, VolParallelBumper};
+
+    fn flat_surface(id: &str, vol: f64) -> VolSurface {
+        VolSurface::builder(id)
+            .expiries(&[1.0])
+            .strikes(&[100.0])
+            .row(&[vol])
+            .build()
+            .expect("surface")
+    }
+
+    #[test]
+    fn parallel_vol_bumper_moves_every_resolved_surface() {
+        let market = MarketContext::new()
+            .insert_surface(flat_surface("VOL-A", 0.20))
+            .insert_surface(flat_surface("VOL-B", 0.30));
+        let bumper = VolParallelBumper {
+            surface_ids: vec![CurveId::new("VOL-A"), CurveId::new("VOL-B")],
+            bump_abs: 0.01,
+        };
+
+        assert!(bumper.is_applicable(&market, Date::MIN));
+        let bumped = bumper
+            .bump_market(&market, Date::MIN, 1.0)
+            .expect("parallel bump");
+        let bumped_a = bumped
+            .get_surface("VOL-A")
+            .expect("VOL-A")
+            .value_checked(1.0, 100.0)
+            .expect("VOL-A value");
+        let bumped_b = bumped
+            .get_surface("VOL-B")
+            .expect("VOL-B")
+            .value_checked(1.0, 100.0)
+            .expect("VOL-B value");
+        assert!((bumped_a - 0.21).abs() < 1e-12);
+        assert!((bumped_b - 0.31).abs() < 1e-12);
+    }
 
     #[test]
     fn cross_factor_pair_metric_id_roundtrip() {

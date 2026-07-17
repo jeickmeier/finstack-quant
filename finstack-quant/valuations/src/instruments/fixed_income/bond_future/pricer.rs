@@ -13,7 +13,6 @@ use finstack_quant_core::Result;
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::Bond;
-use crate::instruments::Position;
 
 /// Bond future pricer.
 ///
@@ -392,8 +391,9 @@ impl BondFuturePricer {
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::{CurveId, InstrumentId};
     /// use finstack_quant_valuations::instruments::Bond;
-    /// use finstack_quant_valuations::instruments::fixed_income::bond_future::{BondFuture, DeliverableBond, Position};
+    /// use finstack_quant_valuations::instruments::fixed_income::bond_future::{BondFuture, DeliverableBond};
     /// use finstack_quant_valuations::instruments::fixed_income::bond_future::pricer::BondFuturePricer;
+    /// use finstack_quant_valuations::instruments::Position;
     /// use time::macros::date;
     ///
     /// # fn main() -> finstack_quant_core::Result<()> {
@@ -456,11 +456,7 @@ impl BondFuturePricer {
         // Calculate price differential
         let price_diff = model_price - future.quoted_price;
 
-        // Position sign: +1 for Long, -1 for Short
-        let position_sign = match future.position {
-            Position::Long => 1.0,
-            Position::Short => -1.0,
-        };
+        let position_sign = future.position.sign();
 
         // Futures MTM: no discounting — exchange-traded futures settle daily
         // via variation margin, so the mark-to-market is undiscounted.
@@ -504,9 +500,9 @@ impl crate::pricer::Pricer for BondFuturePricer {
             .instrument_type(crate::pricer::InstrumentType::BondFuture)
             .model(crate::pricer::ModelKey::BondFutureCleanPriceProxy);
 
-        // Delegate to BondFuture::value(), which resolves the CTD bond and computes NPV.
+        // Delegate to the unshocked kernel; the registry owns scenario application.
         let npv = future
-            .value(market, as_of)
+            .base_value(market, as_of)
             .map_err(|e| crate::pricer::PricingError::from_core(e, ctx))?;
 
         Ok(crate::results::ValuationResult::stamped(
@@ -537,6 +533,7 @@ mod tests {
 
     use crate::cashflow::traits::CashflowProvider;
     use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::Position;
 
     /// Helper to create a simple market context with a flat discount curve
     fn create_test_market(rate: f64) -> MarketContext {
