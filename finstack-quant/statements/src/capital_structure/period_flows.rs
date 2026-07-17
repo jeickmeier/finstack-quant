@@ -173,10 +173,25 @@ pub fn calculate_period_flows(
     // we now warn at 1.05 and refuse to amplify beyond 1.10.
     const SCALE_WARN_THRESHOLD: f64 = 1.05;
     const SCALE_CLAMP_MAX: f64 = 1.10;
+    // Whether a draw event lands in this period (revolver redraw, or a
+    // mid-period issuance / delayed-draw notional exchange). Computed once and
+    // used both for the closing balance and, below, for the scale: a draw
+    // establishes a fresh balance even from a zero stateful opening, and the
+    // in-period flows are already scheduled against it. Keeping this a single
+    // binding stops the scale and closing branches from drifting apart.
+    let has_new_funding = full_schedule.get_flows().iter().any(|cf| {
+        cf.date >= period.start
+            && cf.date < period.end
+            && (matches!(cf.kind, CFKind::RevolvingDraw)
+                || (matches!(cf.kind, CFKind::Notional) && cf.amount.amount() <= 0.0))
+    });
     let scale = if opening_balance.amount() == 0.0 {
-        if scheduled_opening.amount() == 0.0 {
+        if scheduled_opening.amount() == 0.0 || has_new_funding {
+            // No prior balance and none scheduled (pre-issuance start), or the
+            // balance is established by a draw this period: book at full scale.
             1.0
         } else {
+            // Balance scheduled but not yet drawn/issued: book nothing.
             0.0
         }
     } else if scheduled_opening.amount() == 0.0 {
@@ -377,15 +392,6 @@ pub fn calculate_period_flows(
             }
         });
 
-    let has_new_funding = full_schedule.get_flows().iter().any(|cf| {
-        (cf.date >= period.start
-            && cf.date < period.end
-            && matches!(cf.kind, CFKind::RevolvingDraw))
-            || (cf.date >= period.start
-                && cf.date < period.end
-                && matches!(cf.kind, CFKind::Notional)
-                && cf.amount.amount() <= 0.0)
-    });
     let net_new_funding: f64 = full_schedule
         .get_flows()
         .iter()
@@ -606,6 +612,125 @@ mod tests {
             -13_000.0,
             "net interest expense is negative when the hedge is in the money"
         );
+    }
+
+    /// A period that redraws from a zero stateful balance must still book the
+    /// period's interest.
+    ///
+    /// When stateful opening is 0 but the schedule shows a draw this period (a
+    /// revolver redrawn after a full sweep, or an instrument issued mid-period),
+    /// `scale` was 0, zeroing every coupon, fee, and the accrual — while the
+    /// closing-balance branch correctly recognized the draw via
+    /// `has_new_funding`. The two halves disagreed about whether the debt
+    /// exists.
+    #[test]
+    fn redraw_from_zero_balance_still_books_interest() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
+        let period = Period {
+            id: PeriodId::quarter(2025, 1),
+            start,
+            end,
+            is_actual: false,
+        };
+        let draw_date = Date::from_calendar_date(2025, Month::January, 5).expect("valid date");
+        let coupon_date = Date::from_calendar_date(2025, Month::February, 15).expect("valid date");
+
+        // Revolver: draw 1M this period, then accrue a 20k coupon on it.
+        let instrument = SignedFlowInstrument {
+            schedule: test_schedule(
+                vec![
+                    CashFlow::new(
+                        draw_date,
+                        None,
+                        Money::new(1_000_000.0, Currency::USD),
+                        CFKind::RevolvingDraw,
+                        0.0,
+                        None,
+                    ),
+                    CashFlow::new(
+                        coupon_date,
+                        None,
+                        Money::new(20_000.0, Currency::USD),
+                        CFKind::Fixed,
+                        0.25,
+                        None,
+                    ),
+                ],
+                1_000_000.0,
+                start,
+            ),
+        };
+
+        let market_ctx = MarketContext::new();
+        // Stateful opening is zero — the revolver was fully swept last period.
+        let (breakdown, closing, net_new_funding, _) = calculate_period_flows(
+            &instrument,
+            &period,
+            Money::new(0.0, Currency::USD),
+            Money::new(0.0, Currency::USD),
+            &market_ctx,
+            start,
+        )
+        .expect("period flow calculation should succeed");
+
+        // The draw is recognized (closing = 1M, funding = 1M) ...
+        assert_eq!(net_new_funding.amount(), 1_000_000.0);
+        assert_eq!(closing.amount(), 1_000_000.0);
+        // ... so the coupon on that drawn balance must be booked, not zeroed.
+        assert_eq!(
+            breakdown.interest_expense_cash.amount(),
+            20_000.0,
+            "interest on a redrawn balance must not be zeroed"
+        );
+    }
+
+    /// A genuinely unissued instrument (zero opening, no draw) still books
+    /// nothing — the pre-issuance case the zero-scale branch exists for.
+    #[test]
+    fn zero_balance_without_draw_books_nothing() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
+        let period = Period {
+            id: PeriodId::quarter(2025, 1),
+            start,
+            end,
+            is_actual: false,
+        };
+        let coupon_date = Date::from_calendar_date(2025, Month::February, 15).expect("valid date");
+
+        let instrument = SignedFlowInstrument {
+            schedule: test_schedule(
+                vec![CashFlow::new(
+                    coupon_date,
+                    None,
+                    Money::new(20_000.0, Currency::USD),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                )],
+                1_000_000.0,
+                start,
+            ),
+        };
+
+        let market_ctx = MarketContext::new();
+        let (breakdown, _, _, _) = calculate_period_flows(
+            &instrument,
+            &period,
+            Money::new(0.0, Currency::USD),
+            Money::new(0.0, Currency::USD),
+            &market_ctx,
+            start,
+        )
+        .expect("period flow calculation should succeed");
+
+        assert_eq!(
+            breakdown.interest_expense_cash.amount(),
+            0.0,
+            "an unissued instrument with no draw books no interest"
+        );
+        assert_eq!(breakdown.accrued_interest.amount(), 0.0);
     }
 
     /// Once sweeps push the balance below the cumulative toggled PIK, the
