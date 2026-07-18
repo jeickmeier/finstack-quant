@@ -41,7 +41,7 @@ fn parse_extrapolation(s: &str) -> Result<ExtrapolationPolicy, JsValue> {
 }
 
 // ---------------------------------------------------------------------------
-// DiscountCurve
+// JsDiscountCurve
 // ---------------------------------------------------------------------------
 
 /// Discount factor curve for present-value calculations.
@@ -69,13 +69,13 @@ fn parse_extrapolation(s: &str) -> Result<ExtrapolationPolicy, JsValue> {
 /// curve.zero(2.5);        // continuously-compounded zero rate at 2.5y
 /// ```
 #[wasm_bindgen(js_name = DiscountCurve)]
-pub struct DiscountCurve {
+pub struct JsDiscountCurve {
     #[wasm_bindgen(skip)]
     pub(crate) inner: Arc<RustDiscountCurve>,
 }
 
 #[wasm_bindgen(js_class = DiscountCurve)]
-impl DiscountCurve {
+impl JsDiscountCurve {
     /// Construct from an array of `[time, df]` pairs.
     ///
     /// @param id - Curve identifier (e.g. `"USD-OIS"`). Used as the lookup
@@ -112,7 +112,7 @@ impl DiscountCurve {
         day_count: Option<String>,
         validation_mode: Option<String>,
         forward_floor: Option<f64>,
-    ) -> Result<DiscountCurve, JsValue> {
+    ) -> Result<JsDiscountCurve, JsValue> {
         let base = parse_iso_date(base_date)?;
         let style = match interp {
             Some(ref s) => parse_interp_style(s)?,
@@ -155,7 +155,11 @@ impl DiscountCurve {
     /// @param base_date - ISO-8601 curve base date from which time coordinates are measured.
     /// @param continuous_rate - Flat continuously compounded zero rate expressed as a decimal.
     #[wasm_bindgen(js_name = flat)]
-    pub fn flat(id: &str, base_date: &str, continuous_rate: f64) -> Result<DiscountCurve, JsValue> {
+    pub fn flat(
+        id: &str,
+        base_date: &str,
+        continuous_rate: f64,
+    ) -> Result<JsDiscountCurve, JsValue> {
         let curve = RustDiscountCurve::flat(id, parse_iso_date(base_date)?, continuous_rate)
             .map_err(to_js_err)?;
         Ok(Self {
@@ -197,7 +201,7 @@ impl DiscountCurve {
 }
 
 // ---------------------------------------------------------------------------
-// ForwardCurve
+// JsForwardCurve
 // ---------------------------------------------------------------------------
 
 #[derive(Deserialize)]
@@ -221,14 +225,14 @@ struct ForwardCurveOptions {
 
 /// Forward rate curve for a floating-rate index with a fixed tenor.
 #[wasm_bindgen(js_name = ForwardCurve)]
-pub struct ForwardCurve {
+pub struct JsForwardCurve {
     #[wasm_bindgen(skip)]
     pub(crate) inner: Arc<RustForwardCurve>,
 }
 
 #[wasm_bindgen(js_class = ForwardCurve)]
-impl ForwardCurve {
-    fn build(options: ForwardCurveOptions) -> Result<ForwardCurve, JsValue> {
+impl JsForwardCurve {
+    fn build(options: ForwardCurveOptions) -> Result<JsForwardCurve, JsValue> {
         let base = parse_iso_date(&options.base_date)?;
         let style = options
             .interp
@@ -303,7 +307,7 @@ impl ForwardCurve {
         extrapolation: Option<String>,
         projection_grid: Option<Vec<f64>>,
         reset_lag: Option<i32>,
-    ) -> Result<ForwardCurve, JsValue> {
+    ) -> Result<JsForwardCurve, JsValue> {
         Self::build(ForwardCurveOptions {
             id: id.to_string(),
             tenor,
@@ -320,7 +324,7 @@ impl ForwardCurve {
     /// Construct from a named JavaScript options object.
     /// @param options - JavaScript options object defining the requested curve construction inputs.
     #[wasm_bindgen(js_name = fromOptions)]
-    pub fn from_options(options: JsValue) -> Result<ForwardCurve, JsValue> {
+    pub fn from_options(options: JsValue) -> Result<JsForwardCurve, JsValue> {
         let options = serde_wasm_bindgen::from_value(options).map_err(to_js_err)?;
         Self::build(options)
     }
@@ -368,18 +372,18 @@ impl ForwardCurve {
 }
 
 // ---------------------------------------------------------------------------
-// FxConversionPolicy / FxRateResult
+// JsFxConversionPolicy / JsFxRateResult
 // ---------------------------------------------------------------------------
 
 /// Typed FX conversion policy wrapper for WASM callers.
 #[wasm_bindgen(js_name = FxConversionPolicy)]
 #[derive(Clone, Copy, Debug)]
-pub struct FxConversionPolicy {
+pub struct JsFxConversionPolicy {
     inner: RustFxConversionPolicy,
 }
 
 #[wasm_bindgen(js_class = FxConversionPolicy)]
-impl FxConversionPolicy {
+impl JsFxConversionPolicy {
     /// Use spot/forward on the cashflow date.
     #[wasm_bindgen(js_name = cashflowDate)]
     pub fn cashflow_date() -> Self {
@@ -431,12 +435,12 @@ impl FxConversionPolicy {
 
 /// Structured FX lookup result for WASM callers.
 #[wasm_bindgen(js_name = FxRateResult)]
-pub struct FxRateResult {
+pub struct JsFxRateResult {
     inner: RustFxRateResult,
 }
 
 #[wasm_bindgen(js_class = FxRateResult)]
-impl FxRateResult {
+impl JsFxRateResult {
     /// The FX conversion rate.
     #[wasm_bindgen(getter, js_name = rate)]
     pub fn rate(&self) -> f64 {
@@ -451,23 +455,23 @@ impl FxRateResult {
 }
 
 // ---------------------------------------------------------------------------
-// FxMatrix
+// JsFxMatrix
 // ---------------------------------------------------------------------------
 
 /// Foreign-exchange rate matrix for currency conversion.
 #[wasm_bindgen(js_name = FxMatrix)]
-pub struct FxMatrix {
+pub struct JsFxMatrix {
     inner: Arc<RustFxMatrix>,
 }
 
-impl Default for FxMatrix {
+impl Default for JsFxMatrix {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[wasm_bindgen(js_class = FxMatrix)]
-impl FxMatrix {
+impl JsFxMatrix {
     /// Create an empty FX matrix.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
@@ -505,7 +509,7 @@ impl FxMatrix {
         base: &str,
         quote: &str,
         date: &str,
-        policy: &FxConversionPolicy,
+        policy: &JsFxConversionPolicy,
         rate: f64,
     ) -> Result<(), JsValue> {
         let base_ccy: RustCurrency = base.parse().map_err(to_js_err)?;
@@ -528,14 +532,14 @@ impl FxMatrix {
         base: &str,
         quote: &str,
         date: &str,
-        policy: &FxConversionPolicy,
-    ) -> Result<FxRateResult, JsValue> {
+        policy: &JsFxConversionPolicy,
+    ) -> Result<JsFxRateResult, JsValue> {
         let base_ccy: RustCurrency = base.parse().map_err(to_js_err)?;
         let quote_ccy: RustCurrency = quote.parse().map_err(to_js_err)?;
         let d = parse_iso_date(date)?;
         let query = FxQuery::with_policy(base_ccy, quote_ccy, d, policy.inner);
         let result = self.inner.rate(query).map_err(to_js_err)?;
-        Ok(FxRateResult { inner: result })
+        Ok(JsFxRateResult { inner: result })
     }
 
     /// Look up an FX rate using cashflow-date conversion semantics.
@@ -548,7 +552,7 @@ impl FxMatrix {
         base: &str,
         quote: &str,
         date: &str,
-    ) -> Result<FxRateResult, JsValue> {
+    ) -> Result<JsFxRateResult, JsValue> {
         let base_ccy: RustCurrency = base.parse().map_err(to_js_err)?;
         let quote_ccy: RustCurrency = quote.parse().map_err(to_js_err)?;
         let d = parse_iso_date(date)?;
@@ -556,13 +560,13 @@ impl FxMatrix {
             FxQuery::with_policy(base_ccy, quote_ccy, d, RustFxConversionPolicy::CashflowDate);
         self.inner
             .rate(query)
-            .map(|inner| FxRateResult { inner })
+            .map(|inner| JsFxRateResult { inner })
             .map_err(to_js_err)
     }
 }
 
 // ---------------------------------------------------------------------------
-// VolCube
+// JsVolCube
 // ---------------------------------------------------------------------------
 
 /// SABR volatility cube for swaption pricing.
@@ -571,13 +575,13 @@ impl FxMatrix {
 /// implied volatilities via bilinear parameter interpolation followed by the
 /// Hagan (2002) approximation.
 #[wasm_bindgen(js_name = VolCube)]
-pub struct VolCube {
+pub struct JsVolCube {
     #[wasm_bindgen(skip)]
     pub(crate) inner: Arc<RustVolCube>,
 }
 
 #[wasm_bindgen(js_class = VolCube)]
-impl VolCube {
+impl JsVolCube {
     /// Construct a vol cube from a flat SABR parameter array.
     ///
     /// # Arguments
@@ -598,7 +602,7 @@ impl VolCube {
         params_flat: &[f64],
         forwards: &[f64],
         interpolation_mode: Option<String>,
-    ) -> Result<VolCube, JsValue> {
+    ) -> Result<JsVolCube, JsValue> {
         let n_nodes = expiries.len() * tenors.len();
         if params_flat.len() != n_nodes * 5 {
             return Err(JsValue::from_str(&format!(
@@ -710,7 +714,7 @@ impl VolCube {
 }
 
 // ---------------------------------------------------------------------------
-// FxDeltaVolSurface
+// JsFxDeltaVolSurface
 // ---------------------------------------------------------------------------
 
 /// FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional
@@ -720,13 +724,13 @@ impl VolCube {
 /// converts to a strike-axis volatility surface on demand via Garman-Kohlhagen.
 /// The delta convention is **forward delta (premium-unadjusted)**.
 #[wasm_bindgen(js_name = FxDeltaVolSurface)]
-pub struct FxDeltaVolSurface {
+pub struct JsFxDeltaVolSurface {
     #[wasm_bindgen(skip)]
     pub(crate) inner: Arc<RustFxDeltaVolSurface>,
 }
 
 #[wasm_bindgen(js_class = FxDeltaVolSurface)]
-impl FxDeltaVolSurface {
+impl JsFxDeltaVolSurface {
     /// Construct an FX delta-quoted vol surface with 25-delta wings.
     ///
     /// Optional `rr10d` / `bf10d` add 10-delta wings for richer wing
@@ -750,7 +754,7 @@ impl FxDeltaVolSurface {
         bf25d: &[f64],
         rr10d: Option<Vec<f64>>,
         bf10d: Option<Vec<f64>>,
-    ) -> Result<FxDeltaVolSurface, JsValue> {
+    ) -> Result<JsFxDeltaVolSurface, JsValue> {
         let surface = match (rr10d, bf10d) {
             (Some(rr), Some(bf)) => RustFxDeltaVolSurface::with_10d(
                 id,
@@ -906,7 +910,7 @@ mod tests {
 
     #[test]
     fn discount_curve_new_and_accessors() {
-        let curve = DiscountCurve::new(
+        let curve = JsDiscountCurve::new(
             "USD-OIS",
             "2024-01-15",
             &[0.5, 0.99, 1.0, 0.98, 2.0, 0.96],
@@ -929,7 +933,7 @@ mod tests {
     #[test]
     fn discount_curve_flat_uses_continuous_compounding() {
         let curve =
-            DiscountCurve::flat("USD-OIS", "2024-01-15", 0.04).expect("flat discount curve");
+            JsDiscountCurve::flat("USD-OIS", "2024-01-15", 0.04).expect("flat discount curve");
 
         for t in [0.0_f64, 0.25, 1.0, 5.0, 30.0] {
             assert!((curve.df(t) - (-0.04 * t).exp()).abs() < 1e-12);
@@ -939,7 +943,7 @@ mod tests {
 
     #[test]
     fn forward_curve_new_and_accessors() {
-        let curve = ForwardCurve::new(
+        let curve = JsForwardCurve::new(
             "USD-3M",
             0.25,
             "2024-01-15",
@@ -958,12 +962,12 @@ mod tests {
 
     #[test]
     fn fx_matrix_quote_and_rate() {
-        let m = FxMatrix::new();
+        let m = JsFxMatrix::new();
         m.set_quote("USD", "EUR", 0.92).expect("set quote");
         let r = m.rate_default("USD", "EUR", "2024-01-15").expect("fx rate");
         assert!((r.rate() - 0.92).abs() < 1e-9);
         assert!(!r.triangulated());
     }
 
-    // VolCube tests require a WASM runtime (JsValue) — run via wasm-pack test.
+    // JsVolCube tests require a WASM runtime (JsValue) — run via wasm-pack test.
 }

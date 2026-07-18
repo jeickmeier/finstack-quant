@@ -146,12 +146,12 @@ fn rolling_greeks_to_js(rg: &fa::RollingGreeks) -> Result<JsValue, JsValue> {
 /// Invalid dates, shapes, frequencies, tickers, and confidence levels are
 /// returned as rejected JsValue errors.
 #[wasm_bindgen(js_name = Performance)]
-pub struct WasmPerformance {
+pub struct JsPerformance {
     inner: fa::Performance,
 }
 
 #[wasm_bindgen(js_class = Performance)]
-impl WasmPerformance {
+impl JsPerformance {
     /// Construct from a price matrix. `dates` is an array of ISO date strings,
     /// `prices` is `prices[i]` = column for ticker `i`.
     /// # Errors
@@ -159,7 +159,7 @@ impl WasmPerformance {
     /// Rejects malformed dates or matrices, invalid prices, unsupported
     /// frequencies, and an unknown benchmark ticker.
     /// @param dates - ISO-8601 observation dates in ascending order, one entry per price row.
-    /// @param prices - Row-major matrix where prices[i][j] is ticker j on observation i.
+    /// @param prices - Row-major matrix where `prices[i][j]` is ticker j on observation i.
     /// @param ticker_names - Ticker labels aligned with the price-matrix columns.
     /// @param benchmark_ticker - Optional ticker label to use as the benchmark return series.
     /// @param freq - Optional observation frequency token; defaults to daily.
@@ -170,7 +170,7 @@ impl WasmPerformance {
         ticker_names: JsValue,
         benchmark_ticker: Option<String>,
         freq: Option<String>,
-    ) -> Result<WasmPerformance, JsValue> {
+    ) -> Result<JsPerformance, JsValue> {
         let panel = parse_panel_inputs(dates, prices, ticker_names, freq)?;
         let inner = fa::Performance::new(
             panel.dates,
@@ -180,7 +180,7 @@ impl WasmPerformance {
             panel.freq,
         )
         .map_err(to_js_err)?;
-        Ok(WasmPerformance { inner })
+        Ok(JsPerformance { inner })
     }
 
     /// Construct from a return matrix (one row per `dates` entry per ticker).
@@ -189,7 +189,7 @@ impl WasmPerformance {
     /// Rejects malformed dates or matrices and invalid benchmark or
     /// frequency inputs.
     /// @param dates - ISO-8601 observation dates in ascending order, one entry per return row.
-    /// @param returns - Row-major simple decimal return matrix where returns[i][j] is ticker j on observation i.
+    /// @param returns - Row-major simple decimal return matrix where `returns[i][j]` is ticker j on observation i.
     /// @param ticker_names - Ticker labels aligned with the return-matrix columns.
     /// @param benchmark_ticker - Optional ticker label to use as the benchmark return series.
     /// @param freq - Optional observation frequency token; defaults to daily.
@@ -200,7 +200,7 @@ impl WasmPerformance {
         ticker_names: JsValue,
         benchmark_ticker: Option<String>,
         freq: Option<String>,
-    ) -> Result<WasmPerformance, JsValue> {
+    ) -> Result<JsPerformance, JsValue> {
         let panel = parse_panel_inputs(dates, returns, ticker_names, freq)?;
         let inner = fa::Performance::from_returns(
             panel.dates,
@@ -210,7 +210,7 @@ impl WasmPerformance {
             panel.freq,
         )
         .map_err(to_js_err)?;
-        Ok(WasmPerformance { inner })
+        Ok(JsPerformance { inner })
     }
 
     // ── Mutators ──

@@ -1,8 +1,8 @@
 //! WASM bindings for the credit factor hierarchy.
 //!
-//! Exposes [`WasmCreditFactorModel`], [`WasmCreditCalibrator`], the free
+//! Exposes [`JsCreditFactorModel`], [`JsCreditCalibrator`], the free
 //! functions [`decompose_levels`] and [`decompose_period`], and
-//! [`WasmFactorCovarianceForecast`].
+//! [`JsFactorCovarianceForecast`].
 //!
 //! `VolHorizon::Custom` is intentionally **not** exposed — closures do not
 //! cross the WASM boundary.
@@ -104,17 +104,17 @@ fn ensure_period_finite(
 
 /// Calibrated credit factor hierarchy artifact.
 ///
-/// Produced by [`WasmCreditCalibrator`] or loaded from JSON via
-/// [`WasmCreditFactorModel::from_json`]. Immutable once constructed.
+/// Produced by [`JsCreditCalibrator`] or loaded from JSON via
+/// [`JsCreditFactorModel::from_json`]. Immutable once constructed.
 #[wasm_bindgen(js_name = CreditFactorModel)]
-pub struct WasmCreditFactorModel {
+pub struct JsCreditFactorModel {
     #[wasm_bindgen(skip)]
     /// Underlying Rust value (not exposed to JS).
     pub(crate) inner: finstack_quant_factor_model::credit::hierarchy::CreditFactorModel,
 }
 
 #[wasm_bindgen(js_class = CreditFactorModel)]
-impl WasmCreditFactorModel {
+impl JsCreditFactorModel {
     /// Deserialize a `CreditFactorModel` from JSON.
     ///
     /// Validates the `schema_version` field and all structural constraints.
@@ -123,7 +123,7 @@ impl WasmCreditFactorModel {
     /// Throws if the JSON is malformed or fails validation.
     /// @param s - JSON-serialized CreditFactorModel to deserialize.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(s: &str) -> Result<WasmCreditFactorModel, JsValue> {
+    pub fn from_json(s: &str) -> Result<JsCreditFactorModel, JsValue> {
         let inner: finstack_quant_factor_model::credit::hierarchy::CreditFactorModel =
             serde_json::from_str(s).map_err(to_js_err)?;
         inner.validate().map_err(to_js_err)?;
@@ -141,23 +141,23 @@ impl WasmCreditFactorModel {
 // CreditCalibrator
 // ---------------------------------------------------------------------------
 
-/// Deterministic calibrator that produces a [`WasmCreditFactorModel`].
+/// Deterministic calibrator that produces a [`JsCreditFactorModel`].
 ///
 /// Configuration and inputs are passed as JSON strings.
 #[wasm_bindgen(js_name = CreditCalibrator)]
-pub struct WasmCreditCalibrator {
+pub struct JsCreditCalibrator {
     inner: finstack_quant_factor_model::credit::calibration::CreditCalibrator,
 }
 
 #[wasm_bindgen(js_class = CreditCalibrator)]
-impl WasmCreditCalibrator {
+impl JsCreditCalibrator {
     /// Construct a calibrator from a JSON-serialized `CreditCalibrationConfig`.
     ///
     /// # Errors
     /// Throws if `config_json` is not a valid `CreditCalibrationConfig`.
     /// @param config_json - Credit-factor calibration configuration JSON controlling model fitting.
     #[wasm_bindgen(constructor)]
-    pub fn new(config_json: &str) -> Result<WasmCreditCalibrator, JsValue> {
+    pub fn new(config_json: &str) -> Result<JsCreditCalibrator, JsValue> {
         let config: finstack_quant_factor_model::credit::calibration::CreditCalibrationConfig =
             serde_json::from_str(config_json).map_err(to_js_err)?;
         Ok(Self {
@@ -172,11 +172,11 @@ impl WasmCreditCalibrator {
     /// # Errors
     /// Throws if inputs are structurally invalid or calibration fails.
     /// @param inputs_json - Credit-factor calibration input JSON containing issuers, spreads, and observations.
-    pub fn calibrate(&self, inputs_json: &str) -> Result<WasmCreditFactorModel, JsValue> {
+    pub fn calibrate(&self, inputs_json: &str) -> Result<JsCreditFactorModel, JsValue> {
         let inputs: finstack_quant_factor_model::credit::calibration::CreditCalibrationInputs =
             serde_json::from_str(inputs_json).map_err(to_js_err)?;
         let model = self.inner.calibrate(inputs).map_err(to_js_err)?;
-        Ok(WasmCreditFactorModel { inner: model })
+        Ok(JsCreditFactorModel { inner: model })
     }
 }
 
@@ -189,14 +189,14 @@ impl WasmCreditCalibrator {
 /// Produced by [`decompose_levels`]. Pass to [`decompose_period`] to compute
 /// period-over-period changes.  The full data is available via `toJson`.
 #[wasm_bindgen(js_name = LevelsAtDate)]
-pub struct WasmLevelsAtDate {
+pub struct JsLevelsAtDate {
     #[wasm_bindgen(skip)]
     /// Underlying Rust value (not exposed to JS).
     pub(crate) inner: finstack_quant_factor_model::credit::decomposition::LevelsAtDate,
 }
 
 #[wasm_bindgen(js_class = LevelsAtDate)]
-impl WasmLevelsAtDate {
+impl JsLevelsAtDate {
     /// Serialize the snapshot to JSON.
     ///
     /// # Errors
@@ -213,18 +213,18 @@ impl WasmLevelsAtDate {
 // PeriodDecomposition  (opaque handle)
 // ---------------------------------------------------------------------------
 
-/// Component-wise difference between two [`WasmLevelsAtDate`] snapshots.
+/// Component-wise difference between two [`JsLevelsAtDate`] snapshots.
 ///
 /// Produced by [`decompose_period`].
 #[wasm_bindgen(js_name = PeriodDecomposition)]
-pub struct WasmPeriodDecomposition {
+pub struct JsPeriodDecomposition {
     #[wasm_bindgen(skip)]
     /// Underlying Rust value (not exposed to JS).
     pub(crate) inner: finstack_quant_factor_model::credit::decomposition::PeriodDecomposition,
 }
 
 #[wasm_bindgen(js_class = PeriodDecomposition)]
-impl WasmPeriodDecomposition {
+impl JsPeriodDecomposition {
     /// Serialize the decomposition to JSON.
     ///
     /// # Errors
@@ -263,12 +263,12 @@ impl WasmPeriodDecomposition {
 /// @param runtime_tags_json - Optional runtime-tag JSON selecting the active factor-model configuration.
 #[wasm_bindgen(js_name = decomposeLevels)]
 pub fn decompose_levels(
-    model: &WasmCreditFactorModel,
+    model: &JsCreditFactorModel,
     observed_spreads_json: &str,
     observed_generic: f64,
     as_of: &str,
     runtime_tags_json: Option<String>,
-) -> Result<WasmLevelsAtDate, JsValue> {
+) -> Result<JsLevelsAtDate, JsValue> {
     let observed_spreads: std::collections::BTreeMap<finstack_quant_core::types::IssuerId, f64> =
         serde_json::from_str(observed_spreads_json).map_err(to_js_err)?;
 
@@ -293,7 +293,7 @@ pub fn decompose_levels(
     )
     .map_err(to_js_err)?;
 
-    Ok(WasmLevelsAtDate { inner })
+    Ok(JsLevelsAtDate { inner })
 }
 
 // ---------------------------------------------------------------------------
@@ -312,15 +312,15 @@ pub fn decompose_levels(
 /// @param to_levels - Credit-factor levels at the end of the attribution period.
 #[wasm_bindgen(js_name = decomposePeriod)]
 pub fn decompose_period(
-    from_levels: &WasmLevelsAtDate,
-    to_levels: &WasmLevelsAtDate,
-) -> Result<WasmPeriodDecomposition, JsValue> {
+    from_levels: &JsLevelsAtDate,
+    to_levels: &JsLevelsAtDate,
+) -> Result<JsPeriodDecomposition, JsValue> {
     let inner = finstack_quant_factor_model::credit::decomposition::decompose_period(
         &from_levels.inner,
         &to_levels.inner,
     )
     .map_err(to_js_err)?;
-    Ok(WasmPeriodDecomposition { inner })
+    Ok(JsPeriodDecomposition { inner })
 }
 
 // ---------------------------------------------------------------------------
@@ -331,18 +331,18 @@ pub fn decompose_period(
 ///
 /// `VolHorizon::Custom` is intentionally **not** exposed.
 #[wasm_bindgen(js_name = FactorCovarianceForecast)]
-pub struct WasmFactorCovarianceForecast {
+pub struct JsFactorCovarianceForecast {
     /// Store the model by value so `FactorCovarianceForecast<'a>` lifetime
     /// requirements don't escape the WASM boundary.
     model: finstack_quant_factor_model::credit::hierarchy::CreditFactorModel,
 }
 
 #[wasm_bindgen(js_class = FactorCovarianceForecast)]
-impl WasmFactorCovarianceForecast {
+impl JsFactorCovarianceForecast {
     /// Wrap a `CreditFactorModel` for vol forecasting.
     /// @param model - Calibrated CreditFactorModel used to produce the covariance forecast.
     #[wasm_bindgen(constructor)]
-    pub fn new(model: &WasmCreditFactorModel) -> WasmFactorCovarianceForecast {
+    pub fn new(model: &JsCreditFactorModel) -> JsFactorCovarianceForecast {
         Self {
             model: model.inner.clone(),
         }

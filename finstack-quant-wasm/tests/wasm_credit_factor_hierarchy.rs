@@ -5,7 +5,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::factor_model::{WasmCreditCalibrator, WasmCreditFactorModel};
+use finstack_quant_wasm::api::factor_model::{JsCreditCalibrator, JsCreditFactorModel};
 use wasm_bindgen_test::*;
 
 // ---- helpers ----------------------------------------------------------------
@@ -94,7 +94,7 @@ fn credit_factor_model_round_trips_through_json() {
         "../../finstack-quant/valuations/tests/schema_fixtures/credit_factor_model_v1.json"
     );
     let model =
-        WasmCreditFactorModel::from_json(json).expect("from_json must succeed on golden artifact");
+        JsCreditFactorModel::from_json(json).expect("from_json must succeed on golden artifact");
     let out = model.to_json().expect("to_json must succeed");
 
     let parsed_in: serde_json::Value = serde_json::from_str(json).unwrap();
@@ -114,7 +114,7 @@ fn calibrate_then_decompose_round_trip() {
     let inputs_json = minimal_inputs_json();
 
     let calibrator =
-        WasmCreditCalibrator::new(&config_json).expect("WasmCreditCalibrator::new must succeed");
+        JsCreditCalibrator::new(&config_json).expect("JsCreditCalibrator::new must succeed");
     let model = calibrator
         .calibrate(&inputs_json)
         .expect("calibrate must succeed on minimal inputs");

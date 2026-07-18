@@ -15,13 +15,13 @@ use wasm_bindgen::prelude::*;
 
 /// Copula model specification for configuration and deferred construction.
 #[wasm_bindgen(js_name = CopulaSpec)]
-pub struct WasmCopulaSpec {
+pub struct JsCopulaSpec {
     #[wasm_bindgen(skip)]
     inner: CopulaSpec,
 }
 
 #[wasm_bindgen(js_class = CopulaSpec)]
-impl WasmCopulaSpec {
+impl JsCopulaSpec {
     /// One-factor Gaussian copula (market standard).
     #[wasm_bindgen(js_name = gaussian)]
     pub fn gaussian() -> Self {
@@ -33,7 +33,7 @@ impl WasmCopulaSpec {
     /// Student-t copula with specified degrees of freedom (must be > 2).
     /// @param df - Positive Student-t copula degrees of freedom controlling tail thickness.
     #[wasm_bindgen(js_name = studentT)]
-    pub fn student_t(df: f64) -> Result<WasmCopulaSpec, JsValue> {
+    pub fn student_t(df: f64) -> Result<JsCopulaSpec, JsValue> {
         CopulaSpec::student_t(df)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -59,10 +59,10 @@ impl WasmCopulaSpec {
 
     /// Build a concrete copula from this specification.
     #[wasm_bindgen(js_name = build)]
-    pub fn build(&self) -> Result<WasmCopula, JsValue> {
+    pub fn build(&self) -> Result<JsCopula, JsValue> {
         self.inner
             .build()
-            .map(|inner| WasmCopula {
+            .map(|inner| JsCopula {
                 inner,
                 spec: self.inner.clone(),
             })
@@ -100,7 +100,7 @@ impl WasmCopulaSpec {
 
 /// Concrete copula model for portfolio default correlation.
 #[wasm_bindgen(js_name = Copula)]
-pub struct WasmCopula {
+pub struct JsCopula {
     #[wasm_bindgen(skip)]
     inner: Box<dyn Copula + Send + Sync>,
     /// Originating spec, retained so concrete-model-only diagnostics
@@ -110,7 +110,7 @@ pub struct WasmCopula {
 }
 
 #[wasm_bindgen(js_class = Copula)]
-impl WasmCopula {
+impl JsCopula {
     /// Conditional default probability given factor realization(s).
     /// @param default_threshold - Latent-variable default threshold corresponding to the marginal default probability.
     /// @param factor_realization - Realized systematic-factor value conditioning the default probability.
@@ -183,19 +183,19 @@ impl WasmCopula {
 
 /// Recovery model specification for configuration and deferred construction.
 #[wasm_bindgen(js_name = RecoverySpec)]
-pub struct WasmRecoverySpec {
+pub struct JsRecoverySpec {
     #[wasm_bindgen(skip)]
     inner: corr::RecoverySpec,
 }
 
 #[wasm_bindgen(js_class = RecoverySpec)]
-impl WasmRecoverySpec {
+impl JsRecoverySpec {
     /// Constant recovery rate.
     ///
     /// Throws if `rate` is not finite or lies outside `[0, 1]`.
     /// @param rate - Constant recovery rate expressed as a fraction from 0 through 1.
     #[wasm_bindgen(js_name = constant)]
-    pub fn constant(rate: f64) -> Result<WasmRecoverySpec, JsValue> {
+    pub fn constant(rate: f64) -> Result<JsRecoverySpec, JsValue> {
         corr::RecoverySpec::constant(rate)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -213,7 +213,7 @@ impl WasmRecoverySpec {
         mean: f64,
         vol: f64,
         correlation: f64,
-    ) -> Result<WasmRecoverySpec, JsValue> {
+    ) -> Result<JsRecoverySpec, JsValue> {
         corr::RecoverySpec::market_correlated(mean, vol, correlation)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -244,8 +244,8 @@ impl WasmRecoverySpec {
 
     /// Build a concrete recovery model from this specification.
     #[wasm_bindgen(js_name = build)]
-    pub fn build(&self) -> WasmRecoveryModel {
-        WasmRecoveryModel {
+    pub fn build(&self) -> JsRecoveryModel {
+        JsRecoveryModel {
             inner: self.inner.build(),
         }
     }
@@ -257,13 +257,13 @@ impl WasmRecoverySpec {
 
 /// Concrete recovery model for credit portfolio pricing.
 #[wasm_bindgen(js_name = RecoveryModel)]
-pub struct WasmRecoveryModel {
+pub struct JsRecoveryModel {
     #[wasm_bindgen(skip)]
     inner: Box<dyn RecoveryModel + Send + Sync>,
 }
 
 #[wasm_bindgen(js_class = RecoveryModel)]
-impl WasmRecoveryModel {
+impl JsRecoveryModel {
     /// Expected (unconditional) recovery rate.
     #[wasm_bindgen(getter, js_name = expectedRecovery)]
     pub fn expected_recovery(&self) -> f64 {
@@ -383,11 +383,11 @@ mod tests {
 
     #[test]
     fn wasm_copula_spec_gaussian_and_student_t() {
-        let g = WasmCopulaSpec::gaussian();
+        let g = JsCopulaSpec::gaussian();
         assert!(g.is_gaussian());
         assert!(!g.is_student_t());
 
-        let Ok(t) = WasmCopulaSpec::student_t(5.0) else {
+        let Ok(t) = JsCopulaSpec::student_t(5.0) else {
             panic!("student_t(5.0) should succeed");
         };
         assert!(t.is_student_t());
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn wasm_copula_spec_random_factor_loading_and_multi_factor_build() {
-        let rfl = WasmCopulaSpec::random_factor_loading(0.5);
+        let rfl = JsCopulaSpec::random_factor_loading(0.5);
         assert!(!rfl.is_gaussian());
         assert!(!rfl.is_student_t());
         assert!(rfl.is_rfl());
@@ -404,7 +404,7 @@ mod tests {
         let rfl_copula = rfl.build().expect("RFL copula should build");
         assert_eq!(rfl_copula.num_factors(), 2);
 
-        let mf = WasmCopulaSpec::multi_factor(2);
+        let mf = JsCopulaSpec::multi_factor(2);
         assert!(mf.is_multi_factor());
         assert!(!mf.is_rfl());
         let mf_copula = mf.build().expect("multi-factor copula should build");
@@ -413,7 +413,7 @@ mod tests {
 
     #[test]
     fn wasm_copula_stress_correlation_proxy_rfl_only() {
-        let rfl = WasmCopulaSpec::random_factor_loading(0.2)
+        let rfl = JsCopulaSpec::random_factor_loading(0.2)
             .build()
             .expect("RFL copula should build");
         // RFL has no closed-form λ_L: NaN per the tail-dependence contract.
@@ -427,7 +427,7 @@ mod tests {
         // non-wasm32 targets, so it can only be asserted in wasm tests.
         #[cfg(target_arch = "wasm32")]
         {
-            let gaussian = WasmCopulaSpec::gaussian()
+            let gaussian = JsCopulaSpec::gaussian()
                 .build()
                 .expect("Gaussian copula should build");
             assert!(
@@ -439,7 +439,7 @@ mod tests {
 
     #[test]
     fn wasm_copula_from_gaussian_spec() {
-        let copula = WasmCopulaSpec::gaussian()
+        let copula = JsCopulaSpec::gaussian()
             .build()
             .expect("Gaussian copula should build");
         assert_eq!(copula.num_factors(), 1);
@@ -457,7 +457,7 @@ mod tests {
 
     #[test]
     fn wasm_recovery_spec_and_model() {
-        let c = WasmRecoverySpec::constant(0.4).expect("0.4 is a valid recovery rate");
+        let c = JsRecoverySpec::constant(0.4).expect("0.4 is a valid recovery rate");
         assert!((c.expected_recovery() - 0.4).abs() < 1e-12);
         let m = c.build();
         assert!((m.expected_recovery() - 0.4).abs() < 1e-12);
@@ -466,7 +466,7 @@ mod tests {
         assert!(!m.is_stochastic());
         assert!(!m.model_name().is_empty());
 
-        let mc = WasmRecoverySpec::market_correlated(0.4, 0.1, 0.3)
+        let mc = JsRecoverySpec::market_correlated(0.4, 0.1, 0.3)
             .expect("valid market-correlated spec")
             .build();
         assert!(mc.is_stochastic());
@@ -476,7 +476,7 @@ mod tests {
             "conditional_lgd must complement conditional_recovery"
         );
 
-        let std = WasmRecoverySpec::market_standard_stochastic().build();
+        let std = JsRecoverySpec::market_standard_stochastic().build();
         assert!(std.is_stochastic());
         assert!((std.recovery_volatility() - 0.25).abs() < 1e-12);
     }
@@ -486,32 +486,32 @@ mod tests {
         // RecoverySpec::constant rejects rates outside [0, 1] and non-finite
         // values at the Rust API boundary.
         assert!(
-            WasmRecoverySpec::constant(1.5).is_err(),
+            JsRecoverySpec::constant(1.5).is_err(),
             "recovery rate above 1 must be rejected, not clamped"
         );
         assert!(
-            WasmRecoverySpec::constant(-0.2).is_err(),
+            JsRecoverySpec::constant(-0.2).is_err(),
             "negative recovery rate must be rejected, not clamped"
         );
         assert!(
-            WasmRecoverySpec::constant(f64::NAN).is_err(),
+            JsRecoverySpec::constant(f64::NAN).is_err(),
             "NaN recovery rate must be rejected"
         );
         // The valid endpoints must still be accepted.
-        assert!(WasmRecoverySpec::constant(0.0).is_ok());
-        assert!(WasmRecoverySpec::constant(1.0).is_ok());
+        assert!(JsRecoverySpec::constant(0.0).is_ok());
+        assert!(JsRecoverySpec::constant(1.0).is_ok());
     }
 
     #[test]
     fn wasm_recovery_spec_market_correlated_validates_inputs() {
         // Mean recovery outside [0, 1] or non-finite must be rejected.
-        assert!(WasmRecoverySpec::market_correlated(1.5, 0.1, 0.3).is_err());
-        assert!(WasmRecoverySpec::market_correlated(f64::NAN, 0.1, 0.3).is_err());
+        assert!(JsRecoverySpec::market_correlated(1.5, 0.1, 0.3).is_err());
+        assert!(JsRecoverySpec::market_correlated(f64::NAN, 0.1, 0.3).is_err());
         // Non-finite vol / correlation must also be rejected.
-        assert!(WasmRecoverySpec::market_correlated(0.4, f64::NAN, 0.3).is_err());
-        assert!(WasmRecoverySpec::market_correlated(0.4, 0.1, f64::INFINITY).is_err());
+        assert!(JsRecoverySpec::market_correlated(0.4, f64::NAN, 0.3).is_err());
+        assert!(JsRecoverySpec::market_correlated(0.4, 0.1, f64::INFINITY).is_err());
         // A fully valid spec is still accepted.
-        assert!(WasmRecoverySpec::market_correlated(0.4, 0.25, -0.4).is_ok());
+        assert!(JsRecoverySpec::market_correlated(0.4, 0.25, -0.4).is_ok());
     }
 
     #[test]

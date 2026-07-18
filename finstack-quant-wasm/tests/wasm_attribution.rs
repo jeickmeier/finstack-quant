@@ -47,9 +47,9 @@ fn market_json(as_of: time::Date, rate: f64) -> String {
     serde_json::to_string(&MarketContextState::from(&market)).expect("market JSON")
 }
 
-fn params(method_json: &str) -> AttributionParams {
+fn params(method_json: &str) -> JsAttributionParams {
     use time::macros::date;
-    AttributionParams::new(
+    JsAttributionParams::new(
         bond_json(),
         market_json(date!(2025 - 01 - 15), 0.04),
         market_json(date!(2025 - 01 - 16), 0.042),
@@ -112,7 +112,7 @@ fn validate_attribution_json_rejects_wrong_schema() {
 fn attribute_pnl_missing_market_data_yields_structured_error() {
     use time::macros::date;
     let empty = serde_json::to_string(&MarketContextState::from(&MarketContext::new())).unwrap();
-    let p = AttributionParams::new(
+    let p = JsAttributionParams::new(
         bond_json(),
         empty.clone(),
         empty,

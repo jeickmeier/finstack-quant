@@ -1,6 +1,6 @@
 //! WASM bindings for factor-model sensitivities and risk decomposition.
 
-use crate::api::valuations::market_handle::Market;
+use crate::api::valuations::market_handle::JsMarket;
 use crate::utils::date::parse_iso_date;
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
@@ -35,7 +35,7 @@ pub fn compute_factor_sensitivities(
     .map_err(to_js_err)
 }
 
-/// Compute first-order factor sensitivities using a pre-parsed [`Market`].
+/// Compute first-order factor sensitivities using a pre-parsed [`JsMarket`].
 ///
 /// Avoids reparsing market JSON for repeated factor analytics calls.
 /// @param positions_json - Canonical portfolio-positions JSON to bump and revalue.
@@ -47,7 +47,7 @@ pub fn compute_factor_sensitivities(
 pub fn compute_factor_sensitivities_with_market(
     positions_json: &str,
     factors_json: &str,
-    market: &Market,
+    market: &JsMarket,
     as_of: &str,
     bump_config_json: Option<String>,
 ) -> Result<String, JsValue> {
@@ -95,7 +95,7 @@ pub fn compute_pnl_profiles(
     .map_err(to_js_err)
 }
 
-/// Compute scenario P&L profiles using a pre-parsed [`Market`].
+/// Compute scenario P&L profiles using a pre-parsed [`JsMarket`].
 /// @param positions_json - Canonical portfolio-positions JSON to bump and revalue.
 /// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
 /// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
@@ -106,7 +106,7 @@ pub fn compute_pnl_profiles(
 pub fn compute_pnl_profiles_with_market(
     positions_json: &str,
     factors_json: &str,
-    market: &Market,
+    market: &JsMarket,
     as_of: &str,
     bump_config_json: Option<String>,
     n_scenario_points: Option<usize>,

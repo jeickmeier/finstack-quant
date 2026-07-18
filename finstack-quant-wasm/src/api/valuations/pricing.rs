@@ -23,7 +23,7 @@
 //! `mc_seed_scenario` inside the instrument JSON. This contract is verified by
 //! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
-use super::market_handle::Market;
+use super::market_handle::JsMarket;
 use crate::utils::{to_js_err, to_js_error, to_js_value};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::results::ValuationResult;
@@ -256,10 +256,10 @@ pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
 }
 
 // ---------------------------------------------------------------------------
-// Market overloads — parse market once, reuse across pricing calls
+// JsMarket overloads — parse market once, reuse across pricing calls
 // ---------------------------------------------------------------------------
 
-/// Price an instrument using a pre-parsed [`Market`].
+/// Price an instrument using a pre-parsed [`JsMarket`].
 ///
 /// Avoids the per-call market-parse overhead of `priceInstrument`.
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
@@ -269,7 +269,7 @@ pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = priceInstrumentWithMarket)]
 pub fn price_instrument_with_market(
     instrument_json: &str,
-    market: &Market,
+    market: &JsMarket,
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
@@ -277,7 +277,7 @@ pub fn price_instrument_with_market(
     price_instrument_with_context(instrument_json, market.inner(), as_of, model)
 }
 
-/// Price an instrument with explicit metric requests using a pre-parsed [`Market`].
+/// Price an instrument with explicit metric requests using a pre-parsed [`JsMarket`].
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -288,7 +288,7 @@ pub fn price_instrument_with_market(
 #[wasm_bindgen(js_name = priceInstrumentWithMetricsAndMarket)]
 pub fn price_instrument_with_metrics_and_market(
     instrument_json: &str,
-    market: &Market,
+    market: &JsMarket,
     as_of: &str,
     model: &str,
     metrics: JsValue,
@@ -308,7 +308,7 @@ pub fn price_instrument_with_metrics_and_market(
     )
 }
 
-/// Per-flow cashflow envelope using a pre-parsed [`Market`].
+/// Per-flow cashflow envelope using a pre-parsed [`JsMarket`].
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -316,7 +316,7 @@ pub fn price_instrument_with_metrics_and_market(
 #[wasm_bindgen(js_name = instrumentCashflowsWithMarket)]
 pub fn instrument_cashflows_with_market(
     instrument_json: &str,
-    market: &Market,
+    market: &JsMarket,
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
@@ -746,7 +746,7 @@ mod tests {
     #[test]
     fn wasm_market_reuses_parsed_market_for_pricing_and_cashflows() {
         let inst = bond_instrument_json();
-        let market = Market::new(&market_context_json()).expect("market handle");
+        let market = JsMarket::new(&market_context_json()).expect("market handle");
 
         let priced = price_instrument_with_market(&inst, &market, "2024-01-01", "discounting")
             .expect("price");

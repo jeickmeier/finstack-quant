@@ -362,13 +362,13 @@ macro_rules! fx_option_subset_class {
     };
 }
 
-fx_class!(WasmFxSpot, "FxSpot", "fx_spot");
-fx_class!(WasmFxForward, "FxForward", "fx_forward");
-fx_class!(WasmFxSwap, "FxSwap", "fx_swap");
-fx_class!(WasmNdf, "Ndf", "ndf");
-fx_option_class!(WasmFxOption, "FxOption", "fx_option");
+fx_class!(JsFxSpot, "FxSpot", "fx_spot");
+fx_class!(JsFxForward, "FxForward", "fx_forward");
+fx_class!(JsFxSwap, "FxSwap", "fx_swap");
+fx_class!(JsNdf, "Ndf", "ndf");
+fx_option_class!(JsFxOption, "FxOption", "fx_option");
 fx_option_subset_class!(
-    WasmFxDigitalOption,
+    JsFxDigitalOption,
     "FxDigitalOption",
     "fx_digital_option",
     [
@@ -380,7 +380,7 @@ fx_option_subset_class!(
     ]
 );
 fx_option_subset_class!(
-    WasmFxTouchOption,
+    JsFxTouchOption,
     "FxTouchOption",
     "fx_touch_option",
     [
@@ -391,7 +391,7 @@ fx_option_subset_class!(
     ]
 );
 fx_option_subset_class!(
-    WasmFxBarrierOption,
+    JsFxBarrierOption,
     "FxBarrierOption",
     "fx_barrier_option",
     [
@@ -403,5 +403,5 @@ fx_option_subset_class!(
         (volga, "volga"),
     ]
 );
-fx_class!(WasmFxVarianceSwap, "FxVarianceSwap", "fx_variance_swap");
-fx_option_class!(WasmQuantoOption, "QuantoOption", "quanto_option");
+fx_class!(JsFxVarianceSwap, "FxVarianceSwap", "fx_variance_swap");
+fx_option_class!(JsQuantoOption, "QuantoOption", "quanto_option");

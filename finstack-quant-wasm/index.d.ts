@@ -124,12 +124,12 @@ export interface Performance extends WasmOwned {}
 /**
  * Calibrated credit factor hierarchy artifact.
  *
- * Produced by [`WasmCreditCalibrator`] or loaded from JSON via
- * [`WasmCreditFactorModel::from_json`]. Immutable once constructed.
+ * Produced by [`CreditCalibrator`] or loaded from JSON via
+ * [`CreditFactorModel.fromJson`]. Immutable once constructed.
  */
 export interface CreditFactorModel extends WasmOwned {}
 /**
- * Deterministic calibrator that produces a [`WasmCreditFactorModel`].
+ * Deterministic calibrator that produces a [`CreditFactorModel`].
  *
  * Configuration and inputs are passed as JSON strings.
  */
@@ -142,7 +142,7 @@ export interface CreditCalibrator extends WasmOwned {}
  */
 export interface LevelsAtDate extends WasmOwned {}
 /**
- * Component-wise difference between two [`WasmLevelsAtDate`] snapshots.
+ * Component-wise difference between two [`LevelsAtDate`] snapshots.
  *
  * Produced by [`decompose_period`].
  */
@@ -6355,7 +6355,7 @@ export interface PortfolioNamespace {
    */
   valuePortfolio(specJson: string, marketJson: string, strictRisk: boolean): string;
   /**
-   * Value an already-built [`WasmPortfolio`] handle. Skips the per-call
+   * Value an already-built [`Portfolio`] handle. Skips the per-call
    * `PortfolioSpec` parse + `Portfolio::from_spec` rebuild that
    * [`value_portfolio`] performs; use this when sweeping market scenarios
    * against a fixed portfolio.
@@ -6376,7 +6376,7 @@ export interface PortfolioNamespace {
   aggregateFullCashflows(specJson: string, marketJson: string): string;
   /**
    * Aggregate the full classified cashflow ladder for an already-built
-   * [`WasmPortfolio`] handle.
+   * [`Portfolio`] handle.
    *
    * Skips the per-call `PortfolioSpec` parse + `Portfolio::from_spec` rebuild.
    * For batched or chained workflows (repeated cashflow builds across market
@@ -6403,7 +6403,7 @@ export interface PortfolioNamespace {
     marketJson: string
   ): ScenarioRevalueResult;
   /**
-   * Apply a scenario to an already-built [`WasmPortfolio`] handle and revalue.
+   * Apply a scenario to an already-built [`Portfolio`] handle and revalue.
    * Returns a JS object with structured `valuation` and `report` values.
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param scenarioJson - Canonical JSON payload representing the scenario consumed by this API.

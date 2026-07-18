@@ -22,21 +22,21 @@ use wasm_bindgen::prelude::*;
 /// }
 /// ```
 #[wasm_bindgen(js_name = Market)]
-pub struct Market {
+pub struct JsMarket {
     inner: Arc<MarketContext>,
 }
 
 #[wasm_bindgen(js_class = Market)]
-impl Market {
+impl JsMarket {
     /// Parse a MarketContext from its JSON representation.
     ///
     /// @param json - MarketContext JSON string.
     /// @returns A `Market` handle that can be reused across pricing calls.
     /// @throws If the JSON is invalid.
     #[wasm_bindgen(constructor)]
-    pub fn new(json: &str) -> Result<Market, JsValue> {
+    pub fn new(json: &str) -> Result<JsMarket, JsValue> {
         let inner: MarketContext = serde_json::from_str(json).map_err(to_js_err)?;
-        Ok(Market {
+        Ok(JsMarket {
             inner: Arc::new(inner),
         })
     }

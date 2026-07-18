@@ -67,7 +67,7 @@ fn apply_scenario_and_revalue_empty_portfolio() {
 #[wasm_bindgen_test]
 fn apply_scenario_and_revalue_built_empty_portfolio() {
     let spec = portfolio_spec_json();
-    let portfolio = WasmPortfolio::from_spec(&spec).unwrap();
+    let portfolio = JsPortfolio::from_spec(&spec).unwrap();
     let scenario = build_scenario_spec("stress", "[]", None, None, 0).unwrap();
     let market = empty_market_json();
     let result = apply_scenario_and_revalue_built(&portfolio, &scenario, &market).unwrap();

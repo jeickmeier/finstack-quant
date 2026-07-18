@@ -5,7 +5,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::analytics::WasmPerformance;
+use finstack_quant_wasm::api::analytics::JsPerformance;
 use js_sys::{Array, Float64Array, Reflect};
 use serde::Deserialize;
 use wasm_bindgen::{JsCast, JsValue};
@@ -64,13 +64,13 @@ fn obj_typed_vec(obj: &JsValue, key: &str) -> Vec<f64> {
 
 /// Build a two-ticker Performance ("TARGET", "BENCH") from the fixture's
 /// return + benchmark series, with TARGET as the benchmark for greeks etc.
-fn build_perf() -> WasmPerformance {
+fn build_perf() -> JsPerformance {
     let fx = fixture();
     // returns matrix is column-major in the binding: returns[i] is the column
     // for ticker i. Two columns => target series, benchmark series.
     let returns = vec![fx.returns.clone(), fx.benchmark.clone()];
     let names = vec!["TARGET".to_string(), "BENCH".to_string()];
-    WasmPerformance::from_returns(
+    JsPerformance::from_returns(
         to_js(&fx.dates),
         to_f64_matrix(&returns),
         to_js(&names),
@@ -106,7 +106,7 @@ fn from_returns_exposes_ticker_specific_active_dates() {
         vec![f64::NAN, 0.04, 0.06, f64::NAN],
     ];
     let names = vec!["BENCH".to_string(), "PORT".to_string()];
-    let perf = WasmPerformance::from_returns(
+    let perf = JsPerformance::from_returns(
         to_js(&dates),
         to_f64_matrix(&returns),
         to_js(&names),
@@ -230,7 +230,7 @@ fn greeks_optional_risk_free_rate_changes_alpha() {
     let benchmark = vec![-0.02, -0.01, 0.0, 0.01, 0.02];
     let target: Vec<f64> = benchmark.iter().map(|&b| 2.0 * b).collect();
     let names = vec!["TARGET".to_string(), "BENCH".to_string()];
-    let perf = WasmPerformance::from_returns(
+    let perf = JsPerformance::from_returns(
         to_js(&dates),
         to_f64_matrix(&[target, benchmark]),
         to_js(&names),

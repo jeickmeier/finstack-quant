@@ -16,9 +16,9 @@ use crate::utils::{structured_js_error, to_js_err};
 use wasm_bindgen::prelude::*;
 
 /// Parameters for P&L attribution via [`attribute_pnl`].
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = AttributionParams)]
 #[derive(Default)]
-pub struct AttributionParams {
+pub struct JsAttributionParams {
     instrument_json: String,
     market_t0_json: String,
     market_t1_json: String,
@@ -29,8 +29,8 @@ pub struct AttributionParams {
     full_cross_attribution: Option<bool>,
 }
 
-#[wasm_bindgen]
-impl AttributionParams {
+#[wasm_bindgen(js_class = AttributionParams)]
+impl JsAttributionParams {
     /// Bundle the attribution inputs (instrument / markets / dates / method
     /// JSON strings plus optional config and full-cross flag) for
     /// `attributePnl`.
@@ -146,13 +146,13 @@ fn catch_attribution_panic<T>(
 
 /// Run P&L attribution for a single instrument.
 ///
-/// Accepts an [`AttributionParams`] struct with the instrument JSON, two market
+/// Accepts a [`JsAttributionParams`] struct with the instrument JSON, two market
 /// snapshots, dates, and a method descriptor. Returns the `PnlAttribution`
 /// result as JSON. `config_json` may include `"execution_policy": "serial"`
 /// for hosts that already parallelize attribution at a higher level.
 /// @param params - Fully specified AttributionParams object containing instrument, markets, dates, and method.
 #[wasm_bindgen(js_name = attributePnl)]
-pub fn attribute_pnl(params: &AttributionParams) -> Result<String, JsValue> {
+pub fn attribute_pnl(params: &JsAttributionParams) -> Result<String, JsValue> {
     // MI3 defense in depth: wrap input-parsing as well. `from_json_inputs`
     // funnels through serde + downstream constructors that should not panic,
     // but a deeply malformed payload could in principle. An uncaught unwind

@@ -9,13 +9,13 @@ use finstack_quant_core::dates::{
 use wasm_bindgen::prelude::*;
 
 // ---------------------------------------------------------------------------
-// DayCountContext
+// JsDayCountContext
 // ---------------------------------------------------------------------------
 
 /// Optional context for day-count conventions that need market metadata.
 #[wasm_bindgen(js_name = DayCountContext)]
 #[derive(Clone, Default)]
-pub struct DayCountContext {
+pub struct JsDayCountContext {
     calendar_code: Option<String>,
     frequency: Option<RustTenor>,
     bus_basis: Option<u16>,
@@ -23,7 +23,7 @@ pub struct DayCountContext {
     end_is_termination_date: bool,
 }
 
-impl DayCountContext {
+impl JsDayCountContext {
     /// Resolve to a runtime context.
     ///
     /// Errors when `calendar_code` is set but unknown to the global calendar
@@ -47,17 +47,17 @@ impl DayCountContext {
 }
 
 #[wasm_bindgen(js_class = DayCountContext)]
-impl DayCountContext {
+impl JsDayCountContext {
     /// Create an empty day-count context.
     #[wasm_bindgen(constructor)]
-    pub fn new() -> DayCountContext {
-        DayCountContext::default()
+    pub fn new() -> JsDayCountContext {
+        JsDayCountContext::default()
     }
 
     /// Return a copy with the calendar used by Bus/252.
     /// @param calendar_code - Registered holiday-calendar identifier used by the Bus/252 convention.
     #[wasm_bindgen(js_name = withCalendar)]
-    pub fn with_calendar(&self, calendar_code: &str) -> DayCountContext {
+    pub fn with_calendar(&self, calendar_code: &str) -> JsDayCountContext {
         let mut next = self.clone();
         next.calendar_code = Some(calendar_code.to_string());
         next
@@ -66,7 +66,7 @@ impl DayCountContext {
     /// Return a copy with the coupon frequency used by Act/Act ISMA.
     /// @param frequency - Coupon-frequency Tenor required by Actual/Actual ICMA calculations.
     #[wasm_bindgen(js_name = withFrequency)]
-    pub fn with_frequency(&self, frequency: &Tenor) -> DayCountContext {
+    pub fn with_frequency(&self, frequency: &JsTenor) -> JsDayCountContext {
         let mut next = self.clone();
         next.frequency = Some(frequency.inner);
         next
@@ -75,7 +75,7 @@ impl DayCountContext {
     /// Return a copy with the business-day basis used by Bus/252.
     /// @param bus_basis - Business-day denominator for Bus/252, normally 252.
     #[wasm_bindgen(js_name = withBusBasis)]
-    pub fn with_bus_basis(&self, bus_basis: u16) -> DayCountContext {
+    pub fn with_bus_basis(&self, bus_basis: u16) -> JsDayCountContext {
         let mut next = self.clone();
         next.bus_basis = Some(bus_basis);
         next
@@ -91,7 +91,7 @@ impl DayCountContext {
         &self,
         start_epoch_days: i32,
         end_epoch_days: i32,
-    ) -> Result<DayCountContext, JsValue> {
+    ) -> Result<JsDayCountContext, JsValue> {
         let start = epoch_to_date(start_epoch_days)?;
         let end = epoch_to_date(end_epoch_days)?;
         let validated = RustDayCountContext::default()
@@ -106,7 +106,7 @@ impl DayCountContext {
     /// termination date (required by 30E/360 ISDA February-end handling).
     /// @param value - Whether the accrual end is the contractual termination date for 30E/360 ISDA.
     #[wasm_bindgen(js_name = withEndIsTerminationDate)]
-    pub fn with_end_is_termination_date(&self, value: bool) -> DayCountContext {
+    pub fn with_end_is_termination_date(&self, value: bool) -> JsDayCountContext {
         let mut next = self.clone();
         next.end_is_termination_date = value;
         next
@@ -114,7 +114,7 @@ impl DayCountContext {
 }
 
 // ---------------------------------------------------------------------------
-// DayCount
+// JsDayCount
 // ---------------------------------------------------------------------------
 
 /// Day-count convention for computing year fractions and day counts.
@@ -143,13 +143,13 @@ impl DayCountContext {
 /// // yf ≈ 0.4959 (181 / 365)
 /// ```
 #[wasm_bindgen(js_name = DayCount)]
-pub struct DayCount {
+pub struct JsDayCount {
     #[wasm_bindgen(skip)]
     pub(crate) inner: RustDayCount,
 }
 
 #[wasm_bindgen(js_class = DayCount)]
-impl DayCount {
+impl JsDayCount {
     /// Parse a day-count convention from its string name.
     ///
     /// @param name - Convention name (e.g. `"act_360"`, `"30_360"`, `"act_act"`).
@@ -157,24 +157,24 @@ impl DayCount {
     /// @returns The parsed `DayCount`.
     /// @throws If `name` is not a recognized day-count convention.
     #[wasm_bindgen(constructor)]
-    pub fn new(name: &str) -> Result<DayCount, JsValue> {
+    pub fn new(name: &str) -> Result<JsDayCount, JsValue> {
         name.parse::<RustDayCount>()
-            .map(|inner| DayCount { inner })
+            .map(|inner| JsDayCount { inner })
             .map_err(to_js_err)
     }
 
     /// Actual/360.
     #[wasm_bindgen(js_name = act360)]
-    pub fn act360() -> DayCount {
-        DayCount {
+    pub fn act360() -> JsDayCount {
+        JsDayCount {
             inner: RustDayCount::Act360,
         }
     }
 
     /// Actual/365 Fixed.
     #[wasm_bindgen(js_name = act365f)]
-    pub fn act365f() -> DayCount {
-        DayCount {
+    pub fn act365f() -> JsDayCount {
+        JsDayCount {
             inner: RustDayCount::Act365F,
         }
     }
@@ -185,56 +185,56 @@ impl DayCount {
     /// date's year is a leap year. Otherwise the denominator is 365. This is
     /// not ACT/ACT AFB.
     #[wasm_bindgen(js_name = act365l)]
-    pub fn act365l() -> DayCount {
-        DayCount {
+    pub fn act365l() -> JsDayCount {
+        JsDayCount {
             inner: RustDayCount::Act365L,
         }
     }
 
     /// 30/360 US (Bond Basis).
     #[wasm_bindgen(js_name = thirty360)]
-    pub fn thirty360() -> DayCount {
-        DayCount {
+    pub fn thirty360() -> JsDayCount {
+        JsDayCount {
             inner: RustDayCount::Thirty360,
         }
     }
 
     /// 30E/360 (Eurobond Basis).
     #[wasm_bindgen(js_name = thirtyE360)]
-    pub fn thirty_e360() -> DayCount {
-        DayCount {
+    pub fn thirty_e360() -> JsDayCount {
+        JsDayCount {
             inner: RustDayCount::ThirtyE360,
         }
     }
 
     /// 30E/360 ISDA.
     #[wasm_bindgen(js_name = thirtyE360Isda)]
-    pub fn thirty_e360_isda() -> DayCount {
-        DayCount {
+    pub fn thirty_e360_isda() -> JsDayCount {
+        JsDayCount {
             inner: RustDayCount::ThirtyE360Isda,
         }
     }
 
     /// Actual/Actual (ISDA).
     #[wasm_bindgen(js_name = actAct)]
-    pub fn act_act() -> DayCount {
-        DayCount {
+    pub fn act_act() -> JsDayCount {
+        JsDayCount {
             inner: RustDayCount::ActAct,
         }
     }
 
     /// Actual/Actual (ICMA/ISMA).
     #[wasm_bindgen(js_name = actActIsma)]
-    pub fn act_act_isma() -> DayCount {
-        DayCount {
+    pub fn act_act_isma() -> JsDayCount {
+        JsDayCount {
             inner: RustDayCount::ActActIsma,
         }
     }
 
     /// Business/252.
     #[wasm_bindgen(js_name = bus252)]
-    pub fn bus252() -> DayCount {
-        DayCount {
+    pub fn bus252() -> JsDayCount {
+        JsDayCount {
             inner: RustDayCount::Bus252,
         }
     }
@@ -295,7 +295,7 @@ impl DayCount {
         &self,
         start_epoch_days: i32,
         end_epoch_days: i32,
-        ctx: &DayCountContext,
+        ctx: &JsDayCountContext,
     ) -> Result<f64, JsValue> {
         let start = epoch_to_date(start_epoch_days)?;
         let end = epoch_to_date(end_epoch_days)?;
@@ -327,7 +327,7 @@ impl DayCount {
 }
 
 // ---------------------------------------------------------------------------
-// Tenor
+// JsTenor
 // ---------------------------------------------------------------------------
 
 /// A financial tenor such as `3M`, `1Y`, or `2W`.
@@ -349,13 +349,13 @@ impl DayCount {
 /// annual.toString();   // "1Y"
 /// ```
 #[wasm_bindgen(js_name = Tenor)]
-pub struct Tenor {
+pub struct JsTenor {
     #[wasm_bindgen(skip)]
     pub(crate) inner: RustTenor,
 }
 
 #[wasm_bindgen(js_class = Tenor)]
-impl Tenor {
+impl JsTenor {
     /// Parse a tenor string.
     ///
     /// @param s - Tenor string. Accepted forms include `"3M"`, `"1Y"`,
@@ -363,56 +363,56 @@ impl Tenor {
     /// @returns The parsed `Tenor`.
     /// @throws If `s` cannot be parsed (unknown unit, missing count).
     #[wasm_bindgen(constructor)]
-    pub fn new(s: &str) -> Result<Tenor, JsValue> {
+    pub fn new(s: &str) -> Result<JsTenor, JsValue> {
         RustTenor::parse(s)
-            .map(|inner| Tenor { inner })
+            .map(|inner| JsTenor { inner })
             .map_err(to_js_err)
     }
 
     /// 1-day tenor.
     #[wasm_bindgen(js_name = daily)]
-    pub fn daily() -> Tenor {
-        Tenor {
+    pub fn daily() -> JsTenor {
+        JsTenor {
             inner: RustTenor::daily(),
         }
     }
 
     /// 1-week tenor.
     #[wasm_bindgen(js_name = weekly)]
-    pub fn weekly() -> Tenor {
-        Tenor {
+    pub fn weekly() -> JsTenor {
+        JsTenor {
             inner: RustTenor::weekly(),
         }
     }
 
     /// 1-month tenor.
     #[wasm_bindgen(js_name = monthly)]
-    pub fn monthly() -> Tenor {
-        Tenor {
+    pub fn monthly() -> JsTenor {
+        JsTenor {
             inner: RustTenor::monthly(),
         }
     }
 
     /// 3-month (quarterly) tenor.
     #[wasm_bindgen(js_name = quarterly)]
-    pub fn quarterly() -> Tenor {
-        Tenor {
+    pub fn quarterly() -> JsTenor {
+        JsTenor {
             inner: RustTenor::quarterly(),
         }
     }
 
     /// 6-month (semi-annual) tenor.
     #[wasm_bindgen(js_name = semiAnnual)]
-    pub fn semi_annual() -> Tenor {
-        Tenor {
+    pub fn semi_annual() -> JsTenor {
+        JsTenor {
             inner: RustTenor::semi_annual(),
         }
     }
 
     /// 12-month (annual) tenor.
     #[wasm_bindgen(js_name = annual)]
-    pub fn annual() -> Tenor {
-        Tenor {
+    pub fn annual() -> JsTenor {
+        JsTenor {
             inner: RustTenor::annual(),
         }
     }
@@ -516,25 +516,25 @@ mod tests {
         epoch(2024, 7, 15)
     }
 
-    // -- DayCount -----------------------------------------------------------
+    // -- JsDayCount -----------------------------------------------------------
 
     #[test]
     fn daycount_constructors() {
-        let dc = DayCount::act360();
+        let dc = JsDayCount::act360();
         assert_eq!(dc.to_string(), "act_360");
-        let dc = DayCount::act365f();
+        let dc = JsDayCount::act365f();
         assert_eq!(dc.to_string(), "act_365f");
-        let dc = DayCount::thirty360();
+        let dc = JsDayCount::thirty360();
         assert_eq!(dc.to_string(), "30_360");
-        let dc = DayCount::thirty_e360();
+        let dc = JsDayCount::thirty_e360();
         assert_eq!(dc.to_string(), "30e_360");
-        let dc = DayCount::thirty_e360_isda();
+        let dc = JsDayCount::thirty_e360_isda();
         assert_eq!(dc.to_string(), "30e_360_isda");
-        let dc = DayCount::act_act();
+        let dc = JsDayCount::act_act();
         assert_eq!(dc.to_string(), "act_act");
-        let dc = DayCount::act_act_isma();
+        let dc = JsDayCount::act_act_isma();
         assert_eq!(dc.to_string(), "act_act_isma");
-        let dc = DayCount::bus252();
+        let dc = JsDayCount::bus252();
         assert_eq!(dc.to_string(), "bus_252");
     }
 
@@ -542,11 +542,11 @@ mod tests {
     fn thirty_e_360_isda_uses_termination_context() {
         let start = epoch(2025, 1, 31);
         let end = epoch(2025, 2, 28);
-        let dc = DayCount::thirty_e360_isda();
+        let dc = JsDayCount::thirty_e360_isda();
         let regular = dc
-            .year_fraction_with_context(start, end, &DayCountContext::new())
+            .year_fraction_with_context(start, end, &JsDayCountContext::new())
             .expect("regular period");
-        let terminal_ctx = DayCountContext::new().with_end_is_termination_date(true);
+        let terminal_ctx = JsDayCountContext::new().with_end_is_termination_date(true);
         let terminal = dc
             .year_fraction_with_context(start, end, &terminal_ctx)
             .expect("terminal period");
@@ -557,52 +557,52 @@ mod tests {
 
     #[test]
     fn daycount_from_string() {
-        let dc = DayCount::new("act_360").expect("valid");
+        let dc = JsDayCount::new("act_360").expect("valid");
         assert_eq!(dc.to_string(), "act_360");
     }
 
     #[test]
     fn year_fraction_act365f() {
-        let dc = DayCount::act365f();
+        let dc = JsDayCount::act365f();
         let yf = dc.year_fraction(jan15(), jul15()).expect("valid");
         assert!(yf > 0.49 && yf < 0.51, "yf={yf}");
     }
 
     #[test]
     fn calendar_days() {
-        let dc = DayCount::act365f();
+        let dc = JsDayCount::act365f();
         let days = dc.calendar_days(jan15(), jul15()).expect("valid");
         assert_eq!(days, (jul15() - jan15()) as i64);
     }
 
-    // -- Tenor --------------------------------------------------------------
+    // -- JsTenor --------------------------------------------------------------
 
     #[test]
     fn tenor_factories() {
-        assert_eq!(Tenor::daily().count(), 1);
-        assert_eq!(Tenor::weekly().count(), 1);
-        assert_eq!(Tenor::monthly().count(), 1);
-        assert_eq!(Tenor::quarterly().count(), 3);
-        assert_eq!(Tenor::semi_annual().count(), 6);
-        assert_eq!(Tenor::annual().count(), 1);
+        assert_eq!(JsTenor::daily().count(), 1);
+        assert_eq!(JsTenor::weekly().count(), 1);
+        assert_eq!(JsTenor::monthly().count(), 1);
+        assert_eq!(JsTenor::quarterly().count(), 3);
+        assert_eq!(JsTenor::semi_annual().count(), 6);
+        assert_eq!(JsTenor::annual().count(), 1);
     }
 
     #[test]
     fn tenor_parse() {
-        let t = Tenor::new("3M").expect("valid");
+        let t = JsTenor::new("3M").expect("valid");
         assert_eq!(t.count(), 3);
         assert!(t.to_years_simple() > 0.24 && t.to_years_simple() < 0.26);
     }
 
     #[test]
     fn tenor_parse_year() {
-        let t = Tenor::new("1Y").expect("valid");
+        let t = JsTenor::new("1Y").expect("valid");
         assert!((t.to_years_simple() - 1.0).abs() < 0.01);
     }
 
     #[test]
     fn tenor_to_string() {
-        let t = Tenor::quarterly();
+        let t = JsTenor::quarterly();
         let s = t.to_string();
         assert!(s.contains('M') || s.contains('Q'), "got: {s}");
     }
@@ -635,7 +635,7 @@ mod tests {
 
     #[test]
     fn year_fraction_act360() {
-        let dc = DayCount::act360();
+        let dc = JsDayCount::act360();
         let yf = dc.year_fraction(jan15(), jul15()).expect("valid");
         let days = (jul15() - jan15()) as f64;
         assert!((yf - days / 360.0).abs() < 1e-10);
@@ -643,33 +643,33 @@ mod tests {
 
     #[test]
     fn year_fraction_thirty360() {
-        let dc = DayCount::thirty360();
+        let dc = JsDayCount::thirty360();
         let yf = dc.year_fraction(jan15(), jul15()).expect("valid");
         assert!(yf > 0.0);
     }
 
     #[test]
     fn tenor_weekly_to_string() {
-        let t = Tenor::weekly();
+        let t = JsTenor::weekly();
         let s = t.to_string();
         assert!(!s.is_empty());
     }
 
     #[test]
     fn tenor_semi_annual_years() {
-        let t = Tenor::semi_annual();
+        let t = JsTenor::semi_annual();
         assert!((t.to_years_simple() - 0.5).abs() < 0.01);
     }
 
     #[test]
     fn tenor_annual_years() {
-        let t = Tenor::annual();
+        let t = JsTenor::annual();
         assert!((t.to_years_simple() - 1.0).abs() < 0.01);
     }
 
     #[test]
     fn tenor_daily_years() {
-        let t = Tenor::daily();
+        let t = JsTenor::daily();
         assert!(t.to_years_simple() < 0.01);
     }
 

@@ -1,4 +1,5 @@
-//! Deterministic calibrator that produces a [`CreditFactorModel`] artifact from
+//! Deterministic calibrator that produces a
+//! [`CreditFactorModel`][crate::credit::hierarchy::CreditFactorModel] artifact from
 //! sparse issuer-spread history.
 //!
 //! # Algorithm overview
@@ -8,7 +9,8 @@
 //! on a *time series* of issuer spreads rather than a single snapshot:
 //!
 //! 1. Classify each issuer as `IssuerBeta` or `BucketOnly` based on the
-//!    [`IssuerBetaPolicy`] and per-issuer [`IssuerBetaOverride`].
+//!    [`IssuerBetaPolicy`][crate::credit::hierarchy::IssuerBetaPolicy] and
+//!    per-issuer [`IssuerBetaOverride`][crate::credit::hierarchy::IssuerBetaOverride].
 //! 2. Optionally convert the spread panel to a return panel (default).
 //! 3. Inventory hierarchy buckets and fold up under-populated buckets.
 //! 4. Regress each issuer's residual on the generic factor (PC peel).
@@ -18,14 +20,18 @@
 //! 7. Anchor every factor's level value at `as_of` using the same peeling logic
 //!    on a single observation in level space.
 //! 8. Estimate per-factor variance via the sample variance.
-//! 9. Assemble correlation and covariance per [`CovarianceStrategy`]:
+//! 9. Assemble correlation and covariance per
+//!    [`CovarianceStrategy`][crate::credit::calibration::CovarianceStrategy]:
 //!    `Diagonal` → identity ρ, Σ = diag(σ²); `Ridge` → sample ρ (PSD-repaired
 //!    if needed), Σ = D·ρ·D + α·I; `FullSampleRepaired` → sample ρ repaired
 //!    to PSD, Σ = D·ρ_repaired·D.
 //! 10. Assemble [`crate::FactorModelConfig`] with `MatchingConfig::CreditHierarchical`.
-//! 11. Build [`CalibrationDiagnostics`] from the bookkeeping above.
-//! 12. Return the assembled [`CreditFactorModel`] after a final
-//!     [`CreditFactorModel::validate`] check.
+//! 11. Build [`CalibrationDiagnostics`][crate::credit::hierarchy::CalibrationDiagnostics]
+//!     from the bookkeeping above.
+//! 12. Return the assembled
+//!     [`CreditFactorModel`][crate::credit::hierarchy::CreditFactorModel] after a final
+//!     [`CreditFactorModel::validate`][crate::credit::hierarchy::CreditFactorModel::validate]
+//!     check.
 //!
 //! # Determinism
 //!
@@ -37,7 +43,8 @@
 //! The anchoring step (step 7) implements the same math as
 //! [`decompose_levels`][crate::credit::decomposition::decompose_levels]
 //! but is called via a private helper because we don't yet have a fully
-//! assembled [`CreditFactorModel`] at that point in the pipeline.
+//! assembled [`CreditFactorModel`][crate::credit::hierarchy::CreditFactorModel]
+//! at that point in the pipeline.
 //!
 //! # Determinism note on OLS
 //!

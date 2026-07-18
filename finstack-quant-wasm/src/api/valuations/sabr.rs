@@ -17,14 +17,14 @@ use wasm_bindgen::prelude::*;
 
 /// SABR model parameters `(alpha, beta, nu, rho)` with optional `shift`.
 #[wasm_bindgen(js_name = SabrParameters)]
-pub struct WasmSabrParameters {
+pub struct JsSabrParameters {
     #[wasm_bindgen(skip)]
     /// Underlying Rust value (not exposed to JS).
     pub inner: SABRParameters,
 }
 
 #[wasm_bindgen(js_class = SabrParameters)]
-impl WasmSabrParameters {
+impl JsSabrParameters {
     /// Create the object from its inputs.
     /// @param alpha - Positive SABR initial volatility scale parameter.
     /// @param beta - SABR CEV elasticity parameter from 0 through 1.
@@ -38,7 +38,7 @@ impl WasmSabrParameters {
         nu: f64,
         rho: f64,
         shift: Option<f64>,
-    ) -> Result<WasmSabrParameters, JsValue> {
+    ) -> Result<JsSabrParameters, JsValue> {
         let inner = match shift {
             Some(s) => SABRParameters::new_with_shift(alpha, beta, nu, rho, s),
             None => SABRParameters::new(alpha, beta, nu, rho),
@@ -49,7 +49,7 @@ impl WasmSabrParameters {
 
     /// Default SABR parameters for equity underlyings.
     #[wasm_bindgen(js_name = equityDefault)]
-    pub fn equity_default() -> WasmSabrParameters {
+    pub fn equity_default() -> JsSabrParameters {
         Self {
             inner: SABRParameters::equity_default(),
         }
@@ -57,7 +57,7 @@ impl WasmSabrParameters {
 
     /// Default SABR parameters for rates underlyings.
     #[wasm_bindgen(js_name = ratesDefault)]
-    pub fn rates_default() -> WasmSabrParameters {
+    pub fn rates_default() -> JsSabrParameters {
         Self {
             inner: SABRParameters::rates_default(),
         }
@@ -100,7 +100,7 @@ impl WasmSabrParameters {
     }
 }
 
-impl WasmSabrParameters {
+impl JsSabrParameters {
     fn clone_inner(&self) -> SABRParameters {
         self.inner.clone()
     }
@@ -112,16 +112,16 @@ impl WasmSabrParameters {
 
 /// Hagan-2002 SABR volatility model.
 #[wasm_bindgen(js_name = SabrModel)]
-pub struct WasmSabrModel {
+pub struct JsSabrModel {
     inner: SABRModel,
 }
 
 #[wasm_bindgen(js_class = SabrModel)]
-impl WasmSabrModel {
+impl JsSabrModel {
     /// Create the object from its inputs.
     /// @param params - SABR parameter object containing alpha, beta, nu, rho, and optional shift.
     #[wasm_bindgen(constructor)]
-    pub fn new(params: &WasmSabrParameters) -> WasmSabrModel {
+    pub fn new(params: &JsSabrParameters) -> JsSabrModel {
         Self {
             inner: SABRModel::new(params.clone_inner()),
         }
@@ -140,8 +140,8 @@ impl WasmSabrModel {
 
     /// Parameters used by this model.
     #[wasm_bindgen(getter)]
-    pub fn params(&self) -> WasmSabrParameters {
-        WasmSabrParameters {
+    pub fn params(&self) -> JsSabrParameters {
+        JsSabrParameters {
             inner: self.inner.parameters().clone(),
         }
     }
@@ -159,18 +159,18 @@ impl WasmSabrModel {
 
 /// Volatility smile generator for a fixed `(forward, t)` pair.
 #[wasm_bindgen(js_name = SabrSmile)]
-pub struct WasmSabrSmile {
+pub struct JsSabrSmile {
     inner: SABRSmile,
 }
 
 #[wasm_bindgen(js_class = SabrSmile)]
-impl WasmSabrSmile {
+impl JsSabrSmile {
     /// Create the object from its inputs.
     /// @param params - SABR parameter object containing alpha, beta, nu, rho, and optional shift.
     /// @param forward - Forward price or rate in the same quote convention as the strike.
     /// @param t - Time from the curve base date in years on the documented day-count basis.
     #[wasm_bindgen(constructor)]
-    pub fn new(params: &WasmSabrParameters, forward: f64, t: f64) -> WasmSabrSmile {
+    pub fn new(params: &JsSabrParameters, forward: f64, t: f64) -> JsSabrSmile {
         let model = SABRModel::new(params.clone_inner());
         Self {
             inner: SABRSmile::new(model, forward, t),
@@ -260,15 +260,15 @@ impl WasmSabrSmile {
 
 /// SABR calibrator (Levenberg-Marquardt with beta fixed).
 #[wasm_bindgen(js_name = SabrCalibrator)]
-pub struct WasmSabrCalibrator {
+pub struct JsSabrCalibrator {
     inner: SABRCalibrator,
 }
 
 #[wasm_bindgen(js_class = SabrCalibrator)]
-impl WasmSabrCalibrator {
+impl JsSabrCalibrator {
     /// Create the object from its inputs.
     #[wasm_bindgen(constructor)]
-    pub fn new() -> WasmSabrCalibrator {
+    pub fn new() -> JsSabrCalibrator {
         Self {
             inner: SABRCalibrator::new(),
         }
@@ -276,7 +276,7 @@ impl WasmSabrCalibrator {
 
     /// Calibrator preset with tighter convergence tolerances.
     #[wasm_bindgen(js_name = highPrecision)]
-    pub fn high_precision() -> WasmSabrCalibrator {
+    pub fn high_precision() -> JsSabrCalibrator {
         Self {
             inner: SABRCalibrator::high_precision(),
         }
@@ -287,7 +287,7 @@ impl WasmSabrCalibrator {
     /// `highPrecision`).
     /// @param tolerance - Non-negative numerical convergence tolerance for the calibration optimizer.
     #[wasm_bindgen(js_name = withTolerance)]
-    pub fn with_tolerance(&self, tolerance: f64) -> WasmSabrCalibrator {
+    pub fn with_tolerance(&self, tolerance: f64) -> JsSabrCalibrator {
         Self {
             inner: self.inner.clone().with_tolerance(tolerance),
         }
@@ -306,11 +306,11 @@ impl WasmSabrCalibrator {
         market_vols: Vec<f64>,
         t: f64,
         beta: f64,
-    ) -> Result<WasmSabrParameters, JsValue> {
+    ) -> Result<JsSabrParameters, JsValue> {
         check_smile_lengths(&strikes, &market_vols)?;
         self.inner
             .calibrate(forward, &strikes, &market_vols, t, beta)
-            .map(|inner| WasmSabrParameters { inner })
+            .map(|inner| JsSabrParameters { inner })
             .map_err(to_js_err)
     }
 
@@ -332,11 +332,11 @@ impl WasmSabrCalibrator {
         market_vols: Vec<f64>,
         t: f64,
         beta: f64,
-    ) -> Result<WasmSabrParameters, JsValue> {
+    ) -> Result<JsSabrParameters, JsValue> {
         check_smile_lengths(&strikes, &market_vols)?;
         self.inner
             .calibrate_auto_shift(forward, &strikes, &market_vols, t, beta)
-            .map(|inner| WasmSabrParameters { inner })
+            .map(|inner| JsSabrParameters { inner })
             .map_err(to_js_err)
     }
 }
@@ -352,7 +352,7 @@ fn check_smile_lengths(strikes: &[f64], market_vols: &[f64]) -> Result<(), JsVal
     Ok(())
 }
 
-impl Default for WasmSabrCalibrator {
+impl Default for JsSabrCalibrator {
     fn default() -> Self {
         Self::new()
     }
@@ -364,23 +364,23 @@ mod tests {
 
     #[test]
     fn sabr_params_equity_default_roundtrip() {
-        let p = WasmSabrParameters::equity_default();
+        let p = JsSabrParameters::equity_default();
         assert!((p.alpha() - 0.20).abs() < 1e-12);
         assert!((p.beta() - 1.0).abs() < 1e-12);
     }
 
     #[test]
     fn sabr_model_computes_atm_vol() {
-        let p = WasmSabrParameters::new(0.2, 1.0, 0.3, -0.2, None).expect("params");
-        let smile = WasmSabrSmile::new(&p, 100.0, 1.0);
+        let p = JsSabrParameters::new(0.2, 1.0, 0.3, -0.2, None).expect("params");
+        let smile = JsSabrSmile::new(&p, 100.0, 1.0);
         let atm = smile.atm_vol().expect("atm_vol");
         assert!(atm > 0.0 && atm < 1.0);
     }
 
     #[test]
     fn sabr_model_exposes_params_getter() {
-        let p = WasmSabrParameters::new(0.2, 0.5, 0.3, -0.2, None).expect("params");
-        let model = WasmSabrModel::new(&p);
+        let p = JsSabrParameters::new(0.2, 0.5, 0.3, -0.2, None).expect("params");
+        let model = JsSabrModel::new(&p);
         let roundtrip = model.params();
         assert!((roundtrip.alpha() - 0.2).abs() < 1e-12);
         assert!((roundtrip.beta() - 0.5).abs() < 1e-12);
@@ -388,16 +388,16 @@ mod tests {
 
     #[test]
     fn sabr_calibrator_with_tolerance_calibrates() {
-        let p = WasmSabrParameters::new(0.05, 0.5, 0.4, -0.1, None).expect("params");
+        let p = JsSabrParameters::new(0.05, 0.5, 0.4, -0.1, None).expect("params");
         let strikes = vec![0.01, 0.02, 0.03, 0.04, 0.05];
-        let smile = WasmSabrSmile::new(&p, 0.03, 1.0);
+        let smile = JsSabrSmile::new(&p, 0.03, 1.0);
         let vols = smile.generate_smile(strikes.clone()).expect("smile");
 
         // 1e-6 on the vega-weighted SSE objective is attainable within the
         // default iteration budget; tighter tolerances fail loudly under the
         // strict non-convergence semantics of core `minimize` because rho is
         // weakly identified on this near-symmetric strike set.
-        let calibrator = WasmSabrCalibrator::new().with_tolerance(1e-6);
+        let calibrator = JsSabrCalibrator::new().with_tolerance(1e-6);
         let fitted = calibrator
             .calibrate(0.03, strikes, vols, 1.0, 0.5)
             .expect("calibrate");
@@ -407,13 +407,13 @@ mod tests {
 
     #[test]
     fn sabr_calibrate_auto_shift_fits_negative_rate_smile() {
-        let p = WasmSabrParameters::new(0.05, 0.5, 0.4, -0.1, Some(0.03)).expect("params");
+        let p = JsSabrParameters::new(0.05, 0.5, 0.4, -0.1, Some(0.03)).expect("params");
         let forward = -0.005;
         let strikes = vec![-0.015, -0.01, -0.005, 0.0, 0.005];
-        let smile = WasmSabrSmile::new(&p, forward, 1.0);
+        let smile = JsSabrSmile::new(&p, forward, 1.0);
         let vols = smile.generate_smile(strikes.clone()).expect("smile");
 
-        let fitted = WasmSabrCalibrator::new()
+        let fitted = JsSabrCalibrator::new()
             .calibrate_auto_shift(forward, strikes, vols, 1.0, 0.5)
             .expect("calibrate_auto_shift");
         let shift = fitted

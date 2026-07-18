@@ -60,17 +60,17 @@ pub mod sensitivity;
 /// `aggregateFullCashflows` on the same portfolio, holding this handle
 /// avoids paying that cost twice.
 #[wasm_bindgen(js_name = Portfolio)]
-pub struct WasmPortfolio {
+pub struct JsPortfolio {
     #[wasm_bindgen(skip)]
     pub(crate) inner: Arc<finstack_quant_portfolio::Portfolio>,
 }
 
 #[wasm_bindgen(js_class = Portfolio)]
-impl WasmPortfolio {
+impl JsPortfolio {
     /// Build from a JSON-serialised `PortfolioSpec`.
     /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
     #[wasm_bindgen(js_name = fromSpec)]
-    pub fn from_spec(spec_json: &str) -> Result<WasmPortfolio, JsValue> {
+    pub fn from_spec(spec_json: &str) -> Result<JsPortfolio, JsValue> {
         let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
             serde_json::from_str(spec_json).map_err(to_js_err)?;
         let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
@@ -256,7 +256,7 @@ pub fn value_portfolio(
     market_json: &str,
     strict_risk: bool,
 ) -> Result<String, JsValue> {
-    let portfolio = WasmPortfolio::from_spec(spec_json)?;
+    let portfolio = JsPortfolio::from_spec(spec_json)?;
     value_portfolio_built(&portfolio, market_json, strict_risk)
 }
 
@@ -265,12 +265,12 @@ pub fn value_portfolio(
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 #[wasm_bindgen(js_name = aggregateFullCashflows)]
 pub fn aggregate_full_cashflows(spec_json: &str, market_json: &str) -> Result<String, JsValue> {
-    let portfolio = WasmPortfolio::from_spec(spec_json)?;
+    let portfolio = JsPortfolio::from_spec(spec_json)?;
     aggregate_full_cashflows_built(&portfolio, market_json)
 }
 
 /// Aggregate the full classified cashflow ladder for an already-built
-/// [`WasmPortfolio`] handle.
+/// [`JsPortfolio`] handle.
 ///
 /// Skips the per-call `PortfolioSpec` parse + `Portfolio::from_spec` rebuild.
 /// For batched or chained workflows (repeated cashflow builds across market
@@ -279,7 +279,7 @@ pub fn aggregate_full_cashflows(spec_json: &str, market_json: &str) -> Result<St
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 #[wasm_bindgen(js_name = aggregateFullCashflowsBuilt)]
 pub fn aggregate_full_cashflows_built(
-    portfolio: &WasmPortfolio,
+    portfolio: &JsPortfolio,
     market_json: &str,
 ) -> Result<String, JsValue> {
     let market: finstack_quant_core::market_data::context::MarketContext =
@@ -290,7 +290,7 @@ pub fn aggregate_full_cashflows_built(
     serde_json::to_string(&cashflows).map_err(to_js_err)
 }
 
-/// Value an already-built [`WasmPortfolio`] handle. Skips the per-call
+/// Value an already-built [`JsPortfolio`] handle. Skips the per-call
 /// `PortfolioSpec` parse + `Portfolio::from_spec` rebuild that
 /// [`value_portfolio`] performs; use this when sweeping market scenarios
 /// against a fixed portfolio.
@@ -299,7 +299,7 @@ pub fn aggregate_full_cashflows_built(
 /// @param strict_risk - Whether unavailable risk metrics are treated as calculation errors.
 #[wasm_bindgen(js_name = valuePortfolioBuilt)]
 pub fn value_portfolio_built(
-    portfolio: &WasmPortfolio,
+    portfolio: &JsPortfolio,
     market_json: &str,
     strict_risk: bool,
 ) -> Result<String, JsValue> {
@@ -320,14 +320,14 @@ pub fn value_portfolio_built(
     serde_json::to_string(&valuation).map_err(to_js_err)
 }
 
-/// Apply a scenario to an already-built [`WasmPortfolio`] handle and revalue.
+/// Apply a scenario to an already-built [`JsPortfolio`] handle and revalue.
 /// Returns a JS object with structured `valuation` and `report` values.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param scenario_json - Canonical JSON payload representing the scenario consumed by this API.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 #[wasm_bindgen(js_name = applyScenarioAndRevalueBuilt)]
 pub fn apply_scenario_and_revalue_built(
-    portfolio: &WasmPortfolio,
+    portfolio: &JsPortfolio,
     scenario_json: &str,
     market_json: &str,
 ) -> Result<JsValue, JsValue> {
@@ -358,7 +358,7 @@ pub fn apply_scenario_and_revalue(
     scenario_json: &str,
     market_json: &str,
 ) -> Result<JsValue, JsValue> {
-    let portfolio = WasmPortfolio::from_spec(spec_json)?;
+    let portfolio = JsPortfolio::from_spec(spec_json)?;
     apply_scenario_and_revalue_built(&portfolio, scenario_json, market_json)
 }
 
@@ -797,7 +797,7 @@ mod tests {
     #[test]
     fn portfolio_handle_roundtrip_and_aggregate_cashflows_built() {
         let spec_json = minimal_portfolio_spec_json();
-        let handle = WasmPortfolio::from_spec(&spec_json).expect("build handle");
+        let handle = JsPortfolio::from_spec(&spec_json).expect("build handle");
         assert_eq!(handle.id(), "test_portfolio");
         assert_eq!(handle.base_ccy(), "USD");
         assert_eq!(handle.as_of(), "2024-01-15");

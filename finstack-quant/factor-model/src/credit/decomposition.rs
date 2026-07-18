@@ -1,11 +1,16 @@
 //! Pure decomposition of issuer spreads into hierarchy-level factor values.
 //!
-//! Given a calibrated [`CreditFactorModel`] and observed issuer spreads at a
-//! point in time, [`decompose_levels`] peels off the generic (PC) component
-//! and each hierarchy level in turn, producing a [`LevelsAtDate`] snapshot.
+//! Given a calibrated [`CreditFactorModel`][crate::credit::hierarchy::CreditFactorModel]
+//! and observed issuer spreads at a point in time,
+//! [`decompose_levels`][crate::credit::decomposition::decompose_levels] peels off
+//! the generic (PC) component and each hierarchy level in turn, producing a
+//! [`LevelsAtDate`][crate::credit::decomposition::LevelsAtDate] snapshot.
 //!
-//! [`decompose_period`] then differences two [`LevelsAtDate`] snapshots into
-//! a [`PeriodDecomposition`] that preserves the linear reconciliation
+//! [`decompose_period`][crate::credit::decomposition::decompose_period] then
+//! differences two [`LevelsAtDate`][crate::credit::decomposition::LevelsAtDate]
+//! snapshots into a
+//! [`PeriodDecomposition`][crate::credit::decomposition::PeriodDecomposition]
+//! that preserves the linear reconciliation
 //! invariant
 //!
 //! ```text

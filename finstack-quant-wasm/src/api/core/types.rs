@@ -24,13 +24,13 @@ use wasm_bindgen::prelude::*;
 /// r.asBps;      // 250
 /// ```
 #[wasm_bindgen(js_name = Rate)]
-pub struct Rate {
+pub struct JsRate {
     #[wasm_bindgen(skip)]
     pub(crate) inner: RustRate,
 }
 
 #[wasm_bindgen(js_class = Rate)]
-impl Rate {
+impl JsRate {
     /// Create a rate from a decimal value.
     ///
     /// @param decimal - Rate as a decimal (e.g. `0.05` for 5%).
@@ -43,9 +43,9 @@ impl Rate {
     /// r.asPercent;  // 5
     /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(decimal: f64) -> Result<Rate, JsValue> {
+    pub fn new(decimal: f64) -> Result<JsRate, JsValue> {
         RustRate::try_from_decimal(decimal)
-            .map(|inner| Rate { inner })
+            .map(|inner| JsRate { inner })
             .map_err(to_js_err)
     }
 
@@ -61,9 +61,9 @@ impl Rate {
     /// r.asDecimal;  // 0.05
     /// ```
     #[wasm_bindgen(js_name = fromPercent)]
-    pub fn from_percent(pct: f64) -> Result<Rate, JsValue> {
+    pub fn from_percent(pct: f64) -> Result<JsRate, JsValue> {
         RustRate::try_from_percent(pct)
-            .map(|inner| Rate { inner })
+            .map(|inner| JsRate { inner })
             .map_err(to_js_err)
     }
 
@@ -87,9 +87,9 @@ impl Rate {
     /// r.asDecimal;  // 0.025
     /// ```
     #[wasm_bindgen(js_name = fromBps)]
-    pub fn from_bps(bps: f64) -> Result<Rate, JsValue> {
+    pub fn from_bps(bps: f64) -> Result<JsRate, JsValue> {
         let b = RustBps::try_new(bps).map_err(to_js_err)?;
-        Ok(Rate { inner: b.as_rate() })
+        Ok(JsRate { inner: b.as_rate() })
     }
 
     /// Rate as a decimal (e.g. `0.05` for 5%).
@@ -130,13 +130,13 @@ impl Rate {
 /// spread.asBps();      // 125
 /// ```
 #[wasm_bindgen(js_name = Bps)]
-pub struct Bps {
+pub struct JsBps {
     #[wasm_bindgen(skip)]
     pub(crate) inner: RustBps,
 }
 
 #[wasm_bindgen(js_class = Bps)]
-impl Bps {
+impl JsBps {
     /// Create basis points from a floating value.
     ///
     /// @param value - Value in basis points (e.g. `25` for 25 bps). Rounded
@@ -144,9 +144,9 @@ impl Bps {
     /// @returns The constructed `Bps`.
     /// @throws If `value` is non-finite.
     #[wasm_bindgen(constructor)]
-    pub fn new(value: f64) -> Result<Bps, JsValue> {
+    pub fn new(value: f64) -> Result<JsBps, JsValue> {
         RustBps::try_new(value)
-            .map(|inner| Bps { inner })
+            .map(|inner| JsBps { inner })
             .map_err(to_js_err)
     }
 
@@ -181,22 +181,22 @@ impl Bps {
 /// p.asPercent();  // 5
 /// ```
 #[wasm_bindgen(js_name = Percentage)]
-pub struct Percentage {
+pub struct JsPercentage {
     #[wasm_bindgen(skip)]
     pub(crate) inner: RustPercentage,
 }
 
 #[wasm_bindgen(js_class = Percentage)]
-impl Percentage {
+impl JsPercentage {
     /// Create a percentage.
     ///
     /// @param value - Value in percent (e.g. `5.0` for 5%).
     /// @returns The constructed `Percentage`.
     /// @throws If `value` is non-finite.
     #[wasm_bindgen(constructor)]
-    pub fn new(value: f64) -> Result<Percentage, JsValue> {
+    pub fn new(value: f64) -> Result<JsPercentage, JsValue> {
         RustPercentage::try_new(value)
-            .map(|inner| Percentage { inner })
+            .map(|inner| JsPercentage { inner })
             .map_err(to_js_err)
     }
 
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn rate_new_roundtrip() {
-        let r = Rate::new(0.05).expect("valid");
+        let r = JsRate::new(0.05).expect("valid");
         assert!((r.as_decimal() - 0.05).abs() < 1e-12);
         assert!((r.as_percent() - 5.0).abs() < 1e-10);
         assert_eq!(r.as_bps(), 500);
@@ -231,34 +231,34 @@ mod tests {
 
     #[test]
     fn rate_from_percent() {
-        let r = Rate::from_percent(5.0).expect("valid");
+        let r = JsRate::from_percent(5.0).expect("valid");
         assert!((r.as_decimal() - 0.05).abs() < 1e-12);
     }
 
     #[test]
     fn rate_from_bps() {
-        let r = Rate::from_bps(250.0).expect("valid");
+        let r = JsRate::from_bps(250.0).expect("valid");
         assert!((r.as_decimal() - 0.025).abs() < 1e-10);
         assert_eq!(r.as_bps(), 250);
     }
 
     #[test]
     fn bps_roundtrip() {
-        let b = Bps::new(25.0).expect("valid");
+        let b = JsBps::new(25.0).expect("valid");
         assert!((b.as_decimal() - 0.0025).abs() < 1e-10);
         assert_eq!(b.as_bps(), 25);
     }
 
     #[test]
     fn percentage_roundtrip() {
-        let p = Percentage::new(5.0).expect("valid");
+        let p = JsPercentage::new(5.0).expect("valid");
         assert!((p.as_decimal() - 0.05).abs() < 1e-12);
         assert!((p.as_percent() - 5.0).abs() < 1e-12);
     }
 
     #[test]
     fn rate_zero() {
-        let r = Rate::new(0.0).expect("valid");
+        let r = JsRate::new(0.0).expect("valid");
         assert_eq!(r.as_decimal(), 0.0);
         assert_eq!(r.as_percent(), 0.0);
         assert_eq!(r.as_bps(), 0);
@@ -266,19 +266,19 @@ mod tests {
 
     #[test]
     fn bps_large_value() {
-        let b = Bps::new(10_000.0).expect("valid");
+        let b = JsBps::new(10_000.0).expect("valid");
         assert!((b.as_decimal() - 1.0).abs() < 1e-10);
     }
 
     #[test]
     fn percentage_zero() {
-        let p = Percentage::new(0.0).expect("valid");
+        let p = JsPercentage::new(0.0).expect("valid");
         assert_eq!(p.as_decimal(), 0.0);
     }
 
     #[test]
     fn rate_negative() {
-        let r = Rate::new(-0.01).expect("valid");
+        let r = JsRate::new(-0.01).expect("valid");
         assert!((r.as_decimal() - (-0.01)).abs() < 1e-12);
     }
 

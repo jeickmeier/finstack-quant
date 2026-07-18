@@ -2,16 +2,17 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::core::dates::{create_date, DayCount, DayCountContext, Tenor};
+use finstack_quant_wasm::api::core::dates::{create_date, JsDayCount, JsDayCountContext, JsTenor};
 use finstack_quant_wasm::api::core::market_data::{
-    DiscountCurve, ForwardCurve, FxConversionPolicy, FxDeltaVolSurface, FxMatrix, VolCube,
+    JsDiscountCurve, JsForwardCurve, JsFxConversionPolicy, JsFxDeltaVolSurface, JsFxMatrix,
+    JsVolCube,
 };
 use js_sys::Float64Array;
 use wasm_bindgen_test::*;
 
 #[wasm_bindgen_test]
 fn fx_matrix_rate_returns_structured_result() {
-    let matrix = FxMatrix::new();
+    let matrix = JsFxMatrix::new();
     matrix.set_quote("EUR", "USD", 1.10).unwrap();
 
     let result = matrix
@@ -19,7 +20,7 @@ fn fx_matrix_rate_returns_structured_result() {
             "EUR",
             "USD",
             "2024-01-02",
-            &FxConversionPolicy::cashflow_date(),
+            &JsFxConversionPolicy::cashflow_date(),
         )
         .unwrap();
 
@@ -31,7 +32,7 @@ fn fx_matrix_rate_returns_structured_result() {
 fn forward_curve_projection_grid_and_rate_between() {
     let t_3m = 91.0 / 360.0;
     let t_6m = 183.0 / 360.0;
-    let curve = ForwardCurve::new(
+    let curve = JsForwardCurve::new(
         "USD-SOFR-3M",
         0.25,
         "2025-01-01",
@@ -57,7 +58,7 @@ fn forward_curve_projection_grid_and_rate_between() {
 
 #[wasm_bindgen_test]
 fn discount_curve_negative_rate_validation_mode_is_explicit() {
-    assert!(DiscountCurve::new(
+    assert!(JsDiscountCurve::new(
         "CHF-OIS",
         "2025-01-01",
         &[0.0, 1.0, 1.0, 1.002],
@@ -69,7 +70,7 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
     )
     .is_err());
 
-    let curve = DiscountCurve::new(
+    let curve = JsDiscountCurve::new(
         "CHF-OIS",
         "2025-01-01",
         &[0.0, 1.0, 1.0, 1.002],
@@ -83,7 +84,7 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
     assert!(curve.forward(0.0, 1.0).expect("negative forward") < 0.0);
 
     for floor in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        assert!(DiscountCurve::new(
+        assert!(JsDiscountCurve::new(
             "CHF-OIS",
             "2025-01-01",
             &[0.0, 1.0, 1.0, 1.002],
@@ -99,7 +100,7 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
 
 #[wasm_bindgen_test]
 fn fx_matrix_rate_defaults_policy_to_cashflow_date() {
-    let matrix = FxMatrix::new();
+    let matrix = JsFxMatrix::new();
     matrix.set_quote("GBP", "USD", 1.25).unwrap();
 
     let result = matrix.rate_default("GBP", "USD", "2024-01-02").unwrap();
@@ -110,8 +111,8 @@ fn fx_matrix_rate_defaults_policy_to_cashflow_date() {
 
 #[wasm_bindgen_test]
 fn fx_matrix_policy_can_be_reused() {
-    let matrix = FxMatrix::new();
-    let policy = FxConversionPolicy::cashflow_date();
+    let matrix = JsFxMatrix::new();
+    let policy = JsFxConversionPolicy::cashflow_date();
     matrix
         .set_quote_on("EUR", "USD", "2024-01-02", &policy, 1.10)
         .unwrap();
@@ -122,7 +123,7 @@ fn fx_matrix_policy_can_be_reused() {
 
 #[wasm_bindgen_test]
 fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
-    let surface = FxDeltaVolSurface::new(
+    let surface = JsFxDeltaVolSurface::new(
         "EURUSD-DELTA-VOL",
         &[0.25, 0.5, 1.0],
         &[0.08, 0.085, 0.09],
@@ -150,7 +151,7 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
 
 #[wasm_bindgen_test]
 fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
-    match FxDeltaVolSurface::new(
+    match JsFxDeltaVolSurface::new(
         "BAD",
         &[0.25, 0.5],
         &[0.08, 0.085],
@@ -169,7 +170,7 @@ fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
 
 #[wasm_bindgen_test]
 fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
-    let cev = VolCube::new(
+    let cev = JsVolCube::new(
         "CEV",
         &[1.0],
         &[2.0],
@@ -181,7 +182,7 @@ fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
     assert!(cev.vol_normal(1.0, 2.0, -0.01).is_err());
     assert!(cev.vol_normal_clamped(1.0, 2.0, -0.01).is_nan());
 
-    let normal = VolCube::new(
+    let normal = JsVolCube::new(
         "NORMAL",
         &[1.0],
         &[2.0],
@@ -198,16 +199,18 @@ fn day_count_context_supports_context_dependent_conventions() {
     let start = create_date(2024, 1, 1).unwrap();
     let end = create_date(2024, 7, 1).unwrap();
 
-    assert!(DayCount::act_act_isma().year_fraction(start, end).is_err());
+    assert!(JsDayCount::act_act_isma()
+        .year_fraction(start, end)
+        .is_err());
 
-    let isma_ctx = DayCountContext::new().with_frequency(&Tenor::semi_annual());
-    let isma = DayCount::act_act_isma()
+    let isma_ctx = JsDayCountContext::new().with_frequency(&JsTenor::semi_annual());
+    let isma = JsDayCount::act_act_isma()
         .year_fraction_with_context(start, end, &isma_ctx)
         .unwrap();
     assert!((isma - 0.5).abs() < 1e-12);
 
-    let bus_ctx = DayCountContext::new().with_calendar("target2");
-    let bus = DayCount::bus252()
+    let bus_ctx = JsDayCountContext::new().with_calendar("target2");
+    let bus = JsDayCount::bus252()
         .year_fraction_with_context(start, end, &bus_ctx)
         .unwrap();
     assert!(bus > 0.0);
@@ -218,13 +221,13 @@ fn day_count_exposes_act365l_and_signed_fraction() {
     let start = create_date(2024, 1, 1).unwrap();
     let end = create_date(2025, 1, 1).unwrap();
     assert_eq!(
-        DayCount::act365l()
+        JsDayCount::act365l()
             .signed_year_fraction(start, end)
             .unwrap(),
         1.0
     );
     assert_eq!(
-        DayCount::act365l()
+        JsDayCount::act365l()
             .signed_year_fraction(end, start)
             .unwrap(),
         -1.0

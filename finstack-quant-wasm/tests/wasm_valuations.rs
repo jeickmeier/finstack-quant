@@ -250,9 +250,9 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
 
 #[wasm_bindgen_test]
 fn fx_price_with_metrics_validates_merged_overrides_before_market() {
-    use finstack_quant_wasm::api::valuations::fx::WasmFxOption;
+    use finstack_quant_wasm::api::valuations::fx::JsFxOption;
 
-    let option = WasmFxOption::from_json(&fx_option_instrument_json()).unwrap();
+    let option = JsFxOption::from_json(&fx_option_instrument_json()).unwrap();
     let metrics = serde_wasm_bindgen::to_value(&Vec::<String>::new()).unwrap();
     let error = option
         .price_with_metrics(

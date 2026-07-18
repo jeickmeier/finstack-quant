@@ -688,7 +688,8 @@ pub struct CreditFactorModel {
     /// **Which matrix is authoritative:** vol forecasting rebuilds
     /// `Σ(t, h) = D·ρ·D` from this matrix plus `vol_state`; point-in-time
     /// risk uses `config.covariance` directly. Under
-    /// [`crate::CovarianceStrategy::Ridge`] the two deliberately differ —
+    /// [`CovarianceStrategy::Ridge`][crate::credit::calibration::CovarianceStrategy::Ridge]
+    /// the two deliberately differ —
     /// `config.covariance = D·ρ·D + α·I`, so its implied correlations are
     /// shrunk relative to `ρ` by `σᵢσⱼ/√((σᵢ²+α)(σⱼ²+α))`.
     pub static_correlation: FactorCorrelationMatrix,

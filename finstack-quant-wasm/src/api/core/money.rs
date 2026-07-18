@@ -1,13 +1,13 @@
 //! WASM bindings for [`finstack_quant_core::money::Money`].
 
-use crate::api::core::currency::Currency;
+use crate::api::core::currency::JsCurrency;
 use crate::utils::to_js_err;
 use finstack_quant_core::money::Money as RustMoney;
 use wasm_bindgen::prelude::*;
 
 /// Currency-tagged monetary amount.
 ///
-/// Money values pin a numeric amount to a [`Currency`]. Arithmetic
+/// Money values pin a numeric amount to a [`JsCurrency`]. Arithmetic
 /// (`add`, `sub`) refuses to mix currencies; scalar multiplication and
 /// division preserve the currency.
 ///
@@ -23,13 +23,13 @@ use wasm_bindgen::prelude::*;
 /// console.log(net.toString(), tax.toString());  // "USD 999950.00", "USD 69996.50"
 /// ```
 #[wasm_bindgen(js_name = Money)]
-pub struct Money {
+pub struct JsMoney {
     #[wasm_bindgen(skip)]
     pub(crate) inner: RustMoney,
 }
 
 #[wasm_bindgen(js_class = Money)]
-impl Money {
+impl JsMoney {
     /// Creates a new money value without implicit currency-minor-unit rounding.
     ///
     /// WASM accepts a JavaScript `number` only. Its finite numeric value is
@@ -50,9 +50,9 @@ impl Money {
     /// m.currency.code;   // "USD"
     /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(amount: f64, currency: &Currency) -> Result<Money, JsValue> {
+    pub fn new(amount: f64, currency: &JsCurrency) -> Result<JsMoney, JsValue> {
         RustMoney::try_new(amount, currency.inner)
-            .map(|inner| Money { inner })
+            .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
@@ -80,10 +80,10 @@ impl Money {
 
     /// Currency of this amount.
     ///
-    /// @returns The [`Currency`] this amount is tagged with.
+    /// @returns The [`JsCurrency`] this amount is tagged with.
     #[wasm_bindgen(getter, js_name = currency)]
-    pub fn currency(&self) -> Currency {
-        Currency {
+    pub fn currency(&self) -> JsCurrency {
+        JsCurrency {
             inner: self.inner.currency(),
         }
     }
@@ -92,10 +92,10 @@ impl Money {
     /// @param target - Target Currency for the converted monetary amount.
     /// @param rate - FX conversion rate expressed as target-currency units per source-currency unit.
     #[wasm_bindgen(js_name = convertAtRate)]
-    pub fn convert_at_rate(&self, target: &Currency, rate: f64) -> Result<Money, JsValue> {
+    pub fn convert_at_rate(&self, target: &JsCurrency, rate: f64) -> Result<JsMoney, JsValue> {
         self.inner
             .convert_at_rate(target.inner, rate)
-            .map(|inner| Money { inner })
+            .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
@@ -114,10 +114,10 @@ impl Money {
     /// a.add(b).amount;  // 15
     /// ```
     #[wasm_bindgen(js_name = add)]
-    pub fn add(&self, other: &Money) -> Result<Money, JsValue> {
+    pub fn add(&self, other: &JsMoney) -> Result<JsMoney, JsValue> {
         self.inner
             .checked_add(other.inner)
-            .map(|inner| Money { inner })
+            .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
@@ -128,10 +128,10 @@ impl Money {
     /// @throws If `other.currency` differs from `this.currency`, or the
     /// operation is not representable as a `Decimal`.
     #[wasm_bindgen(js_name = sub)]
-    pub fn sub(&self, other: &Money) -> Result<Money, JsValue> {
+    pub fn sub(&self, other: &JsMoney) -> Result<JsMoney, JsValue> {
         self.inner
             .checked_sub(other.inner)
-            .map(|inner| Money { inner })
+            .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
@@ -141,10 +141,10 @@ impl Money {
     /// @returns Scaled amount, in the same currency.
     /// @throws If `factor` is non-finite or the result is not representable.
     #[wasm_bindgen(js_name = mulScalar)]
-    pub fn mul_scalar(&self, factor: f64) -> Result<Money, JsValue> {
+    pub fn mul_scalar(&self, factor: f64) -> Result<JsMoney, JsValue> {
         self.inner
             .checked_mul_f64(factor)
-            .map(|inner| Money { inner })
+            .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
@@ -154,10 +154,10 @@ impl Money {
     /// @returns Scaled amount, in the same currency.
     /// @throws If `divisor` is zero, non-finite, or the result is not representable.
     #[wasm_bindgen(js_name = divScalar)]
-    pub fn div_scalar(&self, divisor: f64) -> Result<Money, JsValue> {
+    pub fn div_scalar(&self, divisor: f64) -> Result<JsMoney, JsValue> {
         self.inner
             .checked_div_f64(divisor)
-            .map(|inner| Money { inner })
+            .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
@@ -166,10 +166,10 @@ impl Money {
     /// @returns Negated amount in the same currency.
     /// @throws If the negation is not representable as a `Decimal`.
     #[wasm_bindgen(js_name = negate)]
-    pub fn negate(&self) -> Result<Money, JsValue> {
+    pub fn negate(&self) -> Result<JsMoney, JsValue> {
         self.inner
             .checked_mul_f64(-1.0)
-            .map(|inner| Money { inner })
+            .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
@@ -187,36 +187,36 @@ impl Money {
 mod tests {
     use super::*;
 
-    fn usd() -> Currency {
-        Currency::new("USD").expect("USD")
+    fn usd() -> JsCurrency {
+        JsCurrency::new("USD").expect("USD")
     }
 
     #[test]
     fn construct_and_getters() {
-        let m = Money::new(10.0, &usd()).expect("valid");
+        let m = JsMoney::new(10.0, &usd()).expect("valid");
         assert!((m.amount() - 10.0).abs() < 1e-10);
         assert_eq!(m.currency().code(), "USD");
     }
 
     #[test]
     fn add_same_currency() {
-        let a = Money::new(10.0, &usd()).expect("valid");
-        let b = Money::new(5.0, &usd()).expect("valid");
+        let a = JsMoney::new(10.0, &usd()).expect("valid");
+        let b = JsMoney::new(5.0, &usd()).expect("valid");
         let c = a.add(&b).expect("add");
         assert!((c.amount() - 15.0).abs() < 1e-10);
     }
 
     #[test]
     fn sub_same_currency() {
-        let a = Money::new(10.0, &usd()).expect("valid");
-        let b = Money::new(3.0, &usd()).expect("valid");
+        let a = JsMoney::new(10.0, &usd()).expect("valid");
+        let b = JsMoney::new(3.0, &usd()).expect("valid");
         let c = a.sub(&b).expect("sub");
         assert!((c.amount() - 7.0).abs() < 1e-10);
     }
 
     #[test]
     fn mul_scalar() {
-        let m = Money::new(10.0, &usd()).expect("valid");
+        let m = JsMoney::new(10.0, &usd()).expect("valid");
         let scaled = m.mul_scalar(2.5).expect("finite factor");
         assert!((scaled.amount() - 25.0).abs() < 1e-10);
     }
@@ -226,21 +226,21 @@ mod tests {
 
     #[test]
     fn div_scalar() {
-        let m = Money::new(10.0, &usd()).expect("valid");
+        let m = JsMoney::new(10.0, &usd()).expect("valid");
         let half = m.div_scalar(2.0).expect("div");
         assert!((half.amount() - 5.0).abs() < 1e-10);
     }
 
     #[test]
     fn negate() {
-        let m = Money::new(10.0, &usd()).expect("valid");
+        let m = JsMoney::new(10.0, &usd()).expect("valid");
         let neg = m.negate().expect("negate");
         assert!((neg.amount() + 10.0).abs() < 1e-10);
     }
 
     #[test]
     fn to_string_format() {
-        let m = Money::new(10.0, &usd()).expect("valid");
+        let m = JsMoney::new(10.0, &usd()).expect("valid");
         let s = m.to_string();
         assert!(s.contains("USD"), "expected USD in: {s}");
         assert!(s.contains("10"), "expected 10 in: {s}");
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn negate_zero() {
-        let m = Money::new(0.0, &usd()).expect("valid");
+        let m = JsMoney::new(0.0, &usd()).expect("valid");
         let neg = m.negate().expect("negate");
         assert!(neg.amount().abs() < 1e-12);
     }
