@@ -16,9 +16,9 @@ Run directly or via ``mise run rust-doc``.
 
 from __future__ import annotations
 
+from pathlib import Path
 import re
 import sys
-from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCAN_ROOTS = [REPO_ROOT / "finstack-quant"]
