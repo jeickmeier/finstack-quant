@@ -1620,6 +1620,43 @@ class Performance:
 
     # -- Vector-per-ticker methods --
 
+    def returns(self) -> list[list[float]]:
+        """
+        Per-period simple returns for each ticker.
+
+        Canonical accessor for the raw return panel over the active window.
+        Prefer this over :meth:`excess_returns` with an all-zero risk-free
+        series or un-compounding :meth:`cumulative_returns`. Series are
+        span-aware and therefore ragged across tickers on edge-ragged panels.
+
+        Returns
+        -------
+        list[list[float]]
+            Per-ticker simple return series as decimal fractions
+            (``0.01`` for ``+1%``), in date order.
+        """
+
+    def returns_for_ticker(self, ticker_idx: int) -> list[float]:
+        """
+        Per-period simple returns for a single ticker.
+
+        Parameters
+        ----------
+        ticker_idx : int
+            Zero-based ticker column index.
+
+        Returns
+        -------
+        list[float]
+            Simple return series as decimal fractions (``0.01`` for ``+1%``),
+            in date order, spanning that ticker's active dates.
+
+        Raises
+        ------
+        AnalyticsError
+            If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+
     def cumulative_returns(self) -> list[list[float]]:
         """
         Cumulative returns for each ticker.
@@ -2007,6 +2044,22 @@ class Performance:
         ------
         AnalyticsError
             If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+        """
+        ...
+
+    def returns_to_dataframe(self) -> pd.DataFrame:
+        """
+        Per-period simple returns for all tickers as a pandas DataFrame.
+
+        Ragged per-ticker series are padded with ``NaN`` onto the active date
+        grid. Prefer this over :meth:`excess_returns` with an all-zero
+        risk-free series or un-compounding
+        :meth:`cumulative_returns_to_dataframe`.
+
+        Returns
+        -------
+        pd.DataFrame
+            Simple returns indexed by date, one column per ticker.
         """
         ...
 

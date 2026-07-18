@@ -4,7 +4,8 @@ Credit risk models: academic scoring, PD calibration, and LGD / EAD.
 Bindings for ``finstack_quant_core::credit``. Each submodule mirrors the Rust
 module of the same name and is registered at runtime in ``sys.modules``
 so that ``from finstack_quant.core.credit import scoring`` (or ``pd``, ``lgd``,
-``migration``, ``recovery_waterfall``) works transparently.
+``migration``, ``recovery_waterfall``, ``liability_management``) works
+transparently.
 
 Examples
 --------
@@ -15,7 +16,407 @@ Examples
 
 from __future__ import annotations
 
-__all__ = ["scoring", "pd", "lgd", "migration", "recovery_waterfall"]
+__all__ = ["lgd", "liability_management", "migration", "pd", "recovery_waterfall", "scoring"]
+
+class liability_management:
+    """
+    Distressed-exchange hold-versus-tender economics and issuer LME analytics.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.credit import liability_management
+    >>> liability_management.__name__
+    'liability_management'
+    """
+
+    class ExchangeOfferAnalysis:
+        """
+        Hold-versus-tender economics of a distressed exchange offer.
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.liability_management.ExchangeOfferAnalysis.__name__
+        'ExchangeOfferAnalysis'
+        """
+
+        @property
+        def exchange_type(self) -> str:
+            """
+            Return the canonical exchange structure for this analysis.
+
+            Returns
+            -------
+            str
+                One of ``par_for_par``, ``discount``, ``uptier``, ``downtier``.
+            """
+            ...
+
+        @property
+        def old_npv(self) -> float:
+            """
+            Return the hold-out present value used in the comparison.
+
+            Returns
+            -------
+            float
+                Present value of the existing claim if it is not tendered.
+            """
+            ...
+
+        @property
+        def new_npv(self) -> float:
+            """
+            Return the present value of the new instrument offered.
+
+            Returns
+            -------
+            float
+                Present value received on tendering, excluding fees.
+            """
+            ...
+
+        @property
+        def consent_fee(self) -> float:
+            """
+            Return the cash consent or early-tender fee.
+
+            Returns
+            -------
+            float
+                Fee paid to participating holders, in the input unit.
+            """
+            ...
+
+        @property
+        def equity_sweetener_value(self) -> float:
+            """
+            Return the value of equity or warrants attached to the offer.
+
+            Returns
+            -------
+            float
+                Estimated sweetener value, in the input unit.
+            """
+            ...
+
+        @property
+        def tender_total(self) -> float:
+            """
+            Return the total tender consideration.
+
+            Returns
+            -------
+            float
+                ``new_npv + consent_fee + equity_sweetener_value``.
+            """
+            ...
+
+        @property
+        def delta_npv(self) -> float:
+            """
+            Return the NPV pickup from tendering.
+
+            Returns
+            -------
+            float
+                ``tender_total - old_npv``; negative when holding out wins.
+            """
+            ...
+
+        @property
+        def breakeven_recovery(self) -> float:
+            """
+            Return the hold-out recovery that matches the tender.
+
+            Returns
+            -------
+            float
+                Fraction of the hold-out present value, capped at ``1.0``.
+            """
+            ...
+
+        @property
+        def tender_recommended(self) -> bool:
+            """
+            Return whether the offer clears the 2% tender hurdle.
+
+            Returns
+            -------
+            bool
+                True when ``tender_total > old_npv * 1.02``.
+            """
+            ...
+
+    class LeverageImpact:
+        """
+        Gross-leverage impact of a liability management exercise.
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.liability_management.LeverageImpact.__name__
+        'LeverageImpact'
+        """
+
+        @property
+        def pre_total_debt(self) -> float:
+            """
+            Return gross debt of the target instrument before the exercise.
+
+            Returns
+            -------
+            float
+                Outstanding face amount, in the input unit.
+            """
+            ...
+
+        @property
+        def post_total_debt(self) -> float:
+            """
+            Return gross debt of the target instrument after the exercise.
+
+            Returns
+            -------
+            float
+                Face amount remaining once retired par is removed.
+            """
+            ...
+
+        @property
+        def pre_leverage(self) -> float:
+            """
+            Return gross debt over EBITDA before the exercise.
+
+            Returns
+            -------
+            float
+                Leverage as a multiple, so ``8.0`` reads as 8.0x.
+            """
+            ...
+
+        @property
+        def post_leverage(self) -> float:
+            """
+            Return gross debt over EBITDA after the exercise.
+
+            Returns
+            -------
+            float
+                Leverage as a multiple, so ``4.8`` reads as 4.8x.
+            """
+            ...
+
+        @property
+        def leverage_reduction(self) -> float:
+            """
+            Return the turns of leverage removed by the exercise.
+
+            Returns
+            -------
+            float
+                ``pre_leverage - post_leverage``, in turns.
+            """
+            ...
+
+    class LmeAnalysis:
+        """
+        Issuer-side economics of a liability management exercise.
+
+        Examples
+        --------
+        >>> import finstack_quant.core.credit as binding
+        >>> binding.liability_management.LmeAnalysis.__name__
+        'LmeAnalysis'
+        """
+
+        @property
+        def lme_type(self) -> str:
+            """
+            Return the canonical LME structure for this analysis.
+
+            Returns
+            -------
+            str
+                One of ``open_market_repurchase``, ``tender_offer``,
+                ``amend_and_extend``, ``dropdown``.
+            """
+            ...
+
+        @property
+        def cost(self) -> float:
+            """
+            Return the cash paid by the issuer.
+
+            Returns
+            -------
+            float
+                Repurchase consideration or consent fees, in the input unit.
+            """
+            ...
+
+        @property
+        def notional_reduction(self) -> float:
+            """
+            Return the face amount retired by the exercise.
+
+            Returns
+            -------
+            float
+                Par extinguished; zero for amend-and-extend and dropdowns.
+            """
+            ...
+
+        @property
+        def discount_capture(self) -> float:
+            """
+            Return the discount captured by the issuer.
+
+            Returns
+            -------
+            float
+                ``notional_reduction - cost``, in the input unit.
+            """
+            ...
+
+        @property
+        def discount_capture_pct(self) -> float:
+            """
+            Return the discount captured as a fraction of par retired.
+
+            Returns
+            -------
+            float
+                Fraction in ``[0, 1]``; zero when no par is retired.
+            """
+            ...
+
+        @property
+        def remaining_holder_impact_pct(self) -> float:
+            """
+            Return the value fraction diverted from non-participating holders.
+
+            Returns
+            -------
+            float
+                Nonzero only for a dropdown transaction.
+            """
+            ...
+
+        @property
+        def leverage_impact(self) -> liability_management.LeverageImpact | None:
+            """
+            Return the gross-leverage block, when EBITDA was supplied.
+
+            Returns
+            -------
+            LeverageImpact or None
+                None when no positive EBITDA was provided.
+            """
+            ...
+
+    @staticmethod
+    def analyze_exchange_offer(
+        old_pv: float,
+        new_pv: float,
+        consent_fee: float = 0.0,
+        equity_sweetener_value: float = 0.0,
+        exchange_type: str = "par_for_par",
+    ) -> liability_management.ExchangeOfferAnalysis:
+        """
+        Compare hold-versus-tender economics for a distressed exchange offer.
+
+        Parameters
+        ----------
+        old_pv : float
+            Present value of the existing claim if it is not tendered, in the
+            caller's monetary unit. Must be finite and non-negative.
+        new_pv : float
+            Present value of the new instrument received on tendering,
+            expressed in the same unit as ``old_pv``.
+        consent_fee : float, optional
+            Cash consent or early-tender fee paid to participating holders, in
+            the same unit as ``old_pv``.
+        equity_sweetener_value : float, optional
+            Estimated value of equity or warrants attached to the new
+            instrument, in the same unit as ``old_pv``.
+        exchange_type : str, optional
+            Offer structure: ``par_for_par`` (alias ``par``), ``discount``,
+            ``uptier``, or ``downtier``. Case-insensitive; ``-`` is normalised
+            to ``_``.
+
+        Returns
+        -------
+        ExchangeOfferAnalysis
+            Tender total, NPV pickup, breakeven recovery, and the tender
+            recommendation against the 2% hurdle.
+
+        Raises
+        ------
+        ValueError
+            If an amount is negative or non-finite, or ``exchange_type`` is not
+            a recognised structure.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.credit import liability_management
+        >>> callable(liability_management.analyze_exchange_offer)
+        True
+        """
+        ...
+
+    @staticmethod
+    def analyze_lme(
+        lme_type: str,
+        notional: float,
+        repurchase_price_pct: float,
+        opt_acceptance_pct: float = 1.0,
+        ebitda: float | None = None,
+    ) -> liability_management.LmeAnalysis:
+        """
+        Compute discount capture and leverage impact for an LME transaction.
+
+        Parameters
+        ----------
+        lme_type : str
+            Structure of the exercise: ``open_market`` (aliases
+            ``open_market_repurchase``, ``omr``), ``tender_offer`` (alias
+            ``tender``), ``amend_and_extend`` (aliases ``ae``, ``a&e``), or
+            ``dropdown``. Case-insensitive; ``-`` and ``&`` normalise to ``_``.
+        notional : float
+            Outstanding face amount of the target instrument, in the caller's
+            monetary unit. Must be finite and strictly positive.
+        repurchase_price_pct : float
+            Price as a fraction of par for repurchases and tenders (``(0, 1.5]``),
+            the extension fee for amend-and-extend (``[0, 0.10]``), or the
+            transferred-asset fraction for a dropdown (``[0, 1]``).
+        opt_acceptance_pct : float, optional
+            Fraction of holders participating, in ``[0, 1]``. Defaults to full
+            participation.
+        ebitda : float or None, optional
+            EBITDA in the same unit as ``notional``. A positive value adds the
+            ``leverage_impact`` block; None or a non-positive value omits it.
+
+        Returns
+        -------
+        LmeAnalysis
+            Cash cost, par retired, discount captured, impact on remaining
+            holders, and the optional gross-leverage block.
+
+        Raises
+        ------
+        ValueError
+            If ``notional`` is not positive, ``opt_acceptance_pct`` is outside
+            ``[0, 1]``, ``repurchase_price_pct`` is outside the range admitted
+            by ``lme_type``, or ``lme_type`` is not recognised.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.credit import liability_management
+        >>> callable(liability_management.analyze_lme)
+        True
+        """
+        ...
 
 class recovery_waterfall:
     """

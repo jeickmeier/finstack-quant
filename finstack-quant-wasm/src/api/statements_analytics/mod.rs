@@ -129,6 +129,194 @@ pub fn generate_tornado_entries(
     serde_json::to_string(&entries).map_err(to_js_err)
 }
 
+/// Rank the headline DCF assumptions by enterprise-value impact.
+///
+/// The statement model is evaluated once; each shocked point re-runs only the
+/// DCF. Returns JSON with the baseline enterprise value, tornado entries as
+/// deltas versus that baseline sorted by descending absolute swing, and the
+/// effective (possibly clamped) shock levels.
+/// @param model_json - Canonical JSON payload representing the financial model spec consumed by this API.
+/// @param wacc - Baseline weighted average cost of capital in decimal form (0.10 = 10%).
+/// @param terminal_value_json - Canonical JSON payload representing the terminal value spec, selecting whether growth or the exit multiple is shocked.
+/// @param ufcf_node - Node identifier holding unlevered free cash flow for the forecast periods.
+/// @param net_debt_override - Optional flat net-debt amount used instead of the model-derived bridge.
+/// @param wacc_sensitivity_bump - Absolute shock applied to WACC and to the terminal growth rate, in decimal (0.01 = +/-100 bp).
+/// @param wacc_denominator_epsilon - Minimum spread preserved between WACC and the terminal growth rate so 1/(wacc - g) stays defined, in decimal.
+/// @param exit_multiple_bump - Absolute shock applied to an exit multiple, in turns of the multiple (1.0 = +/-1.0x).
+#[wasm_bindgen(js_name = dcfSensitivity)]
+#[allow(clippy::too_many_arguments)]
+pub fn dcf_sensitivity(
+    model_json: &str,
+    wacc: f64,
+    terminal_value_json: &str,
+    ufcf_node: &str,
+    net_debt_override: Option<f64>,
+    wacc_sensitivity_bump: Option<f64>,
+    wacc_denominator_epsilon: Option<f64>,
+    exit_multiple_bump: Option<f64>,
+) -> Result<String, JsValue> {
+    use finstack_quant_statements_analytics::analysis::{DcfOptions, ExitMultipleBump};
+
+    let model: finstack_quant_statements::FinancialModelSpec =
+        serde_json::from_str(model_json).map_err(to_js_err)?;
+    let terminal_value: finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec =
+        serde_json::from_str(terminal_value_json).map_err(to_js_err)?;
+
+    let defaults = DcfOptions::default();
+    let options = DcfOptions {
+        wacc_sensitivity_bump: wacc_sensitivity_bump.unwrap_or(defaults.wacc_sensitivity_bump),
+        wacc_denominator_epsilon: wacc_denominator_epsilon
+            .unwrap_or(defaults.wacc_denominator_epsilon),
+        exit_multiple_bump: exit_multiple_bump
+            .map_or(defaults.exit_multiple_bump, ExitMultipleBump::Absolute),
+        ..DcfOptions::default()
+    };
+
+    let result = finstack_quant_statements_analytics::analysis::dcf_sensitivity(
+        &model,
+        wacc,
+        terminal_value,
+        ufcf_node,
+        net_debt_override,
+        &options,
+        None,
+    )
+    .map_err(to_js_err)?;
+
+    let entries: Vec<serde_json::Value> = result
+        .entries
+        .iter()
+        .map(|entry| {
+            serde_json::json!({
+                "parameter_id": entry.parameter_id,
+                "downside": entry.downside,
+                "upside": entry.upside,
+            })
+        })
+        .collect();
+
+    serde_json::to_string(&serde_json::json!({
+        "baseline_enterprise_value": result.baseline_enterprise_value.amount(),
+        "currency": result.baseline_enterprise_value.currency().to_string(),
+        "entries": entries,
+        "wacc_down": result.wacc_down,
+        "wacc_down_clamped": result.wacc_down_clamped,
+        "terminal_growth_up": result.terminal_growth_up,
+        "terminal_growth_up_clamped": result.terminal_growth_up_clamped,
+    }))
+    .map_err(to_js_err)
+}
+
+/// Evaluate a leveraged-buyout transaction against a statement model.
+///
+/// Entry enterprise value is priced at the model's first period, the sponsor
+/// equity check is solved as the sources-and-uses residual, and exit proceeds
+/// are the exit enterprise value less the modelled net debt at the exit
+/// period. IRR is out of scope: pair the returned `exit_equity_proceeds` with
+/// the equity outflow at close and call `portfolio.mwrXirr`.
+/// @param model_json - Canonical JSON payload representing the financial model spec consumed by this API.
+/// @param entry_multiple - Entry valuation multiple applied to the entry metric (8.5 = 8.5x).
+/// @param entry_metric_node - Node identifier supplying the entry valuation metric, read at the model's first period.
+/// @param exit_multiple - Exit valuation multiple applied to the exit metric (9.5 = 9.5x).
+/// @param exit_metric_node - Node identifier supplying the exit valuation metric, read at the exit period.
+/// @param exit_net_debt_node - Node identifier supplying net debt outstanding at the exit period, where a modelled amortisation schedule lands.
+/// @param exit_period - Model period label at which the sponsor exits, e.g. "2029".
+/// @param sources_json - Canonical JSON array of funded debt tranches at close, each {"name", "amount"} in the model currency.
+/// @param transaction_fees - Transaction fees and expenses funded at close, in the model currency.
+#[wasm_bindgen(js_name = evaluateLbo)]
+#[allow(clippy::too_many_arguments)]
+pub fn evaluate_lbo(
+    model_json: &str,
+    entry_multiple: f64,
+    entry_metric_node: &str,
+    exit_multiple: f64,
+    exit_metric_node: &str,
+    exit_net_debt_node: &str,
+    exit_period: &str,
+    sources_json: &str,
+    transaction_fees: f64,
+) -> Result<String, JsValue> {
+    use finstack_quant_statements_analytics::analysis::{LboConfig, LboTranche};
+
+    #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct TrancheInput {
+        name: String,
+        amount: f64,
+    }
+
+    let model: finstack_quant_statements::FinancialModelSpec =
+        serde_json::from_str(model_json).map_err(to_js_err)?;
+    let tranches: Vec<TrancheInput> = serde_json::from_str(sources_json).map_err(to_js_err)?;
+    let exit_period: finstack_quant_core::dates::PeriodId =
+        exit_period.parse().map_err(to_js_err)?;
+
+    let config = LboConfig {
+        entry_multiple,
+        entry_metric_node: entry_metric_node.to_owned(),
+        transaction_fees,
+        sources: tranches
+            .into_iter()
+            .map(|t| LboTranche {
+                name: t.name,
+                amount: t.amount,
+            })
+            .collect(),
+        exit_multiple,
+        exit_metric_node: exit_metric_node.to_owned(),
+        exit_net_debt_node: exit_net_debt_node.to_owned(),
+        exit_period,
+        check_mappings: None,
+    };
+
+    let result = finstack_quant_statements_analytics::analysis::evaluate_lbo(&model, &config)
+        .map_err(to_js_err)?;
+
+    serde_json::to_string(&serde_json::json!({
+        "entry_enterprise_value": result.entry_enterprise_value.amount(),
+        "entry_metric": result.entry_metric,
+        "debt_total": result.debt_total.amount(),
+        "equity_check": result.equity_check.amount(),
+        "sources_total": result.sources_total.amount(),
+        "uses_total": result.uses_total.amount(),
+        "sources_uses_balanced": result.sources_uses_balanced,
+        "exit_enterprise_value": result.exit_enterprise_value.amount(),
+        "exit_metric": result.exit_metric,
+        "exit_net_debt": result.exit_net_debt.amount(),
+        "exit_equity_proceeds": result.exit_equity_proceeds.amount(),
+        "moic": result.moic,
+        "currency": result.entry_enterprise_value.currency().to_string(),
+    }))
+    .map_err(to_js_err)
+}
+
+/// Weighted-average cost of capital (WACC).
+///
+/// Blends the required return on equity with the after-tax cost of debt:
+/// `WACC = w_E * r_E + w_D * r_D * (1 - T)`.
+/// @param equity_weight - Equity share of total capital as a decimal fraction (0.6 = 60% equity-funded).
+/// @param cost_of_equity - Required return on equity in decimal form, typically from CAPM (0.115 = 11.5%).
+/// @param debt_weight - Debt share of total capital as a decimal fraction; must sum with the equity weight to 1.0.
+/// @param cost_of_debt - Pre-tax marginal borrowing yield in decimal form, before the interest tax shield (0.06 = 6%).
+/// @param tax_rate - Marginal corporate tax rate as a decimal fraction in [0, 1] (0.25 = 25%).
+#[wasm_bindgen(js_name = wacc)]
+pub fn wacc(
+    equity_weight: f64,
+    cost_of_equity: f64,
+    debt_weight: f64,
+    cost_of_debt: f64,
+    tax_rate: f64,
+) -> Result<f64, JsValue> {
+    finstack_quant_statements_analytics::analysis::wacc(
+        equity_weight,
+        cost_of_equity,
+        debt_weight,
+        cost_of_debt,
+        tax_rate,
+    )
+    .map_err(to_js_err)
+}
+
 /// Run Monte Carlo simulation on a financial model (JSON in/out).
 /// @param model_json - Canonical JSON payload representing the model consumed by this API.
 /// @param config_json - Canonical JSON payload representing the config consumed by this API.

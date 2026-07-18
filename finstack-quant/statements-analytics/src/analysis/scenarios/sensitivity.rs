@@ -410,7 +410,11 @@ fn max_target_impact(
         .fold(0.0, f64::max)
 }
 
-fn descending_f64(lhs: f64, rhs: f64) -> std::cmp::Ordering {
+/// Descending comparator that sorts `NaN` last.
+///
+/// Shared by every tornado-style ranking in the crate so entry ordering
+/// cannot drift between the sensitivity sweep and the DCF sensitivity.
+pub(crate) fn descending_f64(lhs: f64, rhs: f64) -> std::cmp::Ordering {
     let lhs = if lhs.is_nan() { f64::NEG_INFINITY } else { lhs };
     let rhs = if rhs.is_nan() { f64::NEG_INFINITY } else { rhs };
     rhs.total_cmp(&lhs)

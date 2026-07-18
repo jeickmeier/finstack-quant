@@ -241,6 +241,12 @@ fn resolve_metrics(options: &PortfolioValuationOptions) -> Vec<MetricId> {
     }
 }
 
+fn batch_pricing_options(config: &FinstackConfig) -> PricingOptions {
+    PricingOptions::default()
+        .with_config(config)
+        .with_new_hazard_recalibration_cache()
+}
+
 /// Assemble final valuation from per-position results.
 fn assemble_valuation(
     position_values_vec: Vec<PositionValue>,
@@ -436,6 +442,7 @@ pub fn value_portfolio_at(
     }
 
     let metrics = resolve_metrics(options);
+    let pricing_options = batch_pricing_options(config);
 
     use rayon::prelude::*;
     let position_values_vec: Vec<PositionValue> = portfolio
@@ -449,7 +456,7 @@ pub fn value_portfolio_at(
                 as_of,
                 &metrics,
                 options.strict_risk,
-                config,
+                &pricing_options,
             )
         })
         .collect::<Result<Vec<_>>>()?;
@@ -476,6 +483,7 @@ pub(crate) fn value_portfolio_serial_at(
     as_of: Date,
 ) -> Result<PortfolioValuation> {
     let metrics = resolve_metrics(options);
+    let pricing_options = batch_pricing_options(config);
 
     let position_values_vec: Vec<PositionValue> = portfolio
         .positions
@@ -488,7 +496,7 @@ pub(crate) fn value_portfolio_serial_at(
                 as_of,
                 &metrics,
                 options.strict_risk,
-                config,
+                &pricing_options,
             )
         })
         .collect::<Result<Vec<_>>>()?;
@@ -506,7 +514,7 @@ fn value_single_position(
     as_of: Date,
     metrics: &[MetricId],
     strict_risk: bool,
-    config: &FinstackConfig,
+    pricing_options: &PricingOptions,
 ) -> Result<PositionValue> {
     // Price the instrument with metrics.
     //
@@ -517,12 +525,7 @@ fn value_single_position(
         (
             position
                 .instrument
-                .price_with_metrics(
-                    market,
-                    as_of,
-                    metrics,
-                    PricingOptions::default().with_config(config),
-                )
+                .price_with_metrics(market, as_of, metrics, pricing_options.clone())
                 .map_err(|e: finstack_quant_core::Error| Error::ValuationError {
                     position_id: position.position_id.clone(),
                     message: e.to_string(),
@@ -535,10 +538,14 @@ fn value_single_position(
             market,
             as_of,
             metrics,
-            PricingOptions::default().with_config(config),
+            pricing_options.clone(),
         ) {
             Ok(result) => (result, true, None),
             Err(metric_error) => {
+                let fallback_config = match pricing_options.config.as_deref() {
+                    Some(config) => config.clone(),
+                    None => FinstackConfig::default(),
+                };
                 let value = position.instrument.value(market, as_of).map_err(
                     |e: finstack_quant_core::Error| Error::ValuationError {
                         position_id: position.position_id.clone(),
@@ -558,7 +565,7 @@ fn value_single_position(
                         position.instrument.id(),
                         as_of,
                         value,
-                        config,
+                        &fallback_config,
                     ),
                     false,
                     Some(metric_error.to_string()),
@@ -595,7 +602,7 @@ fn reuse_prior_or_value_position(
     portfolio: &Portfolio,
     metrics: &[MetricId],
     strict_risk: bool,
-    config: &FinstackConfig,
+    pricing_options: &PricingOptions,
     prior: &PortfolioValuation,
 ) -> Result<PositionValue> {
     if let Some(pv) = prior.position_values.get(position.position_id.as_str()) {
@@ -608,7 +615,7 @@ fn reuse_prior_or_value_position(
             portfolio.as_of,
             metrics,
             strict_risk,
-            config,
+            pricing_options,
         )
     }
 }
@@ -669,6 +676,7 @@ pub fn revalue_affected(
          the index — call Portfolio::rebuild_index after direct mutation"
     );
     let positions = &portfolio.positions;
+    let pricing_options = batch_pricing_options(config);
     let affected_indices = if changed
         .iter()
         .any(|key| matches!(key, crate::dependencies::MarketFactorKey::Fx { .. }))
@@ -698,7 +706,7 @@ pub fn revalue_affected(
                     portfolio,
                     &metrics,
                     options.strict_risk,
-                    config,
+                    &pricing_options,
                     prior,
                 )
             })
@@ -733,7 +741,7 @@ pub fn revalue_affected(
                         portfolio.as_of,
                         &metrics,
                         options.strict_risk,
-                        config,
+                        &pricing_options,
                     )
                 } else {
                     reuse_prior_or_value_position(
@@ -742,7 +750,7 @@ pub fn revalue_affected(
                         portfolio,
                         &metrics,
                         options.strict_risk,
-                        config,
+                        &pricing_options,
                         prior,
                     )
                 }
@@ -768,7 +776,7 @@ pub fn revalue_affected(
                     portfolio.as_of,
                     &metrics,
                     options.strict_risk,
-                    config,
+                    &pricing_options,
                 )?);
             } else {
                 values.push(reuse_prior_or_value_position(
@@ -777,7 +785,7 @@ pub fn revalue_affected(
                     portfolio,
                     &metrics,
                     options.strict_risk,
-                    config,
+                    &pricing_options,
                     prior,
                 )?);
             }

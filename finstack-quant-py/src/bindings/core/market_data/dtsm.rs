@@ -273,6 +273,38 @@ fn yield_pca_scenario(
 }
 
 // ---------------------------------------------------------------------------
+// Nelson-Siegel: static cross-section
+// ---------------------------------------------------------------------------
+
+/// Evaluate the static Nelson-Siegel (1987) yield curve for a given decay
+/// parameter, factor triple, and tenor grid.
+///
+/// This is the Diebold-Li cross-sectional equation evaluated for a single date:
+/// ``y(tau) = beta1 + beta2 * slope(tau) + beta3 * (slope(tau) - exp(-lambda*tau))``
+/// where ``slope(tau) = (1 - exp(-lambda*tau)) / (lambda*tau)``. Use it to
+/// reconstruct a fitted or forecast curve from factors returned by
+/// ``diebold_li_fit_factors`` / ``diebold_li_forecast``.
+///
+/// Arguments:
+///     lambda: Decay parameter for tenors **in years**; must be finite and > 0.
+///         The 0.7308 default used elsewhere in this module is the
+///         years-equivalent of Diebold-Li's canonical 0.0609 months value.
+///     factors: ``[beta1, beta2, beta3]`` = ``[level, slope, curvature]`` in
+///         decimal yield units (0.045 = 4.5%). Exactly three finite values.
+///     tenors: Maturities in years, each finite and >= 0. Order is preserved
+///         in the output; no sorting or de-duplication is applied.
+///
+/// Returns a list[float] of fitted yields, one per input tenor, in decimal
+/// units and in the same order as ``tenors``.
+#[pyfunction]
+#[pyo3(signature = (lambda, factors, tenors))]
+#[pyo3(text_signature = "(lambda, factors, tenors)")]
+fn nelson_siegel_yields(lambda: f64, factors: [f64; 3], tenors: Vec<f64>) -> PyResult<Vec<f64>> {
+    finstack_quant_core::market_data::dtsm::nelson_siegel_yields(lambda, factors, &tenors)
+        .map_err(core_to_py)
+}
+
+// ---------------------------------------------------------------------------
 // Register
 // ---------------------------------------------------------------------------
 
@@ -286,6 +318,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_function(wrap_pyfunction!(diebold_li_fit_factors, &m)?)?;
     m.add_function(wrap_pyfunction!(diebold_li_forecast, &m)?)?;
+    m.add_function(wrap_pyfunction!(nelson_siegel_yields, &m)?)?;
     m.add_function(wrap_pyfunction!(yield_pca_fit, &m)?)?;
     m.add_function(wrap_pyfunction!(yield_pca_scenario, &m)?)?;
 
@@ -294,6 +327,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         [
             "diebold_li_fit_factors",
             "diebold_li_forecast",
+            "nelson_siegel_yields",
             "yield_pca_fit",
             "yield_pca_scenario",
         ],

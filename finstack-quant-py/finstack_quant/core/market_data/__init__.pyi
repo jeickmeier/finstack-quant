@@ -1011,6 +1011,36 @@ class InflationCurve:
         """
         ...
 
+    def index_ratio(self, t: float) -> float:
+        """
+        Return the principal indexation ratio at a curve time.
+
+        Computes ``cpi_with_lag(t) / base_cpi`` -- the factor by which the
+        notional of an inflation-linked security is uplifted at `t`. This is
+        the curve-level view of the ``inflation_index_ratio`` reported per
+        cashflow by the valuations layer. No deflation floor is applied, so
+        the ratio may fall below 1.0 in a deflationary curve.
+
+        Parameters
+        ----------
+        t : float
+            Year fraction from the curve base date identifying the settlement
+            date whose indexed principal is wanted; the indexation lag is
+            applied on top of it.
+
+        Returns
+        -------
+        float
+            Lagged CPI at `t` divided by the curve's base CPI, as a
+            dimensionless multiplier on original face.
+
+        Raises
+        ------
+        ValueError
+            If the curve's base CPI is not finite and strictly positive.
+        """
+        ...
+
     def inflation_rate(self, t1: float, t2: float) -> float:
         """
         Return annualized compounded inflation between two curve times.

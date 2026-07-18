@@ -754,6 +754,38 @@ impl Performance {
         self.returns_for_span(ticker_idx, self.active_span_for_ticker(ticker_idx))
     }
 
+    /// Per-period simple returns for one ticker over the active window.
+    ///
+    /// This is the canonical way to read back the raw return series a
+    /// [`Performance`] was built from (or derived from prices). Prefer it over
+    /// calling [`Self::excess_returns`] with an all-zero risk-free vector or
+    /// un-compounding [`Self::cumulative_returns`]; both reproduce this series
+    /// only up to floating-point noise and are easy to get wrong.
+    ///
+    /// The series is span-aware: on edge-ragged panels it excludes the
+    /// leading/trailing missing observations for this ticker, so its length
+    /// matches [`Self::active_dates_for_ticker`] rather than
+    /// [`Self::active_dates`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// `ticker_idx` is outside the loaded ticker columns.
+    ///
+    /// # Arguments
+    ///
+    /// * `ticker_idx` - Zero-based ticker column index, in
+    ///   [`Self::ticker_names`] order.
+    ///
+    /// # Returns
+    ///
+    /// The ticker's simple (non-compounded) returns as decimal fractions,
+    /// e.g. `0.01` for `+1%`, in date order.
+    pub fn returns_for_ticker(&self, ticker_idx: usize) -> crate::Result<Vec<f64>> {
+        self.ensure_ticker_idx(ticker_idx)?;
+        Ok(self.active_returns(ticker_idx).to_vec())
+    }
+
     /// Date slice corresponding to the currently active analysis window.
     pub fn active_dates(&self) -> &[Date] {
         let range = self.active_range();

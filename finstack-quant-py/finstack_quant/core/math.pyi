@@ -83,6 +83,44 @@ class linalg:
         ...
 
     @staticmethod
+    def apply_lower_triangular(l: list[list[float]], z: list[float]) -> list[float]:
+        """
+        Apply a lower-triangular factor L to a vector z, returning ``L z``.
+
+        This is the Cholesky "apply" step that turns independent standard
+        normals into correlated normals: if ``A = L L^T`` and ``z ~ N(0, I)``,
+        then ``L z ~ N(0, A)``.
+
+        Parameters
+        ----------
+        l : list[list[float]]
+            Square lower-triangular factor L, typically the output of
+            ``cholesky_decomposition``. Only the lower triangle is read; the
+            upper triangle is assumed zero and ignored.
+        z : list[float]
+            Vector to transform, of the same length as L's dimension,
+            typically independent standard-normal draws.
+
+        Returns
+        -------
+        list[float]
+            The product ``L z``, in the same variable order as ``z``.
+
+        Raises
+        ------
+        CholeskyError
+            If ``z``'s length does not match L's dimension.
+        ValueError
+            If the input is not a square matrix.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import linalg
+        >>> correlated = linalg.apply_lower_triangular(L, [1.0, 0.0])  # doctest: +SKIP
+        """
+        ...
+
+    @staticmethod
     def cholesky_decomposition(matrix: list[list[float]]) -> list[list[float]]:
         """
         Compute the Cholesky decomposition L of a symmetric positive-definite

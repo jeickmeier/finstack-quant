@@ -36,16 +36,29 @@ def _configure_pythonpath() -> None:
 
 
 def find_notebooks(base_dir: Path, subdirectory: str | None = None) -> list[Path]:
-    """Find all Jupyter notebooks under *base_dir*, optionally filtered to *subdirectory*."""
+    """Find notebooks under *base_dir*, optionally filtered to *subdirectory*.
+
+    *subdirectory* may name either a directory to search recursively or a single
+    ``.ipynb`` file, and is resolved relative to *base_dir*.
+    """
     search_root = base_dir / subdirectory if subdirectory else base_dir
     if not search_root.exists():
         return []
+    if search_root.is_file():
+        return [search_root] if search_root.suffix == ".ipynb" else []
     notebooks = sorted(search_root.glob("**/*.ipynb"))
     return [nb for nb in notebooks if ".ipynb_checkpoints" not in str(nb)]
 
 
-def run_notebook(notebook_path: Path, timeout: int) -> tuple[bool, str, float]:
-    """Run a single notebook; return (success, message, elapsed_seconds)."""
+def run_notebook(
+    notebook_path: Path, timeout: int, save_outputs: bool = False
+) -> tuple[bool, str, float]:
+    """Run a single notebook; return (success, message, elapsed_seconds).
+
+    When *save_outputs* is set, a successfully executed notebook is written back
+    with its freshly computed outputs. Notebooks that fail are never written, so
+    a broken run cannot overwrite a good file.
+    """
     _configure_pythonpath()
     start = time.time()
     try:
@@ -62,6 +75,10 @@ def run_notebook(notebook_path: Path, timeout: int) -> tuple[bool, str, float]:
 
         elapsed = time.time() - start
         cell_count = sum(1 for c in nb.cells if c.cell_type == "code")
+        if save_outputs:
+            with open(notebook_path, "w", encoding="utf-8") as f:
+                nbformat.write(nb, f)
+            return True, f"Executed {cell_count} code cells; outputs saved", elapsed
         return True, f"Executed {cell_count} code cells", elapsed
 
     except CellExecutionError as e:
@@ -92,13 +109,21 @@ def _fmt(seconds: float) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run finstack example notebooks")
-    parser.add_argument("--directory", help="Only run notebooks in this subdirectory")
+    parser.add_argument(
+        "--directory",
+        help="Only run notebooks in this subdirectory, or a single .ipynb path",
+    )
     parser.add_argument("--timeout", type=int, default=300, help="Per-notebook timeout in seconds")
     parser.add_argument("--verbose", action="store_true", help="Show detailed output")
     parser.add_argument(
         "--fail-fast",
         action="store_true",
         help="Stop after the first notebook failure",
+    )
+    parser.add_argument(
+        "--save-outputs",
+        action="store_true",
+        help="Write each successfully executed notebook back with fresh outputs",
     )
     args = parser.parse_args()
 
@@ -125,7 +150,7 @@ def main() -> int:
         rel = nb_path.relative_to(base_dir)
         print(f"[{i}/{len(notebooks)}] Running {rel}...", end=" ", flush=True)
 
-        ok, msg, elapsed = run_notebook(nb_path, args.timeout)
+        ok, msg, elapsed = run_notebook(nb_path, args.timeout, args.save_outputs)
         results[nb_path] = (ok, msg, elapsed)
 
         if ok:

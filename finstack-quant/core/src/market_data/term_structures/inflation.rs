@@ -282,6 +282,77 @@ impl InflationCurve {
         self.cpi(t - lag_years)
     }
 
+    /// Principal indexation ratio at time `t` (years).
+    ///
+    /// Returns `cpi_with_lag(t) / base_cpi` — the factor by which the notional
+    /// of an inflation-linked security is uplifted at `t`. A value of `1.0`
+    /// means no accrued indexation; `1.08` means the inflation-adjusted
+    /// principal is 108% of the original face. Deflation gives a ratio below
+    /// `1.0` (this accessor applies no deflation floor; US TIPS' par floor at
+    /// maturity is an instrument-level feature, not a curve-level one).
+    ///
+    /// This is the curve-level view of the same quantity that the valuation
+    /// layer computes per cashflow and reports as `inflation_index_ratio` in
+    /// its cashflow exports; exposing it here lets callers inspect the
+    /// indexation profile of a curve without building an instrument.
+    ///
+    /// The lag is applied exactly as in [`cpi_with_lag`](Self::cpi_with_lag) —
+    /// a continuous `indexation_lag_months / 12`-year shift on the curve's own
+    /// interpolation, not the Canadian-model monthly-print convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `base_cpi` is not strictly
+    /// positive (the ratio would be undefined or sign-flipped). Builder
+    /// validation normally prevents this, but the guard keeps deserialized
+    /// curves safe.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time in years from the curve's base date (the settlement date
+    ///   whose indexed principal is wanted).
+    ///
+    /// # Returns
+    ///
+    /// The lagged CPI level at `t` divided by the curve's base CPI.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use finstack_quant_core::market_data::term_structures::InflationCurve;
+    /// use finstack_quant_core::dates::Date;
+    /// use time::Month;
+    ///
+    /// let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
+    /// let curve = InflationCurve::builder("US-CPI")
+    ///     .base_date(base)
+    ///     .base_cpi(300.0)
+    ///     .knots([(0.0, 300.0), (5.0, 330.0)])
+    ///     .indexation_lag_months(0)
+    ///     .build()
+    ///     .expect("InflationCurve builder should succeed");
+    ///
+    /// // With no lag, t = 0 sits exactly on the base CPI knot.
+    /// assert!((curve.index_ratio(0.0).expect("positive base CPI") - 1.0).abs() < 1e-12);
+    /// assert!(curve.index_ratio(5.0).expect("positive base CPI") > 1.0);
+    /// ```
+    ///
+    /// # References
+    ///
+    /// - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed
+    ///   Securities: Bonds, Swaps and Other Derivatives* (2nd ed.). Wiley,
+    ///   Chapter 2 (index ratio and indexation lag conventions).
+    #[must_use = "computed index ratio should not be discarded"]
+    pub fn index_ratio(&self, t: f64) -> crate::Result<f64> {
+        if !(self.base_cpi.is_finite() && self.base_cpi > 0.0) {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' base_cpi must be finite and positive to compute an index ratio, got {}",
+                self.id, self.base_cpi
+            )));
+        }
+        Ok(self.cpi_with_lag(t) / self.base_cpi)
+    }
+
     /// Annualised inflation rate between `t1` and `t2` using CAGR formula.
     ///
     /// # NaN contract
@@ -777,6 +848,30 @@ mod tests {
             (lagged - direct).abs() < 1e-12,
             "Lagged CPI at t=1.0 should equal CPI at t=0.75"
         );
+    }
+
+    #[test]
+    fn index_ratio_equals_lagged_cpi_over_base_cpi() {
+        let ic = sample_curve();
+        let ratio = ic.index_ratio(1.0).expect("positive base CPI");
+        let expected = ic.cpi_with_lag(1.0) / ic.base_cpi();
+        assert!((ratio - expected).abs() < 1e-12);
+        // A rising CPI curve indexes principal above par.
+        assert!(ratio > 1.0, "expected uplift above par, got {ratio}");
+    }
+
+    #[test]
+    fn index_ratio_is_one_at_base_without_lag() {
+        let base =
+            Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date");
+        let ic = InflationCurve::builder("CPI-NOLAG")
+            .base_date(base)
+            .base_cpi(300.0)
+            .knots([(0.0, 300.0), (5.0, 330.0)])
+            .indexation_lag_months(0)
+            .build()
+            .expect("InflationCurve builder should succeed in test");
+        assert!((ic.index_ratio(0.0).expect("positive base CPI") - 1.0).abs() < 1e-12);
     }
 
     #[test]

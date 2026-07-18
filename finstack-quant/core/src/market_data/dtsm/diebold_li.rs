@@ -542,6 +542,106 @@ pub(crate) fn ns_loading_matrix(lambda: f64, tenors: &[f64]) -> DMatrix<f64> {
     x
 }
 
+/// Evaluate the static Nelson-Siegel yield curve for a given decay parameter,
+/// factor triple, and tenor grid.
+///
+/// This is the cross-sectional (measurement) equation of the Diebold-Li model
+/// evaluated for a *single* date — the closed-form Nelson & Siegel (1987)
+/// parametric curve:
+///
+/// ```text
+/// y(tau) = beta1
+///        + beta2 * ((1 - exp(-lambda * tau)) / (lambda * tau))
+///        + beta3 * ((1 - exp(-lambda * tau)) / (lambda * tau) - exp(-lambda * tau))
+/// ```
+///
+/// The three loadings are, in order, the **level** (constant 1, the long-run
+/// yield), the **slope** (decays monotonically from 1 at `tau -> 0` to 0 at
+/// long maturities, so `beta2` is the negative of the short-minus-long spread)
+/// and the **curvature** (hump-shaped, zero at both ends, peaking where
+/// `lambda * tau ~= 1.79`). The `tau -> 0` limit of the slope loading is 1 and
+/// is handled exactly.
+///
+/// # Units
+///
+/// `tenors` are maturities in **years** and `lambda` is a per-year decay rate,
+/// matching the workspace-wide tenor convention. Diebold & Li (2006) quote
+/// `lambda = 0.0609` for maturities in **months**; because `lambda * tau` is
+/// dimensionless the years-equivalent is `12 x 0.0609 = 0.7308`, which is the
+/// default used by [`DieboldLi`]. Passing the raw months value alongside year
+/// tenors would move the curvature peak from ~2.45 years to ~29 years and
+/// distort the level/slope/curvature decomposition. Yields are returned in the
+/// same units as the factors (decimals, e.g. `0.045` for 4.5%).
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] if `lambda` is not finite and strictly
+/// positive, if any factor is not finite, or if any tenor is not finite or is
+/// negative.
+///
+/// # Arguments
+///
+/// * `lambda` - Exponential decay parameter per year; must be finite and `> 0`.
+/// * `factors` - `[beta1, beta2, beta3]` = `[level, slope, curvature]`, in
+///   decimal yield units.
+/// * `tenors` - Maturities in years, each finite and `>= 0`. Order is preserved.
+///
+/// # Returns
+///
+/// One fitted yield per input tenor, in the same order as `tenors`.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_core::market_data::dtsm::nelson_siegel_yields;
+///
+/// // Level 6%, slope -2%, curvature +1% with the years-convention default lambda.
+/// let ys = nelson_siegel_yields(0.7308, [0.06, -0.02, 0.01], &[0.0, 1.0, 30.0])
+///     .expect("valid Nelson-Siegel inputs");
+///
+/// // At tau -> 0 the slope loading is 1 and the curvature loading is 0,
+/// // so the short rate is beta1 + beta2.
+/// assert!((ys[0] - 0.04).abs() < 1e-12);
+/// // At long maturities both loadings vanish and the yield tends to beta1.
+/// assert!((ys[2] - 0.06).abs() < 1e-3);
+/// ```
+///
+/// # References
+///
+/// - Nelson, C. R., & Siegel, A. F. (1987). "Parsimonious Modeling of Yield
+///   Curves." *Journal of Business*, 60(4), 473-489.
+/// - Diebold, F. X., & Li, C. (2006). "Forecasting the Term Structure of
+///   Government Bond Yields." *Journal of Econometrics*, 130(2), 337-364.
+pub fn nelson_siegel_yields(
+    lambda: f64,
+    factors: [f64; 3],
+    tenors: &[f64],
+) -> crate::Result<Vec<f64>> {
+    if !lambda.is_finite() || lambda <= 0.0 {
+        return Err(crate::Error::Validation(format!(
+            "Nelson-Siegel lambda must be finite and positive, got {lambda}"
+        )));
+    }
+    for (i, &beta) in factors.iter().enumerate() {
+        if !beta.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "Nelson-Siegel factor {i} must be finite, got {beta}"
+            )));
+        }
+    }
+    for (i, &tau) in tenors.iter().enumerate() {
+        if !tau.is_finite() || tau < 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "Nelson-Siegel tenor {i} must be finite and non-negative (years), got {tau}"
+            )));
+        }
+    }
+
+    let loadings = ns_loading_matrix(lambda, tenors);
+    let beta = DVector::from_row_slice(&factors);
+    Ok((loadings * beta).as_slice().to_vec())
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -823,5 +923,66 @@ mod tests {
                 fc.yields[i]
             );
         }
+    }
+
+    #[test]
+    fn nelson_siegel_yields_matches_closed_form() {
+        let lambda = DEFAULT_LAMBDA;
+        let tenors = standard_tenors();
+        let (b0, b1, b2) = (0.06, -0.02, 0.01);
+
+        let expected = make_ns_yields(b0, b1, b2, lambda, &tenors);
+        let actual = nelson_siegel_yields(lambda, [b0, b1, b2], &tenors).unwrap();
+
+        assert_eq!(actual.len(), tenors.len());
+        for (a, e) in actual.iter().zip(expected.iter()) {
+            assert!((a - e).abs() < 1e-12, "got {a}, expected {e}");
+        }
+    }
+
+    #[test]
+    fn nelson_siegel_yields_endpoint_limits() {
+        let (b0, b1, b2) = (0.06, -0.02, 0.01);
+        let ys = nelson_siegel_yields(DEFAULT_LAMBDA, [b0, b1, b2], &[0.0, 200.0]).unwrap();
+        // tau -> 0: slope loading 1, curvature loading 0.
+        assert!((ys[0] - (b0 + b1)).abs() < 1e-12);
+        // tau -> infinity: both loadings vanish, yield tends to the level.
+        // The slope loading decays only as O(1/(lambda*tau)), so at 200y the
+        // residual is ~1/146 of (b1 + b2); 1e-4 is the appropriate tolerance.
+        assert!(
+            (ys[1] - b0).abs() < 1e-4,
+            "long-end yield {} vs level {b0}",
+            ys[1]
+        );
+    }
+
+    #[test]
+    fn nelson_siegel_yields_curvature_peak_is_tenor_convention_consistent() {
+        // With the years-convention default the curvature loading peaks at
+        // ≈2.45 years (the ≈30-month peak of Diebold & Li's months lambda).
+        let peak = nelson_siegel_yields(DEFAULT_LAMBDA, [0.0, 0.0, 1.0], &[2.45]).unwrap()[0];
+        for tau in [0.5, 1.0, 5.0, 10.0] {
+            let other = nelson_siegel_yields(DEFAULT_LAMBDA, [0.0, 0.0, 1.0], &[tau]).unwrap()[0];
+            assert!(
+                other < peak,
+                "curvature at {tau}y ({other}) should be < peak {peak}"
+            );
+        }
+    }
+
+    #[test]
+    fn nelson_siegel_yields_rejects_invalid_inputs() {
+        assert!(nelson_siegel_yields(0.0, [0.06, 0.0, 0.0], &[1.0]).is_err());
+        assert!(nelson_siegel_yields(-0.5, [0.06, 0.0, 0.0], &[1.0]).is_err());
+        assert!(nelson_siegel_yields(f64::NAN, [0.06, 0.0, 0.0], &[1.0]).is_err());
+        assert!(nelson_siegel_yields(DEFAULT_LAMBDA, [f64::NAN, 0.0, 0.0], &[1.0]).is_err());
+        assert!(nelson_siegel_yields(DEFAULT_LAMBDA, [0.06, 0.0, 0.0], &[-1.0]).is_err());
+        assert!(nelson_siegel_yields(DEFAULT_LAMBDA, [0.06, 0.0, 0.0], &[f64::INFINITY]).is_err());
+    }
+
+    #[test]
+    fn nelson_siegel_yields_empty_tenors_is_empty() {
+        let ys = nelson_siegel_yields(DEFAULT_LAMBDA, [0.06, -0.02, 0.01], &[]).unwrap();
+        assert!(ys.is_empty());
     }
 }

@@ -36,6 +36,9 @@ run_monte_carlo = _sa.run_monte_carlo
 backtest_forecast = _sa.backtest_forecast
 goal_seek = _sa.goal_seek
 evaluate_dcf = _sa.evaluate_dcf
+dcf_sensitivity = _sa.dcf_sensitivity
+evaluate_lbo = _sa.evaluate_lbo
+wacc = _sa.wacc
 run_corporate_analysis = _sa.run_corporate_analysis
 pl_summary_report = _sa.pl_summary_report
 credit_assessment_report = _sa.credit_assessment_report
@@ -151,9 +154,11 @@ __all__: list[str] = [
     "compute_multiple",
     "credit_assessment",
     "credit_assessment_report",
+    "dcf_sensitivity",
     "dependents",
     "direct_dependencies",
     "evaluate_dcf",
+    "evaluate_lbo",
     "evaluate_scenario_set",
     "explain_formula",
     "explain_formula_text",
@@ -174,5 +179,6 @@ __all__: list[str] = [
     "run_variance",
     "score_relative_value",
     "validate_scorecard_config",
+    "wacc",
     "z_score",
 ]

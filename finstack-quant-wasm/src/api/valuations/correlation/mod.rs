@@ -376,6 +376,37 @@ pub fn nearest_correlation(
     corr::nearest_correlation_matrix(&matrix, n, opts).map_err(to_js_err)
 }
 
+/// Tranche loss statistics over a simulated pool loss distribution.
+///
+/// `attachment` and `detachment` are **fractions** of pool notional in
+/// `[0, 1]` — a 0-3% equity tranche is `(0.0, 0.03)`, not `(0.0, 3.0)`. Each
+/// path's pool loss fraction `L = loss / poolNotional` maps through
+/// `clamp(L - attachment, 0, width) / width`, and the resulting distribution is
+/// aggregated at `confidence` using the loss-positive nearest-rank conventions.
+///
+/// Returns an object with `attachment`, `detachment`, `tranche_notional`,
+/// `expected_loss_fraction`, `expected_loss_amount`, `var_fraction`,
+/// `var_amount`, `expected_shortfall_fraction`, `expected_shortfall_amount`,
+/// `prob_attachment_breached`, and `prob_full_writedown`.
+/// @param losses - Loss-positive path losses in one caller-defined unit, one entry per simulated path.
+/// @param confidence - Loss-positive VaR and expected-shortfall confidence strictly between 0 and 1.
+/// @param attachment - Lower tranche boundary as a fraction of pool notional from 0 through 1.
+/// @param detachment - Upper tranche boundary as a fraction of pool notional, strictly above the attachment and at most 1.
+/// @param pool_notional - Total pool notional, finite and strictly positive, in the same unit as the losses.
+#[wasm_bindgen(js_name = trancheLossStatistics)]
+pub fn tranche_loss_statistics(
+    losses: Vec<f64>,
+    confidence: f64,
+    attachment: f64,
+    detachment: f64,
+    pool_notional: f64,
+) -> Result<JsValue, JsValue> {
+    let stats = corr::PortfolioLossResult::from_losses(losses, confidence)
+        .and_then(|result| result.tranche_loss_statistics(attachment, detachment, pool_notional))
+        .map_err(to_js_err)?;
+    crate::utils::to_js_value(&stats)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -201,6 +201,35 @@ flag "--release" help="Build with release profile (slower compile, faster runtim
 '''
 run = 'uv run maturin develop{% if usage.release %} --release{% endif %}'
 
+[tasks.python-bench-portfolio]
+description = "Benchmark portfolio Python bindings with an optimized extension"
+run = """
+mise run python-build -- --release
+uv run pytest finstack-quant-py/benchmarks/bench_bindings.py \
+  -m perf --benchmark-only -k Portfolio
+"""
+
+[tasks.python-bench-portfolio-baseline]
+description = "Save an optimized portfolio Python binding benchmark baseline"
+run = """
+mise run python-build -- --release
+uv run pytest finstack-quant-py/benchmarks/bench_bindings.py \
+  -m perf --benchmark-only -k Portfolio \
+  --benchmark-storage=file://target/python-benchmarks \
+  --benchmark-save=portfolio-main
+"""
+
+[tasks.python-bench-portfolio-compare]
+description = "Compare portfolio Python bindings and fail on a median regression above 10%"
+run = """
+mise run python-build -- --release
+uv run pytest finstack-quant-py/benchmarks/bench_bindings.py \
+  -m perf --benchmark-only -k Portfolio \
+  --benchmark-storage=file://target/python-benchmarks \
+  --benchmark-compare='[0-9][0-9][0-9][0-9]_portfolio-main' \
+  --benchmark-compare-fail=median:10%
+"""
+
 [tasks.python-test]
 description = "Build dev Python bindings, then run fast Python tests"
 run = """

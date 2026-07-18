@@ -255,6 +255,29 @@ pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
     to_js_value(&map)
 }
 
+/// List every pricing model key registered in the standard pricer registry.
+///
+/// The list is registry-derived rather than enum-derived, so it reflects real
+/// dispatch coverage: a model with no registered pricer is omitted. Returns a
+/// sorted array of canonical keys (`"discounting"`, `"black76"`, …) accepted by
+/// the `model` argument of `priceInstrument`.
+#[wasm_bindgen(js_name = listModels)]
+pub fn list_models() -> Result<JsValue, JsValue> {
+    let models = finstack_quant_valuations::pricer::list_models();
+    serde_wasm_bindgen::to_value(&models).map_err(to_js_err)
+}
+
+/// List the standard registry's pricing models grouped by instrument type.
+///
+/// Returns a JSON object `{ instrument_type: [model_key, ...], ... }`. Only
+/// instrument types with at least one registered pricer appear, and each entry
+/// lists only the models that can actually price that instrument.
+#[wasm_bindgen(js_name = listModelsGrouped)]
+pub fn list_models_grouped() -> Result<JsValue, JsValue> {
+    let grouped = finstack_quant_valuations::pricer::list_models_grouped();
+    to_js_value(&grouped)
+}
+
 // ---------------------------------------------------------------------------
 // JsMarket overloads — parse market once, reuse across pricing calls
 // ---------------------------------------------------------------------------

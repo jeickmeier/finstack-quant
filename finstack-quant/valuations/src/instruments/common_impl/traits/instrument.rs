@@ -853,6 +853,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
             market_history,
             model,
             registry,
+            hazard_recalibration_cache,
         } = options;
         let model = model.unwrap_or_else(|| self.default_model());
         let registry = registry.unwrap_or_else(shared_standard_registry);
@@ -862,6 +863,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
             market_history,
             model: None,
             registry: None,
+            hazard_recalibration_cache,
         };
 
         PricerRegistry::price_with_metrics_shared(

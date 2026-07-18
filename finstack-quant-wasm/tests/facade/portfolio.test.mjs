@@ -58,6 +58,8 @@ const EXPORTED_KEYS = [
   'portfolioResultTotalValue',
   'replayPortfolio',
   'rollEffectiveSpread',
+  'scenarioPnl',
+  'scenarioPnlBuilt',
   'twrrLinked',
   'twrrModifiedDietz',
   'valuePortfolio',

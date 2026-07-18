@@ -62,6 +62,49 @@ pub struct PortfolioLossResult {
     pub var: f64,
     /// Mean loss from the VaR observation through the worst path.
     pub expected_shortfall: f64,
+    /// Loss-positive confidence used for [`Self::var`] and
+    /// [`Self::expected_shortfall`], in `(0, 1)`.
+    pub confidence: f64,
+}
+
+/// Loss statistics for one attachment/detachment tranche over a simulated pool
+/// loss distribution.
+///
+/// All `*_fraction` members are expressed as a share of the tranche's own
+/// notional, so a fully written-down tranche has fraction `1.0`. All `*_amount`
+/// members are in the same scalar unit as the pool notional supplied to
+/// [`PortfolioLossResult::tranche_loss_statistics`].
+///
+/// # References
+///
+/// - O'Kane, D. (2008). *Modelling Single-name and Multi-name Credit
+///   Derivatives*. Wiley Finance. Chapter 15 ("Modelling Tranches"), which
+///   defines the tranche loss function
+///   `min(max(L - A, 0), D - A) / (D - A)` used here.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct TrancheLossStatistics {
+    /// Tranche attachment point as a fraction of pool notional, in `[0, 1)`.
+    pub attachment: f64,
+    /// Tranche detachment point as a fraction of pool notional, in `(0, 1]`.
+    pub detachment: f64,
+    /// Tranche notional `(detachment - attachment) * pool_notional`.
+    pub tranche_notional: f64,
+    /// Mean tranche loss as a fraction of tranche notional, in `[0, 1]`.
+    pub expected_loss_fraction: f64,
+    /// Mean tranche loss in pool-notional units.
+    pub expected_loss_amount: f64,
+    /// Nearest-rank tranche loss fraction at the distribution's confidence.
+    pub var_fraction: f64,
+    /// Nearest-rank tranche loss amount at the distribution's confidence.
+    pub var_amount: f64,
+    /// Mean tranche loss fraction from the VaR observation through the worst path.
+    pub expected_shortfall_fraction: f64,
+    /// Mean tranche loss amount from the VaR observation through the worst path.
+    pub expected_shortfall_amount: f64,
+    /// Share of paths whose pool loss fraction strictly exceeds `attachment`.
+    pub prob_attachment_breached: f64,
+    /// Share of paths whose pool loss fraction reaches or exceeds `detachment`.
+    pub prob_full_writedown: f64,
 }
 
 impl PortfolioLossResult {
@@ -114,6 +157,122 @@ impl PortfolioLossResult {
             expected_loss,
             var,
             expected_shortfall,
+            confidence,
+        })
+    }
+
+    /// Tranche loss statistics for an attachment/detachment pair over this
+    /// simulated pool loss distribution.
+    ///
+    /// Each path's pool loss is converted to a pool loss fraction
+    /// `L = loss / pool_notional` and mapped through the standard tranche loss
+    /// function
+    ///
+    /// ```text
+    /// tranche_loss_fraction(L) = clamp(L - A, 0, D - A) / (D - A)
+    /// ```
+    ///
+    /// so the tranche absorbs nothing until the pool loss breaches `A` and is
+    /// fully written down once it reaches `D`. Expected loss, VaR, and expected
+    /// shortfall are then aggregated from that per-path fraction distribution
+    /// using exactly the same loss-positive nearest-rank conventions as
+    /// [`PortfolioLossResult::from_losses`], evaluated at this result's own
+    /// [`Self::confidence`].
+    ///
+    /// # Units
+    ///
+    /// `attachment` and `detachment` are **fractions of pool notional in
+    /// `[0, 1]`** — a 0–3% equity tranche is `(0.0, 0.03)`, not `(0.0, 3.0)`.
+    /// This deliberately differs from
+    /// [`crate::instruments::fixed_income::structured_credit::Tranche::loss_allocation`],
+    /// which is `Money`-based and carries its attachment points in percent; that
+    /// documented unit inconsistency is not reused here.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `attachment` or `detachment` is outside
+    /// `[0, 1]`, when `attachment >= detachment`, when `pool_notional` is not
+    /// finite and strictly positive, or when a derived tranche statistic is not
+    /// finite.
+    ///
+    /// # Arguments
+    ///
+    /// * `attachment` - Lower tranche boundary as a fraction of pool notional;
+    ///   losses below this point are absorbed by more junior tranches.
+    /// * `detachment` - Upper tranche boundary as a fraction of pool notional;
+    ///   losses above this point are absorbed by more senior tranches.
+    /// * `pool_notional` - Total pool notional in the same scalar unit as the
+    ///   simulated losses; used to convert path losses to loss fractions.
+    ///
+    /// # Returns
+    ///
+    /// [`TrancheLossStatistics`] with fraction-of-tranche-notional and absolute
+    /// expected loss, VaR, expected shortfall, and the attachment-breach and
+    /// full-write-down probabilities.
+    ///
+    /// # References
+    ///
+    /// - O'Kane, D. (2008). *Modelling Single-name and Multi-name Credit
+    ///   Derivatives*. Wiley Finance, Chapter 15.
+    /// - Gibson, M. S. (2004). "Understanding the Risk of Synthetic CDOs."
+    ///   *Finance and Economics Discussion Series* 2004-36, Federal Reserve Board.
+    pub fn tranche_loss_statistics(
+        &self,
+        attachment: f64,
+        detachment: f64,
+        pool_notional: f64,
+    ) -> Result<TrancheLossStatistics> {
+        validate_unit_interval("tranche attachment", attachment)?;
+        validate_unit_interval("tranche detachment", detachment)?;
+        if attachment >= detachment {
+            return Err(validation_error(format!(
+                "tranche attachment must be strictly below detachment, got {attachment} >= {detachment}"
+            )));
+        }
+        if !pool_notional.is_finite() || pool_notional <= 0.0 {
+            return Err(validation_error(format!(
+                "tranche pool_notional must be finite and strictly positive, got {pool_notional}"
+            )));
+        }
+
+        let width = detachment - attachment;
+        let tranche_notional = width * pool_notional;
+        let mut fractions = Vec::new();
+        fractions
+            .try_reserve_exact(self.losses.len())
+            .map_err(|error| {
+                allocation_error(format!(
+                    "could not reserve {} tranche loss fractions: {error}",
+                    self.losses.len()
+                ))
+            })?;
+        let mut breached = 0_usize;
+        let mut written_down = 0_usize;
+        for loss in &self.losses {
+            let pool_fraction = loss / pool_notional;
+            if pool_fraction > attachment {
+                breached += 1;
+            }
+            if pool_fraction >= detachment {
+                written_down += 1;
+            }
+            fractions.push((pool_fraction - attachment).clamp(0.0, width) / width);
+        }
+
+        let path_count = self.losses.len() as f64;
+        let aggregated = Self::from_losses(fractions, self.confidence)?;
+        Ok(TrancheLossStatistics {
+            attachment,
+            detachment,
+            tranche_notional,
+            expected_loss_fraction: aggregated.expected_loss,
+            expected_loss_amount: aggregated.expected_loss * tranche_notional,
+            var_fraction: aggregated.var,
+            var_amount: aggregated.var * tranche_notional,
+            expected_shortfall_fraction: aggregated.expected_shortfall,
+            expected_shortfall_amount: aggregated.expected_shortfall * tranche_notional,
+            prob_attachment_breached: breached as f64 / path_count,
+            prob_full_writedown: written_down as f64 / path_count,
         })
     }
 }

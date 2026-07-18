@@ -20,6 +20,8 @@ pub(super) struct EnrichmentRequest<'a> {
     pub(super) metrics: &'a [MetricId],
     pub(super) cfg: Option<Arc<FinstackConfig>>,
     pub(super) market_history: Option<Arc<MarketHistory>>,
+    pub(super) hazard_recalibration_cache:
+        Option<Arc<crate::calibration::bumps::hazard::HazardRecalibrationCache>>,
     pub(super) pricer_registry: Arc<PricerRegistry>,
     pub(super) base_result: ValuationResult,
 }
@@ -35,6 +37,7 @@ pub(super) fn enrich(
         metrics,
         cfg,
         market_history,
+        hazard_recalibration_cache,
         pricer_registry,
         mut base_result,
     } = request;
@@ -51,6 +54,7 @@ pub(super) fn enrich(
             MetricBuildOptions {
                 cfg,
                 market_history,
+                hazard_recalibration_cache,
                 metric_registry,
                 pricing_model: Some(model),
                 pricer_registry: Some(pricer_registry),
@@ -80,6 +84,7 @@ pub(super) fn enrich(
             MetricBuildOptions {
                 cfg: cfg.clone(),
                 market_history: market_history.clone(),
+                hazard_recalibration_cache: hazard_recalibration_cache.clone(),
                 metric_registry: metric_registry.clone(),
                 ..MetricBuildOptions::default()
             },
@@ -99,6 +104,7 @@ pub(super) fn enrich(
             MetricBuildOptions {
                 cfg,
                 market_history,
+                hazard_recalibration_cache,
                 metric_registry,
                 pricing_model: Some(model),
                 pricer_registry: Some(pricer_registry),

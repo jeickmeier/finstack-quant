@@ -66,6 +66,7 @@ pub use finstack_quant_core::math::probability::{
 };
 pub use portfolio_loss::{
     simulate_portfolio_loss, simulate_portfolio_loss_serial, simulate_portfolio_loss_with_recovery,
-    CreditExposure, PortfolioLossConfig, PortfolioLossResult, MAX_PORTFOLIO_LOSS_PATHS,
+    CreditExposure, PortfolioLossConfig, PortfolioLossResult, TrancheLossStatistics,
+    MAX_PORTFOLIO_LOSS_PATHS,
 };
 pub use recovery::{ConstantRecovery, CorrelatedRecovery, RecoveryModel, RecoverySpec};

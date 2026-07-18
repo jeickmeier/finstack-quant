@@ -449,6 +449,306 @@ fn evaluate_dcf<'py>(
 }
 
 // ---------------------------------------------------------------------------
+// DCF sensitivity, LBO, and cost of capital
+// ---------------------------------------------------------------------------
+
+/// Rank the headline DCF assumptions by enterprise-value impact.
+///
+/// The statement model is evaluated once; each shocked point re-runs only the
+/// DCF. Entries are returned as deltas versus the baseline enterprise value,
+/// sorted by descending absolute swing.
+///
+/// Parameters
+/// ----------
+/// model : FinancialModelSpec | str
+///     A ``FinancialModelSpec`` object or a JSON string; metadata must include
+///     a ``"currency"`` key.
+/// wacc : float
+///     Baseline weighted average cost of capital in decimal form (``0.10`` = 10%).
+/// terminal_value_json : str
+///     JSON-serialized ``TerminalValueSpec`` (tagged enum, e.g.
+///     ``{"type": "gordon_growth", "growth_rate": 0.02}``); selects whether the
+///     terminal growth rate or the exit multiple is shocked.
+/// ufcf_node : str
+///     Node ID containing unlevered free cash flow for the forecast periods.
+/// net_debt_override : float | None
+///     Optional flat net-debt amount used instead of the model-derived bridge.
+/// wacc_sensitivity_bump : float
+///     Absolute shock applied to WACC and to the terminal growth rate, in
+///     decimal (``0.01`` = +/-100 bp).
+/// wacc_denominator_epsilon : float
+///     Minimum spread preserved between WACC and the terminal growth rate so
+///     ``1/(wacc - g)`` stays defined, in decimal (``0.005`` = 50 bp).
+/// exit_multiple_bump : float
+///     Absolute shock applied to an exit multiple, in turns (``1.0`` = +/-1.0x).
+/// mid_year_convention : bool
+///     Enable mid-year discounting convention for every re-run.
+/// market : MarketContext | str | None
+///     Optional ``MarketContext`` object or JSON string for curve-based discounting.
+///
+/// Returns
+/// -------
+/// dict
+///     Dict with ``baseline_enterprise_value`` (float), ``currency`` (str),
+///     ``entries`` (list of ``{"parameter_id", "downside", "upside"}`` dicts),
+///     ``wacc_down``, ``wacc_down_clamped``, ``terminal_growth_up``,
+///     ``terminal_growth_up_clamped``.
+#[pyfunction]
+#[pyo3(signature = (
+    model,
+    wacc,
+    terminal_value_json,
+    ufcf_node="ufcf",
+    net_debt_override=None,
+    wacc_sensitivity_bump=0.01,
+    wacc_denominator_epsilon=0.005,
+    exit_multiple_bump=1.0,
+    mid_year_convention=false,
+    market=None,
+))]
+#[allow(clippy::too_many_arguments)]
+fn dcf_sensitivity<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    wacc: f64,
+    terminal_value_json: &str,
+    ufcf_node: &str,
+    net_debt_override: Option<f64>,
+    wacc_sensitivity_bump: f64,
+    wacc_denominator_epsilon: f64,
+    exit_multiple_bump: f64,
+    mid_year_convention: bool,
+    market: Option<&Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyDict>> {
+    use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
+
+    let model = extract_model_ref(model)?.into_owned();
+    let terminal_value: TerminalValueSpec =
+        serde_json::from_str(terminal_value_json).map_err(display_to_py)?;
+    let ufcf_node = ufcf_node.to_owned();
+    let market = extract_market_opt(market)?;
+
+    let options = finstack_quant_statements_analytics::analysis::DcfOptions {
+        mid_year_convention,
+        wacc_sensitivity_bump,
+        wacc_denominator_epsilon,
+        exit_multiple_bump:
+            finstack_quant_statements_analytics::analysis::ExitMultipleBump::Absolute(
+                exit_multiple_bump,
+            ),
+        ..Default::default()
+    };
+
+    let result = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::dcf_sensitivity(
+                &model,
+                wacc,
+                terminal_value,
+                &ufcf_node,
+                net_debt_override,
+                &options,
+                market.as_ref(),
+            )
+        })
+        .map_err(display_to_py)?;
+
+    let entries = PyList::empty(py);
+    for entry in &result.entries {
+        let item = PyDict::new(py);
+        item.set_item("parameter_id", entry.parameter_id.as_str())?;
+        item.set_item("downside", entry.downside)?;
+        item.set_item("upside", entry.upside)?;
+        entries.append(item)?;
+    }
+
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "baseline_enterprise_value",
+        result.baseline_enterprise_value.amount(),
+    )?;
+    dict.set_item(
+        "currency",
+        result.baseline_enterprise_value.currency().to_string(),
+    )?;
+    dict.set_item("entries", entries)?;
+    dict.set_item("wacc_down", result.wacc_down)?;
+    dict.set_item("wacc_down_clamped", result.wacc_down_clamped)?;
+    dict.set_item("terminal_growth_up", result.terminal_growth_up)?;
+    dict.set_item(
+        "terminal_growth_up_clamped",
+        result.terminal_growth_up_clamped,
+    )?;
+    Ok(dict)
+}
+
+/// Evaluate a leveraged-buyout transaction against a statement model.
+///
+/// Entry enterprise value is priced at the model's first period, the sponsor
+/// equity check is solved as the sources-and-uses residual, and exit proceeds
+/// are the exit enterprise value less the modelled net debt at ``exit_period``.
+/// IRR is out of scope: pair ``exit_equity_proceeds`` with the equity outflow
+/// at close and call ``finstack_quant.portfolio.mwr_xirr``.
+///
+/// Parameters
+/// ----------
+/// model : FinancialModelSpec | str
+///     A ``FinancialModelSpec`` object or a JSON string; metadata must include
+///     a ``"currency"`` key.
+/// entry_multiple : float
+///     Entry valuation multiple applied to the entry metric (``8.5`` = 8.5x).
+/// entry_metric_node : str
+///     Node ID supplying the entry valuation metric, read at the model's first
+///     period (typically ``"ebitda"``).
+/// exit_multiple : float
+///     Exit valuation multiple applied to the exit metric (``9.5`` = 9.5x).
+/// exit_metric_node : str
+///     Node ID supplying the exit valuation metric, read at ``exit_period``.
+/// exit_net_debt_node : str
+///     Node ID supplying net debt outstanding at ``exit_period``; this is where
+///     a modelled tranche amortisation schedule lands.
+/// exit_period : str
+///     Period label at which the sponsor exits, e.g. ``"2029"`` or ``"2029Q4"``.
+/// sources : list[tuple[str, float]]
+///     Funded debt tranches at close as ``(name, amount)`` pairs in the model
+///     currency; the sponsor equity check is the residual that balances them
+///     against uses.
+/// transaction_fees : float
+///     Transaction fees and expenses funded at close, in the model currency.
+///
+/// Returns
+/// -------
+/// dict
+///     Dict with ``entry_enterprise_value``, ``entry_metric``, ``debt_total``,
+///     ``equity_check``, ``sources_total``, ``uses_total``,
+///     ``sources_uses_balanced`` (bool), ``exit_enterprise_value``,
+///     ``exit_metric``, ``exit_net_debt``, ``exit_equity_proceeds``, ``moic``,
+///     and ``currency`` (str).
+#[pyfunction]
+#[pyo3(signature = (
+    model,
+    entry_multiple,
+    entry_metric_node,
+    exit_multiple,
+    exit_metric_node,
+    exit_net_debt_node,
+    exit_period,
+    sources,
+    transaction_fees=0.0,
+))]
+#[allow(clippy::too_many_arguments)]
+fn evaluate_lbo<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    entry_multiple: f64,
+    entry_metric_node: &str,
+    exit_multiple: f64,
+    exit_metric_node: &str,
+    exit_net_debt_node: &str,
+    exit_period: &str,
+    sources: Vec<(String, f64)>,
+    transaction_fees: f64,
+) -> PyResult<Bound<'py, PyDict>> {
+    use finstack_quant_statements_analytics::analysis::{LboConfig, LboTranche};
+
+    let model = extract_model_ref(model)?.into_owned();
+    let exit_period: finstack_quant_core::dates::PeriodId =
+        exit_period.parse().map_err(display_to_py)?;
+
+    let config = LboConfig {
+        entry_multiple,
+        entry_metric_node: entry_metric_node.to_owned(),
+        transaction_fees,
+        sources: sources
+            .into_iter()
+            .map(|(name, amount)| LboTranche { name, amount })
+            .collect(),
+        exit_multiple,
+        exit_metric_node: exit_metric_node.to_owned(),
+        exit_net_debt_node: exit_net_debt_node.to_owned(),
+        exit_period,
+        check_mappings: None,
+    };
+
+    let result = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::evaluate_lbo(&model, &config)
+        })
+        .map_err(display_to_py)?;
+
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "entry_enterprise_value",
+        result.entry_enterprise_value.amount(),
+    )?;
+    dict.set_item("entry_metric", result.entry_metric)?;
+    dict.set_item("debt_total", result.debt_total.amount())?;
+    dict.set_item("equity_check", result.equity_check.amount())?;
+    dict.set_item("sources_total", result.sources_total.amount())?;
+    dict.set_item("uses_total", result.uses_total.amount())?;
+    dict.set_item("sources_uses_balanced", result.sources_uses_balanced)?;
+    dict.set_item(
+        "exit_enterprise_value",
+        result.exit_enterprise_value.amount(),
+    )?;
+    dict.set_item("exit_metric", result.exit_metric)?;
+    dict.set_item("exit_net_debt", result.exit_net_debt.amount())?;
+    dict.set_item("exit_equity_proceeds", result.exit_equity_proceeds.amount())?;
+    dict.set_item("moic", result.moic)?;
+    dict.set_item(
+        "currency",
+        result.entry_enterprise_value.currency().to_string(),
+    )?;
+    Ok(dict)
+}
+
+/// Weighted-average cost of capital (WACC).
+///
+/// Blends the required return on equity with the after-tax cost of debt:
+/// ``WACC = w_E * r_E + w_D * r_D * (1 - T)``.
+///
+/// Parameters
+/// ----------
+/// equity_weight : float
+///     Equity share of total capital as a decimal fraction (``0.6`` = 60%
+///     equity-funded); must be non-negative.
+/// cost_of_equity : float
+///     Required return on equity in decimal form, typically from CAPM
+///     (``0.115`` = 11.5%).
+/// debt_weight : float
+///     Debt share of total capital as a decimal fraction (``0.4`` = 40%
+///     debt-funded); must be non-negative and sum with ``equity_weight`` to 1.0.
+/// cost_of_debt : float
+///     Pre-tax marginal borrowing yield in decimal form, before the interest
+///     tax shield (``0.06`` = 6%).
+/// tax_rate : float
+///     Marginal corporate tax rate as a decimal fraction in ``[0, 1]``
+///     (``0.25`` = 25%).
+///
+/// Returns
+/// -------
+/// float
+///     Blended discount rate as a decimal fraction.
+#[pyfunction]
+#[pyo3(signature = (equity_weight, cost_of_equity, debt_weight, cost_of_debt, tax_rate))]
+fn wacc(
+    equity_weight: f64,
+    cost_of_equity: f64,
+    debt_weight: f64,
+    cost_of_debt: f64,
+    tax_rate: f64,
+) -> PyResult<f64> {
+    finstack_quant_statements_analytics::analysis::wacc(
+        equity_weight,
+        cost_of_equity,
+        debt_weight,
+        cost_of_debt,
+        tax_rate,
+    )
+    .map_err(display_to_py)
+}
+
+// ---------------------------------------------------------------------------
 // Corporate analysis (orchestrator)
 // ---------------------------------------------------------------------------
 
@@ -1126,6 +1426,9 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(backtest_forecast, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(goal_seek, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(evaluate_dcf, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(dcf_sensitivity, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(evaluate_lbo, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(wacc, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(run_corporate_analysis, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(pl_summary_report, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(credit_assessment_report, m)?)?;

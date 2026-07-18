@@ -686,6 +686,23 @@ impl PyPerformance {
 
     // -- Vector-per-ticker methods --
 
+    /// Per-period simple returns for each ticker.
+    ///
+    /// Canonical accessor for the raw return panel. Prefer this over
+    /// :meth:`excess_returns` with an all-zero risk-free series or
+    /// un-compounding :meth:`cumulative_returns`. Series are span-aware and
+    /// therefore ragged across tickers on edge-ragged panels.
+    fn returns(&self) -> Vec<Vec<f64>> {
+        self.inner.returns()
+    }
+
+    /// Per-period simple returns for a single ticker.
+    fn returns_for_ticker(&self, ticker_idx: usize) -> PyResult<Vec<f64>> {
+        self.inner
+            .returns_for_ticker(ticker_idx)
+            .map_err(core_to_py)
+    }
+
     /// Cumulative returns for each ticker.
     fn cumulative_returns(&self) -> Vec<Vec<f64>> {
         self.inner.cumulative_returns()
@@ -949,6 +966,17 @@ impl PyPerformance {
 
         let idx = ticker_index(py, self.inner.ticker_names())?;
         dict_to_dataframe(py, &data, Some(idx))
+    }
+
+    /// Per-period simple returns for all tickers as a pandas ``DataFrame``.
+    ///
+    /// Returns a DataFrame with a date index and one column per ticker.
+    /// Ragged per-ticker series are padded with ``NaN`` onto the active date
+    /// grid. Prefer this over :meth:`excess_returns` with an all-zero
+    /// risk-free series or un-compounding
+    /// :meth:`cumulative_returns_to_dataframe`.
+    fn returns_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        panel_to_dataframe(py, &self.inner, self.inner.returns())
     }
 
     /// Cumulative returns for all tickers as a pandas ``DataFrame``.

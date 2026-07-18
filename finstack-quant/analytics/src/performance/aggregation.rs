@@ -14,6 +14,27 @@ use crate::math::stats::correlation;
 use crate::returns::{comp_sum, comp_total, excess_returns};
 
 impl Performance {
+    /// Per-period simple returns for each ticker.
+    ///
+    /// This is the canonical accessor for the raw return panel over the active
+    /// window. Prefer it over calling [`Performance::excess_returns`] with an
+    /// all-zero risk-free vector or hand-un-compounding
+    /// [`Performance::cumulative_returns`].
+    ///
+    /// Series are span-aware and therefore ragged across tickers on
+    /// edge-ragged panels: row `i` has the length of
+    /// [`Performance::active_dates_for_ticker`] for ticker `i`, which may be
+    /// shorter than [`Performance::active_dates`]. Use
+    /// [`Performance::returns_for_ticker`] when only one column is needed.
+    ///
+    /// # Returns
+    ///
+    /// One vector per ticker, in [`Performance::ticker_names`] order, holding
+    /// simple returns as decimal fractions (`0.01` for `+1%`) in date order.
+    pub fn returns(&self) -> Vec<Vec<f64>> {
+        self.map_tickers(|i| self.active_returns(i).to_vec())
+    }
+
     /// Cumulative compounded returns for each ticker.
     pub fn cumulative_returns(&self) -> Vec<Vec<f64>> {
         self.map_tickers(|i| comp_sum(self.active_returns(i)))

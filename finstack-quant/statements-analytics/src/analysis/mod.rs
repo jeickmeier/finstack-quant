@@ -76,8 +76,9 @@ pub use scenarios::{
     TornadoEntry, VarianceAnalyzer, VarianceConfig, VarianceReport, VarianceRow,
 };
 pub use valuation::{
-    evaluate_dcf_with_market, CorporateAnalysis, CorporateAnalysisBuilder,
-    CorporateValuationResult, CreditInstrumentAnalysis, DcfOptions,
+    dcf_sensitivity, evaluate_dcf_with_market, evaluate_lbo, wacc, CorporateAnalysis,
+    CorporateAnalysisBuilder, CorporateValuationResult, CreditInstrumentAnalysis, DcfOptions,
+    DcfSensitivityResult, ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche,
 };
 
 // ---- Check-framework re-exports ----

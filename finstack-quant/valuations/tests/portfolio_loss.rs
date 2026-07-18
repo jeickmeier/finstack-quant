@@ -199,3 +199,118 @@ fn simulation_rejects_invalid_paths_confidence_exposures_and_loadings() {
     cfg.copula = CopulaSpec::random_factor_loading(0.1);
     assert!(simulate_portfolio_loss(&[valid], &cfg).is_err());
 }
+
+// ---------------------------------------------------------------------------
+// Tranche loss statistics
+// ---------------------------------------------------------------------------
+
+/// Five-path pool distribution used by the tranche cases below.
+///
+/// Pool notional is 100, so the path loss fractions are
+/// `[0.00, 0.01, 0.02, 0.05, 0.10]`. At confidence 0.75 the nearest-rank VaR
+/// index is `ceil(0.75 * 5) - 1 = 3`, i.e. the fourth-worst observation.
+fn tranche_pool() -> PortfolioLossResult {
+    PortfolioLossResult::from_losses(vec![0.0, 1.0, 2.0, 5.0, 10.0], 0.75)
+        .expect("valid loss distribution")
+}
+
+const TRANCHE_POOL_NOTIONAL: f64 = 100.0;
+const TOL: f64 = 1e-12;
+
+#[test]
+fn from_losses_records_the_confidence_used_for_tail_statistics() {
+    assert_eq!(tranche_pool().confidence, 0.75);
+}
+
+#[test]
+fn equity_tranche_absorbs_the_first_losses_and_writes_down_fully() {
+    let stats = tranche_pool()
+        .tranche_loss_statistics(0.0, 0.03, TRANCHE_POOL_NOTIONAL)
+        .expect("valid 0-3% equity tranche");
+
+    assert_eq!(stats.attachment, 0.0);
+    assert_eq!(stats.detachment, 0.03);
+    assert!((stats.tranche_notional - 3.0).abs() < TOL);
+
+    // Per-path tranche fractions: [0, 1/3, 2/3, 1, 1].
+    assert!((stats.expected_loss_fraction - 0.6).abs() < 1e-9);
+    assert!((stats.expected_loss_amount - 1.8).abs() < 1e-9);
+    // VaR at rank 3 of the sorted fractions is a full write-down, so ES is too.
+    assert!((stats.var_fraction - 1.0).abs() < TOL);
+    assert!((stats.var_amount - 3.0).abs() < TOL);
+    assert!((stats.expected_shortfall_fraction - 1.0).abs() < TOL);
+    assert!((stats.expected_shortfall_amount - 3.0).abs() < TOL);
+    // Four of five paths lose something; two reach the 3% detachment.
+    assert!((stats.prob_attachment_breached - 0.8).abs() < TOL);
+    assert!((stats.prob_full_writedown - 0.4).abs() < TOL);
+}
+
+#[test]
+fn mezzanine_tranche_is_protected_by_subordination() {
+    let pool = tranche_pool();
+    let equity = pool
+        .tranche_loss_statistics(0.0, 0.03, TRANCHE_POOL_NOTIONAL)
+        .expect("valid equity tranche");
+    let mezzanine = pool
+        .tranche_loss_statistics(0.03, 0.10, TRANCHE_POOL_NOTIONAL)
+        .expect("valid 3-10% mezzanine tranche");
+
+    // Only the 5% and 10% paths pierce 3%; only the 10% path exhausts it.
+    let expected = (0.02 / 0.07 + 1.0) / 5.0;
+    assert!((mezzanine.expected_loss_fraction - expected).abs() < 1e-12);
+    assert!((mezzanine.tranche_notional - 7.0).abs() < 1e-12);
+    assert!((mezzanine.expected_loss_amount - expected * 7.0).abs() < 1e-12);
+    assert!((mezzanine.prob_attachment_breached - 0.4).abs() < TOL);
+    assert!((mezzanine.prob_full_writedown - 0.2).abs() < TOL);
+
+    // Subordination: the junior tranche can never lose a smaller share.
+    assert!(equity.expected_loss_fraction > mezzanine.expected_loss_fraction);
+}
+
+#[test]
+fn senior_tranche_above_the_worst_loss_is_untouched() {
+    // Boundary case L <= A for every path: the worst path loses exactly 10%.
+    let stats = tranche_pool()
+        .tranche_loss_statistics(0.10, 0.30, TRANCHE_POOL_NOTIONAL)
+        .expect("valid 10-30% senior tranche");
+
+    assert_eq!(stats.expected_loss_fraction, 0.0);
+    assert_eq!(stats.expected_loss_amount, 0.0);
+    assert_eq!(stats.var_fraction, 0.0);
+    assert_eq!(stats.expected_shortfall_fraction, 0.0);
+    assert_eq!(stats.prob_attachment_breached, 0.0);
+    assert_eq!(stats.prob_full_writedown, 0.0);
+}
+
+#[test]
+fn thin_equity_tranche_below_every_positive_loss_is_fully_written_down() {
+    // Boundary case L >= D on every path that loses anything at all.
+    let stats = tranche_pool()
+        .tranche_loss_statistics(0.0, 0.005, TRANCHE_POOL_NOTIONAL)
+        .expect("valid 0-0.5% first-loss tranche");
+
+    assert!((stats.expected_loss_fraction - 0.8).abs() < TOL);
+    assert!((stats.var_fraction - 1.0).abs() < TOL);
+    assert!((stats.expected_shortfall_fraction - 1.0).abs() < TOL);
+    assert!((stats.prob_attachment_breached - 0.8).abs() < TOL);
+    assert!((stats.prob_full_writedown - 0.8).abs() < TOL);
+}
+
+#[test]
+fn tranche_statistics_reject_invalid_boundaries_and_pool_notional() {
+    let pool = tranche_pool();
+
+    // attachment >= detachment
+    assert!(pool.tranche_loss_statistics(0.10, 0.10, 100.0).is_err());
+    assert!(pool.tranche_loss_statistics(0.20, 0.10, 100.0).is_err());
+    // outside [0, 1]
+    for (attachment, detachment) in [(-0.01, 0.10), (0.10, 1.01), (f64::NAN, 0.10)] {
+        assert!(pool
+            .tranche_loss_statistics(attachment, detachment, 100.0)
+            .is_err());
+    }
+    // non-positive or non-finite pool notional
+    for notional in [0.0, -100.0, f64::NAN, f64::INFINITY] {
+        assert!(pool.tranche_loss_statistics(0.0, 0.03, notional).is_err());
+    }
+}

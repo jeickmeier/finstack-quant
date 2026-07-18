@@ -14,7 +14,8 @@
 //! - `parsePortfolioSpec`, `buildPortfolioFromSpec`
 //! - `valuePortfolio`, `valuePortfolioBuilt`,
 //!   `aggregateFullCashflows`, `aggregateFullCashflowsBuilt`,
-//!   `applyScenarioAndRevalue`, `applyScenarioAndRevalueBuilt`
+//!   `applyScenarioAndRevalue`, `applyScenarioAndRevalueBuilt`,
+//!   `scenarioPnl`, `scenarioPnlBuilt`
 //! - `aggregateMetrics`, `portfolioResultTotalValue`,
 //!   `portfolioResultGetMetric`
 //! - `replayPortfolio`
@@ -360,6 +361,56 @@ pub fn apply_scenario_and_revalue(
 ) -> Result<JsValue, JsValue> {
     let portfolio = JsPortfolio::from_spec(spec_json)?;
     apply_scenario_and_revalue_built(&portfolio, scenario_json, market_json)
+}
+
+/// Compute the profit and loss attributable to a scenario for an already-built
+/// [`Portfolio`] handle.
+///
+/// Values the portfolio against the unshocked market and against the
+/// scenario-shocked market, and returns a JS object with structured `pnl`
+/// (base-currency `total` plus `by_position`) and `report` values. Positions
+/// added or removed by the scenario are zero-filled against the missing side,
+/// so the drill-down always sums to the total.
+/// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
+/// @param scenario_json - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
+/// @param market_json - Canonical market-context JSON supplying the unshocked curves, quotes, and FX data used for the base leg.
+#[wasm_bindgen(js_name = scenarioPnlBuilt)]
+pub fn scenario_pnl_built(
+    portfolio: &JsPortfolio,
+    scenario_json: &str,
+    market_json: &str,
+) -> Result<JsValue, JsValue> {
+    let scenario: finstack_quant_scenarios::ScenarioSpec =
+        serde_json::from_str(scenario_json).map_err(to_js_err)?;
+    let market: finstack_quant_core::market_data::context::MarketContext =
+        serde_json::from_str(market_json).map_err(to_js_err)?;
+    let config = finstack_quant_core::config::FinstackConfig::default();
+    let out = finstack_quant_portfolio::scenarios::scenario_pnl_envelope(
+        &portfolio.inner,
+        &scenario,
+        &market,
+        &config,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&out)
+}
+
+/// Compute the profit and loss attributable to a scenario.
+///
+/// Values the portfolio against the unshocked market and against the
+/// scenario-shocked market, and returns a JS object with structured `pnl`
+/// (base-currency `total` plus `by_position`) and `report` values.
+/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+/// @param scenario_json - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
+/// @param market_json - Canonical market-context JSON supplying the unshocked curves, quotes, and FX data used for the base leg.
+#[wasm_bindgen(js_name = scenarioPnl)]
+pub fn scenario_pnl(
+    spec_json: &str,
+    scenario_json: &str,
+    market_json: &str,
+) -> Result<JsValue, JsValue> {
+    let portfolio = JsPortfolio::from_spec(spec_json)?;
+    scenario_pnl_built(&portfolio, scenario_json, market_json)
 }
 
 /// Optimize portfolio weights using the LP-based optimizer.

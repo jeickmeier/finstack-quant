@@ -18,6 +18,8 @@ export const portfolio = {
   aggregateFullCashflowsBuilt: wasm.aggregateFullCashflowsBuilt,
   applyScenarioAndRevalue: wasm.applyScenarioAndRevalue,
   applyScenarioAndRevalueBuilt: wasm.applyScenarioAndRevalueBuilt,
+  scenarioPnl: wasm.scenarioPnl,
+  scenarioPnlBuilt: wasm.scenarioPnlBuilt,
   optimizePortfolio: wasm.optimizePortfolio,
   replayPortfolio: wasm.replayPortfolio,
   parametricVarDecomposition: wasm.parametricVarDecomposition,

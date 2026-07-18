@@ -1043,3 +1043,95 @@ fn test_model_key_repr_values() {
     assert_eq!(ModelKey::HullWhite1F as u16, 4);
     assert_eq!(ModelKey::HazardRate as u16, 5);
 }
+
+#[test]
+fn test_all_models_is_sorted_deduplicated_and_registry_derived() {
+    let registry = standard_registry();
+    let models = registry.all_models();
+
+    assert!(!models.is_empty());
+    let mut sorted = models.clone();
+    sorted.sort_unstable();
+    sorted.dedup();
+    assert_eq!(models, sorted, "all_models must be sorted and deduplicated");
+
+    // Registry-derived: every reported model must actually price something.
+    for model in &models {
+        assert!(
+            registry
+                .all_models_grouped()
+                .values()
+                .any(|instrument_models| instrument_models.contains(model)),
+            "model {model} has no registered pricer"
+        );
+    }
+}
+
+#[test]
+fn test_all_models_grouped_agrees_with_available_models_for_instrument() {
+    let registry = standard_registry();
+    let grouped = registry.all_models_grouped();
+    assert!(!grouped.is_empty());
+
+    for (instrument, models) in &grouped {
+        let mut available = registry.available_models_for_instrument(*instrument);
+        available.sort_unstable();
+        available.dedup();
+        assert_eq!(&available, models);
+        assert!(!models.is_empty());
+    }
+
+    let mut flattened: Vec<ModelKey> = grouped.values().flatten().copied().collect();
+    flattened.sort_unstable();
+    flattened.dedup();
+    assert_eq!(flattened, registry.all_models());
+}
+
+#[test]
+fn test_list_models_mirrors_the_standard_registry_and_is_deterministic() {
+    let expected: Vec<String> = standard_registry()
+        .all_models()
+        .into_iter()
+        .map(|model| model.to_string())
+        .collect();
+
+    assert_eq!(list_models(), expected);
+    assert_eq!(list_models(), list_models());
+    assert!(list_models().contains(&"discounting".to_string()));
+
+    // Every advertised name must round-trip through the canonical parser.
+    for name in list_models() {
+        let parsed = parse_model_key(&name).expect("listed model must parse");
+        assert_eq!(parsed.to_string(), name);
+    }
+}
+
+#[test]
+fn test_list_models_grouped_covers_the_same_models_as_list_models() {
+    let grouped = list_models_grouped();
+    assert!(!grouped.is_empty());
+
+    let mut flattened: Vec<String> = grouped.values().flatten().cloned().collect();
+    flattened.sort();
+    flattened.dedup();
+    let mut flat = list_models();
+    flat.sort();
+    assert_eq!(flattened, flat);
+
+    // Keys are canonical instrument-type names in ascending order.
+    let keys: Vec<&String> = grouped.keys().collect();
+    let mut sorted_keys = keys.clone();
+    sorted_keys.sort();
+    assert_eq!(keys, sorted_keys);
+    assert!(grouped.contains_key(&InstrumentType::Bond.to_string()));
+    assert_eq!(
+        grouped
+            .get(&InstrumentType::Bond.to_string())
+            .expect("bond models"),
+        &standard_registry()
+            .available_models_for_instrument(InstrumentType::Bond)
+            .into_iter()
+            .map(|model| model.to_string())
+            .collect::<Vec<_>>()
+    );
+}

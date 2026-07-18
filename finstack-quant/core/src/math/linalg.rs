@@ -718,6 +718,86 @@ pub fn apply_correlation(
     Ok(())
 }
 
+/// Apply a lower-triangular factor `L` to a vector `z`, returning `L z`.
+///
+/// This is the Cholesky *apply* step used to turn a vector of i.i.d. standard
+/// normals into correlated normals: if `Sigma = L L^T` and `z ~ N(0, I)`, then
+/// `L z ~ N(0, Sigma)`. It is the owned-return counterpart of
+/// [`apply_correlation`], which writes into a caller-supplied buffer; use this
+/// form when an output buffer is inconvenient (for example across the Python
+/// and WASM bindings) and [`apply_correlation`] on hot Monte Carlo paths where
+/// the allocation matters.
+///
+/// `l` is the same **row-major, `n * n`, lower-triangular** flat layout that
+/// [`cholesky_decomposition`] returns — entry `(i, j)` lives at `l[i * n + j]`.
+/// Only the lower triangle (`j <= i`) is read; the upper triangle is assumed
+/// zero and is ignored rather than validated.
+///
+/// # Errors
+///
+/// Returns [`crate::error::InputError::DimensionMismatch`] if `l.len() != n * n`
+/// or `z.len() != n`.
+///
+/// # Arguments
+///
+/// * `l` - Lower-triangular factor in row-major order with exactly `n * n`
+///   entries, typically the output of [`cholesky_decomposition`].
+/// * `n` - Dimension used to interpret both flat buffers (number of variables).
+/// * `z` - Vector of length `n` to transform, typically i.i.d. standard normal
+///   draws.
+///
+/// # Returns
+///
+/// A newly allocated vector of length `n` holding `L z`, in the same variable
+/// order as `z`.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_core::math::linalg::{apply_lower_triangular, cholesky_decomposition};
+///
+/// // Correlation matrix [[1.0, 0.5], [0.5, 1.0]].
+/// let corr = vec![1.0, 0.5, 0.5, 1.0];
+/// let l = cholesky_decomposition(&corr, 2).expect("Cholesky decomposition should succeed");
+///
+/// let correlated = apply_lower_triangular(&l, 2, &[1.0, 0.0]).expect("dimensions match");
+/// assert!((correlated[0] - 1.0).abs() < 1e-12);
+/// assert!((correlated[1] - 0.5).abs() < 1e-12);
+/// ```
+///
+/// # Complexity
+///
+/// Time: O(n²), Space: O(n).
+///
+/// # References
+///
+/// - Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*.
+///   Springer. Section 2.3.3, pp. 71-73 (generating correlated normals from a
+///   Cholesky factor).
+/// - Golub, G. H., & Van Loan, C. F. (2013). *Matrix Computations* (4th ed.).
+///   Johns Hopkins University Press. Section 3.1 (triangular matrix-vector
+///   products).
+///
+/// # See Also
+///
+/// - [`apply_correlation`] for the buffer-writing, allocation-free form.
+/// - [`CorrelationFactor::apply`] for the pivoted, rank-aware factor.
+pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Vec<f64>> {
+    if l.len() != n * n || z.len() != n {
+        return Err(error::InputError::DimensionMismatch.into());
+    }
+
+    let mut out = vec![0.0; n];
+    for (i, slot) in out.iter_mut().enumerate() {
+        let mut sum = 0.0;
+        for (j, &z_j) in z.iter().enumerate().take(i + 1) {
+            sum += l[i * n + j] * z_j;
+        }
+        *slot = sum;
+    }
+    Ok(out)
+}
+
 /// Solve linear system Ax = b using Cholesky decomposition L of A (A = L L^T).
 ///
 /// Solves L y = b (forward substitution) then L^T x = y (backward substitution).
@@ -1434,5 +1514,53 @@ mod tests {
         cholesky_solve(&chol, &b, &mut x).expect("scaled one-dimensional solve should succeed");
 
         assert!((x[0] - 2.0).abs() < 1e-12, "x={}", x[0]);
+    }
+
+    #[test]
+    fn apply_lower_triangular_matches_apply_correlation() {
+        let corr = vec![1.0, 0.5, 0.3, 0.5, 1.0, 0.2, 0.3, 0.2, 1.0];
+        let l = cholesky_decomposition(&corr, 3)
+            .expect("Cholesky decomposition should succeed in test");
+        let z = vec![0.7, -1.3, 0.4];
+
+        let mut expected = vec![0.0; 3];
+        apply_correlation(&l, &z, &mut expected).expect("dimensions match in test");
+        let actual = apply_lower_triangular(&l, 3, &z).expect("dimensions match in test");
+
+        for (a, e) in actual.iter().zip(expected.iter()) {
+            assert!((a - e).abs() < 1e-15, "got {a}, expected {e}");
+        }
+    }
+
+    #[test]
+    fn apply_lower_triangular_reproduces_target_covariance() {
+        // L L^T must equal the input matrix, i.e. applying L to each unit
+        // vector and taking inner products recovers the correlations.
+        let corr = vec![1.0, 0.5, 0.5, 1.0];
+        let l = cholesky_decomposition(&corr, 2)
+            .expect("Cholesky decomposition should succeed in test");
+
+        let e0 = apply_lower_triangular(&l, 2, &[1.0, 0.0]).expect("dimensions match in test");
+        let e1 = apply_lower_triangular(&l, 2, &[0.0, 1.0]).expect("dimensions match in test");
+
+        // Cov(x_i, x_j) = sum_k L[i,k] L[j,k] = row_i . row_j.
+        let cov_01 = l[0] * l[2] + l[1] * l[3];
+        assert!((cov_01 - 0.5).abs() < 1e-12);
+        // Upper triangle is ignored: the first output depends only on z[0].
+        assert!((e0[0] - 1.0).abs() < 1e-12);
+        assert!((e1[0] - 0.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn apply_lower_triangular_rejects_dimension_mismatch() {
+        let l = vec![1.0, 0.0, 0.5, 0.866];
+        assert!(apply_lower_triangular(&l, 3, &[1.0, 0.0, 0.0]).is_err());
+        assert!(apply_lower_triangular(&l, 2, &[1.0]).is_err());
+    }
+
+    #[test]
+    fn apply_lower_triangular_handles_empty_input() {
+        let out = apply_lower_triangular(&[], 0, &[]).expect("empty dimensions are consistent");
+        assert!(out.is_empty());
     }
 }

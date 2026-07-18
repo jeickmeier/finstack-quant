@@ -178,6 +178,52 @@ pub fn list_standard_metrics_grouped() -> BTreeMap<String, Vec<String>> {
         .collect()
 }
 
+/// List every pricing model key that has a pricer in the standard registry.
+///
+/// The list is **registry-derived**, not enum-derived: it reports real dispatch
+/// coverage. A [`ModelKey`] variant that exists in the enum but has no
+/// registered pricer is omitted, whereas iterating `ModelKey` itself would
+/// advertise models that cannot price any instrument. Names are the canonical
+/// `ModelKey` display strings (`"discounting"`, `"black76"`, …) accepted by
+/// [`parse_model_key`] and by the `model` argument of the JSON pricing entry
+/// points.
+///
+/// # Returns
+///
+/// Deduplicated canonical model keys in ascending [`ModelKey`] order.
+pub fn list_models() -> Vec<String> {
+    crate::pricer::standard_registry()
+        .all_models()
+        .into_iter()
+        .map(|model| model.to_string())
+        .collect()
+}
+
+/// List the standard registry's pricing models grouped by instrument type.
+///
+/// This is the grouped counterpart to [`list_models`] and shares its
+/// registry-derived semantics: only instrument types with at least one
+/// registered pricer appear, and each entry lists only the models that can
+/// actually price that instrument. Keys are canonical [`crate::pricer::InstrumentType`]
+/// display strings; values are canonical [`ModelKey`] display strings.
+///
+/// # Returns
+///
+/// A map from instrument type to its ascending, deduplicated model keys, in
+/// ascending instrument-type order.
+pub fn list_models_grouped() -> BTreeMap<String, Vec<String>> {
+    crate::pricer::standard_registry()
+        .all_models_grouped()
+        .into_iter()
+        .map(|(instrument, models)| {
+            (
+                instrument.to_string(),
+                models.into_iter().map(|model| model.to_string()).collect(),
+            )
+        })
+        .collect()
+}
+
 /// Parse tagged instrument JSON, optionally merge metric pricing overrides, and
 /// box the concrete instrument for pricing dispatch.
 ///

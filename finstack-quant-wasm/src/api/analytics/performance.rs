@@ -590,6 +590,28 @@ impl JsPerformance {
 
     // ── Vector outputs ──
 
+    /// Per-period simple return series per asset, as decimal fractions.
+    ///
+    /// Canonical accessor for the raw return panel over the active window;
+    /// prefer it over `excessReturns` with an all-zero risk-free series or
+    /// un-compounding `cumulativeReturns`. Series are span-aware and therefore
+    /// ragged across assets on edge-ragged panels.
+    #[wasm_bindgen(js_name = returns)]
+    pub fn returns(&self) -> JsValue {
+        matrix_f64_to_js(&self.inner.returns())
+    }
+
+    /// Per-period simple return series for one asset, as decimal fractions.
+    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    #[wasm_bindgen(js_name = returnsForTicker)]
+    pub fn returns_for_ticker(&self, ticker_idx: usize) -> Result<JsValue, JsValue> {
+        let series = self
+            .inner
+            .returns_for_ticker(ticker_idx)
+            .map_err(to_js_err)?;
+        Ok(vec_f64_to_js(&series))
+    }
+
     /// Cumulative return series per asset.
     #[wasm_bindgen(js_name = cumulativeReturns)]
     pub fn cumulative_returns(&self) -> JsValue {

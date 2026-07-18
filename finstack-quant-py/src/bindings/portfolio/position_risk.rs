@@ -1,44 +1,22 @@
 //! Python bindings for position-level VaR/ES decomposition and risk budgeting.
 //!
 //! Exposes covariance-based and historical Euler allocation engines, plus a
-//! risk-budget evaluator, through numpy-friendly function signatures.
-//! Inputs are plain `Vec<f64>` / `Vec<Vec<f64>>` so callers can pass numpy
-//! arrays directly (PyO3 converts automatically). Results are returned as
+//! risk-budget evaluator, through NumPy-friendly function signatures.
+//! Dense `float64` NumPy matrices use a contiguous-buffer fast path; nested
+//! Python lists retain the existing conversion path. Results are returned as
 //! nested `PyDict` structures rather than opaque `#[pyclass]` wrappers.
 
 use crate::errors::core_to_py;
 use finstack_quant_portfolio::factor_model::{
-    flatten_position_pnls as core_flatten_position_pnls,
-    flatten_square_matrix as core_flatten_square_matrix, DecompositionConfig,
-    HistoricalPositionDecomposer, ParametricPositionDecomposer, PositionRiskDecomposition,
-    RiskBudget,
+    DecompositionConfig, HistoricalPositionDecomposer, ParametricPositionDecomposer,
+    PositionRiskDecomposition, RiskBudget,
 };
 use finstack_quant_portfolio::types::PositionId;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// Forward to the shared `factor_model::flatten_square_matrix` and remap the
-/// `core::Error::Validation` shape into a `PyValueError` so the same matrix
-/// validation diagnostics surface from both the Python and WASM bindings.
-fn flatten_square_matrix(matrix: Vec<Vec<f64>>, n: usize, label: &str) -> PyResult<Vec<f64>> {
-    core_flatten_square_matrix(matrix, n, label)
-        .map_err(|e| crate::errors::value_error(e.to_string()))
-}
-
-/// Forward to the shared Rust scenario flattener so Python and WASM preserve
-/// the same row-count and scenario-count validation.
-fn flatten_position_pnls(
-    position_pnls: Vec<Vec<f64>>,
-    n_positions: usize,
-) -> PyResult<(Vec<f64>, usize)> {
-    core_flatten_position_pnls(position_pnls, n_positions)
-        .map_err(|e| crate::errors::value_error(e.to_string()))
-}
+use super::matrix_input::{extract_position_pnls, extract_square_matrix};
 
 /// Convert `Vec<String>` position ids to the Rust newtype.
 fn to_position_ids(ids: Vec<String>) -> Vec<PositionId> {
@@ -114,9 +92,10 @@ fn es_decomposition_to_dict<'py>(
 ///     Position identifiers, length ``n``.
 /// weights : list[float]
 ///     Position weights (fractions of portfolio value), length ``n``.
-/// covariance : list[list[float]]
+/// covariance : list[list[float]] | numpy.ndarray
 ///     ``n x n`` symmetric positive semi-definite covariance matrix of
-///     position returns (row-major).
+///     position returns. C-contiguous ``float64`` arrays use the direct buffer
+///     path; nested lists and other array layouts preserve logical row order.
 /// confidence : float, default ``0.95``
 ///     Confidence level in ``(0, 1)``.
 ///
@@ -133,11 +112,11 @@ fn parametric_var_decomposition<'py>(
     py: Python<'py>,
     position_ids: Vec<String>,
     weights: Vec<f64>,
-    covariance: Vec<Vec<f64>>,
+    covariance: &Bound<'_, PyAny>,
     confidence: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
     let n = weights.len();
-    let cov_flat = flatten_square_matrix(covariance, n, "covariance")?;
+    let cov_flat = extract_square_matrix(covariance, n, "covariance")?;
     let ids = to_position_ids(position_ids);
 
     let mut config = DecompositionConfig::parametric_95();
@@ -159,7 +138,9 @@ fn parametric_var_decomposition<'py>(
 /// ----------
 /// position_ids : list[str]
 /// weights : list[float]
-/// covariance : list[list[float]]
+/// covariance : list[list[float]] | numpy.ndarray
+///     Square matrix aligned with ``position_ids``. C-contiguous ``float64``
+///     arrays use the direct buffer path.
 /// confidence : float, default ``0.95``
 ///
 /// Returns
@@ -175,11 +156,11 @@ fn parametric_es_decomposition<'py>(
     py: Python<'py>,
     position_ids: Vec<String>,
     weights: Vec<f64>,
-    covariance: Vec<Vec<f64>>,
+    covariance: &Bound<'_, PyAny>,
     confidence: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
     let n = weights.len();
-    let cov_flat = flatten_square_matrix(covariance, n, "covariance")?;
+    let cov_flat = extract_square_matrix(covariance, n, "covariance")?;
     let ids = to_position_ids(position_ids);
 
     let mut config = DecompositionConfig::parametric_95();
@@ -205,9 +186,10 @@ fn parametric_es_decomposition<'py>(
 /// ----------
 /// position_ids : list[str]
 ///     Position identifiers, length ``n``.
-/// position_pnls : list[list[float]]
+/// position_pnls : list[list[float]] | numpy.ndarray
 ///     Per-position P&L scenarios, shape ``(n, n_scenarios)``. That is,
 ///     ``position_pnls[i][t]`` is position ``i``'s P&L under scenario ``t``.
+///     C-contiguous ``float64`` arrays use the direct buffer path.
 /// confidence : float, default ``0.95``
 ///
 /// Returns
@@ -220,15 +202,17 @@ fn parametric_es_decomposition<'py>(
 fn historical_var_decomposition<'py>(
     py: Python<'py>,
     position_ids: Vec<String>,
-    position_pnls: Vec<Vec<f64>>,
+    position_pnls: &Bound<'_, PyAny>,
     confidence: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
     let n = position_ids.len();
-    let (flat, n_scenarios) = flatten_position_pnls(position_pnls, n)?;
+    let position_pnls = extract_position_pnls(position_pnls, n)?;
+    let n_scenarios = position_pnls.n_scenarios();
 
     let config = DecompositionConfig::historical(confidence);
     let result = py
         .detach(move || {
+            let flat = position_pnls.into_scenario_major(n);
             let ids = to_position_ids(position_ids);
             HistoricalPositionDecomposer.decompose_from_pnls(&flat, &ids, n_scenarios, &config)
         })

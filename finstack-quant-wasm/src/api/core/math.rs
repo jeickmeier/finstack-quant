@@ -79,6 +79,23 @@ pub fn cholesky_solve_flat(chol: &[f64], b: &[f64], n: usize) -> Result<Box<[f64
     Ok(x.into_boxed_slice())
 }
 
+/// Apply a lower-triangular factor L to a vector z, returning `L z`.
+///
+/// This is the Cholesky "apply" step that turns independent standard normals
+/// into correlated normals: if `A = L L^T` and `z ~ N(0, I)`, then
+/// `L z ~ N(0, A)`. Accepts L as `n * n` row-major entries; only the lower
+/// triangle is read and the upper triangle is assumed zero.
+/// @param l - Lower-triangular Cholesky factor as a flat row-major array of n × n entries.
+/// @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
+/// @param z - Vector of length n to transform, typically independent standard-normal draws.
+#[wasm_bindgen(js_name = applyLowerTriangular)]
+pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Box<[f64]>, JsValue> {
+    validate_flat_matrix_len(l, n)?;
+    linalg::apply_lower_triangular(l, n, z)
+        .map(Vec::into_boxed_slice)
+        .map_err(to_js_err)
+}
+
 /// Validate a flat row-major correlation matrix.
 ///
 /// This is the only correlation-matrix validator on the `core` namespace.

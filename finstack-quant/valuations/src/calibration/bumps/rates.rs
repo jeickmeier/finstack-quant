@@ -20,6 +20,7 @@ use finstack_quant_core::market_data::term_structures::{
     RateCalibrationMethod, RateCalibrationOisCompounding, RateCalibrationPillar,
     RateCalibrationQuote, RateCalibrationRecipe,
 };
+#[cfg(test)]
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::{CurveId, IndexId};
 #[cfg(test)]
@@ -1273,94 +1274,122 @@ pub(crate) fn find_closest_quote(
         .map(|(i, _)| i)
 }
 
-/// Bump discount curve by synthesizing par instruments from the curve, shocking them, and re-calibrating.
+/// Smallest knot time eligible to receive a tenor-targeted zero-rate shift.
 ///
-/// Used when original quotes are unavailable. It implies par rates from
-/// the current curve discount factors, applies shocks, and re-bootstraps.
+/// The `t = 0` anchor knot always has `DF = 1` by definition and carries no
+/// rate information, so it is never selected as a bump target.
+const MIN_BUMPABLE_KNOT_TIME: f64 = 1e-4;
+
+/// Index of the knot closest to `target_years`, ignoring the `t ≈ 0` anchor.
+///
+/// Mirrors the "closest pillar wins" selection used by
+/// [`find_closest_quote`] for the quote-driven bump paths, but resolves
+/// against curve knot times directly.
+fn closest_bumpable_knot(knots: &[f64], target_years: f64) -> Option<usize> {
+    knots
+        .iter()
+        .enumerate()
+        .filter(|(_, &t)| t > MIN_BUMPABLE_KNOT_TIME)
+        .min_by(|(_, &a), (_, &b)| {
+            (a - target_years)
+                .abs()
+                .partial_cmp(&(b - target_years).abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|(index, _)| index)
+}
+
+/// Bump a discount curve by shifting its continuously-compounded zero rates.
+///
+/// Used when the original calibration quotes are unavailable, so there is no
+/// quote set to shock and re-bootstrap. The shock is applied directly in
+/// zero-rate space on the curve's own knots:
+///
+/// ```text
+/// DF_bumped(tᵢ) = DF(tᵢ) · exp(−δᵢ · tᵢ),    δᵢ = bpᵢ / 10_000
+/// ```
+///
+/// which is the same construction as
+/// [`DiscountCurve::with_parallel_bump`](finstack_quant_core::market_data::term_structures::DiscountCurve::with_parallel_bump),
+/// except that the curve identifier is preserved so the result can replace the
+/// original in a [`MarketContext`].
+///
+/// # Guarantees
+///
+/// * **Zero-shock identity** — a `0 bp` bump multiplies every knot by
+///   `exp(0) = 1`, so the curve is reproduced exactly at every tenor, knot and
+///   non-knot alike.
+/// * **Faithfulness** — an `X bp` parallel bump moves the continuously-compounded
+///   zero `z(t) = −ln DF(t) / t` by exactly `X bp` at every knot. Between knots
+///   this is exact for log-linear interpolation (log-DF is affine in `t`, and
+///   `−δt` is affine, so the shift survives interpolation unchanged); for
+///   interpolation styles that are not affine in log-DF a second-order
+///   interpolation-basis residual remains, bounded by the curve's own knot
+///   spacing.
+/// * **Additivity** — `+X bp` followed by `−X bp` returns to the base curve.
+///
+/// # Why not imply-and-re-bootstrap
+///
+/// This function previously implied synthetic deposit quotes from the curve
+/// (`rate = (1/DF − 1) / yf` under a hardcoded `Act365F`) and re-bootstrapped
+/// them through a money-market index. That round trip was **not** the identity:
+/// the implying day count disagreed with the index's registered `Act360`, the
+/// synthetic maturity `base + round(t · 365.25)` days did not map back to the
+/// original knot time, and the bootstrap additionally applied business-day and
+/// settlement adjustments that the implied rate never accounted for. A `0 bp`
+/// shock therefore shifted zeros by roughly +4.4 bp to +5.5 bp before any bump
+/// was applied. Shifting zero rates directly removes the round trip rather than
+/// attempting to make three separate conventions agree.
 ///
 /// # Arguments
 ///
-/// * `curve` - Existing discount curve from which synthetic par quotes are
-///   implied before re-bootstrap.
-/// * `context` - Market context supplying curve and convention dependencies
-///   for the synthetic calibration step.
-/// * `bump` - Parallel or tenor-specific rate shock in [`BumpRequest`] basis
-///   point units.
-/// * `as_of` - Valuation/base date used to convert curve times into synthetic
-///   instrument maturities.
-/// * `currency` - Curve currency used to select synthetic money-market and
-///   OIS index conventions because `DiscountCurve` lacks currency metadata.
+/// * `curve` - Existing discount curve whose knots are shifted in zero-rate space.
+/// * `_context` - Unused. Retained so the signature stays compatible with the
+///   quote-driven bump entry points; no calibration step runs any more.
+/// * `bump` - Parallel or tenor-specific zero-rate shock in [`BumpRequest`]
+///   basis point units.
+/// * `_as_of` - Unused. The shift is applied on the curve's own time grid, so no
+///   date arithmetic is needed.
+/// * `_currency` - Unused. No synthetic index conventions are selected any more.
+///
+/// # Errors
+///
+/// Returns an error when the shifted knots violate the curve's preserved
+/// validation policy (discount-factor monotonicity or minimum forward rate).
 pub fn bump_discount_curve_synthetic(
     curve: &finstack_quant_core::market_data::term_structures::DiscountCurve,
-    context: &MarketContext,
+    _context: &MarketContext,
     bump: &BumpRequest,
-    as_of: Date,
-    currency: Currency,
+    _as_of: Date,
+    _currency: Currency,
 ) -> finstack_quant_core::Result<DiscountCurve> {
-    let curve_id = curve.id();
-    let base_date = as_of;
     let knots = curve.knots();
+    let dfs = curve.dfs();
 
-    // Choose synthetic indices. Deposits use a short-dated money-market index,
-    // while swaps must use the corresponding OIS index conventions.
-    let deposit_index_id = match currency {
-        // Align with `rate_index_conventions.json` (there is no `EUR-ESTR-1M` alias today).
-        Currency::EUR => "EUR-ESTR-OIS",
-        Currency::GBP => "GBP-SONIA-1M",
-        Currency::JPY => "JPY-TONA-1M",
-        _ => "USD-SOFR-1M",
-    };
-
-    // Synthesize quotes for each knot (excluding t≈0) and re-calibrate.
-    // Use deposit-style quotes for all maturities here. The synthetic bump path
-    // is a deterministic approximation used when original quotes are unavailable,
-    // and staying in deposit space avoids OIS swap seasoning/fixings requirements
-    // during scenario shock application.
-
-    let mut quotes = Vec::new();
-    let dc = DayCount::Act365F;
-    let dc_ctx = DayCountContext::default();
-
-    for &t in knots {
-        if t <= 0.0001 {
-            continue;
+    // Per-knot continuously-compounded zero shift, in decimal.
+    let mut shifts = vec![0.0_f64; knots.len()];
+    match bump {
+        BumpRequest::Parallel(bp) => {
+            let shift = bp * 1e-4;
+            shifts.fill(shift);
         }
-
-        let df = curve.df(t);
-        let maturity_days = (t * 365.25).round() as i64;
-        let maturity = base_date + time::Duration::days(maturity_days);
-
-        let yf = dc.year_fraction(base_date, maturity, dc_ctx).unwrap_or(t);
-
-        let rate = if yf > 1e-4 {
-            (1.0 / df - 1.0) / yf
-        } else {
-            0.0
-        };
-        quotes.push(RateQuote::Deposit {
-            id: QuoteId::new(format!("SYNTH-DEP-{}", t)),
-            index: finstack_quant_core::types::IndexId::new(deposit_index_id),
-            pillar: Pillar::Date(maturity),
-            rate,
-        });
+        BumpRequest::Tenors(targets) => {
+            for (target_years, bp) in targets {
+                if let Some(index) = closest_bumpable_knot(knots, *target_years) {
+                    shifts[index] += bp * 1e-4;
+                }
+            }
+        }
     }
 
-    let params = DiscountCurveParams {
-        curve_id: curve_id.clone(),
-        currency,
-        base_date,
-        method: CalibrationMethod::Bootstrap,
-        interpolation: Default::default(),
-        extrapolation: ExtrapolationPolicy::FlatForward,
-        pricing_discount_id: None,
-        pricing_forward_id: None,
-        conventions: RatesStepConventions {
-            ois_compounding: None,
-            curve_day_count: Some(DayCount::Act365F),
-        },
-    };
+    let bumped: Vec<(f64, f64)> = knots
+        .iter()
+        .zip(dfs.iter())
+        .zip(shifts.iter())
+        .map(|((&t, &df), &shift)| (t, df * (-shift * t).exp()))
+        .collect();
 
-    bump_discount_curve(&quotes, &params, context, bump)
+    curve.rebuild_with_knots(bumped)
 }
 
 #[cfg(test)]

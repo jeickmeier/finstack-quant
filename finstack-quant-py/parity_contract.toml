@@ -30,7 +30,7 @@ status = "exists"  # Python package already present
 [crates.core.modules]
 cashflow      = { python = "finstack_quant.core.cashflow",      status = "missing", note = "Core cashflow APIs are not yet materialized as a dedicated Python submodule" }
 config        = { python = "finstack_quant.core.config",        status = "exists" }
-credit        = { python = "finstack_quant.core.credit",        status = "exists", note = "Includes scoring, pd, lgd, migration, and recovery_waterfall submodules." }
+credit        = { python = "finstack_quant.core.credit",        status = "exists", note = "Includes scoring, pd, lgd, migration, recovery_waterfall, and liability_management submodules." }
 currency      = { python = "finstack_quant.core.currency",      status = "exists" }
 dates         = { python = "finstack_quant.core.dates",         status = "exists" }
 error         = { python = "finstack_quant.core.error",         status = "missing" }
@@ -124,7 +124,7 @@ public = [
 
 [crates.core.module_symbols.credit]
 python_package = "finstack_quant.core.credit"
-public = ["scoring", "pd", "lgd", "migration", "recovery_waterfall"]
+public = ["scoring", "pd", "lgd", "migration", "recovery_waterfall", "liability_management"]
 
 [crates.core.credit_recovery_waterfall]
 python_package = "finstack_quant.core.credit.recovery_waterfall"
@@ -133,6 +133,16 @@ public = [
     "RecoveryClaim",
     "RecoveryWaterfallResult",
     "allocate_recovery",
+]
+
+[crates.core.credit_liability_management]
+python_package = "finstack_quant.core.credit.liability_management"
+public = [
+    "ExchangeOfferAnalysis",
+    "LeverageImpact",
+    "LmeAnalysis",
+    "analyze_exchange_offer",
+    "analyze_lme",
 ]
 
 # Member-level pinning for Python credit-migration diagnostics. Keys follow
@@ -456,6 +466,7 @@ public = [
     "PortfolioLossResult",
     "RecoveryModel",
     "RecoverySpec",
+    "TrancheLossStatistics",
     "cholesky_decompose",
     "correlation_bounds",
     "joint_probabilities",
@@ -469,6 +480,8 @@ python_package = "finstack_quant.valuations.instruments"
 public = [
     "bond_from_cashflows_json",
     "instrument_cashflows_json",
+    "list_models",
+    "list_models_grouped",
     "list_standard_metrics",
     "list_standard_metrics_grouped",
     "price_instrument",
@@ -632,9 +645,11 @@ public = [
     "compute_multiple",
     "credit_assessment",
     "credit_assessment_report",
+    "dcf_sensitivity",
     "dependents",
     "direct_dependencies",
     "evaluate_dcf",
+    "evaluate_lbo",
     "evaluate_scenario_set",
     "explain_formula",
     "explain_formula_text",
@@ -655,6 +670,7 @@ public = [
     "run_variance",
     "score_relative_value",
     "validate_scorecard_config",
+    "wacc",
     "z_score",
 ]
 
@@ -720,6 +736,9 @@ root_exports = [
     "generateTornadoEntries",
     "runMonteCarlo",
     "goalSeek",
+    "dcfSensitivity",
+    "evaluateLbo",
+    "wacc",
     "traceDependencies",
     "explainFormula",
     "explainFormulaText",
@@ -747,6 +766,9 @@ backtest_forecast = "backtestForecast"
 generate_tornado_entries = "generateTornadoEntries"
 run_monte_carlo = "runMonteCarlo"
 goal_seek = "goalSeek"
+dcf_sensitivity = "dcfSensitivity"
+evaluate_lbo = "evaluateLbo"
+wacc = "wacc"
 explain_formula = "explainFormula"
 explain_formula_text = "explainFormulaText"
 pl_summary_report = "plSummaryReport"
@@ -960,10 +982,12 @@ public = [
   "position_what_if",
   "replay_portfolio",
   "roll_effective_spread",
+  "scenario_pnl",
   "twrr_linked",
   "twrr_modified_dietz",
   "validate_allocation_json",
   "value_portfolio",
+  "value_portfolio_typed",
 ]
 
 # ---------------------------------------------------------------------------
@@ -995,6 +1019,8 @@ root_exports = [
   "aggregateFullCashflowsBuilt",
   "applyScenarioAndRevalue",
   "applyScenarioAndRevalueBuilt",
+  "scenarioPnl",
+  "scenarioPnlBuilt",
   "optimizePortfolio",
   "replayPortfolio",
   "parametricVarDecomposition",
@@ -1079,12 +1105,14 @@ python_only = [
   "position_component_var",
   "position_what_if",
   "validate_allocation_json",
+  "value_portfolio_typed",
 ]
 
 wasm_only = [
   "valuePortfolioBuilt",
   "aggregateFullCashflowsBuilt",
   "applyScenarioAndRevalueBuilt",
+  "scenarioPnlBuilt",
   "computeFactorSensitivitiesWithMarket",
   "computePnlProfilesWithMarket",
 ]
@@ -1104,6 +1132,7 @@ aggregate_metrics = "aggregateMetrics"
 value_portfolio = "valuePortfolio"
 aggregate_full_cashflows = "aggregateFullCashflows"
 apply_scenario_and_revalue = "applyScenarioAndRevalue"
+scenario_pnl = "scenarioPnl"
 optimize_portfolio = "optimizePortfolio"
 replay_portfolio = "replayPortfolio"
 parametric_var_decomposition = "parametricVarDecomposition"
@@ -1262,6 +1291,10 @@ namespaces = [
 rust_module_root = "finstack-quant-wasm/src/api/core/"
 js_export_file   = "../finstack-quant-wasm/exports/core.js"
 modules = [
+    # Partial: only the `liability_management` analytics are bound
+    # (`analyzeExchangeOffer`, `analyzeLme`). The credit registry, scoring, PD,
+    # LGD, migration, and recovery-waterfall submodules remain Python-only.
+    "credit",
     "currency",
     "dates",
     "market_data",
@@ -1283,7 +1316,6 @@ vol_cube_members = ["id", "interpolationMode", "vol", "volClamped", "volNormal",
 excluded = [
     "cashflow",      # XIRR/NPV: deferred until concrete WASM use case
     "config",        # Configuration model is Rust-internal / Python-only
-    "credit",        # Credit registry not yet needed in browser callers
     "expr",          # Expression engine not exposed to WASM
     "explain",       # Trace/audit helpers are server/notebook-side concerns
     "prelude",       # Re-export bag; no host-language meaning
@@ -1312,6 +1344,8 @@ root_exports = [
     "FxConversionPolicy",
     "FxRateResult",
     "FxMatrix",
+    "nelsonSiegelYields",
+    "applyLowerTriangular",
     "choleskyDecomposition",
     "choleskySolve",
     "choleskyDecompositionFlat",
@@ -1340,6 +1374,8 @@ root_exports = [
     "neumaierSumArray",
     "countConsecutive",
     "countConsecutiveArray",
+    "analyzeExchangeOffer",
+    "analyzeLme",
 ]
 
 # finstack_quant.core.market_data symbols intentionally absent from the WASM core
@@ -1490,6 +1526,7 @@ correlation = [
     "correlationBounds",
     "jointProbabilities",
     "nearestCorrelation",
+    "trancheLossStatistics",
     "validateCorrelationMatrix",
 ]
 credit = [
@@ -1529,6 +1566,8 @@ instruments = [
     "bondFromCashflowsJson",
     "instrumentCashflowsJson",
     "instrumentCashflowsWithMarket",
+    "listModels",
+    "listModelsGrouped",
     "listStandardMetrics",
     "listStandardMetricsGrouped",
     "priceInstrument",

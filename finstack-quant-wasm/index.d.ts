@@ -1729,6 +1729,63 @@ export interface BacktestForecastMetricsJson {
 }
 
 /**
+ * Gross-leverage impact of a liability management exercise.
+ * Leverage is gross debt over EBITDA, so `8.0` reads as 8.0x.
+ */
+export interface LmeLeverageImpact {
+  /** Gross debt of the target instrument before the exercise. */
+  pre_total_debt: number;
+  /** Gross debt of the target instrument after the exercise. */
+  post_total_debt: number;
+  /** Gross debt over EBITDA before the exercise, as a multiple. */
+  pre_leverage: number;
+  /** Gross debt over EBITDA after the exercise, as a multiple. */
+  post_leverage: number;
+  /** Turns of leverage removed: `pre_leverage - post_leverage`. */
+  leverage_reduction: number;
+}
+
+/** Hold-versus-tender economics of a distressed exchange offer. */
+export interface ExchangeOfferAnalysis {
+  /** Canonical offer structure, echoed back from the request. */
+  exchange_type: 'par_for_par' | 'discount' | 'uptier' | 'downtier';
+  /** Present value of the existing claim if it is not tendered. */
+  old_npv: number;
+  /** Present value of the new instrument received on tendering. */
+  new_npv: number;
+  /** Cash consent or early-tender fee. */
+  consent_fee: number;
+  /** Estimated value of attached equity or warrants. */
+  equity_sweetener_value: number;
+  /** Total tender consideration: `new_npv + consent_fee + equity_sweetener_value`. */
+  tender_total: number;
+  /** Tender consideration less the hold-out present value. */
+  delta_npv: number;
+  /** Hold-out recovery fraction that matches the tender; capped at 1.0. */
+  breakeven_recovery: number;
+  /** True when `tender_total` exceeds `old_npv * 1.02`. */
+  tender_recommended: boolean;
+}
+
+/** Issuer-side economics of a liability management exercise. */
+export interface LmeAnalysis {
+  /** Canonical LME structure, echoed back from the request. */
+  lme_type: 'open_market_repurchase' | 'tender_offer' | 'amend_and_extend' | 'dropdown';
+  /** Cash paid by the issuer, in the caller's monetary unit. */
+  cost: number;
+  /** Face amount retired; zero for structures that do not extinguish debt. */
+  notional_reduction: number;
+  /** Par retired less cash paid — the discount captured by the issuer. */
+  discount_capture: number;
+  /** Discount captured as a fraction of par retired; zero when no par is retired. */
+  discount_capture_pct: number;
+  /** Value fraction diverted from non-participating holders; nonzero only for a dropdown. */
+  remaining_holder_impact_pct: number;
+  /** Gross-leverage block, or null when no positive EBITDA was supplied. */
+  leverage_impact: LmeLeverageImpact | null;
+}
+
+/**
  * Namespaced TypeScript entry points for core calculations and types.
  * @example
  * ```typescript
@@ -1831,6 +1888,42 @@ export interface CoreNamespace {
    * Fx matrix exposed by this `Core` value.
    */
   FxMatrix: FxMatrixConstructor;
+  /**
+   * Evaluate the static Nelson-Siegel (1987) yield curve for one factor triple.
+   *
+   * This is the Diebold-Li cross-sectional equation for a single date:
+   * `y(tau) = b1 + b2 * s(tau) + b3 * (s(tau) - exp(-lambda * tau))` with
+   * `s(tau) = (1 - exp(-lambda * tau)) / (lambda * tau)`. Returns one yield per
+   * tenor, in decimal units and in input order.
+   * @param lambda - Exponential decay parameter for tenors in years; must be finite and greater than zero (0.7308 is the years-equivalent of Diebold-Li's 0.0609 months value).
+   * @param level - Nelson-Siegel beta1, the long-run level factor in decimal yield units such as 0.06 for 6%.
+   * @param slope - Nelson-Siegel beta2, the slope factor (negative of the short-minus-long spread) in decimal yield units.
+   * @param curvature - Nelson-Siegel beta3, the hump-shaped curvature factor in decimal yield units.
+   * @param tenors - Maturities in years, each finite and non-negative; output order matches this array.
+   * @returns Returns numeric results as a `Float64Array` in the documented order.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  nelsonSiegelYields(
+    lambda: number,
+    level: number,
+    slope: number,
+    curvature: number,
+    tenors: NumericArray,
+  ): Float64Array;
+  /**
+   * Apply a lower-triangular factor L to a vector z, returning `L z`.
+   *
+   * This is the Cholesky "apply" step that turns independent standard normals
+   * into correlated normals: if `A = L L^T` and `z ~ N(0, I)`, then
+   * `L z ~ N(0, A)`. Accepts L as `n * n` row-major entries; only the lower
+   * triangle is read and the upper triangle is assumed zero.
+   * @param l - Lower-triangular Cholesky factor as a flat row-major array of n × n entries.
+   * @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
+   * @param z - Vector of length n to transform, typically independent standard-normal draws.
+   * @returns Returns numeric results as a `Float64Array` in the documented order.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  applyLowerTriangular(l: NumericArray, n: number, z: NumericArray): Float64Array;
   /**
    * Cholesky decomposition of a symmetric positive-definite matrix.
    *
@@ -2049,6 +2142,42 @@ export interface CoreNamespace {
    * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
    */
   countConsecutiveArray(values: NumericArray): number;
+  /**
+   * Compare hold-versus-tender economics for a distressed exchange offer.
+   * Tendering is recommended only when the total consideration exceeds the
+   * hold-out present value by more than 2%.
+   * @param oldPv - Present value of the existing claim if it is not tendered, in the caller's monetary unit.
+   * @param newPv - Present value of the new instrument received on tendering, in the same unit as oldPv.
+   * @param consentFee - Cash consent or early-tender fee paid to participating holders, in the same unit as oldPv.
+   * @param equitySweetenerValue - Estimated value of equity or warrants attached to the new instrument, in the same unit as oldPv.
+   * @param exchangeType - Offer structure: par_for_par (alias par), discount, uptier, or downtier. Case-insensitive; '-' normalises to '_'.
+   * @returns Returns the tender total, NPV pickup, breakeven recovery, and tender recommendation.
+   * @throws Error - Thrown when an amount is negative or non-finite, or exchangeType is not a recognised structure.
+   */
+  analyzeExchangeOffer(
+    oldPv: number,
+    newPv: number,
+    consentFee: number,
+    equitySweetenerValue: number,
+    exchangeType: string,
+  ): ExchangeOfferAnalysis;
+  /**
+   * Compute discount capture and leverage impact for an LME transaction.
+   * @param lmeType - Structure of the exercise: open_market (aliases open_market_repurchase, omr), tender_offer (alias tender), amend_and_extend (aliases ae, a&e), or dropdown.
+   * @param notional - Outstanding face amount of the target instrument, in the caller's monetary unit; must be finite and positive.
+   * @param repurchasePricePct - Price as a fraction of par for repurchases and tenders ((0, 1.5]), the extension fee for amend-and-extend ([0, 0.10]), or the transferred-asset fraction for a dropdown ([0, 1]).
+   * @param optAcceptancePct - Fraction of holders participating, in [0, 1].
+   * @param ebitda - EBITDA in the same unit as notional; a positive value adds the leverage_impact block, null or non-positive omits it.
+   * @returns Returns cash cost, par retired, discount captured, remaining-holder impact, and the optional leverage block.
+   * @throws Error - Thrown when notional is not positive, optAcceptancePct is outside [0, 1], repurchasePricePct is outside the range admitted by lmeType, or lmeType is not recognised.
+   */
+  analyzeLme(
+    lmeType: string,
+    notional: number,
+    repurchasePricePct: number,
+    optAcceptancePct: number,
+    ebitda?: number | null,
+  ): LmeAnalysis;
 }
 
 /**
@@ -2587,6 +2716,23 @@ export declare class Performance {
   modifiedSharpe(riskFreeRate?: number, confidence?: number): Float64Array;
   sterlingRatio(riskFreeRate?: number, n?: number): Float64Array;
   burkeRatio(riskFreeRate?: number, n?: number): Float64Array;
+  /**
+   * Per-period simple returns per asset, as decimal fractions (0.01 = +1%).
+   *
+   * Canonical accessor for the raw return panel over the active window; prefer
+   * it over `excessReturns` with an all-zero risk-free series or un-compounding
+   * `cumulativeReturns`. Series are span-aware and therefore ragged across
+   * assets on edge-ragged panels.
+   * @returns One Float64Array per asset, in `tickerNames()` order.
+   */
+  returns(): Float64Array[];
+  /**
+   * Per-period simple returns for one asset, as decimal fractions (0.01 = +1%).
+   * @param tickerIdx - Zero-based ticker column index in `tickerNames()` order.
+   * @returns The asset's simple return series in date order.
+   * @throws If `tickerIdx` is outside the loaded ticker columns.
+   */
+  returnsForTicker(tickerIdx: number): Float64Array;
   cumulativeReturns(): Float64Array[];
   drawdownSeries(): Float64Array[];
   correlationMatrix(): Float64Array[];
@@ -3343,6 +3489,38 @@ export interface RecoveryModelClass {
 }
 
 /**
+ * Tranche loss statistics returned by
+ * {@link CorrelationNamespace.trancheLossStatistics}.
+ *
+ * Fractions are expressed relative to the tranche notional unless the field
+ * name says otherwise; amounts are in the same unit as the input losses.
+ */
+export interface TrancheLossStatisticsJson {
+  /** Tranche attachment point as a fraction of pool notional, in `[0, 1)`. */
+  attachment: number;
+  /** Tranche detachment point as a fraction of pool notional, in `(0, 1]`. */
+  detachment: number;
+  /** Tranche notional `(detachment - attachment) * poolNotional`. */
+  tranche_notional: number;
+  /** Mean tranche loss as a fraction of tranche notional, in `[0, 1]`. */
+  expected_loss_fraction: number;
+  /** Mean tranche loss in pool-notional units. */
+  expected_loss_amount: number;
+  /** Nearest-rank tranche loss fraction at the distribution's confidence. */
+  var_fraction: number;
+  /** Nearest-rank tranche loss amount at the distribution's confidence. */
+  var_amount: number;
+  /** Mean tranche loss fraction from the VaR observation through the worst path. */
+  expected_shortfall_fraction: number;
+  /** Mean tranche loss amount from the VaR observation through the worst path. */
+  expected_shortfall_amount: number;
+  /** Share of paths whose pool loss fraction strictly exceeds `attachment`. */
+  prob_attachment_breached: number;
+  /** Share of paths whose pool loss fraction reaches or exceeds `detachment`. */
+  prob_full_writedown: number;
+}
+
+/**
  * Namespaced TypeScript entry points for correlation calculations and types.
  * @example
  * ```typescript
@@ -3425,6 +3603,29 @@ export interface CorrelationNamespace {
    * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
    */
   nearestCorrelation(matrix: NumericArray, n: number, maxIter?: number, tol?: number): Float64Array;
+  /**
+   * Tranche loss statistics over a simulated pool loss distribution.
+   *
+   * `attachment` and `detachment` are fractions of pool notional in `[0, 1]` —
+   * a 0-3% equity tranche is `(0.0, 0.03)`, not `(0.0, 3.0)`. Each path's pool
+   * loss fraction `L = loss / poolNotional` maps through
+   * `clamp(L - attachment, 0, width) / width`, and the resulting distribution
+   * is aggregated at `confidence` using loss-positive nearest-rank conventions.
+   * @param losses - Loss-positive path losses in one caller-defined unit, one entry per simulated path.
+   * @param confidence - Loss-positive VaR and expected-shortfall confidence strictly between 0 and 1.
+   * @param attachment - Lower tranche boundary as a fraction of pool notional from 0 through 1.
+   * @param detachment - Upper tranche boundary as a fraction of pool notional, strictly above the attachment and at most 1.
+   * @param poolNotional - Total pool notional, finite and strictly positive, in the same unit as the losses.
+   * @returns Returns the tranche notional, expected loss, VaR, expected shortfall, and breach probabilities.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  trancheLossStatistics(
+    losses: NumericArray,
+    confidence: number,
+    attachment: number,
+    detachment: number,
+    poolNotional: number,
+  ): TrancheLossStatisticsJson;
 }
 
 // --- monte_carlo ----------------------------------------------------------
@@ -4206,6 +4407,27 @@ export interface ValuationInstrumentsNamespace {
     asOf: string,
     model: string
   ): string;
+  /**
+   * List every pricing model key registered in the standard pricer registry.
+   *
+   * The list is registry-derived rather than enum-derived, so it reflects real
+   * dispatch coverage: a model with no registered pricer is omitted. Returns a
+   * sorted array of canonical keys (`"discounting"`, `"black76"`, …) accepted
+   * by the `model` argument of `priceInstrument`.
+   * @returns Returns the resulting `string[]` collection in ascending model-key order.
+   * @throws Error - Thrown when the registry cannot be serialized for the JavaScript boundary.
+   */
+  listModels(): string[];
+  /**
+   * List the standard registry's pricing models grouped by instrument type.
+   *
+   * Returns a JSON object `{ instrument_type: [model_key, ...], ... }`. Only
+   * instrument types with at least one registered pricer appear, and each
+   * entry lists only the models that can actually price that instrument.
+   * @returns Returns the resulting `Record<string, string[]>` value keyed by instrument type.
+   * @throws Error - Thrown when the registry cannot be serialized for the JavaScript boundary.
+   */
+  listModelsGrouped(): Record<string, string[]>;
   /**
    * List all metric IDs in the standard metric registry.
    * @returns Returns the resulting `string[]` collection in the documented order.
@@ -6025,6 +6247,85 @@ export interface StatementsAnalyticsNamespace {
     boundsHi?: number | null
   ): GoalSeekResult;
   /**
+   * Rank the headline DCF assumptions by enterprise-value impact.
+   *
+   * The statement model is evaluated once; each shocked point re-runs only the
+   * DCF. Returns JSON with the baseline enterprise value, tornado entries as
+   * deltas versus that baseline sorted by descending absolute swing, and the
+   * effective (possibly clamped) shock levels.
+   * @param modelJson - Canonical JSON payload representing the financial model spec consumed by this API.
+   * @param wacc - Baseline weighted average cost of capital in decimal form (0.10 = 10%).
+   * @param terminalValueJson - Canonical JSON payload representing the terminal value spec, selecting whether growth or the exit multiple is shocked.
+   * @param ufcfNode - Node identifier holding unlevered free cash flow for the forecast periods.
+   * @param netDebtOverride - Optional flat net-debt amount used instead of the model-derived bridge.
+   * @param waccSensitivityBump - Absolute shock applied to WACC and to the terminal growth rate, in decimal (0.01 = +/-100 bp).
+   * @param waccDenominatorEpsilon - Minimum spread preserved between WACC and the terminal growth rate so 1/(wacc - g) stays defined, in decimal.
+   * @param exitMultipleBump - Absolute shock applied to an exit multiple, in turns of the multiple (1.0 = +/-1.0x).
+   * @returns Returns the requested string representation or JSON payload.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  dcfSensitivity(
+    modelJson: string,
+    wacc: number,
+    terminalValueJson: string,
+    ufcfNode: string,
+    netDebtOverride?: number | null,
+    waccSensitivityBump?: number | null,
+    waccDenominatorEpsilon?: number | null,
+    exitMultipleBump?: number | null
+  ): string;
+  /**
+   * Evaluate a leveraged-buyout transaction against a statement model.
+   *
+   * Entry enterprise value is priced at the model's first period, the sponsor
+   * equity check is solved as the sources-and-uses residual, and exit proceeds
+   * are the exit enterprise value less the modelled net debt at the exit
+   * period. IRR is out of scope: pair the returned `exit_equity_proceeds` with
+   * the equity outflow at close and call `portfolio.mwrXirr`.
+   * @param modelJson - Canonical JSON payload representing the financial model spec consumed by this API.
+   * @param entryMultiple - Entry valuation multiple applied to the entry metric (8.5 = 8.5x).
+   * @param entryMetricNode - Node identifier supplying the entry valuation metric, read at the model's first period.
+   * @param exitMultiple - Exit valuation multiple applied to the exit metric (9.5 = 9.5x).
+   * @param exitMetricNode - Node identifier supplying the exit valuation metric, read at the exit period.
+   * @param exitNetDebtNode - Node identifier supplying net debt outstanding at the exit period, where a modelled amortisation schedule lands.
+   * @param exitPeriod - Model period label at which the sponsor exits, e.g. "2029".
+   * @param sourcesJson - Canonical JSON array of funded debt tranches at close, each {"name", "amount"} in the model currency.
+   * @param transactionFees - Transaction fees and expenses funded at close, in the model currency.
+   * @returns Returns the requested string representation or JSON payload.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  evaluateLbo(
+    modelJson: string,
+    entryMultiple: number,
+    entryMetricNode: string,
+    exitMultiple: number,
+    exitMetricNode: string,
+    exitNetDebtNode: string,
+    exitPeriod: string,
+    sourcesJson: string,
+    transactionFees: number
+  ): string;
+  /**
+   * Weighted-average cost of capital (WACC).
+   *
+   * Blends the required return on equity with the after-tax cost of debt:
+   * `WACC = w_E * r_E + w_D * r_D * (1 - T)`.
+   * @param equityWeight - Equity share of total capital as a decimal fraction (0.6 = 60% equity-funded).
+   * @param costOfEquity - Required return on equity in decimal form, typically from CAPM (0.115 = 11.5%).
+   * @param debtWeight - Debt share of total capital as a decimal fraction; must sum with the equity weight to 1.0.
+   * @param costOfDebt - Pre-tax marginal borrowing yield in decimal form, before the interest tax shield (0.06 = 6%).
+   * @param taxRate - Marginal corporate tax rate as a decimal fraction in [0, 1] (0.25 = 25%).
+   * @returns Returns the blended discount rate as a decimal fraction.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  wacc(
+    equityWeight: number,
+    costOfEquity: number,
+    debtWeight: number,
+    costOfDebt: number,
+    taxRate: number
+  ): number;
+  /**
    * Trace dependencies for a node and return ASCII tree.
    * @param modelJson - Canonical JSON payload representing the model consumed by this API.
    * @param nodeId - Stable node identifier used to select the required domain object.
@@ -6216,6 +6517,24 @@ export interface ScenarioRevalueResult {
   valuation: Record<string, unknown>;
   /**
    * Report exposed by this `ScenarioRevalueResult` value.
+   */
+  report: Record<string, unknown>;
+}
+
+/**
+ * Scenario-attributable profit and loss together with the scenario
+ * application report.
+ */
+export interface ScenarioPnlResult {
+  /**
+   * Profit-and-loss ladder: base-currency `total` plus a `by_position`
+   * map of per-position base-currency amounts. Positions added or removed
+   * by the scenario are zero-filled against the missing side, so
+   * `by_position` always sums to `total`.
+   */
+  pnl: Record<string, unknown>;
+  /**
+   * Report exposed by this `ScenarioPnlResult` value.
    */
   report: Record<string, unknown>;
 }
@@ -6416,6 +6735,43 @@ export interface PortfolioNamespace {
     scenarioJson: string,
     marketJson: string
   ): ScenarioRevalueResult;
+  /**
+   * Compute the profit and loss attributable to a scenario.
+   *
+   * Values the portfolio against the unshocked market and against the
+   * scenario-shocked market, and returns a JS object with structured `pnl`
+   * (base-currency `total` plus `by_position`) and `report` values.
+   * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+   * @param scenarioJson - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
+   * @param marketJson - Canonical market-context JSON supplying the unshocked curves, quotes, and FX data used for the base leg.
+   * @returns Returns the resulting `ScenarioPnlResult` value or WebAssembly handle.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  scenarioPnl(
+    specJson: string,
+    scenarioJson: string,
+    marketJson: string
+  ): ScenarioPnlResult;
+  /**
+   * Compute the profit and loss attributable to a scenario for an
+   * already-built [`Portfolio`] handle.
+   *
+   * Values the portfolio against the unshocked market and against the
+   * scenario-shocked market, and returns a JS object with structured `pnl`
+   * (base-currency `total` plus `by_position`) and `report` values. Positions
+   * added or removed by the scenario are zero-filled against the missing side,
+   * so the drill-down always sums to the total.
+   * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
+   * @param scenarioJson - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
+   * @param marketJson - Canonical market-context JSON supplying the unshocked curves, quotes, and FX data used for the base leg.
+   * @returns Returns the resulting `ScenarioPnlResult` value or WebAssembly handle.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  scenarioPnlBuilt(
+    portfolio: Portfolio,
+    scenarioJson: string,
+    marketJson: string
+  ): ScenarioPnlResult;
   /**
    * Optimize portfolio weights using the LP-based optimizer.
    *

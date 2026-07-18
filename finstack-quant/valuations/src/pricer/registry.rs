@@ -243,6 +243,50 @@ impl PricerRegistry {
             .collect()
     }
 
+    /// Return every distinct [`ModelKey`] that has at least one registered
+    /// pricer, in ascending `ModelKey` order.
+    ///
+    /// This is registry-derived, not enum-derived: a [`ModelKey`] variant with
+    /// no registered pricer is deliberately omitted, so the result describes
+    /// real dispatch coverage rather than the full model vocabulary that
+    /// `ModelKey::iter()` would advertise.
+    ///
+    /// # Returns
+    ///
+    /// Deduplicated model keys sorted ascending, which makes the order
+    /// deterministic independently of the backing [`BTreeMap`]'s
+    /// instrument-major key ordering.
+    pub fn all_models(&self) -> Vec<ModelKey> {
+        let mut models: Vec<ModelKey> = self.pricers.keys().map(|key| key.model).collect();
+        models.sort_unstable();
+        models.dedup();
+        models
+    }
+
+    /// Return every registered [`ModelKey`] grouped by [`InstrumentType`].
+    ///
+    /// Like [`Self::all_models`] this is registry-derived: only instrument
+    /// types that actually have a registered pricer appear as keys, and each
+    /// entry lists only the models that can price that instrument. Both the
+    /// outer map and each model list are in ascending key order, so the
+    /// grouping is deterministic across runs.
+    ///
+    /// # Returns
+    ///
+    /// A [`BTreeMap`] from instrument type to its deduplicated, ascending
+    /// model keys.
+    pub fn all_models_grouped(&self) -> BTreeMap<InstrumentType, Vec<ModelKey>> {
+        let mut grouped: BTreeMap<InstrumentType, Vec<ModelKey>> = BTreeMap::new();
+        for key in self.pricers.keys() {
+            grouped.entry(key.instrument).or_default().push(key.model);
+        }
+        for models in grouped.values_mut() {
+            models.sort_unstable();
+            models.dedup();
+        }
+        grouped
+    }
+
     /// Price an instrument and compute requested metrics through the registered pricer.
     ///
     /// This is the single registry-level pricing entry point. Pass an empty
@@ -367,6 +411,7 @@ impl PricerRegistry {
         let crate::instruments::PricingOptions {
             config: cfg,
             market_history,
+            hazard_recalibration_cache,
             ..
         } = options;
 
@@ -408,6 +453,7 @@ impl PricerRegistry {
             metrics,
             cfg,
             market_history,
+            hazard_recalibration_cache,
             pricer_registry: shared.registry.unwrap_or_else(|| Arc::new(self.clone())),
             base_result,
         })

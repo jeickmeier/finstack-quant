@@ -21,6 +21,7 @@ __all__ = [
     "CreditExposure",
     "PortfolioLossConfig",
     "PortfolioLossResult",
+    "TrancheLossStatistics",
     "RecoverySpec",
     "RecoveryModel",
     "LatentFactorSpec",
@@ -634,6 +635,62 @@ class PortfolioLossResult:
         """
         ...
 
+    @property
+    def confidence(self) -> float:
+        """
+        Return the loss-positive confidence used for `var` and `expected_shortfall`.
+
+        Returns
+        -------
+        float
+            Tail-statistic confidence in ``(0, 1)`` recorded when this
+            `PortfolioLossResult` was aggregated.
+        """
+        ...
+
+    def tranche_loss_statistics(
+        self,
+        attachment: float,
+        detachment: float,
+        pool_notional: float,
+    ) -> TrancheLossStatistics:
+        """
+        Compute tranche loss statistics over this simulated loss distribution.
+
+        Each path's pool loss fraction ``L = loss / pool_notional`` maps through
+        the standard tranche loss function
+        ``clamp(L - attachment, 0, detachment - attachment) / (detachment - attachment)``,
+        and the resulting distribution is aggregated at this result's own
+        :attr:`confidence`.
+
+        Parameters
+        ----------
+        attachment : float
+            Lower tranche boundary as a **fraction** of pool notional in
+            ``[0, 1)``; losses below this point hit more junior tranches. A
+            0-3% equity tranche uses ``0.0``.
+        detachment : float
+            Upper tranche boundary as a **fraction** of pool notional in
+            ``(0, 1]`` and strictly above ``attachment``; losses above this
+            point hit more senior tranches. A 0-3% equity tranche uses ``0.03``.
+        pool_notional : float
+            Total pool notional, finite and strictly positive, in the same
+            scalar unit as the simulated losses.
+
+        Returns
+        -------
+        TrancheLossStatistics
+            Expected loss, VaR, expected shortfall, and breach probabilities
+            for the requested tranche.
+
+        Raises
+        ------
+        ValueError
+            If a boundary lies outside ``[0, 1]``, ``attachment >= detachment``,
+            or ``pool_notional`` is not finite and strictly positive.
+        """
+        ...
+
     def to_json(self) -> str:
         """
         Serialize `PortfolioLossResult` to canonical JSON.
@@ -642,6 +699,164 @@ class PortfolioLossResult:
         -------
         str
             Canonical JSON representation of this `PortfolioLossResult`, suitable for a matching `from_json` call.
+        """
+        ...
+
+class TrancheLossStatistics:
+    """
+    Expected loss, tail statistics, and breach probabilities for one tranche.
+
+    Fraction members are shares of the tranche's own notional; amount members
+    are in the pool-notional unit supplied to
+    :meth:`PortfolioLossResult.tranche_loss_statistics`.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.correlation import TrancheLossStatistics
+    >>> TrancheLossStatistics.__name__
+    'TrancheLossStatistics'
+    """
+
+    @property
+    def attachment(self) -> float:
+        """
+        Return the attachment point for `TrancheLossStatistics`.
+
+        Returns
+        -------
+        float
+            Lower tranche boundary as a fraction of pool notional.
+        """
+        ...
+
+    @property
+    def detachment(self) -> float:
+        """
+        Return the detachment point for `TrancheLossStatistics`.
+
+        Returns
+        -------
+        float
+            Upper tranche boundary as a fraction of pool notional.
+        """
+        ...
+
+    @property
+    def tranche_notional(self) -> float:
+        """
+        Return the tranche notional for `TrancheLossStatistics`.
+
+        Returns
+        -------
+        float
+            ``(detachment - attachment) * pool_notional``.
+        """
+        ...
+
+    @property
+    def expected_loss_fraction(self) -> float:
+        """
+        Return the expected loss fraction for `TrancheLossStatistics`.
+
+        Returns
+        -------
+        float
+            Mean tranche loss as a share of tranche notional, in ``[0, 1]``.
+        """
+        ...
+
+    @property
+    def expected_loss_amount(self) -> float:
+        """
+        Return the expected loss amount for `TrancheLossStatistics`.
+
+        Returns
+        -------
+        float
+            Mean tranche loss in pool-notional units.
+        """
+        ...
+
+    @property
+    def var_fraction(self) -> float:
+        """
+        Return the VaR fraction for `TrancheLossStatistics`.
+
+        Returns
+        -------
+        float
+            Nearest-rank tranche loss share at the distribution's confidence.
+        """
+        ...
+
+    @property
+    def var_amount(self) -> float:
+        """
+        Return the VaR amount for `TrancheLossStatistics`.
+
+        Returns
+        -------
+        float
+            Nearest-rank tranche loss in pool-notional units.
+        """
+        ...
+
+    @property
+    def expected_shortfall_fraction(self) -> float:
+        """
+        Return the expected shortfall fraction for `TrancheLossStatistics`.
+
+        Returns
+        -------
+        float
+            Mean tranche loss share from the VaR observation through the worst path.
+        """
+        ...
+
+    @property
+    def expected_shortfall_amount(self) -> float:
+        """
+        Return the expected shortfall amount for `TrancheLossStatistics`.
+
+        Returns
+        -------
+        float
+            Mean tranche loss amount from the VaR observation through the worst path.
+        """
+        ...
+
+    @property
+    def prob_attachment_breached(self) -> float:
+        """
+        Return the attachment-breach probability for `TrancheLossStatistics`.
+
+        Returns
+        -------
+        float
+            Share of paths whose pool loss fraction strictly exceeds the attachment.
+        """
+        ...
+
+    @property
+    def prob_full_writedown(self) -> float:
+        """
+        Return the full-write-down probability for `TrancheLossStatistics`.
+
+        Returns
+        -------
+        float
+            Share of paths whose pool loss fraction reaches or exceeds the detachment.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize `TrancheLossStatistics` to canonical JSON.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `TrancheLossStatistics`, suitable for a matching `from_json` call.
         """
         ...
 

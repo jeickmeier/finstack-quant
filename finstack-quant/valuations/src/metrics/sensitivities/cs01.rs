@@ -47,9 +47,7 @@
 //!   (short bond, buy protection) gains when spreads widen, so CS01 is
 //!   positive.
 
-use crate::calibration::bumps::hazard::{
-    bump_hazard_shift, bump_hazard_spreads_with_doc_clause_and_valuation_convention,
-};
+use crate::calibration::bumps::hazard::bump_hazard_shift;
 use crate::calibration::bumps::BumpRequest;
 use crate::instruments::credit_derivatives::cds::CdsValuationConvention;
 use crate::market::conventions::ids::CdsDocClause;
@@ -149,23 +147,24 @@ where
     // Central differencing does not need the base PV, but we still probe whether
     // par-spread re-bootstrapping is available so both legs use the same methodology.
     let used_rebootstrap = if discount_id.is_some() && has_par_points {
-        crate::calibration::bumps::hazard::bump_hazard_spreads_with_doc_clause_and_valuation_convention(
-            hazard_ref,
-            base_ctx,
-            &BumpRequest::Parallel(0.0),
-            discount_id,
-            doc_clause,
-            cds_valuation_convention,
-        )
-        .map_err(|e| finstack_quant_core::Error::Calibration {
-            message: format!(
-                "CS01 hazard curve re-calibration failed for '{}': {} \
+        context
+            .bump_hazard_spreads_cached(
+                hazard_ref,
+                base_ctx,
+                &BumpRequest::Parallel(0.0),
+                discount_id,
+                doc_clause,
+                cds_valuation_convention,
+            )
+            .map_err(|e| finstack_quant_core::Error::Calibration {
+                message: format!(
+                    "CS01 hazard curve re-calibration failed for '{}': {} \
                  (cannot compute CS01 under market-standard par spread bump methodology)",
-                hazard_id.as_str(),
-                e
-            ),
-            category: "cs01_rebootstrap".to_string(),
-        })?;
+                    hazard_id.as_str(),
+                    e
+                ),
+                category: "cs01_rebootstrap".to_string(),
+            })?;
         true
     } else {
         false
@@ -175,45 +174,47 @@ where
     let bump_request_down = BumpRequest::Parallel(-bump_bp);
 
     let bumped_hazard_up = if used_rebootstrap {
-        crate::calibration::bumps::hazard::bump_hazard_spreads_with_doc_clause_and_valuation_convention(
-            hazard_ref,
-            base_ctx,
-            &bump_request_up,
-            discount_id,
-            doc_clause,
-            cds_valuation_convention,
-        )
-        .map_err(|e| finstack_quant_core::Error::Calibration {
-            message: format!(
-                "CS01 up-bumped hazard curve re-calibration failed for '{}': {}",
-                hazard_id.as_str(),
-                e
-            ),
-            category: "cs01_rebootstrap".to_string(),
-        })?
+        context
+            .bump_hazard_spreads_cached(
+                hazard_ref,
+                base_ctx,
+                &bump_request_up,
+                discount_id,
+                doc_clause,
+                cds_valuation_convention,
+            )
+            .map_err(|e| finstack_quant_core::Error::Calibration {
+                message: format!(
+                    "CS01 up-bumped hazard curve re-calibration failed for '{}': {}",
+                    hazard_id.as_str(),
+                    e
+                ),
+                category: "cs01_rebootstrap".to_string(),
+            })?
     } else {
-        bump_hazard_shift(hazard_ref, &bump_request_up)?
+        Arc::new(bump_hazard_shift(hazard_ref, &bump_request_up)?)
     };
 
     let bumped_hazard_down = if used_rebootstrap {
-        crate::calibration::bumps::hazard::bump_hazard_spreads_with_doc_clause_and_valuation_convention(
-            hazard_ref,
-            base_ctx,
-            &bump_request_down,
-            discount_id,
-            doc_clause,
-            cds_valuation_convention,
-        )
-        .map_err(|e| finstack_quant_core::Error::Calibration {
-            message: format!(
-                "CS01 down-bumped hazard curve re-calibration failed for '{}': {}",
-                hazard_id.as_str(),
-                e
-            ),
-            category: "cs01_rebootstrap".to_string(),
-        })?
+        context
+            .bump_hazard_spreads_cached(
+                hazard_ref,
+                base_ctx,
+                &bump_request_down,
+                discount_id,
+                doc_clause,
+                cds_valuation_convention,
+            )
+            .map_err(|e| finstack_quant_core::Error::Calibration {
+                message: format!(
+                    "CS01 down-bumped hazard curve re-calibration failed for '{}': {}",
+                    hazard_id.as_str(),
+                    e
+                ),
+                category: "cs01_rebootstrap".to_string(),
+            })?
     } else {
-        bump_hazard_shift(hazard_ref, &bump_request_down)?
+        Arc::new(bump_hazard_shift(hazard_ref, &bump_request_down)?)
     };
 
     let (pv_bumped_up, pv_bumped_down) = context.with_market_scratch(|_, scratch| {
@@ -305,28 +306,29 @@ where
     // Central differencing does not need the base PV, but we still probe whether
     // par-spread re-bootstrapping is available so all buckets use the same methodology.
     let used_rebootstrap = if discount_id.is_some() && has_par_points {
-        bump_hazard_spreads_with_doc_clause_and_valuation_convention(
-            hazard_ref,
-            base_ctx,
-            &BumpRequest::Parallel(0.0),
-            discount_id,
-            doc_clause,
-            cds_valuation_convention,
-        )
-        .map_err(|e| finstack_quant_core::Error::Calibration {
-            message: format!(
-                "CS01 hazard curve re-calibration failed for '{}': {}",
-                hazard_id.as_str(),
-                e
-            ),
-            category: "cs01_rebootstrap".to_string(),
-        })?;
+        context
+            .bump_hazard_spreads_cached(
+                hazard_ref,
+                base_ctx,
+                &BumpRequest::Parallel(0.0),
+                discount_id,
+                doc_clause,
+                cds_valuation_convention,
+            )
+            .map_err(|e| finstack_quant_core::Error::Calibration {
+                message: format!(
+                    "CS01 hazard curve re-calibration failed for '{}': {}",
+                    hazard_id.as_str(),
+                    e
+                ),
+                category: "cs01_rebootstrap".to_string(),
+            })?;
         true
     } else {
         false
     };
 
-    let (series, total) = context.with_market_scratch(|_, scratch| {
+    let (series, total) = context.with_market_scratch(|context, scratch| {
         let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> = Vec::new();
         let mut total_acc = NeumaierAccumulator::new();
 
@@ -337,43 +339,45 @@ where
             let bump_request_down = BumpRequest::Tenors(vec![(t, -bump_bp)]);
 
             let bumped_hazard_up = if used_rebootstrap {
-                bump_hazard_spreads_with_doc_clause_and_valuation_convention(
-                    hazard_ref,
-                    base_ctx,
-                    &bump_request_up,
-                    discount_id,
-                    doc_clause,
-                    cds_valuation_convention,
-                )
-                .map_err(|e| finstack_quant_core::Error::Calibration {
-                    message: format!(
-                        "CS01 bucket '{}' up-bump hazard re-calibration failed: {}",
-                        label, e
-                    ),
-                    category: "cs01_rebootstrap".to_string(),
-                })?
+                context
+                    .bump_hazard_spreads_cached(
+                        hazard_ref,
+                        base_ctx,
+                        &bump_request_up,
+                        discount_id,
+                        doc_clause,
+                        cds_valuation_convention,
+                    )
+                    .map_err(|e| finstack_quant_core::Error::Calibration {
+                        message: format!(
+                            "CS01 bucket '{}' up-bump hazard re-calibration failed: {}",
+                            label, e
+                        ),
+                        category: "cs01_rebootstrap".to_string(),
+                    })?
             } else {
-                bump_hazard_shift(hazard_ref, &bump_request_up)?
+                Arc::new(bump_hazard_shift(hazard_ref, &bump_request_up)?)
             };
 
             let bumped_hazard_down = if used_rebootstrap {
-                bump_hazard_spreads_with_doc_clause_and_valuation_convention(
-                    hazard_ref,
-                    base_ctx,
-                    &bump_request_down,
-                    discount_id,
-                    doc_clause,
-                    cds_valuation_convention,
-                )
-                .map_err(|e| finstack_quant_core::Error::Calibration {
-                    message: format!(
-                        "CS01 bucket '{}' down-bump hazard re-calibration failed: {}",
-                        label, e
-                    ),
-                    category: "cs01_rebootstrap".to_string(),
-                })?
+                context
+                    .bump_hazard_spreads_cached(
+                        hazard_ref,
+                        base_ctx,
+                        &bump_request_down,
+                        discount_id,
+                        doc_clause,
+                        cds_valuation_convention,
+                    )
+                    .map_err(|e| finstack_quant_core::Error::Calibration {
+                        message: format!(
+                            "CS01 bucket '{}' down-bump hazard re-calibration failed: {}",
+                            label, e
+                        ),
+                        category: "cs01_rebootstrap".to_string(),
+                    })?
             } else {
-                bump_hazard_shift(hazard_ref, &bump_request_down)?
+                Arc::new(bump_hazard_shift(hazard_ref, &bump_request_down)?)
             };
 
             scratch.insert_mut(bumped_hazard_up);

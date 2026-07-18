@@ -160,6 +160,37 @@ fn list_standard_metrics_grouped() -> std::collections::BTreeMap<String, Vec<Str
     finstack_quant_valuations::pricer::list_standard_metrics_grouped()
 }
 
+/// List every pricing model key registered in the standard pricer registry.
+///
+/// The list is registry-derived rather than enum-derived: it reflects real
+/// dispatch coverage, so a model with no registered pricer is omitted. The
+/// returned names are the canonical keys accepted by the ``model`` argument of
+/// :func:`price_instrument`.
+///
+/// Returns
+/// -------
+/// list[str]
+///     Canonical model keys (e.g. ``"discounting"``, ``"black76"``), sorted.
+#[pyfunction]
+fn list_models() -> Vec<String> {
+    finstack_quant_valuations::pricer::list_models()
+}
+
+/// List the standard registry's pricing models grouped by instrument type.
+///
+/// Returns a dict ``{ instrument_type: [model_key, ...], ... }``. Only
+/// instrument types with at least one registered pricer appear, and each entry
+/// lists only the models that can actually price that instrument.
+///
+/// Returns
+/// -------
+/// dict[str, list[str]]
+///     Model keys grouped by canonical instrument-type name.
+#[pyfunction]
+fn list_models_grouped() -> std::collections::BTreeMap<String, Vec<String>> {
+    finstack_quant_valuations::pricer::list_models_grouped()
+}
+
 /// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
 ///
 /// Supported ``model`` values are ``"discounting"`` (DF-only PV) and
@@ -214,6 +245,8 @@ fn instrument_cashflows_json(
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(price_instrument, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(price_instrument_with_metrics, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(list_models, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(list_models_grouped, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics_grouped, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(instrument_cashflows_json, m)?)?;

@@ -74,6 +74,6 @@ pub mod pca;
 pub mod types;
 
 // Re-export primary types for convenience
-pub use diebold_li::{DieboldLi, DieboldLiBuilder};
+pub use diebold_li::{nelson_siegel_yields, DieboldLi, DieboldLiBuilder};
 pub use pca::YieldPca;
 pub use types::{FactorTimeSeries, YieldForecast, YieldPanel};

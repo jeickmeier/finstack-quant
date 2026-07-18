@@ -77,8 +77,10 @@ portfolio_result_total_value = _portfolio.portfolio_result_total_value
 portfolio_result_get_metric = _portfolio.portfolio_result_get_metric
 aggregate_metrics = _portfolio.aggregate_metrics
 value_portfolio = _portfolio.value_portfolio
+value_portfolio_typed = _portfolio.value_portfolio_typed
 aggregate_full_cashflows = _portfolio.aggregate_full_cashflows
 apply_scenario_and_revalue = _portfolio.apply_scenario_and_revalue
+scenario_pnl = _portfolio.scenario_pnl
 attribute_portfolio_pnl = _portfolio.attribute_portfolio_pnl
 allocate_weights = _portfolio.allocate_weights
 validate_allocation_json = _portfolio.validate_allocation_json
@@ -249,8 +251,10 @@ __all__: list[str] = [
     "position_what_if",
     "replay_portfolio",
     "roll_effective_spread",
+    "scenario_pnl",
     "twrr_linked",
     "twrr_modified_dietz",
     "validate_allocation_json",
     "value_portfolio",
+    "value_portfolio_typed",
 ]

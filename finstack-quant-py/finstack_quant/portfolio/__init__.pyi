@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 from finstack_quant.core.market_data import MarketContext
@@ -58,10 +60,12 @@ __all__ = [
     "replay_portfolio",
     "position_what_if",
     "roll_effective_spread",
+    "scenario_pnl",
     "twrr_linked",
     "twrr_modified_dietz",
     "validate_allocation_json",
     "value_portfolio",
+    "value_portfolio_typed",
     # factor_model typed result classes
     "FactorContribution",
     "PositionFactorContribution",
@@ -1101,6 +1105,7 @@ def value_portfolio(
     portfolio: Portfolio | str,
     market: MarketContext | str,
     strict_risk: bool = False,
+    metrics: list[str] | None = None,
 ) -> str:
     """
     Value a portfolio.
@@ -1120,6 +1125,9 @@ def value_portfolio(
     strict_risk : bool
         Whether absent or failed risk calculations are treated as errors rather
         than diagnostic output; defaults to ``False``.
+    metrics : list[str] or None, default None
+        Exact metric identifiers to compute. ``None`` requests the standard
+        portfolio risk set; an empty list performs PV-only valuation.
 
     Returns
     -------
@@ -1135,6 +1143,51 @@ def value_portfolio(
     --------
     >>> from finstack_quant.portfolio import value_portfolio
     >>> callable(value_portfolio)
+    True
+    """
+    ...
+
+def value_portfolio_typed(
+    portfolio: Portfolio | str,
+    market: MarketContext | str,
+    strict_risk: bool = False,
+    metrics: list[str] | None = None,
+) -> PortfolioValuation:
+    """
+    Value a portfolio and return a typed result without JSON serialization.
+
+    This is the preferred entry point for in-process Python pipelines. Typed
+    ``Portfolio`` and ``MarketContext`` inputs avoid rebuilding runtime state,
+    while the typed result can be passed directly to :func:`aggregate_metrics`.
+
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        Built portfolio or canonical ``PortfolioSpec`` JSON to value.
+    market : MarketContext or str
+        Market context object or JSON supplying curves, quotes, and FX data.
+    strict_risk : bool, default False
+        Whether absent or failed risk calculations abort the valuation rather
+        than being recorded as diagnostics.
+    metrics : list[str] or None, default None
+        Exact metric identifiers to compute. ``None`` requests the standard
+        portfolio risk set; an empty list performs PV-only valuation.
+
+    Returns
+    -------
+    PortfolioValuation
+        Typed valuation result backed directly by the Rust calculation.
+
+    Raises
+    ------
+    PortfolioError
+        If portfolio construction, market lookup, FX conversion, pricing, or
+        strict risk evaluation fails.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import value_portfolio_typed
+    >>> callable(value_portfolio_typed)
     True
     """
     ...
@@ -1204,6 +1257,56 @@ def apply_scenario_and_revalue(
     --------
     >>> from finstack_quant.portfolio import apply_scenario_and_revalue
     >>> callable(apply_scenario_and_revalue)
+    True
+    """
+    ...
+
+def scenario_pnl(
+    portfolio: Portfolio | str,
+    scenario_json: str,
+    market: MarketContext | str,
+) -> tuple[str, str]:
+    """
+    Compute the profit and loss attributable to a scenario.
+
+    Values the portfolio against the unshocked market and against the
+    scenario-shocked market, then reports the base-currency difference per
+    position and in total. Positions added or removed by the scenario are
+    zero-filled against the missing side, so ``by_position`` always sums to
+    ``total``.
+
+    Returns ``(pnl_json, report_json)``.
+
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        Built portfolio or canonical ``PortfolioSpec`` JSON valued on both the
+        unshocked and shocked legs.
+    scenario_json : str
+        Canonical scenario specification JSON describing the market-data shocks
+        whose profit-and-loss impact is measured.
+    market : MarketContext or str
+        Unshocked market context object or JSON used as the base leg and as the
+        source the scenario operations are applied to.
+
+    Returns
+    -------
+    tuple[str, str]
+        ``(pnl_json, report_json)`` — the ``ScenarioPnl`` ladder (base-currency
+        ``total`` and ``by_position`` amounts) and the scenario application
+        report carrying which operations were applied.
+
+    Raises
+    ------
+    PortfolioError
+        If supplied inputs violate the documented type, shape, finite-value, or
+        domain constraints, or if a position's shocked and base values carry
+        different currencies.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import scenario_pnl
+    >>> callable(scenario_pnl)
     True
     """
     ...
@@ -1391,7 +1494,7 @@ def replay_portfolio(
 def parametric_var_decomposition(
     position_ids: list[str],
     weights: list[float],
-    covariance: list[list[float]],
+    covariance: list[list[float]] | npt.NDArray[np.float64],
     confidence: float = 0.95,
 ) -> dict[str, object]:
     """
@@ -1403,8 +1506,9 @@ def parametric_var_decomposition(
         Position identifiers aligned with ``weights``.
     weights : list[float]
         Portfolio weights or exposures.
-    covariance : list[list[float]]
-        Square covariance matrix aligned with ``position_ids``.
+    covariance : list[list[float]] or numpy.ndarray
+        Square covariance matrix aligned with ``position_ids``. C-contiguous
+        ``float64`` arrays use the direct buffer path.
     confidence : float, default 0.95
         VaR confidence level in ``(0, 1)``.
 
@@ -1431,7 +1535,7 @@ def parametric_var_decomposition(
 def parametric_es_decomposition(
     position_ids: list[str],
     weights: list[float],
-    covariance: list[list[float]],
+    covariance: list[list[float]] | npt.NDArray[np.float64],
     confidence: float = 0.95,
 ) -> dict[str, object]:
     """
@@ -1443,8 +1547,9 @@ def parametric_es_decomposition(
         Position identifiers aligned with ``weights``.
     weights : list[float]
         Portfolio weights or exposures.
-    covariance : list[list[float]]
-        Square covariance matrix aligned with ``position_ids``.
+    covariance : list[list[float]] or numpy.ndarray
+        Square covariance matrix aligned with ``position_ids``. C-contiguous
+        ``float64`` arrays use the direct buffer path.
     confidence : float, default 0.95
         ES confidence level in ``(0, 1)``.
 
@@ -1470,7 +1575,7 @@ def parametric_es_decomposition(
 
 def historical_var_decomposition(
     position_ids: list[str],
-    position_pnls: list[list[float]],
+    position_pnls: list[list[float]] | npt.NDArray[np.float64],
     confidence: float = 0.95,
 ) -> dict[str, object]:
     """
@@ -1480,9 +1585,10 @@ def historical_var_decomposition(
     ----------
     position_ids : list[str]
         Position identifiers.
-    position_pnls : list[list[float]]
-        Matrix of position P&Ls, one scenario row per list and
-        one column per ``position_ids`` entry.
+    position_pnls : list[list[float]] or numpy.ndarray
+        Position-major matrix of P&Ls shaped
+        ``len(position_ids) x n_scenarios``. C-contiguous ``float64`` arrays
+        use the direct buffer path.
     confidence : float, default 0.95
         Historical VaR confidence level in ``(0, 1)``.
 
@@ -4302,7 +4408,7 @@ class DecompositionConfig:
 def parametric_var_decomposition_typed(
     position_ids: list[str],
     weights: list[float],
-    covariance: list[list[float]],
+    covariance: list[list[float]] | npt.NDArray[np.float64],
     confidence: float = 0.95,
     compute_incremental: bool = False,
 ) -> PositionRiskDecomposition:
@@ -4315,9 +4421,10 @@ def parametric_var_decomposition_typed(
         Position identifiers aligned with weights and covariance rows/columns.
     weights : list[float]
         Decimal portfolio weights aligned one-for-one with ``position_ids``.
-    covariance : list[list[float]]
+    covariance : list[list[float]] or numpy.ndarray
         Square covariance matrix aligned to ``position_ids`` in row and column
-        order, using returns at the selected risk horizon.
+        order, using returns at the selected risk horizon. C-contiguous
+        ``float64`` arrays use the direct buffer path.
     confidence : float
         VaR confidence as a decimal probability; defaults to ``0.95``.
     compute_incremental : bool
@@ -4343,7 +4450,7 @@ def parametric_var_decomposition_typed(
 
 def historical_var_decomposition_typed(
     position_ids: list[str],
-    position_pnls: list[list[float]],
+    position_pnls: list[list[float]] | npt.NDArray[np.float64],
     confidence: float = 0.95,
 ) -> PositionRiskDecomposition:
     """
@@ -4353,9 +4460,9 @@ def historical_var_decomposition_typed(
     ----------
     position_ids : list[str]
         Position identifiers aligned with the P&L matrix columns.
-    position_pnls : list[list[float]]
-        Scenario-major matrix of position P&Ls, with each row aligned to
-        ``position_ids``.
+    position_pnls : list[list[float]] or numpy.ndarray
+        Position-major matrix shaped ``len(position_ids) x n_scenarios``.
+        C-contiguous ``float64`` arrays use the direct buffer path.
     confidence : float
         VaR confidence as a decimal probability; defaults to ``0.95``.
 
@@ -4530,7 +4637,7 @@ def position_what_if(
 
 def build_stress_attribution(
     position_ids: list[str],
-    position_pnls: list[list[float]],
+    position_pnls: list[list[float]] | npt.NDArray[np.float64],
     confidence: float = 0.95,
 ) -> StressAttribution:
     """
@@ -4544,9 +4651,10 @@ def build_stress_attribution(
     ----------
     position_ids : list[str]
         Position identifiers, one per row in ``position_pnls``.
-    position_pnls : list[list[float]]
+    position_pnls : list[list[float]] or numpy.ndarray
         Matrix shaped ``len(position_ids) x n_scenarios``.
         Every row must have the same number of finite scenario P&Ls.
+        C-contiguous ``float64`` arrays use the direct buffer path.
     confidence : float, default 0.95
         Tail confidence level in ``(0.5, 1)``. The Rust engine
         selects ``floor((1 - confidence) * n_scenarios)`` tail scenarios.

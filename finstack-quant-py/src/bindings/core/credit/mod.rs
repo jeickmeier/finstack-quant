@@ -1,6 +1,7 @@
 //! Python bindings for `finstack_quant_core::credit`.
 
 mod lgd;
+mod liability_management;
 mod migration;
 mod pd;
 mod recovery_waterfall;
@@ -29,10 +30,18 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     lgd::register(py, &m)?;
     migration::register(py, &m)?;
     recovery_waterfall::register(py, &m)?;
+    liability_management::register(py, &m)?;
 
     let all = PyList::new(
         py,
-        ["scoring", "pd", "lgd", "migration", "recovery_waterfall"],
+        [
+            "scoring",
+            "pd",
+            "lgd",
+            "migration",
+            "recovery_waterfall",
+            "liability_management",
+        ],
     )?;
     m.setattr("__all__", all)?;
     crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;

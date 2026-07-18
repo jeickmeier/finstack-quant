@@ -246,6 +246,8 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         [
             "bond_from_cashflows_json",
             "instrument_cashflows_json",
+            "list_models",
+            "list_models_grouped",
             "list_standard_metrics",
             "list_standard_metrics_grouped",
             "price_instrument",

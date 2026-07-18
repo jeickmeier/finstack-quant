@@ -11,6 +11,7 @@ mod brinson;
 mod factor_model;
 mod json_bridge;
 mod liquidity;
+mod matrix_input;
 mod optimization;
 mod optimization_spec;
 mod performance;
@@ -81,8 +82,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "portfolio_result_get_metric",
         "aggregate_metrics",
         "value_portfolio",
+        "value_portfolio_typed",
         "aggregate_full_cashflows",
         "apply_scenario_and_revalue",
+        "scenario_pnl",
         "attribute_portfolio_pnl",
         "allocate_weights",
         "optimize_portfolio",

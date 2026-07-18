@@ -56,6 +56,9 @@ pub struct PricingOptions {
     pub model: Option<ModelKey>,
     /// Optional explicit pricer registry override.
     pub registry: Option<Arc<PricerRegistry>>,
+    /// Batch-local cache shared by finite-difference credit-risk calculations.
+    pub(crate) hazard_recalibration_cache:
+        Option<Arc<crate::calibration::bumps::hazard::HazardRecalibrationCache>>,
 }
 
 impl PricingOptions {
@@ -92,6 +95,17 @@ impl PricingOptions {
     /// Set an explicit pricer registry override for this pricing request.
     pub fn with_registry(mut self, registry: Arc<PricerRegistry>) -> Self {
         self.registry = Some(registry);
+        self
+    }
+
+    /// Attach a new hazard-recalibration cache for one immutable pricing batch.
+    ///
+    /// Clones of the returned options share the cache. Callers must create a
+    /// fresh cache when the market snapshot changes.
+    pub fn with_new_hazard_recalibration_cache(mut self) -> Self {
+        self.hazard_recalibration_cache = Some(Arc::new(
+            crate::calibration::bumps::hazard::HazardRecalibrationCache::default(),
+        ));
         self
     }
 

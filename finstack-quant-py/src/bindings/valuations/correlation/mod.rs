@@ -12,7 +12,7 @@ use finstack_quant_valuations::correlation::CreditExposure;
 use finstack_quant_valuations::correlation::{
     self as corr, Copula, CopulaSpec, CorrelatedBernoulli, LatentFactorKind, LatentFactorSpec,
     LatentMultiFactor, LatentSingleFactor, LatentTwoFactor, PortfolioLossConfig,
-    PortfolioLossResult, RecoveryModel, RecoverySpec,
+    PortfolioLossResult, RecoveryModel, RecoverySpec, TrancheLossStatistics,
 };
 
 // ---------------------------------------------------------------------------
@@ -992,6 +992,108 @@ impl PyPortfolioLossResult {
         self.inner.expected_shortfall
     }
 
+    #[getter]
+    fn confidence(&self) -> f64 {
+        self.inner.confidence
+    }
+
+    /// Tranche loss statistics for one attachment/detachment pair.
+    ///
+    /// ``attachment`` and ``detachment`` are fractions of pool notional in
+    /// ``[0, 1]`` — a 0-3% equity tranche is ``(0.0, 0.03)``. Each path's
+    /// pool loss fraction ``L`` maps to
+    /// ``clamp(L - attachment, 0, width) / width``, and the resulting
+    /// distribution is aggregated at this result's own ``confidence``.
+    #[pyo3(text_signature = "(attachment, detachment, pool_notional)")]
+    fn tranche_loss_statistics(
+        &self,
+        py: Python<'_>,
+        attachment: f64,
+        detachment: f64,
+        pool_notional: f64,
+    ) -> PyResult<PyTrancheLossStatistics> {
+        py.detach(|| {
+            self.inner
+                .tranche_loss_statistics(attachment, detachment, pool_notional)
+        })
+        .map(|inner| PyTrancheLossStatistics { inner })
+        .map_err(display_to_py)
+    }
+
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(|error| value_error(error.to_string()))
+    }
+}
+
+/// Expected loss, tail statistics, and breach probabilities for one tranche.
+#[pyclass(
+    name = "TrancheLossStatistics",
+    module = "finstack_quant.valuations.correlation",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone, Debug)]
+pub struct PyTrancheLossStatistics {
+    inner: TrancheLossStatistics,
+}
+
+#[pymethods]
+impl PyTrancheLossStatistics {
+    #[getter]
+    fn attachment(&self) -> f64 {
+        self.inner.attachment
+    }
+
+    #[getter]
+    fn detachment(&self) -> f64 {
+        self.inner.detachment
+    }
+
+    #[getter]
+    fn tranche_notional(&self) -> f64 {
+        self.inner.tranche_notional
+    }
+
+    #[getter]
+    fn expected_loss_fraction(&self) -> f64 {
+        self.inner.expected_loss_fraction
+    }
+
+    #[getter]
+    fn expected_loss_amount(&self) -> f64 {
+        self.inner.expected_loss_amount
+    }
+
+    #[getter]
+    fn var_fraction(&self) -> f64 {
+        self.inner.var_fraction
+    }
+
+    #[getter]
+    fn var_amount(&self) -> f64 {
+        self.inner.var_amount
+    }
+
+    #[getter]
+    fn expected_shortfall_fraction(&self) -> f64 {
+        self.inner.expected_shortfall_fraction
+    }
+
+    #[getter]
+    fn expected_shortfall_amount(&self) -> f64 {
+        self.inner.expected_shortfall_amount
+    }
+
+    #[getter]
+    fn prob_attachment_breached(&self) -> f64 {
+        self.inner.prob_attachment_breached
+    }
+
+    #[getter]
+    fn prob_full_writedown(&self) -> f64 {
+        self.inner.prob_full_writedown
+    }
+
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(|error| value_error(error.to_string()))
     }
@@ -1155,6 +1257,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCreditExposure>()?;
     m.add_class::<PyPortfolioLossConfig>()?;
     m.add_class::<PyPortfolioLossResult>()?;
+    m.add_class::<PyTrancheLossStatistics>()?;
     m.add("MAX_PORTFOLIO_LOSS_PATHS", corr::MAX_PORTFOLIO_LOSS_PATHS)?;
     m.add_function(wrap_pyfunction!(correlation_bounds, &m)?)?;
     m.add_function(wrap_pyfunction!(joint_probabilities, &m)?)?;
@@ -1180,6 +1283,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "MAX_PORTFOLIO_LOSS_PATHS",
             "PortfolioLossConfig",
             "PortfolioLossResult",
+            "TrancheLossStatistics",
             "correlation_bounds",
             "joint_probabilities",
             "validate_correlation_matrix",

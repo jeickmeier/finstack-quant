@@ -33,6 +33,9 @@ __all__ = [
     "backtest_forecast",
     "goal_seek",
     "evaluate_dcf",
+    "dcf_sensitivity",
+    "evaluate_lbo",
+    "wacc",
     "run_corporate_analysis",
     "pl_summary_report",
     "credit_assessment_report",
@@ -1341,6 +1344,185 @@ def evaluate_dcf(
     --------
     >>> from finstack_quant.statements_analytics import evaluate_dcf
     >>> dcf = evaluate_dcf(mj, 0.09, tv_json)  # doctest: +SKIP
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+    """
+    ...
+
+def dcf_sensitivity(
+    model: FinancialModelSpec | str,
+    wacc: float,
+    terminal_value_json: str,
+    ufcf_node: str = "ufcf",
+    net_debt_override: float | None = None,
+    wacc_sensitivity_bump: float = 0.01,
+    wacc_denominator_epsilon: float = 0.005,
+    exit_multiple_bump: float = 1.0,
+    mid_year_convention: bool = False,
+    market: MarketContext | str | None = None,
+) -> dict[str, object]:
+    """
+    Rank the headline DCF assumptions by enterprise-value impact.
+
+    The statement model is evaluated once and each shocked point re-runs only
+    the DCF. Tornado entries are deltas versus the baseline enterprise value,
+    sorted by descending absolute swing. Shocks that would collapse the
+    ``1/(wacc - g)`` terminal denominator are clamped and the clamp is reported.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string; metadata must include ``currency``.
+    wacc : float
+        Baseline weighted average cost of capital as a decimal (``0.10`` = 10%).
+    terminal_value_json : str
+        JSON ``TerminalValueSpec``; selects whether terminal growth or the exit
+        multiple is the second shocked parameter.
+    ufcf_node : str
+        Node ID holding unlevered free cash flow for the forecast periods.
+    net_debt_override : float or None
+        Flat net-debt amount used instead of the model-derived balance-sheet bridge.
+    wacc_sensitivity_bump : float
+        Absolute shock applied to WACC and to terminal growth, as a decimal
+        (``0.01`` = +/-100 bp).
+    wacc_denominator_epsilon : float
+        Minimum spread preserved between WACC and terminal growth so the terminal
+        denominator stays defined, as a decimal (``0.005`` = 50 bp).
+    exit_multiple_bump : float
+        Absolute shock applied to an exit multiple, in turns (``1.0`` = +/-1.0x).
+    mid_year_convention : bool
+        Use mid-year discounting on every re-run when ``True``.
+    market : MarketContext or str or None
+        ``MarketContext`` object or JSON string for curve-based discounting.
+
+    Returns
+    -------
+    dict[str, object]
+        Dict with ``baseline_enterprise_value``, ``currency``, ``entries``
+        (list of ``{"parameter_id", "downside", "upside"}``), ``wacc_down``,
+        ``wacc_down_clamped``, ``terminal_growth_up``, ``terminal_growth_up_clamped``.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import dcf_sensitivity
+    >>> callable(dcf_sensitivity)
+    True
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+    """
+    ...
+
+def evaluate_lbo(
+    model: FinancialModelSpec | str,
+    entry_multiple: float,
+    entry_metric_node: str,
+    exit_multiple: float,
+    exit_metric_node: str,
+    exit_net_debt_node: str,
+    exit_period: str,
+    sources: list[tuple[str, float]],
+    transaction_fees: float = 0.0,
+) -> dict[str, float | bool | str]:
+    """
+    Evaluate a leveraged-buyout transaction against a statement model.
+
+    Entry enterprise value is priced at the model's first period, the sponsor
+    equity check is solved as the sources-and-uses residual, and exit proceeds
+    are the exit enterprise value less the modelled net debt at ``exit_period``.
+    IRR is out of scope: pair ``exit_equity_proceeds`` with the equity outflow at
+    close and call :func:`finstack_quant.portfolio.mwr_xirr`.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string; metadata must include ``currency``.
+    entry_multiple : float
+        Entry valuation multiple applied to the entry metric (``8.5`` = 8.5x).
+    entry_metric_node : str
+        Node ID supplying the entry valuation metric, read at the model's first
+        period (typically ``"ebitda"``).
+    exit_multiple : float
+        Exit valuation multiple applied to the exit metric (``9.5`` = 9.5x).
+    exit_metric_node : str
+        Node ID supplying the exit valuation metric, read at ``exit_period``.
+    exit_net_debt_node : str
+        Node ID supplying net debt outstanding at ``exit_period``, where a modelled
+        tranche amortisation schedule lands.
+    exit_period : str
+        Period label at which the sponsor exits, e.g. ``"2029"`` or ``"2029Q4"``.
+    sources : list[tuple[str, float]]
+        Funded debt tranches at close as ``(name, amount)`` pairs in the model
+        currency; amounts must be finite and non-negative.
+    transaction_fees : float
+        Transaction fees and expenses funded at close, in the model currency.
+
+    Returns
+    -------
+    dict[str, float | bool | str]
+        Dict with ``entry_enterprise_value``, ``entry_metric``, ``debt_total``,
+        ``equity_check``, ``sources_total``, ``uses_total``, ``sources_uses_balanced``,
+        ``exit_enterprise_value``, ``exit_metric``, ``exit_net_debt``,
+        ``exit_equity_proceeds``, ``moic``, and ``currency``.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import evaluate_lbo
+    >>> callable(evaluate_lbo)
+    True
+
+    Raises
+    ------
+    ValueError
+        If supplied inputs violate the documented type, shape, finite-value, or domain constraints.
+    """
+    ...
+
+def wacc(
+    equity_weight: float,
+    cost_of_equity: float,
+    debt_weight: float,
+    cost_of_debt: float,
+    tax_rate: float,
+) -> float:
+    """
+    Weighted-average cost of capital (WACC).
+
+    Blends the required return on equity with the after-tax cost of debt:
+    ``WACC = w_E * r_E + w_D * r_D * (1 - T)``. The ``(1 - T)`` factor is the
+    interest tax shield (Modigliani & Miller, 1963); equity carries no shield.
+
+    Parameters
+    ----------
+    equity_weight : float
+        Equity share of total capital as a decimal fraction (``0.6`` = 60%
+        equity-funded); must be non-negative.
+    cost_of_equity : float
+        Required return on equity as a decimal, typically from CAPM (``0.115`` = 11.5%).
+    debt_weight : float
+        Debt share of total capital as a decimal fraction (``0.4`` = 40% debt-funded);
+        must be non-negative and sum with ``equity_weight`` to ``1.0``.
+    cost_of_debt : float
+        Pre-tax marginal borrowing yield as a decimal, before the interest tax
+        shield (``0.06`` = 6%).
+    tax_rate : float
+        Marginal corporate tax rate as a decimal fraction in ``[0, 1]`` (``0.25`` = 25%).
+
+    Returns
+    -------
+    float
+        Blended discount rate as a decimal fraction.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import wacc
+    >>> callable(wacc)
+    True
 
     Raises
     ------

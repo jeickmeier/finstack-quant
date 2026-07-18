@@ -1,7 +1,7 @@
 //! Tests for complex multi-operation integration scenarios.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{build_periods, Date};
+use finstack_quant_core::dates::{build_periods, Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -107,8 +107,14 @@ fn test_fx_equity_curve_combo() {
 fn test_statements_rate_bindings_curve() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
+    // The day count is set explicitly: the binding below resolves the "1Y"
+    // tenor to a year fraction and rejects tenors past the last knot (t = 1.0).
+    // Under Act365F the 1Y pillar lands exactly on t = 1.0; leaving the builder
+    // default (Act360) would place it at 365/360 = 1.0139 and take the binding
+    // out of range.
     let curve = DiscountCurve::builder("USD_SOFR")
         .base_date(base_date)
+        .day_count(DayCount::Act365F)
         .knots(vec![(0.0, 1.0), (1.0, 0.98)])
         .build()
         .unwrap();
@@ -183,12 +189,18 @@ fn test_statements_rate_bindings_curve() {
         AmountOrScalar::Amount(_) => panic!("Expected scalar"),
     }
 
-    // Verify rate was updated from curve
+    // Verify rate was updated from the shocked curve. The base 1Y zero is
+    // -ln(0.98) and the +100bp parallel shock shifts it by exactly 0.01, so the
+    // bound rate is analytically determined.
     let rate = model.get_node("InterestRate").unwrap();
     let first_rate = rate.values.as_ref().unwrap().values().next().unwrap();
     match first_rate {
         AmountOrScalar::Scalar(s) => {
-            assert!(*s > 0.02, "Rate should be updated from shocked curve");
+            let expected = -(0.98_f64.ln()) + 0.01;
+            assert!(
+                (s - expected).abs() < 1e-12,
+                "Rate should be updated from shocked curve: expected {expected}, got {s}",
+            );
         }
         AmountOrScalar::Amount(_) => panic!("Expected scalar"),
     }
@@ -298,11 +310,12 @@ fn test_conflicting_operations_last_wins() {
     // Both shocks applied sequentially: +25bp then +50bp = equivalent to +75bp
     let curve = market.get_discount("USD_SOFR").unwrap();
     let df = curve.df(1.0);
-    // Original DF(1Y) = 0.98
-    // Solve-to-par with settlement_days=0 (for synthetic curve re-calibration)
-    let expected_df = 0.972180;
+    // Original DF(1Y) = 0.98. Parallel bumps shift continuously-compounded
+    // zeros by exactly the requested size and compose additively, so two
+    // sequential shocks of +25bp and +50bp are exactly a +75bp shift.
+    let expected_df = 0.98 * (-0.0075_f64 * 1.0).exp();
     assert!(
-        (df - expected_df).abs() < 1e-4,
+        (df - expected_df).abs() < 1e-12,
         "Expected DF ≈ {:.6} after sequential +25bp and +50bp shocks, got {:.6}",
         expected_df,
         df

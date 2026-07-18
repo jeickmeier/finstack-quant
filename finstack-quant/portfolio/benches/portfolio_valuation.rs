@@ -32,7 +32,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::metrics::aggregate_metrics;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::valuation::{revalue_affected, value_portfolio};
+use finstack_quant_portfolio::valuation::{
+    revalue_affected, value_portfolio, PortfolioValuationOptions, RequestedMetrics,
+};
 use finstack_quant_portfolio::MarketFactorKey;
 use finstack_quant_portfolio::PortfolioBuilder;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::{
@@ -1221,23 +1223,26 @@ fn bench_portfolio_with_metrics(c: &mut Criterion) {
 // ============================================================================
 
 fn bench_portfolio_scaling(c: &mut Criterion) {
-    let mut group = c.benchmark_group("portfolio_scaling");
+    let mut group = c.benchmark_group("portfolio_pv_scaling");
     let market = create_market_context();
     let config = FinstackConfig::default();
+    let options = PortfolioValuationOptions {
+        strict_risk: false,
+        metrics: RequestedMetrics::Only(Vec::new()),
+    };
 
-    {
-        let num_positions = &250;
-        let portfolio = create_institutional_portfolio(*num_positions);
+    for num_positions in [250usize, 3_000, 25_000] {
+        let portfolio = create_institutional_portfolio(num_positions);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}pos", num_positions)),
-            num_positions,
+            &num_positions,
             |b, _| {
                 b.iter(|| {
                     value_portfolio(
                         black_box(&portfolio),
                         black_box(&market),
                         black_box(&config),
-                        &Default::default(),
+                        black_box(&options),
                     )
                 });
             },

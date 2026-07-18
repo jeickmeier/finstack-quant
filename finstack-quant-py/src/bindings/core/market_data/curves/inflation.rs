@@ -80,6 +80,19 @@ impl PyInflationCurve {
         self.inner.cpi_with_lag(t)
     }
 
+    /// Principal indexation ratio at year fraction `t`.
+    ///
+    /// Returns ``cpi_with_lag(t) / base_cpi`` -- the factor by which the
+    /// notional of an inflation-linked security is uplifted at `t`. This is the
+    /// curve-level view of the ``inflation_index_ratio`` reported per cashflow
+    /// by the valuations layer. No deflation floor is applied.
+    ///
+    /// Raises ``ValueError`` if the curve's base CPI is not strictly positive.
+    #[pyo3(text_signature = "(self, t)")]
+    fn index_ratio(&self, t: f64) -> PyResult<f64> {
+        self.inner.index_ratio(t).map_err(core_to_py)
+    }
+
     /// Annualized inflation rate between `t1` and `t2` using CAGR.
     #[pyo3(text_signature = "(self, t1, t2)")]
     fn inflation_rate(&self, t1: f64, t2: f64) -> f64 {

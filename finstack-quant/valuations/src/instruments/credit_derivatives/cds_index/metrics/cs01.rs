@@ -28,7 +28,7 @@
 //! [canonical]: crate::metrics::sensitivities::cs01
 //! [`CDSIndex::cs01`]: crate::instruments::credit_derivatives::cds_index::CDSIndex::cs01
 
-use crate::calibration::bumps::hazard::{bump_hazard_shift, bump_hazard_spreads};
+use crate::calibration::bumps::hazard::bump_hazard_shift;
 use crate::calibration::bumps::BumpRequest;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds_index::{CDSIndex, IndexPricing};
@@ -123,20 +123,28 @@ impl MetricCalculator for Cs01HazardCalculator {
 /// `BumpRequest::Tenors` shock at a tenor with no matching par point is a
 /// no-op, so summing all standard buckets reproduces the parallel bump.
 fn bump_index_credit_curve_at_tenor(
+    context: &MetricContext,
     hazard: &HazardCurve,
     base_ctx: &MarketContext,
     discount_id: &CurveId,
     t: f64,
     bp: f64,
-) -> Result<HazardCurve> {
+) -> Result<Arc<HazardCurve>> {
     let req = BumpRequest::Tenors(vec![(t, bp)]);
     if hazard.par_spread_points().next().is_some() {
-        match bump_hazard_spreads(hazard, base_ctx, &req, Some(discount_id)) {
+        match context.bump_hazard_spreads_cached(
+            hazard,
+            base_ctx,
+            &req,
+            Some(discount_id),
+            None,
+            None,
+        ) {
             Ok(curve) => Ok(curve),
-            Err(_) => bump_hazard_shift(hazard, &req),
+            Err(_) => bump_hazard_shift(hazard, &req).map(Arc::new),
         }
     } else {
-        bump_hazard_shift(hazard, &req)
+        bump_hazard_shift(hazard, &req).map(Arc::new)
     }
 }
 
@@ -192,7 +200,8 @@ impl MetricCalculator for CdsIndexBucketedCs01Calculator {
             let mut out = base_ctx.clone();
             for id in &credit_ids {
                 let hazard = base_ctx.get_hazard(id.as_str())?;
-                out = out.insert(bump_index_credit_curve_at_tenor(
+                out.insert_mut(bump_index_credit_curve_at_tenor(
+                    context,
                     hazard.as_ref(),
                     base_ctx,
                     &discount_id,

@@ -16,6 +16,8 @@ use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::market_data::term_structures::ParInterp;
 use finstack_quant_core::market_data::term_structures::Seniority;
 use finstack_quant_core::types::CurveId;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 struct HazardParRecalibration<'a> {
     hazard: &'a HazardCurve,
@@ -26,6 +28,90 @@ struct HazardParRecalibration<'a> {
     cds_valuation_convention: Option<CdsValuationConvention>,
     quote_id_prefix: &'static str,
     spread_bump: Option<&'a BumpRequest>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum HazardBumpKey {
+    None,
+    Parallel(u64),
+    Tenors(Vec<(u64, u64)>),
+}
+
+impl From<Option<&BumpRequest>> for HazardBumpKey {
+    fn from(bump: Option<&BumpRequest>) -> Self {
+        match bump {
+            None => Self::None,
+            Some(BumpRequest::Parallel(bp)) => Self::Parallel(bp.to_bits()),
+            Some(BumpRequest::Tenors(tenors)) => Self::Tenors(
+                tenors
+                    .iter()
+                    .map(|(tenor, bp)| (tenor.to_bits(), bp.to_bits()))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct HazardRecalibrationKey {
+    hazard_id: String,
+    discount_id: String,
+    recovery_rate: u64,
+    doc_clause: CdsDocClause,
+    cds_valuation_convention: Option<CdsValuationConvention>,
+    quote_id_prefix: &'static str,
+    bump: HazardBumpKey,
+}
+
+type CachedHazardCurve = Arc<Mutex<Option<Arc<HazardCurve>>>>;
+
+/// Batch-local cache for hazard-curve recalibrations used by spread risk.
+///
+/// A cache instance is scoped to one immutable market snapshot. Each key uses
+/// its own mutex so concurrent portfolio positions requesting the same curve
+/// bump share the in-flight calibration while different bumps can proceed in
+/// parallel. Failed calibrations are not cached, preserving the original error.
+#[derive(Default)]
+pub(crate) struct HazardRecalibrationCache {
+    entries: Mutex<HashMap<HazardRecalibrationKey, CachedHazardCurve>>,
+}
+
+impl HazardRecalibrationCache {
+    fn get_or_recalibrate(
+        &self,
+        request: HazardParRecalibration<'_>,
+    ) -> finstack_quant_core::Result<Arc<HazardCurve>> {
+        let key = HazardRecalibrationKey {
+            hazard_id: request.hazard.id().to_string(),
+            discount_id: request.discount_id.to_string(),
+            recovery_rate: request.recovery_rate.to_bits(),
+            doc_clause: request.doc_clause,
+            cds_valuation_convention: request.cds_valuation_convention,
+            quote_id_prefix: request.quote_id_prefix,
+            bump: request.spread_bump.into(),
+        };
+        let entry = {
+            let mut entries = match self.entries.lock() {
+                Ok(entries) => entries,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            Arc::clone(
+                entries
+                    .entry(key)
+                    .or_insert_with(|| Arc::new(Mutex::new(None))),
+            )
+        };
+        let mut cached = match entry.lock() {
+            Ok(cached) => cached,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(curve) = cached.as_ref() {
+            return Ok(Arc::clone(curve));
+        }
+        let curve = Arc::new(recalibrate_from_par_spreads(request)?);
+        *cached = Some(Arc::clone(&curve));
+        Ok(curve)
+    }
 }
 
 fn require_discount_id(discount_id: Option<&CurveId>) -> finstack_quant_core::Result<&CurveId> {
@@ -143,6 +229,32 @@ fn recalibrate_from_par_spreads(
     Ok(new_curve)
 }
 
+pub(crate) fn bump_hazard_spreads_cached(
+    cache: Option<&HazardRecalibrationCache>,
+    hazard: &HazardCurve,
+    context: &MarketContext,
+    bump: &BumpRequest,
+    discount_id: Option<&CurveId>,
+    doc_clause: Option<CdsDocClause>,
+    cds_valuation_convention: Option<CdsValuationConvention>,
+) -> finstack_quant_core::Result<Arc<HazardCurve>> {
+    let discount_id = require_discount_id(discount_id)?;
+    let request = HazardParRecalibration {
+        hazard,
+        context,
+        discount_id,
+        recovery_rate: hazard.recovery_rate(),
+        doc_clause: doc_clause.unwrap_or(CdsDocClause::IsdaNa),
+        cds_valuation_convention,
+        quote_id_prefix: "BUMP",
+        spread_bump: Some(bump),
+    };
+    match cache {
+        Some(cache) => cache.get_or_recalibrate(request),
+        None => recalibrate_from_par_spreads(request).map(Arc::new),
+    }
+}
+
 /// Bump hazard curve by shocking par spreads and re-calibrating.
 ///
 /// This is the standard "Risk Re-calibration" approach. It extracts par
@@ -220,17 +332,16 @@ pub fn bump_hazard_spreads_with_doc_clause_and_valuation_convention(
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_quant_core::Result<HazardCurve> {
-    let discount_id = require_discount_id(discount_id)?;
-    recalibrate_from_par_spreads(HazardParRecalibration {
+    bump_hazard_spreads_cached(
+        None,
         hazard,
         context,
+        bump,
         discount_id,
-        recovery_rate: hazard.recovery_rate(),
-        doc_clause: doc_clause.unwrap_or(CdsDocClause::IsdaNa),
+        doc_clause,
         cds_valuation_convention,
-        quote_id_prefix: "BUMP",
-        spread_bump: Some(bump),
-    })
+    )
+    .map(|curve| curve.as_ref().clone())
 }
 
 /// Bump hazard curve directly (model hazard shift), without recalibration.

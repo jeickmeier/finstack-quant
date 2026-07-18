@@ -379,6 +379,31 @@ def convertible_bond(idx: int) -> tuple[str, dict]:
     }}
 
 
+def acme_bond() -> dict:
+    """The "ACME 4.25% 2034" USD fixed-rate bond wire payload used by tear sheets.
+
+    Pairs with :func:`_shared.market.usd_ois_2026`, whose curve id this
+    references. Returns a fresh dict on each call, so callers may mutate it.
+    """
+    return {"type": "bond", "spec": {
+        "id": "ACME 4.25% 2034",
+        "notional": {"amount": "10000000", "currency": "USD"},
+        "issue_date": "2024-03-15",
+        "maturity": "2034-03-15",
+        "cashflow_spec": {"Fixed": {
+            "coupon_type": "Cash", "rate": 0.0425,
+            "freq": {"count": 6, "unit": "months"},
+            "dc": "Thirty360", "bdc": "following",
+            "calendar_id": "weekends_only", "stub": "None",
+            "end_of_month": False, "payment_lag_days": 0,
+        }},
+        "discount_curve_id": "USD-OIS",
+        "call_put": None,
+        "attributes": {"tags": [], "meta": {}},
+        "pricing_overrides": {},
+    }}
+
+
 def instrument_description(instrument_spec: dict) -> str:
     """One-line analyst-readable label for a portfolio position."""
     itype = instrument_spec["type"]

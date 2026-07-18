@@ -10,5 +10,22 @@
     "ebt",
     "taxes",
     "net_income"
+  ],
+  "BS_NODES": [
+    "cash",
+    "ar",
+    "inventory",
+    "ppe_net",
+    "total_assets",
+    "ap",
+    "total_debt",
+    "retained_earnings",
+    "total_liab_equity"
+  ],
+  "CF_NODES": [
+    "cfo",
+    "cfi",
+    "cff",
+    "net_change_cash"
   ]
 }

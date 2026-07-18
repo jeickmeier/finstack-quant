@@ -91,6 +91,24 @@ fn cholesky_solve(py: Python<'_>, chol: Vec<Vec<f64>>, b: Vec<f64>) -> PyResult<
     Ok(x)
 }
 
+/// Apply a lower-triangular factor L to a vector z, returning L z.
+///
+/// This is the Cholesky "apply" step that turns independent standard normals into
+/// correlated normals: if A = L L^T and z ~ N(0, I), then L z ~ N(0, A).
+///
+/// Accepts L as `list[list[float]]` (only the lower triangle is read; the upper
+/// triangle is assumed zero) and z as `list[float]`. Returns L z as `list[float]`.
+///
+/// Raises ``ValueError`` when L is not square, and ``CholeskyError`` when z's length
+/// does not match L's dimension.
+#[pyfunction]
+#[pyo3(text_signature = "(l, z)")]
+fn apply_lower_triangular(py: Python<'_>, l: Vec<Vec<f64>>, z: Vec<f64>) -> PyResult<Vec<f64>> {
+    let (flat, n) = flatten_matrix(l)?;
+    py.detach(|| linalg::apply_lower_triangular(&flat, n, &z))
+        .map_err(cholesky_err)
+}
+
 /// Validate that a matrix is a valid correlation matrix.
 ///
 /// Checks diagonal elements are 1, off-diagonal entries are in [-1, 1],
@@ -117,6 +135,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "Linear algebra utilities: Cholesky decomposition, correlation matrices.",
     )?;
 
+    m.add_function(wrap_pyfunction!(apply_lower_triangular, &m)?)?;
     m.add_function(wrap_pyfunction!(cholesky_decomposition, &m)?)?;
     m.add_function(wrap_pyfunction!(cholesky_solve, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_correlation_matrix, &m)?)?;
@@ -130,6 +149,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(
         py,
         [
+            "apply_lower_triangular",
             "cholesky_decomposition",
             "cholesky_solve",
             "validate_correlation_matrix",

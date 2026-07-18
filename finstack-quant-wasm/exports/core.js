@@ -20,6 +20,8 @@ export const core = {
   FxConversionPolicy: wasm.FxConversionPolicy,
   FxRateResult: wasm.FxRateResult,
   FxMatrix: wasm.FxMatrix,
+  nelsonSiegelYields: wasm.nelsonSiegelYields,
+  applyLowerTriangular: wasm.applyLowerTriangular,
   choleskyDecomposition: wasm.choleskyDecomposition,
   choleskySolve: wasm.choleskySolve,
   choleskyDecompositionFlat: wasm.choleskyDecompositionFlat,
@@ -48,4 +50,6 @@ export const core = {
   neumaierSumArray: wasm.neumaierSumArray,
   countConsecutive: wasm.countConsecutive,
   countConsecutiveArray: wasm.countConsecutiveArray,
+  analyzeExchangeOffer: wasm.analyzeExchangeOffer,
+  analyzeLme: wasm.analyzeLme,
 };

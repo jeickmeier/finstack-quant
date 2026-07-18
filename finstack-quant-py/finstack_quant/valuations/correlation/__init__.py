@@ -31,6 +31,7 @@ CreditExposure = _corr.CreditExposure
 MAX_PORTFOLIO_LOSS_PATHS = _corr.MAX_PORTFOLIO_LOSS_PATHS
 PortfolioLossConfig = _corr.PortfolioLossConfig
 PortfolioLossResult = _corr.PortfolioLossResult
+TrancheLossStatistics = _corr.TrancheLossStatistics
 correlation_bounds = _corr.correlation_bounds
 joint_probabilities = _corr.joint_probabilities
 validate_correlation_matrix = _corr.validate_correlation_matrix
@@ -53,6 +54,7 @@ __all__: list[str] = [
     "PortfolioLossResult",
     "RecoveryModel",
     "RecoverySpec",
+    "TrancheLossStatistics",
     "cholesky_decompose",
     "correlation_bounds",
     "joint_probabilities",

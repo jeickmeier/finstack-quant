@@ -6,6 +6,7 @@
 //! ## Test Organization
 //!
 //! - `bootstrap` - Determinism and smoke tests for curve bootstrapping
+//! - `bumps` - Bump-path invariants (zero-shock identity, faithfulness, additivity)
 //! - `repricing` - Repricing accuracy tests for calibrated curves
 //! - `config` - Configuration helpers and validation rules
 //! - `finstack_config` - Finstack Quant-specific config integration
@@ -27,6 +28,7 @@ mod base_correlation;
 mod bloomberg_accuracy;
 mod bootstrap;
 mod builder;
+mod bumps;
 mod config;
 mod diagnostics;
 mod explainability;

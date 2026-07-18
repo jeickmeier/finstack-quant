@@ -62,13 +62,15 @@ fn test_tenor_exact_match() {
     // It does NOT create a suffixed ID like "USD-OIS_bump_25bp" anymore.
     let bumped_curve = market.get_discount("USD-OIS").unwrap();
     let df_5y = bumped_curve.df(5.0);
-    // For an exact-match tenor shock, the 5Y node must move in the expected direction.
-    // We assert directional correctness and a tight-ish numerical band for determinism.
+    // An exact-match tenor shock shifts the continuously-compounded zero at the
+    // matched node by exactly the requested size:
+    //   DF_bumped(5) = DF(5) · exp(-25/10_000 · 5)
     assert!(df_5y < 0.90, "DF(5Y) should decrease after +25bp shock");
+    let expected_df_5y = 0.90 * (-0.0025_f64 * 5.0).exp();
     assert!(
-        (df_5y - 0.888705).abs() < 1e-4,
+        (df_5y - expected_df_5y).abs() < 1e-12,
         "Expected DF(5Y) ≈ {:.6}, got {:.6}",
-        0.888705,
+        expected_df_5y,
         df_5y
     );
 }

@@ -2,14 +2,6 @@
 
 use super::currency::infer_currency_from_id;
 use super::BumpRequest;
-use crate::calibration::api::schema::{InflationCurveParams, StepParams};
-use crate::calibration::config::CalibrationMethod;
-use crate::calibration::step_runtime;
-use crate::calibration::CalibrationConfig;
-use crate::market::conventions::ids::InflationSwapConventionId;
-use crate::market::quotes::ids::QuoteId;
-use crate::market::quotes::inflation::InflationQuote;
-use crate::market::quotes::market_quote::MarketQuote;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::InflationCurve;
@@ -46,120 +38,104 @@ pub fn observation_lag_from_curve(curve: &InflationCurve) -> String {
     }
 }
 
-/// Bump inflation curve by shocking implied zero-coupon swap rates and re-calibrating.
+/// Bump an inflation curve by shifting its implied zero-coupon inflation rates.
 ///
-/// Converts the current inflation curve back to implied ZCIS rates,
-/// applies shocks to those rates, and re-executes the inflation bootstrapper.
+/// The shock is applied directly on the curve's own knots. For each knot time
+/// `t` the implied zero-coupon inflation rate is recovered and shifted, then
+/// the CPI level is rebuilt from the shifted rate:
+///
+/// ```text
+/// r(t)     = (CPI(t) / CPI_base)^(1/t) − 1
+/// CPI'(t)  = CPI_base · (1 + r(t) + δ)^t,        δ = bp / 10_000
+/// ```
+///
+/// # Guarantees
+///
+/// * **Zero-shock identity** — with `δ = 0` the reconstruction collapses to
+///   `CPI_base · ((CPI(t)/CPI_base)^(1/t))^t = CPI(t)`, reproducing the curve to
+///   floating-point round-off at every knot.
+/// * **Faithfulness** — an `X bp` parallel bump moves the implied zero-coupon
+///   inflation rate by exactly `X bp` at every knot.
+/// * **Additivity** — `+X bp` followed by `−X bp` returns to the base curve.
+///
+/// # Why not imply-and-re-bootstrap
+///
+/// This function previously implied ZCIS quotes, placed them at
+/// `base + round(t · 365.25)` days, and re-ran the inflation bootstrapper. That
+/// round trip was not the identity — the synthetic maturity grid did not map
+/// back to the original knot times, and the bootstrapper applied its own
+/// observation-lag, day-count, and schedule conventions that the implied rate
+/// never accounted for. A `0 bp` shock moved `CPI(1y)` from 307.50 to 309.57
+/// (+0.67%), and a 25 bp shock realized 101 bp. This mirrors the defect that
+/// affected [`bump_discount_curve_synthetic`](super::bump_discount_curve_synthetic);
+/// the fix is the same — remove the round trip rather than reconcile three
+/// separate convention sets.
 ///
 /// # Arguments
 ///
-/// * `curve` - Existing inflation curve from which zero-coupon inflation swap
-///   rates are implied before re-bootstrap.
-/// * `context` - Market context supplying dependencies for the inflation
-///   calibration step.
+/// * `curve` - Existing inflation curve whose knots are shifted in implied
+///   zero-coupon inflation-rate space.
+/// * `_context` - Unused. Retained for signature compatibility with the other
+///   bump entry points; no calibration step runs any more.
 /// * `bump` - Parallel or tenor-specific inflation-rate shock in
 ///   [`BumpRequest`] basis point units.
-/// * `discount_id` - Discount curve identifier used to present-value implied
-///   zero-coupon inflation swaps.
-/// * `as_of` - Valuation/base date used by the reconstructed calibration step.
-/// * `currency` - Inflation-index currency used to select conventions because
-///   `InflationCurve` lacks explicit currency metadata.
-/// * `observation_lag` - Original index observation lag, such as `"3M"` or
-///   `"NONE"`, preserved by the re-calibration.
+/// * `_discount_id` - Unused. No zero-coupon inflation swaps are present-valued
+///   any more.
+/// * `_as_of` - Unused. The shift is applied on the curve's own time grid.
+/// * `_currency` - Unused. No inflation swap conventions are selected any more.
+/// * `_observation_lag` - Unused. The curve's own indexation lag is preserved
+///   by the rebuild.
+///
+/// # Errors
+///
+/// Returns an error when the shifted knots fail inflation-curve validation.
 pub fn bump_inflation_rates(
     curve: &InflationCurve,
-    context: &MarketContext,
+    _context: &MarketContext,
     bump: &BumpRequest,
-    discount_id: &finstack_quant_core::types::CurveId,
-    as_of: Date,
-    currency: Currency,
-    observation_lag: &str,
+    _discount_id: &finstack_quant_core::types::CurveId,
+    _as_of: Date,
+    _currency: Currency,
+    _observation_lag: &str,
 ) -> finstack_quant_core::Result<InflationCurve> {
-    let base_date = as_of;
-    let curve_id = curve.id();
-
-    // Map currency to standard inflation convention ID
-    let convention_id = match currency {
-        Currency::USD => InflationSwapConventionId::new("USD-CPI"),
-        Currency::EUR => InflationSwapConventionId::new("EUR-HICP"),
-        Currency::GBP => InflationSwapConventionId::new("UK-RPI"),
-        _ => InflationSwapConventionId::new(format!("{}-CPI", currency)), // Best guess fallback
-    };
-
     let base_cpi = curve.base_cpi();
-    let knots = curve.knots(); // time in years
+    let knots = curve.knots();
+    let cpi_levels = curve.cpi_levels();
 
-    let mut quotes = Vec::new();
-
-    for &t in knots {
-        if t <= 0.0 {
-            continue;
-        } // Skip base point
-
-        let cpi = curve.cpi(t);
-        // Implied zero-coupon rate: (CPI(T) / Base)^(1/T) - 1
-        let implied_rate = (cpi / base_cpi).powf(1.0 / t) - 1.0;
-
-        let mut bumped_rate = implied_rate;
-
-        // Apply bump
-        match bump {
-            BumpRequest::Parallel(bp) => {
-                bumped_rate += bp * 1e-4;
+    let bumped: Vec<(f64, f64)> = knots
+        .iter()
+        .zip(cpi_levels.iter())
+        .map(|(&t, &cpi)| {
+            // The t <= 0 anchor carries the base CPI level and no rate
+            // information, so it passes through untouched.
+            if t <= 0.0 {
+                return (t, cpi);
             }
-            BumpRequest::Tenors(targets) => {
-                for (target_t, bp) in targets {
-                    // 0.1 year tolerance
-                    if (t - *target_t).abs() < 0.1 {
-                        bumped_rate += bp * 1e-4;
-                    }
-                }
-            }
-        }
 
-        let maturity_days = (t * 365.25).round() as i64;
-        let maturity = base_date + time::Duration::days(maturity_days);
+            let shift = match bump {
+                BumpRequest::Parallel(bp) => bp * 1e-4,
+                BumpRequest::Tenors(targets) => targets
+                    .iter()
+                    // 0.1 year tolerance, matching the previous selection rule.
+                    .filter(|(target_t, _)| (t - *target_t).abs() < 0.1)
+                    .map(|(_, bp)| bp * 1e-4)
+                    .sum(),
+            };
 
-        let id = QuoteId::new(format!("{}-ZCIS-{}", curve_id.as_str(), maturity));
-        quotes.push(InflationQuote::InflationSwap {
-            id,
-            maturity,
-            rate: bumped_rate,
-            index: curve_id.as_str().to_string(), // Use curve ID as index name? Or generic?
-            convention: convention_id.clone(),
-        });
-    }
+            let implied_rate = (cpi / base_cpi).powf(1.0 / t) - 1.0;
+            (t, base_cpi * (1.0 + implied_rate + shift).powf(t))
+        })
+        .collect();
 
-    if quotes.is_empty() {
-        // No knots to bump? return clone
-        return Ok(curve.clone());
-    }
-
-    let market_quotes: Vec<MarketQuote> = quotes.into_iter().map(MarketQuote::Inflation).collect();
-    let params = InflationCurveParams {
-        curve_id: curve_id.clone(),
-        currency,
-        base_date,
-        discount_curve_id: discount_id.clone(),
-        index: curve_id.as_str().to_string(),
-        observation_lag: observation_lag.to_string(),
-        base_cpi,
-        notional: 1.0,
-        method: CalibrationMethod::Bootstrap,
-        interpolation: Default::default(),
-        seasonal_factors: None,
-    };
-
-    // Re-calibration uses the default CalibrationConfig — see the "Calibration
-    // config — known limitation" note in this module's docs (`bumps/mod.rs`).
-    let cfg = CalibrationConfig::default();
-    let step = StepParams::Inflation(params.clone());
-    let (ctx, _report) =
-        step_runtime::execute_params_and_apply(&step, &market_quotes, context, &cfg)?;
-    Ok(ctx
-        .get_inflation_curve(params.curve_id.as_str())?
-        .as_ref()
-        .clone())
+    InflationCurve::builder(curve.id().clone())
+        .base_cpi(base_cpi)
+        .base_date(curve.base_date())
+        .day_count(curve.day_count())
+        .indexation_lag_months(curve.indexation_lag_months())
+        .interp(curve.interp_style())
+        .extrapolation(curve.extrapolation())
+        .knots(bumped)
+        .build()
 }
 
 #[cfg(test)]

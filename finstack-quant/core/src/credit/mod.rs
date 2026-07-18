@@ -10,11 +10,14 @@
 //!   scale mapping.
 //! - [`recovery_waterfall`][crate::credit::recovery_waterfall]: absolute-priority
 //!   allocation of a distributable estate across restructuring claims.
+//! - [`liability_management`][crate::credit::liability_management]: hold-versus-tender
+//!   economics for distressed exchanges and issuer liability management exercises.
 
 /// Loss Given Default: seniority recovery distributions, workout LGD,
 /// downturn adjustments, and EAD computation.
 pub mod lgd;
 
+pub mod liability_management;
 pub mod migration;
 pub mod pd;
 pub mod recovery_waterfall;

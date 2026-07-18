@@ -124,8 +124,9 @@ pub use interp::{
     LogLinearStrategy, MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy,
 };
 pub use linalg::{
-    apply_correlation, build_correlation_matrix, cholesky_correlation, cholesky_decomposition,
-    symmetric_eigen, validate_correlation_matrix, CholeskyError, CorrelationFactor,
+    apply_correlation, apply_lower_triangular, build_correlation_matrix, cholesky_correlation,
+    cholesky_decomposition, symmetric_eigen, validate_correlation_matrix, CholeskyError,
+    CorrelationFactor,
 };
 pub use probability::{correlation_bounds, joint_probabilities, CorrelatedBernoulli};
 pub use random::sobol::{SobolRng, MAX_SOBOL_DIMENSION};

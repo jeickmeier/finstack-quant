@@ -8,9 +8,10 @@ Run with verbose output::
 
     uv run pytest finstack-quant-py/benchmarks/bench_bindings.py -m perf --benchmark-only -v
 
-Compare against a saved baseline::
+Save and compare a portfolio baseline::
 
-    uv run pytest finstack-quant-py/benchmarks/bench_bindings.py -m perf --benchmark-only --benchmark-compare
+    mise run python-bench-portfolio-baseline
+    mise run python-bench-portfolio-compare
 """
 
 from __future__ import annotations
@@ -20,31 +21,10 @@ from itertools import accumulate
 import json
 import math
 
+import numpy as np
 import pytest
 
-from finstack_quant.analytics import (
-    CagrBasis,
-    Performance,
-    beta,
-    cagr,
-    calmar,
-    comp_sum,
-    drawdown_details,
-    expected_shortfall,
-    kurtosis,
-    max_drawdown,
-    mean_return,
-    period_stats,
-    rolling_sharpe,
-    sharpe,
-    simple_returns,
-    skewness,
-    sortino,
-    to_drawdown_series,
-    tracking_error,
-    value_at_risk,
-    volatility,
-)
+from finstack_quant.analytics import Performance
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, FxMatrix, MarketContext
@@ -61,8 +41,6 @@ from finstack_quant.margin import (
 )
 from finstack_quant.monte_carlo import (
     EuropeanPricer,
-    GbmProcess,
-    HestonProcess,
     LsmcPricer,
     McEngine,
     PathDependentPricer,
@@ -73,12 +51,15 @@ from finstack_quant.monte_carlo import (
 )
 from finstack_quant.portfolio import (
     Portfolio,
-    PortfolioValuation,
     aggregate_full_cashflows,
     aggregate_metrics,
     build_portfolio_from_spec,
+    build_stress_attribution,
+    historical_var_decomposition_typed,
+    parametric_var_decomposition_typed,
     parse_portfolio_spec,
     value_portfolio,
+    value_portfolio_typed,
 )
 from finstack_quant.scenarios import (
     build_from_template,
@@ -126,9 +107,16 @@ from finstack_quant.valuations.instruments import list_standard_metrics, validat
 RETURNS_10K: list[float] = [0.0004 + (i % 17) * 1e-5 for i in range(10_000)]
 RETURNS_10K_ALT: list[float] = [0.0003 + (i % 13) * 1.2e-5 for i in range(10_000)]
 PRICES_10K: list[float] = list(accumulate(RETURNS_10K, lambda p, r: p * (1.0 + r), initial=100.0))
+PRICES_10K_ALT: list[float] = list(accumulate(RETURNS_10K_ALT, lambda p, r: p * (1.0 + r), initial=100.0))
 
 DATES_252 = [date(2024, 1, 1) + timedelta(days=i) for i in range(252)]
 DATES_10K = [date(2000, 1, 1) + timedelta(days=i) for i in range(10_000)]
+
+_PERFORMANCE_10K = Performance.from_arrays(
+    DATES_10K,
+    [PRICES_10K[:10_000], PRICES_10K_ALT[:10_000]],
+    ["ASSET", "BENCH"],
+)
 
 DATA_10K: list[float] = [float(i) * 0.01 for i in range(10_000)]
 
@@ -262,6 +250,23 @@ def _build_bench_market() -> MarketContext:
 _BENCH_SPEC_JSON_500 = _build_portfolio_spec_json(500)
 _BENCH_MARKET = _build_bench_market()
 _BENCH_MARKET_JSON = _BENCH_MARKET.to_json()
+
+_RISK_MATRIX_SIZE = 256
+_RISK_POSITION_IDS = [f"RISK-{i}" for i in range(_RISK_MATRIX_SIZE)]
+_RISK_WEIGHTS = [1.0 / _RISK_MATRIX_SIZE] * _RISK_MATRIX_SIZE
+_RISK_COVARIANCE_LIST = [
+    [0.04 if row == col else 0.002 for col in range(_RISK_MATRIX_SIZE)] for row in range(_RISK_MATRIX_SIZE)
+]
+_RISK_COVARIANCE_NUMPY = np.asarray(_RISK_COVARIANCE_LIST, dtype=np.float64)
+
+_HISTORICAL_POSITION_COUNT = 200
+_HISTORICAL_SCENARIO_COUNT = 1_000
+_HISTORICAL_POSITION_IDS = [f"HIST-{i}" for i in range(_HISTORICAL_POSITION_COUNT)]
+_HISTORICAL_PNLS_LIST = [
+    [((position + 1) * ((scenario % 31) - 15)) / 10_000.0 for scenario in range(_HISTORICAL_SCENARIO_COUNT)]
+    for position in range(_HISTORICAL_POSITION_COUNT)
+]
+_HISTORICAL_PNLS_NUMPY = np.asarray(_HISTORICAL_PNLS_LIST, dtype=np.float64)
 
 
 def _build_model_spec() -> FinancialModelSpec:
@@ -423,61 +428,54 @@ class TestAnalyticsBenchmarks:
         benchmark(Performance.from_arrays, dates, [prices], ["BENCH"])
 
     def test_sharpe(self, benchmark) -> None:
-        ann_ret = mean_return(RETURNS_10K) * 252
-        ann_vol = volatility(RETURNS_10K, annualize=True)
-        benchmark(sharpe, ann_ret, ann_vol)
+        benchmark(_PERFORMANCE_10K.sharpe)
 
     def test_to_drawdown_series(self, benchmark) -> None:
-        benchmark(to_drawdown_series, RETURNS_10K)
+        benchmark(_PERFORMANCE_10K.drawdown_series)
 
     def test_rolling_sharpe(self, benchmark) -> None:
-        benchmark(rolling_sharpe, RETURNS_10K, DATES_10K, 63)
+        benchmark(_PERFORMANCE_10K.rolling_sharpe, 0, 63)
 
     def test_volatility(self, benchmark) -> None:
-        benchmark(volatility, RETURNS_10K)
+        benchmark(_PERFORMANCE_10K.volatility)
 
     def test_simple_returns(self, benchmark) -> None:
-        benchmark(simple_returns, PRICES_10K)
+        benchmark(_PERFORMANCE_10K.returns)
 
     def test_comp_sum(self, benchmark) -> None:
-        benchmark(comp_sum, RETURNS_10K)
+        benchmark(_PERFORMANCE_10K.cumulative_returns)
 
     def test_value_at_risk(self, benchmark) -> None:
-        benchmark(value_at_risk, RETURNS_10K)
+        benchmark(_PERFORMANCE_10K.value_at_risk)
 
     def test_expected_shortfall(self, benchmark) -> None:
-        benchmark(expected_shortfall, RETURNS_10K)
+        benchmark(_PERFORMANCE_10K.expected_shortfall)
 
     def test_skewness_kurtosis(self, benchmark) -> None:
         def _skew_kurt():
-            s = skewness(RETURNS_10K)
-            k = kurtosis(RETURNS_10K)
+            s = _PERFORMANCE_10K.skewness()
+            k = _PERFORMANCE_10K.kurtosis()
             return s, k
 
         benchmark(_skew_kurt)
 
     def test_sortino(self, benchmark) -> None:
-        benchmark(sortino, RETURNS_10K)
+        benchmark(_PERFORMANCE_10K.sortino)
 
     def test_beta(self, benchmark) -> None:
-        benchmark(beta, RETURNS_10K, RETURNS_10K_ALT)
+        benchmark(_PERFORMANCE_10K.beta)
 
     def test_tracking_error(self, benchmark) -> None:
-        benchmark(tracking_error, RETURNS_10K, RETURNS_10K_ALT)
+        benchmark(_PERFORMANCE_10K.tracking_error)
 
     def test_drawdown_details(self, benchmark) -> None:
-        dd = to_drawdown_series(RETURNS_10K)
-        dates_dd = [date(2000, 1, 1) + timedelta(days=i) for i in range(len(dd))]
-        benchmark(drawdown_details, dd, dates_dd)
+        benchmark(_PERFORMANCE_10K.drawdown_details, 0, 5)
 
     def test_calmar(self, benchmark) -> None:
-        dd = to_drawdown_series(RETURNS_10K)
-        cg = cagr(RETURNS_10K, CagrBasis.factor(252.0))
-        md = max_drawdown(dd)
-        benchmark(calmar, cg, md)
+        benchmark(_PERFORMANCE_10K.calmar)
 
     def test_period_stats(self, benchmark) -> None:
-        benchmark(period_stats, RETURNS_10K[:252])
+        benchmark(_PERFORMANCE_10K.period_stats, 0, "monthly")
 
     def test_count_consecutive(self, benchmark) -> None:
         benchmark(count_consecutive, RETURNS_10K)
@@ -585,12 +583,6 @@ class TestMonteCarloBenchmarks:
             )
 
         benchmark.pedantic(_price, rounds=5, warmup_rounds=1)
-
-    def test_gbm_process_construction(self, benchmark) -> None:
-        benchmark(GbmProcess, 0.05, 0.0, 0.2)
-
-    def test_heston_process_construction(self, benchmark) -> None:
-        benchmark(HestonProcess, 0.05, 0.0, 0.04, 2.0, 0.04, 0.3, -0.7)
 
     def test_european_pricer(self, benchmark) -> None:
         pricer = EuropeanPricer(num_paths=10_000, seed=42)
@@ -863,8 +855,7 @@ class TestPortfolioCompoundWorkflow:
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
 
         def _run():
-            val_json = value_portfolio(portfolio, _BENCH_MARKET)
-            val = PortfolioValuation.from_json(val_json)
+            val = value_portfolio_typed(portfolio, _BENCH_MARKET)
             agg = aggregate_metrics(val, "USD", _BENCH_MARKET, "2025-01-15")
             cf = aggregate_full_cashflows(portfolio, _BENCH_MARKET)
             return val, agg, cf
@@ -875,14 +866,68 @@ class TestPortfolioCompoundWorkflow:
         """One-time cost of building a typed Portfolio from a 500-position spec."""
         benchmark(Portfolio.from_spec, _BENCH_SPEC_JSON_500)
 
-    def test_value_portfolio_typed_500(self, benchmark) -> None:
-        """Pure value_portfolio on the typed fast path, 500 positions."""
+    def test_value_portfolio_typed_inputs_json_result_500(self, benchmark) -> None:
+        """Typed inputs with the backward-compatible JSON result, 500 positions."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
         benchmark(value_portfolio, portfolio, _BENCH_MARKET)
+
+    def test_value_portfolio_typed_result_500(self, benchmark) -> None:
+        """Typed input and output path, avoiding valuation JSON serialization."""
+        portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
+        benchmark(value_portfolio_typed, portfolio, _BENCH_MARKET)
 
     def test_value_portfolio_json_500(self, benchmark) -> None:
         """Pure value_portfolio on the JSON path, 500 positions."""
         benchmark(value_portfolio, _BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON)
+
+
+@pytest.mark.perf
+class TestPortfolioRiskInputBenchmarks:
+    """Portfolio risk bindings across list and contiguous NumPy inputs."""
+
+    def test_parametric_typed_list_256x256(self, benchmark) -> None:
+        benchmark(
+            parametric_var_decomposition_typed,
+            _RISK_POSITION_IDS,
+            _RISK_WEIGHTS,
+            _RISK_COVARIANCE_LIST,
+        )
+
+    def test_parametric_typed_numpy_256x256(self, benchmark) -> None:
+        benchmark(
+            parametric_var_decomposition_typed,
+            _RISK_POSITION_IDS,
+            _RISK_WEIGHTS,
+            _RISK_COVARIANCE_NUMPY,
+        )
+
+    def test_historical_typed_list_200x1000(self, benchmark) -> None:
+        benchmark(
+            historical_var_decomposition_typed,
+            _HISTORICAL_POSITION_IDS,
+            _HISTORICAL_PNLS_LIST,
+        )
+
+    def test_historical_typed_numpy_200x1000(self, benchmark) -> None:
+        benchmark(
+            historical_var_decomposition_typed,
+            _HISTORICAL_POSITION_IDS,
+            _HISTORICAL_PNLS_NUMPY,
+        )
+
+    def test_stress_attribution_list_200x1000(self, benchmark) -> None:
+        benchmark(
+            build_stress_attribution,
+            _HISTORICAL_POSITION_IDS,
+            _HISTORICAL_PNLS_LIST,
+        )
+
+    def test_stress_attribution_numpy_200x1000(self, benchmark) -> None:
+        benchmark(
+            build_stress_attribution,
+            _HISTORICAL_POSITION_IDS,
+            _HISTORICAL_PNLS_NUMPY,
+        )
 
 
 # ===================================================================

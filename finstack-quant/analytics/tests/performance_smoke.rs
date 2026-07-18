@@ -211,3 +211,60 @@ fn performance_smoke_asserts_fiscal_lookback_and_zero_variance_invariants() {
         .expect("lookback");
     assert!(lookbacks.fytd.expect("fytd present")[0] > 0.0);
 }
+
+#[test]
+fn returns_accessors_reproduce_cumulative_returns_and_zero_rf_excess_returns() {
+    let dates = calendar_days(
+        Date::from_calendar_date(2025, Month::January, 1).expect("d0"),
+        60,
+    );
+    let perf = Performance::new(
+        dates.clone(),
+        vec![
+            ramp(dates.len(), 100.0, 0.35),
+            ramp(dates.len(), 80.0, -0.1),
+        ],
+        vec!["AAA".to_string(), "BBB".to_string()],
+        Some("BBB"),
+        PeriodKind::Daily,
+    )
+    .expect("perf");
+
+    let panel = perf.returns();
+    assert_eq!(panel.len(), perf.ticker_names().len());
+
+    // The panel accessor and the checked per-ticker accessor agree.
+    for (idx, series) in panel.iter().enumerate() {
+        let single = perf.returns_for_ticker(idx).expect("valid ticker index");
+        assert_eq!(&single, series);
+        // Span-aware: one return per active date for this ticker.
+        assert_eq!(
+            series.len(),
+            perf.active_dates_for_ticker(idx)
+                .expect("valid ticker index")
+                .len()
+        );
+    }
+
+    // Compounding the raw returns reproduces the cumulative return series.
+    let cumulative = perf.cumulative_returns();
+    for (series, cum) in panel.iter().zip(cumulative.iter()) {
+        assert_eq!(series.len(), cum.len());
+        let mut growth = 1.0_f64;
+        for (&r, &c) in series.iter().zip(cum.iter()) {
+            growth *= 1.0 + r;
+            assert!(
+                (growth - 1.0 - c).abs() < 1e-12,
+                "compounded returns must match cumulative_returns"
+            );
+        }
+    }
+
+    // The `excess_returns(zeros)` workaround is now unnecessary: it is exactly
+    // what `returns()` yields.
+    let rf = vec![0.0; perf.active_dates().len()];
+    assert_eq!(perf.excess_returns(&rf, None), panel);
+
+    // Out-of-range indices are rejected rather than silently returning empty.
+    assert!(perf.returns_for_ticker(perf.ticker_names().len()).is_err());
+}

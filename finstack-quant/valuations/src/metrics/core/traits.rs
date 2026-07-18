@@ -131,6 +131,10 @@ pub struct MetricContext {
     /// the full market container separately for each Greek/DV01 calculator.
     market_scratch: Option<MarketContext>,
 
+    /// Batch-local hazard recalibrations shared across position metric contexts.
+    hazard_recalibration_cache:
+        Option<Arc<crate::calibration::bumps::hazard::HazardRecalibrationCache>>,
+
     /// Optional market history for historical scenario revaluation (e.g., Historical VaR).
     ///
     /// This is intentionally **not** stored inside `finstack_quant_core::MarketContext` to keep
@@ -240,6 +244,7 @@ impl MetricContext {
             instrument,
             curves,
             market_scratch: None,
+            hazard_recalibration_cache: None,
             market_history: None,
             pricing_model: None,
             pricer_registry: None,
@@ -327,6 +332,39 @@ impl MetricContext {
     #[inline]
     pub(crate) fn get_market_history(&self) -> Option<&MarketHistory> {
         self.market_history.as_deref()
+    }
+
+    /// Attach the batch-local hazard recalibration cache.
+    pub(crate) fn set_hazard_recalibration_cache(
+        &mut self,
+        cache: Option<Arc<crate::calibration::bumps::hazard::HazardRecalibrationCache>>,
+    ) {
+        self.hazard_recalibration_cache = cache;
+    }
+
+    /// Recalibrate a hazard curve, reusing an identical batch-local result.
+    pub(crate) fn bump_hazard_spreads_cached(
+        &self,
+        hazard: &finstack_quant_core::market_data::term_structures::HazardCurve,
+        market: &MarketContext,
+        bump: &crate::calibration::bumps::BumpRequest,
+        discount_id: Option<&CurveId>,
+        doc_clause: Option<crate::market::conventions::ids::CdsDocClause>,
+        cds_valuation_convention: Option<
+            crate::instruments::credit_derivatives::cds::CdsValuationConvention,
+        >,
+    ) -> finstack_quant_core::Result<
+        Arc<finstack_quant_core::market_data::term_structures::HazardCurve>,
+    > {
+        crate::calibration::bumps::hazard::bump_hazard_spreads_cached(
+            self.hazard_recalibration_cache.as_deref(),
+            hazard,
+            market,
+            bump,
+            discount_id,
+            doc_clause,
+            cds_valuation_convention,
+        )
     }
 
     /// Clones the pricing dispatch pair (model + registry) for use in sub-contexts.

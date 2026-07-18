@@ -850,6 +850,38 @@ impl JsFxDeltaVolSurface {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Dynamic term structures (Nelson-Siegel / Diebold-Li)
+// ---------------------------------------------------------------------------
+
+/// Evaluate the static Nelson-Siegel (1987) yield curve for one factor triple.
+///
+/// This is the Diebold-Li cross-sectional equation for a single date:
+/// `y(tau) = b1 + b2 * s(tau) + b3 * (s(tau) - exp(-lambda * tau))` with
+/// `s(tau) = (1 - exp(-lambda * tau)) / (lambda * tau)`. Returns one yield per
+/// tenor, in decimal units and in input order.
+/// @param lambda - Exponential decay parameter for tenors in years; must be finite and greater than zero (0.7308 is the years-equivalent of Diebold-Li's 0.0609 months value).
+/// @param level - Nelson-Siegel beta1, the long-run level factor in decimal yield units such as 0.06 for 6%.
+/// @param slope - Nelson-Siegel beta2, the slope factor (negative of the short-minus-long spread) in decimal yield units.
+/// @param curvature - Nelson-Siegel beta3, the hump-shaped curvature factor in decimal yield units.
+/// @param tenors - Maturities in years, each finite and non-negative; output order matches this array.
+#[wasm_bindgen(js_name = nelsonSiegelYields)]
+pub fn nelson_siegel_yields(
+    lambda: f64,
+    level: f64,
+    slope: f64,
+    curvature: f64,
+    tenors: &[f64],
+) -> Result<Box<[f64]>, JsValue> {
+    finstack_quant_core::market_data::dtsm::nelson_siegel_yields(
+        lambda,
+        [level, slope, curvature],
+        tenors,
+    )
+    .map(Vec::into_boxed_slice)
+    .map_err(to_js_err)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

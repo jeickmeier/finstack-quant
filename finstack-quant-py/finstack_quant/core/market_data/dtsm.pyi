@@ -25,6 +25,7 @@ from typing import Any
 __all__ = [
     "diebold_li_fit_factors",
     "diebold_li_forecast",
+    "nelson_siegel_yields",
     "yield_pca_fit",
     "yield_pca_scenario",
 ]
@@ -129,6 +130,62 @@ def diebold_li_forecast(
     --------
     >>> from finstack_quant.core.market_data.dtsm import diebold_li_forecast
     >>> fc = diebold_li_forecast(tenors, yields_matrix, horizon=6)  # doctest: +SKIP
+    """
+    ...
+
+def nelson_siegel_yields(
+    lambda_decay: float,
+    factors: tuple[float, float, float],
+    tenors: list[float],
+    /,
+) -> list[float]:
+    """
+    Evaluate the static Nelson-Siegel (1987) curve for one factor triple.
+
+    This is the Diebold-Li cross-sectional equation for a single date::
+
+        y(tau) = beta1 + beta2 * s(tau) + beta3 * (s(tau) - exp(-lambda * tau))
+        s(tau) = (1 - exp(-lambda * tau)) / (lambda * tau)
+
+    Use it to reconstruct a fitted or forecast curve from the factors returned
+    by :func:`diebold_li_fit_factors` or :func:`diebold_li_forecast`.
+
+    Parameters
+    ----------
+    lambda_decay : float
+        Exponential decay parameter for tenors **in years**; must be finite and
+        strictly positive. ``0.7308`` is the years-equivalent of Diebold-Li's
+        canonical ``0.0609`` months value and places the curvature peak at
+        ≈2.45 years. The runtime binding exposes this positionally as
+        ``lambda``; the stub uses ``lambda_decay`` because ``lambda`` is a
+        Python keyword.
+    factors : tuple[float, float, float]
+        The triple ``(beta1, beta2, beta3)`` = ``(level, slope, curvature)`` in
+        decimal yield units (``0.045`` for 4.5%). All three must be finite.
+    tenors : list[float]
+        Maturities in years, each finite and non-negative. Order is preserved in
+        the output; no sorting or de-duplication is applied.
+
+    Returns
+    -------
+    list[float]
+        Fitted yields in decimal units, one per input tenor and in the same
+        order as ``tenors``.
+
+    Raises
+    ------
+    ValueError
+        If ``lambda_decay`` is non-positive or non-finite, a factor is
+        non-finite, or a tenor is negative or non-finite.
+
+    Sources
+    -------
+    See ``docs/REFERENCES.md#diebold-li-2006``.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data.dtsm import nelson_siegel_yields
+    >>> ys = nelson_siegel_yields(0.7308, (0.06, -0.02, 0.01), [1.0, 10.0])  # doctest: +SKIP
     """
     ...
 

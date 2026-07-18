@@ -40,6 +40,7 @@ use crate::bindings::factor_model::credit::PyCreditFactorModel;
 use crate::errors::{core_to_py, display_to_py, portfolio_to_py, serde_json_to_py};
 
 use super::json_bridge::{deserialize_json, serialize_json};
+use super::matrix_input::{extract_position_pnls, extract_square_matrix};
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -48,14 +49,6 @@ use super::json_bridge::{deserialize_json, serialize_json};
 /// Convert `Vec<String>` of position ids into the Rust newtype.
 fn to_position_ids(ids: Vec<String>) -> Vec<PositionId> {
     ids.into_iter().map(PositionId::new).collect()
-}
-
-/// Forward to the shared `factor_model::flatten_square_matrix` and remap the
-/// `core::Error::Validation` shape into a `PyValueError` so the same matrix
-/// validation diagnostics surface from both the Python and WASM bindings.
-fn flatten_square_matrix(matrix: Vec<Vec<f64>>, n: usize, label: &str) -> PyResult<Vec<f64>> {
-    fm::flatten_square_matrix(matrix, n, label)
-        .map_err(|e| crate::errors::value_error(e.to_string()))
 }
 
 /// Serialize a Python object to JSON via `json.dumps`, then deserialize into `T`.
@@ -110,41 +103,6 @@ fn parse_position_changes(
             },
         )
         .collect()
-}
-
-fn transpose_position_pnls(
-    position_ids: Vec<String>,
-    position_pnls: Vec<Vec<f64>>,
-) -> PyResult<(Vec<PositionId>, Vec<f64>, usize)> {
-    let n = position_ids.len();
-    if position_pnls.len() != n {
-        return Err(crate::errors::value_error(format!(
-            "position_pnls must have {n} rows (one per position), got {}",
-            position_pnls.len()
-        )));
-    }
-    if n == 0 {
-        return Ok((to_position_ids(position_ids), Vec::new(), 0));
-    }
-
-    let n_scenarios = position_pnls[0].len();
-    for (i, row) in position_pnls.iter().enumerate() {
-        if row.len() != n_scenarios {
-            return Err(crate::errors::value_error(format!(
-                "position_pnls row {i} has {} scenarios, expected {n_scenarios}",
-                row.len()
-            )));
-        }
-    }
-
-    let mut flat = Vec::with_capacity(n_scenarios * n);
-    for scenario in 0..n_scenarios {
-        for row in &position_pnls {
-            flat.push(row[scenario]);
-        }
-    }
-
-    Ok((to_position_ids(position_ids), flat, n_scenarios))
 }
 
 /// Convert a Rust `DecompositionMethod` to a stable Python string.
@@ -1813,12 +1771,12 @@ fn parametric_var_decomposition_typed(
     py: Python<'_>,
     position_ids: Vec<String>,
     weights: Vec<f64>,
-    covariance: Vec<Vec<f64>>,
+    covariance: &Bound<'_, PyAny>,
     confidence: f64,
     compute_incremental: bool,
 ) -> PyResult<PyPositionRiskDecomposition> {
     let n = weights.len();
-    let cov_flat = flatten_square_matrix(covariance, n, "covariance")?;
+    let cov_flat = extract_square_matrix(covariance, n, "covariance")?;
     let ids = to_position_ids(position_ids);
 
     let mut config = DecompositionConfig::parametric_95();
@@ -1843,45 +1801,17 @@ fn parametric_var_decomposition_typed(
 fn historical_var_decomposition_typed(
     py: Python<'_>,
     position_ids: Vec<String>,
-    position_pnls: Vec<Vec<f64>>,
+    position_pnls: &Bound<'_, PyAny>,
     confidence: f64,
 ) -> PyResult<PyPositionRiskDecomposition> {
     let n = position_ids.len();
-    if position_pnls.len() != n {
-        return Err(crate::errors::value_error(format!(
-            "position_pnls must have {n} rows (one per position), got {}",
-            position_pnls.len()
-        )));
-    }
-    if n == 0 {
-        let ids = to_position_ids(position_ids);
-        let config = DecompositionConfig::historical(confidence);
-        let result = py
-            .detach(move || HistoricalPositionDecomposer.decompose_from_pnls(&[], &ids, 0, &config))
-            .map_err(core_to_py)?;
-        return Ok(PyPositionRiskDecomposition::from_inner(result));
-    }
-
-    let n_scenarios = position_pnls[0].len();
-    for (i, row) in position_pnls.iter().enumerate() {
-        if row.len() != n_scenarios {
-            return Err(crate::errors::value_error(format!(
-                "position_pnls row {i} has {} scenarios, expected {n_scenarios}",
-                row.len()
-            )));
-        }
-    }
+    let position_pnls = extract_position_pnls(position_pnls, n)?;
+    let n_scenarios = position_pnls.n_scenarios();
 
     let config = DecompositionConfig::historical(confidence);
     let result = py
         .detach(move || {
-            // Transpose to row-major scenarios x positions layout expected by the engine.
-            let mut flat = Vec::with_capacity(n_scenarios * n);
-            for s in 0..n_scenarios {
-                for row in &position_pnls {
-                    flat.push(row[s]);
-                }
-            }
+            let flat = position_pnls.into_scenario_major(n);
             let ids = to_position_ids(position_ids);
             HistoricalPositionDecomposer.decompose_from_pnls(&flat, &ids, n_scenarios, &config)
         })
@@ -2021,12 +1951,18 @@ fn position_what_if(
 fn build_stress_attribution(
     py: Python<'_>,
     position_ids: Vec<String>,
-    position_pnls: Vec<Vec<f64>>,
+    position_pnls: &Bound<'_, PyAny>,
     confidence: f64,
 ) -> PyResult<PyStressAttribution> {
-    let (ids, flat, n_scenarios) = transpose_position_pnls(position_ids, position_pnls)?;
+    let n_positions = position_ids.len();
+    let position_pnls = extract_position_pnls(position_pnls, n_positions)?;
+    let n_scenarios = position_pnls.n_scenarios();
     let result = py
-        .detach(move || fm::build_stress_attribution(&ids, &flat, n_scenarios, confidence))
+        .detach(move || {
+            let ids = to_position_ids(position_ids);
+            let flat = position_pnls.into_scenario_major(n_positions);
+            fm::build_stress_attribution(&ids, &flat, n_scenarios, confidence)
+        })
         .map_err(core_to_py)?;
     Ok(PyStressAttribution::from_inner(result))
 }

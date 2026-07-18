@@ -15,6 +15,8 @@ from finstack_quant.core.market_data import MarketContext
 __all__ = [
     "bond_from_cashflows_json",
     "instrument_cashflows_json",
+    "list_models",
+    "list_models_grouped",
     "list_standard_metrics",
     "list_standard_metrics_grouped",
     "price_instrument",
@@ -217,6 +219,49 @@ def instrument_cashflows_json(
     --------
     >>> from finstack_quant.valuations.instruments import instrument_cashflows_json
     >>> callable(instrument_cashflows_json)
+    True
+    """
+    ...
+
+def list_models() -> list[str]:
+    """
+    Return every pricing model key registered in the standard pricer registry.
+
+    The list is registry-derived rather than enum-derived, so it reflects real
+    dispatch coverage: a model with no registered pricer is omitted. The names
+    are the canonical keys accepted by the ``model`` argument of
+    :func:`price_instrument`.
+
+    Returns
+    -------
+    list[str]
+        Canonical model keys such as ``"discounting"`` or ``"black76"``,
+        deduplicated and sorted.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import list_models
+    >>> callable(list_models)
+    True
+    """
+    ...
+
+def list_models_grouped() -> dict[str, list[str]]:
+    """
+    Return the standard registry's pricing models grouped by instrument type.
+
+    Only instrument types with at least one registered pricer appear as keys,
+    and each entry lists only the models that can price that instrument.
+
+    Returns
+    -------
+    dict[str, list[str]]
+        Mapping from canonical instrument-type name to its sorted model keys.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import list_models_grouped
+    >>> callable(list_models_grouped)
     True
     """
     ...

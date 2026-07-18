@@ -15,9 +15,13 @@ portfolio/scenario workflows, advanced quant methods, and reporting.
 Interactive use:
 
 ```bash
-PYTHONPATH=finstack-quant-py/examples/notebooks uv run jupyter lab \
-  finstack-quant-py/examples/notebooks
+uv run jupyter lab finstack-quant-py/examples/notebooks
 ```
+
+Notebooks that need shared helpers add the notebooks root with a relative
+`sys.path` insert (`".."` or `"../.."` depending on depth), then
+`from _shared import ...`. The batch runner also puts that directory on
+`PYTHONPATH`.
 
 Batch execution from the repository root:
 
