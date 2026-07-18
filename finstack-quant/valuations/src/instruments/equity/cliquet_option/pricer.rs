@@ -164,25 +164,30 @@ impl CliquetOptionMcPricer {
 
         // Period boundaries for the forward-vol/rate bootstrap: the remaining
         // reset dates plus the final maturity so the process covers the whole
-        // horizon.
-        let mut check_points: Vec<f64> = future_resets
+        // horizon. Pairs carry (model_time, date) so the bootstrap can sample
+        // the vol surface on the instrument clock while taking discount
+        // factors from exact curve dates (two-clock convention).
+        let mut check_points: Vec<(f64, Date)> = future_resets
             .iter()
-            .map(|d| {
-                inst.day_count
-                    .year_fraction(as_of, *d, DayCountContext::default())
+            .map(|&d| {
+                Ok((
+                    inst.day_count
+                        .year_fraction(as_of, d, DayCountContext::default())?,
+                    d,
+                ))
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?
             .into_iter()
-            .filter(|&t| t > 0.0)
+            .filter(|&(t, _)| t > 0.0)
             .collect();
-        check_points.sort_by(|a, b| a.total_cmp(b));
-        check_points.dedup();
-        if let Some(&last) = check_points.last() {
+        check_points.sort_by(|a, b| a.0.total_cmp(&b.0));
+        check_points.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-10);
+        if let Some(&(last, _)) = check_points.last() {
             if last < t - 1e-6 {
-                check_points.push(t);
+                check_points.push((t, final_date));
             }
         } else {
-            check_points.push(t);
+            check_points.push((t, final_date));
         }
 
         let process = crate::instruments::equity::piecewise_gbm::bootstrap_forward_gbm(

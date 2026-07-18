@@ -132,6 +132,7 @@ description = "Build workspace docs, enforce input docs, and run core doctests"
 run = [
   "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps",
   "python3 scripts/check_public_api_input_docs.py",
+  "python3 scripts/check_deprecated_annotations.py",
   "cargo test -p finstack-quant-core --doc",
 ]
 

@@ -50,9 +50,14 @@ impl AutocallableMcPricer {
         let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
 
         // Use explicit expiry as the contractual settlement/maturity date.
+        //
+        // Two-clock convention (INVARIANTS.md §4): model/vol time is measured on
+        // the instrument's day count (the vol-surface calibration basis,
+        // typically Act/365F for equity), while discounting uses exact
+        // date-based factors on the curve's own basis.
         let final_date = inst.expiry;
-        let disc_dc = disc_curve.day_count();
-        let t = disc_dc.year_fraction(as_of, final_date, DayCountContext::default())?;
+        let model_dc = inst.day_count;
+        let t = model_dc.year_fraction(as_of, final_date, DayCountContext::default())?;
         let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
 
         // Reference (strike-set) level S_0 for barrier and payoff ratios.
@@ -167,10 +172,11 @@ impl AutocallableMcPricer {
             0.0
         };
 
-        // Map remaining (future) observation dates to times.
+        // Map remaining (future) observation dates to model times on the
+        // instrument clock (matches the vol-surface calibration basis).
         let observation_times: Vec<f64> = future_dates
             .iter()
-            .map(|&date| disc_dc.year_fraction(as_of, date, DayCountContext::default()))
+            .map(|&date| model_dc.year_fraction(as_of, date, DayCountContext::default()))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         // Bootstrap a piecewise-constant forward GBM over the autocall observation
@@ -180,13 +186,18 @@ impl AutocallableMcPricer {
         // surface/curve is not flat; for a flat surface this reduces exactly to the
         // previous constant-GBM process.
         //
-        // NOTE: vol-surface expiries are assumed to share the discount curve's day
-        // count (both typically ACT/365F for equity vol).
-        let mut check_points = observation_times.clone();
-        check_points.retain(|&ct| ct > 0.0);
-        check_points.push(t);
-        check_points.sort_by(|a, b| a.total_cmp(b));
-        check_points.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
+        // Check points carry (model_time, date) pairs: the vol surface is
+        // sampled on the instrument clock while discount factors come from
+        // exact curve dates.
+        let mut check_points: Vec<(f64, Date)> = observation_times
+            .iter()
+            .copied()
+            .zip(future_dates.iter().copied())
+            .filter(|&(ct, _)| ct > 0.0)
+            .collect();
+        check_points.push((t, final_date));
+        check_points.sort_by(|a, b| a.0.total_cmp(&b.0));
+        check_points.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-10);
         let process = bootstrap_forward_gbm(
             disc_curve.as_ref(),
             curves,

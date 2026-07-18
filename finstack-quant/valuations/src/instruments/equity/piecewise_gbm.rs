@@ -10,7 +10,7 @@
 
 use crate::instruments::common_impl::vol_resolution::resolve_sigma_at;
 use crate::instruments::pricing_overrides::MarketQuoteOverrides;
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::Result;
@@ -126,12 +126,20 @@ impl Discretization<PiecewiseGbmProcess> for PiecewiseExactGbm {
 }
 
 /// Bootstrap a piecewise-constant forward GBM from the discount curve and vol
-/// surface over the supplied `check_points` (period-boundary times in years from
-/// `as_of`, strictly positive and sorted ascending; the caller must include the
-/// final maturity so the process covers the whole horizon).
+/// surface over the supplied `check_points`: `(model_time, date)` pairs where
+/// `model_time` is the year fraction from `as_of` on the **instrument/model
+/// clock** (the vol-surface calibration basis, typically Act/365F for equity)
+/// and `date` is the corresponding calendar date. Pairs must be strictly
+/// positive in time and sorted ascending; the caller must include the final
+/// maturity so the process covers the whole horizon.
+///
+/// Two-clock convention (INVARIANTS.md §4.2): discount factors are looked up
+/// **by date** on the curve's own basis via `df_between_dates`, then bridged
+/// onto model time, so that simulated drift over `dt_model` reproduces the
+/// exact curve discount factor: `fwd_r = ln(DF_prev / DF_curr) / dt_model`.
 ///
 /// For each interval `[prev_t, curr_t]`:
-/// - **forward rate** `f = ln(DF(prev_t) / DF(curr_t)) / dt`;
+/// - **forward rate** `f = ln(DF(prev_date) / DF(curr_date)) / dt_model`;
 /// - **forward volatility** from the total-variance increment
 ///   `σ²(curr_t)·curr_t − σ²(prev_t)·prev_t` (the surface is sampled at the ATM
 ///   forward `F(0, curr_t)`). A non-monotone (calendar-arbitrageable) surface can
@@ -150,7 +158,7 @@ pub(crate) fn bootstrap_forward_gbm(
     as_of: Date,
     initial_spot: f64,
     div_yield: f64,
-    check_points: &[f64],
+    check_points: &[(f64, Date)],
     context_label: &str,
 ) -> Result<PiecewiseGbmProcess> {
     let mut times = Vec::new();
@@ -160,29 +168,23 @@ pub(crate) fn bootstrap_forward_gbm(
 
     let mut prev_t = 0.0;
     let mut prev_var = 0.0;
+    let mut df_prev = 1.0;
 
-    // `disc_curve.df(t)` takes a curve-time relative to the curve base date, so
-    // shift period offsets by year_fraction(base_date, as_of).
-    let t_base_to_as_of = disc_curve.day_count().year_fraction(
-        disc_curve.base_date(),
-        as_of,
-        DayCountContext::default(),
-    )?;
-    let df_base_to_as_of = disc_curve.df(t_base_to_as_of);
-
-    for &curr_t in check_points {
+    for &(curr_t, curr_date) in check_points {
         if curr_t <= prev_t {
             continue;
         }
 
-        let df_prev = disc_curve.df(t_base_to_as_of + prev_t);
-        let df_curr = disc_curve.df(t_base_to_as_of + curr_t);
+        // Exact date-based discount factor relative to as_of; correct even when
+        // the curve base date differs from as_of or the curve day count differs
+        // from the model clock.
+        let df_curr = disc_curve.df_between_dates(as_of, curr_date)?;
         let dt = curr_t - prev_t;
 
         if df_curr <= 0.0 || !df_curr.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "{context_label}: discount factor at t={curr_t} is non-positive ({df_curr}); \
-                 the curve is degenerate or extrapolated past its valid range"
+                "{context_label}: discount factor at t={curr_t} ({curr_date}) is non-positive \
+                 ({df_curr}); the curve is degenerate or extrapolated past its valid range"
             )));
         }
         if dt <= 1e-6 {
@@ -192,13 +194,13 @@ pub(crate) fn bootstrap_forward_gbm(
             )));
         }
 
-        // Forward rate over [prev_t, curr_t].
+        // Forward rate over [prev_t, curr_t] on the model clock, bridged from
+        // exact date-based discount factors.
         let fwd_r = (df_prev / df_curr).ln() / dt;
 
         // ATM forward for the surface lookup:
-        //   F(0, curr_t) = S_0 · exp(-q·curr_t) / DF(as_of, curr_t),
-        //   DF(as_of, curr_t) = df_curr / df_base_to_as_of.
-        let forward_price = initial_spot * (-div_yield * curr_t).exp() / df_curr * df_base_to_as_of;
+        //   F(0, curr_t) = S_0 · exp(-q·curr_t) / DF(as_of, curr_date).
+        let forward_price = initial_spot * (-div_yield * curr_t).exp() / df_curr;
 
         let vol_curr =
             resolve_sigma_at(market_quotes, curves, vol_surface_id, curr_t, forward_price)?;
@@ -229,6 +231,7 @@ pub(crate) fn bootstrap_forward_gbm(
 
         prev_t = curr_t;
         prev_var = var_curr;
+        df_prev = df_curr;
     }
 
     Ok(PiecewiseGbmProcess {

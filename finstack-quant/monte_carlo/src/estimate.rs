@@ -138,7 +138,7 @@ impl Estimate {
     /// engine-created estimates.
     #[deprecated(
         since = "0.6.0",
-        note = "Engine loops now reject non-finite payoffs; num_skipped is always zero for new estimates. Retained for serde backward compatibility only."
+        note = "Engine loops now reject non-finite payoffs; num_skipped is always zero for new estimates. Retained for serde backward compatibility only; removable in 1.0.0."
     )]
     pub fn with_num_skipped(mut self, num_skipped: usize) -> Self {
         self.num_skipped = num_skipped;

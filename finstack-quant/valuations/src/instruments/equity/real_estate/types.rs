@@ -272,7 +272,9 @@ impl RealEstateAsset {
     /// - `noi_schedule` is empty (both methods need at least one NOI point)
     /// - `noi_schedule` is not strictly date-increasing, or contains
     ///   non-finite NOI amounts
-    /// - `capex_schedule` (when set) is unsorted or contains non-finite values
+    /// - `capex_schedule` (when set) is unsorted, contains non-finite values,
+    ///   or contains negative amounts (values are magnitude-positive outflows;
+    ///   the pricer applies the outflow sign)
     /// - `discount_rate`, `cap_rate`, `terminal_cap_rate` are set but non-finite
     /// - `cap_rate` or `terminal_cap_rate` are ≤ 0 (would divide-by-zero or
     ///   produce negative valuations)
@@ -319,6 +321,25 @@ impl RealEstateAsset {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "RealEstateAsset '{}' capex_schedule[{}] amount on {} must be finite, got {}",
                         self.id.as_str(), i, date, amount
+                    )));
+                }
+                // Sign-perspective gate (INVARIANTS.md §3.2): capex_schedule
+                // holds StatementMagnitude values (positive outflows); the
+                // pricer owns the single negation into economic cash flow.
+                // A negative entry is almost always CFS-signed CapEx piped in
+                // without conversion, which would double-negate the outflow
+                // and turn CapEx into an inflow in the DCF.
+                if *amount < 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "RealEstateAsset '{}' capex_schedule[{}] amount on {} must be a \
+                         non-negative outflow magnitude, got {}; capex_schedule uses the \
+                         magnitude-positive convention and the pricer applies the outflow \
+                         sign — pass CFS-signed (negative) CapEx through a sign conversion \
+                         first",
+                        self.id.as_str(),
+                        i,
+                        date,
+                        amount
                     )));
                 }
             }
@@ -622,6 +643,33 @@ mod tests {
         let mut asset = build_dcf_asset();
         asset.noi_schedule.clear();
         assert!(asset.validate().is_err());
+    }
+
+    /// Failure mode locked in (INVARIANTS.md §3.2): a negative capex_schedule
+    /// amount is CFS-signed CapEx piped in without magnitude conversion; the
+    /// pricer would double-negate it into an inflow. Must `Err`, not price.
+    #[test]
+    fn validate_rejects_negative_capex_schedule_amount() {
+        let mut asset = build_dcf_asset();
+        let c1 = Date::from_calendar_date(2026, time::Month::June, 1).unwrap();
+        asset.capex_schedule = Some(vec![(c1, -25.0)]);
+        let err = asset
+            .validate()
+            .expect_err("negative CapEx magnitude must error");
+        assert!(
+            err.to_string().contains("non-negative outflow magnitude"),
+            "error must explain the magnitude-positive convention: {err}"
+        );
+    }
+
+    /// Positive magnitudes (including zero) remain valid.
+    #[test]
+    fn validate_accepts_non_negative_capex_schedule() {
+        let mut asset = build_dcf_asset();
+        let c1 = Date::from_calendar_date(2026, time::Month::June, 1).unwrap();
+        let c2 = Date::from_calendar_date(2027, time::Month::June, 1).unwrap();
+        asset.capex_schedule = Some(vec![(c1, 0.0), (c2, 25.0)]);
+        assert!(asset.validate().is_ok());
     }
 
     #[test]

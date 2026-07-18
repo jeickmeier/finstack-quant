@@ -911,6 +911,65 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
+    // INVARIANTS.md §8 compatibility contract: the root artifact is closed
+    // (`deny_unknown_fields`), so an unknown root key must FAIL to
+    // deserialize; `CalibrationDiagnostics` is an open extension point, so
+    // an unknown diagnostics key must deserialize successfully. Adding a
+    // root key therefore requires a schema-version bump.
+    // ------------------------------------------------------------------
+    #[test]
+    fn unknown_root_key_is_rejected_but_diagnostics_extension_is_accepted() {
+        let model = minimal_model();
+        let json = serde_json::to_string(&model).unwrap();
+
+        // Unknown root key: closed root must reject (forward-compat break).
+        let mut root = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+        root.as_object_mut()
+            .unwrap()
+            .insert("future_root_field".to_owned(), serde_json::json!(42));
+        let with_root_key = serde_json::to_string(&root).unwrap();
+        assert!(
+            serde_json::from_str::<CreditFactorModel>(&with_root_key).is_err(),
+            "unknown root key must fail: root uses deny_unknown_fields, so \
+             additive root fields require a new schema version"
+        );
+
+        // Unknown diagnostics key: open extension point must accept.
+        let mut diag = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+        diag.as_object_mut()
+            .unwrap()
+            .get_mut("diagnostics")
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert("future_diagnostic".to_owned(), serde_json::json!("extra"));
+        let with_diag_key = serde_json::to_string(&diag).unwrap();
+        let parsed = serde_json::from_str::<CreditFactorModel>(&with_diag_key);
+        assert!(
+            parsed.is_ok(),
+            "unknown CalibrationDiagnostics key must deserialize: diagnostics \
+             is a declared open extension point (no deny_unknown_fields)"
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // INVARIANTS.md §8: wrong schema_version deserializes (serde does not
+    // validate it) but MUST be rejected by validate().
+    // ------------------------------------------------------------------
+    #[test]
+    fn wrong_schema_version_deserializes_but_fails_validate() {
+        let mut model = minimal_model();
+        model.schema_version = "finstack_quant.credit_factor_model/999".to_owned();
+        let json = serde_json::to_string(&model).unwrap();
+        let parsed: CreditFactorModel =
+            serde_json::from_str(&json).expect("serde alone does not check schema_version");
+        assert!(
+            parsed.validate().is_err(),
+            "validate() must reject a schema_version other than SCHEMA_VERSION"
+        );
+    }
+
+    // ------------------------------------------------------------------
     // PR-plan test 2: reject duplicate issuers
     // ------------------------------------------------------------------
     #[test]
