@@ -53,14 +53,9 @@ def check_file(path: Path) -> list[str]:
             problems.append("missing `note`")
         else:
             if not REMOVAL_RE.search(note):
-                problems.append(
-                    "note must state the earliest planned removal release "
-                    '(e.g. "removable in 0.8.0")'
-                )
+                problems.append('note must state the earliest planned removal release (e.g. "removable in 0.8.0")')
             if not REPLACEMENT_RE.search(note):
-                problems.append(
-                    "note must point at the replacement API or state the retention rationale"
-                )
+                problems.append("note must point at the replacement API or state the retention rationale")
         if problems:
             diagnostics.append(f"{location}: #[deprecated] violates INVARIANTS.md §7.2: " + "; ".join(problems))
     return diagnostics
