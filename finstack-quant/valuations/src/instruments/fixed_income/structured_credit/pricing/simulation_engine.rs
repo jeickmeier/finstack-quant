@@ -2641,6 +2641,225 @@ mod tests {
         instrument
     }
 
+    /// A three-class CLO (senior / mezzanine / equity) — the realistic shape,
+    /// where a failing OC test has subordinated interest available to divert.
+    fn clo_with_mezz(
+        triggers: Vec<
+            crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger,
+        >,
+    ) -> StructuredCredit {
+        let maturity = Date::from_calendar_date(2029, Month::January, 1).expect("valid date");
+        let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(10_000_000.0, Currency::USD),
+            0.08,
+            maturity,
+            DayCount::Thirty360,
+        ));
+        let mk = |id: &str, seniority, attach: f64, detach: f64, bal: f64, rate: f64| {
+            Tranche::new(
+                id,
+                attach,
+                detach,
+                seniority,
+                Money::new(bal, Currency::USD),
+                TrancheCoupon::Fixed { rate },
+                maturity,
+            )
+            .expect("tranche")
+        };
+        let tranches = TrancheStructure::new(vec![
+            mk(
+                "CLASS_A",
+                TrancheSeniority::Senior,
+                30.0,
+                100.0,
+                7_000_000.0,
+                0.05,
+            ),
+            mk(
+                "CLASS_B",
+                TrancheSeniority::Mezzanine,
+                10.0,
+                30.0,
+                2_000_000.0,
+                0.08,
+            ),
+            mk(
+                "EQUITY",
+                TrancheSeniority::Equity,
+                0.0,
+                10.0,
+                1_000_000.0,
+                0.0,
+            ),
+        ])
+        .expect("structure");
+        let mut instrument = StructuredCredit::new_clo(
+            "CLO-MEZZ",
+            pool,
+            tranches,
+            cleanup_test_date(),
+            maturity,
+            "USD-OIS",
+        )
+        .with_payment_calendar("nyse");
+        instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.03);
+        instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        instrument.coverage_triggers = triggers;
+        instrument
+    }
+
+    /// Total cash reaching a named tranche over the life of a deal.
+    fn tranche_total(instrument: &StructuredCredit, tranche_id: &str) -> f64 {
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let results = crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
+            instrument,
+            &market,
+            cleanup_test_date(),
+        )
+        .expect("simulation");
+        results
+            .get(tranche_id)
+            .map(|tc| tc.cashflows.iter().map(|(_, m)| m.amount()).sum())
+            .unwrap_or(0.0)
+    }
+
+    /// SC-M30 — a failing OC test must actually MOVE CASH: subordinated
+    /// interest is diverted to redeem senior notes.
+    ///
+    /// This is the payoff for SC-C03 (wiring the triggers) and SC-M30
+    /// (splitting the debt-interest tier at the senior/subordinated boundary).
+    /// Before the split the only divertible tier was the equity residual,
+    /// which sits after a principal tier that sweeps all remaining cash — so
+    /// `remaining` was always zero there and a breaching OC test, though
+    /// correctly evaluated and producing a cure amount, moved nothing.
+    ///
+    /// With a mezzanine class present the cure has a genuine source: CLASS_B's
+    /// coupon is trapped and paid to CLASS_A principal instead.
+    #[test]
+    fn failing_oc_test_diverts_subordinated_interest_to_senior_principal() {
+        use crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger;
+
+        let untriggered = clo_with_mezz(vec![]);
+        // Pool 10M against 7M senior = 143% OC at closing. A 175% requirement
+        // breaches from the first period.
+        let triggered = clo_with_mezz(vec![CoverageTrigger {
+            tranche_id: "CLASS_A".to_string(),
+            oc_trigger: Some(1.75),
+            ic_trigger: None,
+        }]);
+
+        let mezz_without = tranche_total(&untriggered, "CLASS_B");
+        let mezz_with = tranche_total(&triggered, "CLASS_B");
+
+        assert!(
+            mezz_without - mezz_with > 1_000.0,
+            "a breaching OC test must trap SUBORDINATED interest: CLASS_B \
+             received {mezz_with:.2} with the trigger vs {mezz_without:.2} \
+             without (trapped {:.2}). An equal or trivially-different value \
+             means the cure still has no source — the debt-interest tier is \
+             not split at the senior/subordinated boundary, or the divertible \
+             tier is unreachable (SC-M30).",
+            mezz_without - mezz_with
+        );
+
+        // The trapped cash must ACCELERATE senior principal. Note the senior's
+        // total nominal cash actually FALLS when the cure fires, which is
+        // correct and not a defect: de-levering faster means less interest
+        // accrues over the deal's life. The benefit to the senior holder is
+        // earlier principal (shorter WAL, less exposure), not more cash — so
+        // the assertion is on timing, not on totals.
+        let senior_principal_wal = |deal: &StructuredCredit| -> f64 {
+            let market = MarketContext::new().insert(cleanup_discount_curve());
+            let results =
+                crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
+                    deal,
+                    &market,
+                    cleanup_test_date(),
+                )
+                .expect("simulation");
+            let flows = &results
+                .get("CLASS_A")
+                .expect("senior results")
+                .principal_flows;
+            let (mut weighted, mut total) = (0.0_f64, 0.0_f64);
+            for (date, amount) in flows {
+                let years = (*date - cleanup_test_date()).whole_days() as f64 / 365.0;
+                weighted += years * amount.amount();
+                total += amount.amount();
+            }
+            if total > 0.0 {
+                weighted / total
+            } else {
+                0.0
+            }
+        };
+
+        let wal_without = senior_principal_wal(&untriggered);
+        let wal_with = senior_principal_wal(&triggered);
+        assert!(
+            wal_with < wal_without,
+            "trapped subordinated interest must accelerate senior principal: \
+             CLASS_A WAL was {wal_with:.4}y with the trigger vs \
+             {wal_without:.4}y without"
+        );
+    }
+
+    /// SC-M30 — the tier split must be exact identity when nothing is failing.
+    ///
+    /// Sequential allocation pays recipients in `payment_priority` order
+    /// bounded by the cash carried forward, so splitting one ordered tier into
+    /// two consecutive tiers must not change a single distribution.
+    #[test]
+    fn interest_tier_split_is_identity_without_triggers() {
+        let deal = clo_with_mezz(vec![]);
+        let waterfall = deal.create_waterfall();
+
+        let tier_ids: Vec<&str> = waterfall.tiers.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(
+            tier_ids,
+            vec![
+                "senior_interest",
+                "subordinated_interest",
+                "principal",
+                "equity"
+            ],
+            "the standard waterfall must split debt interest at the \
+             senior/subordinated boundary"
+        );
+
+        let sub_tier = waterfall
+            .tiers
+            .iter()
+            .find(|t| t.id == "subordinated_interest")
+            .expect("subordinated interest tier");
+        assert!(
+            sub_tier.divertible,
+            "the subordinated interest tier must be divertible — it is the \
+             source a real CLO OC cure draws on"
+        );
+
+        // Interest recipients must still appear in payment_priority order
+        // across the two tiers, which is what makes the split identity.
+        let interest_order: Vec<String> = waterfall
+            .tiers
+            .iter()
+            .filter(|t| t.id.ends_with("interest"))
+            .flat_map(|t| t.recipients.iter().map(|r| r.id.clone()))
+            .collect();
+        assert_eq!(
+            interest_order,
+            vec![
+                "CLASS_A_interest".to_string(),
+                "CLASS_B_interest".to_string()
+            ],
+            "splitting must preserve the seniority ordering of interest payments"
+        );
+    }
+
     /// SC-C03 — an OC trigger attached to a deal must actually be EVALUATED,
     /// report its breach, and produce a cure amount.
     ///

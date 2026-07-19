@@ -943,25 +943,68 @@ impl Waterfall {
         let mut sorted_tranches = tranches.tranches.clone();
         sorted_tranches.sort_by_key(|t| t.payment_priority);
 
-        let mut interest_recipients = Vec::new();
+        // SC-M30: the debt-interest tier is split at the senior/subordinated
+        // boundary, and the SUBORDINATED half is marked divertible.
+        //
+        // A real CLO overcollateralization cure diverts *subordinated interest
+        // proceeds* to redeem senior notes (INTEX/Bloomberg convention): the
+        // junior noteholders give up their coupon so the senior notes
+        // de-lever, which is what restores the ratio. With a single combined
+        // interest tier there was nothing subordinated to divert — the only
+        // divertible tier was the equity residual, which sits AFTER the
+        // principal tier, and that tier carries `TranchePrincipal { target:
+        // None }` and sweeps all remaining cash. So `remaining` was always
+        // zero by the time the divertible tier was reached and a failing OC
+        // test, even once wired up (SC-C03), moved no cash at all.
+        //
+        // Splitting here is exactly identity while no test is failing:
+        // sequential allocation pays recipients in `payment_priority` order
+        // bounded by the cash carried forward, so processing the same ordered
+        // recipients as two consecutive tiers gives the same distribution as
+        // one tier. Only when `diversion_active` flips does the second tier
+        // behave differently — which is the whole point.
+        //
+        // KNOWN LIMIT: a deal whose only debt is `Senior` (senior note plus
+        // equity, no mezzanine) still has no subordinated interest to divert.
+        // Curing that case needs the interest and principal waterfalls
+        // separated, so principal collections pay principal while surplus
+        // interest flows on to the residual tier where it can be trapped.
+        // That is a larger change and remains open.
+        let mut senior_interest_recipients = Vec::new();
+        let mut subordinated_interest_recipients = Vec::new();
         for tranche in &sorted_tranches {
-            if tranche.seniority != super::TrancheSeniority::Equity {
-                interest_recipients.push(Recipient::tranche_interest(
-                    format!("{}_interest", tranche.id.as_str()),
-                    tranche.id.as_str(),
-                ));
+            if tranche.seniority == super::TrancheSeniority::Equity {
+                continue;
+            }
+            let recipient = Recipient::tranche_interest(
+                format!("{}_interest", tranche.id.as_str()),
+                tranche.id.as_str(),
+            );
+            if tranche.seniority == super::TrancheSeniority::Senior {
+                senior_interest_recipients.push(recipient);
+            } else {
+                subordinated_interest_recipients.push(recipient);
             }
         }
 
-        if !interest_recipients.is_empty() {
-            let interest_tier = WaterfallTier::new("interest", priority, PaymentType::Interest)
+        if !senior_interest_recipients.is_empty() {
+            let tier = WaterfallTier::new("senior_interest", priority, PaymentType::Interest)
                 .allocation_mode(AllocationMode::Sequential);
-            let interest_tier = interest_recipients
+            let tier = senior_interest_recipients
                 .into_iter()
-                .fold(interest_tier, |tier, recipient| {
-                    tier.add_recipient(recipient)
-                });
-            engine.tiers.push(interest_tier);
+                .fold(tier, |tier, recipient| tier.add_recipient(recipient));
+            engine.tiers.push(tier);
+            priority += 1;
+        }
+
+        if !subordinated_interest_recipients.is_empty() {
+            let tier = WaterfallTier::new("subordinated_interest", priority, PaymentType::Interest)
+                .allocation_mode(AllocationMode::Sequential)
+                .divertible(true);
+            let tier = subordinated_interest_recipients
+                .into_iter()
+                .fold(tier, |tier, recipient| tier.add_recipient(recipient));
+            engine.tiers.push(tier);
             priority += 1;
         }
 

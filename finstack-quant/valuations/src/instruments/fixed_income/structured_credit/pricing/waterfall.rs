@@ -247,21 +247,34 @@ fn execute_waterfall_core(
 
     // Process tiers in priority order
     for tier in &waterfall.tiers {
-        let (target_recipients, tier_diverted): (&[Recipient], bool) = if tier.divertible
-            && diversion_active
-        {
-            let senior_tier = waterfall
-                .tiers
-                .iter()
-                .filter(|t| t.priority < tier.priority && t.payment_type == PaymentType::Principal)
-                .min_by_key(|t| t.priority);
+        let (target_recipients, tier_diverted): (&[Recipient], bool) =
+            if tier.divertible && diversion_active {
+                // The cure always pays down the most-senior principal tier.
+                //
+                // SC-M30: this deliberately does NOT require the principal tier to
+                // sit earlier in the waterfall. A real CLO cure diverts
+                // SUBORDINATED INTEREST to senior principal, and the subordinated
+                // interest tier necessarily runs BEFORE the principal tier — so a
+                // `priority < tier.priority` filter found nothing and silently
+                // disabled the diversion for exactly the tier that is supposed to
+                // fund it.
+                //
+                // Paying senior principal "early" from this slot is safe:
+                // `record_in_period_principal` books it into
+                // `principal_paid_in_period`, so when the principal tier itself
+                // runs it nets the amount already paid and cannot double-pay.
+                let senior_tier = waterfall
+                    .tiers
+                    .iter()
+                    .filter(|t| t.payment_type == PaymentType::Principal)
+                    .min_by_key(|t| t.priority);
 
-            senior_tier
-                .map(|s| (&s.recipients[..], true))
-                .unwrap_or((&tier.recipients[..], false))
-        } else {
-            (&tier.recipients[..], false)
-        };
+                senior_tier
+                    .map(|s| (&s.recipients[..], true))
+                    .unwrap_or((&tier.recipients[..], false))
+            } else {
+                (&tier.recipients[..], false)
+            };
 
         // When diverting with a cure amount, cap the diversion at the cure amount.
         // This implements partial diversion (INTEX-standard): only redirect enough
