@@ -539,6 +539,70 @@ fn release_spread_account(
     Ok(())
 }
 
+/// Release any residual reserve-account balance at deal end, paying it down the
+/// capital structure senior-first with the remainder to the residual holder.
+///
+/// A reserve account is credit enhancement funded at closing and topped up by
+/// `ReserveAccount` waterfall recipients. It is drawn during the deal to cover
+/// debt-interest shortfalls (see the draw in `simulate_period`); whatever
+/// survives to deal end belongs to the transaction, not to the void.
+///
+/// Without this sweep the account was a pure sink: the only mutation anywhere
+/// was the `checked_add` booking deposits, so every deposited dollar was
+/// destroyed and lifetime distributions were understated by the full balance.
+///
+/// Pays outstanding notes most-senior-first (a released reserve is available to
+/// redeem the notes), then routes any excess over the remaining capital
+/// structure to the most-junior / equity tranche — mirroring
+/// [`release_principal_funding_account`], so the two terminal sweeps behave
+/// identically and neither can strand cash.
+fn release_reserve_account(state: &mut SimulationState<'_>) -> Result<()> {
+    let mut remaining = state.reserve_balance.amount();
+    if remaining <= 0.0 {
+        return Ok(());
+    }
+
+    let release_date = state.prev_date.unwrap_or(state.closing_date);
+    let mut order: Vec<usize> = (0..state.tranches.tranches.len()).collect();
+    order.sort_by_key(|&i| state.tranches.tranches[i].payment_priority);
+
+    for i in order {
+        if remaining <= 0.0 {
+            break;
+        }
+        let id = state.tranches.tranches[i].id.as_str().to_string();
+        let balance = state.tranche_balances.get(&id).map_or(0.0, |m| m.amount());
+        if balance <= 0.0 {
+            continue;
+        }
+        let pay = remaining.min(balance);
+        state
+            .tranche_balances
+            .insert(id.clone(), Money::new(balance - pay, state.base_ccy));
+        append_residual_principal(state, &id, Money::new(pay, state.base_ccy), release_date)?;
+        remaining -= pay;
+    }
+
+    if remaining > WRITEDOWN_DE_MINIMIS {
+        let residual_id = state
+            .tranches
+            .tranches
+            .iter()
+            .max_by_key(|t| t.payment_priority)
+            .map(|t| t.id.as_str().to_string());
+        if let Some(id) = residual_id {
+            append_residual_principal(
+                state,
+                &id,
+                Money::new(remaining, state.base_ccy),
+                release_date,
+            )?;
+        }
+    }
+    state.reserve_balance = Money::new(0.0, state.base_ccy);
+    Ok(())
+}
+
 /// Release any residual controlled-accumulation funding-account balance at deal
 /// end, paying it down the capital structure senior-first.
 ///
@@ -1043,6 +1107,34 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
                             .unwrap_or(Money::new(0.0, state.base_ccy));
                     }
                 }
+
+                // SC-M22: any cash left after every tranche has been fully
+                // redeemed is residual value belonging to the equity /
+                // most-junior holder, not cash to be dropped on the floor.
+                //
+                // A cleanup call is exercised precisely when the remaining
+                // collateral is worth more than the outstanding notes, so an
+                // excess here is the normal case, not an edge case: the caller
+                // buys the pool at par-plus-accrued and whatever the pool is
+                // worth above the notes' total claim is the residual. Dropping
+                // it at the `break` destroyed that value and understated the
+                // equity tranche on every called deal.
+                //
+                // Mirrors the equity backstop in `drain_pending_recoveries_at_end`
+                // and the terminal sweeps for the spread, funding and reserve
+                // accounts, so no termination path can strand cash.
+                if available_for_redemption > WRITEDOWN_DE_MINIMIS {
+                    let residual_id = state
+                        .tranches
+                        .tranches
+                        .iter()
+                        .max_by_key(|t| t.payment_priority)
+                        .map(|t| t.id.as_str().to_string());
+                    if let Some(id) = residual_id {
+                        let residual = Money::new(available_for_redemption, state.base_ccy);
+                        append_residual_principal(&mut state, &id, residual, pay_date)?;
+                    }
+                }
                 break; // Terminate simulation after cleanup call
             }
         }
@@ -1081,6 +1173,12 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
     // end before the bullet date. Prevents the accumulated principal from being
     // silently stranded.
     release_principal_funding_account(&mut state, instrument)?;
+
+    // Release any reserve-account balance that survived to deal end. The
+    // reserve is credit enhancement, drawn during the deal to cover interest
+    // shortfalls; whatever remains belongs to the transaction. Without this the
+    // account was a pure sink and every deposited dollar was destroyed.
+    release_reserve_account(&mut state)?;
 
     Ok(state.finalize())
 }
@@ -2362,6 +2460,134 @@ mod tests {
         );
     }
 
+    /// Build a simple amortizing ABS with an optionally funded reserve account.
+    fn reserve_account_deal(reserve: f64) -> StructuredCredit {
+        let maturity = Date::from_calendar_date(2029, Month::January, 1).expect("valid date");
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(10_000_000.0, Currency::USD),
+            0.06,
+            maturity,
+            DayCount::Thirty360,
+        ));
+        pool.reserve_account = Money::new(reserve, Currency::USD);
+        let tranche = Tranche::new(
+            "A",
+            0.0,
+            100.0,
+            TrancheSeniority::Senior,
+            Money::new(10_000_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            maturity,
+        )
+        .expect("tranche");
+        let mut instrument = StructuredCredit::new_abs(
+            "ABS-RESERVE",
+            pool,
+            TrancheStructure::new(vec![tranche]).expect("structure"),
+            cleanup_test_date(),
+            maturity,
+            "USD-OIS",
+        )
+        .with_payment_calendar("nyse");
+        instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        instrument
+    }
+
+    /// Total cash distributed to every tranche over the life of a deal.
+    fn total_distributed(instrument: &StructuredCredit) -> f64 {
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let results = crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
+            instrument,
+            &market,
+            cleanup_test_date(),
+        )
+        .expect("simulation");
+        results
+            .values()
+            .flat_map(|tc| tc.cashflows.iter())
+            .map(|(_, m)| m.amount())
+            .sum()
+    }
+
+    /// SC-C07 — a funded reserve account must reach investors.
+    ///
+    /// The reserve was a pure sink: the only mutation anywhere was the
+    /// `checked_add` booking deposits, so every dollar was destroyed and
+    /// lifetime distributions were understated by the full balance. An
+    /// otherwise-identical deal with a funded reserve must distribute that
+    /// reserve on top of what the unfunded deal distributes.
+    #[test]
+    fn funded_reserve_account_is_released_to_investors_not_destroyed() {
+        const RESERVE: f64 = 250_000.0;
+        let without = total_distributed(&reserve_account_deal(0.0));
+        let with = total_distributed(&reserve_account_deal(RESERVE));
+
+        assert!(
+            with > without,
+            "a funded reserve must increase lifetime distributions; got \
+             {with:.2} with a {RESERVE:.0} reserve vs {without:.2} without — \
+             the reserve is being destroyed (SC-C07)"
+        );
+        assert!(
+            (with - without - RESERVE).abs() < 1.0,
+            "the entire reserve must reach investors: expected an uplift of \
+             {RESERVE:.2}, got {:.2}",
+            with - without
+        );
+    }
+
+    /// SC-C07 — the reserve must be DRAWN to cover a debt-interest shortfall,
+    /// which is the whole purpose of the account as credit enhancement.
+    ///
+    /// The tranche coupon (9%) exceeds the collateral coupon (6%), so pool
+    /// interest cannot cover the note interest and the deal runs a shortfall in
+    /// every period before maturity.
+    ///
+    /// This asserts on the FIRST period's interest, not the lifetime total.
+    /// Lifetime interest is the same either way: without a reserve the
+    /// shortfall is merely deferred and then cured out of the maturity balloon,
+    /// so the totals converge. What credit enhancement actually buys the
+    /// noteholder is being paid ON TIME, and that is what the draw delivers.
+    #[test]
+    fn reserve_account_is_drawn_to_cover_interest_shortfall() {
+        fn first_period_interest(reserve: f64) -> f64 {
+            let mut deal = reserve_account_deal(reserve);
+            deal.tranches.tranches[0].coupon = TrancheCoupon::Fixed { rate: 0.09 };
+            let market = MarketContext::new().insert(cleanup_discount_curve());
+            let results =
+                crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
+                    &deal,
+                    &market,
+                    cleanup_test_date(),
+                )
+                .expect("simulation");
+            let mut flows: Vec<(Date, f64)> = results
+                .values()
+                .flat_map(|tc| tc.interest_flows.iter())
+                .map(|(d, m)| (*d, m.amount()))
+                .collect();
+            flows.sort_by_key(|(d, _)| *d);
+            flows.first().map_or(0.0, |(_, amt)| *amt)
+        }
+
+        const RESERVE: f64 = 250_000.0;
+        let without = first_period_interest(0.0);
+        let with = first_period_interest(RESERVE);
+
+        assert!(
+            with > without + 1.0,
+            "a funded reserve must be drawn to cure the CURRENT period's \
+             interest shortfall: first-period interest was {with:.2} with a \
+             {RESERVE:.0} reserve vs {without:.2} without. Equal values mean \
+             the reserve is never drawn and is inert as credit enhancement \
+             (SC-C07)."
+        );
+    }
+
     // ── W-26: cleanup-call redemption must INCLUDE pending recoveries ───────
 
     /// A deal that accumulates a large recovery queue before the cleanup call
@@ -3460,28 +3686,30 @@ fn simulate_period(
     // interest shortfalls. No-op (identity) when no `excess_spread` is set.
     // `spread_net_capture` is the net cash diverted into the account this period
     // (negative when drawing), reconciled by the cash-conservation check.
-    let mut spread_net_capture = 0.0_f64;
-    if let Some(es) = instrument
+    // Total interest the waterfall owes debt (non-equity) tranches this period:
+    // the current-period coupon (shared helper, so the surplus measured here
+    // matches what Step 5 records, including the live AFC cap) PLUS each
+    // tranche's outstanding non-PIK deferred interest — a senior claim the
+    // waterfall must also satisfy. Omitting the deferred piece would let the
+    // excess-spread account capture interest it should instead leave behind to
+    // cure that shortfall.
+    //
+    // Computed once and shared by the excess-spread capture/draw and the
+    // reserve-account draw (SC-C07), which both key off the same shortfall.
+    // Only computed when one of those features is live, so deals with neither
+    // pay nothing for it.
+    let needs_interest_due = instrument
         .waterfall_rules
         .as_ref()
         .and_then(|rules| rules.excess_spread.as_ref())
-    {
-        // Snapshot the account balance before any capture/draw, to independently
-        // reconcile the recorded net capture against the actual balance move.
-        let spread_before = state.spread_account.amount();
-
-        // Total interest the waterfall owes debt (non-equity) tranches this
-        // period: the current-period coupon (shared helper, so the surplus
-        // measured here matches what Step 5 records, including the live AFC cap)
-        // PLUS each tranche's outstanding non-PIK deferred interest — a senior
-        // claim the waterfall must also satisfy. Omitting the deferred piece
-        // would let the account capture interest it should instead leave behind
-        // to cure that shortfall.
+        .is_some()
+        || state.reserve_balance.amount() > 0.0;
+    let mut debt_interest_due = 0.0_f64;
+    if needs_interest_due {
         let afc = instrument
             .waterfall_rules
             .as_ref()
             .and_then(|rules| rules.afc.as_ref());
-        let mut debt_interest_due = 0.0_f64;
         for tranche in &state.tranches.tranches {
             if tranche.seniority == TrancheSeniority::Equity {
                 continue;
@@ -3514,6 +3742,17 @@ fn simulate_period(
                     .map_or(0.0, Money::amount);
             }
         }
+    }
+
+    let mut spread_net_capture = 0.0_f64;
+    if let Some(es) = instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.excess_spread.as_ref())
+    {
+        // Snapshot the account balance before any capture/draw, to independently
+        // reconcile the recorded net capture against the actual balance move.
+        let spread_before = state.spread_account.amount();
 
         let interest_avail = pool_flows.interest.amount();
         if interest_avail > debt_interest_due {
@@ -3558,6 +3797,36 @@ fn simulate_period(
             "spread-account delta {} != recorded net capture {spread_net_capture}",
             state.spread_account.amount() - spread_before
         );
+    }
+
+    // ── Reserve-account draw (SC-C07) ────────────────────────────────
+    //
+    // A reserve account is credit enhancement: it is funded at closing (and
+    // topped up by `ReserveAccount` waterfall recipients) precisely so it can
+    // be DRAWN to cover debt-interest shortfalls. Before this the account was a
+    // pure sink — the only mutation anywhere was the `checked_add` that books
+    // deposits after the waterfall — so every dollar deposited was destroyed,
+    // never reaching any tranche or the residual holder, and total distributions
+    // were understated by the full reserve balance.
+    //
+    // Drawn AFTER the excess-spread account, against whatever shortfall that
+    // account did not cover: excess spread is the first loss-absorbing layer
+    // (it is skimmed from surplus interest that would otherwise reach equity),
+    // while the reserve is structural enhancement held against the notes. The
+    // draw is bounded by both the shortfall and the balance, so it can never
+    // manufacture cash, and `reserve_net_capture` (negative for a draw) feeds
+    // the cash-conservation identity alongside the other side accounts.
+    let mut reserve_net_capture = 0.0_f64;
+    if state.reserve_balance.amount() > 0.0 {
+        let interest_available = pool_flows.interest.amount() - spread_net_capture;
+        let shortfall = (debt_interest_due - interest_available).max(0.0);
+        let draw = shortfall.min(state.reserve_balance.amount()).max(0.0);
+        if draw > 0.0 {
+            let draw_money = Money::new(draw, state.base_ccy);
+            state.reserve_balance = state.reserve_balance.checked_sub(draw_money)?;
+            total_cash_for_waterfall = total_cash_for_waterfall.checked_add(draw_money)?;
+            reserve_net_capture = -draw;
+        }
     }
 
     // Controlled-accumulation funding account. During accumulation, divert this
@@ -3875,7 +4144,9 @@ fn simulate_period(
     // Net cash diverted out of the waterfall into side accounts this period:
     // the excess-spread net capture less any controlled-accumulation bullet
     // release (which adds cash back from the funding account).
-    let side_net_capture = spread_net_capture - funding_net_release;
+    // `reserve_net_capture` is negative when the reserve was drawn (cash added
+    // to the waterfall), so it enters with the same sign as the spread capture.
+    let side_net_capture = spread_net_capture + reserve_net_capture - funding_net_release;
     debug_assert_cash_conserved(
         total_cash_for_waterfall,
         &pool_flows,
