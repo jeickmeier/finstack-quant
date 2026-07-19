@@ -31,6 +31,9 @@ use tracing::debug;
 pub(super) struct BuildState {
     pub(super) flows: Vec<CashFlow>,
     pub(super) outstanding_after: finstack_quant_core::HashMap<Date, Decimal>,
+    /// Same entries as `outstanding_after`, kept in ascending date order for
+    /// range scans (TWA fees). The map remains for point lookups by date.
+    pub(super) outstanding_history: Vec<(Date, Decimal)>,
     /// Outstanding balance tracked as `Decimal` for accounting-grade precision.
     ///
     /// Using `Decimal` eliminates f64 accumulation drift that can exceed 1 bp
@@ -286,9 +289,13 @@ fn initialize_build_state(
     outstanding_after.reserve(estimated_dates);
     outstanding_after.insert(issue, outstanding);
 
+    let mut outstanding_history: Vec<(Date, Decimal)> = Vec::with_capacity(estimated_dates);
+    outstanding_history.push((issue, outstanding));
+
     Ok(BuildState {
         flows,
         outstanding_after,
+        outstanding_history,
         outstanding,
     })
 }

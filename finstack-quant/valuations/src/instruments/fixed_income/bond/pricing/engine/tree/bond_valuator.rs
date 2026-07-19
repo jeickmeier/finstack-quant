@@ -489,6 +489,9 @@ impl BondValuator {
         let mut call_vec: Vec<Option<f64>> = vec![None; num_steps];
         let mut put_vec: Vec<Option<f64>> = vec![None; num_steps];
         if let Some(ref call_put) = bond.call_put {
+            let accrual_cfg = bond.accrual_config();
+            let accrual_index =
+                crate::cashflow::accrual::AccrualIndex::build(&full_schedule, &accrual_cfg)?;
             for call in &call_put.calls {
                 for exercise_date in Self::exercise_dates_for_period(
                     call.start_date,
@@ -520,11 +523,7 @@ impl BondValuator {
                     } else {
                         floor_price
                     };
-                    let accrued_on_call = crate::cashflow::accrual::accrued_interest_amount(
-                        &full_schedule,
-                        exercise_date,
-                        &bond.accrual_config(),
-                    )?;
+                    let accrued_on_call = accrual_index.accrued_at(exercise_date)?;
                     let call_price = Self::value_at_step_time(
                         clean_call_price + accrued_on_call,
                         exercise_time,
@@ -554,11 +553,7 @@ impl BondValuator {
                     // Use outstanding principal at exercise step, not original notional
                     let outstanding = outstanding_principal_vec[step];
                     let clean_put_price = outstanding * (put.price_pct_of_par / 100.0);
-                    let accrued_on_put = crate::cashflow::accrual::accrued_interest_amount(
-                        &full_schedule,
-                        exercise_date,
-                        &bond.accrual_config(),
-                    )?;
+                    let accrued_on_put = accrual_index.accrued_at(exercise_date)?;
                     let put_price = Self::value_at_step_time(
                         clean_put_price + accrued_on_put,
                         exercise_time,

@@ -1029,6 +1029,15 @@ pub(crate) fn solve_ytw_from_flows(
     let mut best_yield = f64::INFINITY;
     let mut best_flows: Vec<(Date, Money)> = Vec::new();
 
+    let accrual_cfg = bond.accrual_config();
+    let accrual_index = match schedule {
+        Some(sched) => Some(crate::cashflow::accrual::AccrualIndex::build(
+            sched,
+            &accrual_cfg,
+        )?),
+        None => None,
+    };
+
     for (exercise_date, pct_or_zero) in candidates {
         // Truncate flows to exercise and add redemption
         let mut ex_flows: Vec<(Date, Money)> = Vec::with_capacity(flows.len());
@@ -1051,14 +1060,9 @@ pub(crate) fn solve_ytw_from_flows(
             } else {
                 bond.notional.amount()
             };
-            let accrued = if let Some(sched) = schedule {
-                crate::cashflow::accrual::accrued_interest_amount(
-                    sched,
-                    exercise_date,
-                    &bond.accrual_config(),
-                )?
-            } else {
-                0.0
+            let accrued = match accrual_index.as_ref() {
+                Some(index) => index.accrued_at(exercise_date)?,
+                None => 0.0,
             };
             Money::new(
                 outstanding * (pct / 100.0) + accrued,

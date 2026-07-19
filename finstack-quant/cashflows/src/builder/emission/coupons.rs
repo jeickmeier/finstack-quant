@@ -303,12 +303,7 @@ pub(crate) fn emit_fixed_coupons_on(
             let accrual_start = period.accrual_start;
             let accrual_end = period.accrual_end;
             let is_stub = schedule.first_last.contains(&d);
-            let is_termination_date = schedule
-                .prev
-                .values()
-                .map(|period| period.accrual_end)
-                .max()
-                .is_some_and(|last| accrual_end == last);
+            let is_termination_date = schedule.terminal_accrual_end == Some(accrual_end);
             let base_out = *outstanding_after
                 .get(&accrual_start)
                 .unwrap_or(&outstanding_fallback);
@@ -416,30 +411,7 @@ fn observation_window(
     Ok((accrual_start, accrual_end))
 }
 
-/// Sample overnight rates with the ISDA 2021 / ARRC 2020 "Lookback" convention.
-///
-/// For each accrual-period business day `d`, the observed rate is sampled from
-/// the forward curve `lookback_bd` business days **before** `d`, while the
-/// per-day weight remains the accrual-period calendar-day weight tied to `d`.
-/// Annualization uses the accrual-period day count.
-///
-/// This differs from `sample_overnight_rates` called on a shifted window:
-/// that variant shifts BOTH rates and weights (Observation Shift). Lookback
-/// shifts only the rate-observation index.
-///
-/// Walks the accrual business days and looks up each observation date
-/// directly via
-/// [`finstack_quant_core::dates::DateExt::add_business_days`] rather than
-/// rewriting indices into a pre-sampled `accrual_start..accrual_end`
-/// window, so rates from before `accrual_start` are sampled correctly
-/// instead of clamping to `daily_rates[0]`.
-///
-/// Observation dates strictly before the curve base date are realized
-/// historical fixings resolved from `fixings` (the `FIXING:{index_id}`
-/// series, LOCF); see [`observed_overnight_rate`].
-///
-/// Reference: ARRC 2020 *Recommended Conventions* §2 "Lookback";
-/// ISDA 2021 Supp. 70 §7.1(g)(ii).
+/// Shared market inputs for overnight rate sampling.
 struct OvernightSamplingInput<'a> {
     fwd: &'a ForwardCurve,
     overnight_basis: f64,
@@ -448,6 +420,75 @@ struct OvernightSamplingInput<'a> {
     index_id: &'a str,
 }
 
+/// Prematerialized ascending business days for an overnight observation window.
+struct OvernightBusinessDays {
+    /// Business days in `[earliest, window_end)`, ascending.
+    days: Vec<Date>,
+}
+
+impl OvernightBusinessDays {
+    /// Business days in `[window_start, window_end)` plus `lead_business_days`
+    /// of leading margin before `window_start`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates calendar errors from locating the leading margin.
+    fn build(
+        window_start: Date,
+        window_end: Date,
+        lead_business_days: u32,
+        calendar: &dyn finstack_quant_core::dates::HolidayCalendar,
+    ) -> finstack_quant_core::Result<Self> {
+        let lead: i32 = i32::try_from(lead_business_days).map_err(|_| {
+            finstack_quant_core::Error::Validation(format!(
+                "lookback lead = {lead_business_days} exceeds i32::MAX"
+            ))
+        })?;
+        let earliest = if lead == 0 {
+            window_start
+        } else {
+            window_start.add_business_days(-lead, calendar)?
+        };
+
+        let span = (window_end - earliest).whole_days().max(0) as usize;
+        let mut days = Vec::with_capacity(span / 5 * 2 + 8);
+        let mut cursor = earliest;
+        while cursor < window_end {
+            if cursor.is_business_day(calendar) {
+                days.push(cursor);
+            }
+            cursor += time::Duration::days(1);
+        }
+        Ok(Self { days })
+    }
+
+    /// Index of the first business day at or after `date`.
+    fn cursor_at_or_after(&self, date: Date) -> usize {
+        self.days.partition_point(|d| *d < date)
+    }
+
+    /// Business day `back` positions before `ordinal`, or `None` if out of range.
+    fn step_back(&self, ordinal: usize, back: usize) -> Option<Date> {
+        self.days.get(ordinal.checked_sub(back)?).copied()
+    }
+}
+
+/// Error for an observation window that lacks the required leading margin.
+fn insufficient_lookback_window(obs_back: usize, date: Date) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(format!(
+        "overnight observation window lacks {obs_back} business days of history before {date}"
+    ))
+}
+
+/// Sample overnight rates with the ISDA 2021 / ARRC 2020 Lookback convention.
+///
+/// For each accrual-period business day `d`, the observed rate is taken
+/// `lookback_bd` business days before `d`; weights stay on the accrual dates.
+/// Observation Shift (via `sample_overnight_rates` on a shifted window) moves
+/// both rates and weights. Pre-base observations come from `input.fixings`.
+///
+/// Reference: ARRC 2020 *Recommended Conventions* §2 "Lookback";
+/// ISDA 2021 Supp. 70 §7.1(g)(ii).
 fn sample_overnight_rates_with_lookback(
     accrual_start: Date,
     accrual_end: Date,
@@ -465,11 +506,14 @@ fn sample_overnight_rates_with_lookback(
             input.index_id,
         );
     }
-    let lookback_i32: i32 = i32::try_from(lookback_bd).map_err(|_| {
-        finstack_quant_core::Error::Validation(format!(
-            "lookback_days = {lookback_bd} exceeds i32::MAX"
-        ))
-    })?;
+    let business_days = OvernightBusinessDays::build(
+        accrual_start,
+        accrual_end,
+        lookback_bd.saturating_add(1),
+        input.calendar,
+    )?;
+    let mut ordinal = business_days.cursor_at_or_after(accrual_start);
+    let lookback_back = lookback_bd as usize;
 
     let mut daily_rates: Vec<(f64, u32)> = Vec::new();
     let mut pre_first_fixing_days: u32 = 0;
@@ -484,17 +528,20 @@ fn sample_overnight_rates_with_lookback(
         };
         let days = (next_capped - current).whole_days().max(1) as u32;
 
-        if current.is_business_day(input.calendar) {
+        if business_days.days.get(ordinal).copied() == Some(current) {
             // ARRC 2020 §2: rate observation moves back `lookback_bd` business
             // days; accrual weight remains tied to `current`. Pre-base
             // observations resolve from historical fixings (or error through
             // the spec's fallback policy when no series is provided).
-            let obs_date = current.add_business_days(-lookback_i32, input.calendar)?;
+            let obs_date = business_days
+                .step_back(ordinal, lookback_back)
+                .ok_or_else(|| insufficient_lookback_window(lookback_back, current))?;
             if pre_first_fixing_days > 0 {
                 // Leading non-business days use the preceding business-day
                 // fixing instead of the following Monday fixing.
-                let preceding_obs =
-                    current.add_business_days(-(lookback_i32 + 1), input.calendar)?;
+                let preceding_obs = business_days
+                    .step_back(ordinal, lookback_back + 1)
+                    .ok_or_else(|| insufficient_lookback_window(lookback_back + 1, current))?;
                 let leading_rate = observed_overnight_rate(
                     preceding_obs,
                     pre_first_fixing_days,
@@ -515,6 +562,7 @@ fn sample_overnight_rates_with_lookback(
                 input.index_id,
             )?;
             daily_rates.push((rate, days));
+            ordinal += 1;
         } else if daily_rates.is_empty() {
             pre_first_fixing_days += days;
         } else if let Some(last) = daily_rates.last_mut() {
@@ -561,6 +609,11 @@ fn sample_overnight_rates(
     fixings: Option<&ScalarTimeSeries>,
     index_id: &str,
 ) -> finstack_quant_core::Result<(Vec<(f64, u32)>, u32)> {
+    // One business-day pass over the window (plus a single day of leading
+    // margin for the pre-first-fixing case) replaces a calendar scan per day.
+    let business_days = OvernightBusinessDays::build(accrual_start, accrual_end, 1, calendar)?;
+    let mut ordinal = business_days.cursor_at_or_after(accrual_start);
+
     let mut daily_rates: Vec<(f64, u32)> = Vec::new();
     let mut pre_first_fixing_days: u32 = 0;
     let mut current = accrual_start;
@@ -574,13 +627,15 @@ fn sample_overnight_rates(
         };
         let days = (next_capped - current).whole_days().max(1) as u32;
 
-        if current.is_business_day(calendar) {
+        if business_days.days.get(ordinal).copied() == Some(current) {
             // Pre-base observations are realized historical fixings resolved
             // from the `FIXING:{index_id}` series; without a series the error routes through the spec's
             // fallback policy. T+0 prefers a published fixing, else projects
             // from t = 0; later dates project the overnight forward.
             if pre_first_fixing_days > 0 {
-                let preceding = current.add_business_days(-1, calendar)?;
+                let preceding = business_days
+                    .step_back(ordinal, 1)
+                    .ok_or_else(|| insufficient_lookback_window(1, current))?;
                 let leading_rate = observed_overnight_rate(
                     preceding,
                     pre_first_fixing_days,
@@ -595,6 +650,7 @@ fn sample_overnight_rates(
             let rate =
                 observed_overnight_rate(current, days, fwd, overnight_basis, fixings, index_id)?;
             daily_rates.push((rate, days));
+            ordinal += 1;
         } else if daily_rates.is_empty() {
             // Non-business day before the first fixing: accumulate to assign
             // to the first fixing's weight once we encounter it.
@@ -629,12 +685,11 @@ fn apply_daily_index_constraints_if_needed<'a>(
     params: &super::super::rate_helpers::FloatingRateParams,
     runtime_spec: &super::super::rate_helpers::ResolvedFloatingRateSpec,
 ) -> std::borrow::Cow<'a, [(f64, u32)]> {
+    // Borrow when the mapping is identity (not Daily, or no cap/floor).
     if runtime_spec.overnight_index_constraints
         != super::super::specs::OvernightIndexConstraintApplication::Daily
+        || (params.index_floor_bp.is_none() && params.index_cap_bp.is_none())
     {
-        // No per-day cap/floor to apply: borrow the sampled rates instead of
-        // copying the whole per-day vector (a SOFR coupon period samples one
-        // entry per business day).
         return std::borrow::Cow::Borrowed(daily_rates);
     }
 
@@ -718,12 +773,7 @@ pub(crate) fn emit_float_coupons_on(
             let accrual_start = period.accrual_start;
             let accrual_end = period.accrual_end;
             let is_stub = schedule.first_last.contains(&d);
-            let is_termination_date = schedule
-                .prev
-                .values()
-                .map(|period| period.accrual_end)
-                .max()
-                .is_some_and(|last| accrual_end == last);
+            let is_termination_date = schedule.terminal_accrual_end == Some(accrual_end);
             let base_out = *outstanding_after
                 .get(&accrual_start)
                 .unwrap_or(&outstanding_fallback);
@@ -882,18 +932,27 @@ pub(crate) fn emit_float_coupons_on(
                                         total_days,
                                         day_count_basis,
                                     );
-                                let daily_rates = apply_daily_index_constraints_if_needed(
+                                let constrained_rates = apply_daily_index_constraints_if_needed(
                                     &daily_rates,
                                     params,
                                     runtime_spec,
                                 );
-                                let compounded_index =
-                                    super::super::rate_helpers::compute_overnight_rate(
-                                        *method,
-                                        &daily_rates,
-                                        total_days,
-                                        day_count_basis,
-                                    );
+                                // A borrowed slice means no constraint changed
+                                // any rate, so the compounding product is
+                                // bit-identical to the one just computed —
+                                // reuse it rather than repeating an O(days)
+                                // pass over the same values.
+                                let compounded_index = match &constrained_rates {
+                                    std::borrow::Cow::Borrowed(_) => projected_index_rate,
+                                    std::borrow::Cow::Owned(rates) => {
+                                        super::super::rate_helpers::compute_overnight_rate(
+                                            *method,
+                                            rates,
+                                            total_days,
+                                            day_count_basis,
+                                        )
+                                    }
+                                };
 
                                 let final_params =
                                     period_rate_params_for_overnight(params, runtime_spec);
@@ -1057,6 +1116,52 @@ mod tests {
     use super::*;
     use crate::builder::calendar::resolve_calendar_strict;
     use time::Month;
+
+    #[test]
+    fn business_day_index_matches_calendar_walk() {
+        let calendar = resolve_calendar_strict("usny").expect("usny calendar");
+        let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::July, 15).expect("valid date");
+
+        for lookback in [0u32, 1, 2, 5, 10] {
+            let index = OvernightBusinessDays::build(start, end, lookback + 1, calendar)
+                .expect("window builds");
+
+            let mut ordinal = index.cursor_at_or_after(start);
+            let mut current = start;
+            let mut checked = 0usize;
+            while current < end {
+                let is_business = index.days.get(ordinal).copied() == Some(current);
+                assert_eq!(
+                    is_business,
+                    current.is_business_day(calendar),
+                    "business-day predicate disagreed at {current}"
+                );
+
+                if is_business {
+                    for back in [lookback, lookback + 1] {
+                        let via_index = index
+                            .step_back(ordinal, back as usize)
+                            .expect("window has enough leading margin");
+                        let via_calendar = current
+                            .add_business_days(-(back as i32), calendar)
+                            .expect("calendar walk succeeds");
+                        assert_eq!(
+                            via_index, via_calendar,
+                            "step back {back} from {current} disagreed"
+                        );
+                    }
+                    ordinal += 1;
+                    checked += 1;
+                }
+                current += time::Duration::days(1);
+            }
+            assert!(
+                checked > 100,
+                "expected a substantial sample, got {checked}"
+            );
+        }
+    }
 
     #[test]
     fn emit_inflation_coupons_preserves_non_positive_amounts() {

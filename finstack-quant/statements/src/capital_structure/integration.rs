@@ -16,7 +16,7 @@ use crate::capital_structure::period_flows::period_snapshot_date;
 use crate::error::Result;
 use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_cashflows::CashflowProvider;
-use finstack_quant_cashflows::{accrued_interest_amount, AccrualConfig};
+use finstack_quant_cashflows::{AccrualConfig, AccrualIndex};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Period, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -379,6 +379,9 @@ pub fn aggregate_instrument_cashflows(
         // so we need to interpolate for periods without explicit entries.
         let outstanding_path = full_schedule.outstanding_by_date()?;
 
+        let accrual_cfg = AccrualConfig::default();
+        let accrual_index = AccrualIndex::build(&full_schedule, &accrual_cfg)?;
+
         // Calculate accrued interest and debt balance for ALL periods, not just
         // periods with cashflow entries. This ensures proper accrual accumulation
         // between coupon payment dates.
@@ -429,11 +432,7 @@ pub fn aggregate_instrument_cashflows(
                 // which is incorrect for ACT/ACT ISMA schedules (the accrual
                 // engine falls back to ISDA semantics). `CashFlowMeta` does not
                 // carry the coupon frequency, so it cannot be populated here.
-                let accrued_scalar = accrued_interest_amount(
-                    &full_schedule,
-                    snapshot_date,
-                    &AccrualConfig::default(),
-                )?;
+                let accrued_scalar = accrual_index.accrued_at(snapshot_date)?;
                 let accrued_money = Money::new(accrued_scalar, currency);
                 breakdown.accrued_interest = accrued_money;
 

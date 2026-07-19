@@ -288,34 +288,100 @@ pub fn accrued_interest_amount(
     as_of: Date,
     cfg: &AccrualConfig,
 ) -> finstack_quant_core::Result<f64> {
-    schedule.validate()?;
-    let expected_currency = schedule.notional.initial.currency();
-    for flow in &schedule.flows {
-        if is_coupon_kind(flow.kind, cfg.include_pik) && flow.amount.currency() != expected_currency
-        {
-            return Err(finstack_quant_core::Error::CurrencyMismatch {
-                expected: expected_currency,
-                actual: flow.amount.currency(),
-            });
+    AccrualIndex::build(schedule, cfg)?.accrued_at(as_of)
+}
+
+/// Precomputed accrual state for repeated [`Self::accrued_at`] queries.
+///
+/// Builds coupon periods and the outstanding path once for a
+/// `(schedule, config)` pair. Prefer this over [`accrued_interest_amount`] when
+/// accruing the same schedule on many dates.
+#[derive(Debug, Clone)]
+pub struct AccrualIndex {
+    /// Per-period accrual inputs; empty when the schedule has no coupon periods.
+    period_inputs: Vec<PeriodInputs>,
+    /// Configuration captured at build time; every query reuses it.
+    cfg: AccrualConfig,
+}
+
+impl AccrualIndex {
+    /// Build reusable accrual state for `schedule` under `cfg`.
+    ///
+    /// # Arguments
+    ///
+    /// * `schedule` - Canonical cashflow schedule containing coupon, PIK, and
+    ///   notional flows.
+    /// * `cfg` - Accrual method and ex-coupon configuration bound into the
+    ///   index. Build a separate index to accrue under a different config.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the schedule fails validation, mixes currencies
+    /// across coupon flows, carries a non-finite accrual factor, or if the
+    /// outstanding-balance path or a day-count calculation fails.
+    pub fn build(
+        schedule: &CashFlowSchedule,
+        cfg: &AccrualConfig,
+    ) -> finstack_quant_core::Result<Self> {
+        schedule.validate()?;
+        let expected_currency = schedule.notional.initial.currency();
+        for flow in &schedule.flows {
+            if is_coupon_kind(flow.kind, cfg.include_pik)
+                && flow.amount.currency() != expected_currency
+            {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: expected_currency,
+                    actual: flow.amount.currency(),
+                });
+            }
         }
-    }
-    let periods = build_coupon_periods(schedule, cfg)?;
-    if periods.is_empty() {
-        return Ok(0.0);
+
+        let periods = build_coupon_periods(schedule, cfg)?;
+        let period_inputs = if periods.is_empty() {
+            Vec::new()
+        } else {
+            let outstanding_path = schedule.outstanding_by_date()?;
+            build_period_inputs(schedule, &periods, &outstanding_path, cfg.frequency)?
+        };
+
+        Ok(Self {
+            period_inputs,
+            cfg: cfg.clone(),
+        })
     }
 
-    // Build outstanding path including notional draws/repays and PIK.
-    let outstanding_path = schedule.outstanding_by_date()?;
-    let period_inputs = build_period_inputs(schedule, &periods, &outstanding_path, cfg.frequency)?;
+    /// Accrued interest as of `as_of` using the prebuilt periods.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Accrual cut-off date. Dates outside all coupon periods
+    ///   return zero.
+    ///
+    /// # Returns
+    ///
+    /// Scalar accrued interest in the schedule's currency space. Negative
+    /// inside an active ex-coupon window (the seller keeps the coupon; the
+    /// buyer is compensated for the remaining stub).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a day-count calculation fails or a configured
+    /// ex-coupon calendar ID cannot be resolved.
+    pub fn accrued_at(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+        if self.period_inputs.is_empty() {
+            return Ok(0.0);
+        }
 
-    // Multiple legs may share a payment date while retaining distinct accrual
-    // periods or day counts. Accrue each active identity independently.
-    let active = find_active_periods_and_elapsed(&period_inputs, as_of, cfg)?;
-    let mut accrued = finstack_quant_core::math::summation::NeumaierAccumulator::default();
-    for (inputs, elapsed_yf) in active {
-        accrued.add(accrue_in_period(inputs, elapsed_yf, &cfg.method)?);
+        // Multiple legs may share a payment date while retaining distinct
+        // accrual periods or day counts. Accrue each active identity
+        // independently.
+        let active = find_active_periods_and_elapsed(&self.period_inputs, as_of, &self.cfg)?;
+        let mut accrued = finstack_quant_core::math::summation::NeumaierAccumulator::default();
+        for (inputs, elapsed_yf) in active {
+            accrued.add(accrue_in_period(inputs, elapsed_yf, &self.cfg.method)?);
+        }
+        Ok(accrued.total())
     }
-    Ok(accrued.total())
 }
 
 /// Aggregated coupon information for a single payment date.
@@ -409,7 +475,7 @@ fn build_coupon_periods(
         "coupon flows must preserve schedule date order"
     );
 
-    let mut buckets: Vec<CouponBucket> = Vec::new();
+    let mut buckets: Vec<CouponBucket> = Vec::with_capacity(coupon_idx.len());
 
     // Cash and PIK legs combine only when their payment date and contractual
     // accrual identity match. Same-date legs with different periods or day
@@ -437,12 +503,17 @@ fn build_coupon_periods(
             None
         };
 
-        let matching_bucket = buckets.iter_mut().find(|bucket| {
-            bucket.date == cf.date
-                && bucket.accrual_start == true_period.map(|(start, _)| start)
-                && bucket.accrual_end == true_period.map(|(_, end)| end)
-                && bucket.accrual_day_count == flow_day_count
-        });
+        // Buckets are date-ordered; a match can only be in the trailing run for
+        // `cf.date`, so scan backwards and stop at the date boundary.
+        let matching_bucket = buckets
+            .iter_mut()
+            .rev()
+            .take_while(|bucket| bucket.date == cf.date)
+            .find(|bucket| {
+                bucket.accrual_start == true_period.map(|(start, _)| start)
+                    && bucket.accrual_end == true_period.map(|(_, end)| end)
+                    && bucket.accrual_day_count == flow_day_count
+            });
         if let Some(bucket) = matching_bucket {
             if cf.kind == CFKind::PIK {
                 bucket.pik_amount += cf.amount.amount();

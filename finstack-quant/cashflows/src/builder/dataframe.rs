@@ -493,6 +493,27 @@ impl CashFlowSchedule {
             return Ok(());
         };
 
+        // Curve base, day count, and as-of survival are row-independent.
+        let hazard_basis = match hazard_arc_opt.as_ref() {
+            Some(h) => match Survival::base_date(h.as_ref()) {
+                Some(h_base) => {
+                    let h_dc = h.day_count();
+                    let t_base =
+                        h_dc.signed_year_fraction(h_base, base, DayCountContext::default())?;
+                    let sp_base = h.sp(t_base);
+                    if !sp_base.is_finite() || sp_base <= 0.0 {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "hazard curve returned invalid survival at as_of {}: {}",
+                            base, sp_base
+                        )));
+                    }
+                    Some((h_base, h_dc, sp_base))
+                }
+                None => None,
+            },
+            None => None,
+        };
+
         for (flow_index, outstanding_pre, _) in self.replay_balances(funding_anchor)? {
             let cf = &self.flows[flow_index];
 
@@ -552,24 +573,18 @@ impl CashFlowSchedule {
             out.discount_factors.push(df);
 
             // Survival probability
+            let mut sp_row: Option<f64> = None;
             if let (Some(h), Some(spv)) = (hazard_arc_opt.as_ref(), out.survival_probs.as_mut()) {
-                let sp = if let Some(h_base) = Survival::base_date(h.as_ref()) {
-                    let h_dc = h.day_count();
-                    let t =
-                        h_dc.signed_year_fraction(h_base, cf.date, DayCountContext::default())?;
-                    let t_base =
-                        h_dc.signed_year_fraction(h_base, base, DayCountContext::default())?;
-                    let sp_base = h.sp(t_base);
-                    if !sp_base.is_finite() || sp_base <= 0.0 {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "hazard curve returned invalid survival at as_of {}: {}",
-                            base, sp_base
-                        )));
+                let sp = match hazard_basis {
+                    Some((h_base, h_dc, sp_base)) => {
+                        let t =
+                            h_dc.signed_year_fraction(h_base, cf.date, DayCountContext::default())?;
+                        h.sp(t) / sp_base
                     }
-                    h.sp(t) / sp_base
-                } else {
-                    let t = compute_discount_time(cf.date, base, dc, disc_dc_ctx)?;
-                    h.sp(t)
+                    None => {
+                        let t = compute_discount_time(cf.date, base, dc, disc_dc_ctx)?;
+                        h.sp(t)
+                    }
                 };
                 if !sp.is_finite() {
                     return Err(finstack_quant_core::Error::Validation(format!(
@@ -578,13 +593,10 @@ impl CashFlowSchedule {
                     )));
                 }
                 spv.push(Some(sp));
+                sp_row = Some(sp);
             }
 
-            let sp_mult = if let Some(ref spv) = out.survival_probs {
-                spv.last().copied().flatten().unwrap_or(1.0)
-            } else {
-                1.0
-            };
+            let sp_mult = sp_row.unwrap_or(1.0);
             let pv_amt = if hazard_arc_opt.is_some() {
                 crate::aggregation::credit_adjusted_period_pv(
                     cf,

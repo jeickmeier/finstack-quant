@@ -461,6 +461,8 @@ impl CashFlowSchedule {
         for flow in &mut self.flows {
             flow.amount *= scale;
         }
+        // Amount is a `compare_flows` key; re-sort after scaling.
+        sort_flows(&mut self.flows);
         Ok(self)
     }
 
@@ -739,7 +741,15 @@ impl CashFlowSchedule {
             return Ok(Vec::new());
         }
         let mut order: Vec<usize> = (0..self.flows.len()).collect();
-        order.sort_by(|left, right| compare_flows(&self.flows[*left], &self.flows[*right]));
+        // Skip the sort when already canonical; keep it as a repair path for
+        // partially updated schedules (`try_update_flows`).
+        let already_ordered = self
+            .flows
+            .windows(2)
+            .all(|w| compare_flows(&w[0], &w[1]) != std::cmp::Ordering::Greater);
+        if !already_ordered {
+            order.sort_by(|left, right| compare_flows(&self.flows[*left], &self.flows[*right]));
+        }
         let mut outstanding = self.notional.initial;
         let mut initial_funding_skipped = false;
         let initial_amount = self.notional.initial.amount();
@@ -1221,6 +1231,34 @@ mod tests {
             0.0,
             None,
         )
+    }
+
+    #[test]
+    fn scale_amounts_restores_canonical_order_under_sign_flip() {
+        let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+        let schedule = CashFlowSchedule::from_parts(
+            vec![
+                flow(date, 100.0, CFKind::Amortization),
+                flow(date, 200.0, CFKind::Amortization),
+            ],
+            Notional::par(1000.0, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta::default(),
+        );
+        assert_eq!(schedule.flows[0].amount.amount(), 100.0);
+        assert_eq!(schedule.flows[1].amount.amount(), 200.0);
+
+        let scaled = schedule.scale_amounts(-1.0).expect("finite scale");
+
+        assert_eq!(scaled.flows[0].amount.amount(), -200.0);
+        assert_eq!(scaled.flows[1].amount.amount(), -100.0);
+        assert!(
+            scaled
+                .flows
+                .windows(2)
+                .all(|w| compare_flows(&w[0], &w[1]) != std::cmp::Ordering::Greater),
+            "scale_amounts must leave flows in canonical compare_flows order"
+        );
     }
 
     #[test]

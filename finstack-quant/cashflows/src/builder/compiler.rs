@@ -132,6 +132,11 @@ fn build_periods_with_meta(
     index_period_schedule(periods, params.freq)
 }
 
+/// Latest `accrual_end` across a compiled period map (`None` if empty).
+fn terminal_accrual_end(prev: &PeriodMap) -> Option<Date> {
+    prev.values().map(|period| period.accrual_end).max()
+}
+
 /// Compiled fixed-coupon schedule produced by [`compute_coupon_schedules`].
 #[derive(Clone)]
 pub(crate) struct FixedSchedule {
@@ -140,6 +145,8 @@ pub(crate) struct FixedSchedule {
     pub(crate) dates: Vec<Date>,
     pub(crate) prev: PeriodMap,
     pub(crate) first_last: DateSet,
+    /// Latest `accrual_end` in `prev`; identifies the termination period.
+    pub(crate) terminal_accrual_end: Option<Date>,
 }
 
 /// Compiled floating-coupon schedule produced by [`compute_coupon_schedules`].
@@ -153,6 +160,8 @@ pub(crate) struct FloatSchedule {
     pub(crate) prev: PeriodMap,
     /// Payment dates whose accrual period is a genuine stub (irregular span).
     pub(crate) first_last: DateSet,
+    /// Latest `accrual_end` in `prev`; identifies the termination period.
+    pub(crate) terminal_accrual_end: Option<Date>,
 }
 
 /// Periodic fee schedule prepared from fee specs.
@@ -178,6 +187,8 @@ pub(super) struct PeriodicFee {
     pub(super) dates: Vec<Date>,
     pub(super) prev: PeriodMap,
     pub(super) accrual_basis: FeeAccrualBasis,
+    /// Latest `accrual_end` in `prev`; identifies the termination period.
+    pub(super) terminal_accrual_end: Option<Date>,
 }
 
 /// Convenience alias for a list of compiled periodic-fee schedules.
@@ -281,6 +292,7 @@ pub(super) fn build_fee_schedules(
                     )));
                 }
                 let calendar = resolve_calendar_strict(calendar_id)?;
+                let terminal = terminal_accrual_end(&prev);
                 periodic_fees.push(PeriodicFee {
                     base: base.clone(),
                     bps: *bps,
@@ -290,6 +302,7 @@ pub(super) fn build_fee_schedules(
                     dates,
                     prev,
                     accrual_basis: accrual_basis.clone(),
+                    terminal_accrual_end: terminal,
                 });
             }
         }
@@ -454,6 +467,8 @@ fn compile_step_up_schedules(input: StepUpCompileInput<'_>) -> Vec<FixedSchedule
         }
 
         fn into_fixed_schedule(self, input: &StepUpCompileInput<'_>) -> FixedSchedule {
+            // Terminal end for this rate group, not the parent schedule.
+            let terminal = terminal_accrual_end(&self.prev);
             FixedSchedule {
                 spec: FixedCouponSpec {
                     coupon_type: input.split,
@@ -464,6 +479,7 @@ fn compile_step_up_schedules(input: StepUpCompileInput<'_>) -> Vec<FixedSchedule
                 dates: self.dates,
                 prev: self.prev,
                 first_last: self.first_last,
+                terminal_accrual_end: terminal,
             }
         }
     }
@@ -716,12 +732,14 @@ pub(super) fn compute_coupon_schedules(
                     rate: *rate,
                     schedule: chosen_coupon.schedule.clone(),
                 };
+                let terminal = terminal_accrual_end(&prev);
                 fixed_schedules.push(FixedSchedule {
                     spec,
                     calendar,
                     dates,
                     prev,
                     first_last: first_or_last,
+                    terminal_accrual_end: terminal,
                 });
             }
             CouponSpec::StepUp {
@@ -758,6 +776,7 @@ pub(super) fn compute_coupon_schedules(
                     .as_deref()
                     .unwrap_or(&spec.schedule.calendar_id);
                 let fixing_calendar = resolve_calendar_strict(fixing_calendar_id)?;
+                let terminal = terminal_accrual_end(&prev);
                 float_schedules.push(FloatSchedule {
                     spec,
                     calendar,
@@ -766,6 +785,7 @@ pub(super) fn compute_coupon_schedules(
                     dates,
                     prev,
                     first_last: first_or_last,
+                    terminal_accrual_end: terminal,
                 });
             }
         }

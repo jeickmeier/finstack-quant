@@ -64,36 +64,6 @@ pub(crate) fn is_regular_period(accrual_start: Date, accrual_end: Date, freq: Te
         || step_tenor(accrual_end, freq, -1) == Some(accrual_start)
 }
 
-/// Business-day adjust both accrual boundaries of `period` in place.
-///
-/// Used for swap-style schedules where calculation periods are themselves
-/// adjusted (ISDA 2006 §4.10; ARRC SOFR conventions). The payment date is
-/// left untouched: it is already derived from `adjust(accrual_end, bdc)` plus
-/// any payment lag, so it agrees with the adjusted accrual end.
-///
-/// # Errors
-///
-/// Returns `Error::Validation` when adjustment collapses the period to zero
-/// length (adjusted start == adjusted end), which would otherwise silently
-/// produce a zero-coupon period.
-pub(crate) fn adjust_period_accruals(
-    period: &mut SchedulePeriod,
-    bdc: BusinessDayConvention,
-    cal: &dyn HolidayCalendar,
-) -> finstack_quant_core::Result<()> {
-    let adj_start = adjust(period.accrual_start, bdc, cal)?;
-    let adj_end = adjust(period.accrual_end, bdc, cal)?;
-    if adj_start >= adj_end {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "accrual adjustment collapsed period [{}, {}) to zero length (adjusted to [{}, {}))",
-            period.accrual_start, period.accrual_end, adj_start, adj_end
-        )));
-    }
-    period.accrual_start = adj_start;
-    period.accrual_end = adj_end;
-    Ok(())
-}
-
 /// Build one skeletal schedule period from accrual bounds and payment lag.
 pub(crate) fn build_schedule_period(
     accrual_start: Date,
@@ -191,16 +161,8 @@ fn duplicate_payment_date_error(
     ))
 }
 
-/// Generate skeletal periods between start/end with strict error handling.
-///
-/// # Errors
-///
-/// Returns `finstack_quant_core::Error` when:
-/// - `calendar_id` is provided but calendar is not found
-/// - Schedule generation fails due to invalid date ranges
-/// - Business day adjustment fails
-/// - `payment_lag_days` is negative (payment lags are forward-only)
-///
+/// Test helper: generate skeletal periods with unadjusted accrual boundaries.
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_periods(
     start: Date,
@@ -212,32 +174,17 @@ pub(crate) fn generate_periods(
     payment_lag_days: i32,
     calendar_id: &str,
 ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
-    if payment_lag_days < 0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "payment_lag_days must be non-negative; got {payment_lag_days}"
-        )));
-    }
-    let builder = ScheduleBuilder::new(start, end)?
-        .frequency(freq)
-        .stub_rule(stub)
-        .end_of_month(end_of_month);
-    let cal = resolve_calendar_strict(calendar_id)?;
-
-    let schedule = builder.build()?;
-    let dates = schedule.dates;
-
-    if dates.len() < 2 {
-        return Ok(Vec::new());
-    }
-
-    let mut periods = Vec::with_capacity(dates.len().saturating_sub(1));
-
-    for window in dates.windows(2) {
-        let period = build_schedule_period(window[0], window[1], bdc, payment_lag_days, cal)?;
-        periods.push(period);
-    }
-
-    Ok(periods)
+    generate_periods_with_adjustment(
+        start,
+        end,
+        freq,
+        stub,
+        bdc,
+        end_of_month,
+        payment_lag_days,
+        calendar_id,
+        false,
+    )
 }
 
 /// Generate skeletal periods and apply the optional accrual-boundary policy.
@@ -258,22 +205,87 @@ pub(crate) fn generate_periods_with_adjustment(
     calendar_id: &str,
     adjust_accrual_dates: bool,
 ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
-    let mut periods = generate_periods(
-        start,
-        end,
-        freq,
-        stub,
-        bdc,
-        end_of_month,
-        payment_lag_days,
-        calendar_id,
-    )?;
-    if adjust_accrual_dates {
-        let cal = resolve_calendar_strict(calendar_id)?;
-        for period in &mut periods {
-            adjust_period_accruals(period, bdc, cal)?;
+    if payment_lag_days < 0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "payment_lag_days must be non-negative; got {payment_lag_days}"
+        )));
+    }
+    let builder = ScheduleBuilder::new(start, end)?
+        .frequency(freq)
+        .stub_rule(stub)
+        .end_of_month(end_of_month);
+    let cal = resolve_calendar_strict(calendar_id)?;
+
+    let schedule = builder.build()?;
+    let dates = schedule.dates;
+
+    if dates.len() < 2 {
+        return Ok(Vec::new());
+    }
+
+    // Contiguous anchors: adjust each once and share across adjacent periods.
+    // Skip adjusting `dates[0]` unless accrual dates are adjusted — it is never
+    // a payment date, and unconditional adjustment can fail schedules that
+    // otherwise succeed.
+    let mut adjusted: Vec<Date> = Vec::with_capacity(dates.len());
+    for (index, &anchor) in dates.iter().enumerate() {
+        if index == 0 && !adjust_accrual_dates {
+            adjusted.push(anchor);
+        } else {
+            adjusted.push(adjust(anchor, bdc, cal)?);
         }
     }
+
+    // Resolve payment dates first when adjusting accruals so lag failures
+    // surface before accrual-collapse errors.
+    let payment_dates: Option<Vec<Date>> = if adjust_accrual_dates {
+        let mut resolved = Vec::with_capacity(dates.len() - 1);
+        for window in adjusted.windows(2) {
+            let adjusted_end = window[1];
+            resolved.push(if payment_lag_days == 0 {
+                adjusted_end
+            } else {
+                adjusted_end.add_business_days(payment_lag_days, cal)?
+            });
+        }
+        Some(resolved)
+    } else {
+        None
+    };
+    let mut resolved_payments = payment_dates.into_iter().flatten();
+
+    let mut periods = Vec::with_capacity(dates.len() - 1);
+    for (raw, adj) in dates.windows(2).zip(adjusted.windows(2)) {
+        let (raw_start, raw_end) = (raw[0], raw[1]);
+        let adjusted_end = adj[1];
+        let payment_date = match resolved_payments.next() {
+            Some(date) => date,
+            None if payment_lag_days == 0 => adjusted_end,
+            None => adjusted_end.add_business_days(payment_lag_days, cal)?,
+        };
+
+        let (accrual_start, accrual_end) = if adjust_accrual_dates {
+            let (adj_start, adj_end) = (adj[0], adjusted_end);
+            if adj_start >= adj_end {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "accrual adjustment collapsed period [{raw_start}, {raw_end}) to zero length \
+                     (adjusted to [{adj_start}, {adj_end}))"
+                )));
+            }
+            (adj_start, adj_end)
+        } else {
+            (raw_start, raw_end)
+        };
+
+        periods.push(SchedulePeriod {
+            accrual_start,
+            accrual_end,
+            payment_date,
+            reset_date: None,
+            accrual_year_fraction: 0.0,
+        });
+    }
+
     Ok(periods)
 }
 
@@ -285,6 +297,86 @@ mod tests {
     fn d(y: i32, m: u8, day: u8) -> Date {
         Date::from_calendar_date(y, Month::try_from(m).expect("Valid month (1-12)"), day)
             .expect("Valid test date")
+    }
+
+    #[test]
+    fn adjust_is_idempotent_for_every_convention() {
+        let cal = resolve_calendar_strict("usny").expect("usny calendar");
+        let conventions = [
+            BusinessDayConvention::Unadjusted,
+            BusinessDayConvention::Following,
+            BusinessDayConvention::ModifiedFollowing,
+            BusinessDayConvention::Preceding,
+            BusinessDayConvention::ModifiedPreceding,
+        ];
+
+        let mut date = d(2025, 1, 1);
+        let end = d(2026, 1, 1);
+        while date < end {
+            for bdc in conventions {
+                let once = adjust(date, bdc, cal).expect("adjustment succeeds");
+                let twice = adjust(once, bdc, cal).expect("adjustment succeeds");
+                assert_eq!(
+                    once, twice,
+                    "adjust must be idempotent for {bdc:?} at {date}"
+                );
+            }
+            date += time::Duration::days(1);
+        }
+    }
+
+    #[test]
+    fn adjusted_accrual_boundaries_are_shared_between_consecutive_periods() {
+        for (stub, start, end) in [
+            (StubKind::None, d(2025, 1, 31), d(2027, 1, 31)),
+            (StubKind::ShortFront, d(2025, 2, 14), d(2027, 1, 31)),
+            (StubKind::ShortBack, d(2025, 1, 31), d(2026, 11, 15)),
+        ] {
+            let periods = generate_periods_with_adjustment(
+                start,
+                end,
+                Tenor::quarterly(),
+                stub,
+                BusinessDayConvention::ModifiedFollowing,
+                true,
+                0,
+                "usny",
+                true,
+            )
+            .expect("schedule builds");
+
+            assert!(periods.len() >= 2, "need multiple periods for {stub:?}");
+            for pair in periods.windows(2) {
+                assert_eq!(
+                    pair[0].accrual_end, pair[1].accrual_start,
+                    "adjusted boundaries must be shared ({stub:?})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn payment_date_equals_adjusted_accrual_end_without_lag() {
+        let periods = generate_periods_with_adjustment(
+            d(2025, 1, 31),
+            d(2027, 1, 31),
+            Tenor::quarterly(),
+            StubKind::None,
+            BusinessDayConvention::ModifiedFollowing,
+            true,
+            0,
+            "usny",
+            true,
+        )
+        .expect("schedule builds");
+
+        assert!(!periods.is_empty());
+        for period in &periods {
+            assert_eq!(
+                period.payment_date, period.accrual_end,
+                "zero-lag payment date must equal the adjusted accrual end"
+            );
+        }
     }
 
     #[test]

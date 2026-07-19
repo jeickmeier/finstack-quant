@@ -10,8 +10,8 @@ use finstack_quant_core::InputError;
 
 use super::calendar::resolve_calendar_strict;
 use super::date_generation::{
-    adjust_period_accruals, build_schedule_period, generate_periods_with_adjustment,
-    is_regular_period, validate_unique_payment_dates,
+    build_schedule_period, generate_periods_with_adjustment, is_regular_period,
+    validate_unique_payment_dates,
 };
 use super::emission::compute_reset_date;
 use super::specs::ScheduleParams;
@@ -98,12 +98,11 @@ fn enrich_period(
     params: &BuildPeriodsParams<'_>,
     cal: &dyn finstack_quant_core::dates::HolidayCalendar,
 ) -> finstack_quant_core::Result<SchedulePeriod> {
-    // Regularity is assessed on the unadjusted boundaries (the schedule
-    // anchors) before any business-day adjustment.
+    // When `adjust_accrual_dates` is set, boundaries arrive already adjusted
+    // from date generation, so regularity is assessed on adjusted dates.
+    // That can misclassify regular periods as stubs (ACT/ACT ICMA then falls
+    // back to the quasi-coupon grid). Left as-is: fixing it changes accrual.
     let regular = is_regular_period(period.accrual_start, period.accrual_end, params.frequency);
-    if params.adjust_accrual_dates {
-        adjust_period_accruals(&mut period, params.bdc, cal)?;
-    }
     // ACT/ACT ICMA reference period: for regular periods the coupon period is
     // the accrual period itself (exact ISMA accrual). For stub periods the
     // reference period is not cleanly derivable from a single period, so it

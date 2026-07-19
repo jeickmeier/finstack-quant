@@ -132,7 +132,7 @@ impl<'a> DateProcessor<'a> {
             self.ctx.periodic_fees,
             self.ctx.fixed_fees,
             state.outstanding,
-            &state.outstanding_after,
+            &state.outstanding_history,
             self.ctx.ccy,
             &mut state.flows,
         )
@@ -144,7 +144,12 @@ impl<'a> DateProcessor<'a> {
         d: Date,
         state: &mut BuildState,
     ) -> finstack_quant_core::Result<()> {
-        for ev in self.ctx.principal_events.iter().filter(|ev| ev.date == d) {
+        // Events are date-sorted; take the contiguous run for `d`.
+        let first = self.ctx.principal_events.partition_point(|ev| ev.date < d);
+        for ev in self.ctx.principal_events[first..]
+            .iter()
+            .take_while(|ev| ev.date == d)
+        {
             if ev.delta.amount() != 0.0 || ev.cash.amount() != 0.0 {
                 // Sign convention depends on flow kind:
                 // - Notional (draws): cash is inflow to borrower, flow is negative (funding outflow)
@@ -216,6 +221,18 @@ impl<'a> DateProcessor<'a> {
         self.handle_maturity(d, &mut state)?;
 
         state.outstanding_after.insert(d, state.outstanding);
+        // Keep history sorted/unique; dates arrive ascending.
+        debug_assert!(
+            state
+                .outstanding_history
+                .last()
+                .is_none_or(|(last, _)| *last <= d),
+            "outstanding_history requires ascending build dates"
+        );
+        match state.outstanding_history.last_mut() {
+            Some((last_date, last_value)) if *last_date == d => *last_value = state.outstanding,
+            _ => state.outstanding_history.push((d, state.outstanding)),
+        }
 
         Ok(state)
     }

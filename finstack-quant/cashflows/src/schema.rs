@@ -57,24 +57,38 @@ const SCHEMAS: [(&str, &str); 7] = [
     ),
 ];
 
+/// Parse the embedded schemas once per process.
+///
+/// Errors are cached as `String` because `finstack_quant_core::Error` is not
+/// `Clone`.
+fn parsed_schemas() -> &'static std::result::Result<Vec<(String, jsonschema::Resource)>, String> {
+    static CACHE: std::sync::OnceLock<
+        std::result::Result<Vec<(String, jsonschema::Resource)>, String>,
+    > = std::sync::OnceLock::new();
+
+    CACHE.get_or_init(|| {
+        SCHEMAS
+            .into_iter()
+            .map(|(filename, raw)| {
+                let schema = serde_json::from_str::<Value>(raw)
+                    .map_err(|err| format!("invalid cashflow schema JSON at {filename}: {err}"))?;
+                let resource = jsonschema::Resource::from_contents(schema).map_err(|err| {
+                    format!("invalid cashflow schema resource at {filename}: {err}")
+                })?;
+                Ok((format!("{CASHFLOW_SCHEMA_BASE}{filename}"), resource))
+            })
+            .collect()
+    })
+}
+
 /// Return the embedded cashflow schemas as JSON-Schema resolver resources.
 ///
 /// # Errors
 ///
 /// Returns a validation error if a checked-in schema is malformed.
 pub fn resources() -> Result<Vec<(String, jsonschema::Resource)>> {
-    SCHEMAS
-        .into_iter()
-        .map(|(filename, raw)| {
-            let schema = serde_json::from_str::<Value>(raw).map_err(|err| {
-                Error::Validation(format!("invalid cashflow schema JSON at {filename}: {err}"))
-            })?;
-            let resource = jsonschema::Resource::from_contents(schema).map_err(|err| {
-                Error::Validation(format!(
-                    "invalid cashflow schema resource at {filename}: {err}"
-                ))
-            })?;
-            Ok((format!("{CASHFLOW_SCHEMA_BASE}{filename}"), resource))
-        })
-        .collect()
+    match parsed_schemas() {
+        Ok(entries) => Ok(entries.clone()),
+        Err(err) => Err(Error::Validation(err.clone())),
+    }
 }

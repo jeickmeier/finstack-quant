@@ -71,52 +71,42 @@ fn emit_revolving_fee_on(
 ///
 /// If no history entries exist for the period, returns the `fallback` value.
 fn compute_time_weighted_average(
-    outstanding_history: &finstack_quant_core::HashMap<Date, Decimal>,
+    outstanding_history: &[(Date, Decimal)],
     accrual_start: Date,
     accrual_end: Date,
     fallback: Decimal,
     entries_buf: &mut Vec<(Date, Decimal)>,
 ) -> Decimal {
-    // Collect entries that are relevant to the accrual period:
-    // any date < accrual_end (we need entries before start to carry forward).
-    entries_buf.clear();
-    entries_buf.extend(
-        outstanding_history
-            .iter()
-            .filter(|(date, _)| **date < accrual_end)
-            .map(|(date, val)| (*date, *val)),
+    // History is ascending; window with two binary searches.
+    debug_assert!(
+        outstanding_history.windows(2).all(|w| w[0].0 <= w[1].0),
+        "compute_time_weighted_average requires ascending history"
     );
 
-    if entries_buf.is_empty() {
+    let hi = outstanding_history.partition_point(|(date, _)| *date < accrual_end);
+    if hi == 0 {
         return fallback;
     }
+    let lo = outstanding_history.partition_point(|(date, _)| *date < accrual_start);
 
-    entries_buf.sort_by_key(|(d, _)| *d);
+    entries_buf.clear();
+    // Carry the prior balance forward when `accrual_start` has no exact entry.
+    if !(lo < hi && outstanding_history[lo].0 == accrual_start) {
+        let carry_in = if lo == 0 {
+            fallback
+        } else {
+            outstanding_history[lo - 1].1
+        };
+        entries_buf.push((accrual_start, carry_in));
+    }
+    entries_buf.extend_from_slice(&outstanding_history[lo..hi]);
     let entries = entries_buf;
 
-    // Find the outstanding at accrual_start: the most recent entry at or before accrual_start
-    let start_idx = match entries.binary_search_by_key(&accrual_start, |(d, _)| *d) {
-        Ok(i) => i,
-        Err(i) => {
-            if i == 0 {
-                // No entry at or before accrual_start; use fallback for the initial value
-                entries.insert(0, (accrual_start, fallback));
-                0
-            } else {
-                // The entry just before the insertion point is the most recent before accrual_start.
-                // Create a synthetic entry at accrual_start with that value.
-                let val = entries[i - 1].1;
-                entries.insert(i, (accrual_start, val));
-                i
-            }
-        }
-    };
-
-    // Compute TWA from start_idx onward, clamped to [accrual_start, accrual_end)
+    // Compute TWA over [accrual_start, accrual_end)
     let mut weighted_sum = Decimal::ZERO;
     let mut total_days = 0i64;
 
-    for i in start_idx..entries.len() {
+    for i in 0..entries.len() {
         let (date_i, val_i) = entries[i];
         if date_i >= accrual_end {
             break;
@@ -163,27 +153,18 @@ pub(in crate::builder) fn emit_fees_on(
     periodic_fees: &[PeriodicFee],
     fixed_fees: &[(Date, Money)],
     outstanding: Decimal,
-    outstanding_history: &finstack_quant_core::HashMap<Date, Decimal>,
+    outstanding_history: &[(Date, Decimal)],
     ccy: Currency,
     new_flows: &mut Vec<CashFlow>,
 ) -> finstack_quant_core::Result<()> {
-    // Lazily allocated: only `TimeWeightedAverage` fees touch this buffer (via
-    // `compute_time_weighted_average`, which clears + extends it itself). For
-    // the common cases — no periodic fees, point-in-time fees, or a date with
-    // no matching fee period — `Vec::new()` never allocates, avoiding an
-    // O(history) allocation on every build date.
+    // Allocated only if a TWA fee needs it.
     let mut twa_buf: Vec<(Date, Decimal)> = Vec::new();
 
     for pf in periodic_fees {
         if let Some(period) = pf.prev.get(&d) {
             // Use proper DayCountContext with calendar and frequency so that
             // conventions like Bus/252 and Act/Act ISMA compute correctly.
-            let is_termination_date = pf
-                .prev
-                .values()
-                .map(|p| p.accrual_end)
-                .max()
-                .is_some_and(|last| period.accrual_end == last);
+            let is_termination_date = pf.terminal_accrual_end == Some(period.accrual_end);
             let yf = pf.dc.year_fraction(
                 period.accrual_start,
                 period.accrual_end,
@@ -203,9 +184,9 @@ pub(in crate::builder) fn emit_fees_on(
             // live balance is only a fallback when no history entry exists for
             // the accrual start (e.g., synthetic unit-test periods).
             let effective_outstanding = match pf.accrual_basis {
-                FeeAccrualBasis::PointInTime => *outstanding_history
-                    .get(&period.accrual_start)
-                    .unwrap_or(&outstanding),
+                FeeAccrualBasis::PointInTime => outstanding_history
+                    .binary_search_by_key(&period.accrual_start, |(date, _)| *date)
+                    .map_or(outstanding, |idx| outstanding_history[idx].1),
                 FeeAccrualBasis::TimeWeightedAverage => compute_time_weighted_average(
                     outstanding_history,
                     period.accrual_start,
@@ -394,6 +375,7 @@ mod tests {
             dates: vec![accrual_start, accrual_end],
             prev,
             accrual_basis,
+            terminal_accrual_end: Some(accrual_end),
         }
     }
 
@@ -413,7 +395,7 @@ mod tests {
         );
 
         let outstanding = dec!(1000000);
-        let history = finstack_quant_core::HashMap::default();
+        let history: Vec<(Date, Decimal)> = Vec::new();
         let mut flows = Vec::new();
 
         emit_fees_on(
@@ -444,8 +426,7 @@ mod tests {
         let payment = end;
         let outstanding = dec!(1000000);
 
-        let mut history = finstack_quant_core::HashMap::default();
-        history.insert(start, outstanding);
+        let history: Vec<(Date, Decimal)> = vec![(start, outstanding)];
 
         let pf_pit = make_periodic_fee(
             start,
@@ -504,9 +485,7 @@ mod tests {
         let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
         let payment = end;
 
-        let mut history = finstack_quant_core::HashMap::default();
-        history.insert(start, dec!(1000000));
-        history.insert(mid, dec!(500000));
+        let history: Vec<(Date, Decimal)> = vec![(start, dec!(1000000)), (mid, dec!(500000))];
 
         let pf = make_periodic_fee(
             start,
@@ -549,9 +528,7 @@ mod tests {
         let payment = end;
         let facility_limit = 2_000_000.0;
 
-        let mut history = finstack_quant_core::HashMap::default();
-        history.insert(start, dec!(1000000));
-        history.insert(mid, dec!(500000));
+        let history: Vec<(Date, Decimal)> = vec![(start, dec!(1000000)), (mid, dec!(500000))];
 
         let pf = make_periodic_fee(
             start,
@@ -593,7 +570,7 @@ mod tests {
     fn compute_twa_no_history_returns_fallback() {
         let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-        let history = finstack_quant_core::HashMap::default();
+        let history: Vec<(Date, Decimal)> = Vec::new();
         let mut buf = Vec::new();
         let result = compute_time_weighted_average(&history, start, end, dec!(42), &mut buf);
         assert_eq!(result, dec!(42));
@@ -603,8 +580,7 @@ mod tests {
     fn compute_twa_single_entry_at_start() {
         let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-        let mut history = finstack_quant_core::HashMap::default();
-        history.insert(start, dec!(1000000));
+        let history: Vec<(Date, Decimal)> = vec![(start, dec!(1000000))];
         let mut buf = Vec::new();
         let result = compute_time_weighted_average(&history, start, end, dec!(0), &mut buf);
         assert_eq!(result, dec!(1000000), "Expected 1M, got {}", result);
@@ -615,8 +591,7 @@ mod tests {
         let before = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-        let mut history = finstack_quant_core::HashMap::default();
-        history.insert(before, dec!(1000000));
+        let history: Vec<(Date, Decimal)> = vec![(before, dec!(1000000))];
         let mut buf = Vec::new();
         let result = compute_time_weighted_average(&history, start, end, dec!(0), &mut buf);
         assert_eq!(result, dec!(1000000), "Expected 1M, got {}", result);
@@ -631,8 +606,7 @@ mod tests {
         let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
         let payment = end;
 
-        let mut history = finstack_quant_core::HashMap::default();
-        history.insert(start, dec!(1000000));
+        let history: Vec<(Date, Decimal)> = vec![(start, dec!(1000000))];
 
         let pf = make_periodic_fee(
             start,
@@ -670,8 +644,7 @@ mod tests {
         let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
         let payment = end;
 
-        let mut history = finstack_quant_core::HashMap::default();
-        history.insert(start, dec!(1000000));
+        let history: Vec<(Date, Decimal)> = vec![(start, dec!(1000000))];
 
         let pf = make_periodic_fee(
             start,
