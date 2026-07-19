@@ -2090,6 +2090,224 @@ mod tests {
         );
     }
 
+    /// Build a single-asset 30-year level-pay pool for amortization tests.
+    fn level_pay_pool_and_tranches(
+        maturity: Date,
+        rate: f64,
+        balance: f64,
+    ) -> (AssetPool, TrancheStructure) {
+        use crate::instruments::fixed_income::structured_credit::types::AssetType;
+        use finstack_quant_core::types::InstrumentId;
+
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset {
+            day_count: DayCount::Thirty360,
+            id: InstrumentId::new("MTG1"),
+            asset_type: AssetType::SingleFamilyMortgage { ltv: None },
+            balance: Money::new(balance, Currency::USD),
+            rate,
+            spread_bps: None,
+            index_id: None,
+            maturity,
+            credit_quality: None,
+            industry: None,
+            obligor_id: None,
+            is_defaulted: false,
+            recovery_amount: None,
+            purchase_price: None,
+            acquisition_date: None,
+            smm_override: None,
+            mdr_override: None,
+            contractual_payment: None,
+        });
+        let tranche = Tranche::new(
+            "A",
+            0.0,
+            100.0,
+            TrancheSeniority::Senior,
+            Money::new(balance, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            maturity,
+        )
+        .expect("tranche");
+        let tranches = TrancheStructure::new(vec![tranche]).expect("structure");
+        (pool, tranches)
+    }
+
+    /// Run a monthly-pay pool to exhaustion and report (WAL years, principal
+    /// returned, payoff month) where payoff month is 0 if it never exhausts.
+    fn run_monthly_amortization(
+        pool: &AssetPool,
+        tranches: &TrancheStructure,
+        closing: Date,
+        smm: f64,
+        months: usize,
+    ) -> (f64, f64, usize) {
+        use finstack_quant_core::dates::DateExt;
+
+        let market = MarketContext::new().insert(cc_discount_curve());
+        let mut state = SimulationState::new(pool, tranches, closing, closing, 0).expect("state");
+        let rates = PoolFlowRates {
+            smm,
+            mdr: 0.0,
+            recovery_rate: 0.0,
+        };
+        let mut prev = closing;
+        let (mut weighted, mut total) = (0.0_f64, 0.0_f64);
+        let mut payoff_month = 0usize;
+        for m in 1..=months {
+            let pay = closing.add_months(i32::try_from(m).expect("month fits i32"));
+            let flows = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
+                state: &mut state,
+                pay_date: pay,
+                prev_date: prev,
+                months_per_period: 1.0,
+                context: &market,
+                rates,
+                copula_outcome: None,
+            })
+            .expect("pool flows");
+            let principal = flows.scheduled_principal.amount() + flows.prepayment.amount();
+            weighted += (m as f64 / 12.0) * principal;
+            total += principal;
+            prev = pay;
+            if state.pool_state.balances[0] <= 1e-9 {
+                payoff_month = m;
+                break;
+            }
+        }
+        (weighted / total, total, payoff_month)
+    }
+
+    /// SC-C01 — a rep-line's contractual level payment must scale by the
+    /// PREPAYMENT survival fraction as well as the default survival fraction.
+    ///
+    /// SMM is Single Monthly Mortality: the fraction of the line that pays off
+    /// in full and leaves the pool. Under the SIFMA/BMA pool convention the
+    /// pool's scheduled principal is the underlying loan's amortization *rate*
+    /// applied to the current pool balance, so scheduled principal scales down
+    /// with the balance as loans prepay away.
+    ///
+    /// The pre-fix engine scaled the frozen payment only by `(1 − mdr)`, so with
+    /// prepayments the payment stayed flat while the balance shrank — the
+    /// rep-line behaved like a SINGLE loan receiving perpetual curtailments and
+    /// amortized far too fast. This test pins the corrected behavior and, via
+    /// the explicit `assert!(wal > ...)` bound, fails loudly if the regression
+    /// returns.
+    #[test]
+    fn level_pay_amortization_scales_payment_by_prepayment_survival() {
+        let closing = Date::from_calendar_date(2024, Month::January, 1).expect("date");
+        let maturity = Date::from_calendar_date(2054, Month::January, 1).expect("date"); // 360mo
+        let (pool, tranches) = level_pay_pool_and_tranches(maturity, 0.06, 100.0);
+
+        // ── Zero prepayment: pure scheduled amortization, unchanged by the fix.
+        let (wal_zero, principal_zero, payoff_zero) =
+            run_monthly_amortization(&pool, &tranches, closing, 0.0, 360);
+        assert!(
+            (wal_zero - 19.306).abs() < 0.01,
+            "zero-CPR WAL must be the textbook 30y level-pay value 19.306y, got {wal_zero:.3}"
+        );
+        assert!(
+            (principal_zero - 100.0).abs() < 1e-6,
+            "all principal must be returned, got {principal_zero}"
+        );
+        assert_eq!(
+            payoff_zero, 360,
+            "a zero-prepay 30y pool must amortize over exactly 360 months"
+        );
+
+        // ── ~5.8% CPR (SMM 0.5%/month). Under the SIFMA convention the pool
+        // still runs to its 360-month maturity — prepayments shrink the balance
+        // but the survivors stay on their original schedule.
+        let (wal_prepay, principal_prepay, payoff_prepay) =
+            run_monthly_amortization(&pool, &tranches, closing, 0.005, 360);
+        assert!(
+            (principal_prepay - 100.0).abs() < 1e-6,
+            "all principal must be returned under prepayment, got {principal_prepay}"
+        );
+        assert!(
+            (wal_prepay - 10.750).abs() < 0.02,
+            "SIFMA-convention WAL at ~5.8% CPR must be 10.750y, got {wal_prepay:.3}"
+        );
+
+        // Regression guard: the pre-fix engine reported 7.007y and retired the
+        // pool at month 168. Both are far outside the tolerance above, but pin
+        // them explicitly so the failure message names the bug.
+        assert!(
+            wal_prepay > 9.0,
+            "WAL {wal_prepay:.3}y is near the pre-fix value of 7.007y — the \
+             contractual level payment is not scaling by prepayment survival \
+             (SC-C01). Scheduled principal is overstated and the pool is \
+             amortizing as a single curtailed loan rather than a rep-line."
+        );
+        assert_eq!(
+            payoff_prepay, 360,
+            "under the SIFMA convention a 30y pool at 5.8% CPR must run to its \
+             360-month maturity, retiring only on the final balloon — the \
+             pre-fix engine retired it early at month 168"
+        );
+    }
+
+    /// SC-C01 — cross-check against the workspace's other implementation of the
+    /// same math. `mbs_passthrough/pricer.rs` re-derives the level payment from
+    /// the current balance and remaining term each period, which is the SIFMA
+    /// convention expressed differently. Both must produce the same scheduled
+    /// principal for the same pool state, or the workspace disagrees with
+    /// itself about how a mortgage pool amortizes.
+    #[test]
+    fn level_pay_scheduled_principal_matches_mbs_passthrough_convention() {
+        let closing = Date::from_calendar_date(2024, Month::January, 1).expect("date");
+        let maturity = Date::from_calendar_date(2054, Month::January, 1).expect("date");
+        let rate = 0.06_f64;
+        let (pool, tranches) = level_pay_pool_and_tranches(maturity, rate, 100.0);
+
+        use finstack_quant_core::dates::DateExt;
+        let market = MarketContext::new().insert(cc_discount_curve());
+        let mut state = SimulationState::new(&pool, &tranches, closing, closing, 0).expect("state");
+        let rates = PoolFlowRates {
+            smm: 0.005,
+            mdr: 0.0,
+            recovery_rate: 0.0,
+        };
+
+        let monthly_rate = rate / 12.0;
+        let mut prev = closing;
+        for m in 1..=120usize {
+            let balance_before = state.pool_state.balances[0];
+            let remaining = 360 - m + 1;
+
+            // mbs_passthrough convention: payment re-derived on the CURRENT
+            // balance over the remaining term.
+            let factor = (1.0 + monthly_rate).powi(i32::try_from(remaining).expect("term"));
+            let reference_payment = balance_before * monthly_rate * factor / (factor - 1.0);
+            let reference_sched = (reference_payment - balance_before * monthly_rate)
+                .max(0.0)
+                .min(balance_before);
+
+            let pay = closing.add_months(i32::try_from(m).expect("month"));
+            let flows = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
+                state: &mut state,
+                pay_date: pay,
+                prev_date: prev,
+                months_per_period: 1.0,
+                context: &market,
+                rates,
+                copula_outcome: None,
+            })
+            .expect("pool flows");
+            prev = pay;
+
+            let engine_sched = flows.scheduled_principal.amount();
+            let tolerance = (reference_sched.abs() * 1e-6).max(1e-9);
+            assert!(
+                (engine_sched - reference_sched).abs() <= tolerance,
+                "month {m}: structured-credit scheduled principal {engine_sched:.10} \
+                 disagrees with the mbs_passthrough convention {reference_sched:.10} \
+                 (balance {balance_before:.6}, remaining {remaining})"
+            );
+        }
+    }
+
     // ── W-26: cleanup-call redemption must INCLUDE pending recoveries ───────
 
     /// A deal that accumulates a large recovery queue before the cleanup call
@@ -4039,6 +4257,16 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
             continue;
         }
 
+        // This period's prepayment rate, resolved up-front alongside
+        // `period_mdr`: both are attrition channels that retire whole loans
+        // from the (rep-line) asset, and the contractual level payment below
+        // must scale by BOTH survival fractions.
+        let period_smm = if let Some(smm) = state.pool_state.smm_overrides[i] {
+            1.0 - (1.0 - smm).powf(request.months_per_period)
+        } else {
+            global_period_smm
+        };
+
         // Scheduled amortization for amortizing assets, computed on the
         // SURVIVING (post-default) balance.
         //
@@ -4112,10 +4340,38 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
             // Defaulted loans' contractual payments terminate. Defaults are
             // applied pro-rata across the (rep-line) asset, so the surviving
             // pool's aggregate level payment scales by this period's survival
-            // fraction. Persist the scaled payment so future periods amortize
-            // off the survivors' contractual payment.
+            // fraction.
             let surviving_payment = level_payment * (1.0 - period_mdr);
-            state.pool_state.level_payments[i] = Some(surviving_payment);
+
+            // Prepaid loans' contractual payments terminate too. SMM is Single
+            // Monthly *Mortality* — the fraction of the rep-line that pays off
+            // in FULL and leaves the pool — so the aggregate level payment must
+            // scale by the prepayment survival fraction exactly as it does by
+            // the default survival fraction. This is the SIFMA/BMA pool
+            // convention (Fabozzi, "Handbook of Mortgage-Backed Securities"):
+            // scheduled principal is the underlying loan's amortization *rate*
+            // applied to the CURRENT pool balance, which is what scaling the
+            // payment alongside the balance reproduces. It also matches the
+            // reference implementation in `mbs_passthrough/pricer.rs`, which
+            // re-derives the payment from the current balance each period.
+            //
+            // Scaling only by default survival treats the rep-line as a SINGLE
+            // loan receiving perpetual curtailments: the payment stays flat
+            // while the balance shrinks, so the interest component falls faster
+            // than it should and scheduled principal is progressively
+            // overstated. Measured impact before this fix, on a 30y 6% pool at
+            // ~5.8% CPR: WAL 7.007y and full payoff at month 168, versus the
+            // correct 10.750y running to month 360 — a 35% WAL error. The two
+            // channels are applied multiplicatively because they attrit
+            // disjoint slices of the line (defaults off the BOP balance,
+            // prepayments off the post-scheduled remainder).
+            //
+            // `period_smm` scales the payment PERSISTED for future periods, not
+            // the one used for this period's scheduled principal: prepayments
+            // occur after scheduled principal in the period ordering, so the
+            // loans prepaying this period do make their scheduled payment.
+            state.pool_state.level_payments[i] =
+                Some(surviving_payment * (1.0 - period_smm).clamp(0.0, 1.0));
 
             // Scheduled principal = survivors' level payment − this period's
             // interest on the surviving balance (interest + scheduled
@@ -4139,12 +4395,8 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         // Prepayment LAST: SMM applies to the survivor balance after
         // scheduled principal (Intex/Moody's Analytics & SIFMA standard
         // ordering: default on BOP balance → scheduled principal on the
-        // survivor → prepayment on the remainder).
-        let period_smm = if let Some(smm) = state.pool_state.smm_overrides[i] {
-            1.0 - (1.0 - smm).powf(request.months_per_period)
-        } else {
-            global_period_smm
-        };
+        // survivor → prepayment on the remainder). `period_smm` was resolved
+        // above so the contractual level payment could scale by it.
         let prepay_amt = balance_after_sched * period_smm;
         total_prepay = total_prepay.checked_add(Money::new(prepay_amt, base_ccy))?;
 
