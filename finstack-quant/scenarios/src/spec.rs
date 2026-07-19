@@ -863,6 +863,15 @@ pub enum TenorMatchMode {
 /// business-day adjustment. [`TimeRollMode::Approximate`] uses fixed day-count
 /// approximations aligned with the internal period-to-day conversion.
 ///
+/// # Reported day counts are always calendar days
+///
+/// Every mode reports `RollForwardReport::days` (and `HorizonResult::horizon_days`)
+/// as the *calendar-day* span between the old and new as-of dates. `BusinessDays`
+/// adjusts the **target date**, not the unit of the count: a `1M` business-day
+/// roll whose target is carried from a Saturday to the following Monday reports
+/// 33 calendar days, not 31 and not a business-day tally. Downstream ACT/365F
+/// annualization depends on this.
+///
 /// # Non-additivity of `Approximate`
 ///
 /// [`TimeRollMode::Approximate`] is **not additive across composed rolls**.
@@ -877,7 +886,15 @@ pub enum TenorMatchMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TimeRollMode {
-    /// Calendar-aware roll that adjusts to business days when a calendar is supplied.
+    /// Business-day-adjusted roll (ModifiedFollowing).
+    ///
+    /// The tenor is added to the as-of date and the result is adjusted with
+    /// [`BusinessDayConvention::ModifiedFollowing`]. When the execution context
+    /// carries no calendar, [`finstack_quant_core::dates::WEEKENDS_ONLY`] is
+    /// used, so this mode always avoids weekends; supply a calendar for holiday
+    /// awareness.
+    ///
+    /// [`BusinessDayConvention::ModifiedFollowing`]: finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing
     #[default]
     BusinessDays,
     /// Pure calendar-day addition (no business-day adjustment even if a calendar exists).

@@ -123,6 +123,20 @@ fn default_stub_kind() -> StubKind {
 /// so tiers must be strictly ascending for the algorithm to work correctly.
 /// Duplicate thresholds are rejected because the first would be unreachable.
 fn validate_fee_tier_ordering(tiers: &[FeeTier], context: &str) -> finstack_quant_core::Result<()> {
+    for (index, tier) in tiers.iter().enumerate() {
+        if !(Decimal::ZERO..=Decimal::ONE).contains(&tier.threshold) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RevolvingCredit {context}[{index}].threshold must be in [0, 1], got {}",
+                tier.threshold
+            )));
+        }
+        if tier.bps < Decimal::ZERO {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RevolvingCredit {context}[{index}].bps must be non-negative, got {}",
+                tier.bps
+            )));
+        }
+    }
     for i in 1..tiers.len() {
         if tiers[i].threshold <= tiers[i - 1].threshold {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -551,6 +565,12 @@ impl McConfig {
         {
             validation::require_or(*kappa > 0.0 && *sigma >= 0.0, InputError::Invalid)?;
         }
+        if let Some(InterestRateProcessSpec::HullWhite1F { initial, theta, .. }) =
+            &self.interest_rate_process
+        {
+            validation::validate_f64_finite(*initial, "Hull-White initial short rate")?;
+            validation::validate_f64_finite(*theta, "Hull-White mean-reversion level")?;
+        }
 
         Ok(())
     }
@@ -669,6 +689,7 @@ impl RevolvingCredit {
             0.0,
             "RevolvingCredit commitment_amount",
         )?;
+        validation::validate_money_finite(self.drawn_amount, "RevolvingCredit drawn_amount")?;
 
         // Drawn amount must be non-negative (check before relationship check
         // so a negative drawn_amount is reported clearly rather than passing
@@ -726,6 +747,21 @@ impl RevolvingCredit {
         validate_fee_tier_ordering(&self.fees.commitment_fee_tiers, "commitment_fee_tiers")?;
         validate_fee_tier_ordering(&self.fees.usage_fee_tiers, "usage_fee_tiers")?;
 
+        if let Some(upfront_fee) = self.fees.upfront_fee {
+            validation::validate_money_finite(upfront_fee, "RevolvingCredit upfront_fee")?;
+            validation::validate_money_currency(
+                upfront_fee,
+                self.commitment_amount.currency(),
+                "RevolvingCredit upfront_fee currency",
+            )?;
+            validation::require_with(upfront_fee.amount() >= 0.0, || {
+                format!(
+                    "RevolvingCredit upfront_fee must be non-negative, got {}",
+                    upfront_fee
+                )
+            })?;
+        }
+
         // Validate facility fee is non-negative
         validation::validate_f64_non_negative(
             self.fees.facility_fee_bp,
@@ -737,19 +773,104 @@ impl RevolvingCredit {
             validation::validate_f64_finite(*rate, "RevolvingCredit fixed base rate")?;
         }
 
-        // Deterministic draw/repay events must be dated strictly after the
-        // commitment date: the position at commitment is defined by
-        // drawn_amount, and a commitment-date event would double-count
-        // principal (see CashflowEngine::build_deterministic_schedule).
-        if let DrawRepaySpec::Deterministic(events) = &self.draw_repay_spec {
-            for event in events {
-                validation::require_with(event.date > self.commitment_date, || {
+        match &self.draw_repay_spec {
+            DrawRepaySpec::Deterministic(events) => {
+                let mut events = events.iter().collect::<Vec<_>>();
+                events.sort_by_key(|event| event.date);
+                let mut balance = self.drawn_amount.amount();
+                for event in events {
+                    validation::require_with(
+                        event.date > self.commitment_date && event.date <= self.maturity,
+                        || {
+                            format!(
+                                "RevolvingCredit draw/repay event dated {} must be after \
+                                 commitment ({}) and on or before maturity ({})",
+                                event.date, self.commitment_date, self.maturity
+                            )
+                        },
+                    )?;
+                    validation::validate_money_finite(
+                        event.amount,
+                        "RevolvingCredit draw/repay amount",
+                    )?;
+                    validation::validate_money_gt(
+                        event.amount,
+                        0.0,
+                        "RevolvingCredit draw/repay amount",
+                    )?;
+                    validation::validate_money_currency(
+                        event.amount,
+                        self.commitment_amount.currency(),
+                        "RevolvingCredit draw/repay amount currency",
+                    )?;
+                    if event.is_draw {
+                        balance += event.amount.amount();
+                        validation::require_with(
+                            balance <= self.commitment_amount.amount(),
+                            || {
+                                format!(
+                                    "RevolvingCredit draw on {} would increase balance to {}, \
+                                     above commitment {}",
+                                    event.date, balance, self.commitment_amount
+                                )
+                            },
+                        )?;
+                    } else {
+                        validation::require_with(event.amount.amount() <= balance, || {
+                            format!(
+                                "RevolvingCredit repayment on {} of {} exceeds current balance {}",
+                                event.date, event.amount, balance
+                            )
+                        })?;
+                        balance -= event.amount.amount();
+                    }
+                }
+            }
+            DrawRepaySpec::Stochastic(spec) => {
+                validation::require_with(spec.num_paths >= 2, || {
                     format!(
-                        "RevolvingCredit draw/repay event dated {} must be strictly after the \
-                         commitment date ({}); encode the initial position in drawn_amount",
-                        event.date, self.commitment_date
+                        "RevolvingCredit stochastic num_paths must be at least 2, got {}",
+                        spec.num_paths
                     )
                 })?;
+                match &spec.utilization_process {
+                    UtilizationProcess::MeanReverting {
+                        target_rate,
+                        speed,
+                        volatility,
+                    } => {
+                        validation::require_with(
+                            target_rate.is_finite() && (0.0..=1.0).contains(target_rate),
+                            || {
+                                format!(
+                                    "RevolvingCredit utilization target_rate must be finite and \
+                                     in [0, 1], got {target_rate}"
+                                )
+                            },
+                        )?;
+                        validation::validate_f64_positive(
+                            *speed,
+                            "RevolvingCredit utilization speed",
+                        )?;
+                        validation::validate_f64_non_negative(
+                            *volatility,
+                            "RevolvingCredit utilization volatility",
+                        )?;
+                    }
+                }
+                if let Some(mc_config) = &spec.mc_config {
+                    mc_config.validate()?;
+                    validation::require_with(
+                        (mc_config.recovery_rate - self.recovery_rate).abs() <= 1e-12,
+                        || {
+                            format!(
+                                "RevolvingCredit McConfig recovery_rate ({}) must equal the \
+                                 facility recovery_rate ({})",
+                                mc_config.recovery_rate, self.recovery_rate
+                            )
+                        },
+                    )?;
+                }
             }
         }
 
@@ -792,6 +913,10 @@ impl RevolvingCredit {
 // Implement the Instrument trait
 impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
     impl_instrument_base!(crate::pricer::InstrumentType::RevolvingCredit);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(
         &self,
@@ -916,6 +1041,8 @@ impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
 #[cfg(test)]
 mod dependency_tests {
     use super::*;
+    use finstack_quant_core::currency::Currency;
+    use time::macros::date;
 
     #[test]
     fn floating_revolver_uses_the_canonical_fixing_series_id() {
@@ -929,5 +1056,72 @@ mod dependency_tests {
         let deps =
             crate::instruments::Instrument::market_dependencies(&facility).expect("dependencies");
         assert_eq!(deps.series_ids, vec![expected]);
+    }
+
+    #[test]
+    fn deterministic_events_are_validated_and_replayed_chronologically() {
+        let mut facility = RevolvingCredit::example().expect("example");
+        facility.draw_repay_spec = DrawRepaySpec::Deterministic(vec![
+            DrawRepayEvent {
+                date: date!(2025 - 06 - 01),
+                amount: Money::new(20_000_000.0, Currency::USD),
+                is_draw: false,
+            },
+            DrawRepayEvent {
+                date: date!(2025 - 01 - 01),
+                amount: Money::new(20_000_000.0, Currency::USD),
+                is_draw: true,
+            },
+        ]);
+
+        facility
+            .validate()
+            .expect("chronologically valid events must not depend on input order");
+        let balance = super::super::cashflow_engine::calculate_drawn_balance_at_date(
+            &facility,
+            date!(2025 - 12 - 31),
+        )
+        .expect("balance");
+        assert_eq!(balance.amount(), 10_000_000.0);
+    }
+
+    #[test]
+    fn validation_rejects_events_outside_life_and_mismatched_mc_recovery() {
+        let mut facility = RevolvingCredit::example().expect("example");
+        facility.draw_repay_spec = DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
+            date: date!(2028 - 01 - 01),
+            amount: Money::new(1_000_000.0, Currency::USD),
+            is_draw: true,
+        }]);
+        assert!(facility
+            .validate()
+            .expect_err("post-maturity draw must fail")
+            .to_string()
+            .contains("maturity"));
+
+        facility.recovery_rate = 0.4;
+        facility.draw_repay_spec = DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
+            utilization_process: UtilizationProcess::MeanReverting {
+                target_rate: 0.5,
+                speed: 1.0,
+                volatility: 0.1,
+            },
+            num_paths: 100,
+            seed: Some(7),
+            antithetic: false,
+            use_sobol_qmc: false,
+            mc_config: Some(McConfig {
+                correlation_matrix: None,
+                recovery_rate: 0.35,
+                credit_spread_process: CreditSpreadProcessSpec::Constant(0.01),
+                interest_rate_process: None,
+                util_credit_corr: None,
+            }),
+        }));
+        assert!(facility
+            .validate()
+            .expect_err("mismatched recovery assumptions must fail")
+            .to_string()
+            .contains("must equal"));
     }
 }

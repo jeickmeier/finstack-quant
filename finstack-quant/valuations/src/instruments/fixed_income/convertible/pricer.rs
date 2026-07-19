@@ -1173,6 +1173,8 @@ pub fn price_convertible_bond(
     tree_type: ConvertibleTreeType,
     as_of: Date,
 ) -> Result<Money> {
+    bond.validate_for_pricing()?;
+    validate_tree_type(tree_type)?;
     if as_of > bond.maturity {
         return Ok(Money::new(0.0, bond.notional.currency()));
     }
@@ -1212,7 +1214,14 @@ pub fn calculate_convertible_greeks(
     bump_size: Option<f64>,
     as_of: Date,
 ) -> Result<TreeGreeks> {
+    bond.validate_for_pricing()?;
+    validate_tree_type(tree_type)?;
     let bump_pct = bump_size.unwrap_or(0.01);
+    if !bump_pct.is_finite() || bump_pct <= 0.0 {
+        return Err(Error::Validation(format!(
+            "convertible Greek spot bump must be finite and positive, got {bump_pct}"
+        )));
+    }
 
     // Resolve market data and compute base price in one pass.
     // The base price is computed inline to avoid a second prepare_for_pricing call
@@ -1423,6 +1432,7 @@ pub fn settlement_date(bond: &ConvertibleBond, as_of: Date) -> Date {
 /// * `as_of` - Trade or valuation date from which the bond settlement date is
 ///   calculated.
 pub fn calculate_accrued_interest(bond: &ConvertibleBond, as_of: Date) -> Result<f64> {
+    bond.validate_for_pricing()?;
     if bond.fixed_coupon.is_none() && bond.floating_coupon.is_none() {
         return Ok(0.0); // Zero-coupon
     }
@@ -1474,6 +1484,18 @@ pub fn calculate_accrued_interest(bond: &ConvertibleBond, as_of: Date) -> Result
     }
 
     Ok(0.0)
+}
+
+fn validate_tree_type(tree_type: ConvertibleTreeType) -> Result<()> {
+    let steps = match tree_type {
+        ConvertibleTreeType::Binomial(steps) | ConvertibleTreeType::Trinomial(steps) => steps,
+    };
+    if steps == 0 {
+        return Err(Error::Validation(
+            "convertible tree must contain at least one time step".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 // ========================= REGISTRY PRICER =========================

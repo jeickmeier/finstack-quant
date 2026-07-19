@@ -730,6 +730,7 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0))
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(stoch_spec)))
         .discount_curve_id("USD-OIS".into())
+        .recovery_rate(0.4)
         .build()
         .unwrap();
 

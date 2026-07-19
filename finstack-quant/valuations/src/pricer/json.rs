@@ -611,11 +611,17 @@ fn instrument_json_for_pricing<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::credit_derivatives::cds_option::CDSOption;
     use crate::instruments::equity::equity_option::EquityOption;
     use crate::instruments::equity::pe_fund::PrivateMarketsFund;
     use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::fixed_income::cmo::AgencyCmo;
+    use crate::instruments::fixed_income::convertible::ConvertibleBond;
+    use crate::instruments::fixed_income::revolving_credit::RevolvingCredit;
     use crate::instruments::fixed_income::structured_credit::StructuredCredit;
+    use crate::instruments::fixed_income::term_loan::TermLoan;
     use crate::instruments::fx::FxOption;
+    use crate::instruments::rates::ir_future::InterestRateFuture;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
@@ -792,6 +798,77 @@ mod tests {
             err.to_string().contains("strike") && err.to_string().contains("positive"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    fn validate_instrument_json_rejects_credit_and_convertible_invariants() {
+        let mut cds_option = CDSOption::example().expect("CDS option");
+        cds_option.exercise_style = crate::instruments::ExerciseStyle::American;
+        let json = serde_json::to_string(&InstrumentJson::CDSOption(cds_option)).expect("json");
+        assert!(validate_instrument_json(&json)
+            .expect_err("unsupported exercise style must fail")
+            .to_string()
+            .contains("European"));
+
+        let mut convertible = ConvertibleBond::example().expect("convertible");
+        convertible.conversion.ratio = None;
+        convertible.conversion.price = None;
+        let json =
+            serde_json::to_string(&InstrumentJson::ConvertibleBond(convertible)).expect("json");
+        assert!(validate_instrument_json(&json)
+            .expect_err("missing conversion terms must fail")
+            .to_string()
+            .contains("conversion.ratio"));
+    }
+
+    #[test]
+    fn validate_instrument_json_rejects_invalid_revolving_credit_path() {
+        let mut facility = RevolvingCredit::example().expect("revolving credit");
+        facility.draw_repay_spec =
+            crate::instruments::fixed_income::revolving_credit::DrawRepaySpec::Deterministic(vec![
+                crate::instruments::fixed_income::revolving_credit::DrawRepayEvent {
+                    date: facility.maturity + time::Duration::days(1),
+                    amount: Money::new(1_000_000.0, Currency::USD),
+                    is_draw: true,
+                },
+            ]);
+        let json = serde_json::to_string(&InstrumentJson::RevolvingCredit(facility)).expect("json");
+        assert!(validate_instrument_json(&json)
+            .expect_err("post-maturity draw must fail")
+            .to_string()
+            .contains("maturity"));
+    }
+
+    #[test]
+    fn validate_instrument_json_rejects_rates_and_securitized_invariants() {
+        let mut future = InterestRateFuture::example().expect("IR future");
+        future.contract_specs.convexity_adjustment = None;
+        future.vol_surface_id = None;
+        let json =
+            serde_json::to_string(&InstrumentJson::InterestRateFuture(future)).expect("json");
+        assert!(validate_instrument_json(&json)
+            .expect_err("missing convexity source must fail")
+            .to_string()
+            .contains("convexity_adjustment"));
+
+        let mut cmo = AgencyCmo::example().expect("CMO");
+        cmo.reference_tranche_id = "MISSING".to_string();
+        let json = serde_json::to_string(&InstrumentJson::AgencyCmo(cmo)).expect("json");
+        assert!(validate_instrument_json(&json)
+            .expect_err("unknown reference tranche must fail")
+            .to_string()
+            .contains("reference tranche"));
+    }
+
+    #[test]
+    fn validate_instrument_json_rejects_invalid_term_loan_notional() {
+        let mut loan = TermLoan::example().expect("term loan");
+        loan.notional_limit = Money::new(-1.0, Currency::USD);
+        let json = serde_json::to_string(&InstrumentJson::TermLoan(loan)).expect("json");
+        assert!(validate_instrument_json(&json)
+            .expect_err("negative notional must fail")
+            .to_string()
+            .contains("notional_limit"));
     }
 
     #[test]

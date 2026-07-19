@@ -211,12 +211,16 @@ impl CDSOption {
 
     /// Validate the CDSOption parameters.
     fn validate(&self) -> finstack_quant_core::Result<()> {
+        use crate::instruments::common_impl::validation;
+
         super::parameters::validate_common_terms(
             self.strike,
             self.expiry,
             self.cds_maturity,
             self.index_factor,
         )?;
+        validation::validate_money_finite(self.notional, "CDS option notional")?;
+        validation::validate_money_gt(self.notional, 0.0, "CDS option notional")?;
 
         if let (Some(cash_settlement), Some(exercise_settlement)) =
             (self.cash_settlement_date, self.exercise_settlement_date)
@@ -227,6 +231,8 @@ impl CDSOption {
                     exercise_settlement, cash_settlement
                 )));
             }
+        }
+        if let Some(exercise_settlement) = self.exercise_settlement_date {
             if exercise_settlement >= self.cds_maturity {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "exercise_settlement_date ({}) must be before CDS maturity ({})",
@@ -244,9 +250,12 @@ impl CDSOption {
         }
 
         // Recovery rate validation
-        if self.recovery_rate <= 0.0 || self.recovery_rate >= MAX_RECOVERY_RATE {
+        if !self.recovery_rate.is_finite()
+            || self.recovery_rate <= 0.0
+            || self.recovery_rate >= MAX_RECOVERY_RATE
+        {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "recovery_rate must be in (0, 1), got {}",
+                "recovery_rate must be finite and in (0, 1), got {}",
                 self.recovery_rate
             )));
         }
@@ -278,9 +287,9 @@ impl CDSOption {
             .market_quotes
             .implied_volatility
         {
-            if vol <= 0.0 {
+            if !vol.is_finite() || vol <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "implied_volatility must be positive, got {}",
+                    "implied_volatility must be finite and positive, got {}",
                     vol
                 )));
             }
@@ -486,6 +495,7 @@ impl CDSOption {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
+        crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
         super::metrics::delta::delta(self, curves, as_of)
     }
 
@@ -497,6 +507,7 @@ impl CDSOption {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
+        crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
         super::metrics::gamma::gamma(self, curves, as_of)
     }
 
@@ -508,6 +519,7 @@ impl CDSOption {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
+        crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
         super::metrics::vega::vega(self, curves, as_of)
     }
 
@@ -521,6 +533,7 @@ impl CDSOption {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
+        crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
         super::pricer::theta(self, curves, as_of)
     }
 
@@ -534,6 +547,7 @@ impl CDSOption {
         target_price: f64,
         initial_guess: Option<f64>,
     ) -> finstack_quant_core::Result<f64> {
+        crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
         super::pricer::implied_vol(self, curves, as_of, target_price, initial_guess)
     }
 }
@@ -555,6 +569,11 @@ pub(crate) fn prior_cds_roll_on_or_before(date: Date) -> Date {
 
 impl crate::instruments::common_impl::traits::Instrument for CDSOption {
     impl_instrument_base!(crate::pricer::InstrumentType::CDSOption);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()?;
+        self.validate_supported_configuration()
+    }
 
     fn market_dependencies(
         &self,
@@ -607,6 +626,7 @@ crate::impl_empty_cashflow_provider!(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::common_impl::traits::Instrument;
     use finstack_quant_core::currency::Currency;
     use time::macros::date;
 
@@ -742,5 +762,24 @@ mod tests {
             err.to_string().contains("underlying_cds_coupon"),
             "error should point to missing underlying_cds_coupon: {err}"
         );
+    }
+
+    #[test]
+    fn pricing_boundary_rejects_non_finite_and_unsupported_terms() {
+        let mut option = CDSOption::example().expect("example");
+        option.recovery_rate = f64::NAN;
+        assert!(option
+            .validate_for_pricing()
+            .expect_err("NaN recovery must fail")
+            .to_string()
+            .contains("finite"));
+
+        option.recovery_rate = 0.4;
+        option.exercise_style = ExerciseStyle::American;
+        assert!(option
+            .validate_for_pricing()
+            .expect_err("American CDS option must fail")
+            .to_string()
+            .contains("European"));
     }
 }

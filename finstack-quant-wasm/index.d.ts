@@ -7282,6 +7282,9 @@ export interface ScenariosNamespace {
    *
    * JSON-serialized `HorizonResult`.
    * @param configJson - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
+   * @param calendarId - Optional holiday calendar (e.g. "nyse", "target") used to
+   *   business-day adjust `time_roll_forward` targets under `business_days` mode.
+   *   Omit for a weekends-only calendar; unknown identifiers throw.
    * @returns Returns the requested string representation or JSON payload.
    * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
    */
@@ -7291,7 +7294,8 @@ export interface ScenariosNamespace {
     asOf: string,
     scenarioJson: string,
     method?: string,
-    configJson?: string
+    configJson?: string,
+    calendarId?: string
   ): string;
 }
 

@@ -122,6 +122,7 @@ pub struct TbaSettlement {
     finstack_quant_valuations_macros::FinancialBuilder,
     finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
+#[builder(validate = AgencyTba::validate)]
 #[serde(deny_unknown_fields)]
 pub struct AgencyTba {
     /// Unique instrument identifier.
@@ -185,6 +186,60 @@ pub struct AgencyTba {
 }
 
 impl AgencyTba {
+    /// Validate the TBA economic contract and optional assumed collateral.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        let context = format!("Agency TBA '{}'", self.id.as_str());
+        if !self.coupon.is_finite() || !(0.0..=1.0).contains(&self.coupon) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} coupon must be a finite decimal rate in [0, 1]"
+            )));
+        }
+        if !self.notional.amount().is_finite() || self.notional.amount() <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} notional must be positive and finite"
+            )));
+        }
+        if !self.trade_price.is_finite() || self.trade_price <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} trade_price must be positive and finite"
+            )));
+        }
+        if self
+            .pool_factor
+            .is_some_and(|factor| !factor.is_finite() || !(0.0..=1.0).contains(&factor))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} pool_factor must be finite and in [0, 1]"
+            )));
+        }
+        if self.discount_curve_id.as_str().trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} requires a non-empty discount_curve_id"
+            )));
+        }
+        if !(1..=12).contains(&self.settlement_month) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} settlement_month must be in 1..=12"
+            )));
+        }
+        if let (Some(trade), Ok(settlement)) = (self.trade_date, self.get_settlement_date()) {
+            if trade > settlement {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} trade_date cannot follow settlement"
+                )));
+            }
+        }
+        if let Some(pool) = &self.assumed_pool {
+            crate::instruments::Instrument::validate_for_pricing(pool.as_ref())?;
+            if pool.current_face.currency() != self.notional.currency() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} assumed-pool currency must match TBA notional currency"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Create a canonical example TBA for testing and documentation.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
@@ -308,6 +363,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyTba {
 
 impl crate::instruments::common_impl::traits::Instrument for AgencyTba {
     impl_instrument_base!(crate::pricer::InstrumentType::AgencyTba);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(
         &self,

@@ -50,6 +50,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
     finstack_quant_valuations_macros::FinancialBuilder,
     finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
+#[builder(validate = IrFutureOption::validate)]
 #[serde(deny_unknown_fields)]
 pub struct IrFutureOption {
     /// Unique identifier
@@ -93,6 +94,35 @@ pub struct IrFutureOption {
 }
 
 impl IrFutureOption {
+    /// Validate Black-76 inputs and contract scaling.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        let context = format!("IR future option '{}'", self.id.as_str());
+        for (field, value) in [
+            ("futures_price", self.futures_price),
+            ("strike", self.strike),
+            ("notional", self.notional.amount()),
+            ("tick_size", self.tick_size),
+            ("tick_value", self.tick_value),
+        ] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} {field} must be positive and finite"
+                )));
+            }
+        }
+        if !self.volatility.is_finite() || self.volatility < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} volatility must be non-negative and finite"
+            )));
+        }
+        if self.discount_curve_id.as_str().trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} requires a non-empty discount_curve_id"
+            )));
+        }
+        Ok(())
+    }
+
     /// Time to expiry in years from `as_of`, using Act/365F.
     ///
     /// Returns `Ok(0.0)` for expired options (`as_of >= expiry`).
@@ -187,6 +217,7 @@ impl IrFutureOption {
 
     /// Present value of the option.
     pub fn npv(&self, context: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         if as_of > self.expiry {
             return Ok(0.0);
         }
@@ -209,6 +240,7 @@ impl IrFutureOption {
     ///
     /// Propagates a day-count failure from internal time-to-expiry calculation.
     pub fn delta(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         if as_of > self.expiry {
             return Ok(0.0);
         }
@@ -244,6 +276,7 @@ impl IrFutureOption {
     ///
     /// Propagates a day-count failure from internal time-to-expiry calculation.
     pub fn gamma(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.volatility <= 0.0 || self.futures_price <= 0.0 {
             return Ok(0.0);
@@ -261,6 +294,7 @@ impl IrFutureOption {
     ///
     /// Propagates a day-count failure from internal time-to-expiry calculation.
     pub fn vega_per_pct(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.futures_price <= 0.0 {
             return Ok(0.0);
@@ -281,6 +315,7 @@ impl IrFutureOption {
     ///
     /// Propagates a day-count failure from internal time-to-expiry calculation.
     pub fn theta_daily(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.volatility <= 0.0 || self.futures_price <= 0.0 {
             return Ok(0.0);
@@ -311,6 +346,10 @@ impl IrFutureOption {
 
 impl crate::instruments::common_impl::traits::Instrument for IrFutureOption {
     impl_instrument_base!(crate::pricer::InstrumentType::IrFutureOption);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();

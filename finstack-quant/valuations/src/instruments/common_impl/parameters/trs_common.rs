@@ -117,6 +117,27 @@ impl TrsScheduleSpec {
         }
     }
 
+    /// Validate the accrual interval, calendar, and generated period schedule.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Instrument name included in validation diagnostics.
+    pub(crate) fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
+        if self.start >= self.end {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} schedule start must precede end"
+            )));
+        }
+        crate::cashflow::builder::calendar::resolve_calendar_strict(&self.params.calendar_id)?;
+        let schedule = self.period_schedule()?;
+        if schedule.dates.len() < 2 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} schedule must contain at least one accrual period"
+            )));
+        }
+        Ok(())
+    }
+
     /// Builds the period date schedule in a canonical way.
     pub fn period_schedule(&self) -> finstack_quant_core::Result<Schedule> {
         use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};

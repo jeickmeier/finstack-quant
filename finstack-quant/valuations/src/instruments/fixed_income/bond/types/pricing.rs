@@ -185,60 +185,9 @@ impl Bond {
         // Validate coupon rate for fixed-rate bonds (including amortizing with fixed base)
         Self::validate_coupon_rate(&self.cashflow_spec)?;
 
-        // Validate call/put prices and exercise date ranges
+        // Validate call/put prices and exercise date ranges.
         if let Some(ref call_put) = self.call_put {
-            for call in &call_put.calls {
-                if call.price_pct_of_par <= 0.0 {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Bond call price must be positive, got {} for period [{}, {}]",
-                        call.price_pct_of_par, call.start_date, call.end_date
-                    )));
-                }
-                if call.start_date < self.issue_date || call.start_date > self.maturity {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Call exercise start date {} is outside bond life [{}, {}]",
-                        call.start_date, self.issue_date, self.maturity
-                    )));
-                }
-                if call.end_date > self.maturity {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Call exercise end date {} is after maturity {}",
-                        call.end_date, self.maturity
-                    )));
-                }
-                if call.start_date > call.end_date {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Call exercise start date {} is after end date {}",
-                        call.start_date, call.end_date
-                    )));
-                }
-            }
-            for put in &call_put.puts {
-                if put.price_pct_of_par <= 0.0 {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Bond put price must be positive, got {} for period [{}, {}]",
-                        put.price_pct_of_par, put.start_date, put.end_date
-                    )));
-                }
-                if put.start_date < self.issue_date || put.start_date > self.maturity {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Put exercise start date {} is outside bond life [{}, {}]",
-                        put.start_date, self.issue_date, self.maturity
-                    )));
-                }
-                if put.end_date > self.maturity {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Put exercise end date {} is after maturity {}",
-                        put.end_date, self.maturity
-                    )));
-                }
-                if put.start_date > put.end_date {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Put exercise start date {} is after end date {}",
-                        put.start_date, put.end_date
-                    )));
-                }
-            }
+            call_put.validate_for_life(self.issue_date, self.maturity, "Bond")?;
         }
 
         Ok(())
@@ -305,8 +254,10 @@ impl Bond {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule, MakeWholeSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::types::CurveId;
     use time::macros::date;
 
     fn ex_coupon_bond() -> Bond {
@@ -348,5 +299,36 @@ mod tests {
             flows.iter().any(|(d, _)| *d == coupon_date),
             "cum-coupon flows must include the next coupon"
         );
+    }
+
+    #[test]
+    fn validation_rejects_non_finite_call_and_make_whole_quotes() {
+        let mut bond = ex_coupon_bond();
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: date!(2027 - 01 - 01),
+                end_date: date!(2027 - 01 - 01),
+                price_pct_of_par: f64::NAN,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+        assert!(bond
+            .validate()
+            .expect_err("NaN call price must fail")
+            .to_string()
+            .contains("finite"));
+
+        let call = &mut bond.call_put.as_mut().expect("schedule").calls[0];
+        call.price_pct_of_par = 101.0;
+        call.make_whole = Some(MakeWholeSpec {
+            reference_curve_id: CurveId::new("USD-TREASURY"),
+            spread_bps: f64::INFINITY,
+        });
+        assert!(bond
+            .validate()
+            .expect_err("infinite make-whole spread must fail")
+            .to_string()
+            .contains("make-whole"));
     }
 }

@@ -107,10 +107,10 @@ pub(crate) fn implied_vol(
     target_price: f64,
     initial_guess: Option<f64>,
 ) -> Result<f64> {
-    if target_price < 0.0 {
-        return Err(finstack_quant_core::Error::Validation(
-            "implied vol target price must be non-negative".to_string(),
-        ));
+    if !target_price.is_finite() || target_price < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "implied vol target price must be finite and non-negative, got {target_price}"
+        )));
     }
     if option.expiry <= as_of {
         return Ok(0.0);

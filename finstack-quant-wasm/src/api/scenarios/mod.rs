@@ -264,6 +264,9 @@ pub fn apply_scenario_to_market(
 ///
 /// JSON-serialized `HorizonResult`.
 /// @param config_json - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
+/// @param calendar_id - Optional holiday calendar (e.g. "nyse", "target") used to
+///   business-day adjust `time_roll_forward` targets under `business_days` mode.
+///   Omit for a weekends-only calendar; unknown identifiers throw.
 #[wasm_bindgen(js_name = computeHorizonReturn)]
 pub fn compute_horizon_return(
     instrument_json: &str,
@@ -272,6 +275,7 @@ pub fn compute_horizon_return(
     scenario_json: &str,
     method: Option<String>,
     config_json: Option<String>,
+    calendar_id: Option<String>,
 ) -> Result<String, JsValue> {
     use finstack_quant_attribution::AttributionMethod;
     use finstack_quant_valuations::instruments::InstrumentJson;
@@ -318,10 +322,13 @@ pub fn compute_horizon_return(
         None => finstack_quant_core::config::FinstackConfig::default(),
     };
 
-    let analyzer = finstack_quant_scenarios::horizon::HorizonAnalysis::new(
+    let mut analyzer = finstack_quant_scenarios::horizon::HorizonAnalysis::new(
         attribution_method,
         finstack_config,
     );
+    if let Some(id) = calendar_id.as_deref() {
+        analyzer = analyzer.with_calendar_id(id);
+    }
     let result = analyzer
         .compute(&instrument, &market, date, &scenario)
         .map_err(to_js_err)?;

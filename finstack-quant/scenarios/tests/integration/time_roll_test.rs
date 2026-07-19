@@ -130,8 +130,10 @@ fn test_time_roll_1_month() {
     let report = engine.apply(&scenario, &mut ctx).unwrap();
     assert_eq!(report.operations_applied, 1);
 
-    // Verify date advanced using calendar-aware month addition
-    let expected_date = base_date + time::Duration::days(31);
+    // Verify date advanced using calendar-aware month addition. 2025-01-01 + 1M
+    // is Saturday 2025-02-01, so BusinessDays (ModifiedFollowing) carries the
+    // target to Monday 2025-02-03 (33 calendar days).
+    let expected_date = base_date + time::Duration::days(33);
     assert_eq!(ctx.as_of, expected_date);
 }
 
@@ -210,7 +212,9 @@ fn test_time_roll_with_bond_carry() {
             .unwrap(),
     )];
 
-    let expected_date = base_date + time::Duration::days(31);
+    // 2025-01-01 + 1M is Saturday 2025-02-01; BusinessDays carries the target
+    // to Monday 2025-02-03 (33 calendar days).
+    let expected_date = base_date + time::Duration::days(33);
     use finstack_quant_valuations::metrics::MetricId;
 
     let pv_base = {

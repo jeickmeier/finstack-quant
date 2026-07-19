@@ -315,6 +315,61 @@ impl CallPutSchedule {
     pub fn has_options(&self) -> bool {
         !self.calls.is_empty() || !self.puts.is_empty()
     }
+
+    /// Validate call and put entries against an instrument's contractual life.
+    pub(crate) fn validate_for_life(
+        &self,
+        issue_date: Date,
+        maturity: Date,
+        instrument_name: &str,
+    ) -> finstack_quant_core::Result<()> {
+        validate_call_put_entries(&self.calls, "call", issue_date, maturity, instrument_name)?;
+        validate_call_put_entries(&self.puts, "put", issue_date, maturity, instrument_name)
+    }
+}
+
+fn validate_call_put_entries(
+    entries: &[CallPut],
+    side: &str,
+    issue_date: Date,
+    maturity: Date,
+    instrument_name: &str,
+) -> finstack_quant_core::Result<()> {
+    for entry in entries {
+        if !entry.price_pct_of_par.is_finite() || entry.price_pct_of_par <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{instrument_name} {side} price must be finite and positive, got {} for period [{}, {}]",
+                entry.price_pct_of_par, entry.start_date, entry.end_date
+            )));
+        }
+        if entry.start_date < issue_date || entry.start_date > maturity {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{instrument_name} {side} exercise start date {} is outside instrument life [{}, {}]",
+                entry.start_date, issue_date, maturity
+            )));
+        }
+        if entry.end_date > maturity {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{instrument_name} {side} exercise end date {} is after maturity {}",
+                entry.end_date, maturity
+            )));
+        }
+        if entry.start_date > entry.end_date {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{instrument_name} {side} exercise start date {} is after end date {}",
+                entry.start_date, entry.end_date
+            )));
+        }
+        if let Some(make_whole) = &entry.make_whole {
+            if !make_whole.spread_bps.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{instrument_name} {side} make-whole spread must be finite, got {} for period [{}, {}]",
+                    make_whole.spread_bps, entry.start_date, entry.end_date
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

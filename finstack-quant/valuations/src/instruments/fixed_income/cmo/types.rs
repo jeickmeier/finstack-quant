@@ -241,7 +241,7 @@ impl CmoWaterfall {
     finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
-#[builder(validate = AgencyCmo::validate_interest_coverage)]
+#[builder(validate = AgencyCmo::validate)]
 pub struct AgencyCmo {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -291,6 +291,123 @@ pub struct AgencyCmo {
 }
 
 impl AgencyCmo {
+    /// Validate the tranche waterfall, collateral, and interest conservation.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        let context = format!("Agency CMO '{}'", self.id.as_str());
+        if self.deal_name.as_str().trim().is_empty()
+            || self.reference_tranche_id.trim().is_empty()
+            || self.discount_curve_id.as_str().trim().is_empty()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} requires non-empty deal, reference-tranche, and discount-curve identifiers"
+            )));
+        }
+        if self.waterfall.tranches.is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} requires at least one tranche"
+            )));
+        }
+        let currency = self.waterfall.tranches[0].original_face.currency();
+        let mut ids = std::collections::HashSet::new();
+        for tranche in &self.waterfall.tranches {
+            if tranche.id.trim().is_empty() || !ids.insert(tranche.id.as_str()) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} tranche identifiers must be non-empty and unique"
+                )));
+            }
+            let original = tranche.original_face.amount();
+            let current = tranche.current_face.amount();
+            if tranche.original_face.currency() != currency
+                || tranche.current_face.currency() != currency
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} all tranche balances must use the same currency"
+                )));
+            }
+            if !original.is_finite()
+                || original <= 0.0
+                || !current.is_finite()
+                || current < 0.0
+                || current > original
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} tranche '{}' requires 0 <= current_face <= positive original_face",
+                    tranche.id
+                )));
+            }
+            if !tranche.coupon.is_finite() || !(0.0..=1.0).contains(&tranche.coupon) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} tranche '{}' coupon must be a finite decimal rate in [0, 1]",
+                    tranche.id
+                )));
+            }
+            if matches!(
+                tranche.tranche_type,
+                CmoTrancheType::Sequential | CmoTrancheType::Pac | CmoTrancheType::Support
+            ) && tranche.priority == 0
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} waterfall tranche '{}' requires positive priority",
+                    tranche.id
+                )));
+            }
+            match (&tranche.tranche_type, &tranche.pac_collar) {
+                (CmoTrancheType::Pac, Some(collar))
+                    if collar.lower_psa.is_finite()
+                        && collar.upper_psa.is_finite()
+                        && collar.lower_psa >= 0.0
+                        && collar.lower_psa <= collar.upper_psa => {}
+                (CmoTrancheType::Pac, _) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} PAC tranche '{}' requires a finite ordered non-negative collar",
+                        tranche.id
+                    )));
+                }
+                (_, Some(_)) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} non-PAC tranche '{}' cannot define a PAC collar",
+                        tranche.id
+                    )));
+                }
+                _ => {}
+            }
+            if tranche.tranche_type == CmoTrancheType::PrincipalOnly && tranche.coupon != 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} principal-only tranche '{}' must have zero coupon",
+                    tranche.id
+                )));
+            }
+        }
+        if self.reference_tranche().is_none() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} reference tranche '{}' is not present in the waterfall",
+                self.reference_tranche_id
+            )));
+        }
+        if self
+            .collateral_wac
+            .is_some_and(|wac| !wac.is_finite() || !(0.0..=1.0).contains(&wac))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} collateral_wac must be a finite decimal rate in [0, 1]"
+            )));
+        }
+        if self.collateral_wam == Some(0) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} collateral_wam must be positive"
+            )));
+        }
+        if let Some(pool) = &self.collateral {
+            crate::instruments::Instrument::validate_for_pricing(pool.as_ref())?;
+            if pool.current_face.currency() != currency {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} collateral and tranche currencies must match"
+                )));
+            }
+        }
+        Self::validate_interest_coverage(self)
+    }
+
     /// Create a canonical example CMO for testing.
     pub fn example() -> finstack_quant_core::Result<Self> {
         use time::macros::date;
@@ -447,6 +564,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyCmo {
 
 impl crate::instruments::common_impl::traits::Instrument for AgencyCmo {
     impl_instrument_base!(crate::pricer::InstrumentType::AgencyCmo);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(
         &self,

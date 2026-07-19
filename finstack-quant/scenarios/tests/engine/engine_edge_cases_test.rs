@@ -424,8 +424,9 @@ fn test_time_roll_with_apply_shocks_false() {
     let report = engine.apply(&scenario, &mut ctx).unwrap();
     assert_eq!(report.operations_applied, 1, "Only time roll should apply");
 
-    // Date should be rolled
-    let expected = base_date + time::Duration::days(31);
+    // Date should be rolled. 2025-01-01 + 1M is Saturday 2025-02-01, so the
+    // BusinessDays mode carries the target to Monday 2025-02-03 (33 days).
+    let expected = base_date + time::Duration::days(33);
     assert_eq!(ctx.as_of, expected);
 }
 

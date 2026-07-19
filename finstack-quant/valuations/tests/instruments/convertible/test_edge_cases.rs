@@ -355,7 +355,7 @@ fn test_call_put_before_issue() {
     let mut bond = create_standard_convertible();
     let mut call_put = CallPutSchedule::default();
 
-    // Call date before issue (should be ignored)
+    // Call date before issue is an invalid economic contract.
     let before_issue = Date::from_calendar_date(2024, Month::January, 1).unwrap();
     call_put.calls.push(CallPut {
         start_date: before_issue,
@@ -367,18 +367,14 @@ fn test_call_put_before_issue() {
 
     let market = create_market_context();
 
-    // Should handle gracefully (ignore past calls)
-    let price = price_convertible_bond(
+    let error = price_convertible_bond(
         &bond,
         &market,
         ConvertibleTreeType::Binomial(50),
         dates::base_date(),
     )
-    .unwrap();
-    assert!(
-        price.amount().is_finite(),
-        "Past call dates should be ignored"
-    );
+    .expect_err("pre-issue call must be rejected");
+    assert!(error.to_string().contains("outside instrument life"));
 }
 
 #[test]
@@ -389,7 +385,7 @@ fn test_call_put_after_maturity() {
     let mut bond = create_standard_convertible();
     let mut call_put = CallPutSchedule::default();
 
-    // Call date after maturity (should be ignored)
+    // Call date after maturity is an invalid economic contract.
     let after_maturity = Date::from_calendar_date(2031, Month::January, 1).unwrap();
     call_put.calls.push(CallPut {
         start_date: after_maturity,
@@ -401,18 +397,14 @@ fn test_call_put_after_maturity() {
 
     let market = create_market_context();
 
-    // Should handle gracefully (ignore calls after maturity)
-    let price = price_convertible_bond(
+    let error = price_convertible_bond(
         &bond,
         &market,
         ConvertibleTreeType::Binomial(50),
         dates::base_date(),
     )
-    .unwrap();
-    assert!(
-        price.amount().is_finite(),
-        "Call dates after maturity should be ignored"
-    );
+    .expect_err("post-maturity call must be rejected");
+    assert!(error.to_string().contains("outside instrument life"));
 }
 
 #[test]
@@ -423,7 +415,7 @@ fn test_zero_conversion_ratio() {
 
     let mut bond = create_standard_convertible();
     bond.conversion = ConversionSpec {
-        ratio: Some(0.0), // Zero conversion ratio - invalid but test handling
+        ratio: Some(0.0),
         price: None,
         policy: ConversionPolicy::Voluntary,
         anti_dilution:
@@ -435,18 +427,14 @@ fn test_zero_conversion_ratio() {
 
     let market = create_market_context();
 
-    // Should still price (as straight bond)
-    let price = price_convertible_bond(
+    let error = price_convertible_bond(
         &bond,
         &market,
         ConvertibleTreeType::Binomial(50),
         dates::base_date(),
     )
-    .unwrap();
-    assert!(
-        price.amount() > 0.0,
-        "Zero conversion ratio should behave like straight bond"
-    );
+    .expect_err("zero conversion ratio must be rejected");
+    assert!(error.to_string().contains("conversion ratio"));
 }
 
 #[test]

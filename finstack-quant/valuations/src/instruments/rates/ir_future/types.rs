@@ -48,6 +48,7 @@ use crate::instruments::Position;
     finstack_quant_valuations_macros::FinancialBuilder,
     finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
+#[builder(validate = InterestRateFuture::validate)]
 #[serde(deny_unknown_fields)]
 pub struct InterestRateFuture {
     /// Unique identifier
@@ -157,6 +158,34 @@ impl FutureContractSpecs {
         delivery_months: 3,
         convexity_adjustment: None,
     };
+
+    fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
+        for (field, value) in [
+            ("face_value", self.face_value),
+            ("tick_size", self.tick_size),
+            ("tick_value", self.tick_value),
+        ] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} {field} must be positive and finite"
+                )));
+            }
+        }
+        if self.delivery_months == 0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} delivery_months must be positive"
+            )));
+        }
+        if self
+            .convexity_adjustment
+            .is_some_and(|adjustment| !adjustment.is_finite())
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} convexity_adjustment must be finite"
+            )));
+        }
+        Ok(())
+    }
 }
 
 impl Default for FutureContractSpecs {
@@ -170,6 +199,50 @@ impl Default for FutureContractSpecs {
 }
 
 impl InterestRateFuture {
+    /// Validate contract scaling, dates, quotes, and convexity inputs.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        let context = format!("IR future '{}'", self.id.as_str());
+        if !self.notional.amount().is_finite() || self.notional.amount() < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} notional must be non-negative and finite"
+            )));
+        }
+        if !self.quoted_price.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} quoted_price must be finite"
+            )));
+        }
+        self.contract_specs.validate(&context)?;
+        let (fixing, period_start, period_end) = self.resolve_dates()?;
+        if period_start < fixing {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} period_start cannot precede fixing_date"
+            )));
+        }
+        if period_end <= period_start {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} period_end must follow period_start"
+            )));
+        }
+        if self.discount_curve_id.as_str().trim().is_empty()
+            || self.forward_curve_id.as_str().trim().is_empty()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} curve identifiers cannot be empty"
+            )));
+        }
+        if self
+            .vol_surface_id
+            .as_ref()
+            .is_some_and(|id| id.as_str().trim().is_empty())
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} vol_surface_id cannot be empty"
+            )));
+        }
+        Ok(())
+    }
+
     pub(crate) fn resolve_dates(&self) -> finstack_quant_core::Result<(Date, Date, Date)> {
         let fixing = self.fixing_date.unwrap_or(self.expiry);
         let period_start = self
@@ -180,7 +253,7 @@ impl InterestRateFuture {
         } else {
             period_start.add_months(self.contract_specs.delivery_months as i32)
         };
-        if period_end < period_start {
+        if period_end <= period_start {
             return Err(finstack_quant_core::error::InputError::InvalidDateRange.into());
         }
         Ok((fixing, period_start, period_end))
@@ -304,6 +377,7 @@ impl InterestRateFuture {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         use finstack_quant_core::dates::DayCountContext;
         let (fixing_date, period_start, period_end) = self.resolve_dates()?;
         if as_of >= self.expiry {
@@ -347,29 +421,12 @@ impl InterestRateFuture {
             )?
         };
 
-        if !self.contract_specs.tick_size.is_finite()
-            || self.contract_specs.tick_size <= 0.0
-            || !self.contract_specs.tick_value.is_finite()
-            || self.contract_specs.tick_value <= 0.0
-            || !self.contract_specs.face_value.is_finite()
-            || self.contract_specs.face_value <= 0.0
-        {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "IR Future {} requires positive finite face_value, tick_size, and tick_value",
-                self.id
-            )));
-        }
-
         // Position sign: Long benefits when implied > model (rates down → price up)
         let sign = self.position.sign();
 
         // Scale by contracts: notional may represent multiples of face value.
         // Zero face value means zero exposure (no contracts).
-        let contracts_scale = if self.contract_specs.face_value > 0.0 {
-            self.notional.amount() / self.contract_specs.face_value
-        } else {
-            0.0
-        };
+        let contracts_scale = self.notional.amount() / self.contract_specs.face_value;
 
         let model_price = 100.0 * (1.0 - adjusted_rate);
         let price_delta = model_price - self.quoted_price;
@@ -383,6 +440,7 @@ impl InterestRateFuture {
     ///
     /// tick_value ≈ Face × tau(period_start, period_end) × 1bp × (tick_size / 1bp)
     pub fn derived_tick_value(&self) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         let (_fixing_date, period_start, period_end) = self.resolve_dates()?;
         let tau = self
             .day_count
@@ -506,6 +564,23 @@ impl InterestRateFuture {
 
 impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture {
     impl_instrument_base!(crate::pricer::InstrumentType::InterestRateFuture);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
+    fn validate_for_pricing(&self) -> finstack_quant_core::Result<()> {
+        self.validate()?;
+        if self.contract_specs.convexity_adjustment.is_none() && self.vol_surface_id.is_none() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Missing vol_surface_id: IR future '{}' requires either a volatility surface or a fixed convexity_adjustment",
+                self.id.as_str()
+            )));
+        }
+        self.instrument_pricing_overrides.validate()?;
+        self.metric_pricing_overrides.validate()?;
+        self.scenario_pricing_overrides.validate()
+    }
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();

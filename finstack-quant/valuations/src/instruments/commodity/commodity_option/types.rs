@@ -189,6 +189,7 @@ pub struct CommodityOption {
 impl CommodityOption {
     /// Validate the static economic inputs shared by builders and JSON loads.
     pub fn validate(&self) -> Result<()> {
+        self.underlying.validate("CommodityOption")?;
         crate::instruments::common_impl::validation::validate_f64_positive(
             self.strike,
             "CommodityOption strike",

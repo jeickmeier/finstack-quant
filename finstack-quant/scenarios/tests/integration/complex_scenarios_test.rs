@@ -246,8 +246,9 @@ fn test_time_roll_with_market_shocks() {
     let report = engine.apply(&scenario, &mut ctx).unwrap();
     assert_eq!(report.operations_applied, 2);
 
-    // Date rolled
-    let expected_date = base_date + time::Duration::days(31);
+    // Date rolled. 2025-01-01 + 1M is Saturday 2025-02-01, so the BusinessDays
+    // mode carries the target to Monday 2025-02-03 (33 days).
+    let expected_date = base_date + time::Duration::days(33);
     assert_eq!(ctx.as_of, expected_date);
 
     // Price shocked

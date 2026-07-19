@@ -132,8 +132,8 @@ pub struct LboResult {
     pub sources_total: Money,
     /// Total uses: entry enterprise value plus transaction fees.
     pub uses_total: Money,
-    /// `true` when sources reconcile to uses within
-    /// [`SOURCES_USES_REL_TOLERANCE`] scaled by deal size. False signals a
+    /// `true` when sources reconcile to uses within a relative tolerance of
+    /// `1e-9` scaled by deal size. False signals a
     /// numerically degenerate capital structure (for example, tranche amounts
     /// so large relative to the purchase price that the residual equity check
     /// loses all significance).

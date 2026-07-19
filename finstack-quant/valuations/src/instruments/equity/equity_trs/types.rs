@@ -291,10 +291,26 @@ impl EquityTotalReturnSwap {
     /// - `discrete_dividends` contains a non-finite or negative amount, or
     ///   non-strictly-increasing ex-dates
     pub fn validate(&self) -> Result<()> {
-        if !self.notional.amount().is_finite() {
+        let context = format!("Equity TRS '{}'", self.id.as_str());
+        if !self.notional.amount().is_finite() || self.notional.amount() < 0.0 {
             return Err(finstack_quant_core::Error::Validation(
-                "EquityTRS notional amount must be finite".into(),
+                "EquityTRS notional amount must be non-negative and finite".into(),
             ));
+        }
+        if self.notional.currency() != self.underlying.currency {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} notional currency must match the underlying currency"
+            )));
+        }
+        self.underlying.validate(&context)?;
+        self.financing.validate(&context)?;
+        self.schedule.validate(&context)?;
+        if let Some(level) = self.initial_level {
+            if !level.is_finite() || level <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} initial_level must be positive and finite"
+                )));
+            }
         }
         if !self.dividend_tax_rate.is_finite() || !(0.0..=1.0).contains(&self.dividend_tax_rate) {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -342,6 +358,23 @@ impl EquityTotalReturnSwap {
                     v
                 )));
             }
+            if *d < self.schedule.start || *d >= self.schedule.end {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "EquityTRS '{}' past fixing date {} must lie in [{}, {})",
+                    self.id.as_str(),
+                    d,
+                    self.schedule.start,
+                    self.schedule.end
+                )));
+            }
+        }
+        for window in self.past_fixings.windows(2) {
+            if window[0].0 >= window[1].0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "EquityTRS '{}' past fixing dates must be strictly increasing",
+                    self.id.as_str()
+                )));
+            }
         }
         Ok(())
     }
@@ -363,6 +396,7 @@ impl EquityTotalReturnSwap {
     /// # Returns
     /// Present value of the total return leg in the instrument's currency.
     pub fn pv_total_return_leg(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+        self.validate()?;
         crate::instruments::equity::equity_trs::pricer::pv_total_return_leg(self, curves, as_of)
     }
 
@@ -375,6 +409,7 @@ impl EquityTotalReturnSwap {
     /// # Returns
     /// Present value of the financing leg in the instrument's currency.
     pub fn pv_financing_leg(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+        self.validate()?;
         let discount = curves.get_discount(self.financing.discount_curve_id.as_str())?;
         let schedule = self.cashflow_schedule(curves, as_of)?;
         let financing_flows: Vec<_> = schedule
@@ -423,6 +458,7 @@ impl EquityTotalReturnSwap {
     /// # Returns
     /// Financing annuity (sum of discounted year fractions × notional).
     pub fn financing_annuity(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
+        self.validate()?;
         use crate::instruments::common_impl::pricing::TrsEngine;
         TrsEngine::financing_annuity(
             &self.financing,

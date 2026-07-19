@@ -66,9 +66,10 @@ use finstack_quant_attribution::{
     attribute_pnl_waterfall, default_attribution_metrics, ExecutionPolicy,
 };
 use finstack_quant_core::config::FinstackConfig;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{calendars_by_ids, Date, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::CalendarId;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PricingOptions;
 
@@ -107,6 +108,14 @@ pub struct HorizonAnalysis {
     pub config: FinstackConfig,
     /// Scenario engine instance.
     pub engine: ScenarioEngine,
+    /// Holiday calendar used to business-day adjust
+    /// [`OperationSpec::TimeRollForward`] targets under
+    /// [`crate::TimeRollMode::BusinessDays`].
+    ///
+    /// `None` falls back to [`finstack_quant_core::dates::WEEKENDS_ONLY`], so
+    /// business-day rolls always avoid weekends even when no calendar is named.
+    /// Supply an identifier (e.g. `"nyse"`, `"target"`) for holiday awareness.
+    pub calendar_id: Option<CalendarId>,
 }
 
 impl Default for HorizonAnalysis {
@@ -115,6 +124,7 @@ impl Default for HorizonAnalysis {
             attribution_method: AttributionMethod::Parallel,
             config: FinstackConfig::default(),
             engine: ScenarioEngine::new(),
+            calendar_id: None,
         }
     }
 }
@@ -124,14 +134,50 @@ impl HorizonAnalysis {
     ///
     /// The config is also threaded into the internal [`ScenarioEngine`] so the
     /// rounding policy stamped into the scenario report reflects the active
-    /// configuration.
+    /// configuration. No holiday calendar is set; use
+    /// [`with_calendar_id`](Self::with_calendar_id) to name one.
     pub fn new(attribution_method: AttributionMethod, config: FinstackConfig) -> Self {
         let engine = ScenarioEngine::with_config(config.clone());
         Self {
             attribution_method,
             config,
             engine,
+            calendar_id: None,
         }
+    }
+
+    /// Set the holiday calendar used for business-day roll adjustment.
+    ///
+    /// The identifier is resolved against core's built-in calendar registry
+    /// during [`compute`](Self::compute); unknown identifiers surface there as
+    /// an error listing near matches rather than being silently ignored.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_scenarios::HorizonAnalysis;
+    ///
+    /// let analyzer = HorizonAnalysis::default().with_calendar_id("nyse");
+    /// assert!(analyzer.calendar_id.is_some());
+    /// ```
+    #[must_use]
+    pub fn with_calendar_id(mut self, calendar_id: impl Into<CalendarId>) -> Self {
+        self.calendar_id = Some(calendar_id.into());
+        self
+    }
+
+    /// Resolve [`Self::calendar_id`] against core's built-in calendar registry.
+    ///
+    /// # Errors
+    ///
+    /// Propagates core's calendar-not-found error (which includes suggestions)
+    /// when the identifier does not name a built-in calendar.
+    fn resolve_calendar(&self) -> crate::Result<Option<&'static dyn HolidayCalendar>> {
+        let Some(id) = self.calendar_id.as_ref() else {
+            return Ok(None);
+        };
+        let resolved = calendars_by_ids(std::slice::from_ref(id))?;
+        Ok(resolved.into_iter().next())
     }
 }
 
@@ -175,9 +221,10 @@ impl HorizonAnalysis {
     /// # Errors
     ///
     /// Returns an error if scenario application or attribution fails (e.g.
-    /// missing market data for a curve referenced in the spec), or if the
+    /// missing market data for a curve referenced in the spec), if the
     /// scenario contains an instrument-scoped operation unsupported by horizon
-    /// attribution.
+    /// attribution, or if [`Self::calendar_id`] does not name a built-in
+    /// calendar.
     pub fn compute(
         &self,
         instrument: &Arc<dyn Instrument>,
@@ -197,13 +244,14 @@ impl HorizonAnalysis {
         let initial_value = instrument.value(market_t0, as_of_t0)?;
 
         // 2. Clone market and build a market-only execution context
+        let calendar = self.resolve_calendar()?;
         let mut market_t1 = market_t0.clone();
         let mut ctx = ExecutionContext {
             market: &mut market_t1,
             model: None,
             instruments: None,
             rate_bindings: None,
-            calendar: None,
+            calendar,
             as_of: as_of_t0,
         };
 
@@ -297,15 +345,23 @@ impl HorizonResult {
     /// Total return as a decimal fraction (e.g. `0.05` = 5%).
     ///
     /// Computed as `total_pnl / initial_value`. Returns:
-    /// - `0.0` when `initial_value` is zero (to avoid division by zero), and
+    /// - `0.0` when `initial_value` is zero (to avoid division by zero),
     /// - [`f64::NAN`] when `initial_value` and `total_pnl` are denominated in
     ///   different currencies. Multi-currency results require an explicit
-    ///   base-currency conversion policy that this helper does not apply.
+    ///   base-currency conversion policy that this helper does not apply, and
+    /// - [`f64::NAN`] when `initial_value` is negative. A return on a negative
+    ///   mark (payer swaps, short protection, any liability position) is not
+    ///   defined by this ratio: dividing by a negative denominator inverts the
+    ///   sign, so a profitable horizon would report as a loss. Compute a return
+    ///   on notional or on an explicit capital base instead.
     pub fn total_return_pct(&self) -> f64 {
         if self.initial_value.currency() != self.attribution.total_pnl.currency() {
             return f64::NAN;
         }
         let iv = self.initial_value.amount();
+        if iv < 0.0 {
+            return f64::NAN;
+        }
         if iv == 0.0 {
             return 0.0;
         }
@@ -339,8 +395,10 @@ impl HorizonResult {
 
     /// A single factor's P&L as a fraction of initial value.
     ///
-    /// Returns `0.0` if initial value is zero and [`f64::NAN`] if the factor
-    /// P&L currency does not match the initial value currency.
+    /// Returns `0.0` if initial value is zero, and [`f64::NAN`] if the factor
+    /// P&L currency does not match the initial value currency or if initial
+    /// value is negative (see [`total_return_pct`](Self::total_return_pct) for
+    /// why a negative denominator is rejected rather than divided through).
     pub fn factor_contribution(&self, factor: &AttributionFactor) -> f64 {
         let factor_money = match factor {
             AttributionFactor::Carry => &self.attribution.carry,
@@ -357,6 +415,9 @@ impl HorizonResult {
             return f64::NAN;
         }
         let iv = self.initial_value.amount();
+        if iv < 0.0 {
+            return f64::NAN;
+        }
         if iv == 0.0 {
             return 0.0;
         }
@@ -702,6 +763,99 @@ mod tests {
         assert!(result
             .factor_contribution(&AttributionFactor::Carry)
             .is_nan());
+    }
+
+    /// A negative initial value (payer swap, short protection, any liability
+    /// mark) must not produce a sign-inverted return. Dividing a gain by a
+    /// negative denominator previously reported a profitable horizon as a
+    /// loss, and could drive `annualized_return` to a spurious `-100%`.
+    #[test]
+    fn negative_initial_value_returns_nan_rather_than_inverted_sign() {
+        // +$5 of P&L against a -$100 mark.
+        let gain_on_liability = synthetic_result(Currency::USD, -100.0, Currency::USD, 5.0, 30);
+
+        assert!(
+            gain_on_liability.total_return_pct().is_nan(),
+            "return on a negative mark is undefined, must not report -5%"
+        );
+        assert!(
+            gain_on_liability.annualized_return().is_none(),
+            "non-finite total return must not annualize"
+        );
+        assert!(gain_on_liability
+            .factor_contribution(&AttributionFactor::Carry)
+            .is_nan());
+    }
+
+    /// An unknown calendar identifier must fail loudly at compute time rather
+    /// than silently degrading to an unadjusted roll.
+    #[test]
+    fn unknown_calendar_id_is_rejected() -> crate::Result<()> {
+        let as_of = date!(2025 - 01 - 15);
+        let instrument = test_bond(as_of)?;
+        let market = test_market(as_of)?;
+
+        let scenario = ScenarioSpec {
+            id: "roll_1m".into(),
+            name: None,
+            description: None,
+            operations: vec![crate::OperationSpec::TimeRollForward {
+                period: "1M".into(),
+                apply_shocks: false,
+                roll_mode: crate::TimeRollMode::BusinessDays,
+            }],
+            priority: 0,
+            resolution_mode: Default::default(),
+        };
+
+        let analyzer = HorizonAnalysis::default().with_calendar_id("not_a_real_calendar");
+        let err = analyzer
+            .compute(&instrument, &market, as_of, &scenario)
+            .expect_err("unknown calendar id should fail loudly");
+        assert!(
+            err.to_string().contains("not_a_real_calendar"),
+            "error should name the bad calendar: {err}"
+        );
+        Ok(())
+    }
+
+    /// A named holiday calendar must actually reach the time-roll adapter: a
+    /// roll targeting a market holiday has to land past it.
+    #[test]
+    fn named_calendar_adjusts_horizon_past_a_holiday() -> crate::Result<()> {
+        // Thu 2025-06-19 (Juneteenth) is an NYSE holiday, and is the
+        // unadjusted 1M target from Mon 2025-05-19.
+        let as_of = date!(2025 - 05 - 19);
+        let instrument = test_bond(as_of)?;
+        let market = test_market(as_of)?;
+
+        let scenario = ScenarioSpec {
+            id: "roll_1m".into(),
+            name: None,
+            description: None,
+            operations: vec![crate::OperationSpec::TimeRollForward {
+                period: "1M".into(),
+                apply_shocks: false,
+                roll_mode: crate::TimeRollMode::BusinessDays,
+            }],
+            priority: 0,
+            resolution_mode: Default::default(),
+        };
+
+        // Weekends-only fallback: 2025-06-19 is a Thursday, so no adjustment.
+        let weekends_only = HorizonAnalysis::default();
+        let base = weekends_only.compute(&instrument, &market, as_of, &scenario)?;
+        assert_eq!(base.horizon_days, Some(31));
+
+        // NYSE: Juneteenth is a holiday, so ModifiedFollowing carries to Fri 06-20.
+        let nyse = HorizonAnalysis::default().with_calendar_id("nyse");
+        let adjusted = nyse.compute(&instrument, &market, as_of, &scenario)?;
+        assert_eq!(
+            adjusted.horizon_days,
+            Some(32),
+            "NYSE calendar should push the horizon past Juneteenth"
+        );
+        Ok(())
     }
 
     /// A total loss (or worse) must collapse to `-100%` annualized rather

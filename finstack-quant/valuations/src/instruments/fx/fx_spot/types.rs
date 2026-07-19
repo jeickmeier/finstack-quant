@@ -494,6 +494,10 @@ impl FxSpot {
 impl crate::instruments::common_impl::traits::Instrument for FxSpot {
     impl_instrument_base!(crate::pricer::InstrumentType::FxSpot);
 
+    fn validate_invariants(&self) -> Result<()> {
+        self.validate_economics()
+    }
+
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<

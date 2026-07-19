@@ -67,6 +67,41 @@ pub struct Equity {
 }
 
 impl Equity {
+    fn validate(&self) -> finstack_quant_core::Result<()> {
+        use crate::instruments::common_impl::validation;
+
+        if self.ticker.trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "Equity requires a non-empty ticker".to_string(),
+            ));
+        }
+        if let Some(shares) = self.shares {
+            validation::validate_f64_finite(shares, "Equity shares")?;
+        }
+        if let Some(price) = self.price_quote {
+            validation::validate_f64_non_negative(price, "Equity price_quote")?;
+        }
+        if self
+            .price_id
+            .as_deref()
+            .is_some_and(|id| id.trim().is_empty())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "Equity price_id must not be empty when supplied".to_string(),
+            ));
+        }
+        for (date, amount) in &self.discrete_dividends {
+            validation::validate_f64_non_negative(*amount, "Equity discrete-dividend amount")
+                .map_err(|error| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "Equity '{}' dividend on {date} is invalid: {error}",
+                        self.id
+                    ))
+                })?;
+        }
+        Ok(())
+    }
+
     /// Create a canonical example equity for testing and documentation.
     ///
     /// Returns a 100-share position in AAPL with realistic market data IDs.
@@ -182,10 +217,15 @@ impl Equity {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
-        match scalar {
+        let price = match scalar {
             MarketScalar::Price(m) => self.convert_price_to_currency(*m, market, as_of),
             MarketScalar::Unitless(v) => Ok(Money::new(*v, self.currency)),
-        }
+        }?;
+        crate::instruments::common_impl::validation::validate_f64_non_negative(
+            price.amount(),
+            "Equity market price",
+        )?;
+        Ok(price)
     }
 
     fn convert_price_to_currency(
@@ -244,6 +284,7 @@ impl Equity {
         curves: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
+        self.validate()?;
         if let Some(px) = self.price_quote {
             return Ok(Money::new(px, self.currency));
         }
@@ -275,7 +316,13 @@ impl Equity {
     pub fn dividend_yield(&self, curves: &MarketContext) -> finstack_quant_core::Result<f64> {
         if let Some(explicit_id) = self.div_yield_id.as_deref() {
             return match curves.get_price(explicit_id)? {
-                MarketScalar::Unitless(value) => Ok(*value),
+                MarketScalar::Unitless(value) if value.is_finite() => Ok(*value),
+                MarketScalar::Unitless(value) => {
+                    Err(finstack_quant_core::Error::Validation(format!(
+                        "Equity '{}' dividend yield '{}' must be finite, got {value}",
+                        self.id, explicit_id
+                    )))
+                }
                 MarketScalar::Price(_) => Err(finstack_quant_core::Error::Validation(format!(
                     "Equity '{}' dividend yield '{}' must be unitless",
                     self.id, explicit_id
@@ -285,7 +332,13 @@ impl Equity {
         let candidates = self.dividend_yield_id_candidates();
         for key in &candidates {
             match curves.get_price(key) {
-                Ok(MarketScalar::Unitless(v)) => return Ok(*v),
+                Ok(MarketScalar::Unitless(v)) if v.is_finite() => return Ok(*v),
+                Ok(MarketScalar::Unitless(v)) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "Equity '{}' dividend yield '{}' must be finite, got {v}",
+                        self.id, key
+                    )));
+                }
                 Ok(MarketScalar::Price(_)) => continue,
                 Err(err) => match err {
                     finstack_quant_core::Error::Input(
@@ -373,6 +426,10 @@ impl Equity {
 
 impl crate::instruments::common_impl::traits::Instrument for Equity {
     impl_instrument_base!(crate::pricer::InstrumentType::Equity);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();

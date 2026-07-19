@@ -142,6 +142,7 @@ pub struct CommoditySwaption {
 impl CommoditySwaption {
     /// Validate commodity swaption input invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        self.underlying.validate("CommoditySwaption")?;
         // expiry <= swap_start < swap_end
         crate::instruments::common_impl::validation::validate_date_range_non_strict(
             self.expiry,

@@ -512,6 +512,25 @@ impl FinancingLegSpec {
         self.compounding = compounding;
         self
     }
+
+    /// Validate the curve identifiers required by the financing leg.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Instrument name included in validation diagnostics.
+    pub(crate) fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
+        if self.discount_curve_id.as_str().trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} requires a non-empty financing discount_curve_id"
+            )));
+        }
+        if self.forward_curve_id.as_str().trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} requires a non-empty financing forward_curve_id"
+            )));
+        }
+        Ok(())
+    }
 }
 
 /// Specification for TRS total return legs

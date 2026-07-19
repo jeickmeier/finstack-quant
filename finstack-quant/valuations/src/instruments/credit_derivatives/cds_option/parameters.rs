@@ -39,9 +39,9 @@ pub(crate) fn validate_common_terms(
         )));
     }
     if let Some(factor) = index_factor {
-        if factor <= 0.0 || factor > 1.0 {
+        if !factor.is_finite() || factor <= 0.0 || factor > 1.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "index_factor must be in (0, 1], got {}",
+                "index_factor must be finite and in (0, 1], got {}",
                 factor
             )));
         }

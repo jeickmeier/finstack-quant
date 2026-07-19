@@ -61,13 +61,24 @@ impl SoftCallTrigger {
     /// Validate soft-call trigger parameters.
     ///
     /// - `threshold_pct` must exceed 100% (otherwise the trigger is trivially satisfied).
+    /// - `observation_days` and `required_days_above` must be non-zero.
     /// - `required_days_above` cannot exceed `observation_days`.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        if self.threshold_pct <= 100.0 {
+        if !self.threshold_pct.is_finite() || self.threshold_pct <= 100.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "soft-call threshold_pct ({:.1}%) must exceed 100%",
+                "soft-call threshold_pct ({:.1}%) must be finite and exceed 100%",
                 self.threshold_pct,
             )));
+        }
+        if self.observation_days == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "soft-call observation_days must be greater than zero".to_string(),
+            ));
+        }
+        if self.required_days_above == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "soft-call required_days_above must be greater than zero".to_string(),
+            ));
         }
         if self.required_days_above > self.observation_days {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -347,6 +358,160 @@ pub struct ConversionSpec {
 }
 
 impl ConvertibleBond {
+    fn validate(&self) -> finstack_quant_core::Result<()> {
+        use crate::instruments::common_impl::validation;
+
+        validation::validate_date_range_strict(self.issue_date, self.maturity, "convertible bond")?;
+        validation::validate_money_finite(self.notional, "convertible bond notional")?;
+        validation::validate_money_gt(self.notional, 0.0, "convertible bond notional")?;
+
+        match (self.conversion.ratio, self.conversion.price) {
+            (None, None) => {
+                return Err(finstack_quant_core::Error::Validation(
+                    "convertible bond requires conversion.ratio or conversion.price".to_string(),
+                ));
+            }
+            (Some(ratio), price) => {
+                validation::validate_f64_positive(ratio, "convertible bond conversion ratio")?;
+                if let Some(price) = price {
+                    validation::validate_f64_positive(price, "convertible bond conversion price")?;
+                    let implied_ratio = self.notional.amount() / price;
+                    let tolerance = 1e-10 * ratio.abs().max(implied_ratio.abs()).max(1.0);
+                    if (ratio - implied_ratio).abs() > tolerance {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "convertible bond conversion ratio ({ratio}) is inconsistent with \
+                             notional / conversion price ({implied_ratio})"
+                        )));
+                    }
+                }
+            }
+            (None, Some(price)) => {
+                validation::validate_f64_positive(price, "convertible bond conversion price")?
+            }
+        }
+
+        match &self.conversion.policy {
+            ConversionPolicy::Voluntary
+            | ConversionPolicy::UponEvent(
+                ConversionEvent::QualifiedIpo | ConversionEvent::ChangeOfControl,
+            ) => {}
+            ConversionPolicy::MandatoryOn(date) => {
+                validate_conversion_date(*date, self.issue_date, self.maturity, "mandatory")?;
+            }
+            ConversionPolicy::Window { start, end } => {
+                validation::validate_date_range_non_strict(
+                    *start,
+                    *end,
+                    "convertible conversion window",
+                )?;
+                validate_conversion_date(*start, self.issue_date, self.maturity, "window start")?;
+                validate_conversion_date(*end, self.issue_date, self.maturity, "window end")?;
+            }
+            ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger {
+                threshold,
+                lookback_days,
+            }) => {
+                validation::validate_f64_positive(
+                    *threshold,
+                    "convertible price-trigger threshold",
+                )?;
+                if *lookback_days == 0 {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "convertible price-trigger lookback_days must be greater than zero"
+                            .to_string(),
+                    ));
+                }
+            }
+            ConversionPolicy::MandatoryVariable {
+                conversion_date,
+                upper_conversion_price,
+                lower_conversion_price,
+            } => {
+                validate_conversion_date(
+                    *conversion_date,
+                    self.issue_date,
+                    self.maturity,
+                    "mandatory-variable",
+                )?;
+                validation::validate_f64_positive(
+                    *lower_conversion_price,
+                    "mandatory-variable lower conversion price",
+                )?;
+                validation::validate_f64_positive(
+                    *upper_conversion_price,
+                    "mandatory-variable upper conversion price",
+                )?;
+                if lower_conversion_price > upper_conversion_price {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "convertible bond '{}' has inverted mandatory-variable bounds: \
+                         lower conversion price ({lower_conversion_price}) must not exceed \
+                         upper conversion price ({upper_conversion_price})",
+                        self.id.as_str()
+                    )));
+                }
+            }
+        }
+
+        for event in &self.conversion.dilution_events {
+            validate_conversion_date(event.date, self.issue_date, self.maturity, "dilution event")?;
+            validation::validate_f64_positive(
+                event.new_issue_price,
+                "convertible dilution-event issue price",
+            )?;
+            validation::validate_f64_positive(
+                event.new_shares_issued,
+                "convertible dilution-event new shares",
+            )?;
+            validation::validate_f64_positive(
+                event.shares_outstanding_before,
+                "convertible dilution-event prior shares outstanding",
+            )?;
+        }
+
+        let underlying = self
+            .underlying_equity_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "convertible bond requires a non-empty underlying_equity_id".to_string(),
+                )
+            })?;
+        let _ = underlying;
+
+        if self.fixed_coupon.is_some() && self.floating_coupon.is_some() {
+            return Err(finstack_quant_core::Error::Validation(
+                "convertible bond cannot have simultaneous fixed and floating coupon schedules"
+                    .to_string(),
+            ));
+        }
+        if let Some(fixed_coupon) = &self.fixed_coupon {
+            if fixed_coupon.rate.is_sign_negative() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "convertible bond fixed coupon rate must be non-negative, got {}",
+                    fixed_coupon.rate
+                )));
+            }
+        }
+        if let Some(recovery_rate) = self.recovery_rate {
+            if !recovery_rate.is_finite() || !(0.0..=1.0).contains(&recovery_rate) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "convertible bond '{}' recovery_rate must be finite and in [0, 1], got {recovery_rate}",
+                    self.id.as_str()
+                )));
+            }
+        }
+        if let Some(trigger) = &self.soft_call_trigger {
+            trigger.validate()?;
+        }
+        if let Some(call_put) = &self.call_put {
+            call_put.validate_for_life(self.issue_date, self.maturity, "Convertible bond")?;
+        }
+
+        Ok(())
+    }
+
     /// Base conversion ratio (shares per bond) derived from explicit ratio or price.
     ///
     /// Returns `None` if neither `ratio` nor `price` is set on the conversion spec.
@@ -582,6 +747,7 @@ impl ConvertibleBond {
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
+        crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
         let underlying_id = self.underlying_equity_id.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::internal("convertible parity requires underlying_equity_id")
         })?;
@@ -601,6 +767,7 @@ impl ConvertibleBond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         bond_price: f64,
     ) -> finstack_quant_core::Result<f64> {
+        crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
         let underlying_id = self.underlying_equity_id.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::internal(
                 "convertible conversion premium requires underlying_equity_id",
@@ -699,6 +866,10 @@ impl ConvertibleBond {
 impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
     impl_instrument_base!(crate::pricer::InstrumentType::Convertible);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<
@@ -791,6 +962,21 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
     crate::impl_focused_pricing_overrides!();
 }
 
+fn validate_conversion_date(
+    date: Date,
+    issue_date: Date,
+    maturity: Date,
+    context: &str,
+) -> finstack_quant_core::Result<()> {
+    if date < issue_date || date > maturity {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "convertible {context} date {date} is outside instrument life \
+             [{issue_date}, {maturity}]"
+        )));
+    }
+    Ok(())
+}
+
 impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
@@ -812,6 +998,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
 mod tests {
     use super::*;
     use crate::cashflow::CashflowProvider;
+    use crate::instruments::common_impl::traits::Instrument;
 
     #[test]
     fn market_dependencies_cover_convertible_equity_input_fallbacks() {
@@ -881,5 +1068,56 @@ mod tests {
             expected.get_notional().initial
         );
         assert_eq!(actual.get_day_count(), expected.get_day_count());
+    }
+
+    #[test]
+    fn validation_rejects_incomplete_conversion_terms_and_invalid_soft_call() {
+        let mut bond = ConvertibleBond::example().expect("example");
+        bond.conversion.ratio = None;
+        bond.conversion.price = None;
+        assert!(bond
+            .validate_for_pricing()
+            .expect_err("missing conversion terms must fail")
+            .to_string()
+            .contains("conversion.ratio"));
+
+        bond.conversion.ratio = Some(25.0);
+        bond.soft_call_trigger = Some(SoftCallTrigger {
+            threshold_pct: f64::NAN,
+            observation_days: 30,
+            required_days_above: 20,
+        });
+        assert!(bond
+            .validate_for_pricing()
+            .expect_err("NaN soft-call trigger must fail")
+            .to_string()
+            .contains("finite"));
+    }
+
+    #[test]
+    fn validation_rejects_double_coupon_and_inconsistent_conversion_quotes() {
+        let mut bond = ConvertibleBond::example().expect("example");
+        bond.floating_coupon = Some(
+            match crate::instruments::fixed_income::bond::Bond::example_floating()
+                .expect("floating example")
+                .cashflow_spec
+            {
+                crate::instruments::fixed_income::bond::CashflowSpec::Floating(spec) => spec,
+                _ => unreachable!("floating example"),
+            },
+        );
+        assert!(bond
+            .validate_for_pricing()
+            .expect_err("simultaneous coupon schedules must fail")
+            .to_string()
+            .contains("simultaneous"));
+
+        bond.floating_coupon = None;
+        bond.conversion.price = Some(100.0);
+        assert!(bond
+            .validate_for_pricing()
+            .expect_err("inconsistent ratio and price must fail")
+            .to_string()
+            .contains("inconsistent"));
     }
 }

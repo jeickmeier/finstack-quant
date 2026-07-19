@@ -256,6 +256,7 @@ impl InflationSource {
     finstack_quant_valuations_macros::FinancialBuilder,
     finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
+#[builder(validate = InflationLinkedBond::validate)]
 #[serde(deny_unknown_fields)]
 pub struct InflationLinkedBond {
     /// Unique instrument identifier
@@ -319,6 +320,89 @@ pub struct InflationLinkedBond {
 }
 
 impl InflationLinkedBond {
+    /// Validate the linker contract, schedule, and market-data identifiers.
+    pub fn validate(&self) -> Result<()> {
+        let context = format!("Inflation-linked bond '{}'", self.id.as_str());
+        if !self.notional.amount().is_finite() || self.notional.amount() <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} notional must be positive and finite"
+            )));
+        }
+        self.real_coupon
+            .to_f64()
+            .filter(|coupon| coupon.is_finite())
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "{context} real_coupon must be finite"
+                ))
+            })?;
+        if self.issue_date >= self.maturity {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} issue_date must precede maturity"
+            )));
+        }
+        if self.base_date > self.maturity {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} base_date cannot follow maturity"
+            )));
+        }
+        if !self.base_index.is_finite() || self.base_index <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} base_index must be positive and finite"
+            )));
+        }
+        if self
+            .quoted_clean
+            .is_some_and(|price| !price.is_finite() || price <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} quoted_clean must be positive and finite"
+            )));
+        }
+        if self.discount_curve_id.as_str().trim().is_empty()
+            || self.inflation_index_id.as_str().trim().is_empty()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} curve and inflation-index identifiers cannot be empty"
+            )));
+        }
+        if matches!(self.indexation_method, IndexationMethod::UK)
+            && !matches!(self.lag, InflationLag::Months(3) | InflationLag::Months(8))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} UK linkers require a 3-month modern or 8-month legacy lag"
+            )));
+        }
+        let calendar_id = self
+            .calendar_id
+            .as_ref()
+            .map_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID, |id| {
+                id.as_str()
+            });
+        crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
+        let periods = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: self.issue_date,
+                end: self.maturity,
+                frequency: self.frequency,
+                stub: self.stub,
+                bdc: self.bdc,
+                calendar_id,
+                end_of_month: false,
+                day_count: self.day_count,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
+        )?;
+        if periods.is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} must generate at least one coupon period"
+            )));
+        }
+        Ok(())
+    }
+
     /// Create a canonical example US TIPS inflation-linked bond.
     ///
     /// Returns a 10-year TIPS with semi-annual coupons and standard 3-month lag.
@@ -1130,6 +1214,10 @@ impl InflationLinkedBond {
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
 impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond {
     impl_instrument_base!(crate::pricer::InstrumentType::InflationLinkedBond);
+
+    fn validate_invariants(&self) -> Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();

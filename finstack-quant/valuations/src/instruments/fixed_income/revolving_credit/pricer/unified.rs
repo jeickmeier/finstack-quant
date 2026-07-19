@@ -410,6 +410,7 @@ impl RevolvingCreditPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<EnhancedMonteCarloResult> {
+        facility.validate()?;
         match &facility.draw_repay_spec {
             DrawRepaySpec::Stochastic(_) => Self::price_monte_carlo(facility, market, as_of),
             DrawRepaySpec::Deterministic(_) => Err(finstack_quant_core::Error::Validation(

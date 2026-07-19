@@ -17,12 +17,10 @@ fn resolved_index_forward(
         if let Some(fixing) = option.expiry_fixing {
             return Ok(fixing);
         }
-        if as_of >= option.expiry {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "VolatilityIndexOption '{}' requires expiry_fixing on expiry and through settlement",
-                option.id
-            )));
-        }
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "VolatilityIndexOption '{}' requires expiry_fixing on expiry and through settlement",
+            option.id
+        )));
     }
     context
         .get_vol_index_curve(&option.vol_index_curve_id)?
@@ -139,7 +137,6 @@ pub(crate) fn delta(
     if as_of > option.expiry {
         return Ok(0.0);
     }
-    let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
     let disc = context.get_discount(&option.discount_curve_id)?;
     let t = option
         .day_count
@@ -176,6 +173,7 @@ pub(crate) fn delta(
             * df);
     }
 
+    let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
     let forward = resolved_index_forward(option, context, as_of)?;
     let sigma = vol_surface.value_clamped(t, option.strike);
     let df = disc.df_between_dates(as_of, option.effective_settlement_date())?;
@@ -195,8 +193,6 @@ pub(crate) fn gamma(
     if as_of > option.expiry {
         return Ok(0.0);
     }
-    let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
-    let disc = context.get_discount(&option.discount_curve_id)?;
     let t = option
         .day_count
         .year_fraction(as_of, option.expiry, DayCountContext::default())?
@@ -204,6 +200,8 @@ pub(crate) fn gamma(
     if t <= 0.0 {
         return Ok(0.0);
     }
+    let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
+    let disc = context.get_discount(&option.discount_curve_id)?;
     let forward = resolved_index_forward(option, context, as_of)?;
     let sigma = vol_surface.value_clamped(t, option.strike);
     let df = disc.df_between_dates(as_of, option.effective_settlement_date())?;
@@ -221,8 +219,6 @@ pub(crate) fn vega(
     if as_of > option.expiry {
         return Ok(0.0);
     }
-    let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
-    let disc = context.get_discount(&option.discount_curve_id)?;
     let t = option
         .day_count
         .year_fraction(as_of, option.expiry, DayCountContext::default())?
@@ -230,6 +226,8 @@ pub(crate) fn vega(
     if t <= 0.0 {
         return Ok(0.0);
     }
+    let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
+    let disc = context.get_discount(&option.discount_curve_id)?;
     let forward = resolved_index_forward(option, context, as_of)?;
     let sigma = vol_surface.value_clamped(t, option.strike);
     let df = disc.df_between_dates(as_of, option.effective_settlement_date())?;
@@ -429,6 +427,36 @@ mod tests {
         assert!(
             d_call.abs() < 1e-12,
             "expired OTM call delta must be 0, got {d_call}"
+        );
+    }
+
+    #[test]
+    fn expiry_greeks_do_not_require_live_volatility_market_data() {
+        let expiry = date!(2025 - 03 - 19);
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(date!(2025 - 01 - 01))
+            .knots([(0.0, 1.0), (1.0, 0.96)])
+            .build()
+            .expect("disc");
+        let discount_only_market = MarketContext::new().insert(disc);
+
+        let mut put = sample_option();
+        put.option_type = OptionType::Put;
+        put.expiry_fixing = Some(18.0);
+
+        let scale = put.contract_specs.multiplier * put.num_contracts();
+        let delta_at_expiry =
+            delta(&put, &discount_only_market, expiry).expect("expiry delta without vol surface");
+        assert!((delta_at_expiry + scale).abs() < 1e-9);
+
+        let empty_market = MarketContext::new();
+        assert_eq!(
+            gamma(&put, &empty_market, expiry).expect("expiry gamma without market data"),
+            0.0
+        );
+        assert_eq!(
+            vega(&put, &empty_market, expiry).expect("expiry vega without market data"),
+            0.0
         );
     }
 

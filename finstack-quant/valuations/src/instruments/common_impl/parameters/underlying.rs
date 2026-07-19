@@ -138,6 +138,39 @@ impl EquityUnderlyingParams {
         self.contract_size = size;
         self
     }
+
+    /// Validate identifiers, contract scale, and market-data routing fields.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Instrument name included in validation diagnostics.
+    pub(crate) fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
+        if self.ticker.trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} requires a non-empty equity ticker"
+            )));
+        }
+        if self.spot_id.as_str().trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} requires a non-empty equity spot_id"
+            )));
+        }
+        if self
+            .div_yield_id
+            .as_ref()
+            .is_some_and(|id| id.as_str().trim().is_empty())
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} dividend-yield identifier cannot be empty"
+            )));
+        }
+        if !self.contract_size.is_finite() || self.contract_size < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} contract_size must be non-negative and finite"
+            )));
+        }
+        Ok(())
+    }
 }
 
 impl UnderlyingParams for EquityUnderlyingParams {
@@ -177,6 +210,26 @@ impl CommodityUnderlyingParams {
             unit: unit.into(),
             currency,
         }
+    }
+
+    /// Validate that the commodity identifiers required for market-data routing are present.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Instrument name included in validation diagnostics.
+    pub(crate) fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
+        for (field, value) in [
+            ("commodity_type", self.commodity_type.as_str()),
+            ("ticker", self.ticker.as_str()),
+            ("unit", self.unit.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} requires a non-empty commodity {field}"
+                )));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -246,6 +299,36 @@ impl IndexUnderlyingParams {
     pub fn with_contract_size(mut self, size: f64) -> Self {
         self.contract_size = size;
         self
+    }
+
+    /// Validate the index identifier, optional market-data identifiers, and scale.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Instrument name included in validation diagnostics.
+    pub(crate) fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
+        if self.index_id.as_str().trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} requires a non-empty index_id"
+            )));
+        }
+        for (field, id) in [
+            ("yield_id", self.yield_id.as_deref()),
+            ("duration_id", self.duration_id.as_deref()),
+            ("convexity_id", self.convexity_id.as_deref()),
+        ] {
+            if id.is_some_and(|value| value.trim().is_empty()) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} {field} cannot be empty"
+                )));
+            }
+        }
+        if !self.contract_size.is_finite() || self.contract_size < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} contract_size must be non-negative and finite"
+            )));
+        }
+        Ok(())
     }
 }
 

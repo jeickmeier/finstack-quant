@@ -62,6 +62,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
     finstack_quant_valuations_macros::FinancialBuilder,
     finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
+#[builder(validate = DollarRoll::validate)]
 #[serde(deny_unknown_fields)]
 pub struct DollarRoll {
     /// Unique instrument identifier.
@@ -147,6 +148,70 @@ pub struct DollarRoll {
 }
 
 impl DollarRoll {
+    /// Validate both TBA legs and the chronological roll contract.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        let context = format!("Dollar roll '{}'", self.id.as_str());
+        if !self.coupon.is_finite() || !(0.0..=1.0).contains(&self.coupon) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} coupon must be a finite decimal rate in [0, 1]"
+            )));
+        }
+        if !self.notional.amount().is_finite() || self.notional.amount() <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} notional must be positive and finite"
+            )));
+        }
+        for (field, price) in [
+            ("front_price", self.front_price),
+            ("back_price", self.back_price),
+        ] {
+            if !price.is_finite() || price <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} {field} must be positive and finite"
+                )));
+            }
+        }
+        if self.discount_curve_id.as_str().trim().is_empty()
+            || self
+                .repo_curve_id
+                .as_ref()
+                .is_some_and(|id| id.as_str().trim().is_empty())
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} curve identifiers cannot be empty"
+            )));
+        }
+        if !(1..=12).contains(&self.front_settlement_month)
+            || !(1..=12).contains(&self.back_settlement_month)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} settlement months must be in 1..=12"
+            )));
+        }
+        if (self.back_settlement_year, self.back_settlement_month)
+            <= (self.front_settlement_year, self.front_settlement_month)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} back settlement month must follow front settlement month"
+            )));
+        }
+        if let (Some(front), Some(back)) = (self.front_settlement_date, self.back_settlement_date) {
+            if back <= front {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} explicit back settlement must follow explicit front settlement"
+                )));
+            }
+        }
+        if let (Some(trade), Ok(front)) = (self.trade_date, self.front_settle_date()) {
+            if trade > front {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} trade_date cannot follow front settlement"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Create a canonical example dollar roll for testing.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
@@ -258,6 +323,10 @@ impl DollarRoll {
 
 impl crate::instruments::common_impl::traits::Instrument for DollarRoll {
     impl_instrument_base!(crate::pricer::InstrumentType::DollarRoll);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(
         &self,

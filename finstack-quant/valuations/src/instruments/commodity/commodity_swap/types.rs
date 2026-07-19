@@ -143,6 +143,38 @@ fn default_pay_receive() -> PayReceive {
 }
 
 impl CommoditySwap {
+    fn validate(&self) -> Result<()> {
+        use crate::instruments::common_impl::validation;
+
+        self.underlying.validate("CommoditySwap")?;
+        validation::validate_f64_positive(self.quantity, "CommoditySwap quantity")?;
+        validation::validate_date_range_strict(self.start_date, self.maturity, "commodity swap")?;
+        if self.frequency.count() == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommoditySwap frequency must contain at least one tenor unit".to_string(),
+            ));
+        }
+        if let Some(calendar_id) = self.calendar_id.as_deref() {
+            calendar_by_id(calendar_id).ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "CommoditySwap '{}' references unknown calendar_id '{calendar_id}'",
+                    self.id
+                ))
+            })?;
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        for (date, value) in &self.realized_fixings {
+            if !seen.insert(*date) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CommoditySwap '{}' has duplicate realized fixing for date {date}",
+                    self.id
+                )));
+            }
+            validation::validate_f64_finite(*value, "CommoditySwap realized-fixing value")?;
+        }
+        Ok(())
+    }
+
     /// Create a canonical example commodity swap for testing and documentation.
     ///
     /// Returns a natural gas swap with monthly settlements.
@@ -361,6 +393,7 @@ impl CommoditySwap {
     pub fn payment_schedule(&self, _as_of: Date) -> Result<Vec<Date>> {
         use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
+        self.validate()?;
         let bdc = if self.calendar_id.is_some() {
             self.bdc
         } else {
@@ -486,6 +519,10 @@ impl CommoditySwap {
 
 impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
     impl_instrument_base!(crate::pricer::InstrumentType::CommoditySwap);
+
+    fn validate_invariants(&self) -> Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(
         &self,
@@ -625,6 +662,30 @@ mod tests {
         assert_eq!(swap.quantity, 1000.0);
         assert_eq!(swap.fixed_price.to_f64().expect("decimal to f64"), 70.0);
         assert_eq!(swap.side, PayReceive::Pay);
+    }
+
+    #[test]
+    fn validation_rejects_invalid_schedule_and_fixing_inputs() {
+        let mut swap = CommoditySwap::example();
+        swap.quantity = 0.0;
+        assert!(swap.validate_for_pricing().is_err());
+
+        swap.quantity = 1.0;
+        swap.start_date = swap.maturity;
+        assert!(swap.validate_for_pricing().is_err());
+
+        swap.start_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        swap.realized_fixings = vec![
+            (
+                Date::from_calendar_date(2025, Month::February, 3).expect("date"),
+                3.5,
+            ),
+            (
+                Date::from_calendar_date(2025, Month::February, 3).expect("date"),
+                3.6,
+            ),
+        ];
+        assert!(swap.validate_for_pricing().is_err());
     }
 
     #[test]

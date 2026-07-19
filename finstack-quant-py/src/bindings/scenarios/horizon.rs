@@ -26,6 +26,12 @@ use pyo3::prelude::*;
 /// method : str, optional
 ///     Attribution method: ``"parallel"`` (default), ``"waterfall"``,
 ///     ``"metrics_based"``, or ``"taylor"``.
+/// calendar_id : str, optional
+///     Holiday calendar used to business-day adjust ``time_roll_forward``
+///     targets under ``TimeRollMode.business_days`` (e.g. ``"nyse"``,
+///     ``"target"``). Defaults to a weekends-only calendar, so business-day
+///     rolls always avoid weekends but not market holidays. Raises
+///     ``ValueError`` if the identifier is not a built-in calendar.
 ///
 /// Returns
 /// -------
@@ -44,7 +50,8 @@ use pyo3::prelude::*;
 /// caller's ``market`` object is never mutated. The GIL is released while the
 /// scenario and attribution computations run.
 #[pyfunction]
-#[pyo3(signature = (instrument_json, market, as_of, scenario_json, method = "parallel", config = None))]
+#[allow(clippy::too_many_arguments)] // Mirrors the Python keyword-argument surface.
+#[pyo3(signature = (instrument_json, market, as_of, scenario_json, method = "parallel", config = None, calendar_id = None))]
 pub(crate) fn compute_horizon_return<'py>(
     py: Python<'py>,
     instrument_json: &str,
@@ -53,6 +60,7 @@ pub(crate) fn compute_horizon_return<'py>(
     scenario_json: &str,
     method: &str,
     config: Option<&str>,
+    calendar_id: Option<&str>,
 ) -> PyResult<PyHorizonResult> {
     use finstack_quant_attribution::AttributionMethod;
     use finstack_quant_valuations::instruments::InstrumentJson;
@@ -99,10 +107,13 @@ pub(crate) fn compute_horizon_return<'py>(
     // Run analysis with the GIL released: horizon attribution revalues the
     // instrument multiple times (potentially rayon-parallel) and can run for
     // seconds on large books.
-    let analyzer = finstack_quant_scenarios::horizon::HorizonAnalysis::new(
+    let mut analyzer = finstack_quant_scenarios::horizon::HorizonAnalysis::new(
         attribution_method,
         finstack_config,
     );
+    if let Some(id) = calendar_id {
+        analyzer = analyzer.with_calendar_id(id);
+    }
     let result = py
         .detach(|| analyzer.compute(&instrument, &market_ctx, date, &scenario))
         .map_err(display_to_py)?;

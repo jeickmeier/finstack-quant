@@ -9,7 +9,7 @@ use crate::error::Result;
 use crate::utils::parse_period_to_days;
 use crate::TimeRollMode;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, HolidayCalendar, Tenor, WEEKENDS_ONLY};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
 use indexmap::IndexMap;
@@ -40,7 +40,12 @@ pub struct RollForwardReport {
     /// New as-of date after roll.
     pub new_date: finstack_quant_core::dates::Date,
 
-    /// Number of days rolled forward.
+    /// Calendar days between `old_date` and `new_date`.
+    ///
+    /// This is always a calendar-day span, in every [`TimeRollMode`] — including
+    /// [`TimeRollMode::BusinessDays`], where the *target date* is business-day
+    /// adjusted but the span back to `old_date` is still counted in calendar
+    /// days. Downstream ACT/365F annualization depends on this.
     pub days: i64,
 
     /// Per-instrument carry accrual (if instruments provided), grouped by currency.
@@ -99,8 +104,11 @@ pub struct RollForwardReport {
 ///     calendar: None,
 ///     as_of,
 /// };
+/// // 2025-01-01 + 1M is Saturday 2025-02-01, so ModifiedFollowing carries the
+/// // target to Monday 2025-02-03 -> 33 calendar days.
 /// let report = apply_time_roll_forward(&mut ctx, "1M", TimeRollMode::BusinessDays)?;
-/// assert_eq!(report.days, 31);
+/// assert_eq!(report.new_date, date!(2025 - 02 - 03));
+/// assert_eq!(report.days, 33);
 /// # Ok(())
 /// # }
 /// ```
@@ -128,9 +136,17 @@ pub fn apply_time_roll_forward(
         TimeRollMode::BusinessDays => {
             let tenor =
                 Tenor::parse(period_str).map_err(|e| Error::InvalidPeriod(e.to_string()))?;
+            // `Tenor::add_to_date` discards the business-day convention entirely
+            // when no calendar is supplied, which would silently degrade this
+            // mode into an exact copy of `CalendarDays` and land horizons on
+            // weekends. Fall back to core's `WEEKENDS_ONLY`, the documented
+            // calendar for APIs whose calendar identifier is optional, so the
+            // mode always performs a real adjustment. Callers wanting holiday
+            // awareness supply `ctx.calendar`.
+            let calendar: &dyn HolidayCalendar = ctx.calendar.unwrap_or(&WEEKENDS_ONLY);
             let target = tenor.add_to_date(
                 old_date,
-                ctx.calendar,
+                Some(calendar),
                 BusinessDayConvention::ModifiedFollowing,
             )?;
             let days = (target - old_date).whole_days();
@@ -321,7 +337,7 @@ mod tests {
     use super::*;
     use crate::engine::ExecutionContext;
     use crate::TimeRollMode;
-    use finstack_quant_core::dates::{Date, DayCount, Tenor};
+    use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
@@ -384,7 +400,9 @@ mod tests {
             .expect("pv at base as_of before roll")
             .amount();
 
-        let expected_date = base_date + time::Duration::days(31);
+        // 2025-01-01 + 1M lands on Saturday 2025-02-01; ModifiedFollowing under
+        // the weekends-only fallback carries it to Monday 2025-02-03.
+        let expected_date = base_date + time::Duration::days(33);
         let mut ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),
@@ -398,7 +416,7 @@ mod tests {
             .expect("time roll succeeds");
         assert_eq!(ctx.as_of, expected_date);
         assert_eq!(report.new_date, expected_date);
-        assert_eq!(report.days, 31);
+        assert_eq!(report.days, 33);
         assert!(
             !report.instrument_carry.is_empty(),
             "expected instrument carry to be populated"
@@ -436,6 +454,86 @@ mod tests {
             .get("theta")
             .expect("theta at rolled horizon");
         assert!(theta.is_finite());
+    }
+
+    /// Roll a bare context and return `(new_date, days)` for the given mode.
+    fn roll_dates(base_date: Date, period: &str, mode: TimeRollMode) -> (Date, i64) {
+        let mut market = MarketContext::new();
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: None,
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of: base_date,
+        };
+        let report = apply_time_roll_forward(&mut ctx, period, mode).expect("time roll succeeds");
+        (report.new_date, report.days)
+    }
+
+    /// `BusinessDays` must not silently degrade into `CalendarDays`.
+    ///
+    /// `Tenor::add_to_date` discards the business-day convention when no
+    /// calendar is supplied, which previously made the two modes bit-identical
+    /// and landed horizons on weekends. The weekends-only fallback keeps them
+    /// distinct whenever the unadjusted target is not a business day.
+    #[test]
+    fn business_days_mode_differs_from_calendar_days_on_weekend_targets() {
+        // Wed 2025-01-01 + 1M = Sat 2025-02-01.
+        let base_date = date!(2025 - 01 - 01);
+
+        let (cal_date, cal_days) = roll_dates(base_date, "1M", TimeRollMode::CalendarDays);
+        assert_eq!(
+            cal_date,
+            date!(2025 - 02 - 01),
+            "calendar mode is unadjusted"
+        );
+        assert_eq!(cal_days, 31);
+        assert!(cal_date.is_weekend(), "test premise: target is a weekend");
+
+        let (bus_date, bus_days) = roll_dates(base_date, "1M", TimeRollMode::BusinessDays);
+        assert_eq!(
+            bus_date,
+            date!(2025 - 02 - 03),
+            "ModifiedFollowing should carry Saturday to Monday"
+        );
+        assert_eq!(bus_days, 33);
+
+        assert_ne!(
+            cal_date, bus_date,
+            "BusinessDays must not be an alias for CalendarDays"
+        );
+    }
+
+    /// ModifiedFollowing must roll *back* rather than cross a month boundary.
+    #[test]
+    fn business_days_mode_honours_modified_following_month_end() {
+        // Fri 2025-04-25 + 1W = Fri 2025-05-02 (a business day, unchanged).
+        let (plain, _) = roll_dates(date!(2025 - 04 - 25), "1W", TimeRollMode::BusinessDays);
+        assert_eq!(plain, date!(2025 - 05 - 02));
+
+        // Mon 2025-03-31 + 2M = Sat 2025-05-31, the last day of May. Plain
+        // Following would cross into June, so ModifiedFollowing must step back
+        // to Friday 2025-05-30.
+        let (month_end, days) = roll_dates(date!(2025 - 03 - 31), "2M", TimeRollMode::BusinessDays);
+        assert_eq!(
+            month_end,
+            date!(2025 - 05 - 30),
+            "ModifiedFollowing must not cross the month boundary"
+        );
+        assert_eq!(days, 60);
+    }
+
+    /// When the unadjusted target is already a business day, the two
+    /// calendar-resolving modes must agree exactly.
+    #[test]
+    fn business_and_calendar_modes_agree_on_business_day_targets() {
+        // Wed 2025-01-15 + 3M = Tue 2025-04-15, already a business day.
+        let base_date = date!(2025 - 01 - 15);
+        let calendar = roll_dates(base_date, "3M", TimeRollMode::CalendarDays);
+        let business = roll_dates(base_date, "3M", TimeRollMode::BusinessDays);
+        assert_eq!(calendar, business);
+        assert_eq!(calendar.0, date!(2025 - 04 - 15));
     }
 
     /// Realized-forward roll semantics : after

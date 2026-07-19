@@ -225,14 +225,15 @@ impl<'a> CashflowEngine<'a> {
     /// the original `cashflows.rs::generate_deterministic_cashflows_internal`.
     fn build_deterministic_schedule(&self) -> Result<CashFlowSchedule> {
         // Validate that we have a deterministic spec
-        let draw_repay_events = match &self.facility.draw_repay_spec {
-            DrawRepaySpec::Deterministic(events) => events,
+        let mut draw_repay_events = match &self.facility.draw_repay_spec {
+            DrawRepaySpec::Deterministic(events) => events.clone(),
             DrawRepaySpec::Stochastic(_) => {
                 return Err(finstack_quant_core::Error::Validation(
                     "Deterministic cashflows require DrawRepaySpec::Deterministic".to_string(),
                 ));
             }
         };
+        draw_repay_events.sort_by_key(|event| event.date);
 
         // Events dated on the commitment date are rejected outright: the
         // initial position on the commitment date is defined by
@@ -828,14 +829,15 @@ pub fn calculate_drawn_balance_at_date(
     facility: &RevolvingCredit,
     target_date: Date,
 ) -> Result<Money> {
-    let draw_repay_events = match &facility.draw_repay_spec {
-        DrawRepaySpec::Deterministic(events) => events,
+    let mut draw_repay_events = match &facility.draw_repay_spec {
+        DrawRepaySpec::Deterministic(events) => events.clone(),
         DrawRepaySpec::Stochastic(_) => {
             return Err(finstack_quant_core::Error::Validation(
                 "calculate_drawn_balance_at_date requires DrawRepaySpec::Deterministic".to_string(),
             ));
         }
     };
+    draw_repay_events.sort_by_key(|event| event.date);
 
     let mut balance = facility.drawn_amount;
 

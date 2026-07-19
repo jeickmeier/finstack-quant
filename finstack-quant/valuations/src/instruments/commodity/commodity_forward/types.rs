@@ -211,6 +211,40 @@ pub struct CommodityForward {
 }
 
 impl CommodityForward {
+    fn validate(&self) -> Result<()> {
+        use crate::instruments::common_impl::validation;
+
+        self.underlying.validate("CommodityForward")?;
+        validation::validate_f64_positive(self.quantity, "CommodityForward quantity")?;
+        validation::validate_f64_positive(self.multiplier, "CommodityForward multiplier")?;
+        if let Some(price) = self.contract_price {
+            validation::validate_f64_finite(price, "CommodityForward contract_price")?;
+        }
+        if let Some(price) = self.quoted_price {
+            validation::validate_f64_finite(price, "CommodityForward quoted_price")?;
+        }
+        if self
+            .spot_id
+            .as_deref()
+            .is_some_and(|id| id.trim().is_empty())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommodityForward spot_id must not be empty when supplied".to_string(),
+            ));
+        }
+        if self
+            .settlement_calendar_id
+            .as_deref()
+            .is_some_and(|id| id.trim().is_empty())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommodityForward settlement_calendar_id must not be empty when supplied"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Create a canonical example commodity forward for testing and documentation.
     ///
     /// Returns a WTI crude oil forward with realistic parameters.
@@ -291,6 +325,7 @@ impl CommodityForward {
     /// which respects the curve's own day count convention. This avoids hard-coding
     /// Act365F and ensures consistent time calculation across different curves.
     pub fn forward_price(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        self.validate()?;
         // Use quoted price if available
         if let Some(price) = self.quoted_price {
             return Ok(price);
@@ -396,6 +431,10 @@ impl CommodityForward {
 
 impl crate::instruments::common_impl::traits::Instrument for CommodityForward {
     impl_instrument_base!(crate::pricer::InstrumentType::CommodityForward);
+
+    fn validate_invariants(&self) -> Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(
         &self,
@@ -533,6 +572,21 @@ mod tests {
         assert_eq!(forward.underlying.currency, Currency::USD);
         assert_eq!(forward.position, Position::Long);
         assert!(forward.is_at_market());
+    }
+
+    #[test]
+    fn validation_rejects_non_finite_or_degenerate_contract_scalars() {
+        let mut forward = CommodityForward::example();
+        forward.quantity = f64::NAN;
+        assert!(forward.validate_for_pricing().is_err());
+
+        forward.quantity = 1.0;
+        forward.multiplier = 0.0;
+        assert!(forward.validate_for_pricing().is_err());
+
+        forward.multiplier = 1.0;
+        forward.contract_price = Some(f64::INFINITY);
+        assert!(forward.validate_for_pricing().is_err());
     }
 
     #[test]

@@ -569,6 +569,7 @@ def compute_horizon_return(
     scenario_json: str,
     method: str = "parallel",
     config: str | None = None,
+    calendar_id: str | None = None,
 ) -> HorizonResult:
     """
     Compute horizon total return under a scenario.
@@ -588,6 +589,12 @@ def compute_horizon_return(
         ``"metrics_based"``, or ``"taylor"``.
     config : str, optional
         JSON-serialized ``FinstackConfig``.
+    calendar_id : str, optional
+        Holiday calendar used to business-day adjust ``time_roll_forward``
+        targets under ``TimeRollMode.business_days`` (e.g. ``"nyse"``,
+        ``"target"``). Defaults to a weekends-only calendar, so business-day
+        rolls always avoid weekends but not market holidays. Raises
+        ``ValueError`` if the identifier is not a built-in calendar.
 
     Returns
     -------

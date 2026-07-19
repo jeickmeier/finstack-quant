@@ -156,6 +156,60 @@ pub struct AsianOption {
 }
 
 impl AsianOption {
+    fn validate_structure(&self) -> finstack_quant_core::Result<()> {
+        use crate::instruments::common_impl::validation;
+
+        if self.underlying_ticker.trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "AsianOption requires a non-empty underlying_ticker".to_string(),
+            ));
+        }
+        validation::validate_f64_positive(self.strike, "AsianOption strike")?;
+        validation::validate_money_finite(self.notional, "AsianOption notional")?;
+        validation::validate_money_gt(self.notional, 0.0, "AsianOption notional")?;
+        if self.fixing_dates.is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "AsianOption requires at least one fixing date".to_string(),
+            ));
+        }
+        if self
+            .fixing_dates
+            .windows(2)
+            .any(|dates| dates[0] >= dates[1])
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "AsianOption fixing_dates must be strictly increasing".to_string(),
+            ));
+        }
+        if self.fixing_dates.iter().any(|date| *date > self.expiry) {
+            return Err(finstack_quant_core::Error::Validation(
+                "AsianOption fixing_dates cannot extend beyond expiry".to_string(),
+            ));
+        }
+        let mut observed = std::collections::BTreeSet::new();
+        for (date, value) in &self.past_fixings {
+            if !self.fixing_dates.contains(date) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "AsianOption '{}' has a past fixing for {}, which is not a scheduled fixing date",
+                    self.id, date
+                )));
+            }
+            if !observed.insert(*date) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "AsianOption '{}' has duplicate past fixing for {}",
+                    self.id, date
+                )));
+            }
+            if !value.is_finite() || *value <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "AsianOption '{}' fixing on {} must be positive and finite, got {}",
+                    self.id, date, value
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Create a canonical example Asian option (arithmetic average).
     pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
@@ -193,6 +247,7 @@ impl AsianOption {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
         use crate::instruments::exotics::asian_option::pricer;
         pricer::compute_pv(self, curves, as_of)
     }
@@ -238,6 +293,7 @@ impl AsianOption {
     /// Validate that realized fixing history exactly covers every scheduled
     /// observation on or before the valuation date.
     pub fn validate_realized_fixings(&self, as_of: Date) -> finstack_quant_core::Result<()> {
+        self.validate_structure()?;
         let mut scheduled = std::collections::BTreeSet::new();
         for date in &self.fixing_dates {
             if !scheduled.insert(*date) {
@@ -284,6 +340,10 @@ impl AsianOption {
 
 impl crate::instruments::common_impl::traits::Instrument for AsianOption {
     impl_instrument_base!(crate::pricer::InstrumentType::AsianOption);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate_structure()
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         match self.averaging_method {
@@ -418,5 +478,22 @@ mod tests {
             assert_eq!(v, parsed, "roundtrip failed for {s}");
         }
         assert!(AveragingMethod::from_str("invalid").is_err());
+    }
+
+    #[test]
+    fn validation_rejects_invalid_fixing_schedule_and_notional() {
+        use crate::instruments::common_impl::traits::Instrument;
+
+        let mut option = AsianOption::example().expect("example");
+        option.notional = Money::new(0.0, option.notional.currency());
+        assert!(option.validate_for_pricing().is_err());
+
+        option.notional = Money::new(100_000.0, option.notional.currency());
+        option.fixing_dates.swap(0, 1);
+        assert!(option.validate_for_pricing().is_err());
+
+        option.fixing_dates.sort();
+        option.expiry = option.fixing_dates[option.fixing_dates.len() - 2];
+        assert!(option.validate_for_pricing().is_err());
     }
 }

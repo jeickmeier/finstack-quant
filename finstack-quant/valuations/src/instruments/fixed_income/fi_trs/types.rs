@@ -89,6 +89,32 @@ pub struct FIIndexTotalReturnSwap {
 }
 
 impl FIIndexTotalReturnSwap {
+    /// Validate the economic contract before pricing or host-language dispatch.
+    pub fn validate(&self) -> Result<()> {
+        let context = format!("FI index TRS '{}'", self.id.as_str());
+        if !self.notional.amount().is_finite() || self.notional.amount() < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} notional must be non-negative and finite"
+            )));
+        }
+        if self.notional.currency() != self.underlying.base_currency {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} notional currency must match the underlying base currency"
+            )));
+        }
+        self.underlying.validate(&context)?;
+        self.financing.validate(&context)?;
+        self.schedule.validate(&context)?;
+        if let Some(level) = self.initial_level {
+            if !level.is_finite() || level <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} initial_level must be positive and finite"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Create a canonical example fixed income index TRS (USD Corporate Index, 1Y).
     pub fn example() -> finstack_quant_core::Result<Self> {
         use time::macros::date;
@@ -195,6 +221,7 @@ impl FIIndexTotalReturnSwap {
     /// # Returns
     /// Present value of the total return leg in the instrument's currency.
     pub fn pv_total_return_leg(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+        self.validate()?;
         crate::instruments::fixed_income::fi_trs::pricer::pv_total_return_leg(self, curves, as_of)
     }
 
@@ -207,6 +234,7 @@ impl FIIndexTotalReturnSwap {
     /// # Returns
     /// Present value of the financing leg in the instrument's currency.
     pub fn pv_financing_leg(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+        self.validate()?;
         use crate::instruments::common_impl::pricing::TrsEngine;
         TrsEngine::pv_financing_leg(
             &self.financing,
@@ -226,6 +254,7 @@ impl FIIndexTotalReturnSwap {
     /// # Returns
     /// Financing annuity (sum of discounted year fractions × notional).
     pub fn financing_annuity(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
+        self.validate()?;
         use crate::instruments::common_impl::pricing::TrsEngine;
         TrsEngine::financing_annuity(
             &self.financing,
@@ -243,6 +272,10 @@ impl FIIndexTotalReturnSwap {
 
 impl crate::instruments::common_impl::traits::Instrument for FIIndexTotalReturnSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::FIIndexTotalReturnSwap);
+
+    fn validate_invariants(&self) -> Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(
         &self,
@@ -262,6 +295,7 @@ impl crate::instruments::common_impl::traits::Instrument for FIIndexTotalReturnS
     }
 
     fn base_value(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+        self.validate()?;
         // Calculate total return leg PV
         let total_return_pv = self.pv_total_return_leg(curves, as_of)?;
 

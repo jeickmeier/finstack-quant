@@ -143,7 +143,7 @@ impl TryFrom<BermudanSwaptionWire> for BermudanSwaption {
                 calendar_id: wire.calendar_id,
             },
         )?;
-        Ok(Self {
+        let swaption = Self {
             id: wire.id,
             option_type: wire.option_type,
             notional: wire.notional,
@@ -157,7 +157,9 @@ impl TryFrom<BermudanSwaptionWire> for BermudanSwaption {
             metric_pricing_overrides: wire.metric_pricing_overrides,
             scenario_pricing_overrides: wire.scenario_pricing_overrides,
             attributes: wire.attributes,
-        })
+        };
+        swaption.validate()?;
+        Ok(swaption)
     }
 }
 
@@ -468,6 +470,77 @@ mod wire_tests {
 }
 
 impl BermudanSwaption {
+    /// Validate the underlying swap and the complete exercise schedule.
+    pub fn validate(&self) -> Result<()> {
+        let context = format!("Bermudan swaption '{}'", self.id.as_str());
+        if !self.notional.amount().is_finite() || self.notional.amount() <= 0.0 {
+            return Err(Error::Validation(format!(
+                "{context} notional must be positive and finite"
+            )));
+        }
+        if self.vol_surface_id.as_str().trim().is_empty() {
+            return Err(Error::Validation(format!(
+                "{context} requires a non-empty vol_surface_id"
+            )));
+        }
+        self.underlying_fixed_leg.validate()?;
+        self.underlying_float_leg.validate()?;
+        if self.underlying_fixed_leg.start != self.underlying_float_leg.start
+            || self.underlying_fixed_leg.end != self.underlying_float_leg.end
+        {
+            return Err(Error::Validation(format!(
+                "{context} underlying fixed and floating leg dates must match"
+            )));
+        }
+        if self.underlying_fixed_leg.discount_curve_id
+            != self.underlying_float_leg.discount_curve_id
+        {
+            return Err(Error::Validation(format!(
+                "{context} underlying legs must use the same discount curve"
+            )));
+        }
+        if self.bermudan_schedule.exercise_dates.is_empty() {
+            return Err(Error::Validation(format!(
+                "{context} requires at least one exercise date"
+            )));
+        }
+        for dates in self.bermudan_schedule.exercise_dates.windows(2) {
+            if dates[0] >= dates[1] {
+                return Err(Error::Validation(format!(
+                    "{context} exercise dates must be strictly increasing"
+                )));
+            }
+        }
+        let swap_start = self.get_swap_start();
+        let swap_end = self.get_swap_end();
+        if self
+            .bermudan_schedule
+            .exercise_dates
+            .iter()
+            .any(|date| *date < swap_start || *date >= swap_end)
+        {
+            return Err(Error::Validation(format!(
+                "{context} exercise dates must lie in [{swap_start}, {swap_end})"
+            )));
+        }
+        if self
+            .bermudan_schedule
+            .lockout_end
+            .is_some_and(|lockout| lockout >= swap_end)
+        {
+            return Err(Error::Validation(format!(
+                "{context} lockout_end must precede swap maturity"
+            )));
+        }
+        if self.bermudan_schedule.effective_dates().is_empty() {
+            return Err(Error::Validation(format!(
+                "{context} lockout removes every exercise opportunity"
+            )));
+        }
+        self.strike_f64()?;
+        Ok(())
+    }
+
     /// Create a canonical example Bermudan swaption for testing.
     ///
     /// Returns a 10NC2 payer swaption (10-year swap, callable quarterly after 2 years).
@@ -543,7 +616,7 @@ impl BermudanSwaption {
                 forward_curve_id: forward_curve_id.into(),
                 calendar_id: None,
             });
-        Ok(Self {
+        let swaption = Self {
             id: id.into(),
             option_type: OptionType::Call,
             notional,
@@ -557,7 +630,9 @@ impl BermudanSwaption {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::default(),
-        })
+        };
+        swaption.validate()?;
+        Ok(swaption)
     }
 
     /// Create a new Bermudan receiver swaption (right to receive fixed).
@@ -588,7 +663,7 @@ impl BermudanSwaption {
                 forward_curve_id: forward_curve_id.into(),
                 calendar_id: None,
             });
-        Ok(Self {
+        let swaption = Self {
             id: id.into(),
             option_type: OptionType::Put,
             notional,
@@ -602,7 +677,9 @@ impl BermudanSwaption {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::default(),
-        })
+        };
+        swaption.validate()?;
+        Ok(swaption)
     }
 
     /// Fixed rate of the underlying swap.
@@ -922,6 +999,10 @@ impl BermudanSwaption {
 
 impl crate::instruments::common_impl::traits::Instrument for BermudanSwaption {
     impl_instrument_base!(crate::pricer::InstrumentType::BermudanSwaption);
+
+    fn validate_invariants(&self) -> Result<()> {
+        self.validate()
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::MonteCarloHullWhite1F

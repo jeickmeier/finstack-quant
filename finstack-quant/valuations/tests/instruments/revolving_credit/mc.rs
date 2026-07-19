@@ -55,6 +55,7 @@ fn test_mc_pricer_stochastic_utilization() {
             },
         )))
         .discount_curve_id("USD-OIS".into())
+        .recovery_rate(0.4)
         .build()
         .unwrap();
 
@@ -144,6 +145,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
             },
         )))
         .discount_curve_id("USD-OIS".into())
+        .recovery_rate(0.4)
         .build()
         .unwrap();
 
@@ -187,6 +189,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
             },
         )))
         .discount_curve_id("USD-OIS".into())
+        .recovery_rate(0.4)
         .build()
         .unwrap();
 

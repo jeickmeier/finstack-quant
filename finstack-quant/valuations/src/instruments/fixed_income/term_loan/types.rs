@@ -197,6 +197,7 @@ impl RateSpec {
     finstack_quant_valuations_macros::FinancialBuilder,
     finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
+#[builder(validate = TermLoan::validate)]
 #[serde(deny_unknown_fields)]
 pub struct TermLoan {
     /// Unique instrument identifier
@@ -294,6 +295,346 @@ pub struct TermLoan {
 }
 
 impl TermLoan {
+    /// Validate the complete loan contract, including DDTL and event schedules.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        let context = format!("Term loan '{}'", self.id.as_str());
+        if self.issue_date >= self.maturity {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} issue_date must precede maturity"
+            )));
+        }
+        self.validate_money(self.notional_limit, "notional_limit", true)?;
+        if self.discount_curve_id.as_str().trim().is_empty()
+            || self
+                .credit_curve_id
+                .as_ref()
+                .is_some_and(|id| id.as_str().trim().is_empty())
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} curve identifiers cannot be empty"
+            )));
+        }
+        if let Some(calendar_id) = self.calendar_id.as_deref() {
+            calendar_by_id(calendar_id).ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "{context} unknown calendar_id '{calendar_id}'"
+                ))
+            })?;
+        }
+        if let RateSpec::Floating(rate) = &self.rate {
+            rate.validate()?;
+            if rate.index_id.as_str().trim().is_empty() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} floating-rate index_id cannot be empty"
+                )));
+            }
+        }
+        if let CouponType::Split { cash_pct, pik_pct } = self.coupon_type {
+            if cash_pct < rust_decimal::Decimal::ZERO
+                || pik_pct < rust_decimal::Decimal::ZERO
+                || cash_pct > rust_decimal::Decimal::ONE
+                || pik_pct > rust_decimal::Decimal::ONE
+                || (cash_pct + pik_pct - rust_decimal::Decimal::ONE).abs()
+                    > rust_decimal::Decimal::new(1, 9)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} coupon split fractions must be in [0, 1] and sum to one"
+                )));
+            }
+        }
+        if let Some(fee) = self.upfront_fee {
+            self.validate_money(fee, "upfront_fee", false)?;
+        }
+        self.validate_amortization(&context)?;
+        if let Some(ddtl) = &self.ddtl {
+            self.validate_ddtl(ddtl, &context)?;
+        }
+        if let Some(covenants) = &self.covenants {
+            self.validate_covenants(covenants, &context)?;
+        }
+        if let Some(schedule) = &self.call_schedule {
+            for call in &schedule.calls {
+                if call.date < self.issue_date || call.date >= self.maturity {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} call dates must lie in [issue, maturity)"
+                    )));
+                }
+                if !call.price_pct_of_par.is_finite() || call.price_pct_of_par <= 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} call prices must be positive and finite"
+                    )));
+                }
+                if matches!(
+                    call.call_type,
+                    super::spec::LoanCallType::MakeWhole {
+                        treasury_spread_bp
+                    } if treasury_spread_bp < 0
+                ) {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} make-whole treasury spread cannot be negative"
+                    )));
+                }
+            }
+            if schedule
+                .calls
+                .windows(2)
+                .any(|calls| calls[0].date >= calls[1].date)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} call dates must be strictly increasing"
+                )));
+            }
+        }
+        let calendar_id = self
+            .calendar_id
+            .as_deref()
+            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+        let periods = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: self.issue_date,
+                end: self.maturity,
+                frequency: self.frequency,
+                stub: self.stub,
+                bdc: self.bdc,
+                calendar_id,
+                end_of_month: false,
+                day_count: self.day_count,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
+        )?;
+        if periods.is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} must generate at least one payment period"
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_money(
+        &self,
+        money: Money,
+        field: &str,
+        strictly_positive: bool,
+    ) -> finstack_quant_core::Result<()> {
+        let amount = money.amount();
+        if money.currency() != self.currency
+            || !amount.is_finite()
+            || (strictly_positive && amount <= 0.0)
+            || (!strictly_positive && amount < 0.0)
+        {
+            let sign = if strictly_positive {
+                "positive"
+            } else {
+                "non-negative"
+            };
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Term loan '{}' {field} must be {sign}, finite, and denominated in {}",
+                self.id.as_str(),
+                self.currency
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_amortization(&self, context: &str) -> finstack_quant_core::Result<()> {
+        match &self.amortization {
+            AmortizationSpec::None => {}
+            AmortizationSpec::Linear { start, end } => {
+                if *start < self.issue_date || *start >= *end || *end > self.maturity {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} linear amortization dates must lie in loan life and be ordered"
+                    )));
+                }
+            }
+            AmortizationSpec::PercentPerPeriod { bp }
+            | AmortizationSpec::PercentOfOriginalNotional { bp } => {
+                if !(0..=10_000).contains(bp) {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} amortization percentage must be in [0, 10000] bp"
+                    )));
+                }
+            }
+            AmortizationSpec::Custom(items) => {
+                let mut total = 0.0;
+                for (date, amount) in items {
+                    if *date <= self.issue_date || *date > self.maturity {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "{context} custom amortization dates must lie in (issue, maturity]"
+                        )));
+                    }
+                    self.validate_money(*amount, "custom amortization", true)?;
+                    total += amount.amount();
+                }
+                if items.windows(2).any(|items| items[0].0 >= items[1].0)
+                    || total > self.notional_limit.amount() + 1e-6
+                {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} custom amortization must be strictly ordered and cannot exceed notional"
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_ddtl(&self, ddtl: &DdtlSpec, context: &str) -> finstack_quant_core::Result<()> {
+        self.validate_money(ddtl.commitment_limit, "DDTL commitment_limit", true)?;
+        if self.notional_limit.amount() > ddtl.commitment_limit.amount() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} notional_limit cannot exceed DDTL commitment_limit"
+            )));
+        }
+        if ddtl.availability_start < self.issue_date
+            || ddtl.availability_start > ddtl.availability_end
+            || ddtl.availability_end > self.maturity
+            || ddtl.usage_fee_bp < 0
+            || ddtl.commitment_fee_bp < 0
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} DDTL availability must lie inside the loan life and fees cannot be negative"
+            )));
+        }
+        let mut cumulative_draws = 0.0;
+        for draw in &ddtl.draws {
+            if draw.date < ddtl.availability_start || draw.date > ddtl.availability_end {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} DDTL draws must lie inside the availability window"
+                )));
+            }
+            self.validate_money(draw.amount, "DDTL draw", true)?;
+            cumulative_draws += draw.amount.amount();
+            let effective_limit = ddtl
+                .commitment_step_downs
+                .iter()
+                .filter(|step| step.date <= draw.date)
+                .map(|step| step.new_limit.amount())
+                .next_back()
+                .unwrap_or(ddtl.commitment_limit.amount());
+            if cumulative_draws > effective_limit + 1e-6 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} cumulative DDTL draws exceed the effective commitment"
+                )));
+            }
+        }
+        if ddtl
+            .draws
+            .windows(2)
+            .any(|draws| draws[0].date >= draws[1].date)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} DDTL draw dates must be strictly increasing"
+            )));
+        }
+        let mut prior_limit = ddtl.commitment_limit.amount();
+        for step in &ddtl.commitment_step_downs {
+            if step.date < ddtl.availability_start || step.date > ddtl.availability_end {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} DDTL step-down dates must lie inside the availability window"
+                )));
+            }
+            self.validate_money(step.new_limit, "DDTL step-down", false)?;
+            if step.new_limit.amount() > prior_limit {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} DDTL step-down limits cannot increase"
+                )));
+            }
+            prior_limit = step.new_limit.amount();
+        }
+        if ddtl
+            .commitment_step_downs
+            .windows(2)
+            .any(|steps| steps[0].date >= steps[1].date)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} DDTL step-down dates must be strictly increasing"
+            )));
+        }
+        match &ddtl.oid_policy {
+            Some(
+                super::spec::OidPolicy::WithheldPct(bp) | super::spec::OidPolicy::SeparatePct(bp),
+            ) if !(0..=10_000).contains(bp) => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} DDTL OID percentage must be in [0, 10000] bp"
+                )));
+            }
+            Some(
+                super::spec::OidPolicy::WithheldAmount(amount)
+                | super::spec::OidPolicy::SeparateAmount(amount),
+            ) => {
+                self.validate_money(*amount, "DDTL OID amount", false)?;
+                if amount.amount() > ddtl.commitment_limit.amount() {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} DDTL OID amount cannot exceed commitment_limit"
+                    )));
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn validate_covenants(
+        &self,
+        covenants: &TermLoanCovenantEvents,
+        context: &str,
+    ) -> finstack_quant_core::Result<()> {
+        for step in &covenants.margin_stepups {
+            if step.date < self.issue_date || step.date > self.maturity || step.delta_bp < 0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} margin step-ups must be non-negative and inside the loan life"
+                )));
+            }
+        }
+        for toggle in &covenants.pik_toggles {
+            if toggle.date < self.issue_date || toggle.date > self.maturity {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} PIK toggles must lie inside the loan life"
+                )));
+            }
+        }
+        for sweep in &covenants.cash_sweeps {
+            if sweep.date <= self.issue_date || sweep.date > self.maturity {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} cash sweeps must lie in (issue, maturity]"
+                )));
+            }
+            self.validate_money(sweep.amount, "cash sweep", true)?;
+        }
+        if covenants
+            .draw_stop_dates
+            .iter()
+            .any(|date| *date < self.issue_date || *date > self.maturity)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} draw-stop dates must lie inside the loan life"
+            )));
+        }
+        if covenants
+            .margin_stepups
+            .windows(2)
+            .any(|events| events[0].date >= events[1].date)
+            || covenants
+                .pik_toggles
+                .windows(2)
+                .any(|events| events[0].date >= events[1].date)
+            || covenants
+                .cash_sweeps
+                .windows(2)
+                .any(|events| events[0].date >= events[1].date)
+            || covenants
+                .draw_stop_dates
+                .windows(2)
+                .any(|dates| dates[0] >= dates[1])
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} covenant event dates must be strictly increasing within each schedule"
+            )));
+        }
+        Ok(())
+    }
+
     /// Create a canonical example term loan for testing and documentation.
     ///
     /// Generates a 5-year USD term loan with:
@@ -346,9 +687,9 @@ impl TermLoan {
     /// Create an example floating-rate term loan with delayed-draw for testing and documentation.
     ///
     /// Returns a 7-year USD leveraged term loan with:
-    /// - $50M notional, SOFR + 400bps
+    /// - $20M DDTL commitment, SOFR + 400bps
     /// - Quarterly payments, Act/360
-    /// - $20M DDTL commitment with 12-month availability
+    /// - 12-month draw availability
     /// - 1% per-period amortization (of original notional)
     /// - 0% SOFR floor
     pub fn example_floating_with_ddtl() -> finstack_quant_core::Result<Self> {
@@ -403,7 +744,7 @@ impl TermLoan {
         TermLoan::builder()
             .id(InstrumentId::new("TL-FLOAT-DDTL-7Y"))
             .currency(Currency::USD)
-            .notional_limit(Money::new(50_000_000.0, Currency::USD))
+            .notional_limit(Money::new(20_000_000.0, Currency::USD))
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2031 - 01 - 15))
             .rate(RateSpec::Floating(floating_rate))
@@ -757,6 +1098,10 @@ fn validate_currency(expected: Currency, money: Money) -> Result<(), finstack_qu
 
 impl crate::instruments::common_impl::traits::Instrument for TermLoan {
     impl_instrument_base!(crate::pricer::InstrumentType::TermLoan);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(
         &self,

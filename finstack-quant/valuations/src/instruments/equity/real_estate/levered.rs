@@ -74,6 +74,29 @@ pub struct LeveredRealEstateEquity {
 }
 
 impl LeveredRealEstateEquity {
+    fn validate(&self) -> finstack_quant_core::Result<()> {
+        self.asset.validate_for_pricing()?;
+        if self.currency != self.asset.currency {
+            return Err(finstack_quant_core::Error::CurrencyMismatch {
+                expected: self.asset.currency,
+                actual: self.currency,
+            });
+        }
+        if self
+            .exit_date
+            .is_some_and(|exit| exit < self.asset.valuation_date)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "LeveredRealEstateEquity '{}' exit_date cannot precede asset valuation_date {}",
+                self.id, self.asset.valuation_date
+            )));
+        }
+        for financing in &self.financing {
+            financing.clone().into_boxed()?;
+        }
+        Ok(())
+    }
+
     /// Create a representative levered office property example.
     ///
     /// Uses [`RealEstateAsset::example()`] as the underlying asset with no
@@ -116,6 +139,7 @@ impl LeveredRealEstateEquity {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
+        self.validate()?;
         levered_pricer::financing_payoff_at_exit(self, market, as_of)
     }
 
@@ -126,6 +150,10 @@ impl LeveredRealEstateEquity {
 
 impl Instrument for LeveredRealEstateEquity {
     impl_instrument_base!(InstrumentType::LeveredRealEstateEquity);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn market_dependencies(
         &self,
