@@ -154,6 +154,15 @@ jobs:
           cache: true
           cache_save: false
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python environment
+        run: |
+          uv venv --python 3.12
+          echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
+          uv sync --no-install-project
+
       - name: Install nightly Rust for public API docs
         run: rustup toolchain install nightly --profile minimal
 
