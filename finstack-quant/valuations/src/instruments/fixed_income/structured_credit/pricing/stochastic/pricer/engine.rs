@@ -544,18 +544,88 @@ impl StochasticPricer {
         factors
     }
 
-    /// Configured systematic-factor mean-reversion speed κ, when positive.
+    /// Configured systematic-factor mean-reversion speed κ (per year).
     ///
-    /// Only [`LatentFactorSpec::SingleFactor`] carries a mean-reversion
-    /// parameter; other factor specs (and κ = 0) keep the i.i.d. monthly
-    /// factor behavior.
-    fn factor_mean_reversion(&self) -> Option<f64> {
+    /// SC-C05 / SC-M14. This previously returned `Some(κ)` only for
+    /// [`LatentFactorSpec::SingleFactor`] with κ **strictly positive**, and
+    /// `None` otherwise — including κ = 0, which is the DEFAULT
+    /// (`LatentFactorSpec::default()` is `SingleFactor { volatility: 1.0,
+    /// mean_reversion: 0.0 }`) and which `build_scenario_tree_config` never
+    /// overrides. Every production price therefore drew an INDEPENDENT
+    /// systematic factor per period:
+    ///
+    /// ```text
+    /// was:       A_i,t = √ρ·Z_t + √(1−ρ)·ε_i,t,   Z_t ⊥ Z_s
+    /// canonical: A_i   = √ρ·Z   + √(1−ρ)·ε_i      (Li 2000; Vasicek 2002)
+    /// ```
+    ///
+    /// Averaging independent per-period factors dilutes cumulative systematic
+    /// variance, so an input ρ = 20% behaved like an effective three-year asset
+    /// correlation of ~3% — understating tranche correlation risk and tail loss
+    /// by roughly 6x and systematically overvaluing mezzanine.
+    ///
+    /// The semantics were also inverted and discontinuous at zero: κ = 0 gave
+    /// i.i.d. factors while κ = 1e-9 gave φ ≈ 1 and hence PERFECT persistence,
+    /// contradicting this module's own docstring and `factor_model.rs`
+    /// ("0 = random walk").
+    ///
+    /// Now κ = 0 means what it is documented to mean — a random walk, φ = 1,
+    /// one systematic draw held across the horizon, the canonical single-factor
+    /// copula. Arms carrying no κ default to 0.0 and get the same treatment.
+    /// True i.i.d.-per-month remains reachable as the κ → ∞ limit.
+    ///
+    /// NOTE: this must stay paired with [`Self::period_factor_scale`]. Making
+    /// the factor persistent without renormalizing the period aggregation
+    /// leaves the period factor with variance `M` instead of 1, silently
+    /// de-calibrating the copula barrier `Φ⁻¹(PD)` — a quieter and worse
+    /// failure than the dilution it fixes.
+    fn factor_mean_reversion(&self) -> f64 {
         match &self.config.tree_config.factor_spec {
-            LatentFactorSpec::SingleFactor { mean_reversion, .. } if *mean_reversion > 0.0 => {
-                Some(*mean_reversion)
-            }
-            _ => None,
+            LatentFactorSpec::SingleFactor { mean_reversion, .. } => mean_reversion.max(0.0),
+            _ => 0.0,
         }
+    }
+
+    /// Monthly factor autocorrelation `φ = e^{−κ/12}`.
+    fn factor_phi(&self) -> f64 {
+        (-self.factor_mean_reversion() / 12.0).exp()
+    }
+
+    /// Normalizing divisor that keeps the aggregated period factor `N(0,1)`.
+    ///
+    /// The period-representative systematic factor is `Z_period = (Σ Zₘ)/s`.
+    /// Choosing `s` correctly is what keeps the copula barrier `c = Φ⁻¹(PDₜ)`
+    /// calibrated, because that barrier assumes a standard-normal factor.
+    ///
+    /// For the stationary AR(1) path produced by [`Self::evolved_factors`] the
+    /// marginal variance is 1 and the autocorrelation at lag `h` is `φ^h`, so
+    ///
+    /// ```text
+    /// Var(Σ_{m=1..M} Zₘ) = Σ_i Σ_j φ^{|i−j|} = M + 2·Σ_{k=1..M−1} (M−k)·φ^k
+    /// ```
+    ///
+    /// and `s` is the square root of that. The two limits are the sanity check:
+    ///
+    /// * `φ = 0` (independent months) ⇒ `Var = M` ⇒ `s = √M` — the previous
+    ///   hard-coded divisor, which was correct ONLY in this limit.
+    /// * `φ = 1` (fully persistent) ⇒ `Var = M²` ⇒ `s = M`, so
+    ///   `Z_period = Z₁` — exactly the single-draw canonical copula.
+    ///
+    /// Hard-coding `√M` while the factor is persistent would give the period
+    /// factor variance `M`, inflating every latent draw by `√M` and pushing
+    /// far more names across the barrier than the input PD implies.
+    fn period_factor_scale(months: usize, phi: f64) -> f64 {
+        let m = months as f64;
+        if months <= 1 {
+            return 1.0;
+        }
+        let mut variance = m;
+        let mut phi_k = 1.0;
+        for k in 1..months {
+            phi_k *= phi;
+            variance += 2.0 * (m - k as f64) * phi_k;
+        }
+        variance.max(f64::MIN_POSITIVE).sqrt()
     }
 
     /// Evolve monthly factor innovations into a stationary AR(1)/OU path.
@@ -601,14 +671,14 @@ impl StochasticPricer {
         // AR(1)/OU persistence (single chokepoint for MC, tree, and hybrid
         // paths): when a positive mean-reversion speed is configured the
         // monthly draws are innovations, not the factor itself.
-        let evolved_storage;
-        let factors: &[f64] = match self.factor_mean_reversion() {
-            Some(kappa) if self.has_stochastic_rates() => {
-                evolved_storage = Self::evolved_factors(factors, kappa);
-                &evolved_storage
-            }
-            _ => factors,
-        };
+        //
+        // SC-C05: persistence is applied unconditionally. It was previously
+        // also gated on `has_stochastic_rates()` — a misleadingly-named check
+        // that is really "any stochastic spec is configured" — but systematic
+        // credit persistence is a property of the factor, not of whether any
+        // particular channel is simulated.
+        let evolved_storage = Self::evolved_factors(factors, self.factor_mean_reversion());
+        let factors: &[f64] = &evolved_storage;
         let months_per_period = instrument.frequency.months().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "Structured credit stochastic pricing requires month-based payment frequencies"
@@ -689,15 +759,22 @@ impl StochasticPricer {
         // through `aggregate_monthly_shocks`. Taking only the first month's
         // factor ignored months 2..M and desynchronized the two channels.
         //
-        // The `M` monthly factors are i.i.d. `N(0,1)`; their sum has variance
-        // `M`, so the period-representative systematic factor is
-        // `Z_period = (Σ Zₘ)/√M`. Dividing by `√M` (not `M`) keeps
-        // `Z_period ~ N(0,1)`, so the marginal-PD copula barrier
-        // `c = Φ⁻¹(PDₜ)` stays correctly calibrated. A single-month period
-        // recovers exactly that month's factor.
+        // The period-representative systematic factor is `Z_period = (Σ Zₘ)/s`,
+        // where `s` keeps `Z_period ~ N(0,1)` so the marginal-PD copula barrier
+        // `c = Φ⁻¹(PDₜ)` stays correctly calibrated.
+        //
+        // SC-C05: `s` is computed from the factor's actual autocorrelation, not
+        // hard-coded to `√M`. `√M` is the variance of a sum of INDEPENDENT
+        // months — correct only when the monthly factors are i.i.d., which was
+        // itself the bug. Now that the factor is a persistent AR(1) path,
+        // `Var(Σ Zₘ) = Σ_i Σ_j φ^{|i−j|}`, and using `√M` would leave the
+        // period factor with variance up to `M`, inflating every latent draw
+        // and pushing far more names across the barrier than the input PD
+        // implies. A single-month period recovers exactly that month's factor
+        // under either convention.
         let systematic_z = if self.has_stochastic_rates() && !factors.is_empty() {
             let sum: f64 = factors.iter().sum();
-            sum / (factors.len() as f64).sqrt()
+            sum / Self::period_factor_scale(factors.len(), self.factor_phi())
         } else {
             0.0
         };
@@ -1990,13 +2067,25 @@ mod per_name_copula_tests {
         let mut deal = clo_deal(60);
         deal.frequency = finstack_quant_core::dates::Tenor::quarterly();
 
-        let pricer = StochasticPricer::new(copula_config(
+        let mut cfg = copula_config(
             0.05,
             0.30,
             12, // 12 monthly tree periods
             PoolGranularity::PerName,
             16,
-        ));
+        );
+        // SC-C05: exercise this at a FAST mean reversion (κ = 6 ⇒ φ ≈ 0.61).
+        // The aggregation under test is within-period across months, and under
+        // the default κ = 0 the factor is a random walk (φ = 1) whose later
+        // innovations are absorbed entirely — months 2..M would carry the
+        // month-1 value by construction and there would be no distinct stress
+        // to detect. A finite κ keeps the months genuinely different, which is
+        // what gives this test its teeth.
+        cfg.tree_config.factor_spec = LatentFactorSpec::SingleFactor {
+            volatility: 1.0,
+            mean_reversion: 6.0,
+        };
+        let pricer = StochasticPricer::new(cfg);
 
         // Craft 6 monthly factors covering two quarterly periods. The first
         // quarter is benign in month 1 but stressed in months 2 and 3 — a
@@ -2011,9 +2100,16 @@ mod per_name_copula_tests {
             .per_name
             .expect("per-name plan must be present for a copula deal");
 
-        // Expected period systematic factor for quarter 1: (Σ Zₘ)/√3.
-        let m = 3.0_f64;
-        let expected_z = (factors[0] + factors[1] + factors[2]) / m.sqrt();
+        // Expected period systematic factor for quarter 1: (Σ Zₘ)/s.
+        //
+        // SC-C05: the raw draws are innovations — `path_shocks_from_factors`
+        // evolves them into a persistent AR(1) path before aggregating — so
+        // the expectation is built from the EVOLVED factors and normalized by
+        // the same autocorrelation-aware scale the engine uses.
+        let phi = pricer.factor_phi();
+        let evolved = StochasticPricer::evolved_factors(&factors, pricer.factor_mean_reversion());
+        let scale = StochasticPricer::period_factor_scale(3, phi);
+        let expected_z = (evolved[0] + evolved[1] + evolved[2]) / scale;
         assert!(
             (period0.systematic_z - expected_z).abs() < 1e-9,
             "quarter-1 copula systematic factor {} must be the √M-scaled sum \
@@ -2031,6 +2127,129 @@ mod per_name_copula_tests {
             period0.systematic_z,
             factors[0],
         );
+    }
+
+    /// SC-C05 — the aggregated period factor must stay `N(0,1)` at EVERY
+    /// mean-reversion speed.
+    ///
+    /// This is the test that makes the persistence change safe. The copula
+    /// barrier is `c = Φ⁻¹(PD)`, which assumes a standard-normal systematic
+    /// factor. The period factor is `Z_period = (Σ Zₘ)/s`, so `s` must equal
+    /// `sqrt(Var(Σ Zₘ)) = sqrt(Σ_i Σ_j φ^{|i−j|})`.
+    ///
+    /// Hard-coding `s = √M` — correct only for INDEPENDENT months — while the
+    /// factor is persistent leaves `Z_period` with variance up to `M`. That
+    /// inflates every latent draw by up to `√M` and pushes far more names
+    /// across the barrier than the input PD implies: a silent, systematic
+    /// over-statement of defaults on every copula price. It is a quieter and
+    /// more dangerous failure than the correlation dilution the persistence
+    /// change fixes, which is why the two must land together.
+    #[test]
+    fn aggregated_period_factor_is_standard_normal_at_every_kappa() {
+        const MONTHS: usize = 6;
+        const PATHS: usize = 200_000;
+
+        for kappa in [0.0_f64, 0.25, 1.0, 6.0, 50.0] {
+            let phi = (-kappa / 12.0).exp();
+            let scale = StochasticPricer::period_factor_scale(MONTHS, phi);
+
+            let mut sum = 0.0_f64;
+            let mut sum_sq = 0.0_f64;
+            for path in 0..PATHS {
+                let mut rng = PhiloxRng::new(20_260_719).substream(path as u64);
+                let innovations: Vec<f64> = (0..MONTHS).map(|_| rng.next_std_normal()).collect();
+                let evolved = StochasticPricer::evolved_factors(&innovations, kappa);
+                let z_period: f64 = evolved.iter().sum::<f64>() / scale;
+                sum += z_period;
+                sum_sq += z_period * z_period;
+            }
+
+            let n = PATHS as f64;
+            let mean = sum / n;
+            let variance = sum_sq / n - mean * mean;
+
+            assert!(
+                mean.abs() < 0.02,
+                "kappa={kappa}: aggregated period factor mean {mean:.4} must be ~0"
+            );
+            assert!(
+                (variance - 1.0).abs() < 0.03,
+                "kappa={kappa} (phi={phi:.4}): aggregated period factor variance \
+                 {variance:.4} must be ~1, or the copula barrier Phi^-1(PD) is \
+                 de-calibrated. Divisor used was {scale:.4}; the naive sqrt(M) \
+                 would be {:.4}.",
+                (MONTHS as f64).sqrt()
+            );
+        }
+    }
+
+    /// SC-C05 — a PERSISTENT systematic factor must widen the pool loss
+    /// distribution relative to an i.i.d.-per-period one.
+    ///
+    /// This is the economic payoff. Under the canonical single-factor copula
+    /// (Li 2000; Vasicek 2002) one systematic draw governs the whole horizon,
+    /// so bad states persist and defaults cluster in time — which is what
+    /// generates the fat tail that mezzanine tranches are actually exposed to.
+    /// Redrawing the factor independently each period averages that away: the
+    /// cumulative systematic variance is diluted and an input correlation of
+    /// 20% behaves like roughly 3%.
+    ///
+    /// Both runs below use IDENTICAL inputs including the asset correlation;
+    /// only the factor's persistence differs (kappa = 0, a random walk, versus
+    /// a very fast mean reversion that recovers the old i.i.d. behaviour). The
+    /// persistent run must show materially more loss dispersion.
+    #[test]
+    fn persistent_systematic_factor_widens_the_loss_distribution() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let deal = clo_deal(60);
+
+        let unexpected_loss_for = |kappa: f64| -> f64 {
+            let mut cfg = copula_config(0.06, 0.30, 36, PoolGranularity::PerName, 6_000);
+            cfg.tree_config.factor_spec = LatentFactorSpec::SingleFactor {
+                volatility: 1.0,
+                mean_reversion: kappa,
+            };
+            StochasticPricer::new(cfg)
+                .price(&deal, &market)
+                .expect("per-name copula pricing")
+                .unexpected_loss
+                .amount()
+        };
+
+        // kappa = 0  -> phi = 1     -> one systematic draw for the horizon.
+        // kappa = 600 -> phi ~ 0    -> independent monthly factors (the bug).
+        let persistent = unexpected_loss_for(0.0);
+        let independent = unexpected_loss_for(600.0);
+
+        assert!(
+            persistent > independent * 1.10,
+            "a persistent systematic factor must materially widen the loss \
+             distribution: persistent UL {persistent:.0} should exceed the \
+             i.i.d. UL {independent:.0} by more than 10%. A smaller gap means \
+             the factor is still being redrawn each period and the input asset \
+             correlation is being diluted (SC-C05)."
+        );
+    }
+
+    /// SC-C05 — the normalizing divisor must hit its two analytic limits.
+    #[test]
+    fn period_factor_scale_matches_its_analytic_limits() {
+        let m = 6usize;
+        // phi = 0 (independent months): Var(sum) = M, so s = sqrt(M).
+        let independent = StochasticPricer::period_factor_scale(m, 0.0);
+        assert!(
+            (independent - (m as f64).sqrt()).abs() < 1e-12,
+            "at phi=0 the divisor must be sqrt(M)={}, got {independent}",
+            (m as f64).sqrt()
+        );
+        // phi = 1 (fully persistent): Var(sum) = M^2, so s = M and Z_period = Z_1.
+        let persistent = StochasticPricer::period_factor_scale(m, 1.0);
+        assert!(
+            (persistent - m as f64).abs() < 1e-9,
+            "at phi=1 the divisor must be M={m}, got {persistent}"
+        );
+        // Single-month periods are the identity under either convention.
+        assert!((StochasticPricer::period_factor_scale(1, 0.5) - 1.0).abs() < 1e-12);
     }
 
     /// Item 5 — antithetic per-name pricing must be deterministic and produce
@@ -2125,15 +2344,27 @@ mod per_name_copula_tests {
     /// strictly more loss uncertainty. The pre-fix engine applied one
     /// pool-level recovery to every per-name default, making the two
     /// indistinguishable.
+    ///
+    /// SC-C05 note — asset correlation is deliberately LOW here (2%). Now that
+    /// the systematic factor is persistent across periods (the canonical
+    /// single-Z copula), that channel carries several times the cumulative
+    /// variance it did under the old i.i.d.-per-period draw. At the 20%
+    /// correlation this test previously used it swamps the idiosyncratic
+    /// recovery scatter being isolated, and the difference falls below Monte
+    /// Carlo noise (measured: 8.77M against 8.94M — a 1.9% move in the WRONG
+    /// direction, i.e. pure noise). Suppressing the systematic channel restores
+    /// this test's power over the channel it actually targets; persistence
+    /// itself is covered by
+    /// `aggregated_period_factor_is_standard_normal_at_every_kappa`.
     #[test]
     fn per_name_recovery_dispersion_widens_loss_distribution() {
         let market = MarketContext::new().insert((*discount_curve()).clone());
         let deal = clo_deal(40); // concentrated pool — name-level scatter shows
 
-        let mut constant_cfg = copula_config(0.06, 0.20, 36, PoolGranularity::PerName, 4_000);
+        let mut constant_cfg = copula_config(0.06, 0.02, 36, PoolGranularity::PerName, 4_000);
         constant_cfg.tree_config.recovery_spec = RecoverySpec::Constant { rate: 0.40 };
 
-        let mut dispersed_cfg = copula_config(0.06, 0.20, 36, PoolGranularity::PerName, 4_000);
+        let mut dispersed_cfg = copula_config(0.06, 0.02, 36, PoolGranularity::PerName, 4_000);
         // ρ_R = 0 ⇒ the systematic recovery is a flat 0.40, bit-identical to
         // the constant model; only the idiosyncratic σ_R = 0.30 channel differs.
         dispersed_cfg.tree_config.recovery_spec = RecoverySpec::market_correlated(0.40, 0.30, 0.0)
