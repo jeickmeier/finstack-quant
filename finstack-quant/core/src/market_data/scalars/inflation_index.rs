@@ -465,21 +465,16 @@ impl InflationIndex {
     /// [`new`](Self::new) is violated and the underlying series is empty. A
     /// normally constructed index always has at least one observation.
     pub fn date_range(&self) -> Result<(Date, Date)> {
-        let observations = self.series.observations();
-
-        if observations.is_empty() {
-            return Err(Error::internal(
-                "inflation index date_range requires at least one observation",
-            ));
-        }
-
-        let start_date = observations
-            .first()
-            .map(|(d, _)| *d)
+        // O(1) endpoint reads. This is called once per coupon period during
+        // inflation-linked bond pricing, so it must not materialize the whole
+        // observation history (a 40-year monthly CPI series is ~480 prints).
+        let start_date = self
+            .series
+            .first_date()
             .ok_or_else(|| Error::internal("inflation index observations missing first date"))?;
-        let end_date = observations
-            .last()
-            .map(|(d, _)| *d)
+        let end_date = self
+            .series
+            .last_date()
             .ok_or_else(|| Error::internal("inflation index observations missing last date"))?;
 
         Ok((start_date, end_date))

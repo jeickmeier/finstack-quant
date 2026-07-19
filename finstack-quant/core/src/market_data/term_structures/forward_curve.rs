@@ -732,17 +732,6 @@ impl ForwardCurve {
         self.metadata_builder(new_id).knots(bumped_rates).build()
     }
 
-    /// Rebuild only the interpolator from the current knots and forward rates.
-    fn rebuild_interp(&mut self) -> crate::Result<()> {
-        self.interp = super::common::build_interp_allow_any_values(
-            self.interp.style(),
-            self.knots.clone(),
-            self.forwards.clone(),
-            self.interp.extrapolation(),
-        )?;
-        Ok(())
-    }
-
     /// Apply a bump specification in-place, mutating values and rebuilding the interpolator.
     pub(crate) fn bump_in_place(
         &mut self,
@@ -760,15 +749,19 @@ impl ForwardCurve {
             }
         })?;
 
-        let mut bumped = self.clone();
+        // Clone the value array only, not the whole curve -- the interpolator
+        // rebuild below discards any cloned interpolator anyway. Nothing is
+        // written to `self` until the fallible rebuild succeeds, so failure
+        // atomicity is unchanged.
+        let mut forwards = self.forwards.clone();
         match spec.bump_type {
             BumpType::Parallel => {
                 if is_multiplicative {
-                    for fwd in bumped.forwards.iter_mut() {
+                    for fwd in forwards.iter_mut() {
                         *fwd *= val;
                     }
                 } else {
-                    for fwd in bumped.forwards.iter_mut() {
+                    for fwd in forwards.iter_mut() {
                         *fwd += val;
                     }
                 }
@@ -786,7 +779,7 @@ impl ForwardCurve {
                     target_bucket,
                     next_bucket,
                 )?;
-                for (fwd, &t) in bumped.forwards.iter_mut().zip(bumped.knots.iter()) {
+                for (fwd, &t) in forwards.iter_mut().zip(self.knots.iter()) {
                     let weight = super::common::triangular_weight(
                         t,
                         prev_bucket,
@@ -801,8 +794,14 @@ impl ForwardCurve {
                 }
             }
         }
-        bumped.rebuild_interp()?;
-        *self = bumped;
+        let interp = super::common::build_interp_allow_any_values(
+            self.interp.style(),
+            self.knots.clone(),
+            forwards.clone(),
+            self.interp.extrapolation(),
+        )?;
+        self.forwards = forwards;
+        self.interp = interp;
         Ok(())
     }
 

@@ -286,8 +286,80 @@ impl ScalarTimeSeries {
     /// assert!(linear.value_on(jan).expect("Value lookup should succeed") > 10.0);
     /// ```
     pub fn value_on(&self, date: Date) -> Result<f64> {
-        let days = to_days(date);
-        self.values_on_days(&[days]).map(|v| v[0])
+        self.value_at_day(to_days(date))
+    }
+
+    /// Resolve a single query day under this series' interpolation mode.
+    ///
+    /// This is the allocation-free single-point path. It shares its per-point
+    /// arms with [`Self::values_on_days`], so batch and scalar lookups cannot
+    /// drift apart.
+    fn value_at_day(&self, query_day: i32) -> Result<f64> {
+        let date_vec = self.data.dates();
+        let value_vec = self.data.values();
+        match self.interpolation {
+            SeriesInterpolation::Step => self.step_value_at_day(date_vec, value_vec, query_day),
+            SeriesInterpolation::Linear => self.linear_value_at_day(date_vec, value_vec, query_day),
+        }
+    }
+
+    /// Step (last-observation-carried-forward) lookup for one query day.
+    fn step_value_at_day(
+        &self,
+        date_vec: &[i32],
+        value_vec: &[f64],
+        query_day: i32,
+    ) -> Result<f64> {
+        match date_vec.binary_search(&query_day) {
+            Ok(idx) => Ok(value_vec[idx]),
+            Err(idx) => {
+                if idx == 0 {
+                    Err(crate::Error::Input(InputError::NotFound {
+                        id: format!(
+                            "series '{}': no observation on or before {}",
+                            self.id.as_str(),
+                            from_days(query_day),
+                        ),
+                    }))
+                } else {
+                    Ok(value_vec[idx - 1]) // Last observation carried forward
+                }
+            }
+        }
+    }
+
+    /// Linear-interpolation lookup for one query day.
+    fn linear_value_at_day(
+        &self,
+        date_vec: &[i32],
+        value_vec: &[f64],
+        query_day: i32,
+    ) -> Result<f64> {
+        match date_vec.binary_search(&query_day) {
+            Ok(idx) => Ok(value_vec[idx]),
+            Err(idx) => {
+                if idx == 0 {
+                    Err(crate::Error::Input(InputError::NotFound {
+                        id: format!(
+                            "series '{}': no observation on or before {}",
+                            self.id.as_str(),
+                            from_days(query_day),
+                        ),
+                    }))
+                } else if idx >= date_vec.len() {
+                    // Use last value for dates after series
+                    Ok(*value_vec.last().ok_or(InputError::TooFewPoints)?)
+                } else {
+                    // Linear interpolation between adjacent points
+                    let x0 = date_vec[idx - 1] as f64;
+                    let x1 = date_vec[idx] as f64;
+                    let y0 = value_vec[idx - 1];
+                    let y1 = value_vec[idx];
+                    let weight = (query_day as f64 - x0) / (x1 - x0);
+                    Ok(y0 + weight * (y1 - y0))
+                }
+            }
+        }
     }
 
     /// Retrieve the value for an **exactly observed** date.
@@ -395,23 +467,7 @@ impl ScalarTimeSeries {
         let mut result = Vec::with_capacity(query_days.len());
 
         for &query_day in query_days {
-            let value = match date_vec.binary_search(&query_day) {
-                Ok(idx) => value_vec[idx],
-                Err(idx) => {
-                    if idx == 0 {
-                        return Err(crate::Error::Input(InputError::NotFound {
-                            id: format!(
-                                "series '{}': no observation on or before {}",
-                                self.id.as_str(),
-                                from_days(query_day),
-                            ),
-                        }));
-                    } else {
-                        value_vec[idx - 1] // Last observation carried forward
-                    }
-                }
-            };
-            result.push(value);
+            result.push(self.step_value_at_day(date_vec, value_vec, query_day)?);
         }
 
         Ok(result)
@@ -427,31 +483,7 @@ impl ScalarTimeSeries {
         let mut result = Vec::with_capacity(query_days.len());
 
         for &query_day in query_days {
-            let value = match date_vec.binary_search(&query_day) {
-                Ok(idx) => value_vec[idx],
-                Err(idx) => {
-                    if idx == 0 {
-                        return Err(crate::Error::Input(InputError::NotFound {
-                            id: format!(
-                                "series '{}': no observation on or before {}",
-                                self.id.as_str(),
-                                from_days(query_day),
-                            ),
-                        }));
-                    } else if idx >= date_vec.len() {
-                        *value_vec.last().ok_or(InputError::TooFewPoints)? // Use last value for dates after series
-                    } else {
-                        // Linear interpolation between adjacent points
-                        let x0 = date_vec[idx - 1] as f64;
-                        let x1 = date_vec[idx] as f64;
-                        let y0 = value_vec[idx - 1];
-                        let y1 = value_vec[idx];
-                        let weight = (query_day as f64 - x0) / (x1 - x0);
-                        y0 + weight * (y1 - y0)
-                    }
-                }
-            };
-            result.push(value);
+            result.push(self.linear_value_at_day(date_vec, value_vec, query_day)?);
         }
 
         Ok(result)
@@ -470,6 +502,24 @@ impl ScalarTimeSeries {
             .collect()
     }
 
+    /// Get the earliest observation date, or `None` when the series is empty.
+    ///
+    /// O(1). Prefer this over `observations().first()`, which materializes the
+    /// entire series just to read one element.
+    #[inline]
+    pub fn first_date(&self) -> Option<Date> {
+        self.data.dates().first().copied().map(from_days)
+    }
+
+    /// Get the latest observation date, or `None` when the series is empty.
+    ///
+    /// O(1). Prefer this over `observations().last()`, which materializes the
+    /// entire series just to read one element.
+    #[inline]
+    pub fn last_date(&self) -> Option<Date> {
+        self.data.dates().last().copied().map(from_days)
+    }
+
     /// Get the number of observations in the series.
     pub fn len(&self) -> usize {
         self.data.len()
@@ -481,16 +531,19 @@ impl ScalarTimeSeries {
     }
 }
 
+/// The 1970-01-01 epoch these series index from.
+///
+/// Built once rather than reconstructed per call: `to_days`/`from_days` sit on
+/// the per-fixing lookup path and `from_days` is also called once per element by
+/// [`ScalarTimeSeries::observations`].
+const EPOCH: Date = time::macros::date!(1970 - 01 - 01);
+
 fn to_days(date: Date) -> i32 {
-    // Epoch date - unwrap_or provides defensive fallback for infallible operation
-    let epoch = Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN);
-    (date - epoch).whole_days() as i32
+    (date - EPOCH).whole_days() as i32
 }
 
 fn from_days(days: i32) -> Date {
-    // Epoch date - unwrap_or provides defensive fallback for infallible operation
-    let epoch = Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN);
-    epoch + time::Duration::days(days as i64)
+    EPOCH + time::Duration::days(days as i64)
 }
 
 /// Raw serializable state of a ScalarTimeSeries

@@ -305,10 +305,22 @@ pub fn xirr_with_daycount_ctx(
 ///
 /// # Determinism contract
 ///
-/// All solver phases (Brent direct, Newton, Brent fallback) are run exhaustively.
-/// Valid roots are collected, deduplicated within `1e-9` tolerance, and the root
-/// closest to `0.0` that satisfies `rate > MIN_VALID_RATE` is returned. This
-/// guarantees a deterministic result regardless of solver iteration order.
+/// The flows reaching this function are always time-ordered, so Descartes' rule
+/// of signs applies to the amount sequence and the behaviour splits in two:
+///
+/// * **Exactly one sign change** (the overwhelmingly common outflow-then-inflows
+///   shape): at most one root above `MIN_VALID_RATE` exists, so the first valid
+///   root found is returned immediately. Phase order is fixed (Brent direct,
+///   then Newton seeds in listed order, then Brent seeds in listed order), so
+///   the result is deterministic.
+/// * **Two or more sign changes**: the root may be non-unique, so all solver
+///   phases are run exhaustively. Valid roots are collected, deduplicated within
+///   `1e-9` tolerance, and the one closest to `0.0` is returned.
+///
+/// Both branches are deterministic and independent of solver iteration order.
+/// Note that in the unique-root case the returned value is the first converged
+/// representative rather than the smallest of several; these agree to within
+/// solver tolerance.
 ///
 /// # Arguments
 /// * `flows` - Iterator of (time, amount) pairs
@@ -332,7 +344,16 @@ where
     if !has_sign_change(data.iter().map(|&(_, amt)| amt)) {
         return Err(InputError::Invalid.into());
     }
-    if has_multiple_sign_changes(data.iter().map(|&(_, amt)| amt)) {
+    // Descartes' rule of signs: the flows reaching this function are always
+    // time-ordered (`irr` enumerates positions; `xirr_with_daycount` sorts by
+    // year fraction before calling), so the sign-change count of the amount
+    // sequence bounds the number of positive real roots of the NPV polynomial.
+    // Exactly one sign change => at most one root above `MIN_VALID_RATE`, so the
+    // first valid root found is *the* root and the remaining phases can only
+    // rediscover it.
+    let sign_changes = count_sign_changes(data.iter().map(|&(_, amt)| amt));
+    let root_is_unique = sign_changes == 1;
+    if sign_changes > 1 {
         tracing::warn!(
             num_flows = data.len(),
             algorithm = "newton_then_brent",
@@ -432,6 +453,9 @@ where
         let direct_seed = if npv_at_zero > 0.0 { 0.1 } else { -0.1 };
         if let Ok(root) = brent_direct.solve(npv, direct_seed) {
             if is_valid(root) {
+                if root_is_unique {
+                    return Ok(root);
+                }
                 all_roots.push(root);
             }
         }
@@ -441,6 +465,9 @@ where
     for &g in seeds {
         if let Ok(root) = newton.solve_with_derivative(npv, npv_derivative, g) {
             if is_valid(root) && npv(root).abs() < DEFAULT_TOLERANCE * 100.0 {
+                if root_is_unique {
+                    return Ok(root);
+                }
                 all_roots.push(root);
             }
         }
@@ -458,6 +485,9 @@ where
     for &g in brent_seeds {
         if let Ok(root) = brent.solve(npv, g) {
             if is_valid(root) {
+                if root_is_unique {
+                    return Ok(root);
+                }
                 all_roots.push(root);
             }
         }
@@ -492,13 +522,6 @@ where
         }
     }
     false
-}
-
-pub(crate) fn has_multiple_sign_changes<I>(iter: I) -> bool
-where
-    I: IntoIterator<Item = f64>,
-{
-    count_sign_changes(iter) > 1
 }
 
 /// Count the number of sign changes in a numeric sequence.

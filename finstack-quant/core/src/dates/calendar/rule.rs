@@ -836,12 +836,17 @@ impl Rule {
                         && check(date.year() + 1))
             }
             Rule::NthWeekday { n, weekday, month } => {
-                crate::dates::calendar::generated::nth_weekday_of_month(
-                    date.year(),
-                    *month,
-                    *weekday,
-                    *n,
-                ) == Some(date)
+                // Month guard first: `nth_weekday_of_month` only ever returns a date
+                // inside `month`, so a query in any other month cannot match. This
+                // skips the computation for ~11/12 of queries without changing the
+                // answer.
+                date.month() == *month
+                    && crate::dates::calendar::generated::nth_weekday_of_month(
+                        date.year(),
+                        *month,
+                        *weekday,
+                        *n,
+                    ) == Some(date)
             }
             Rule::WeekdayShift {
                 weekday,

@@ -216,15 +216,13 @@ impl MigrationSimulator {
             return Err(MigrationError::InvalidPathCount);
         }
         let n = self.generator.n_states();
-        let scale = Arc::new(self.generator.scale.clone());
         // Flat row-major counts (index `from * n + to`) for cache-friendly
         // accumulation and a single allocation.
         let mut counts = vec![0usize; n * n];
 
         for from in 0..n {
             for _ in 0..n_paths_per_state {
-                let path = simulate_path(&self.generator, &scale, from, self.horizon, rng);
-                let to = path.state_at(self.horizon);
+                let to = simulate_terminal_state(&self.generator, from, self.horizon, rng);
                 counts[from * n + to] += 1;
             }
         }
@@ -260,20 +258,23 @@ impl MigrationSimulator {
 // Core Gillespie algorithm
 // ---------------------------------------------------------------------------
 
-/// Simulate a single rating path using Gillespie's competing exponentials.
-fn simulate_path<R: Rng>(
+/// Run Gillespie's competing-exponentials scheme and return the terminal state.
+///
+/// `on_transition` is invoked for each state change with `(time, new_state)`.
+/// This is the single implementation behind both [`simulate_path`] (which
+/// records transitions) and [`simulate_terminal_state`] (which discards them);
+/// keeping one loop guarantees the two cannot drift and that both consume RNG
+/// draws in exactly the same order.
+fn simulate_gillespie<R: Rng>(
     gen: &GeneratorMatrix,
-    scale: &Arc<RatingScale>,
     initial_state: usize,
     horizon: f64,
     rng: &mut R,
-) -> RatingPath {
+    mut on_transition: impl FnMut(f64, usize),
+) -> usize {
     let n = gen.n_states();
-    let mut transitions = Vec::with_capacity(8);
     let mut t = 0.0;
     let mut state = initial_state;
-
-    transitions.push((0.0, state));
 
     loop {
         let lambda = -gen.data[(state, state)]; // exit rate = -q_ss
@@ -320,7 +321,7 @@ fn simulate_path<R: Rng>(
         }
 
         state = next_state;
-        transitions.push((t, state));
+        on_transition(t, state);
 
         // Absorbing state (e.g., default): stop immediately.
         if -gen.data[(state, state)] < 1e-15 {
@@ -328,9 +329,41 @@ fn simulate_path<R: Rng>(
         }
     }
 
+    state
+}
+
+/// Simulate a single rating path using Gillespie's competing exponentials.
+fn simulate_path<R: Rng>(
+    gen: &GeneratorMatrix,
+    scale: &Arc<RatingScale>,
+    initial_state: usize,
+    horizon: f64,
+    rng: &mut R,
+) -> RatingPath {
+    let mut transitions = Vec::with_capacity(8);
+    transitions.push((0.0, initial_state));
+    simulate_gillespie(gen, initial_state, horizon, rng, |t, state| {
+        transitions.push((t, state));
+    });
+
     RatingPath {
         transitions,
         horizon,
         scale: Arc::clone(scale),
     }
+}
+
+/// Simulate one path and return only the state at `horizon`.
+///
+/// Equivalent to `simulate_path(..).state_at(horizon)` but without allocating
+/// (and immediately dropping) the transition `Vec` or touching the scale's
+/// refcount. `empirical_matrix` runs one path per sample -- millions in a
+/// VaR/CVA run -- so the per-sample allocation dominated its cost.
+fn simulate_terminal_state<R: Rng>(
+    gen: &GeneratorMatrix,
+    initial_state: usize,
+    horizon: f64,
+    rng: &mut R,
+) -> usize {
+    simulate_gillespie(gen, initial_state, horizon, rng, |_, _| {})
 }

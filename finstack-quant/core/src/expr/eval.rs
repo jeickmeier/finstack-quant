@@ -369,8 +369,19 @@ impl CompiledExpr {
                     std::mem::take(&mut guard.offsets),
                 )
             };
-            arena.clear();
-            arena.resize(arena_elements, 0.0);
+            // Grow the pooled arena only when it is too small. Do NOT
+            // `clear()` first: that would force `resize` to re-zero every
+            // element on every call, and the zeros are pure waste -- each node
+            // fully overwrites its own `[start, start+len)` slice before
+            // anything reads it, and the root is extracted from a written
+            // slice. Leaving a longer-than-needed arena is safe because every
+            // index below is bounded by `arena_elements <= arena.len()`.
+            if arena.len() < arena_elements {
+                arena.resize(arena_elements, 0.0);
+            }
+            // `offsets` is only `node_count` entries (vs `len * node_count` for
+            // the arena), so the reset stays -- it is cheap and keeps stale
+            // offsets from a previously failed eval unreachable.
             offsets.clear();
             offsets.resize(id_capacity, None);
 

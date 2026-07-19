@@ -89,7 +89,7 @@ debug = 1
 opt-level = 3           # Optimize for speed
 lto = "fat"             # Full link-time optimization (max cross-crate inlining)
 codegen-units = 1       # Single codegen unit for maximum optimization
-strip = "symbols"       # Strip symbols but keep debug info for profiling
+strip = "symbols"       # Strip symbols (profiling uses the `bench` profile, which keeps them)
 
 [profile.release-size]
 # Size-optimized profile for WASM bundle size
@@ -108,6 +108,8 @@ inherits = "release"
 opt-level = 3       # Optimize for speed
 lto = "fat"         # Full link-time optimization (matches release)
 debug = 1           # Line info for profiling tools (flamegraph, perf)
+strip = "none"      # REQUIRED: `release` sets strip="symbols", which would otherwise
+                    # win over `debug = 1` and leave bench binaries unprofilable.
 
 [workspace.metadata.clippy]
 profile = "finstack-strict"

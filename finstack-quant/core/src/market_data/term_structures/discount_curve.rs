@@ -887,36 +887,21 @@ impl DiscountCurve {
         super::common::year_fraction_to(self.base, date, self.day_count)
     }
 
-    /// Rebuild only the interpolator from the current knots and discount factors.
-    ///
-    /// Skips sort/validation -- caller must ensure data invariants hold.
-    ///
-    /// # Performance
-    ///
-    /// This call clones `self.knots` and `self.dfs` (both `Box<[f64]>`) into
-    /// a fresh interpolator, since the interpolator consumes its inputs.
-    /// On scenario × pillar × curve bump cycles this is on the hot path
-    /// (one clone-pair per bump). The planned long-term fix is to migrate
-    /// the storage type to `Arc<[f64]>` and make the interpolator accept
-    /// `Arc<[f64]>` so this clone becomes a refcount bump; that touches
-    /// ~47 call sites across `math::interp` and all curve types and is
-    /// deferred to a follow-up change-set, gated by the contention
-    /// benchmarks (`benches/curve_bumps_parallel.rs`, future).
-    fn rebuild_interp(&mut self) -> crate::Result<()> {
-        self.interp = super::common::build_interp_input_error(
-            self.style,
-            self.knots.clone(),
-            self.dfs.clone(),
-            self.extrapolation,
-            true,
-        )?;
-        Ok(())
-    }
-
     /// Apply a bump specification in-place, mutating values and rebuilding the interpolator.
     ///
     /// This avoids allocating intermediate `Vec<(f64, f64)>`, skips ID generation,
     /// and skips sort/validation (bumps preserve knot ordering).
+    ///
+    /// # Performance
+    ///
+    /// Bumping clones only the `dfs` array, then hands `knots.clone()` and
+    /// `dfs.clone()` to the interpolator, which consumes its inputs -- three
+    /// `Box<[f64]>` allocations per bump. The planned long-term fix is to
+    /// migrate the storage type to `Arc<[f64]>` and make the interpolator
+    /// accept `Arc<[f64]>` so those clones become refcount bumps; that touches
+    /// ~47 call sites across `math::interp` and all curve types and is
+    /// deferred to a follow-up change-set, gated by the contention
+    /// benchmarks (`benches/curve_bumps_parallel.rs`, future).
     pub(crate) fn bump_in_place(
         &mut self,
         spec: &crate::market_data::bumps::BumpSpec,
@@ -940,10 +925,19 @@ impl DiscountCurve {
         }
         let bump_rate = val;
 
-        let mut bumped = self.clone();
+        // Work on a copy of the value array only. Cloning the whole curve here
+        // would also duplicate `knots`, the prebuilt interpolator (six
+        // `Box<[f64]>` under MonotoneConvex) and the rate-calibration recipe
+        // (a `String` per pillar) -- every one of which the interpolator
+        // rebuild below immediately discards. Bumps run per pillar per bucket
+        // on the DV01/key-rate path, so that waste compounds.
+        //
+        // Failure atomicity is preserved: nothing is written to `self` until
+        // after the fallible interpolator build succeeds.
+        let mut dfs = self.dfs.clone();
         match spec.bump_type {
             BumpType::Parallel => {
-                for (df, &t) in bumped.dfs.iter_mut().zip(bumped.knots.iter()) {
+                for (df, &t) in dfs.iter_mut().zip(self.knots.iter()) {
                     *df *= (-bump_rate * t).exp();
                 }
             }
@@ -960,7 +954,7 @@ impl DiscountCurve {
                     target_bucket,
                     next_bucket,
                 )?;
-                for (df, &t) in bumped.dfs.iter_mut().zip(bumped.knots.iter()) {
+                for (df, &t) in dfs.iter_mut().zip(self.knots.iter()) {
                     let weight = super::common::triangular_weight(
                         t,
                         prev_bucket,
@@ -971,8 +965,15 @@ impl DiscountCurve {
                 }
             }
         }
-        bumped.rebuild_interp()?;
-        *self = bumped;
+        let interp = super::common::build_interp_input_error(
+            self.style,
+            self.knots.clone(),
+            dfs.clone(),
+            self.extrapolation,
+            true,
+        )?;
+        self.dfs = dfs;
+        self.interp = interp;
         Ok(())
     }
 

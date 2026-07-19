@@ -540,18 +540,6 @@ impl HazardCurve {
             .fx_policy_opt(self.fx_policy.clone())
     }
 
-    /// Recompute the survival-probability interpolator from current knots/lambdas.
-    fn rebuild_interp(&mut self) -> crate::Result<()> {
-        let (interp_knots, interp_sp) = survival_pillars(&self.knots, &self.lambdas);
-        self.interp = super::common::build_interp(
-            self.survival_interp_style,
-            interp_knots.into_boxed_slice(),
-            interp_sp.into_boxed_slice(),
-            ExtrapolationPolicy::FlatForward,
-        )?;
-        Ok(())
-    }
-
     /// Apply a bump specification in-place, mutating lambda values and rebuilding the interpolator.
     pub(crate) fn bump_in_place(
         &mut self,
@@ -596,8 +584,11 @@ impl HazardCurve {
         }
 
         let shift = spread / (1.0 - recovery);
-        let mut bumped = self.clone();
-        for lambda in bumped.lambdas.iter_mut() {
+        // Clone the hazard array only, not the whole curve. Early returns below
+        // still leave `self` untouched, and nothing is committed until the
+        // fallible interpolator build succeeds.
+        let mut lambdas = self.lambdas.clone();
+        for lambda in lambdas.iter_mut() {
             let shifted = *lambda + shift;
             if !shifted.is_finite() || shifted < 0.0 {
                 return Err(crate::error::InputError::UnsupportedBump {
@@ -607,14 +598,21 @@ impl HazardCurve {
             }
             *lambda = shifted;
         }
+        let (interp_knots, interp_sp) = survival_pillars(&self.knots, &lambdas);
+        let interp = super::common::build_interp(
+            self.survival_interp_style,
+            interp_knots.into_boxed_slice(),
+            interp_sp.into_boxed_slice(),
+            ExtrapolationPolicy::FlatForward,
+        )?;
+        self.lambdas = lambdas;
         // The stored par-spread quotes were calibrated to the *unbumped*
         // hazards; keeping them would make `cds_quote_bp` report stale quotes.
         // Clear them so `cds_quote_bp` falls back to the hazard-based
         // approximation λ·(1−R)·1e4, which reflects the bumped curve.
-        bumped.par_tenors = Box::new([]);
-        bumped.par_spreads_bp = Box::new([]);
-        bumped.rebuild_interp()?;
-        *self = bumped;
+        self.par_tenors = Box::new([]);
+        self.par_spreads_bp = Box::new([]);
+        self.interp = interp;
         Ok(())
     }
 
