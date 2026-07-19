@@ -18,9 +18,12 @@ from finstack_quant.portfolio import (
     parametric_es_decomposition,
     parametric_var_decomposition,
     parametric_var_decomposition_typed,
+    scenario_pnl,
+    scenario_pnl_batch,
     value_portfolio,
     value_portfolio_typed,
 )
+from finstack_quant.scenarios import build_scenario_spec
 
 AS_OF = "2025-01-15"
 
@@ -69,6 +72,22 @@ def _market() -> MarketContext:
     return market
 
 
+def _scenario_batch_json() -> str:
+    scenarios = []
+    for scenario_id, bp in (("up_10bp", 10.0), ("down_15bp", -15.0)):
+        operations = [
+            {
+                "kind": "curve_parallel_bp",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS",
+                "discount_curve_id": None,
+                "bp": bp,
+            }
+        ]
+        scenarios.append(json.loads(build_scenario_spec(scenario_id, json.dumps(operations))))
+    return json.dumps(scenarios)
+
+
 def test_value_portfolio_typed_matches_legacy_json_result() -> None:
     portfolio = Portfolio.from_spec(_portfolio_json())
     market = _market()
@@ -88,17 +107,37 @@ def test_value_portfolio_metrics_select_pv_only_or_explicit_risk() -> None:
     market = _market()
 
     pv_only = json.loads(value_portfolio_typed(portfolio, market, metrics=[]).to_json())
-    dv01_only = json.loads(
-        value_portfolio_typed(portfolio, market, metrics=["dv01"]).to_json()
-    )
+    dv01_only = json.loads(value_portfolio_typed(portfolio, market, metrics=["dv01"]).to_json())
 
     pv_measures = pv_only["position_values"]["USD-POS"]["valuation_result"]["measures"]
-    dv01_measures = dv01_only["position_values"]["USD-POS"]["valuation_result"][
-        "measures"
-    ]
+    dv01_measures = dv01_only["position_values"]["USD-POS"]["valuation_result"]["measures"]
     assert pv_measures == {}
     assert "dv01" in dv01_measures
     assert "theta" not in dv01_measures
+
+
+def test_scenario_pnl_batch_matches_standalone_and_accepts_json_or_typed_inputs() -> None:
+    portfolio = Portfolio.from_spec(_portfolio_json())
+    market = _market()
+    scenarios_json = _scenario_batch_json()
+    scenarios = json.loads(scenarios_json)
+
+    batch = json.loads(scenario_pnl_batch(portfolio, scenarios_json, market))
+    expected = []
+    for scenario in scenarios:
+        pnl_json, report_json = scenario_pnl(portfolio, json.dumps(scenario), market)
+        expected.append({
+            "scenario_id": scenario["id"],
+            "pnl": json.loads(pnl_json),
+            "report": json.loads(report_json),
+        })
+
+    assert batch == expected
+    assert [item["scenario_id"] for item in batch] == ["up_10bp", "down_15bp"]
+    assert json.loads(scenario_pnl_batch(_portfolio_json(), scenarios_json, market.to_json())) == batch
+    assert json.loads(scenario_pnl_batch(portfolio, "[]", market)) == []
+    with pytest.raises(ValueError, match="invalid type"):
+        scenario_pnl_batch(portfolio, "{}", market)
 
 
 @pytest.mark.parametrize(

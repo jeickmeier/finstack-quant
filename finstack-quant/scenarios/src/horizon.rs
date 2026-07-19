@@ -661,6 +661,7 @@ mod tests {
             operations_applied: 0,
             user_operations: 0,
             expanded_operations: 0,
+            changes: Default::default(),
             warnings: vec![],
             rounding_context: None,
             time_roll: None,

@@ -20,16 +20,17 @@
 //!   `docs/REFERENCES.md#jpmorgan1996RiskMetrics`
 
 use super::assignment::{assign_position_factors, FactorAssignmentReport};
-use super::whatif::WhatIfEngine;
+use super::whatif::{StressResult, WhatIfEngine};
 use super::{
     ParametricDecomposer, PositionResidualContribution, ResidualContributionSource, RiskDecomposer,
     RiskDecomposition,
 };
 use crate::error::{Error, Result};
 use crate::sensitivity::{
-    DeltaBasedEngine, FactorSensitivityEngine, FullRepricingEngine, SensitivityMatrix,
+    exact_factor_market_keys, DeltaBasedEngine, FactorSensitivityEngine, FullRepricingEngine,
+    SensitivityMatrix,
 };
-use crate::Portfolio;
+use crate::{MarketFactorKey, Portfolio};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_factor_model::matching::ISSUER_ID_META_KEY;
@@ -311,6 +312,22 @@ impl FactorModel {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<SensitivityMatrix> {
+        let mut credit_exposures = CreditExposureMatrix::new(market);
+        self.compute_sensitivities_with_credit_exposures(
+            portfolio,
+            market,
+            as_of,
+            &mut credit_exposures,
+        )
+    }
+
+    fn compute_sensitivities_with_credit_exposures(
+        &self,
+        portfolio: &Portfolio,
+        market: &MarketContext,
+        as_of: Date,
+        credit_exposures: &mut CreditExposureMatrix<'_>,
+    ) -> Result<SensitivityMatrix> {
         let _assignment_report = self.assign_factors(portfolio)?;
         let positions: Vec<(String, &dyn Instrument, f64)> = portfolio
             .positions
@@ -332,9 +349,9 @@ impl FactorModel {
         )?;
         self.overlay_assignment_driven_credit_sensitivities(
             portfolio,
-            market,
             as_of,
             &mut sensitivities,
+            credit_exposures,
         )?;
         Ok(sensitivities)
     }
@@ -342,9 +359,9 @@ impl FactorModel {
     fn overlay_assignment_driven_credit_sensitivities(
         &self,
         portfolio: &Portfolio,
-        market: &MarketContext,
         as_of: Date,
         sensitivities: &mut SensitivityMatrix,
+        credit_exposures: &mut CreditExposureMatrix<'_>,
     ) -> Result<()> {
         for (position_idx, position) in portfolio.positions.iter().enumerate() {
             let dependencies = flatten_dependencies(&position.instrument.market_dependencies()?);
@@ -374,10 +391,10 @@ impl FactorModel {
                         &self.factors[factor_idx].id,
                         &self.factors[factor_idx].factor_type,
                     );
-                    let delta = credit_curve_parallel_delta(
+                    let delta = credit_exposures.exposure(
+                        position_idx,
                         position.instrument.as_ref(),
                         position.scale_factor(),
-                        market,
                         as_of,
                         curve_id,
                         bump_size,
@@ -416,12 +433,64 @@ impl FactorModel {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<RiskDecomposition> {
-        let sensitivities = self.compute_sensitivities(portfolio, market, as_of)?;
+        self.analyze_with_sensitivities(portfolio, market, as_of)
+            .map(|(decomposition, _)| decomposition)
+    }
+
+    /// Run one sensitivity pass and return it with the resulting decomposition.
+    ///
+    /// This is the canonical entry point for workflows that need both the
+    /// baseline sensitivity matrix and its risk decomposition, such as
+    /// position and factor what-if analysis. Credit bump contexts and
+    /// exposures are shared across decomposition and residual-risk assembly
+    /// within this call.
+    ///
+    /// # Arguments
+    ///
+    /// * `portfolio` - Portfolio whose weighted position-factor sensitivities
+    ///   and risk decomposition are computed.
+    /// * `market` - Market snapshot used for factor shocks and instrument
+    ///   repricing.
+    /// * `as_of` - Valuation date applied consistently to sensitivity and
+    ///   residual-risk calculations.
+    ///
+    /// # Returns
+    ///
+    /// The risk decomposition together with the exact sensitivity matrix used
+    /// to produce it.
+    ///
+    /// # Errors
+    ///
+    /// Propagates factor assignment, sensitivity generation, decomposition,
+    /// credit-curve lookup, and residual-risk calculation failures.
+    ///
+    /// # References
+    ///
+    /// - `docs/REFERENCES.md#meucci-risk-and-asset-allocation`
+    /// - `docs/REFERENCES.md#tasche-2008-capital-allocation`
+    pub fn analyze_with_sensitivities(
+        &self,
+        portfolio: &Portfolio,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<(RiskDecomposition, SensitivityMatrix)> {
+        let mut credit_exposures = CreditExposureMatrix::new(market);
+        let sensitivities = self.compute_sensitivities_with_credit_exposures(
+            portfolio,
+            market,
+            as_of,
+            &mut credit_exposures,
+        )?;
         let mut decomposition =
             self.decomposer
                 .decompose(&sensitivities, &self.covariance, &self.risk_measure)?;
-        self.add_credit_residual_risk(&mut decomposition, portfolio, market, as_of)?;
-        Ok(decomposition)
+        self.add_credit_residual_risk_with_credit_exposures(
+            &mut decomposition,
+            portfolio,
+            as_of,
+            &mut credit_exposures,
+        )?;
+        Ok((decomposition, sensitivities))
     }
 
     pub(crate) fn add_credit_residual_risk(
@@ -431,11 +500,27 @@ impl FactorModel {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<()> {
+        let mut credit_exposures = CreditExposureMatrix::new(market);
+        self.add_credit_residual_risk_with_credit_exposures(
+            decomposition,
+            portfolio,
+            as_of,
+            &mut credit_exposures,
+        )
+    }
+
+    fn add_credit_residual_risk_with_credit_exposures(
+        &self,
+        decomposition: &mut RiskDecomposition,
+        portfolio: &Portfolio,
+        as_of: Date,
+        credit_exposures: &mut CreditExposureMatrix<'_>,
+    ) -> Result<()> {
         if self.credit_idiosyncratic_variance.is_empty() {
             return Ok(());
         }
         let mut residual_contributions = Vec::new();
-        for position in &portfolio.positions {
+        for (position_idx, position) in portfolio.positions.iter().enumerate() {
             let Some(issuer_id_str) = position
                 .instrument
                 .attributes()
@@ -455,10 +540,10 @@ impl FactorModel {
             let mut exposure = 0.0;
             for dependency in &dependencies {
                 if let Some(curve_id) = credit_curve_id(dependency) {
-                    exposure += credit_curve_parallel_delta(
+                    exposure += credit_exposures.exposure(
+                        position_idx,
                         position.instrument.as_ref(),
                         position.scale_factor(),
-                        market,
                         as_of,
                         curve_id,
                         self.bump_config.credit_bp,
@@ -504,6 +589,43 @@ impl FactorModel {
         WhatIfEngine::new(self, base, sensitivities, portfolio, market, as_of)
     }
 
+    /// Shock configured factors, reprice the portfolio, and decompose risk
+    /// under the stressed market.
+    ///
+    /// This direct workflow does not compute an unused baseline sensitivity
+    /// matrix. Call [`Self::what_if`] only when a position remove/resize
+    /// scenario also needs the supplied baseline decomposition and
+    /// sensitivities.
+    ///
+    /// # Arguments
+    ///
+    /// * `portfolio` - Portfolio whose position P&L and stressed risk are
+    ///   evaluated.
+    /// * `market` - Baseline market snapshot to shock.
+    /// * `as_of` - Valuation date used for both endpoints and stressed
+    ///   sensitivities.
+    /// * `stresses` - Factor IDs and shock magnitudes in each factor's
+    ///   configured market-mapping convention.
+    ///
+    /// # Returns
+    ///
+    /// Total and per-position stressed-minus-base P&L plus the risk
+    /// decomposition under the stressed market.
+    ///
+    /// # Errors
+    ///
+    /// Propagates unknown-factor, market-bump, valuation, currency-validation,
+    /// sensitivity, and decomposition failures.
+    pub fn factor_stress(
+        &self,
+        portfolio: &Portfolio,
+        market: &MarketContext,
+        as_of: Date,
+        stresses: &[(finstack_quant_factor_model::FactorId, f64)],
+    ) -> Result<StressResult> {
+        super::whatif::factor_stress(self, portfolio, market, as_of, stresses)
+    }
+
     pub(crate) fn covariance(&self) -> &FactorCovarianceMatrix {
         &self.covariance
     }
@@ -516,13 +638,17 @@ impl FactorModel {
         &self.risk_measure
     }
 
-    pub(crate) fn stressed_market(
+    /// Build one stressed market and its exact selective-repricing manifest.
+    ///
+    /// Assignment-driven credit curve discovery is performed once per stressed
+    /// factor and reused for both the market shock and dependency keys.
+    pub(crate) fn stressed_market_with_factor_keys(
         &self,
         portfolio: &Portfolio,
         market: &MarketContext,
         as_of: Date,
         stresses: &[(finstack_quant_factor_model::FactorId, f64)],
-    ) -> Result<MarketContext> {
+    ) -> Result<(MarketContext, Option<Vec<MarketFactorKey>>)> {
         use crate::sensitivity::mapping_to_market_bumps;
         use finstack_quant_factor_model::FactorBumpUnit;
 
@@ -536,13 +662,17 @@ impl FactorModel {
         }
 
         let mut stressed = market.clone();
+        let mut exact_keys = (portfolio.dependency_index().indexed_position_count()
+            == portfolio.positions.len())
+        .then(Vec::new);
         for factor in &self.factors {
             let Some(shift) = stress_by_id.get(&factor.id).copied() else {
                 continue;
             };
-            if uses_assignment_driven_credit_shock(factor) {
+            let resolved_curve_ids = if uses_assignment_driven_credit_shock(factor) {
                 let curve_ids = self.credit_curves_matched_to_factor(portfolio, &factor.id)?;
                 stressed = shift_credit_curves(&stressed, &curve_ids, shift)?;
+                Some(curve_ids)
             } else {
                 stressed = stressed.bump(mapping_to_market_bumps(
                     &factor.market_mapping,
@@ -550,10 +680,27 @@ impl FactorModel {
                     FactorBumpUnit::canonical_for(&factor.factor_type),
                     as_of,
                 )?)?;
+                None
+            };
+
+            if exact_keys.is_some() {
+                if let Some(factor_keys) =
+                    exact_factor_market_keys(factor, market, resolved_curve_ids.as_deref())
+                {
+                    if let Some(keys) = exact_keys.as_mut() {
+                        for key in factor_keys {
+                            if !keys.contains(&key) {
+                                keys.push(key);
+                            }
+                        }
+                    }
+                } else {
+                    exact_keys = None;
+                }
             }
         }
 
-        Ok(stressed)
+        Ok((stressed, exact_keys))
     }
 
     fn credit_curves_matched_to_factor(
@@ -754,29 +901,112 @@ fn credit_curve_id(dependency: &MarketDependency) -> Option<&finstack_quant_core
     }
 }
 
-fn credit_curve_parallel_delta(
-    instrument: &dyn Instrument,
-    quantity: f64,
-    market: &MarketContext,
-    as_of: Date,
-    curve_id: &finstack_quant_core::types::CurveId,
-    bump_size: f64,
-) -> Result<f64> {
-    if bump_size.abs() < f64::EPSILON {
-        return Err(Error::invalid_input(
-            "credit factor bump size must be non-zero for sensitivity computation",
-        ));
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct CreditBumpKey {
+    curve_id: finstack_quant_core::types::CurveId,
+    bump_bits: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct CreditExposureKey {
+    position_index: usize,
+    curve_id: finstack_quant_core::types::CurveId,
+    bump_bits: u64,
+}
+
+/// Request-local cache of credit bump markets and scaled position exposures.
+///
+/// The cache belongs to one evaluation call because every stored value depends
+/// on that call's market snapshot and valuation date. It is shared by the
+/// assignment overlay and idiosyncratic-residual passes in [`FactorModel::analyze`]
+/// but never retained on the model. Its direct high-precision raw up/down PVs
+/// are derivative inputs, not ordinary `PortfolioValuation` results, so this
+/// financially distinct kernel intentionally does not enter the Money-valued
+/// portfolio executor.
+struct CreditExposureMatrix<'a> {
+    bump_contexts: CreditBumpContexts<'a>,
+    exposures: HashMap<CreditExposureKey, f64>,
+}
+
+impl<'a> CreditExposureMatrix<'a> {
+    fn new(base: &'a MarketContext) -> Self {
+        Self {
+            bump_contexts: CreditBumpContexts::new(base),
+            exposures: HashMap::default(),
+        }
     }
-    let bump = |value| -> finstack_quant_core::Result<MarketContext> {
-        let curve = market.get_hazard(curve_id.as_str())?;
-        let bumped = bump_hazard_shift(curve.as_ref(), &BumpRequest::Parallel(value))?;
-        Ok(market.clone().insert(bumped))
-    };
-    let up = bump(bump_size)?;
-    let down = bump(-bump_size)?;
-    let pv_up = instrument.value_raw(&up, as_of)?;
-    let pv_down = instrument.value_raw(&down, as_of)?;
-    Ok((pv_up - pv_down) / (2.0 * bump_size) * quantity)
+
+    fn exposure(
+        &mut self,
+        position_index: usize,
+        instrument: &dyn Instrument,
+        quantity: f64,
+        as_of: Date,
+        curve_id: &finstack_quant_core::types::CurveId,
+        bump_size: f64,
+    ) -> Result<f64> {
+        if bump_size.abs() < f64::EPSILON {
+            return Err(Error::invalid_input(
+                "credit factor bump size must be non-zero for sensitivity computation",
+            ));
+        }
+        let key = CreditExposureKey {
+            position_index,
+            curve_id: curve_id.clone(),
+            bump_bits: bump_size.to_bits(),
+        };
+        if let Some(exposure) = self.exposures.get(&key) {
+            return Ok(*exposure);
+        }
+
+        let (up, down) = self.bump_contexts.get(curve_id, bump_size)?;
+        let pv_up = instrument.value_raw(up, as_of)?;
+        let pv_down = instrument.value_raw(down, as_of)?;
+        let exposure = (pv_up - pv_down) / (2.0 * bump_size) * quantity;
+        self.exposures.insert(key, exposure);
+        Ok(exposure)
+    }
+}
+
+struct CreditBumpContexts<'a> {
+    base: &'a MarketContext,
+    contexts: HashMap<CreditBumpKey, (MarketContext, MarketContext)>,
+}
+
+impl<'a> CreditBumpContexts<'a> {
+    fn new(base: &'a MarketContext) -> Self {
+        Self {
+            base,
+            contexts: HashMap::new(),
+        }
+    }
+
+    fn get(
+        &mut self,
+        curve_id: &finstack_quant_core::types::CurveId,
+        bump_size: f64,
+    ) -> Result<(&MarketContext, &MarketContext)> {
+        let key = CreditBumpKey {
+            curve_id: curve_id.clone(),
+            bump_bits: bump_size.to_bits(),
+        };
+        if !self.contexts.contains_key(&key) {
+            let curve = self.base.get_hazard(curve_id.as_str())?;
+            let up_curve = bump_hazard_shift(curve.as_ref(), &BumpRequest::Parallel(bump_size))?;
+            let down_curve = bump_hazard_shift(curve.as_ref(), &BumpRequest::Parallel(-bump_size))?;
+            self.contexts.insert(
+                key.clone(),
+                (
+                    self.base.clone().insert(up_curve),
+                    self.base.clone().insert(down_curve),
+                ),
+            );
+        }
+        self.contexts
+            .get(&key)
+            .map(|(up, down)| (up, down))
+            .ok_or_else(|| Error::invalid_input("credit bump context was not retained"))
+    }
 }
 
 fn shift_credit_curves(
@@ -818,7 +1048,10 @@ mod tests {
     use finstack_quant_valuations::instruments::MarketDependencies;
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
-    use std::sync::Arc;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
     use time::macros::date;
 
     fn simple_config() -> FactorModelConfig {
@@ -996,6 +1229,7 @@ mod tests {
             position_residual_contributions: vec![],
         };
 
+        let sensitivity_calls = Arc::new(AtomicUsize::new(0));
         let model_result = FactorModelBuilder::new()
             .config(FactorModelConfig {
                 factors: vec![FactorDefinition {
@@ -1014,7 +1248,9 @@ mod tests {
                 bump_size: None,
                 unmatched_policy: Some(UnmatchedPolicy::Residual),
             })
-            .with_custom_sensitivity_engine(FixedSensitivityEngine)
+            .with_custom_sensitivity_engine(CountingSensitivityEngine {
+                calls: Arc::clone(&sensitivity_calls),
+            })
             .with_custom_decomposer(FixedDecomposer(expected.clone()))
             .build();
         assert!(model_result.is_ok());
@@ -1027,14 +1263,23 @@ mod tests {
             .as_of(date!(2024 - 01 - 01))
             .build()
             .expect("test should succeed");
-        let analysis_result =
-            model.analyze(&portfolio, &MarketContext::new(), date!(2024 - 01 - 01));
+        let analysis_result = model.analyze_with_sensitivities(
+            &portfolio,
+            &MarketContext::new(),
+            date!(2024 - 01 - 01),
+        );
         assert!(analysis_result.is_ok());
-        let Ok(actual) = analysis_result else {
+        let Ok((actual, sensitivities)) = analysis_result else {
             return;
         };
 
         assert_eq!(actual, expected);
+        assert_eq!(sensitivities.n_factors(), 1);
+        assert_eq!(
+            sensitivity_calls.load(Ordering::SeqCst),
+            1,
+            "combined analysis must run the sensitivity engine exactly once"
+        );
     }
 
     #[test]
@@ -1110,6 +1355,7 @@ mod tests {
         attributes: Attributes,
         discount_curve: CurveId,
         spots: Vec<String>,
+        raw_value_calls: Option<Arc<AtomicUsize>>,
     }
 
     impl MockInstrument {
@@ -1119,7 +1365,13 @@ mod tests {
                 attributes: Attributes::default(),
                 discount_curve: CurveId::new(discount_curve),
                 spots,
+                raw_value_calls: None,
             }
+        }
+
+        fn with_raw_value_calls(mut self, calls: Arc<AtomicUsize>) -> Self {
+            self.raw_value_calls = Some(calls);
+            self
         }
     }
 
@@ -1165,6 +1417,17 @@ mod tests {
             Ok(Money::new(100.0, Currency::USD))
         }
 
+        fn base_value_raw(
+            &self,
+            market: &MarketContext,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<f64> {
+            if let Some(calls) = &self.raw_value_calls {
+                calls.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(self.base_value(market, as_of)?.amount())
+        }
+
         fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
             let mut dependencies = MarketDependencies::new();
             dependencies
@@ -1188,6 +1451,26 @@ mod tests {
         ) -> finstack_quant_core::Result<SensitivityMatrix> {
             Ok(SensitivityMatrix::zeros(
                 Vec::new(),
+                factors.iter().map(|factor| factor.id.clone()).collect(),
+            ))
+        }
+    }
+
+    struct CountingSensitivityEngine {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl FactorSensitivityEngine for CountingSensitivityEngine {
+        fn compute_sensitivities(
+            &self,
+            positions: &[(String, &dyn Instrument, f64)],
+            factors: &[FactorDefinition],
+            _market: &MarketContext,
+            _as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<SensitivityMatrix> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(SensitivityMatrix::zeros(
+                positions.iter().map(|(id, _, _)| id.clone()).collect(),
                 factors.iter().map(|factor| factor.id.clone()).collect(),
             ))
         }
@@ -1507,6 +1790,62 @@ mod tests {
             .build()
             .expect("hazard curve");
         MarketContext::new().insert(discount).insert(hazard)
+    }
+
+    #[test]
+    fn credit_bump_contexts_are_reused_by_curve_and_bump() {
+        let as_of = date!(2024 - 01 - 01);
+        let curve_id = CurveId::new("ISSUER-B-HAZ");
+        let market = credit_market(as_of, curve_id.clone());
+        let mut contexts = CreditBumpContexts::new(&market);
+
+        {
+            let _ = contexts
+                .get(&curve_id, 1.0)
+                .expect("first credit bump context");
+        }
+        {
+            let _ = contexts
+                .get(&curve_id, 1.0)
+                .expect("reused credit bump context");
+        }
+        assert_eq!(contexts.contexts.len(), 1);
+
+        {
+            let _ = contexts
+                .get(&curve_id, 5.0)
+                .expect("different bump context");
+        }
+        assert_eq!(contexts.contexts.len(), 2);
+    }
+
+    #[test]
+    fn credit_exposure_matrix_reuses_endpoint_pvs_for_identical_requests() {
+        let as_of = date!(2024 - 01 - 01);
+        let curve_id = CurveId::new("ISSUER-B-HAZ");
+        let market = credit_market(as_of, curve_id.clone());
+        let calls = Arc::new(AtomicUsize::new(0));
+        let instrument = MockInstrument::new("credit-count", "USD-OIS", vec![])
+            .with_raw_value_calls(Arc::clone(&calls));
+        let mut exposures = CreditExposureMatrix::new(&market);
+
+        let first = exposures
+            .exposure(3, &instrument, 1.0, as_of, &curve_id, 1.0)
+            .expect("first exposure");
+        let repeated = exposures
+            .exposure(3, &instrument, 1.0, as_of, &curve_id, 1.0)
+            .expect("reused exposure");
+        assert_eq!(first, repeated);
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        assert_eq!(exposures.bump_contexts.contexts.len(), 1);
+        assert_eq!(exposures.exposures.len(), 1);
+
+        exposures
+            .exposure(3, &instrument, 1.0, as_of, &curve_id, 5.0)
+            .expect("different bump exposure");
+        assert_eq!(calls.load(Ordering::SeqCst), 4);
+        assert_eq!(exposures.bump_contexts.contexts.len(), 2);
+        assert_eq!(exposures.exposures.len(), 2);
     }
 
     #[test]

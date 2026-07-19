@@ -3,6 +3,9 @@
 use super::model::FactorModel;
 use super::RiskDecomposition;
 use crate::error::{Error, Result};
+use crate::evaluation::{
+    evaluate_raw_portfolio, PositionExecution, RawEvaluationInput, RawSelectiveSeed,
+};
 use crate::position::Position;
 use crate::sensitivity::SensitivityMatrix;
 use crate::types::PositionId;
@@ -11,9 +14,6 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_factor_model::FactorId;
-
-/// Minimum portfolio size at which factor-stress repricing is run in parallel.
-const PARALLEL_FACTOR_STRESS_THRESHOLD: usize = 64;
 
 /// Base/after delta for a single factor contribution.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -214,65 +214,13 @@ impl<'a> WhatIfEngine<'a> {
     /// and decomposition errors. Returns validation errors for non-finite PVs
     /// or a position whose pricing currency differs from the portfolio base.
     pub fn factor_stress(&self, stresses: &[(FactorId, f64)]) -> Result<StressResult> {
-        let stressed_market =
-            self.model
-                .stressed_market(self.portfolio, self.market, self.as_of, stresses)?;
-
-        let positions = &self.portfolio.positions;
-        let compute_position_pnl = |position: &Position| -> Result<(PositionId, f64)> {
-            let pricing_currency = position
-                .instrument
-                .value(self.market, self.as_of)?
-                .currency();
-            if pricing_currency != self.portfolio.base_ccy {
-                return Err(Error::validation(format!(
-                    "M-2: factor stress requires position '{}' to price in portfolio base currency {}; got {}. Explicit FX conversion policy is not implemented for factor stress.",
-                    position.position_id, self.portfolio.base_ccy, pricing_currency
-                )));
-            }
-            let base_value = position.instrument.value_raw(self.market, self.as_of)?;
-            let stressed_value = position
-                .instrument
-                .value_raw(&stressed_market, self.as_of)?;
-            if !base_value.is_finite() || !stressed_value.is_finite() {
-                return Err(Error::validation(format!(
-                    "M-1: non-finite factor-stress PV for position '{}' (base = {base_value}, stressed = {stressed_value})",
-                    position.position_id
-                )));
-            }
-            let pnl = (stressed_value - base_value) * position.scale_factor();
-            Ok((position.position_id.clone(), pnl))
-        };
-        let position_pnl: Vec<(PositionId, f64)> =
-            if positions.len() >= PARALLEL_FACTOR_STRESS_THRESHOLD {
-                // For larger books, the cost of repricing both the base and
-                // stressed market per position is enough to amortize Rayon.
-                use rayon::prelude::*;
-                positions
-                    .par_iter()
-                    .map(compute_position_pnl)
-                    .collect::<Result<Vec<_>>>()?
-            } else {
-                positions
-                    .iter()
-                    .map(compute_position_pnl)
-                    .collect::<Result<Vec<_>>>()?
-            };
-
-        let mut total_pnl_acc = NeumaierAccumulator::new();
-        for (_, pnl) in &position_pnl {
-            total_pnl_acc.add(*pnl);
-        }
-
-        let stressed_decomposition =
-            self.model
-                .analyze(self.portfolio, &stressed_market, self.as_of)?;
-
-        Ok(StressResult {
-            total_pnl: total_pnl_acc.total(),
-            position_pnl,
-            stressed_decomposition,
-        })
+        factor_stress(
+            self.model,
+            self.portfolio,
+            self.market,
+            self.as_of,
+            stresses,
+        )
     }
 
     fn position_index(&self, position_id: &PositionId) -> Option<usize> {
@@ -281,6 +229,86 @@ impl<'a> WhatIfEngine<'a> {
             .iter()
             .position(|current| current == position_id.as_str())
     }
+}
+
+pub(super) fn factor_stress(
+    model: &FactorModel,
+    portfolio: &Portfolio,
+    market: &MarketContext,
+    as_of: Date,
+    stresses: &[(FactorId, f64)],
+) -> Result<StressResult> {
+    let (stressed_market, changed_factor_keys) =
+        model.stressed_market_with_factor_keys(portfolio, market, as_of, stresses)?;
+
+    let base_valuation = evaluate_raw_portfolio(RawEvaluationInput {
+        portfolio,
+        market,
+        as_of,
+        execution: PositionExecution::Auto,
+        seed: None,
+    })?;
+
+    let affected_indices = changed_factor_keys.as_ref().map(|changed_factor_keys| {
+        portfolio
+            .dependency_index()
+            .affected_positions(changed_factor_keys)
+    });
+    let stressed_valuation = if let Some(affected_indices) = &affected_indices {
+        evaluate_raw_portfolio(RawEvaluationInput {
+            portfolio,
+            market: &stressed_market,
+            as_of,
+            execution: PositionExecution::Auto,
+            seed: Some(RawSelectiveSeed {
+                prior: &base_valuation,
+                reprice_indices: affected_indices,
+            }),
+        })?
+    } else {
+        evaluate_raw_portfolio(RawEvaluationInput {
+            portfolio,
+            market: &stressed_market,
+            as_of,
+            execution: PositionExecution::Auto,
+            seed: None,
+        })?
+    };
+
+    let mut position_pnl = Vec::with_capacity(portfolio.positions.len());
+    for (position_index, position) in portfolio.positions.iter().enumerate() {
+        let base_endpoint = base_valuation.endpoint(position_index).ok_or_else(|| {
+            Error::validation(format!(
+                "Factor stress base endpoint is missing position '{}'",
+                position.position_id
+            ))
+        })?;
+        let stressed_endpoint = stressed_valuation.endpoint(position_index).ok_or_else(|| {
+            Error::validation(format!(
+                "Factor stress stressed endpoint is missing position '{}'",
+                position.position_id
+            ))
+        })?;
+        let base_value = base_endpoint.amount;
+        let stressed_value = stressed_endpoint.amount;
+        position_pnl.push((
+            position.position_id.clone(),
+            (stressed_value - base_value) * position.scale_factor(),
+        ));
+    }
+
+    let mut total_pnl_acc = NeumaierAccumulator::new();
+    for (_, pnl) in &position_pnl {
+        total_pnl_acc.add(*pnl);
+    }
+
+    let stressed_decomposition = model.analyze(portfolio, &stressed_market, as_of)?;
+
+    Ok(StressResult {
+        total_pnl: total_pnl_acc.total(),
+        position_pnl,
+        stressed_decomposition,
+    })
 }
 
 fn factor_deltas(
@@ -323,6 +351,7 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::bumps::BumpUnits;
     use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{Attributes, CurveId};
     use finstack_quant_factor_model::matching::{DependencyFilter, MappingRule, MatchingConfig};
@@ -334,7 +363,10 @@ mod tests {
     use finstack_quant_valuations::instruments::MarketDependencies;
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
-    use std::sync::Arc;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
     use time::macros::date;
 
     #[test]
@@ -570,6 +602,142 @@ mod tests {
     }
 
     #[test]
+    fn factor_stress_preserves_raw_pv_precision_in_shared_executor() {
+        let Some((model, _, market)) = build_test_model() else {
+            panic!("setup");
+        };
+        let as_of = date!(2024 - 01 - 01);
+        let position = Position::new(
+            "pos-raw",
+            DUMMY_ENTITY_ID,
+            "inst-raw",
+            Arc::new(
+                MockInstrument::new("inst-raw", "USD-OIS", 100.0)
+                    .with_reported_value_override(42.0),
+            ),
+            2.0,
+            PositionUnit::Units,
+        )
+        .expect("position");
+        let portfolio = Portfolio::builder("raw-factor-stress")
+            .base_ccy(Currency::USD)
+            .as_of(as_of)
+            .position(position)
+            .build()
+            .expect("portfolio");
+
+        let result = model
+            .factor_stress(&portfolio, &market, as_of, &[(FactorId::new("Rates"), 1.0)])
+            .expect("factor stress");
+        let (stressed_market, _) = model
+            .stressed_market_with_factor_keys(
+                &portfolio,
+                &market,
+                as_of,
+                &[(FactorId::new("Rates"), 1.0)],
+            )
+            .expect("stressed market");
+        let base_raw = portfolio.positions[0]
+            .instrument
+            .value_raw(&market, as_of)
+            .expect("base raw");
+        let stressed_raw = portfolio.positions[0]
+            .instrument
+            .value_raw(&stressed_market, as_of)
+            .expect("stressed raw");
+        let expected = (stressed_raw - base_raw) * portfolio.positions[0].scale_factor();
+
+        assert!(expected.abs() > 1e-12);
+        assert!((result.total_pnl - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn factor_stress_subtracts_raw_endpoints_before_position_scaling() {
+        let Some((model, _, market)) = build_test_model() else {
+            panic!("setup");
+        };
+        let as_of = date!(2024 - 01 - 01);
+        let position = Position::new(
+            "pos-cancellation",
+            DUMMY_ENTITY_ID,
+            "inst-cancellation",
+            Arc::new(
+                MockInstrument::new("inst-cancellation", "USD-OIS", 20_000.0)
+                    .with_raw_offset(1.0e16),
+            ),
+            0.1,
+            PositionUnit::Units,
+        )
+        .expect("position");
+        let portfolio = Portfolio::builder("cancellation-factor-stress")
+            .base_ccy(Currency::USD)
+            .as_of(as_of)
+            .position(position)
+            .build()
+            .expect("portfolio");
+
+        let result = model
+            .factor_stress(&portfolio, &market, as_of, &[(FactorId::new("Rates"), 1.0)])
+            .expect("factor stress");
+        let (stressed_market, _) = model
+            .stressed_market_with_factor_keys(
+                &portfolio,
+                &market,
+                as_of,
+                &[(FactorId::new("Rates"), 1.0)],
+            )
+            .expect("stressed market");
+        let base_raw = portfolio.positions[0]
+            .instrument
+            .value_raw(&market, as_of)
+            .expect("base raw");
+        let stressed_raw = portfolio.positions[0]
+            .instrument
+            .value_raw(&stressed_market, as_of)
+            .expect("stressed raw");
+        let expected = (stressed_raw - base_raw) * portfolio.positions[0].scale_factor();
+
+        assert!(expected.abs() > 1e-12);
+        assert_eq!(result.total_pnl, expected);
+    }
+
+    #[test]
+    fn factor_stress_rejects_non_finite_raw_pv_without_panicking() {
+        let Some((model, _, market)) = build_test_model() else {
+            panic!("setup");
+        };
+        let as_of = date!(2024 - 01 - 01);
+        let position = Position::new(
+            "pos-non-finite",
+            DUMMY_ENTITY_ID,
+            "inst-non-finite",
+            Arc::new(MockInstrument::new("inst-non-finite", "USD-OIS", f64::NAN)),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("position");
+        let portfolio = Portfolio::builder("non-finite-factor-stress")
+            .base_ccy(Currency::USD)
+            .as_of(as_of)
+            .position(position)
+            .build()
+            .expect("portfolio");
+
+        let error = model
+            .factor_stress(&portfolio, &market, as_of, &[(FactorId::new("Rates"), 1.0)])
+            .expect_err("non-finite raw PV must be a validation error");
+
+        assert!(
+            error.to_string().contains("M-1"),
+            "unexpected error: {error}"
+        );
+        assert!(
+            error.to_string().contains("pos-non-finite"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
     fn m2_factor_stress_rejects_non_base_currency_positions() {
         let Some((model, _portfolio, market)) = build_test_model() else {
             panic!("setup");
@@ -734,8 +902,8 @@ mod tests {
                 (FactorId::new("credit::generic"), 5.0),
             ])
             .expect("stress");
-        let manually_stressed = model
-            .stressed_market(
+        let (manually_stressed, _) = model
+            .stressed_market_with_factor_keys(
                 &portfolio,
                 &market,
                 as_of,
@@ -756,6 +924,108 @@ mod tests {
 
         assert!((result.total_pnl - (stressed_value - base_value)).abs() < 1e-8);
         assert!(result.total_pnl.abs() > 1e-8);
+    }
+
+    #[test]
+    fn factor_stress_reuses_unaffected_prepared_endpoint() {
+        let Some((model, _, base_market)) = build_test_model() else {
+            panic!("model setup");
+        };
+        let as_of = date!(2024 - 01 - 01);
+        let other_curve = DiscountCurve::builder("USD-OTHER")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+            .build()
+            .expect("other discount curve");
+        let market = base_market.insert(other_curve);
+        let affected_calls = Arc::new(AtomicUsize::new(0));
+        let unaffected_calls = Arc::new(AtomicUsize::new(0));
+        let affected = Position::new(
+            "pos-affected",
+            DUMMY_ENTITY_ID,
+            "inst-affected",
+            Arc::new(
+                MockInstrument::new("inst-affected", "USD-OIS", 100.0)
+                    .with_call_counter(Arc::clone(&affected_calls)),
+            ),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("affected position");
+        let unaffected = Position::new(
+            "pos-unaffected",
+            DUMMY_ENTITY_ID,
+            "inst-unaffected",
+            Arc::new(
+                MockInstrument::new("inst-unaffected", "USD-OTHER", 100.0)
+                    .with_call_counter(Arc::clone(&unaffected_calls)),
+            ),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("unaffected position");
+        let portfolio = Portfolio::builder("selective-factor-stress")
+            .base_ccy(Currency::USD)
+            .as_of(as_of)
+            .position(affected)
+            .position(unaffected)
+            .build()
+            .expect("portfolio");
+        let result = model
+            .factor_stress(&portfolio, &market, as_of, &[(FactorId::new("Rates"), 1.0)])
+            .expect("factor stress");
+
+        assert_eq!(
+            result
+                .position_pnl
+                .iter()
+                .map(|(position_id, _)| position_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["pos-affected", "pos-unaffected"]
+        );
+        assert_eq!(affected_calls.load(Ordering::SeqCst), 2);
+        assert_eq!(unaffected_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(result.position_pnl[1].1, 0.0);
+    }
+
+    #[test]
+    fn factor_stress_reprices_trait_default_empty_dependencies() {
+        let Some((model, _, market)) = build_test_model() else {
+            panic!("model setup");
+        };
+        let as_of = date!(2024 - 01 - 01);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let instrument = DefaultDependencyInstrument(
+            MockInstrument::new("default-deps", "USD-OIS", 100.0)
+                .with_call_counter(Arc::clone(&calls))
+                .with_reported_value_override(42.0),
+        );
+        let position = Position::new(
+            "pos-default-deps",
+            DUMMY_ENTITY_ID,
+            "default-deps",
+            Arc::new(instrument),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("position");
+        let portfolio = Portfolio::builder("default-dependency-factor-stress")
+            .base_ccy(Currency::USD)
+            .as_of(as_of)
+            .position(position)
+            .build()
+            .expect("portfolio");
+
+        let result = model
+            .factor_stress(&portfolio, &market, as_of, &[(FactorId::new("Rates"), 1.0)])
+            .expect("factor stress");
+
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            2,
+            "trait-default empty dependencies must not reuse the base endpoint"
+        );
+        assert!(result.total_pnl.abs() > 1e-12);
     }
 
     fn build_test_model() -> Option<(FactorModel, Portfolio, MarketContext)> {
@@ -843,6 +1113,9 @@ mod tests {
         discount_curve: CurveId,
         scale: f64,
         currency: Currency,
+        call_counter: Option<Arc<AtomicUsize>>,
+        reported_value_override: Option<f64>,
+        raw_offset: f64,
     }
 
     impl MockInstrument {
@@ -853,11 +1126,29 @@ mod tests {
                 discount_curve: CurveId::new(discount_curve),
                 scale,
                 currency: Currency::USD,
+                call_counter: None,
+                reported_value_override: None,
+                raw_offset: 0.0,
             }
         }
 
         fn with_currency(mut self, currency: Currency) -> Self {
             self.currency = currency;
+            self
+        }
+
+        fn with_call_counter(mut self, call_counter: Arc<AtomicUsize>) -> Self {
+            self.call_counter = Some(call_counter);
+            self
+        }
+
+        fn with_reported_value_override(mut self, amount: f64) -> Self {
+            self.reported_value_override = Some(amount);
+            self
+        }
+
+        fn with_raw_offset(mut self, amount: f64) -> Self {
+            self.raw_offset = amount;
             self
         }
     }
@@ -901,8 +1192,35 @@ mod tests {
             market: &MarketContext,
             _as_of: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::Result<Money> {
-            let pv = market.get_discount(self.discount_curve.as_str())?.zero(1.0) * self.scale;
+            if let Some(call_counter) = &self.call_counter {
+                call_counter.fetch_add(1, Ordering::SeqCst);
+            }
+            if let Some(amount) = self.reported_value_override {
+                return Ok(Money::new(amount, self.currency));
+            }
+            let pv = self.raw_offset
+                + market.get_discount(self.discount_curve.as_str())?.zero(1.0) * self.scale;
             Ok(Money::new(pv, self.currency))
+        }
+
+        fn base_value_raw(
+            &self,
+            market: &MarketContext,
+            _as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<f64> {
+            Ok(self.raw_offset
+                + market.get_discount(self.discount_curve.as_str())?.zero(1.0) * self.scale)
+        }
+
+        fn base_value_raw_with_currency(
+            &self,
+            market: &MarketContext,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<(f64, Currency)> {
+            if let Some(call_counter) = &self.call_counter {
+                call_counter.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok((self.base_value_raw(market, as_of)?, self.currency))
         }
 
         fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
@@ -915,22 +1233,81 @@ mod tests {
         }
     }
 
+    #[derive(Clone)]
+    struct DefaultDependencyInstrument(MockInstrument);
+
+    finstack_quant_valuations::impl_empty_cashflow_provider!(
+        DefaultDependencyInstrument,
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
+    );
+
+    impl Instrument for DefaultDependencyInstrument {
+        fn id(&self) -> &str {
+            self.0.id()
+        }
+
+        fn key(&self) -> InstrumentType {
+            self.0.key()
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+
+        fn attributes(&self) -> &Attributes {
+            self.0.attributes()
+        }
+
+        fn attributes_mut(&mut self) -> &mut Attributes {
+            self.0.attributes_mut()
+        }
+
+        fn clone_box(&self) -> Box<dyn Instrument> {
+            Box::new(self.clone())
+        }
+
+        fn base_value(
+            &self,
+            market: &MarketContext,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<Money> {
+            self.0.base_value(market, as_of)
+        }
+
+        fn base_value_raw(
+            &self,
+            market: &MarketContext,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<f64> {
+            self.0.base_value_raw(market, as_of)
+        }
+    }
+
     struct FixedSensitivityEngine;
 
     impl FactorSensitivityEngine for FixedSensitivityEngine {
         fn compute_sensitivities(
             &self,
-            _positions: &[(String, &dyn Instrument, f64)],
+            positions: &[(String, &dyn Instrument, f64)],
             factors: &[FactorDefinition],
             _market: &MarketContext,
             _as_of: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::Result<SensitivityMatrix> {
             let mut matrix = SensitivityMatrix::zeros(
-                vec!["pos-1".into()],
+                positions
+                    .iter()
+                    .map(|(position_id, _, _)| position_id.clone())
+                    .collect(),
                 factors.iter().map(|factor| factor.id.clone()).collect(),
             );
             if !factors.is_empty() {
-                matrix.set_delta(0, 0, 10.0);
+                for position_index in 0..positions.len() {
+                    matrix.set_delta(position_index, 0, 10.0);
+                }
             }
             Ok(matrix)
         }

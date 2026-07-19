@@ -2,6 +2,10 @@
 
 Run with pytest-benchmark::
 
+    uv run pytest finstack-quant-py/benchmarks/bench_bindings.py -m "perf and not slow" --benchmark-only
+
+Run the slow release-scale controls as well::
+
     uv run pytest finstack-quant-py/benchmarks/bench_bindings.py -m perf --benchmark-only
 
 Run with verbose output::
@@ -53,11 +57,15 @@ from finstack_quant.portfolio import (
     Portfolio,
     aggregate_full_cashflows,
     aggregate_metrics,
+    attribute_portfolio_pnl,
     build_portfolio_from_spec,
     build_stress_attribution,
     historical_var_decomposition_typed,
     parametric_var_decomposition_typed,
     parse_portfolio_spec,
+    replay_portfolio,
+    scenario_pnl,
+    scenario_pnl_batch,
     value_portfolio,
     value_portfolio_typed,
 )
@@ -235,21 +243,50 @@ def _build_portfolio_spec_json(n_positions: int) -> str:
     })
 
 
-def _build_bench_market() -> MarketContext:
+def _build_bench_market(rate: float = 0.05, as_of: date = date(2025, 1, 15)) -> MarketContext:
     """Build a minimal `MarketContext` with a flat USD-OIS discount curve.
 
-    Uses a knot schedule equivalent to a flat 5% rate out to 2Y.
+    Uses a knot schedule equivalent to ``rate`` out to 2Y at ``as_of``.
     """
-    base = date(2025, 1, 15)
-    # Flat 5% act/360 ≈ df = exp(-0.05 * t) for a reasonable approximation.
-    knots = [(t, math.exp(-0.05 * t)) for t in (0.0, 0.25, 0.5, 1.0, 2.0)]
-    curve = DiscountCurve("USD-OIS", base, knots)
+    # Flat act/360 rate ≈ df = exp(-rate * t) for a reasonable approximation.
+    knots = [(t, math.exp(-rate * t)) for t in (0.0, 0.25, 0.5, 1.0, 2.0)]
+    curve = DiscountCurve("USD-OIS", as_of, knots)
     return MarketContext().insert(curve)
 
 
 _BENCH_SPEC_JSON_500 = _build_portfolio_spec_json(500)
 _BENCH_MARKET = _build_bench_market()
 _BENCH_MARKET_JSON = _BENCH_MARKET.to_json()
+_BENCH_MARKET_T1 = _build_bench_market(0.0525, date(2025, 1, 16))
+
+
+def _build_curve_scenario_jsons(n_scenarios: int) -> tuple[str, ...]:
+    """Build validated parallel-shift scenarios before benchmark timing begins."""
+    return tuple(
+        build_scenario_spec(
+            f"bench-parallel-{index}",
+            (
+                '[{"kind":"curve_parallel_bp","curve_kind":"discount",'
+                f'"curve_id":"USD-OIS","discount_curve_id":null,"bp":{float(index + 1)}}}]'
+            ),
+            priority=index,
+        )
+        for index in range(n_scenarios)
+    )
+
+
+def _build_replay_snapshots_json(n_snapshots: int) -> str:
+    """Build a dated, gently rising-rate replay path before benchmark timing."""
+    start = date(2025, 1, 15)
+    snapshots = [
+        (
+            f'{{"date":"{(start + timedelta(days=index)).isoformat()}",'
+            f'"market":{_build_bench_market(0.05 + index * 0.00005, start + timedelta(days=index)).to_json()}}}'
+        )
+        for index in range(n_snapshots)
+    ]
+    return f"[{','.join(snapshots)}]"
+
 
 _RISK_MATRIX_SIZE = 256
 _RISK_POSITION_IDS = [f"RISK-{i}" for i in range(_RISK_MATRIX_SIZE)]
@@ -850,7 +887,7 @@ class TestPortfolioCompoundWorkflow:
 
         benchmark.pedantic(_run, rounds=5, warmup_rounds=1)
 
-    def test_typed_path_value_metrics_cashflows(self, benchmark) -> None:
+    def test_typed_pipeline_500_value_metrics_cashflows(self, benchmark) -> None:
         """Typed inputs, 500 positions: Portfolio + MarketContext built once."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
 
@@ -879,6 +916,107 @@ class TestPortfolioCompoundWorkflow:
     def test_value_portfolio_json_500(self, benchmark) -> None:
         """Pure value_portfolio on the JSON path, 500 positions."""
         benchmark(value_portfolio, _BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON)
+
+
+@pytest.mark.perf
+class TestPortfolioReleaseControls:
+    """Representative release-scale controls for the typed portfolio bindings."""
+
+    @pytest.mark.parametrize(
+        "n_positions",
+        [40, pytest.param(120, marks=pytest.mark.slow)],
+        ids=["40-positions", "120-positions"],
+    )
+    def test_metrics_based_attribution(self, benchmark, n_positions: int) -> None:
+        """Metrics attribution over typed portfolios at 40 and 120 positions."""
+        portfolio = Portfolio.from_spec(_build_portfolio_spec_json(n_positions))
+        benchmark.pedantic(
+            attribute_portfolio_pnl,
+            args=(
+                portfolio,
+                _BENCH_MARKET,
+                _BENCH_MARKET_T1,
+                "2025-01-15",
+                "2025-01-16",
+                "MetricsBased",
+            ),
+            rounds=1,
+            warmup_rounds=0,
+        )
+
+    @pytest.mark.parametrize(
+        "n_scenarios",
+        [10, pytest.param(100, marks=pytest.mark.slow)],
+        ids=["10-scenarios", "100-scenarios"],
+    )
+    def test_scenario_pnl_batch_500(self, benchmark, n_scenarios: int) -> None:
+        """One-shot scenarios over a typed 500-position portfolio."""
+        portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
+        scenarios_json = _build_curve_scenario_jsons(n_scenarios)
+        batch_json = f"[{','.join(scenarios_json)}]"
+        benchmark.pedantic(
+            scenario_pnl_batch,
+            args=(portfolio, batch_json, _BENCH_MARKET),
+            rounds=1,
+            warmup_rounds=0,
+        )
+
+    @pytest.mark.parametrize(
+        "n_scenarios",
+        [10, pytest.param(100, marks=pytest.mark.slow)],
+        ids=["10-scenarios", "100-scenarios"],
+    )
+    def test_scenario_pnl_repeated_500(self, benchmark, n_scenarios: int) -> None:
+        """Repeated single-scenario control for the corresponding batch shape."""
+        portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
+        scenarios_json = _build_curve_scenario_jsons(n_scenarios)
+
+        def _run_repeated():
+            return tuple(scenario_pnl(portfolio, scenario_json, _BENCH_MARKET) for scenario_json in scenarios_json)
+
+        benchmark.pedantic(_run_repeated, rounds=1, warmup_rounds=0)
+
+    def test_replay_pv_only_20_snapshots(self, benchmark) -> None:
+        """PV-only replay through twenty prebuilt dated market snapshots."""
+        portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
+        snapshots_json = _build_replay_snapshots_json(20)
+        benchmark.pedantic(
+            replay_portfolio,
+            args=(
+                portfolio,
+                snapshots_json,
+                ('{"mode":"PvOnly","valuation_options":{"strict_risk":false,"metrics":{"mode":"only","metrics":[]}}}'),
+            ),
+            rounds=1,
+            warmup_rounds=0,
+        )
+
+    @pytest.mark.slow
+    def test_value_portfolio_standard_risk_3000(self, benchmark) -> None:
+        """Default standard-risk valuation for a typed 3,000-position portfolio."""
+        portfolio = Portfolio.from_spec(_build_portfolio_spec_json(3_000))
+        benchmark.pedantic(
+            value_portfolio_typed,
+            args=(portfolio, _BENCH_MARKET),
+            rounds=1,
+            warmup_rounds=0,
+        )
+
+    @pytest.mark.parametrize(
+        "n_positions",
+        [3_000, pytest.param(25_000, marks=pytest.mark.slow)],
+        ids=["3000-positions", "25000-positions"],
+    )
+    def test_value_portfolio_pv_only(self, benchmark, n_positions: int) -> None:
+        """PV-only valuation control with typed inputs and typed output."""
+        portfolio = Portfolio.from_spec(_build_portfolio_spec_json(n_positions))
+        benchmark.pedantic(
+            value_portfolio_typed,
+            args=(portfolio, _BENCH_MARKET),
+            kwargs={"metrics": []},
+            rounds=1,
+            warmup_rounds=0,
+        )
 
 
 @pytest.mark.perf

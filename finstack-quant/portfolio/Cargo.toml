@@ -57,5 +57,9 @@ harness = false
 name = "sensitivity_simulation"
 harness = false
 
+[[bench]]
+name = "portfolio_workflows"
+harness = false
+
 [lints]
 workspace = true

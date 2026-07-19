@@ -91,6 +91,99 @@ fn test_attribution_parallel_rates_shift() {
 }
 
 #[test]
+fn test_attribution_metrics_based_rates_shift() {
+    let as_of_t0 = base_date();
+    let as_of_t1 = as_of_t0 + Duration::days(1);
+    let bond = Bond::fixed(
+        "BOND_METRICS_001",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        as_of_t0,
+        as_of_t0 + Duration::days(1825),
+        "USD",
+    )
+    .expect("bond");
+    let position = Position::new(
+        "POS_METRICS_001",
+        "ENTITY_A",
+        "BOND_METRICS_001",
+        Arc::new(bond),
+        1.0,
+        PositionUnit::FaceValue,
+    )
+    .expect("position");
+    let portfolio = PortfolioBuilder::new("TEST_METRICS_ATTR")
+        .base_ccy(Currency::USD)
+        .as_of(as_of_t0)
+        .entity(Entity::new("ENTITY_A"))
+        .position(position)
+        .build()
+        .expect("portfolio");
+
+    let attribution = attribute_portfolio_pnl(
+        &portfolio,
+        &market_with_usd_at_rate(0.0),
+        &market_with_usd_at_rate(100.0),
+        as_of_t0,
+        as_of_t1,
+        &FinstackConfig::default(),
+        AttributionMethod::MetricsBased,
+    )
+    .expect("metrics-based attribution should consume prepared endpoints");
+
+    assert_eq!(attribution.by_position.len(), 1);
+    assert!(attribution.total_pnl.amount().is_finite());
+    assert!(attribution.rates_curves_pnl.amount().is_finite());
+    assert!(attribution.reconciliation_check(1.0e-8).is_reconciled);
+}
+
+#[test]
+fn test_attribution_metrics_based_fx_translation() {
+    let as_of_t0 = base_date();
+    let as_of_t1 = as_of_t0 + Duration::days(1);
+    let bond = Bond::fixed(
+        "BOND_METRICS_EUR",
+        Money::new(1_000_000.0, Currency::EUR),
+        0.03,
+        as_of_t0,
+        as_of_t0 + Duration::days(365),
+        "EUR",
+    )
+    .expect("bond");
+    let position = Position::new(
+        "POS_METRICS_EUR",
+        "ENTITY_A",
+        "BOND_METRICS_EUR",
+        Arc::new(bond),
+        1.0,
+        PositionUnit::FaceValue,
+    )
+    .expect("position");
+    let portfolio = PortfolioBuilder::new("TEST_METRICS_FX_ATTR")
+        .base_ccy(Currency::USD)
+        .as_of(as_of_t0)
+        .entity(Entity::new("ENTITY_A"))
+        .position(position)
+        .build()
+        .expect("portfolio");
+
+    let attribution = attribute_portfolio_pnl(
+        &portfolio,
+        &market_with_eur_and_fx(1.10),
+        &market_with_eur_and_fx(1.12),
+        as_of_t0,
+        as_of_t1,
+        &FinstackConfig::default(),
+        AttributionMethod::MetricsBased,
+    )
+    .expect("metrics-based attribution should preserve FX translation");
+
+    assert_eq!(attribution.fx_translation_pnl.currency(), Currency::USD);
+    assert!(attribution.fx_translation_pnl.amount() > 0.0);
+    assert!(attribution.reconciliation_check(1.0e-8).is_reconciled);
+}
+
+#[test]
 fn test_attribution_fx_translation() {
     let as_of_t0 = base_date();
     let as_of_t1 = as_of_t0 + Duration::days(1);

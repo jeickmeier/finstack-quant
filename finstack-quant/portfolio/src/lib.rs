@@ -205,6 +205,8 @@ pub mod valuation;
 pub mod cashflows;
 /// Market-factor dependency index for selective repricing.
 pub(crate) mod dependencies;
+/// Request-scoped portfolio evaluation planning and execution.
+pub(crate) mod evaluation;
 
 #[cfg(test)]
 mod test_utils;

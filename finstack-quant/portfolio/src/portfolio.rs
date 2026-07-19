@@ -14,6 +14,13 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::HashMap;
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_EVALUATION_STATE_ID: AtomicU64 = AtomicU64::new(1);
+
+fn next_evaluation_state_id() -> u64 {
+    NEXT_EVALUATION_STATE_ID.fetch_add(1, Ordering::Relaxed)
+}
 
 /// A portfolio of positions across multiple entities.
 ///
@@ -76,6 +83,14 @@ pub struct Portfolio {
 
     /// Additional metadata
     pub meta: IndexMap<String, serde_json::Value>,
+
+    /// Process-unique identity for the portfolio's position/instrument state.
+    ///
+    /// This is intentionally request-local and non-serialized. Selective
+    /// valuation uses it only to prove that a prior result was produced from
+    /// the same immutable position state. Clones retain the identity until a
+    /// public position mutation assigns a fresh state ID.
+    pub(crate) evaluation_state_id: u64,
 }
 
 impl Serialize for Portfolio {
@@ -167,6 +182,7 @@ impl Portfolio {
         }
         self.entity_index = entity_index;
         self.attribute_key_index = attribute_key_index;
+        self.evaluation_state_id = next_evaluation_state_id();
     }
 
     /// Borrow all positions as an immutable slice.
@@ -217,6 +233,7 @@ impl Portfolio {
                 .push(idx);
         }
         self.positions.push(position);
+        self.evaluation_state_id = next_evaluation_state_id();
         Ok(())
     }
 
@@ -503,6 +520,7 @@ impl Portfolio {
             positions,
             position_index: HashMap::default(),
             dependency_index: DependencyIndex::default(),
+            evaluation_state_id: 0,
             entity_index: HashMap::default(),
             attribute_key_index: HashMap::default(),
             books: spec.books,

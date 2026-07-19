@@ -1091,6 +1091,17 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
         self.npv_raw_internal(market, as_of)
     }
 
+    fn base_value_raw_with_currency(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
+        Ok((
+            self.npv_raw_internal(market, as_of)?,
+            self.notional.currency(),
+        ))
+    }
+
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.premium.end)
     }

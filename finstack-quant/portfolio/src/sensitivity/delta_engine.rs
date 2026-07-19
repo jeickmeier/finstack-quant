@@ -1,6 +1,6 @@
 //! Finite-difference and repricing utilities for portfolio sensitivities.
 //!
-use super::traits::FactorSensitivityEngine;
+use super::traits::{FactorRepricingPlan, FactorSensitivityEngine};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -30,6 +30,7 @@ impl DeltaBasedEngine {
     fn compute_factor_column(
         &self,
         positions: &[(String, &dyn Instrument, f64)],
+        affected_positions: &[bool],
         factor: &FactorDefinition,
         market: &MarketContext,
         as_of: Date,
@@ -56,7 +57,11 @@ impl DeltaBasedEngine {
 
         positions
             .iter()
-            .map(|(position_id, instrument, weight)| {
+            .zip(affected_positions)
+            .map(|((position_id, instrument, weight), affected)| {
+                if !affected {
+                    return Ok(0.0);
+                }
                 let pv_up = instrument.value_raw(&up_market, as_of)?;
                 let pv_down = instrument.value_raw(&down_market, as_of)?;
                 if !pv_up.is_finite() || !pv_down.is_finite() {
@@ -263,13 +268,26 @@ impl FactorSensitivityEngine for DeltaBasedEngine {
         let position_ids = positions.iter().map(|(id, _, _)| id.clone()).collect();
         let factor_ids = factors.iter().map(|factor| factor.id.clone()).collect();
         let mut matrix = SensitivityMatrix::zeros(position_ids, factor_ids);
+        let repricing_plan = FactorRepricingPlan::build(positions, factors, market);
 
-        let columns: Result<Vec<Vec<f64>>> = factors
+        let column_results: Vec<Result<Vec<f64>>> = factors
             .par_iter()
-            .map(|factor| self.compute_factor_column(positions, factor, market, as_of))
+            .enumerate()
+            .map(|(factor_index, factor)| {
+                self.compute_factor_column(
+                    positions,
+                    repricing_plan.affected(factor_index),
+                    factor,
+                    market,
+                    as_of,
+                )
+            })
             .collect();
+        let columns = column_results
+            .into_iter()
+            .collect::<Result<Vec<Vec<f64>>>>()?;
 
-        for (factor_idx, column) in columns?.iter().enumerate() {
+        for (factor_idx, column) in columns.iter().enumerate() {
             for (position_idx, value) in column.iter().enumerate() {
                 matrix.set_delta(position_idx, factor_idx, *value);
             }
@@ -287,16 +305,22 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
+    use finstack_quant_core::money::fx::{FxMatrix, FxQuery, SimpleFxProvider};
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::Attributes;
+    use finstack_quant_valuations::instruments::{Attributes, MarketDependencies};
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
     use time::macros::date;
 
     #[derive(Clone)]
     enum MockKind {
         CurveZero { curve_id: CurveId, tenor_years: f64 },
         Spot { spot_id: String },
+        FxCross { base: Currency, quote: Currency },
         NonFiniteRaw,
     }
 
@@ -306,6 +330,8 @@ mod tests {
         attributes: Attributes,
         kind: MockKind,
         scale: f64,
+        raw_value_calls: Option<Arc<AtomicUsize>>,
+        dependencies_fail: bool,
     }
 
     finstack_quant_valuations::impl_empty_cashflow_provider!(
@@ -323,6 +349,8 @@ mod tests {
                     tenor_years,
                 },
                 scale,
+                raw_value_calls: None,
+                dependencies_fail: false,
             }
         }
 
@@ -334,6 +362,8 @@ mod tests {
                     spot_id: spot_id.to_string(),
                 },
                 scale,
+                raw_value_calls: None,
+                dependencies_fail: false,
             }
         }
 
@@ -343,10 +373,33 @@ mod tests {
                 attributes: Attributes::new(),
                 kind: MockKind::NonFiniteRaw,
                 scale: 1.0,
+                raw_value_calls: None,
+                dependencies_fail: false,
             }
         }
 
-        fn raw_value(&self, market: &MarketContext) -> Result<f64> {
+        fn fx_cross(id: &str, base: Currency, quote: Currency, scale: f64) -> Self {
+            Self {
+                id: id.to_string(),
+                attributes: Attributes::new(),
+                kind: MockKind::FxCross { base, quote },
+                scale,
+                raw_value_calls: None,
+                dependencies_fail: false,
+            }
+        }
+
+        fn with_raw_value_calls(mut self, calls: Arc<AtomicUsize>) -> Self {
+            self.raw_value_calls = Some(calls);
+            self
+        }
+
+        fn with_dependency_failure(mut self) -> Self {
+            self.dependencies_fail = true;
+            self
+        }
+
+        fn raw_value(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
             match &self.kind {
                 MockKind::CurveZero {
                     curve_id,
@@ -360,6 +413,11 @@ mod tests {
                     };
                     Ok(value * self.scale)
                 }
+                MockKind::FxCross { base, quote } => Ok(market
+                    .fx_required()?
+                    .rate(FxQuery::new(*base, *quote, as_of))?
+                    .rate
+                    * self.scale),
                 MockKind::NonFiniteRaw => Ok(f64::NAN),
             }
         }
@@ -394,17 +452,43 @@ mod tests {
             Box::new(self.clone())
         }
 
-        fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
+        fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
             let amount = if matches!(self.kind, MockKind::NonFiniteRaw) {
                 1.0
             } else {
-                self.raw_value(market)?
+                self.raw_value(market, as_of)?
             };
             Ok(Money::new(amount, Currency::USD))
         }
 
-        fn base_value_raw(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
-            self.raw_value(market)
+        fn base_value_raw(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+            if let Some(calls) = &self.raw_value_calls {
+                calls.fetch_add(1, Ordering::Relaxed);
+            }
+            self.raw_value(market, as_of)
+        }
+
+        fn market_dependencies(&self) -> Result<MarketDependencies> {
+            if self.dependencies_fail {
+                return Err(Error::Validation(
+                    "mock dependency introspection failed".to_string(),
+                ));
+            }
+            let mut dependencies = MarketDependencies::new();
+            match &self.kind {
+                MockKind::CurveZero { curve_id, .. } => {
+                    dependencies.curves.discount_curves.push(curve_id.clone());
+                }
+                MockKind::Spot { spot_id } => dependencies.spot_ids.push(spot_id.clone()),
+                MockKind::FxCross { base, quote } => {
+                    dependencies.add_fx_pair(*base, *quote);
+                }
+                MockKind::NonFiniteRaw => dependencies
+                    .curves
+                    .discount_curves
+                    .push(CurveId::new("USD-OIS")),
+            }
+            Ok(dependencies)
         }
     }
 
@@ -418,6 +502,24 @@ mod tests {
         Ok(MarketContext::new()
             .insert(curve)
             .insert_price("SPOT", MarketScalar::Unitless(100.0)))
+    }
+
+    fn test_market_with_other_curve(as_of: Date) -> Result<MarketContext> {
+        let other_curve = DiscountCurve::builder("USD-OTHER")
+            .base_date(as_of)
+            .interp(InterpStyle::MonotoneConvex)
+            .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.75), (10.0, 0.55)])
+            .build()?;
+        Ok(test_market(as_of)?.insert(other_curve))
+    }
+
+    fn test_fx_market() -> Result<MarketContext> {
+        let provider = Arc::new(SimpleFxProvider::new());
+        provider.set_quotes(&[
+            (Currency::EUR, Currency::USD, 1.10),
+            (Currency::USD, Currency::JPY, 150.0),
+        ])?;
+        Ok(MarketContext::new().insert_fx(FxMatrix::new(provider)))
     }
 
     #[test]
@@ -594,6 +696,48 @@ mod tests {
     }
 
     #[test]
+    fn delta_engine_reports_factor_errors_in_input_order() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market(as_of)?;
+        let instrument = MockInstrument::curve_zero("curve-inst", "USD-OIS", 5.0, 10_000.0);
+        let positions = vec![("curve-pos".to_string(), &instrument as &dyn Instrument, 1.0)];
+        let factors = vec![
+            FactorDefinition {
+                id: finstack_quant_factor_model::FactorId::new("first-factor"),
+                factor_type: finstack_quant_factor_model::FactorType::Rates,
+                market_mapping: MarketMapping::CurveParallel {
+                    curve_ids: vec![CurveId::new("MISSING-FIRST")],
+                    units: BumpUnits::RateBp,
+                },
+                description: None,
+            },
+            FactorDefinition {
+                id: finstack_quant_factor_model::FactorId::new("second-factor"),
+                factor_type: finstack_quant_factor_model::FactorType::Rates,
+                market_mapping: MarketMapping::CurveParallel {
+                    curve_ids: vec![CurveId::new("MISSING-SECOND")],
+                    units: BumpUnits::RateBp,
+                },
+                description: None,
+            },
+        ];
+
+        let error = DeltaBasedEngine::new(BumpSizeConfig::default())
+            .compute_sensitivities(&positions, &factors, &market, as_of)
+            .expect_err("both factor mappings reference missing curves");
+        let message = error.to_string();
+        assert!(
+            message.contains("MISSING-FIRST"),
+            "logical first factor must win: {message}"
+        );
+        assert!(
+            !message.contains("MISSING-SECOND"),
+            "later factor error must not win: {message}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_delta_based_engine_equity_spot_sensitivity() -> Result<()> {
         let as_of = date!(2025 - 01 - 01);
         let market = test_market(as_of)?;
@@ -612,6 +756,142 @@ mod tests {
             .compute_sensitivities(&positions, &factors, &market, as_of)?;
 
         assert!((matrix.delta(0, 0) - 1.0).abs() < 1e-9);
+        Ok(())
+    }
+
+    #[test]
+    fn delta_engine_reprices_triangulated_fx_cross_for_any_leg_change() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_fx_market()?;
+        let instrument = MockInstrument::fx_cross("eur-jpy", Currency::EUR, Currency::JPY, 1.0);
+        let positions = vec![("eur-jpy".to_string(), &instrument as &dyn Instrument, 1.0)];
+        let factors = vec![FactorDefinition {
+            id: finstack_quant_factor_model::FactorId::new("usd-eur"),
+            factor_type: finstack_quant_factor_model::FactorType::FX,
+            market_mapping: MarketMapping::FxRate {
+                pair: (Currency::USD, Currency::EUR),
+            },
+            description: None,
+        }];
+
+        let matrix = DeltaBasedEngine::new(BumpSizeConfig::default())
+            .compute_sensitivities(&positions, &factors, &market, as_of)?;
+
+        assert!(
+            matrix.delta(0, 0).abs() > 1e-12,
+            "a USD/EUR leg bump must move the triangulated EUR/JPY cross"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn delta_engine_skips_proven_unaffected_positions_with_parity() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market_with_other_curve(as_of)?;
+        let affected_calls = Arc::new(AtomicUsize::new(0));
+        let unaffected_calls = Arc::new(AtomicUsize::new(0));
+        let affected = MockInstrument::curve_zero("affected", "USD-OIS", 5.0, 10_000.0)
+            .with_raw_value_calls(Arc::clone(&affected_calls));
+        let unaffected = MockInstrument::curve_zero("unaffected", "USD-OTHER", 5.0, 10_000.0)
+            .with_raw_value_calls(Arc::clone(&unaffected_calls));
+        let positions = vec![
+            ("affected".to_string(), &affected as &dyn Instrument, 1.0),
+            (
+                "unaffected".to_string(),
+                &unaffected as &dyn Instrument,
+                1.0,
+            ),
+        ];
+        let factors = vec![FactorDefinition {
+            id: finstack_quant_factor_model::FactorId::new("rates"),
+            factor_type: finstack_quant_factor_model::FactorType::Rates,
+            market_mapping: MarketMapping::CurveParallel {
+                curve_ids: vec![CurveId::new("USD-OIS")],
+                units: BumpUnits::RateBp,
+            },
+            description: None,
+        }];
+
+        let matrix = DeltaBasedEngine::new(BumpSizeConfig::default())
+            .compute_sensitivities(&positions, &factors, &market, as_of)?;
+        let reference = MockInstrument::curve_zero("reference", "USD-OIS", 5.0, 10_000.0);
+        let reference_positions =
+            vec![("reference".to_string(), &reference as &dyn Instrument, 1.0)];
+        let reference_matrix = DeltaBasedEngine::new(BumpSizeConfig::default())
+            .compute_sensitivities(&reference_positions, &factors, &market, as_of)?;
+
+        assert!((matrix.delta(0, 0) - reference_matrix.delta(0, 0)).abs() < 1e-12);
+        assert_eq!(matrix.delta(1, 0), 0.0);
+        assert_eq!(affected_calls.load(Ordering::Relaxed), 2);
+        assert_eq!(
+            unaffected_calls.load(Ordering::Relaxed),
+            0,
+            "a resolved position on another curve must not be bumped"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn delta_engine_reprices_dependency_failures_conservatively() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market_with_other_curve(as_of)?;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let unresolved = MockInstrument::curve_zero("unresolved", "USD-OTHER", 5.0, 10_000.0)
+            .with_dependency_failure()
+            .with_raw_value_calls(Arc::clone(&calls));
+        let positions = vec![(
+            "unresolved".to_string(),
+            &unresolved as &dyn Instrument,
+            1.0,
+        )];
+        let factors = vec![FactorDefinition {
+            id: finstack_quant_factor_model::FactorId::new("rates"),
+            factor_type: finstack_quant_factor_model::FactorType::Rates,
+            market_mapping: MarketMapping::CurveParallel {
+                curve_ids: vec![CurveId::new("USD-OIS")],
+                units: BumpUnits::RateBp,
+            },
+            description: None,
+        }];
+
+        let matrix = DeltaBasedEngine::new(BumpSizeConfig::default())
+            .compute_sensitivities(&positions, &factors, &market, as_of)?;
+
+        assert_eq!(matrix.delta(0, 0), 0.0);
+        assert_eq!(
+            calls.load(Ordering::Relaxed),
+            2,
+            "failed dependency introspection must fall back to full repricing"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn delta_engine_routes_curve_mapping_by_actual_market_storage() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market_with_other_curve(as_of)?;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let instrument = MockInstrument::curve_zero("custom", "USD-OTHER", 5.0, 10_000.0)
+            .with_raw_value_calls(Arc::clone(&calls));
+        let positions = vec![("custom".to_string(), &instrument as &dyn Instrument, 1.0)];
+        let factors = vec![FactorDefinition {
+            id: finstack_quant_factor_model::FactorId::new("custom"),
+            factor_type: finstack_quant_factor_model::FactorType::Custom("curve".to_string()),
+            market_mapping: MarketMapping::CurveParallel {
+                curve_ids: vec![CurveId::new("USD-OIS")],
+                units: BumpUnits::RateBp,
+            },
+            description: None,
+        }];
+
+        DeltaBasedEngine::new(BumpSizeConfig::default())
+            .compute_sensitivities(&positions, &factors, &market, as_of)?;
+
+        assert_eq!(
+            calls.load(Ordering::Relaxed),
+            0,
+            "declared factor type must not override the exact stored curve role"
+        );
         Ok(())
     }
 }

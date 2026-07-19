@@ -518,6 +518,14 @@ impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
         self.npv_raw(curves, as_of)
     }
 
+    fn base_value_raw_with_currency(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
+        Ok((self.npv_raw(curves, as_of)?, self.notional.currency()))
+    }
+
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.maturity)
     }
@@ -1004,6 +1012,14 @@ impl crate::instruments::common_impl::traits::Instrument for YoYInflationSwap {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
         self.npv_raw(curves, as_of)
+    }
+
+    fn base_value_raw_with_currency(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
+        Ok((self.npv_raw(curves, as_of)?, self.notional.currency()))
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {

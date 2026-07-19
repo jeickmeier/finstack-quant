@@ -13,10 +13,14 @@ use pyo3::prelude::*;
 
 /// Parse a portfolio specification from JSON and return the canonical form.
 #[pyfunction]
-pub fn parse_portfolio_spec(json_str: &str) -> PyResult<String> {
-    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
-        serde_json::from_str(json_str).map_err(display_to_py)?;
-    serde_json::to_string(&spec).map_err(display_to_py)
+pub fn parse_portfolio_spec(py: Python<'_>, json_str: &str) -> PyResult<String> {
+    let json_str = json_str.to_owned();
+    py.detach(move || {
+        let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
+            serde_json::from_str(&json_str)?;
+        serde_json::to_string(&spec)
+    })
+    .map_err(display_to_py)
 }
 
 /// Build a runtime portfolio from a JSON spec and round-trip the spec.
@@ -25,13 +29,16 @@ pub fn parse_portfolio_spec(json_str: &str) -> PyResult<String> {
 /// Prefer :meth:`Portfolio.from_spec` for real work — it returns the typed
 /// object that pipeline functions reuse without rebuilding.
 #[pyfunction]
-pub fn build_portfolio_from_spec(spec_json: &str) -> PyResult<String> {
-    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
-        serde_json::from_str(spec_json).map_err(display_to_py)?;
-    let portfolio =
-        finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(portfolio_to_py)?;
-    let round_tripped = portfolio.to_spec();
-    serde_json::to_string(&round_tripped).map_err(display_to_py)
+pub fn build_portfolio_from_spec(py: Python<'_>, spec_json: &str) -> PyResult<String> {
+    let spec_json = spec_json.to_owned();
+    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec = py
+        .detach(move || serde_json::from_str(&spec_json))
+        .map_err(display_to_py)?;
+    let portfolio = py
+        .detach(move || finstack_quant_portfolio::Portfolio::from_spec(spec))
+        .map_err(portfolio_to_py)?;
+    py.detach(move || serde_json::to_string(&portfolio.to_spec()))
+        .map_err(display_to_py)
 }
 
 /// Extract total portfolio value from a ``PortfolioResult``.
@@ -39,8 +46,8 @@ pub fn build_portfolio_from_spec(spec_json: &str) -> PyResult<String> {
 /// Accepts either a :class:`PortfolioResult` object (no parse) or a JSON
 /// string. The typed path is O(1); the JSON path parses the full result.
 #[pyfunction]
-pub fn portfolio_result_total_value(result: &Bound<'_, PyAny>) -> PyResult<f64> {
-    let result = extract_portfolio_result_ref(result)?;
+pub fn portfolio_result_total_value(py: Python<'_>, result: &Bound<'_, PyAny>) -> PyResult<f64> {
+    let result = extract_portfolio_result_ref(py, result)?;
     Ok(result.total_value().amount())
 }
 
@@ -50,10 +57,11 @@ pub fn portfolio_result_total_value(result: &Bound<'_, PyAny>) -> PyResult<f64> 
 /// string.
 #[pyfunction]
 pub fn portfolio_result_get_metric(
+    py: Python<'_>,
     result: &Bound<'_, PyAny>,
     metric_id: &str,
 ) -> PyResult<Option<f64>> {
-    let result = extract_portfolio_result_ref(result)?;
+    let result = extract_portfolio_result_ref(py, result)?;
     Ok(result.get_metric(metric_id))
 }
 
@@ -77,9 +85,9 @@ pub fn aggregate_metrics(
     market: &Bound<'_, PyAny>,
     as_of: &str,
 ) -> PyResult<String> {
-    let valuation = extract_valuation_ref(valuation)?;
+    let valuation = extract_valuation_ref(py, valuation)?;
     let ccy: finstack_quant_core::currency::Currency = base_ccy.parse().map_err(display_to_py)?;
-    let market = extract_market_ref(market)?;
+    let market = extract_market_ref(py, market)?;
     let date = super::parse_date(as_of)?;
     let valuation_ref: &finstack_quant_portfolio::valuation::PortfolioValuation = &valuation;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
@@ -93,7 +101,8 @@ pub fn aggregate_metrics(
             )
         })
         .map_err(portfolio_to_py)?;
-    serde_json::to_string(&metrics).map_err(display_to_py)
+    py.detach(move || serde_json::to_string(&metrics))
+        .map_err(display_to_py)
 }
 
 /// Register spec functions on the portfolio submodule.

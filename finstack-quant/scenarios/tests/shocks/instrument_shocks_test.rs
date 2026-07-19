@@ -89,6 +89,8 @@ fn test_instrument_type_price_shock_matching() {
 
     let report = engine.apply(&scenario, &mut ctx).unwrap();
     assert_eq!(report.operations_applied, 2, "Should shock 2 bonds");
+    assert_eq!(report.changes.changed_instrument_indices, vec![0, 1]);
+    assert!(report.changes.market_targets.is_empty());
 
     // Verify shock was applied via scenario_overrides (for instruments that support it)
     // or metadata (for instruments that don't)

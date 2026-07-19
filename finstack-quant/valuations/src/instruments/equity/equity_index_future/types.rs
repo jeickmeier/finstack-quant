@@ -494,6 +494,17 @@ impl crate::instruments::common_impl::traits::Instrument for EquityIndexFuture {
         pricer::compute_pv_raw(self, curves, as_of)
     }
 
+    fn base_value_raw_with_currency(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<(f64, Currency)> {
+        Ok((
+            pricer::compute_pv_raw(self, curves, as_of)?,
+            self.notional.currency(),
+        ))
+    }
+
     fn effective_start_date(&self) -> Option<Date> {
         None
     }

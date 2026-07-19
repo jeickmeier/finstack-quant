@@ -12,10 +12,9 @@
 //! * `liquidity::scoring::PARALLEL_SCORING_THRESHOLD` (512) — would need a
 //!   built `Portfolio` and per-position `LiquidityProfile` fixture; defer to
 //!   portfolio-scale fixture work if the threshold becomes contentious.
-//! * `valuation::REVALUE_AFFECTED_PARALLEL_MIN_AFFECTED` (64) — already
-//!   exercised indirectly by `portfolio_valuation` benches with a varying
-//!   `affected_indices` slice; would only need a dedicated bench if the
-//!   threshold itself becomes contentious.
+//! * The request-scoped evaluation executor's 64-position position-axis
+//!   cutoffs are exercised by the portfolio valuation, workflow, and
+//!   selective-repricing benchmark groups.
 //!
 //! The single bench here is intentionally narrow: it isolates the inner
 //! work the threshold gates so the criterion output is dominated by the

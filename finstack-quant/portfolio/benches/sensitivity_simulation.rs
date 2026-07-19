@@ -24,12 +24,18 @@ use finstack_quant_core::Result;
 use finstack_quant_factor_model::sensitivity_matrix::SensitivityMatrix;
 use finstack_quant_factor_model::{
     BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorId, FactorType, MarketMapping,
-    RiskMeasure,
+    PricingMode, RiskMeasure, UnmatchedPolicy,
 };
-use finstack_quant_portfolio::factor_model::{RiskDecomposer, SimulationDecomposer};
+use finstack_quant_portfolio::factor_model::{
+    FactorModelBuilder, RiskDecomposer, SimulationDecomposer,
+};
+use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::sensitivity::FullRepricingEngine;
-use finstack_quant_valuations::instruments::{Attributes, Instrument};
+use finstack_quant_portfolio::types::DUMMY_ENTITY_ID;
+use finstack_quant_portfolio::Portfolio;
+use finstack_quant_valuations::instruments::{Attributes, Instrument, MarketDependencies};
 use finstack_quant_valuations::pricer::InstrumentType;
+use std::sync::Arc;
 use time::macros::date;
 
 // ---------------------------------------------------------------------------
@@ -87,6 +93,21 @@ impl Instrument for CurveZeroInstrument {
     fn base_value_raw(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
         self.raw_value(market)
     }
+    fn base_value_raw_with_currency(
+        &self,
+        market: &MarketContext,
+        _as_of: Date,
+    ) -> Result<(f64, Currency)> {
+        Ok((self.raw_value(market)?, Currency::USD))
+    }
+    fn market_dependencies(&self) -> Result<MarketDependencies> {
+        let mut dependencies = MarketDependencies::new();
+        dependencies
+            .curves
+            .discount_curves
+            .push(self.curve_id.clone());
+        Ok(dependencies)
+    }
 }
 
 const CURVE_ID: &str = "USD-OIS";
@@ -128,6 +149,44 @@ fn repricing_factors(n_factors: usize) -> Vec<FactorDefinition> {
         .collect()
 }
 
+fn sparse_repricing_market(as_of: Date, n_factors: usize) -> MarketContext {
+    (0..n_factors).fold(MarketContext::new(), |market, factor_index| {
+        let curve = DiscountCurve::builder(format!("USD-CURVE-{factor_index}"))
+            .base_date(as_of)
+            .interp(InterpStyle::MonotoneConvex)
+            .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.80), (10.0, 0.60)])
+            .build()
+            .expect("bench: sparse discount curve should build");
+        market.insert(curve)
+    })
+}
+
+fn sparse_repricing_instruments(n_positions: usize, n_factors: usize) -> Vec<CurveZeroInstrument> {
+    (0..n_positions)
+        .map(|position_index| CurveZeroInstrument {
+            id: format!("SPARSE_POS_{position_index}"),
+            attributes: Attributes::new(),
+            curve_id: CurveId::new(format!("USD-CURVE-{}", position_index % n_factors)),
+            tenor_years: 1.0 + (position_index % 9) as f64,
+            scale: 10_000.0,
+        })
+        .collect()
+}
+
+fn sparse_repricing_factors(n_factors: usize) -> Vec<FactorDefinition> {
+    (0..n_factors)
+        .map(|factor_index| FactorDefinition {
+            id: FactorId::new(format!("sparse_rates_{factor_index}")),
+            factor_type: FactorType::Rates,
+            market_mapping: MarketMapping::CurveParallel {
+                curve_ids: vec![CurveId::new(format!("USD-CURVE-{factor_index}"))],
+                units: finstack_quant_core::market_data::bumps::BumpUnits::RateBp,
+            },
+            description: None,
+        })
+        .collect()
+}
+
 fn bench_full_repricing(c: &mut Criterion) {
     let as_of = date!(2025 - 01 - 01);
     let market = repricing_market(as_of);
@@ -157,6 +216,129 @@ fn bench_full_repricing(c: &mut Criterion) {
                         .compute_pnl_profiles(&positions, &factors, &market, as_of)
                         .expect("bench: pnl profiles should compute");
                     std::hint::black_box(profiles);
+                });
+            },
+        );
+
+        let sparse_market = sparse_repricing_market(as_of, n_factors);
+        let sparse_instruments = sparse_repricing_instruments(n_positions, n_factors);
+        let sparse_positions: Vec<(String, &dyn Instrument, f64)> = sparse_instruments
+            .iter()
+            .map(|instrument| (instrument.id.clone(), instrument as &dyn Instrument, 1.0))
+            .collect();
+        let sparse_factors = sparse_repricing_factors(n_factors);
+        group.bench_with_input(
+            BenchmarkId::new(
+                "dependency_routed_profiles",
+                format!("{n_positions}p_x_{n_factors}f"),
+            ),
+            &n_positions,
+            |b, _| {
+                b.iter(|| {
+                    let profiles = engine
+                        .compute_pnl_profiles(
+                            &sparse_positions,
+                            &sparse_factors,
+                            &sparse_market,
+                            as_of,
+                        )
+                        .expect("bench: dependency-routed pnl profiles should compute");
+                    std::hint::black_box(profiles);
+                });
+            },
+        );
+    }
+    group.finish();
+}
+
+// ---------------------------------------------------------------------------
+// Direct factor stress (only the work consumed by the public workflow is timed).
+// ---------------------------------------------------------------------------
+
+fn factor_stress_model() -> finstack_quant_portfolio::factor_model::FactorModel {
+    use finstack_quant_factor_model::matching::{DependencyFilter, MappingRule, MatchingConfig};
+    use finstack_quant_factor_model::{CurveType, DependencyType, FactorModelConfig};
+
+    let factor_id = FactorId::new("rates_stress");
+    let covariance = FactorCovarianceMatrix::new(vec![factor_id.clone()], vec![0.04])
+        .expect("bench: factor covariance should build");
+    FactorModelBuilder::new()
+        .config(FactorModelConfig {
+            factors: vec![FactorDefinition {
+                id: factor_id.clone(),
+                factor_type: FactorType::Rates,
+                market_mapping: MarketMapping::CurveParallel {
+                    curve_ids: vec![CurveId::new(CURVE_ID)],
+                    units: finstack_quant_core::market_data::bumps::BumpUnits::RateBp,
+                },
+                description: None,
+            }],
+            covariance,
+            matching: MatchingConfig::MappingTable(vec![MappingRule {
+                dependency_filter: DependencyFilter {
+                    dependency_type: Some(DependencyType::Discount),
+                    curve_type: Some(CurveType::Discount),
+                    id: Some(CURVE_ID.to_string()),
+                },
+                attribute_filter: finstack_quant_factor_model::AttributeFilter::default(),
+                factor_id,
+            }]),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_size: Some(BumpSizeConfig::default()),
+            unmatched_policy: Some(UnmatchedPolicy::Residual),
+        })
+        .build()
+        .expect("bench: factor model should build")
+}
+
+fn factor_stress_portfolio(n_positions: usize, as_of: Date) -> Portfolio {
+    repricing_instruments(n_positions)
+        .into_iter()
+        .fold(
+            Portfolio::builder("FACTOR_STRESS")
+                .base_ccy(Currency::USD)
+                .as_of(as_of),
+            |builder, instrument| {
+                let position_id = instrument.id.clone();
+                let instrument_id = instrument.id.clone();
+                builder.position(
+                    Position::new(
+                        position_id,
+                        DUMMY_ENTITY_ID,
+                        instrument_id,
+                        Arc::new(instrument),
+                        1.0,
+                        PositionUnit::Units,
+                    )
+                    .expect("bench: position should build"),
+                )
+            },
+        )
+        .build()
+        .expect("bench: portfolio should build")
+}
+
+fn bench_factor_stress(c: &mut Criterion) {
+    let as_of = date!(2025 - 01 - 01);
+    let market = repricing_market(as_of);
+    let model = factor_stress_model();
+    let stresses = vec![(FactorId::new("rates_stress"), 10.0)];
+    let mut group = c.benchmark_group("factor_stress");
+    group.sample_size(10);
+
+    for &n_positions in &[256_usize, 1024] {
+        let portfolio = factor_stress_portfolio(n_positions, as_of);
+
+        group.bench_with_input(
+            BenchmarkId::new("factor_stress", format!("{n_positions}p_x_1f")),
+            &n_positions,
+            |b, _| {
+                b.iter(|| {
+                    let result = model
+                        .factor_stress(&portfolio, &market, as_of, std::hint::black_box(&stresses))
+                        .expect("bench: factor stress should succeed");
+                    std::hint::black_box(result);
                 });
             },
         );
@@ -228,5 +410,10 @@ fn bench_mc_decomposition(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_full_repricing, bench_mc_decomposition);
+criterion_group!(
+    benches,
+    bench_full_repricing,
+    bench_factor_stress,
+    bench_mc_decomposition
+);
 criterion_main!(benches);

@@ -31,9 +31,11 @@ fn optimize_portfolio(
     spec_json: &str,
     market: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
-    let spec: finstack_quant_portfolio::optimization::PortfolioOptimizationSpec =
-        serde_json::from_str(spec_json).map_err(display_to_py)?;
-    let market = extract_market(market)?;
+    let spec_json = spec_json.to_owned();
+    let spec: finstack_quant_portfolio::optimization::PortfolioOptimizationSpec = py
+        .detach(move || serde_json::from_str(&spec_json))
+        .map_err(display_to_py)?;
+    let market = extract_market(py, market)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     // The LP solve (portfolio build + valuation + simplex/interior-point) can
     // run for seconds on large books; release the GIL for it. The owned spec
@@ -44,7 +46,8 @@ fn optimize_portfolio(
             finstack_quant_portfolio::optimization::optimize_from_spec(&spec, &market, &config)
         })
         .map_err(portfolio_to_py)?;
-    serde_json::to_string(&result).map_err(display_to_py)
+    py.detach(move || serde_json::to_string(&result))
+        .map_err(display_to_py)
 }
 
 /// Register optimization functions on the portfolio submodule.

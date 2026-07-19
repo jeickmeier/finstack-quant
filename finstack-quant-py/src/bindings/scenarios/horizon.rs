@@ -64,7 +64,7 @@ pub(crate) fn compute_horizon_return<'py>(
     let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> = Arc::from(boxed);
 
     // Parse market (owned copy so the compute can run without the GIL).
-    let market_ctx = extract_market(market)?;
+    let market_ctx = extract_market(py, market)?;
 
     // Parse date
     let date = super::parse_date(as_of)?;

@@ -52,14 +52,15 @@ fn to_position_ids(ids: Vec<String>) -> Vec<PositionId> {
 }
 
 /// Serialize a Python object to JSON via `json.dumps`, then deserialize into `T`.
-fn py_to_serde<'py, T: serde::de::DeserializeOwned>(
+fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
     label: &str,
 ) -> PyResult<T> {
     let json_mod = py.import("json")?;
     let json_str: String = json_mod.call_method1("dumps", (obj,))?.extract()?;
-    serde_json::from_str(&json_str).map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
+    py.detach(move || serde_json::from_str(&json_str))
+        .map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
 }
 
 #[derive(Deserialize)]
@@ -75,34 +76,38 @@ fn parse_position_changes(
     changes: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<fm::PositionChange>> {
     let specs: Vec<PositionChangeSpec> = py_to_serde(py, changes, "position changes")?;
-    specs
-        .into_iter()
-        .map(
-            |spec| match spec.kind.trim().to_ascii_lowercase().as_str() {
-                "remove" => Ok(fm::PositionChange::Remove {
-                    position_id: PositionId::new(spec.position_id),
-                }),
-                "resize" => {
-                    let new_quantity = spec.new_quantity.ok_or_else(|| {
-                        crate::errors::value_error(format!(
-                            "resize change for position '{}' requires new_quantity",
-                            spec.position_id
-                        ))
-                    })?;
-                    Ok(fm::PositionChange::Resize {
+    py.detach(move || {
+        specs
+            .into_iter()
+            .map(
+                |spec| match spec.kind.trim().to_ascii_lowercase().as_str() {
+                    "remove" => Ok(fm::PositionChange::Remove {
                         position_id: PositionId::new(spec.position_id),
-                        new_quantity,
-                    })
-                }
-                "add" => Err(crate::errors::value_error(
-                    "Python position_what_if changes currently support remove or resize only",
-                )),
-                other => Err(crate::errors::value_error(format!(
-                    "unknown position change kind '{other}' (expected 'remove' or 'resize')"
-                ))),
-            },
-        )
-        .collect()
+                    }),
+                    "resize" => {
+                        let new_quantity = spec.new_quantity.ok_or_else(|| {
+                            format!(
+                                "resize change for position '{}' requires new_quantity",
+                                spec.position_id
+                            )
+                        })?;
+                        Ok(fm::PositionChange::Resize {
+                            position_id: PositionId::new(spec.position_id),
+                            new_quantity,
+                        })
+                    }
+                    "add" => Err(
+                        "Python position_what_if changes currently support remove or resize only"
+                            .to_owned(),
+                    ),
+                    other => Err(format!(
+                        "unknown position change kind '{other}' (expected 'remove' or 'resize')"
+                    )),
+                },
+            )
+            .collect::<Result<Vec<_>, String>>()
+    })
+    .map_err(crate::errors::value_error)
 }
 
 /// Convert a Rust `DecompositionMethod` to a stable Python string.
@@ -1776,8 +1781,7 @@ fn parametric_var_decomposition_typed(
     compute_incremental: bool,
 ) -> PyResult<PyPositionRiskDecomposition> {
     let n = weights.len();
-    let cov_flat = extract_square_matrix(covariance, n, "covariance")?;
-    let ids = to_position_ids(position_ids);
+    let cov_flat = extract_square_matrix(py, covariance, n, "covariance")?;
 
     let mut config = DecompositionConfig::parametric_95();
     config.confidence = confidence;
@@ -1787,6 +1791,7 @@ fn parametric_var_decomposition_typed(
 
     let result = py
         .detach(move || {
+            let ids = to_position_ids(position_ids);
             ParametricPositionDecomposer.decompose_positions(&weights, &cov_flat, &ids, &config)
         })
         .map_err(core_to_py)?;
@@ -1805,7 +1810,7 @@ fn historical_var_decomposition_typed(
     confidence: f64,
 ) -> PyResult<PyPositionRiskDecomposition> {
     let n = position_ids.len();
-    let position_pnls = extract_position_pnls(position_pnls, n)?;
+    let position_pnls = extract_position_pnls(py, position_pnls, n)?;
     let n_scenarios = position_pnls.n_scenarios();
 
     let config = DecompositionConfig::historical(confidence);
@@ -1846,18 +1851,26 @@ fn evaluate_risk_budget_typed(
         )));
     }
 
-    let shared_ids: Vec<PositionId> = position_ids.into_iter().map(PositionId::new).collect();
-
-    let mut targets: IndexMap<PositionId, f64> = IndexMap::with_capacity(n);
-    for (id, &pct) in shared_ids.iter().zip(target_var_pct.iter()) {
-        if targets.insert(id.clone(), pct).is_some() {
-            return Err(crate::errors::value_error(format!(
-                "duplicate position_id '{}' in position_ids",
-                id.as_str()
-            )));
-        }
-    }
-    let budget = RiskBudget::new(targets).with_threshold(utilization_threshold);
+    let (shared_ids, budget, actual_var) = py
+        .detach(move || {
+            let shared_ids: Vec<PositionId> =
+                position_ids.into_iter().map(PositionId::new).collect();
+            let mut targets: IndexMap<PositionId, f64> = IndexMap::with_capacity(n);
+            for (id, &pct) in shared_ids.iter().zip(target_var_pct.iter()) {
+                if targets.insert(id.clone(), pct).is_some() {
+                    return Err(format!(
+                        "duplicate position_id '{}' in position_ids",
+                        id.as_str()
+                    ));
+                }
+            }
+            Ok((
+                shared_ids,
+                RiskBudget::new(targets).with_threshold(utilization_threshold),
+                actual_var,
+            ))
+        })
+        .map_err(crate::errors::value_error)?;
     let result = py
         .detach(move || {
             budget.evaluate_components(
@@ -1881,26 +1894,26 @@ fn factor_stress(
     as_of: &str,
     stresses: Vec<(String, f64)>,
 ) -> PyResult<PyStressResult> {
-    let portfolio = extract_portfolio_ref(portfolio)?;
-    let market = extract_market_ref(market)?;
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let market = extract_market_ref(py, market)?;
     let as_of = parse_iso_date_py(as_of)?;
-    let config: finstack_quant_factor_model::FactorModelConfig =
-        serde_json::from_str(factor_model_config_json).map_err(display_to_py)?;
-    let stresses: Vec<_> = stresses
-        .into_iter()
-        .map(|(factor_id, shift)| (finstack_quant_factor_model::FactorId::new(factor_id), shift))
-        .collect();
+    let config_json = factor_model_config_json.to_owned();
+    let config: finstack_quant_factor_model::FactorModelConfig = py
+        .detach(move || serde_json::from_str(&config_json))
+        .map_err(display_to_py)?;
 
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
     let result = py
         .detach(move || {
+            let stresses = stresses
+                .into_iter()
+                .map(|(factor_id, shift)| {
+                    (finstack_quant_factor_model::FactorId::new(factor_id), shift)
+                })
+                .collect::<Vec<_>>();
             let model = fm::FactorModelBuilder::new().config(config).build()?;
-            let base = model.analyze(portfolio_ref, market_ref, as_of)?;
-            let sensitivities = model.compute_sensitivities(portfolio_ref, market_ref, as_of)?;
-            model
-                .what_if(&base, &sensitivities, portfolio_ref, market_ref, as_of)
-                .factor_stress(&stresses)
+            model.factor_stress(portfolio_ref, market_ref, as_of, &stresses)
         })
         .map_err(portfolio_to_py)?;
 
@@ -1918,11 +1931,13 @@ fn position_what_if(
     as_of: &str,
     changes: &Bound<'_, PyAny>,
 ) -> PyResult<PyWhatIfResult> {
-    let portfolio = extract_portfolio_ref(portfolio)?;
-    let market = extract_market_ref(market)?;
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let market = extract_market_ref(py, market)?;
     let as_of = parse_iso_date_py(as_of)?;
-    let config: finstack_quant_factor_model::FactorModelConfig =
-        serde_json::from_str(factor_model_config_json).map_err(display_to_py)?;
+    let config_json = factor_model_config_json.to_owned();
+    let config: finstack_quant_factor_model::FactorModelConfig = py
+        .detach(move || serde_json::from_str(&config_json))
+        .map_err(display_to_py)?;
     let changes = parse_position_changes(py, changes)?;
 
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
@@ -1930,8 +1945,8 @@ fn position_what_if(
     let result = py
         .detach(move || {
             let model = fm::FactorModelBuilder::new().config(config).build()?;
-            let base = model.analyze(portfolio_ref, market_ref, as_of)?;
-            let sensitivities = model.compute_sensitivities(portfolio_ref, market_ref, as_of)?;
+            let (base, sensitivities) =
+                model.analyze_with_sensitivities(portfolio_ref, market_ref, as_of)?;
             model
                 .what_if(&base, &sensitivities, portfolio_ref, market_ref, as_of)
                 .position_what_if(&changes)
@@ -1955,7 +1970,7 @@ fn build_stress_attribution(
     confidence: f64,
 ) -> PyResult<PyStressAttribution> {
     let n_positions = position_ids.len();
-    let position_pnls = extract_position_pnls(position_pnls, n_positions)?;
+    let position_pnls = extract_position_pnls(py, position_pnls, n_positions)?;
     let n_scenarios = position_pnls.n_scenarios();
     let result = py
         .detach(move || {

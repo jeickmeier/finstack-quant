@@ -429,7 +429,7 @@ fn evaluate_dcf<'py>(
         ..Default::default()
     };
 
-    let market = extract_market_opt(market)?;
+    let market = extract_market_opt(py, market)?;
 
     let result = py
         .detach(move || {
@@ -526,7 +526,7 @@ fn dcf_sensitivity<'py>(
     let terminal_value: TerminalValueSpec =
         serde_json::from_str(terminal_value_json).map_err(display_to_py)?;
     let ufcf_node = ufcf_node.to_owned();
-    let market = extract_market_opt(market)?;
+    let market = extract_market_opt(py, market)?;
 
     let options = finstack_quant_statements_analytics::analysis::DcfOptions {
         mid_year_convention,
@@ -821,7 +821,7 @@ fn run_corporate_analysis<'py>(
         }
     }
 
-    if let Some(mkt) = extract_market_opt(market)? {
+    if let Some(mkt) = extract_market_opt(py, market)? {
         builder = builder.market(mkt);
     }
 

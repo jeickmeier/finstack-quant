@@ -116,7 +116,7 @@ fn parametric_var_decomposition<'py>(
     confidence: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
     let n = weights.len();
-    let cov_flat = extract_square_matrix(covariance, n, "covariance")?;
+    let cov_flat = extract_square_matrix(py, covariance, n, "covariance")?;
     let ids = to_position_ids(position_ids);
 
     let mut config = DecompositionConfig::parametric_95();
@@ -160,7 +160,7 @@ fn parametric_es_decomposition<'py>(
     confidence: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
     let n = weights.len();
-    let cov_flat = extract_square_matrix(covariance, n, "covariance")?;
+    let cov_flat = extract_square_matrix(py, covariance, n, "covariance")?;
     let ids = to_position_ids(position_ids);
 
     let mut config = DecompositionConfig::parametric_95();
@@ -206,7 +206,7 @@ fn historical_var_decomposition<'py>(
     confidence: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
     let n = position_ids.len();
-    let position_pnls = extract_position_pnls(position_pnls, n)?;
+    let position_pnls = extract_position_pnls(py, position_pnls, n)?;
     let n_scenarios = position_pnls.n_scenarios();
 
     let config = DecompositionConfig::historical(confidence);

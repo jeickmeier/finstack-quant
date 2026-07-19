@@ -13,7 +13,7 @@ use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_core::market_data::scalars::{MarketScalar, ScalarTimeSeries};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{
     BaseCorrelationCurve, CreditIndexData, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve,
@@ -289,6 +289,19 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         gbp_usd: 1.25 + fx_shift,
         jpy_usd: 0.0067,
     }));
+    let aapl_history = ScalarTimeSeries::new(
+        "AAPL",
+        (-2_i64..=260)
+            .map(|offset| {
+                (
+                    base + time::Duration::days(offset),
+                    150.0 + offset as f64 * 0.01,
+                )
+            })
+            .collect(),
+        None,
+    )
+    .unwrap();
 
     let usd_alias = DiscountCurve::builder("USD")
         .base_date(base)
@@ -342,6 +355,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         .insert_surface(fx_vol)
         .insert_surface(cds_spread_vol)
         .insert_fx(fx)
+        .insert_series(aapl_history)
         .insert_price("EQUITY-SPOT", MarketScalar::Unitless(150.0))
         .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.02))
         .insert_price(
@@ -349,6 +363,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
             MarketScalar::Price(Money::new(150.0, Currency::USD)),
         )
         .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+        .insert_price("AAPL_IMPL_VOL", MarketScalar::Unitless(0.25))
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02))
         .insert_price(
             "BOND_0_PRICE",
@@ -676,7 +691,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     // 9. Swaptions
     for i in 0..positions_per_derivative.min(3) {
         let swaption_id = format!("SWAPTION_{}", i);
-        let expiry = Date::from_calendar_date(2025, Month::July, 1).unwrap();
+        let expiry = Date::from_calendar_date(2026, Month::July, 1).unwrap();
         let swap_end = Date::from_calendar_date(2030, Month::July, 1).unwrap();
         let params = SwaptionParams::payer(
             Money::new(5_000_000.0, Currency::USD),
@@ -749,7 +764,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let cds_option_id = format!("CDSOPTION_{}", i);
         let option_params = CDSOptionParams::call(
             rust_decimal::Decimal::new(1, 2),
-            base + time::Duration::days(180),
+            base + time::Duration::days(365),
             maturity_5y(),
             Money::new(10_000_000.0, Currency::USD),
         )

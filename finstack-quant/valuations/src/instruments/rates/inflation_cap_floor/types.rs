@@ -671,6 +671,17 @@ impl crate::instruments::common_impl::traits::Instrument for InflationCapFloor {
         self.npv_raw_with_model(curves, as_of, crate::pricer::ModelKey::Black76)
     }
 
+    fn base_value_raw_with_currency(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
+        Ok((
+            self.npv_raw_with_model(curves, as_of, crate::pricer::ModelKey::Black76)?,
+            self.notional.currency(),
+        ))
+    }
+
     fn effective_start_date(&self) -> Option<Date> {
         Some(self.start_date)
     }

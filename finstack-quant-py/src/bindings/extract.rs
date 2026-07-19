@@ -130,23 +130,26 @@ pub fn extract_model(
 /// Always produces an owned value — prefer [`extract_market_ref`] when only
 /// a reference is needed.
 pub fn extract_market(
+    py: Python<'_>,
     obj: &Bound<'_, PyAny>,
 ) -> PyResult<finstack_quant_core::market_data::context::MarketContext> {
     if let Ok(ctx) = obj.cast::<PyMarketContext>() {
         return Ok(ctx.borrow().inner.clone());
     }
     let json: String = obj.extract()?;
-    serde_json::from_str(&json).map_err(to_py)
+    py.detach(move || serde_json::from_str(&json))
+        .map_err(to_py)
 }
 
 /// Extract an optional [`MarketContext`] from `Option<&Bound<'_, PyAny>>`.
 ///
 /// Returns `Ok(None)` when `obj` is `None`.
 pub fn extract_market_opt(
+    py: Python<'_>,
     obj: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Option<finstack_quant_core::market_data::context::MarketContext>> {
     match obj {
-        Some(o) => extract_market(o).map(Some),
+        Some(o) => extract_market(py, o).map(Some),
         None => Ok(None),
     }
 }
@@ -176,14 +179,19 @@ impl std::ops::Deref for MarketAccess<'_> {
     }
 }
 
-/// Borrow a [`MarketContext`] from a typed Python object, or parse from JSON.
-pub fn extract_market_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<MarketAccess<'py>> {
+/// Borrow a [`MarketContext`] from a typed Python object, or parse from JSON
+/// while releasing the GIL.
+pub fn extract_market_ref<'py>(
+    py: Python<'py>,
+    obj: &Bound<'py, PyAny>,
+) -> PyResult<MarketAccess<'py>> {
     if let Ok(ctx) = obj.cast::<PyMarketContext>() {
         return Ok(MarketAccess::Borrowed(ctx.borrow()));
     }
     let json: String = obj.extract()?;
-    let inner: finstack_quant_core::market_data::context::MarketContext =
-        serde_json::from_str(&json).map_err(to_py)?;
+    let inner: finstack_quant_core::market_data::context::MarketContext = py
+        .detach(move || serde_json::from_str(&json))
+        .map_err(to_py)?;
     Ok(MarketAccess::Owned(Box::new(inner)))
 }
 
@@ -214,16 +222,21 @@ impl std::ops::Deref for PortfolioAccess<'_> {
 /// Extract a [`Portfolio`] from a `Portfolio` Python object (fast path) or
 /// build one from a JSON spec string (fallback). The JSON path pays the full
 /// `Portfolio::from_spec` cost, which includes position materialization,
-/// index construction, and validation.
-pub fn extract_portfolio_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<PortfolioAccess<'py>> {
+/// index construction, and validation; both stages release the GIL.
+pub fn extract_portfolio_ref<'py>(
+    py: Python<'py>,
+    obj: &Bound<'py, PyAny>,
+) -> PyResult<PortfolioAccess<'py>> {
     if let Ok(p) = obj.cast::<PyPortfolio>() {
         return Ok(PortfolioAccess::Borrowed(p.borrow()));
     }
     let json: String = obj.extract()?;
-    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
-        serde_json::from_str(&json).map_err(to_py)?;
-    let portfolio =
-        finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(portfolio_to_py)?;
+    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec = py
+        .detach(move || serde_json::from_str(&json))
+        .map_err(to_py)?;
+    let portfolio = py
+        .detach(move || finstack_quant_portfolio::Portfolio::from_spec(spec))
+        .map_err(portfolio_to_py)?;
     Ok(PortfolioAccess::Owned(Box::new(portfolio)))
 }
 
@@ -249,13 +262,17 @@ impl std::ops::Deref for ValuationAccess<'_> {
 }
 
 /// Extract a [`PortfolioValuation`] from a typed Python object or a JSON string.
-pub fn extract_valuation_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ValuationAccess<'py>> {
+pub fn extract_valuation_ref<'py>(
+    py: Python<'py>,
+    obj: &Bound<'py, PyAny>,
+) -> PyResult<ValuationAccess<'py>> {
     if let Ok(v) = obj.cast::<PyPortfolioValuation>() {
         return Ok(ValuationAccess::Borrowed(v.borrow()));
     }
     let json: String = obj.extract()?;
-    let inner: finstack_quant_portfolio::valuation::PortfolioValuation =
-        serde_json::from_str(&json).map_err(to_py)?;
+    let inner: finstack_quant_portfolio::valuation::PortfolioValuation = py
+        .detach(move || serde_json::from_str(&json))
+        .map_err(to_py)?;
     Ok(ValuationAccess::Owned(Box::new(inner)))
 }
 
@@ -282,13 +299,15 @@ impl std::ops::Deref for PortfolioResultAccess<'_> {
 
 /// Extract a [`PortfolioResult`] from a typed Python object or a JSON string.
 pub fn extract_portfolio_result_ref<'py>(
+    py: Python<'py>,
     obj: &Bound<'py, PyAny>,
 ) -> PyResult<PortfolioResultAccess<'py>> {
     if let Ok(r) = obj.cast::<PyPortfolioResult>() {
         return Ok(PortfolioResultAccess::Borrowed(r.borrow()));
     }
     let json: String = obj.extract()?;
-    let inner: finstack_quant_portfolio::results::PortfolioResult =
-        serde_json::from_str(&json).map_err(to_py)?;
+    let inner: finstack_quant_portfolio::results::PortfolioResult = py
+        .detach(move || serde_json::from_str(&json))
+        .map_err(to_py)?;
     Ok(PortfolioResultAccess::Owned(Box::new(inner)))
 }

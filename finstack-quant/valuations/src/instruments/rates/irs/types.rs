@@ -637,6 +637,17 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
         crate::instruments::rates::irs::pricer::compute_pv_raw(self, curves, as_of)
     }
 
+    fn base_value_raw_with_currency(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
+        Ok((
+            crate::instruments::rates::irs::pricer::compute_pv_raw(self, curves, as_of)?,
+            self.notional.currency(),
+        ))
+    }
+
     fn as_marginable(&self) -> Option<&dyn finstack_quant_margin::Marginable> {
         Some(self)
     }

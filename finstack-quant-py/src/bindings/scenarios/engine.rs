@@ -90,7 +90,7 @@ fn apply_scenario<'py>(
 ) -> PyResult<Bound<'py, PyDict>> {
     let spec: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(scenario_json).map_err(display_to_py)?;
-    let mut market = extract_market(market)?;
+    let mut market = extract_market(py, market)?;
     let mut model = extract_model(model)?;
     let date = super::parse_date(as_of)?;
 
@@ -148,7 +148,7 @@ fn apply_scenario_to_market<'py>(
 ) -> PyResult<Bound<'py, PyDict>> {
     let spec: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(scenario_json).map_err(display_to_py)?;
-    let mut market = extract_market(market)?;
+    let mut market = extract_market(py, market)?;
     let date = super::parse_date(as_of)?;
 
     let (report, market) = py.detach(|| {

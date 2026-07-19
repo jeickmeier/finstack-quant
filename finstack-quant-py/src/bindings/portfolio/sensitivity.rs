@@ -13,14 +13,15 @@ const DEFAULT_PNL_SCENARIO_POINTS: usize =
     finstack_quant_portfolio::sensitivity::DEFAULT_PNL_SCENARIO_POINTS;
 
 /// Serialize a Python object to JSON via `json.dumps`, then deserialize into `T`.
-fn py_to_serde<'py, T: serde::de::DeserializeOwned>(
+fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
     label: &str,
 ) -> PyResult<T> {
     let json_mod = py.import("json")?;
     let json_str: String = json_mod.call_method1("dumps", (obj,))?.extract()?;
-    serde_json::from_str(&json_str).map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
+    py.detach(move || serde_json::from_str(&json_str))
+        .map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
 }
 
 // ---------------------------------------------------------------------------
@@ -177,11 +178,11 @@ struct PyFactorPnlProfile {
 }
 
 impl PyFactorPnlProfile {
-    fn from_inner(profile: &finstack_quant_portfolio::sensitivity::FactorPnlProfile) -> Self {
+    fn from_inner(profile: finstack_quant_portfolio::sensitivity::FactorPnlProfile) -> Self {
         Self {
             factor_id: profile.factor_id.to_string(),
-            shifts: profile.shifts.clone(),
-            position_pnls: profile.position_pnls.clone(),
+            shifts: profile.shifts,
+            position_pnls: profile.position_pnls,
         }
     }
 }
@@ -285,25 +286,23 @@ fn compute_factor_sensitivities(
     as_of: &str,
     bump_config_json: Option<&str>,
 ) -> PyResult<PySensitivityMatrix> {
-    let market = extract_market(market)?;
+    let market = extract_market(py, market)?;
     let date = super::parse_date(as_of)?;
     let positions_json = positions_json.to_owned();
     let factors_json = factors_json.to_owned();
     let bump_config_json = bump_config_json.map(str::to_owned);
 
-    let matrix = py
-        .detach(move || {
-            finstack_quant_portfolio::sensitivity::compute_factor_sensitivities_from_json(
-                &positions_json,
-                &factors_json,
-                &market,
-                date,
-                bump_config_json.as_deref(),
-            )
-        })
-        .map_err(core_to_py)?;
-
-    Ok(PySensitivityMatrix::from_inner(matrix))
+    py.detach(move || {
+        finstack_quant_portfolio::sensitivity::compute_factor_sensitivities_from_json(
+            &positions_json,
+            &factors_json,
+            &market,
+            date,
+            bump_config_json.as_deref(),
+        )
+        .map(PySensitivityMatrix::from_inner)
+    })
+    .map_err(core_to_py)
 }
 
 // ---------------------------------------------------------------------------
@@ -343,29 +342,29 @@ fn compute_pnl_profiles(
     bump_config_json: Option<&str>,
     n_scenario_points: usize,
 ) -> PyResult<Vec<PyFactorPnlProfile>> {
-    let market = extract_market(market)?;
+    let market = extract_market(py, market)?;
     let date = super::parse_date(as_of)?;
     let positions_json = positions_json.to_owned();
     let factors_json = factors_json.to_owned();
     let bump_config_json = bump_config_json.map(str::to_owned);
 
-    let profiles = py
-        .detach(move || {
-            finstack_quant_portfolio::sensitivity::compute_pnl_profiles_from_json(
-                &positions_json,
-                &factors_json,
-                &market,
-                date,
-                bump_config_json.as_deref(),
-                n_scenario_points,
-            )
+    py.detach(move || {
+        finstack_quant_portfolio::sensitivity::compute_pnl_profiles_from_json(
+            &positions_json,
+            &factors_json,
+            &market,
+            date,
+            bump_config_json.as_deref(),
+            n_scenario_points,
+        )
+        .map(|profiles| {
+            profiles
+                .into_iter()
+                .map(PyFactorPnlProfile::from_inner)
+                .collect()
         })
-        .map_err(core_to_py)?;
-
-    Ok(profiles
-        .iter()
-        .map(PyFactorPnlProfile::from_inner)
-        .collect())
+    })
+    .map_err(core_to_py)
 }
 
 // ---------------------------------------------------------------------------
@@ -585,49 +584,44 @@ fn decompose_factor_risk(
     covariance_json: &str,
     risk_measure: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyFactorRiskDecomposition> {
-    let factor_ids: Vec<finstack_quant_factor_model::FactorId> = sensitivities
-        .factor_ids
-        .iter()
-        .map(finstack_quant_factor_model::FactorId::new)
-        .collect();
-
-    let mut matrix = finstack_quant_portfolio::sensitivity::SensitivityMatrix::zeros(
-        sensitivities.position_ids.clone(),
-        factor_ids,
-    );
-    if sensitivities.n_factors > 0 {
-        for (i, chunk) in sensitivities
-            .data
-            .chunks_exact(sensitivities.n_factors)
-            .enumerate()
-        {
-            for (j, &val) in chunk.iter().enumerate() {
-                matrix.set_delta(i, j, val);
-            }
-        }
-    }
-
-    let covariance: finstack_quant_factor_model::FactorCovarianceMatrix =
-        serde_json::from_str(covariance_json).map_err(display_to_py)?;
-
     let measure: finstack_quant_factor_model::RiskMeasure = match risk_measure {
         Some(obj) => py_to_serde(py, obj, "risk_measure")?,
         None => finstack_quant_factor_model::RiskMeasure::Variance,
     };
 
-    let decomposer = finstack_quant_portfolio::factor_model::ParametricDecomposer;
-    let result = py
-        .detach(move || {
-            finstack_quant_portfolio::factor_model::RiskDecomposer::decompose(
-                &decomposer,
-                &matrix,
-                &covariance,
-                &measure,
-            )
-        })
+    py.detach(|| {
+        let factor_ids = sensitivities
+            .factor_ids
+            .iter()
+            .map(finstack_quant_factor_model::FactorId::new)
+            .collect();
+        let mut matrix = finstack_quant_portfolio::sensitivity::SensitivityMatrix::zeros(
+            sensitivities.position_ids.clone(),
+            factor_ids,
+        );
+        if sensitivities.n_factors > 0 {
+            for (i, chunk) in sensitivities
+                .data
+                .chunks_exact(sensitivities.n_factors)
+                .enumerate()
+            {
+                for (j, &value) in chunk.iter().enumerate() {
+                    matrix.set_delta(i, j, value);
+                }
+            }
+        }
+        let covariance: finstack_quant_factor_model::FactorCovarianceMatrix =
+            serde_json::from_str(covariance_json).map_err(display_to_py)?;
+        let decomposer = finstack_quant_portfolio::factor_model::ParametricDecomposer;
+        let result = finstack_quant_portfolio::factor_model::RiskDecomposer::decompose(
+            &decomposer,
+            &matrix,
+            &covariance,
+            &measure,
+        )
         .map_err(core_to_py)?;
-
-    Ok(PyFactorRiskDecomposition::from_inner(result))
+        Ok(PyFactorRiskDecomposition::from_inner(result))
+    })
 }
 
 // ---------------------------------------------------------------------------

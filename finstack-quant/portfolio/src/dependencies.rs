@@ -144,15 +144,16 @@ fn finalize_dependency_map(
 /// as a derived, non-serialized cache.  The index maps each [`MarketFactorKey`]
 /// to the position indices whose instruments depend on that key.
 ///
-/// Positions whose `market_dependencies()` returned an error are tracked
-/// separately in [`unresolved`](Self::unresolved) and are conservatively
-/// included in every `affected_positions` query.
+/// Positions whose `market_dependencies()` returned an error or the trait's
+/// compatibility-default empty set are tracked separately in
+/// [`unresolved`](Self::unresolved) and are conservatively included in every
+/// `affected_positions` query.
 #[derive(Debug, Clone, Default)]
 pub struct DependencyIndex {
     inner: HashMap<MarketFactorKey, Vec<usize>>,
-    /// Position indices whose instruments failed to report dependencies.
-    /// These are always included in any affected-position query as a
-    /// conservative fallback.
+    /// Position indices whose instruments failed to report dependencies or
+    /// returned an empty compatibility-default set. These are always included
+    /// in any affected-position query as a conservative fallback.
     unresolved: Vec<usize>,
     /// Number of positions this index was built/extended for. Lets callers
     /// detect a stale index (positions mutated without a matching index
@@ -165,8 +166,9 @@ impl DependencyIndex {
     ///
     /// Iterates all positions, calls `instrument.market_dependencies()`,
     /// flattens each into normalized keys, and records the position index.
-    /// Instruments that return an error from `market_dependencies()` are
-    /// tracked as unresolved and conservatively included in every query.
+    /// Instruments that return an error or an empty compatibility-default set
+    /// from `market_dependencies()` are tracked as unresolved and
+    /// conservatively included in every query.
     ///
     /// # Returns
     ///
@@ -181,7 +183,12 @@ impl DependencyIndex {
                 continue;
             };
 
-            for key in flatten_dependencies(&deps) {
+            let keys = flatten_dependencies(&deps);
+            if keys.is_empty() {
+                unresolved.push(idx);
+                continue;
+            }
+            for key in keys {
                 staged.entry(key).or_default().insert(idx);
             }
         }
@@ -218,6 +225,12 @@ impl DependencyIndex {
             return;
         };
 
+        let keys = flatten_dependencies(&deps);
+        if keys.is_empty() {
+            self.unresolved.push(idx);
+            return;
+        }
+
         // `idx` is the new, strictly-increasing appended index (enforced by the
         // append-only contract asserted above) and `flatten_dependencies` yields
         // each key at most once per call, so `idx` can never already be present
@@ -225,7 +238,7 @@ impl DependencyIndex {
         // guard was a dead O(entry_len) scan that made repeated `add_position`
         // calls O(n²) for a widely-shared factor. Each entry therefore stays
         // sorted and duplicate-free, matching `finalize_dependency_map`.
-        for key in flatten_dependencies(&deps) {
+        for key in keys {
             self.inner.entry(key).or_default().push(idx);
         }
     }
@@ -268,10 +281,30 @@ impl DependencyIndex {
             }
         }
 
+        let has_fx_change = keys
+            .iter()
+            .any(|key| matches!(key, MarketFactorKey::Fx { .. }));
         for key in keys {
             for &idx in self.positions_for_key(key) {
                 if seen.insert(idx) {
                     result.push(idx);
+                }
+            }
+        }
+        if has_fx_change {
+            // An observed FX quote can feed any triangulated cross through the
+            // matrix pivot. Bumped matrices also discard derived observations
+            // before rebuilding. Without a stable, authoritative path
+            // manifest, every FX-dependent instrument is therefore potentially
+            // affected by any FX quote change. Scan the index once even when a
+            // stress manifest contains multiple FX pairs.
+            for (indexed_key, indices) in &self.inner {
+                if matches!(indexed_key, MarketFactorKey::Fx { .. }) {
+                    for &idx in indices {
+                        if seen.insert(idx) {
+                            result.push(idx);
+                        }
+                    }
                 }
             }
         }
@@ -280,7 +313,8 @@ impl DependencyIndex {
         result
     }
 
-    /// Position indices whose instruments failed to report dependencies.
+    /// Position indices whose instruments failed to report dependencies or
+    /// returned an empty compatibility-default dependency set.
     ///
     /// # Returns
     ///
@@ -388,5 +422,24 @@ mod tests {
         let finalized = finalize_dependency_map(staged);
 
         assert_eq!(finalized.get(&key).map(Vec::as_slice), Some(&[1, 2, 3][..]));
+    }
+
+    #[test]
+    fn affected_positions_conservatively_includes_all_fx_dependencies() {
+        let direct = MarketFactorKey::fx(Currency::EUR, Currency::USD);
+        let triangulated_cross = MarketFactorKey::fx(Currency::EUR, Currency::JPY);
+        let mut staged: HashMap<MarketFactorKey, HashSet<usize>> = HashMap::default();
+        staged.entry(direct).or_default().insert(7);
+        staged.entry(triangulated_cross).or_default().insert(11);
+        let index = DependencyIndex {
+            inner: finalize_dependency_map(staged),
+            unresolved: Vec::new(),
+            indexed_positions: 12,
+        };
+
+        assert_eq!(
+            index.affected_positions(&[MarketFactorKey::fx(Currency::USD, Currency::EUR)]),
+            vec![7, 11],
+        );
     }
 }

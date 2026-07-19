@@ -269,6 +269,22 @@ impl crate::instruments::common_impl::traits::Instrument for Deposit {
         )
     }
 
+    fn base_value_raw_with_currency(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
+        Ok((
+            crate::instruments::common_impl::helpers::schedule_pv_raw(
+                self,
+                curves,
+                as_of,
+                &self.discount_curve_id,
+            )?,
+            self.notional.currency(),
+        ))
+    }
+
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<

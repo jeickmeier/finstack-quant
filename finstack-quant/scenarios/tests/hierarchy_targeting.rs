@@ -140,6 +140,7 @@ fn cumulative_mode_stacks_shocks_down_tree() {
     use finstack_quant_core::market_data::hierarchy::MarketDataHierarchy;
     use finstack_quant_core::market_data::hierarchy::ResolutionMode;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_scenarios::engine::ScenarioMarketTarget;
     use finstack_quant_scenarios::{CurveKind, ExecutionContext, ScenarioEngine};
     use finstack_quant_statements::FinancialModelSpec;
     use time::macros::date;
@@ -219,6 +220,21 @@ fn cumulative_mode_stacks_shocks_down_tree() {
         "Expected 3 operations (2 from Credit-wide + 1 from HY-specific), got {}. Warnings: {:?}",
         report.operations_applied, report.warnings
     );
+    assert_eq!(report.changes.market_targets.len(), 2);
+    assert!(report
+        .changes
+        .market_targets
+        .contains(&ScenarioMarketTarget::Curve {
+            curve_kind: CurveKind::Discount,
+            curve_id: "JPM-5Y".into(),
+        }));
+    assert!(report
+        .changes
+        .market_targets
+        .contains(&ScenarioMarketTarget::Curve {
+            curve_kind: CurveKind::Discount,
+            curve_id: "OXY-5Y".into(),
+        }));
 }
 
 /// MostSpecificWins keeps only the deepest matching shock per curve.

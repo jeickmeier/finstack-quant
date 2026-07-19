@@ -881,6 +881,16 @@ mod tests {
             Ok(self.raw_value)
         }
 
+        fn base_value_raw_with_currency(
+            &self,
+            _market: &Market,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
+            assert_eq!(as_of, self.effective_as_of);
+            self.raw_calls.fetch_add(1, Ordering::SeqCst);
+            Ok((self.raw_value, finstack_quant_core::currency::Currency::USD))
+        }
+
         fn get_scenario_pricing_overrides(
             &self,
         ) -> Option<&crate::instruments::ScenarioPricingOverrides> {
@@ -1078,6 +1088,14 @@ mod tests {
             finstack_quant_core::Error::Validation(_)
         ));
 
+        let raw_currency_err = instrument
+            .value_raw_with_currency(&market, as_of)
+            .expect_err("currency-aware raw value request must fail validation");
+        assert!(matches!(
+            raw_currency_err,
+            finstack_quant_core::Error::Validation(_)
+        ));
+
         assert_eq!(pricer_calls.load(Ordering::SeqCst), 0);
         assert_eq!(base_calls.load(Ordering::SeqCst), 0);
         assert_eq!(raw_calls.load(Ordering::SeqCst), 0);
@@ -1117,6 +1135,9 @@ mod tests {
         let direct_raw = instrument
             .value_raw(&market, requested_as_of)
             .expect("direct raw lifecycle");
+        let (direct_raw_with_currency, direct_currency) = instrument
+            .value_raw_with_currency(&market, requested_as_of)
+            .expect("currency-aware direct raw lifecycle");
         let registry_raw = registry
             .price_raw(&instrument, ModelKey::Discounting, &market, requested_as_of)
             .expect("registry raw lifecycle");
@@ -1146,10 +1167,15 @@ mod tests {
         assert_eq!(base_raw, raw_value);
         let expected = raw_value * 0.9;
         assert_eq!(direct_raw, expected);
+        assert_eq!(direct_raw_with_currency, expected);
+        assert_eq!(
+            direct_currency,
+            finstack_quant_core::currency::Currency::USD
+        );
         assert_eq!(registry_raw, expected);
         assert_eq!(result.as_of, effective_as_of);
         assert_eq!(metric_reprice, expected_money);
-        assert_eq!(raw_calls.load(Ordering::SeqCst), 3);
+        assert_eq!(raw_calls.load(Ordering::SeqCst), 4);
     }
 
     #[test]

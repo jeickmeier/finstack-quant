@@ -335,6 +335,14 @@ impl crate::instruments::common_impl::traits::Instrument for IrFutureOption {
         self.npv(curves, as_of)
     }
 
+    fn base_value_raw_with_currency(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
+        Ok((self.npv(curves, as_of)?, self.notional.currency()))
+    }
+
     fn expiry(&self) -> Option<Date> {
         Some(self.expiry)
     }

@@ -81,6 +81,7 @@ value_portfolio_typed = _portfolio.value_portfolio_typed
 aggregate_full_cashflows = _portfolio.aggregate_full_cashflows
 apply_scenario_and_revalue = _portfolio.apply_scenario_and_revalue
 scenario_pnl = _portfolio.scenario_pnl
+scenario_pnl_batch = _portfolio.scenario_pnl_batch
 attribute_portfolio_pnl = _portfolio.attribute_portfolio_pnl
 allocate_weights = _portfolio.allocate_weights
 validate_allocation_json = _portfolio.validate_allocation_json
@@ -252,6 +253,7 @@ __all__: list[str] = [
     "replay_portfolio",
     "roll_effective_spread",
     "scenario_pnl",
+    "scenario_pnl_batch",
     "twrr_linked",
     "twrr_modified_dietz",
     "validate_allocation_json",

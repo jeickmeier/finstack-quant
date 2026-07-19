@@ -58,6 +58,10 @@ stability contract and schema-version policy.
   intermediate model nodes.
 
 ### Added
+- **Batched portfolio scenario P&L:** Rust and Python now expose an ordered
+  one-shot `scenario_pnl_batch` workflow. It applies scenarios in bounded
+  waves, values the base portfolio once, and returns one canonical P&L/report
+  result per input scenario without exposing a stateful evaluation session.
 - **`CashflowBreakdown::interest_income_cash`** (`Option<Money>`, additive per
   [`docs/SERDE_STABILITY.md`](docs/SERDE_STABILITY.md)): net cash interest
   received in a period, non-zero only for two-leg instruments that net to a
@@ -72,6 +76,25 @@ stability contract and schema-version policy.
   money.
 
 ### Changed
+- **Portfolio analytics share a request-scoped evaluation engine.** Valuation,
+  metrics-based attribution, scenario P&L, scenario batches, replay, and
+  factor-stress endpoint P&L now reuse immutable prepared states through one
+  deterministic portfolio pricing path. Each market snapshot owns an isolated
+  calibration cache and each execution wave uses one Rayon axis.
+- **Portfolio scenario and attribution performance:** scenario P&L now requests
+  PV only, scenario batches share their base valuation, metrics-based
+  attribution consumes prepared endpoint results, and replay reuses compatible
+  attribution endpoints. Existing single-workflow signatures and result shapes
+  remain unchanged.
+- **Portfolio sensitivity reuse:** full-repricing grids reuse the collected base
+  PV row at zero shift, and credit factor calculations reuse request-local
+  up/down contexts for identical curve/bump requests. Factor stress reuses
+  unaffected prepared endpoints through the portfolio dependency index.
+- **Portfolio Python concurrency:** typed-object fast paths still borrow their
+  Rust inputs directly, while JSON market/portfolio parsing, portfolio
+  materialization, and large portfolio wrapper serialization now release the
+  GIL. Long-running valuation, attribution, scenario, replay, and factor-stress
+  work remains detached as one native request.
 - **`CapFloor` compounded-RFR contract (intentional pre-1.0 source break):**
   public `spread` and `overnight_coupon` fields now encode spread compounding,
   observation conventions, and payment delay. Serde and builders default these

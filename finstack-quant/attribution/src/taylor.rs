@@ -207,6 +207,28 @@ pub(crate) struct TaylorAttributionResult {
     pub theta_coupon_income: Option<f64>,
 }
 
+#[derive(Clone, Copy)]
+struct TaylorExecution {
+    policy: ExecutionPolicy,
+    prepared_endpoints: Option<(Money, Money)>,
+}
+
+impl TaylorExecution {
+    fn standalone(policy: ExecutionPolicy) -> Self {
+        Self {
+            policy,
+            prepared_endpoints: None,
+        }
+    }
+
+    fn prepared(policy: ExecutionPolicy, val_t0: Money, val_t1: Money) -> Self {
+        Self {
+            policy,
+            prepared_endpoints: Some((val_t0, val_t1)),
+        }
+    }
+}
+
 /// Compute the detailed Taylor factor decomposition.
 ///
 /// Uses bump-and-reprice at T0 to compute first-order sensitivities, then
@@ -232,12 +254,19 @@ fn compute_taylor_result(
     as_of_t0: Date,
     as_of_t1: Date,
     config: &TaylorAttributionConfig,
-    execution_policy: ExecutionPolicy,
+    execution: TaylorExecution,
 ) -> Result<TaylorAttributionResult> {
     config.validate()?;
     validate_attribution_period(as_of_t0, as_of_t1)?;
-    let pv_t0 = reprice_instrument(instrument, market_t0, as_of_t0)?;
-    let pv_t1 = reprice_instrument(instrument, market_t1, as_of_t1)?;
+    let execution_policy = execution.policy;
+    let (pv_t0, pv_t1) = if let Some(endpoints) = execution.prepared_endpoints {
+        endpoints
+    } else {
+        (
+            reprice_instrument(instrument, market_t0, as_of_t0)?,
+            reprice_instrument(instrument, market_t1, as_of_t1)?,
+        )
+    };
     // Decimal-exact difference: subtracting two large `.amount()` f64s loses
     // precision at high notionals, and `checked_sub` also rejects a currency
     // mismatch instead of silently differencing across currencies.
@@ -525,14 +554,28 @@ pub fn attribute_pnl_taylor(
     config: &TaylorAttributionConfig,
     execution_policy: ExecutionPolicy,
 ) -> Result<PnlAttribution> {
-    let taylor = compute_taylor_result(
+    attribute_pnl_taylor_impl(
         instrument,
         market_t0,
         market_t1,
         as_of_t0,
         as_of_t1,
         config,
-        execution_policy,
+        TaylorExecution::standalone(execution_policy),
+    )
+}
+
+fn attribute_pnl_taylor_impl(
+    instrument: &Arc<dyn Instrument>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    as_of_t0: Date,
+    as_of_t1: Date,
+    config: &TaylorAttributionConfig,
+    execution: TaylorExecution,
+) -> Result<PnlAttribution> {
+    let taylor = compute_taylor_result(
+        instrument, market_t0, market_t1, as_of_t0, as_of_t1, config, execution,
     )?;
 
     let total_pnl = compute_pnl_with_fx(
@@ -556,7 +599,7 @@ pub fn attribute_pnl_taylor(
     );
     // Policy-visibility invariant: stamp the execution policy the
     // attribution ran under (workspace rule: results carry the parallel flag).
-    attribution.meta.execution_policy = Some(execution_policy);
+    attribution.meta.execution_policy = Some(execution.policy);
 
     // Taylor factor P&Ls arrive as raw f64s; a degenerate curve or bump can
     // make one non-finite. Route every f64 → Money construction through
@@ -655,6 +698,34 @@ pub fn attribute_pnl_taylor(
     );
 
     Ok(attribution)
+}
+
+/// Run Taylor attribution using ordinary endpoint values prepared by the
+/// portfolio evaluation engine.
+///
+/// This is an internal cross-crate integration path. The endpoint values must
+/// be the unscaled values of `instrument` at the supplied markets and dates.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn attribute_pnl_taylor_prepared(
+    instrument: &Arc<dyn Instrument>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    as_of_t0: Date,
+    as_of_t1: Date,
+    config: &TaylorAttributionConfig,
+    execution_policy: ExecutionPolicy,
+    val_t0: Money,
+    val_t1: Money,
+) -> Result<PnlAttribution> {
+    attribute_pnl_taylor_impl(
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        as_of_t1,
+        config,
+        TaylorExecution::prepared(execution_policy, val_t0, val_t1),
+    )
 }
 
 // ─── Helper functions ──────────────────────────────────────────────────────
@@ -1224,7 +1295,7 @@ mod tests {
             as_of_t0,
             as_of_t1,
             &config,
-            ExecutionPolicy::Parallel,
+            TaylorExecution::standalone(ExecutionPolicy::Parallel),
         )
         .expect("taylor attribution should succeed for simple instrument");
 
@@ -1302,7 +1373,7 @@ mod tests {
             as_of_t0,
             as_of_t1,
             &config,
-            ExecutionPolicy::Parallel,
+            TaylorExecution::standalone(ExecutionPolicy::Parallel),
         )
         .expect("taylor attribution should succeed");
 
@@ -1479,7 +1550,7 @@ mod tests {
             as_of_t0,
             as_of_t1,
             &config,
-            ExecutionPolicy::Parallel,
+            TaylorExecution::standalone(ExecutionPolicy::Parallel),
         )
         .expect("taylor attribution should succeed");
         assert!(

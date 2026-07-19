@@ -32,15 +32,19 @@ impl PyPortfolioAttribution {
 #[pymethods]
 impl PyPortfolioAttribution {
     /// Serialize the complete canonical attribution payload to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+    fn to_json(&self, py: Python<'_>) -> PyResult<String> {
+        let attribution = &self.inner;
+        py.detach(|| serde_json::to_string(attribution))
+            .map_err(display_to_py)
     }
 
     /// Serialize the position-native nested attribution map to compact JSON.
     ///
     /// Position keys retain the canonical Rust ``IndexMap`` insertion order.
-    fn by_position_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.by_position).map_err(display_to_py)
+    fn by_position_json(&self, py: Python<'_>) -> PyResult<String> {
+        let by_position = &self.inner.by_position;
+        py.detach(|| serde_json::to_string(by_position))
+            .map_err(display_to_py)
     }
 
     /// Check that aggregate factor P&L reconciles to total P&L.
@@ -157,23 +161,31 @@ fn attribute_portfolio_pnl(
     method: &Bound<'_, PyAny>,
     config: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyPortfolioAttribution> {
-    let portfolio = extract_portfolio_ref(portfolio)?;
-    let market_t0 = extract_market_ref(market_t0)?;
-    let market_t1 = extract_market_ref(market_t1)?;
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let market_t0 = extract_market_ref(py, market_t0)?;
+    let market_t1 = extract_market_ref(py, market_t1)?;
     let as_of_t0 = super::parse_date(as_of_t0)?;
     let as_of_t1 = super::parse_date(as_of_t1)?;
 
     let method_json = py_to_json_string(py, method, "method")?;
-    let method = serde_json::from_str(&method_json)
-        .map_err(|error| serde_json_to_py(error, "invalid attribution method"))?;
-    let config = config
-        .map(|value| {
-            let json = py_to_json_string(py, value, "config")?;
-            serde_json::from_str(&json)
-                .map_err(|error| serde_json_to_py(error, "invalid finstack config"))
-        })
-        .transpose()?
-        .unwrap_or_default();
+    let config_json = config
+        .map(|value| py_to_json_string(py, value, "config"))
+        .transpose()?;
+    let (method, config): (
+        finstack_quant_portfolio::attribution::AttributionMethod,
+        finstack_quant_core::config::FinstackConfig,
+    ) = py.detach(move || {
+        let method = serde_json::from_str(&method_json)
+            .map_err(|error| serde_json_to_py(error, "invalid attribution method"))?;
+        let config = config_json
+            .map(|json| {
+                serde_json::from_str(&json)
+                    .map_err(|error| serde_json_to_py(error, "invalid finstack config"))
+            })
+            .transpose()?
+            .unwrap_or_default();
+        Ok::<_, PyErr>((method, config))
+    })?;
 
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
     let market_t0_ref: &finstack_quant_core::market_data::context::MarketContext = &market_t0;

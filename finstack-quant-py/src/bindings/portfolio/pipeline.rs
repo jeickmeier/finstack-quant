@@ -20,8 +20,8 @@ fn run_portfolio_valuation(
     strict_risk: bool,
     metrics: Option<Vec<String>>,
 ) -> PyResult<finstack_quant_portfolio::valuation::PortfolioValuation> {
-    let portfolio = extract_portfolio_ref(portfolio)?;
-    let market = extract_market_ref(market)?;
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let market = extract_market_ref(py, market)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let options = finstack_quant_portfolio::valuation::PortfolioValuationOptions {
         strict_risk,
@@ -96,7 +96,8 @@ fn value_portfolio(
     metrics: Option<Vec<String>>,
 ) -> PyResult<String> {
     let valuation = run_portfolio_valuation(py, portfolio, market, strict_risk, metrics)?;
-    serde_json::to_string(&valuation).map_err(display_to_py)
+    py.detach(move || serde_json::to_string(&valuation))
+        .map_err(display_to_py)
 }
 
 /// Value a portfolio and return a typed result without JSON serialization.
@@ -152,8 +153,8 @@ fn aggregate_full_cashflows(
     portfolio: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
 ) -> PyResult<PyPortfolioCashflows> {
-    let portfolio = extract_portfolio_ref(portfolio)?;
-    let market = extract_market_ref(market)?;
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let market = extract_market_ref(py, market)?;
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
     let cashflows = py
@@ -185,10 +186,12 @@ fn apply_scenario_and_revalue(
     scenario_json: &str,
     market: &Bound<'_, PyAny>,
 ) -> PyResult<(String, String)> {
-    let portfolio = extract_portfolio_ref(portfolio)?;
-    let scenario: finstack_quant_scenarios::ScenarioSpec =
-        serde_json::from_str(scenario_json).map_err(display_to_py)?;
-    let market = extract_market_ref(market)?;
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let scenario_json = scenario_json.to_owned();
+    let scenario: finstack_quant_scenarios::ScenarioSpec = py
+        .detach(move || serde_json::from_str(&scenario_json))
+        .map_err(display_to_py)?;
+    let market = extract_market_ref(py, market)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
@@ -202,9 +205,13 @@ fn apply_scenario_and_revalue(
             )
         })
         .map_err(portfolio_to_py)?;
-    let val_json = serde_json::to_string(&valuation).map_err(display_to_py)?;
-    let report_json = serde_json::to_string(&report).map_err(display_to_py)?;
-    Ok((val_json, report_json))
+    py.detach(move || -> Result<(String, String), serde_json::Error> {
+        Ok((
+            serde_json::to_string(&valuation)?,
+            serde_json::to_string(&report)?,
+        ))
+    })
+    .map_err(display_to_py)
 }
 
 /// Compute the profit and loss attributable to a scenario.
@@ -229,10 +236,12 @@ fn scenario_pnl(
     scenario_json: &str,
     market: &Bound<'_, PyAny>,
 ) -> PyResult<(String, String)> {
-    let portfolio = extract_portfolio_ref(portfolio)?;
-    let scenario: finstack_quant_scenarios::ScenarioSpec =
-        serde_json::from_str(scenario_json).map_err(display_to_py)?;
-    let market = extract_market_ref(market)?;
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let scenario_json = scenario_json.to_owned();
+    let scenario: finstack_quant_scenarios::ScenarioSpec = py
+        .detach(move || serde_json::from_str(&scenario_json))
+        .map_err(display_to_py)?;
+    let market = extract_market_ref(py, market)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
@@ -246,9 +255,82 @@ fn scenario_pnl(
             )
         })
         .map_err(portfolio_to_py)?;
-    let pnl_json = serde_json::to_string(&pnl).map_err(display_to_py)?;
-    let report_json = serde_json::to_string(&report).map_err(display_to_py)?;
-    Ok((pnl_json, report_json))
+    py.detach(move || -> Result<(String, String), serde_json::Error> {
+        Ok((
+            serde_json::to_string(&pnl)?,
+            serde_json::to_string(&report)?,
+        ))
+    })
+    .map_err(display_to_py)
+}
+
+/// Compute ordered portfolio P&L for a batch of scenarios.
+///
+/// Parameters
+/// ----------
+/// portfolio : Portfolio | str
+///     A built :class:`Portfolio` or canonical JSON-serialized
+///     ``PortfolioSpec``. The Rust batch engine values its unstressed base leg
+///     once for the complete request.
+/// scenarios_json : str
+///     Canonical JSON array of ``ScenarioSpec`` objects, in the output order
+///     required by the caller. An empty array returns ``"[]"`` without a
+///     valuation.
+/// market : MarketContext | str
+///     The unshocked market snapshot, supplied as a typed object or canonical
+///     JSON string.
+///
+/// Returns
+/// -------
+/// str
+///     A canonical JSON array with one ordered object per input scenario:
+///     ``{"scenario_id": ..., "pnl": ..., "report": ...}``. ``pnl`` and
+///     ``report`` use the same stable JSON shapes returned separately by
+///     :func:`scenario_pnl`.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If ``scenarios_json`` is not a JSON array of valid ``ScenarioSpec``
+///     values.
+/// PortfolioError
+///     If scenario application, valuation, or base-currency P&L differencing
+///     fails. The error identifies the earliest failing input scenario.
+#[pyfunction]
+fn scenario_pnl_batch(
+    py: Python<'_>,
+    portfolio: &Bound<'_, PyAny>,
+    scenarios_json: &str,
+    market: &Bound<'_, PyAny>,
+) -> PyResult<String> {
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let scenarios_json = scenarios_json.to_owned();
+    let scenarios: Vec<finstack_quant_scenarios::ScenarioSpec> = py
+        .detach(move || serde_json::from_str(&scenarios_json))
+        .map_err(display_to_py)?;
+    let market = extract_market_ref(py, market)?;
+    let config = finstack_quant_core::config::FinstackConfig::default();
+
+    // Extract plain Rust references before detaching: the typed access
+    // wrappers own PyRefs and are not Ungil, while their Rust inners are
+    // Send + Sync. Parsing happens above, so the complete batch evaluation and
+    // potentially large result serialization release the GIL without touching
+    // Python state.
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let result_json = py
+        .detach(|| {
+            finstack_quant_portfolio::scenarios::scenario_pnl_batch(
+                portfolio_ref,
+                &scenarios,
+                market_ref,
+                &config,
+            )
+            .map(|results| serde_json::to_string(&results))
+        })
+        .map_err(portfolio_to_py)?;
+
+    result_json.map_err(display_to_py)
 }
 
 /// Register pipeline functions on the portfolio submodule.
@@ -258,5 +340,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(aggregate_full_cashflows, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(apply_scenario_and_revalue, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(scenario_pnl, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(scenario_pnl_batch, m)?)?;
     Ok(())
 }

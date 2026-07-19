@@ -38,8 +38,8 @@ use pyo3::types::PyDict;
 ///     callers to handle the unestimable case explicitly instead of letting
 ///     it propagate silently through downstream arithmetic.
 #[pyfunction]
-fn roll_effective_spread(returns: Vec<f64>) -> Option<f64> {
-    liquidity::roll_effective_spread(&returns)
+fn roll_effective_spread(py: Python<'_>, returns: Vec<f64>) -> Option<f64> {
+    py.detach(move || liquidity::roll_effective_spread(&returns))
 }
 
 /// Compute the Amihud (2002) illiquidity ratio from returns and volumes.
@@ -61,8 +61,8 @@ fn roll_effective_spread(returns: Vec<f64>) -> Option<f64> {
 ///     Average daily illiquidity ratio, or ``None`` if inputs are empty,
 ///     mismatched in length, non-finite, or contain a zero/negative volume.
 #[pyfunction]
-fn amihud_illiquidity(returns: Vec<f64>, volumes: Vec<f64>) -> Option<f64> {
-    liquidity::amihud_illiquidity(&returns, &volumes)
+fn amihud_illiquidity(py: Python<'_>, returns: Vec<f64>, volumes: Vec<f64>) -> Option<f64> {
+    py.detach(move || liquidity::amihud_illiquidity(&returns, &volumes))
 }
 
 // ---------------------------------------------------------------------------
@@ -269,8 +269,8 @@ fn almgren_chriss_impact<'py>(
 ///     Estimated Kyle lambda, or ``None`` if inputs are invalid (empty,
 ///     mismatched length, non-finite, or contain zero volumes).
 #[pyfunction]
-fn kyle_lambda(volumes: Vec<f64>, returns: Vec<f64>) -> Option<f64> {
-    KyleLambdaModel::lambda_from_series(&volumes, &returns)
+fn kyle_lambda(py: Python<'_>, volumes: Vec<f64>, returns: Vec<f64>) -> Option<f64> {
+    py.detach(move || KyleLambdaModel::lambda_from_series(&volumes, &returns))
 }
 
 // ---------------------------------------------------------------------------

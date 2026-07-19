@@ -9,19 +9,26 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
+use finstack_quant_core::money::fx::{
+    FxConversionPolicy, FxMatrix, FxProvider, FxQuery, SimpleFxProvider,
+};
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::valuation::{
     revalue_affected, value_portfolio, PortfolioValuationOptions,
-    PORTFOLIO_SELECTIVE_REPRICING_EXTENSION_KEY,
 };
 use finstack_quant_portfolio::MarketFactorKey;
 use finstack_quant_portfolio::{Portfolio, PortfolioBuilder};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::RatesCurveKind;
+use finstack_quant_valuations::instruments::{
+    Attributes, Instrument, MarketDependencies, PricingOptions, RatesCurveKind,
+};
+use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::pricer::InstrumentType;
+use finstack_quant_valuations::results::ValuationResult;
+use std::any::Any;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
@@ -100,6 +107,17 @@ impl FxProvider for StaticFx {
 
 fn fx_matrix(rate: f64) -> FxMatrix {
     FxMatrix::new(Arc::new(StaticFx { rate }))
+}
+
+fn triangulated_fx_matrix(eur_usd: f64) -> FxMatrix {
+    let provider = Arc::new(SimpleFxProvider::new());
+    provider
+        .set_quotes(&[
+            (Currency::EUR, Currency::USD, eur_usd),
+            (Currency::USD, Currency::JPY, 150.0),
+        ])
+        .expect("valid triangulation quotes");
+    FxMatrix::new(provider)
 }
 
 fn market_with_fx(
@@ -271,41 +289,6 @@ fn selective_reprice_matches_full_reprice_when_one_curve_changes() {
             "position {pid} mismatch"
         );
     }
-}
-
-#[test]
-fn selective_reprice_verify_full_eval_mode_matches_full_reprice() {
-    let portfolio = build_two_curve_portfolio();
-    let mut config = FinstackConfig::default();
-    config
-        .extensions
-        .insert(
-            PORTFOLIO_SELECTIVE_REPRICING_EXTENSION_KEY,
-            serde_json::json!({ "verify_full_eval": true }),
-        )
-        .expect("valid extension key");
-    let options = PortfolioValuationOptions::default();
-
-    let base_market = two_curve_market();
-    let bumped_market = bumped_usd_market();
-
-    let base_val = value_portfolio(&portfolio, &base_market, &config, &Default::default()).unwrap();
-    let full_val =
-        value_portfolio(&portfolio, &bumped_market, &config, &Default::default()).unwrap();
-
-    let selective_val = revalue_affected(
-        &portfolio,
-        &bumped_market,
-        &config,
-        &options,
-        &base_val,
-        &[usd_discount_key()],
-    )
-    .unwrap();
-
-    assert!(
-        (full_val.total_base_ccy.amount() - selective_val.total_base_ccy.amount()).abs() < 1e-10
-    );
 }
 
 #[test]
@@ -489,6 +472,7 @@ fn selective_reprice_fx_change_reprices_native_non_base_positions() {
 #[derive(Clone)]
 struct UnresolvableInstrument {
     attributes: finstack_quant_valuations::instruments::Attributes,
+    fail_dependencies: bool,
 }
 
 finstack_quant_valuations::impl_empty_cashflow_provider!(
@@ -500,6 +484,14 @@ impl UnresolvableInstrument {
     fn new() -> Self {
         Self {
             attributes: finstack_quant_valuations::instruments::Attributes::default(),
+            fail_dependencies: true,
+        }
+    }
+
+    fn with_empty_dependencies() -> Self {
+        Self {
+            attributes: finstack_quant_valuations::instruments::Attributes::default(),
+            fail_dependencies: false,
         }
     }
 }
@@ -537,9 +529,13 @@ impl Instrument for UnresolvableInstrument {
         &self,
     ) -> finstack_quant_core::Result<finstack_quant_valuations::instruments::MarketDependencies>
     {
-        Err(finstack_quant_core::Error::Validation(
-            "stub: unresolvable deps".into(),
-        ))
+        if self.fail_dependencies {
+            Err(finstack_quant_core::Error::Validation(
+                "stub: unresolvable deps".into(),
+            ))
+        } else {
+            Ok(finstack_quant_valuations::instruments::MarketDependencies::new())
+        }
     }
 }
 
@@ -588,4 +584,626 @@ fn unresolved_positions_always_included_in_affected() {
         affected.contains(&1),
         "unresolved position index should appear in affected set even for unrelated keys"
     );
+}
+
+#[test]
+fn empty_compatibility_dependencies_are_conservatively_unresolved() {
+    let position = Position::new(
+        "POS_DEFAULT_DEPS",
+        "ENTITY_A",
+        "DEFAULT_DEPS",
+        Arc::new(UnresolvableInstrument::with_empty_dependencies()),
+        1.0,
+        PositionUnit::Units,
+    )
+    .unwrap();
+    let portfolio = PortfolioBuilder::new("DEFAULT_DEPS")
+        .base_ccy(Currency::USD)
+        .as_of(base_date())
+        .entity(Entity::new("ENTITY_A"))
+        .position(position)
+        .build()
+        .unwrap();
+
+    let index = portfolio.dependency_index();
+    assert_eq!(index.unresolved(), &[0]);
+    assert_eq!(
+        index.affected_positions(&[MarketFactorKey::curve(
+            "USD-OIS".into(),
+            RatesCurveKind::Discount,
+        )]),
+        vec![0],
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Exact-profile and workload-shape acceptance tests
+// ---------------------------------------------------------------------------
+
+#[derive(Clone)]
+struct DependencyProbeInstrument {
+    id: String,
+    value: Money,
+    discount_curve_id: Option<String>,
+    fx_pair: Option<(Currency, Currency)>,
+    value_fx_pair: Option<(Currency, Currency)>,
+    base_calls: Arc<AtomicUsize>,
+    pv_only_calls: Arc<AtomicUsize>,
+    metric_calls: Arc<AtomicUsize>,
+    attributes: Attributes,
+}
+
+finstack_quant_valuations::impl_empty_cashflow_provider!(
+    DependencyProbeInstrument,
+    finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
+);
+
+impl Instrument for DependencyProbeInstrument {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn key(&self) -> InstrumentType {
+        InstrumentType::Basket
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn attributes(&self) -> &Attributes {
+        &self.attributes
+    }
+
+    fn attributes_mut(&mut self) -> &mut Attributes {
+        &mut self.attributes
+    }
+
+    fn clone_box(&self) -> Box<dyn Instrument> {
+        Box::new(self.clone())
+    }
+
+    fn base_value(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
+        self.base_calls.fetch_add(1, Ordering::SeqCst);
+        self.resolved_value(market, as_of)
+    }
+
+    fn price_with_metrics(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        metrics: &[MetricId],
+        options: PricingOptions,
+    ) -> finstack_quant_core::Result<ValuationResult> {
+        if metrics.is_empty() {
+            self.pv_only_calls.fetch_add(1, Ordering::SeqCst);
+        } else {
+            self.metric_calls.fetch_add(1, Ordering::SeqCst);
+        }
+        let config = options.config.as_deref().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "selective test expected the executor request config".to_string(),
+            )
+        })?;
+        Ok(ValuationResult::stamped_with_config(
+            self.id(),
+            as_of,
+            self.resolved_value(market, as_of)?,
+            config,
+        ))
+    }
+
+    fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
+        let mut dependencies = MarketDependencies::new();
+        if let Some(curve_id) = &self.discount_curve_id {
+            dependencies.add_discount_curve(curve_id.clone());
+        }
+        if let Some((base, quote)) = self.fx_pair {
+            dependencies.add_fx_pair(base, quote);
+        }
+        Ok(dependencies)
+    }
+}
+
+impl DependencyProbeInstrument {
+    fn resolved_value(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
+        let Some((base, quote)) = self.value_fx_pair else {
+            return Ok(self.value);
+        };
+        let rate = market
+            .fx_required()?
+            .rate(FxQuery::new(base, quote, as_of))?
+            .rate;
+        Ok(Money::new(
+            self.value.amount() * rate,
+            self.value.currency(),
+        ))
+    }
+}
+
+#[derive(Clone)]
+struct DependencyProbe {
+    base_calls: Arc<AtomicUsize>,
+    pv_only_calls: Arc<AtomicUsize>,
+    metric_calls: Arc<AtomicUsize>,
+}
+
+fn dependency_probe_instrument(
+    id: impl Into<String>,
+    value: Money,
+    discount_curve_id: Option<String>,
+    fx_pair: Option<(Currency, Currency)>,
+    value_fx_pair: Option<(Currency, Currency)>,
+) -> (Arc<dyn Instrument>, DependencyProbe) {
+    let base_calls = Arc::new(AtomicUsize::new(0));
+    let pv_only_calls = Arc::new(AtomicUsize::new(0));
+    let metric_calls = Arc::new(AtomicUsize::new(0));
+    let instrument = DependencyProbeInstrument {
+        id: id.into(),
+        value,
+        discount_curve_id,
+        fx_pair,
+        value_fx_pair,
+        base_calls: Arc::clone(&base_calls),
+        pv_only_calls: Arc::clone(&pv_only_calls),
+        metric_calls: Arc::clone(&metric_calls),
+        attributes: Attributes::new(),
+    };
+    (
+        Arc::new(instrument),
+        DependencyProbe {
+            base_calls,
+            pv_only_calls,
+            metric_calls,
+        },
+    )
+}
+
+fn build_dependency_probe_portfolio(position_count: usize) -> (Portfolio, Vec<DependencyProbe>) {
+    let mut builder = PortfolioBuilder::new(format!("SELECTIVE_{position_count}"))
+        .base_ccy(Currency::USD)
+        .as_of(base_date())
+        .entity(Entity::new("ENTITY_A"));
+    let mut probes = Vec::with_capacity(position_count);
+
+    for index in 0..position_count {
+        let instrument_id = format!("PROBE_{index:04}");
+        let (instrument, probe) = dependency_probe_instrument(
+            instrument_id.clone(),
+            Money::new((index + 1) as f64, Currency::USD),
+            Some(format!("CURVE_{index:04}")),
+            None,
+            None,
+        );
+        builder = builder.position(
+            Position::new(
+                format!("POSITION_{index:04}"),
+                "ENTITY_A",
+                instrument_id,
+                instrument,
+                1.0,
+                PositionUnit::Units,
+            )
+            .expect("valid dependency-probe position"),
+        );
+        probes.push(probe);
+    }
+
+    (
+        builder.build().expect("valid dependency-probe portfolio"),
+        probes,
+    )
+}
+
+fn selective_pv_options() -> PortfolioValuationOptions {
+    PortfolioValuationOptions {
+        strict_risk: true,
+        metrics: finstack_quant_portfolio::valuation::RequestedMetrics::Only(Vec::new()),
+    }
+}
+
+fn reset_probes(probes: &[DependencyProbe]) {
+    for probe in probes {
+        probe.base_calls.store(0, Ordering::SeqCst);
+        probe.pv_only_calls.store(0, Ordering::SeqCst);
+        probe.metric_calls.store(0, Ordering::SeqCst);
+    }
+}
+
+fn total_pv_only_calls(probes: &[DependencyProbe]) -> usize {
+    probes
+        .iter()
+        .map(|probe| probe.pv_only_calls.load(Ordering::SeqCst))
+        .sum()
+}
+
+fn total_metric_calls(probes: &[DependencyProbe]) -> usize {
+    probes
+        .iter()
+        .map(|probe| probe.metric_calls.load(Ordering::SeqCst))
+        .sum()
+}
+
+fn curve_keys(count: usize) -> Vec<MarketFactorKey> {
+    (0..count)
+        .map(|index| {
+            MarketFactorKey::curve(format!("CURVE_{index:04}").into(), RatesCurveKind::Discount)
+        })
+        .collect()
+}
+
+fn assert_same_valuation(
+    expected: &finstack_quant_portfolio::valuation::PortfolioValuation,
+    actual: &finstack_quant_portfolio::valuation::PortfolioValuation,
+) {
+    assert_eq!(actual.as_of, expected.as_of);
+    assert_eq!(actual.total_base_ccy, expected.total_base_ccy);
+    assert_eq!(actual.by_entity, expected.by_entity);
+    assert_eq!(
+        actual.position_values.keys().collect::<Vec<_>>(),
+        expected.position_values.keys().collect::<Vec<_>>()
+    );
+    for (position_id, expected_value) in &expected.position_values {
+        let actual_value = &actual.position_values[position_id];
+        assert_eq!(actual_value.value_native, expected_value.value_native);
+        assert_eq!(actual_value.value_base, expected_value.value_base);
+        assert_eq!(
+            actual_value.risk_metrics_complete,
+            expected_value.risk_metrics_complete
+        );
+    }
+}
+
+#[test]
+fn selective_dirty_fractions_match_full_repricing_and_exact_call_counts() {
+    let (portfolio, probes) = build_dependency_probe_portfolio(100);
+    let market = MarketContext::new();
+    let config = FinstackConfig::default();
+    let options = selective_pv_options();
+    let prior = value_portfolio(&portfolio, &market, &config, &options).expect("base valuation");
+
+    for dirty_count in [0usize, 1, 25, 50, 100] {
+        reset_probes(&probes);
+        let changed = if dirty_count == 0 {
+            vec![MarketFactorKey::curve(
+                "UNCHANGED_CURVE".into(),
+                RatesCurveKind::Discount,
+            )]
+        } else {
+            curve_keys(dirty_count)
+        };
+        let selective = revalue_affected(&portfolio, &market, &config, &options, &prior, &changed)
+            .expect("selective valuation");
+        assert_eq!(
+            total_pv_only_calls(&probes),
+            dirty_count,
+            "the authoritative dirty set should control the number of PV calls"
+        );
+
+        let full = value_portfolio(&portfolio, &market, &config, &options)
+            .expect("full comparison valuation");
+        assert_same_valuation(&full, &selective);
+    }
+}
+
+#[test]
+fn reordered_prior_position_values_force_full_repricing() {
+    let (portfolio, probes) = build_dependency_probe_portfolio(4);
+    let market = MarketContext::new();
+    let config = FinstackConfig::default();
+    let options = selective_pv_options();
+    let mut prior =
+        value_portfolio(&portfolio, &market, &config, &options).expect("base valuation");
+    prior.position_values.swap_indices(0, 1);
+    reset_probes(&probes);
+
+    let result = revalue_affected(
+        &portfolio,
+        &market,
+        &config,
+        &options,
+        &prior,
+        &[MarketFactorKey::curve(
+            "UNCHANGED_CURVE".into(),
+            RatesCurveKind::Discount,
+        )],
+    )
+    .expect("reordered-prior valuation");
+
+    assert_eq!(
+        total_pv_only_calls(&probes),
+        portfolio.positions().len(),
+        "selective reuse requires the executor's exact position order"
+    );
+    let full =
+        value_portfolio(&portfolio, &market, &config, &options).expect("full comparison valuation");
+    assert_same_valuation(&full, &result);
+}
+
+#[test]
+fn selective_63_and_64_affected_positions_preserve_results_and_call_counts() {
+    let (portfolio, probes) = build_dependency_probe_portfolio(128);
+    let market = MarketContext::new();
+    let config = FinstackConfig::default();
+    let options = selective_pv_options();
+    let prior = value_portfolio(&portfolio, &market, &config, &options).expect("base valuation");
+
+    for dirty_count in [63usize, 64] {
+        reset_probes(&probes);
+        let selective = revalue_affected(
+            &portfolio,
+            &market,
+            &config,
+            &options,
+            &prior,
+            &curve_keys(dirty_count),
+        )
+        .expect("threshold selective valuation");
+        assert_eq!(total_pv_only_calls(&probes), dirty_count);
+
+        let full = value_portfolio(&portfolio, &market, &config, &options)
+            .expect("full threshold comparison");
+        assert_same_valuation(&full, &selective);
+    }
+}
+
+#[test]
+fn selective_profile_change_forces_a_full_metric_reprice() {
+    let (portfolio, probes) = build_dependency_probe_portfolio(4);
+    let market = MarketContext::new();
+    let config = FinstackConfig::default();
+    let prior = value_portfolio(&portfolio, &market, &config, &selective_pv_options())
+        .expect("PV-only prior");
+    reset_probes(&probes);
+
+    let target_options = PortfolioValuationOptions {
+        strict_risk: true,
+        metrics: finstack_quant_portfolio::valuation::RequestedMetrics::Only(vec![MetricId::Dv01]),
+    };
+    let result = revalue_affected(
+        &portfolio,
+        &market,
+        &config,
+        &target_options,
+        &prior,
+        &[MarketFactorKey::curve(
+            "UNCHANGED_CURVE".into(),
+            RatesCurveKind::Discount,
+        )],
+    )
+    .expect("profile-changing selective request");
+
+    assert_eq!(
+        total_metric_calls(&probes),
+        portfolio.positions().len(),
+        "a PV-only prior cannot satisfy an exact metric profile"
+    );
+    assert!(result
+        .position_values
+        .values()
+        .all(|value| value.risk_metrics_complete));
+}
+
+#[test]
+fn selective_instrument_replacement_with_same_position_id_forces_reprice() {
+    let config = FinstackConfig::default();
+    let market = MarketContext::new();
+    let options = selective_pv_options();
+    let (base_instrument, _) = dependency_probe_instrument(
+        "BASE_INSTRUMENT",
+        Money::new(100.0, Currency::USD),
+        Some("CURVE_A".to_string()),
+        None,
+        None,
+    );
+    let base_portfolio = PortfolioBuilder::new("BASE")
+        .base_ccy(Currency::USD)
+        .as_of(base_date())
+        .entity(Entity::new("ENTITY_A"))
+        .position(
+            Position::new(
+                "SAME_POSITION",
+                "ENTITY_A",
+                "BASE_INSTRUMENT",
+                base_instrument,
+                1.0,
+                PositionUnit::Units,
+            )
+            .expect("base position"),
+        )
+        .build()
+        .expect("base portfolio");
+    let prior =
+        value_portfolio(&base_portfolio, &market, &config, &options).expect("base valuation");
+
+    let (replacement, replacement_probe) = dependency_probe_instrument(
+        "BASE_INSTRUMENT",
+        Money::new(250.0, Currency::USD),
+        Some("CURVE_B".to_string()),
+        None,
+        None,
+    );
+    let replacement_portfolio = PortfolioBuilder::new("REPLACEMENT")
+        .base_ccy(Currency::USD)
+        .as_of(base_date())
+        .entity(Entity::new("ENTITY_A"))
+        .position(
+            Position::new(
+                "SAME_POSITION",
+                "ENTITY_A",
+                "BASE_INSTRUMENT",
+                replacement,
+                1.0,
+                PositionUnit::Units,
+            )
+            .expect("replacement position"),
+        )
+        .build()
+        .expect("replacement portfolio");
+
+    let result = revalue_affected(
+        &replacement_portfolio,
+        &market,
+        &config,
+        &options,
+        &prior,
+        &[MarketFactorKey::curve(
+            "UNCHANGED_CURVE".into(),
+            RatesCurveKind::Discount,
+        )],
+    )
+    .expect("replacement valuation");
+
+    assert_eq!(
+        replacement_probe.pv_only_calls.load(Ordering::SeqCst),
+        1,
+        "portfolio-state identity must change when economics change under the same position and instrument IDs"
+    );
+    assert_eq!(
+        result.position_values["SAME_POSITION"].value_base.amount(),
+        250.0
+    );
+}
+
+#[test]
+fn selective_portfolio_shape_change_forces_full_reprice() {
+    let (base_portfolio, _) = build_dependency_probe_portfolio(3);
+    let (expanded_portfolio, expanded_probes) = build_dependency_probe_portfolio(4);
+    let market = MarketContext::new();
+    let config = FinstackConfig::default();
+    let options = selective_pv_options();
+    let prior =
+        value_portfolio(&base_portfolio, &market, &config, &options).expect("base valuation");
+    reset_probes(&expanded_probes);
+
+    let selective = revalue_affected(
+        &expanded_portfolio,
+        &market,
+        &config,
+        &options,
+        &prior,
+        &[MarketFactorKey::curve(
+            "UNCHANGED_CURVE".into(),
+            RatesCurveKind::Discount,
+        )],
+    )
+    .expect("shape-changing revaluation");
+
+    assert_eq!(
+        total_pv_only_calls(&expanded_probes),
+        expanded_portfolio.positions().len()
+    );
+    let full = value_portfolio(&expanded_portfolio, &market, &config, &options)
+        .expect("full shape comparison");
+    assert_same_valuation(&full, &selective);
+}
+
+#[test]
+fn selective_fx_change_reprices_only_fx_dependent_instrument_and_refreshes_all_conversions() {
+    let (fx_dependent, fx_probe) = dependency_probe_instrument(
+        "FX_DEPENDENT",
+        Money::new(100.0, Currency::EUR),
+        None,
+        Some((Currency::EUR, Currency::USD)),
+        None,
+    );
+    let (conversion_only, conversion_probe) = dependency_probe_instrument(
+        "CONVERSION_ONLY",
+        Money::new(200.0, Currency::EUR),
+        Some("UNRELATED_STATIC_INPUT".to_string()),
+        None,
+        None,
+    );
+    let (triangulated_cross, triangulated_probe) = dependency_probe_instrument(
+        "TRIANGULATED_CROSS",
+        Money::new(50.0, Currency::USD),
+        None,
+        Some((Currency::EUR, Currency::JPY)),
+        Some((Currency::EUR, Currency::JPY)),
+    );
+    let portfolio = PortfolioBuilder::new("FX_SELECTIVE")
+        .base_ccy(Currency::USD)
+        .as_of(base_date())
+        .entity(Entity::new("ENTITY_A"))
+        .position(
+            Position::new(
+                "FX_DEPENDENT_POSITION",
+                "ENTITY_A",
+                "FX_DEPENDENT",
+                fx_dependent,
+                1.0,
+                PositionUnit::Units,
+            )
+            .expect("FX-dependent position"),
+        )
+        .position(
+            Position::new(
+                "CONVERSION_ONLY_POSITION",
+                "ENTITY_A",
+                "CONVERSION_ONLY",
+                conversion_only,
+                1.0,
+                PositionUnit::Units,
+            )
+            .expect("conversion-only position"),
+        )
+        .position(
+            Position::new(
+                "TRIANGULATED_CROSS_POSITION",
+                "ENTITY_A",
+                "TRIANGULATED_CROSS",
+                triangulated_cross,
+                1.0,
+                PositionUnit::Units,
+            )
+            .expect("triangulated-cross position"),
+        )
+        .build()
+        .expect("FX selective portfolio");
+    let config = FinstackConfig::default();
+    let options = selective_pv_options();
+    let base_market = MarketContext::new().insert_fx(triangulated_fx_matrix(1.10));
+    let stressed_market = MarketContext::new().insert_fx(triangulated_fx_matrix(1.20));
+    let prior =
+        value_portfolio(&portfolio, &base_market, &config, &options).expect("base FX valuation");
+    fx_probe.pv_only_calls.store(0, Ordering::SeqCst);
+    conversion_probe.pv_only_calls.store(0, Ordering::SeqCst);
+    triangulated_probe.pv_only_calls.store(0, Ordering::SeqCst);
+
+    let selective = revalue_affected(
+        &portfolio,
+        &stressed_market,
+        &config,
+        &options,
+        &prior,
+        &[MarketFactorKey::fx(Currency::EUR, Currency::USD)],
+    )
+    .expect("selective FX valuation");
+    assert_eq!(fx_probe.pv_only_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        triangulated_probe.pv_only_calls.load(Ordering::SeqCst),
+        1,
+        "any changed FX quote can alter an instrument's triangulated cross"
+    );
+    assert_eq!(
+        conversion_probe.pv_only_calls.load(Ordering::SeqCst),
+        0,
+        "conversion-only FX changes should reuse native PV"
+    );
+
+    let full = value_portfolio(&portfolio, &stressed_market, &config, &options)
+        .expect("full FX comparison");
+    assert_same_valuation(&full, &selective);
 }

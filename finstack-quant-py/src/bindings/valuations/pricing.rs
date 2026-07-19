@@ -50,7 +50,7 @@ fn price_instrument(
     model: &str,
 ) -> PyResult<String> {
     validate_pricing_instrument_json(py, instrument_json, None)?;
-    let market = extract_market(market)?;
+    let market = extract_market(py, market)?;
     let instrument_json = instrument_json.to_owned();
     let as_of = as_of.to_owned();
     let model = model.to_owned();
@@ -111,7 +111,7 @@ fn price_instrument_with_metrics(
     market_history: Option<&str>,
 ) -> PyResult<String> {
     validate_pricing_instrument_json(py, instrument_json, pricing_options)?;
-    let market = extract_market(market)?;
+    let market = extract_market(py, market)?;
     let instrument_json = instrument_json.to_owned();
     let as_of = as_of.to_owned();
     let model = model.to_owned();
@@ -225,7 +225,7 @@ fn instrument_cashflows_json(
     model: &str,
 ) -> PyResult<String> {
     validate_pricing_instrument_json(py, instrument_json, None)?;
-    let market = extract_market(market)?;
+    let market = extract_market(py, market)?;
     let instrument_json = instrument_json.to_owned();
     let as_of = as_of.to_owned();
     let model = model.to_owned();

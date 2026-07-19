@@ -52,11 +52,14 @@ impl PyPortfolio {
     /// this work.
     #[staticmethod]
     #[pyo3(text_signature = "(spec_json)")]
-    fn from_spec(spec_json: &str) -> PyResult<Self> {
-        let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
-            serde_json::from_str(spec_json).map_err(display_to_py)?;
-        let inner =
-            finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(portfolio_to_py)?;
+    fn from_spec(py: Python<'_>, spec_json: &str) -> PyResult<Self> {
+        let spec_json = spec_json.to_owned();
+        let spec: finstack_quant_portfolio::portfolio::PortfolioSpec = py
+            .detach(move || serde_json::from_str(&spec_json))
+            .map_err(display_to_py)?;
+        let inner = py
+            .detach(move || finstack_quant_portfolio::Portfolio::from_spec(spec))
+            .map_err(portfolio_to_py)?;
         Ok(Self::from_inner(inner))
     }
 
@@ -85,9 +88,10 @@ impl PyPortfolio {
 
     /// Round-trip the portfolio back to its JSON spec form.
     #[pyo3(text_signature = "(self)")]
-    fn to_spec_json(&self) -> PyResult<String> {
-        let spec = self.inner.to_spec();
-        serde_json::to_string(&spec).map_err(display_to_py)
+    fn to_spec_json(&self, py: Python<'_>) -> PyResult<String> {
+        let portfolio = self.inner.as_ref();
+        py.detach(|| serde_json::to_string(&portfolio.to_spec()))
+            .map_err(display_to_py)
     }
 
     fn __repr__(&self) -> String {
@@ -133,16 +137,20 @@ impl PyPortfolioValuation {
     /// Parse a valuation from a JSON string.
     #[staticmethod]
     #[pyo3(text_signature = "(valuation_json)")]
-    fn from_json(valuation_json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::valuation::PortfolioValuation =
-            serde_json::from_str(valuation_json).map_err(display_to_py)?;
+    fn from_json(py: Python<'_>, valuation_json: &str) -> PyResult<Self> {
+        let valuation_json = valuation_json.to_owned();
+        let inner: finstack_quant_portfolio::valuation::PortfolioValuation = py
+            .detach(move || serde_json::from_str(&valuation_json))
+            .map_err(display_to_py)?;
         Ok(Self::from_inner(inner))
     }
 
     /// Serialize back to JSON.
     #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+    fn to_json(&self, py: Python<'_>) -> PyResult<String> {
+        let valuation = &self.inner;
+        py.detach(|| serde_json::to_string(valuation))
+            .map_err(display_to_py)
     }
 
     /// Total portfolio value in the base currency (amount).
@@ -208,16 +216,20 @@ impl PyPortfolioResult {
     /// Parse a result from a JSON string.
     #[staticmethod]
     #[pyo3(text_signature = "(result_json)")]
-    fn from_json(result_json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::results::PortfolioResult =
-            serde_json::from_str(result_json).map_err(display_to_py)?;
+    fn from_json(py: Python<'_>, result_json: &str) -> PyResult<Self> {
+        let result_json = result_json.to_owned();
+        let inner: finstack_quant_portfolio::results::PortfolioResult = py
+            .detach(move || serde_json::from_str(&result_json))
+            .map_err(display_to_py)?;
         Ok(Self::from_inner(inner))
     }
 
     /// Serialize back to JSON.
     #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+    fn to_json(&self, py: Python<'_>) -> PyResult<String> {
+        let result = &self.inner;
+        py.detach(|| serde_json::to_string(result))
+            .map_err(display_to_py)
     }
 
     /// Total portfolio value in base currency.
@@ -272,14 +284,19 @@ pub struct PyPortfolioMetrics {
 impl PyPortfolioMetrics {
     /// Parse aggregate portfolio metrics from canonical JSON.
     #[staticmethod]
-    fn from_json(metrics_json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(metrics_json).map_err(display_to_py)?;
+    fn from_json(py: Python<'_>, metrics_json: &str) -> PyResult<Self> {
+        let metrics_json = metrics_json.to_owned();
+        let inner = py
+            .detach(move || serde_json::from_str(&metrics_json))
+            .map_err(display_to_py)?;
         Ok(Self { inner })
     }
 
     /// Serialize aggregate portfolio metrics to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+    fn to_json(&self, py: Python<'_>) -> PyResult<String> {
+        let metrics = &self.inner;
+        py.detach(|| serde_json::to_string(metrics))
+            .map_err(display_to_py)
     }
 
     /// Return decoded components, total, and ordered entity breakdown by base metric.
@@ -341,16 +358,20 @@ impl PyPortfolioCashflows {
     /// Parse a cashflow ladder from a JSON string.
     #[staticmethod]
     #[pyo3(text_signature = "(cashflows_json)")]
-    fn from_json(cashflows_json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_portfolio::cashflows::PortfolioCashflows =
-            serde_json::from_str(cashflows_json).map_err(display_to_py)?;
+    fn from_json(py: Python<'_>, cashflows_json: &str) -> PyResult<Self> {
+        let cashflows_json = cashflows_json.to_owned();
+        let inner: finstack_quant_portfolio::cashflows::PortfolioCashflows = py
+            .detach(move || serde_json::from_str(&cashflows_json))
+            .map_err(display_to_py)?;
         Ok(Self { inner })
     }
 
     /// Serialize the full ladder back to JSON.
     #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+    fn to_json(&self, py: Python<'_>) -> PyResult<String> {
+        let cashflows = &self.inner;
+        py.detach(|| serde_json::to_string(cashflows))
+            .map_err(display_to_py)
     }
 
     /// Number of dated cashflow events.
@@ -371,20 +392,26 @@ impl PyPortfolioCashflows {
 
     /// JSON for the flat ``events`` vector only.
     #[pyo3(text_signature = "(self)")]
-    fn events_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.events).map_err(display_to_py)
+    fn events_json(&self, py: Python<'_>) -> PyResult<String> {
+        let events = &self.inner.events;
+        py.detach(|| serde_json::to_string(events))
+            .map_err(display_to_py)
     }
 
     /// JSON for the ``by_date`` currency/kind totals only.
     #[pyo3(text_signature = "(self)")]
-    fn by_date_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.by_date).map_err(display_to_py)
+    fn by_date_json(&self, py: Python<'_>) -> PyResult<String> {
+        let by_date = &self.inner.by_date;
+        py.detach(|| serde_json::to_string(by_date))
+            .map_err(display_to_py)
     }
 
     /// JSON for the ``issues`` vector only.
     #[pyo3(text_signature = "(self)")]
-    fn issues_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.issues).map_err(display_to_py)
+    fn issues_json(&self, py: Python<'_>) -> PyResult<String> {
+        let issues = &self.inner.issues;
+        py.detach(|| serde_json::to_string(issues))
+            .map_err(display_to_py)
     }
 
     /// Collapse multi-currency flows into a single base-currency
@@ -396,20 +423,22 @@ impl PyPortfolioCashflows {
     #[pyo3(text_signature = "(self, market, base_ccy, as_of)")]
     fn collapse_to_base_by_date_kind(
         &self,
+        py: Python<'_>,
         market: &Bound<'_, PyAny>,
         base_ccy: &str,
         as_of: &str,
     ) -> PyResult<String> {
-        let market = crate::bindings::extract::extract_market_ref(market)?;
+        let market = crate::bindings::extract::extract_market_ref(py, market)?;
         let ccy: finstack_quant_core::currency::Currency =
             base_ccy.parse().map_err(display_to_py)?;
         let as_of_date = super::parse_date(as_of)?;
         let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-        let collapsed = self
-            .inner
-            .collapse_to_base_by_date_kind(market_ref, ccy, as_of_date)
+        let cashflows = &self.inner;
+        let collapsed = py
+            .detach(|| cashflows.collapse_to_base_by_date_kind(market_ref, ccy, as_of_date))
             .map_err(portfolio_to_py)?;
-        serde_json::to_string(&collapsed).map_err(display_to_py)
+        py.detach(move || serde_json::to_string(&collapsed))
+            .map_err(display_to_py)
     }
 
     fn __repr__(&self) -> String {

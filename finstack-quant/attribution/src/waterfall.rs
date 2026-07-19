@@ -233,6 +233,70 @@ pub fn attribute_pnl_waterfall_with_credit_model(
     credit_factor_model: Option<&CreditFactorModel>,
     credit_factor_detail_options: &CreditFactorDetailOptions,
 ) -> Result<PnlAttribution> {
+    attribute_pnl_waterfall_impl(
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        as_of_t1,
+        _config,
+        factor_order,
+        strict_validation,
+        model_params_t0,
+        credit_factor_model,
+        credit_factor_detail_options,
+        None,
+    )
+}
+
+/// Run waterfall attribution using ordinary endpoint values prepared by the
+/// portfolio evaluation engine.
+///
+/// This is an internal cross-crate integration path. The endpoint values must
+/// be the unscaled values of `instrument` at the supplied markets and dates.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn attribute_pnl_waterfall_prepared(
+    instrument: &Arc<dyn Instrument>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    as_of_t0: Date,
+    as_of_t1: Date,
+    config: &FinstackConfig,
+    factor_order: Vec<AttributionFactor>,
+    val_t0: Money,
+    val_t1: Money,
+) -> Result<PnlAttribution> {
+    attribute_pnl_waterfall_impl(
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        as_of_t1,
+        config,
+        factor_order,
+        false,
+        None,
+        None,
+        &CreditFactorDetailOptions::default(),
+        Some((val_t0, val_t1)),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn attribute_pnl_waterfall_impl(
+    instrument: &Arc<dyn Instrument>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    as_of_t0: Date,
+    as_of_t1: Date,
+    _config: &FinstackConfig,
+    factor_order: Vec<AttributionFactor>,
+    strict_validation: bool,
+    model_params_t0: Option<&ModelParamsSnapshot>,
+    credit_factor_model: Option<&CreditFactorModel>,
+    credit_factor_detail_options: &CreditFactorDetailOptions,
+    prepared_endpoints: Option<(Money, Money)>,
+) -> Result<PnlAttribution> {
     if factor_order.is_empty() {
         return Err(Error::Validation(
             "Waterfall attribution requires non-empty factor_order".to_string(),
@@ -274,10 +338,14 @@ pub fn attribute_pnl_waterfall_with_credit_model(
     } else {
         Arc::clone(instrument)
     };
-    let val_t0 = reprice_instrument(&instrument_t0, market_t0, as_of_t0)?;
-
-    // Also price at T₁ for total P&L calculation
-    let val_t1 = reprice_instrument(instrument, market_t1, as_of_t1)?;
+    let (val_t0, val_t1) = if let Some(endpoints) = prepared_endpoints {
+        endpoints
+    } else {
+        (
+            reprice_instrument(&instrument_t0, market_t0, as_of_t0)?,
+            reprice_instrument(instrument, market_t1, as_of_t1)?,
+        )
+    };
 
     let total_pnl = compute_pnl_with_fx(
         val_t0,

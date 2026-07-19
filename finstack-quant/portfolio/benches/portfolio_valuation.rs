@@ -306,6 +306,7 @@ fn create_market_context() -> MarketContext {
             MarketScalar::Price(Money::new(150.0, Currency::USD)),
         )
         .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+        .insert_price("AAPL_IMPL_VOL", MarketScalar::Unitless(0.25))
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02))
         // Repo collateral prices
         .insert_price(
@@ -1072,6 +1073,82 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_quant_portfo
     builder.build().unwrap()
 }
 
+fn xl_benchmarks_enabled() -> bool {
+    std::env::var("FINSTACK_PORTFOLIO_BENCH_XL").is_ok_and(|value| value == "1")
+}
+
+/// Uniform-cost fixture used to isolate selective invalidation and scheduling.
+///
+/// The headline valuation and attribution groups remain mixed/credit-bearing.
+/// This fixture intentionally assigns exact dependency bands so the benchmark
+/// names correspond to measured 3%, 25%, 50%, and 100% dirty sets.
+fn create_selective_benchmark_portfolio(
+    num_positions: usize,
+) -> finstack_quant_portfolio::Portfolio {
+    let sparse_end = num_positions * 3 / 100;
+    let quarter_end = num_positions / 4;
+    let half_end = num_positions / 2;
+    let mut builder = PortfolioBuilder::new("SELECTIVE_BENCHMARK")
+        .base_ccy(Currency::USD)
+        .as_of(base_date())
+        .entity(Entity::new("SELECTIVE_ENTITY"));
+
+    for index in 0..num_positions {
+        let (curve_id, currency) = if index < sparse_end {
+            ("SELECTIVE_SPARSE", Currency::USD)
+        } else if index < quarter_end {
+            ("SELECTIVE_TO_25", Currency::USD)
+        } else if index < half_end {
+            ("SELECTIVE_TO_50", Currency::USD)
+        } else {
+            ("SELECTIVE_TO_100", Currency::EUR)
+        };
+        let instrument_id = format!("SELECTIVE_DEPOSIT_{index:05}");
+        let deposit = Deposit::builder()
+            .id(instrument_id.clone().into())
+            .notional(Money::new(100_000.0, currency))
+            .start_date(base_date())
+            .maturity(maturity_2y())
+            .day_count(DayCount::Act360)
+            .discount_curve_id(curve_id.into())
+            .quote_rate_opt(Some(dec!(0.04)))
+            .build()
+            .unwrap();
+        builder = builder.position(
+            Position::new(
+                format!("SELECTIVE_POSITION_{index:05}"),
+                "SELECTIVE_ENTITY",
+                instrument_id,
+                Arc::new(deposit),
+                1.0,
+                PositionUnit::Units,
+            )
+            .unwrap(),
+        );
+    }
+    builder.build().unwrap()
+}
+
+fn create_selective_benchmark_market() -> MarketContext {
+    [
+        "SELECTIVE_SPARSE",
+        "SELECTIVE_TO_25",
+        "SELECTIVE_TO_50",
+        "SELECTIVE_TO_100",
+    ]
+    .into_iter()
+    .fold(create_market_context(), |market, curve_id| {
+        market.insert(
+            DiscountCurve::builder(curve_id)
+                .base_date(base_date())
+                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+                .interp(InterpStyle::Linear)
+                .build()
+                .unwrap(),
+        )
+    })
+}
+
 // ============================================================================
 // Portfolio Valuation Benchmarks
 // ============================================================================
@@ -1224,6 +1301,7 @@ fn bench_portfolio_with_metrics(c: &mut Criterion) {
 
 fn bench_portfolio_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_pv_scaling");
+    group.sample_size(10);
     let market = create_market_context();
     let config = FinstackConfig::default();
     let options = PortfolioValuationOptions {
@@ -1231,7 +1309,11 @@ fn bench_portfolio_scaling(c: &mut Criterion) {
         metrics: RequestedMetrics::Only(Vec::new()),
     };
 
-    for num_positions in [250usize, 3_000, 25_000] {
+    let mut position_counts = vec![63usize, 64, 250, 3_000];
+    if xl_benchmarks_enabled() {
+        position_counts.push(25_000);
+    }
+    for num_positions in position_counts {
         let portfolio = create_institutional_portfolio(num_positions);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}pos", num_positions)),
@@ -1244,6 +1326,89 @@ fn bench_portfolio_scaling(c: &mut Criterion) {
                         black_box(&config),
                         black_box(&options),
                     )
+                });
+            },
+        );
+    }
+    group.finish();
+}
+
+fn bench_selective_repricing_shapes(c: &mut Criterion) {
+    let mut group = c.benchmark_group("portfolio_selective_repricing_3000");
+    group.sample_size(30);
+    let market = create_selective_benchmark_market();
+    let portfolio = create_selective_benchmark_portfolio(3_000);
+    let config = FinstackConfig::default();
+    let options = PortfolioValuationOptions {
+        strict_risk: true,
+        metrics: RequestedMetrics::Only(Vec::new()),
+    };
+    let prior =
+        value_portfolio(&portfolio, &market, &config, &options).expect("selective benchmark prior");
+    let cases = [
+        (
+            "dirty_03pct",
+            vec![MarketFactorKey::curve(
+                "SELECTIVE_SPARSE".into(),
+                RatesCurveKind::Discount,
+            )],
+        ),
+        (
+            "dirty_25pct",
+            vec![
+                MarketFactorKey::curve("SELECTIVE_SPARSE".into(), RatesCurveKind::Discount),
+                MarketFactorKey::curve("SELECTIVE_TO_25".into(), RatesCurveKind::Discount),
+            ],
+        ),
+        (
+            "dirty_50pct",
+            vec![
+                MarketFactorKey::curve("SELECTIVE_SPARSE".into(), RatesCurveKind::Discount),
+                MarketFactorKey::curve("SELECTIVE_TO_25".into(), RatesCurveKind::Discount),
+                MarketFactorKey::curve("SELECTIVE_TO_50".into(), RatesCurveKind::Discount),
+            ],
+        ),
+        (
+            "dirty_100pct",
+            vec![
+                MarketFactorKey::curve("SELECTIVE_SPARSE".into(), RatesCurveKind::Discount),
+                MarketFactorKey::curve("SELECTIVE_TO_25".into(), RatesCurveKind::Discount),
+                MarketFactorKey::curve("SELECTIVE_TO_50".into(), RatesCurveKind::Discount),
+                MarketFactorKey::curve("SELECTIVE_TO_100".into(), RatesCurveKind::Discount),
+            ],
+        ),
+        (
+            "fx_conversion_refresh",
+            vec![MarketFactorKey::fx(Currency::EUR, Currency::USD)],
+        ),
+    ];
+
+    group.bench_function("full_control", |bencher| {
+        bencher.iter(|| {
+            value_portfolio(
+                black_box(&portfolio),
+                black_box(&market),
+                black_box(&config),
+                black_box(&options),
+            )
+            .expect("full selective control")
+        });
+    });
+    for (label, changed) in &cases {
+        group.bench_with_input(
+            BenchmarkId::from_parameter(*label),
+            changed,
+            |bencher, changed| {
+                bencher.iter(|| {
+                    revalue_affected(
+                        black_box(&portfolio),
+                        black_box(&market),
+                        black_box(&config),
+                        black_box(&options),
+                        black_box(&prior),
+                        black_box(changed),
+                    )
+                    .expect("selective shape benchmark")
                 });
             },
         );
@@ -1317,6 +1482,7 @@ criterion_group!(
     bench_position_filtering,
     bench_portfolio_with_metrics,
     bench_portfolio_scaling,
+    bench_selective_repricing_shapes,
     bench_revalue_affected,
 );
 criterion_main!(benches);

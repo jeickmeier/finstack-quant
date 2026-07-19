@@ -652,6 +652,39 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         Ok(self.base_value(market, as_of)?.amount())
     }
 
+    /// Compute the raw base present value and its reporting currency together.
+    ///
+    /// The compatibility default invokes [`Instrument::base_value_raw`] to
+    /// preserve existing high-precision overrides, then invokes
+    /// [`Instrument::base_value`] only to discover the reporting currency.
+    /// Built-in instruments with a distinct raw kernel override this method so
+    /// both values are returned by one pricing call.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data context used by the instrument pricing kernel.
+    /// * `as_of` - Valuation date before public lifecycle date resolution.
+    ///
+    /// # Returns
+    ///
+    /// Raw present value and the currency in which that value is denominated.
+    ///
+    /// # Errors
+    ///
+    /// Propagates market-data or pricing errors from
+    /// [`Instrument::base_value_raw`] or [`Instrument::base_value`] in the
+    /// default implementation, or from the instrument's combined raw pricing
+    /// kernel when overridden.
+    fn base_value_raw_with_currency(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<(f64, Currency)> {
+        let raw = self.base_value_raw(market, as_of)?;
+        let currency = self.base_value(market, as_of)?.currency();
+        Ok((raw, currency))
+    }
+
     /// Compute the present value as raw f64 (high precision path for risk calculations).
     ///
     /// This method returns the NPV as an unrounded f64, avoiding the precision loss
@@ -718,6 +751,39 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         let effective_as_of = lifecycle.effective_as_of(market, as_of);
         let base = self.base_value_raw(market, effective_as_of)?;
         Ok(lifecycle.apply_raw_value(base))
+    }
+
+    /// Compute the raw present value together with its reporting currency.
+    ///
+    /// This is the currency-aware counterpart to [`Instrument::value_raw`].
+    /// It executes one validated raw pricing kernel, resolves the effective
+    /// valuation date, and applies any scenario price adjustment exactly once.
+    /// Risk engines use it when they need high-precision finite differences and
+    /// must also reject accidental cross-currency aggregation.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data context containing the pricing inputs.
+    /// * `as_of` - Requested valuation date.
+    ///
+    /// # Returns
+    ///
+    /// Scenario-adjusted raw present value and its reporting currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns instrument-validation, market-data, effective-date, or pricing
+    /// errors from the same lifecycle used by [`Instrument::value_raw`].
+    fn value_raw_with_currency(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<(f64, Currency)> {
+        let lifecycle =
+            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
+        let effective_as_of = lifecycle.effective_as_of(market, as_of);
+        let (base, currency) = self.base_value_raw_with_currency(market, effective_as_of)?;
+        Ok((lifecycle.apply_raw_value(base), currency))
     }
 
     /// Return the default pricing model for this instrument.

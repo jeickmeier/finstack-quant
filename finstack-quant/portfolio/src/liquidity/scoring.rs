@@ -388,6 +388,7 @@ mod tests {
             by_entity: IndexMap::new(),
             degraded_positions: Vec::new(),
             fx_collapse_policy: FxConversionPolicy::CashflowDate,
+            provenance: None,
         };
         let profiles = [
             (
@@ -444,6 +445,7 @@ mod tests {
             by_entity: IndexMap::new(),
             degraded_positions: Vec::new(),
             fx_collapse_policy: FxConversionPolicy::CashflowDate,
+            provenance: None,
         };
         let profiles = [
             (

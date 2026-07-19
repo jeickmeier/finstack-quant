@@ -397,6 +397,92 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
 use std::sync::Arc;
 
+/// Hidden support paths for sibling Finstack crates.
+#[doc(hidden)]
+pub mod __private {
+    use super::*;
+
+    /// Attribute one instrument using endpoint values prepared by a portfolio
+    /// evaluation engine.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument` - Instrument whose unscaled endpoint values were prepared.
+    /// * `market_t0` - Opening market state used by factor repricings.
+    /// * `market_t1` - Closing market state used by factor repricings.
+    /// * `as_of_t0` - Opening valuation date corresponding to `val_t0`.
+    /// * `as_of_t1` - Closing valuation date corresponding to `val_t1`.
+    /// * `config` - Finstack configuration used by the selected method.
+    /// * `method` - Repricing-based attribution method to execute.
+    /// * `execution_policy` - Inner factor scheduling policy.
+    /// * `val_t0` - Canonical unscaled instrument value at T0.
+    /// * `val_t1` - Canonical unscaled instrument value at T1.
+    ///
+    /// # Returns
+    ///
+    /// The same financial decomposition as the standalone method, without
+    /// repeating its two ordinary endpoint repricings.
+    ///
+    /// # Errors
+    ///
+    /// Returns method-specific validation, market-data, repricing, and
+    /// currency errors. Metrics-based attribution is rejected because it
+    /// requires complete prepared valuation results.
+    #[allow(clippy::too_many_arguments)]
+    pub fn attribute_pnl_prepared(
+        instrument: &Arc<dyn Instrument>,
+        market_t0: &MarketContext,
+        market_t1: &MarketContext,
+        as_of_t0: Date,
+        as_of_t1: Date,
+        config: &finstack_quant_core::config::FinstackConfig,
+        method: &AttributionMethod,
+        execution_policy: ExecutionPolicy,
+        val_t0: Money,
+        val_t1: Money,
+    ) -> finstack_quant_core::Result<PnlAttribution> {
+        match method {
+            AttributionMethod::Parallel => parallel::attribute_pnl_parallel_prepared(
+                instrument,
+                market_t0,
+                market_t1,
+                as_of_t0,
+                as_of_t1,
+                config,
+                execution_policy,
+                val_t0,
+                val_t1,
+            ),
+            AttributionMethod::Waterfall(order) => waterfall::attribute_pnl_waterfall_prepared(
+                instrument,
+                market_t0,
+                market_t1,
+                as_of_t0,
+                as_of_t1,
+                config,
+                order.clone(),
+                val_t0,
+                val_t1,
+            ),
+            AttributionMethod::Taylor(taylor_config) => taylor::attribute_pnl_taylor_prepared(
+                instrument,
+                market_t0,
+                market_t1,
+                as_of_t0,
+                as_of_t1,
+                taylor_config,
+                execution_policy,
+                val_t0,
+                val_t1,
+            ),
+            AttributionMethod::MetricsBased => Err(finstack_quant_core::Error::Validation(
+                "metrics-based attribution requires prepared valuation results, not scalar endpoints"
+                    .to_string(),
+            )),
+        }
+    }
+}
+
 /// Minimal, no-frills P&L bridge: `value(T₁) − value(T₀)`.
 ///
 /// This is the **cheapest** attribution entry point — it prices the

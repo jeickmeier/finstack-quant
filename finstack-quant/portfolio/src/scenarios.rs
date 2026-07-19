@@ -1,18 +1,26 @@
 //! Scenario application for portfolios.
 //!
-//! Applies [`ScenarioSpec`](finstack_quant_scenarios::spec::ScenarioSpec) to a cloned
-//! portfolio and market context, then optionally re-values with the stressed data.
+//! Applies [`ScenarioSpec`](finstack_quant_scenarios::spec::ScenarioSpec) to a
+//! cloned market context and a borrowed-or-owned portfolio state, then
+//! optionally re-values with the stressed data.
 
 use crate::error::{Error, Result};
 use crate::portfolio::Portfolio;
 use crate::types::PositionId;
+use crate::{evaluation::PositionInvalidation, MarketFactorKey};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_scenarios::engine::{ApplicationReport, ExecutionContext, ScenarioEngine};
-use finstack_quant_scenarios::spec::ScenarioSpec;
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_scenarios::engine::{
+    ApplicationReport, ExecutionContext, ScenarioChangeManifest, ScenarioEngine,
+    ScenarioMarketTarget,
+};
+use finstack_quant_scenarios::spec::{CurveKind, ScenarioSpec};
+use finstack_quant_valuations::instruments::{Instrument, RatesCurveKind};
 use indexmap::IndexMap;
+use std::borrow::Cow;
 use std::sync::Arc;
+
+const SCENARIO_BATCH_MAX_ACTIVE_STATES: usize = 8;
 
 /// JSON envelope returned by scenario-and-revalue binding surfaces.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -23,35 +31,104 @@ pub struct ScenarioRevalueEnvelope {
     pub report: ApplicationReport,
 }
 
+struct AppliedScenarioState<'a> {
+    portfolio: Cow<'a, Portfolio>,
+    market: MarketContext,
+    as_of: finstack_quant_core::dates::Date,
+    report: ApplicationReport,
+}
+
+fn selective_invalidation(
+    portfolio: &Portfolio,
+    changes: &ScenarioChangeManifest,
+) -> Option<PositionInvalidation> {
+    if changes.as_of_changed
+        || changes.portfolio_shape_changed
+        || changes.all_dirty
+        || portfolio.dependency_index().indexed_position_count() != portfolio.positions.len()
+        || changes
+            .changed_instrument_indices
+            .iter()
+            .any(|index| *index >= portfolio.positions.len())
+    {
+        return None;
+    }
+
+    let mut changed_factors = Vec::with_capacity(changes.market_targets.len());
+    let mut refresh_base_currency = false;
+    for target in &changes.market_targets {
+        let key = match target {
+            ScenarioMarketTarget::Curve {
+                curve_kind,
+                curve_id,
+            } => {
+                let kind = match curve_kind {
+                    CurveKind::Discount => RatesCurveKind::Discount,
+                    CurveKind::Forward | CurveKind::Commodity => RatesCurveKind::Forward,
+                    CurveKind::ParCDS => RatesCurveKind::Credit,
+                    CurveKind::Inflation => RatesCurveKind::Inflation,
+                };
+                MarketFactorKey::curve(curve_id.clone(), kind)
+            }
+            ScenarioMarketTarget::VolSurface { surface_id, .. } => {
+                MarketFactorKey::vol_surface(surface_id.as_str())
+            }
+            ScenarioMarketTarget::EquityPrice { price_id } => {
+                MarketFactorKey::spot(price_id.as_str())
+            }
+            ScenarioMarketTarget::Fx { base, quote } => {
+                refresh_base_currency = true;
+                MarketFactorKey::fx(*base, *quote)
+            }
+            ScenarioMarketTarget::VolatilityIndex { .. }
+            | ScenarioMarketTarget::BaseCorrelation { .. } => return None,
+        };
+        changed_factors.push(key);
+    }
+
+    let mut reprice_indices = if changed_factors.is_empty() {
+        Vec::new()
+    } else {
+        portfolio
+            .dependency_index()
+            .affected_positions(&changed_factors)
+    };
+    reprice_indices.extend(changes.changed_instrument_indices.iter().copied());
+
+    let invalidation = PositionInvalidation::new(reprice_indices, refresh_base_currency);
+    Some(if changes.changed_instrument_indices.is_empty() {
+        invalidation
+    } else {
+        invalidation.with_authoritative_portfolio_change()
+    })
+}
+
 /// Apply a scenario to a portfolio.
 ///
 /// This function:
-/// 1. Clones the portfolio (scenarios create modified copies)
-/// 2. Extracts instruments into a mutable vector for the scenario engine
+/// 1. Borrows the portfolio for market-only scenarios
+/// 2. Clones instruments only when the scenario requires instrument access
 /// 3. Applies the scenario using the engine
-/// 4. Returns the modified portfolio and market data
+/// 4. Owns a modified portfolio only when instruments changed
 ///
 /// # Aliasing contract
 ///
-/// The input `portfolio` and `market` references are **never mutated**: the
-/// function works on owned clones. The values returned in the result tuple
-/// are **fresh `Portfolio` and `MarketContext` instances** distinct from the
-/// inputs — re-using the original `market` after the call therefore continues
-/// to see pre-scenario data, and re-using the returned `MarketContext` sees
-/// post-scenario data. Callers that want to chain multiple scenario passes
-/// must thread the *returned* market into the next call; threading the
-/// original is silently a no-op for stacked scenarios.
+/// The input `portfolio` and `market` references are **never mutated**.
+/// Market-only scenarios borrow the portfolio and own only the cloned,
+/// stressed market. Instrument-mutating scenarios additionally own a cloned
+/// portfolio with rebuilt indexes. The returned effective date comes from the
+/// scenario execution context, including time rolls.
 ///
 /// # Arguments
 ///
-/// * `portfolio` - Portfolio to clone and mutate within the scenario engine.
+/// * `portfolio` - Portfolio to borrow or clone according to scenario effects.
 /// * `scenario` - Scenario specification describing desired transformations.
 /// * `market` - Market data context subject to the scenario operations.
 ///
 /// # Returns
 ///
-/// [`Result`] containing the modified portfolio, the modified market data
-/// (a fresh clone — see "Aliasing contract" above), and the application report.
+/// [`Result`] containing the prepared portfolio/market/date state and the
+/// application report.
 ///
 /// # Errors
 ///
@@ -73,29 +150,25 @@ pub struct ScenarioRevalueEnvelope {
 /// # Ok(())
 /// # }
 /// ```
-pub(crate) fn apply_scenario(
-    portfolio: &Portfolio,
+fn apply_scenario<'a>(
+    portfolio: &'a Portfolio,
     scenario: &ScenarioSpec,
     market: &MarketContext,
-) -> Result<(Portfolio, MarketContext, ApplicationReport)> {
+) -> Result<AppliedScenarioState<'a>> {
     let mut market_copy = market.clone();
-    let mut portfolio_copy = portfolio.clone();
-
-    // Extract instruments into a mutable vector
-    let mut instruments: Vec<Box<dyn Instrument>> = portfolio_copy
-        .positions
-        .iter()
-        .map(|pos| {
-            // Clone the instrument via its Arc
-            pos.instrument.clone_box()
-        })
-        .collect();
+    let mut instruments = scenario.requires_instruments().then(|| {
+        portfolio
+            .positions
+            .iter()
+            .map(|position| position.instrument.clone_box())
+            .collect::<Vec<Box<dyn Instrument>>>()
+    });
 
     // Build execution context
     let mut ctx = ExecutionContext {
         market: &mut market_copy,
         model: None,
-        instruments: Some(&mut instruments),
+        instruments: instruments.as_mut(),
         rate_bindings: None,
         calendar: None,
         as_of: portfolio.as_of,
@@ -106,10 +179,29 @@ pub(crate) fn apply_scenario(
     let report = engine
         .apply(scenario, &mut ctx)
         .map_err(|e| Error::ScenarioError(e.to_string()))?;
+    let as_of = ctx.as_of;
+    drop(ctx);
 
-    replace_portfolio_instruments(&mut portfolio_copy, instruments)?;
+    let portfolio = if scenario.mutates_instruments() {
+        let mut portfolio_copy = portfolio.clone();
+        let instruments = instruments.ok_or_else(|| {
+            Error::ScenarioError(
+                "scenario classified as instrument-mutating without instrument state".to_string(),
+            )
+        })?;
+        replace_portfolio_instruments(&mut portfolio_copy, instruments)?;
+        portfolio_copy.as_of = as_of;
+        Cow::Owned(portfolio_copy)
+    } else {
+        Cow::Borrowed(portfolio)
+    };
 
-    Ok((portfolio_copy, market_copy, report))
+    Ok(AppliedScenarioState {
+        portfolio,
+        market: market_copy,
+        as_of,
+        report,
+    })
 }
 
 fn replace_portfolio_instruments(
@@ -128,6 +220,7 @@ fn replace_portfolio_instruments(
     for (position, modified_inst) in portfolio.positions.iter_mut().zip(instruments.into_iter()) {
         position.instrument = Arc::from(modified_inst);
     }
+    portfolio.rebuild_index();
 
     Ok(())
 }
@@ -177,15 +270,21 @@ pub fn apply_and_revalue(
     market: &MarketContext,
     config: &finstack_quant_core::config::FinstackConfig,
 ) -> Result<(crate::valuation::PortfolioValuation, ApplicationReport)> {
-    let (modified_portfolio, modified_market, report) =
-        apply_scenario(portfolio, scenario, market)?;
-
-    let valuation = crate::valuation::value_portfolio(
-        &modified_portfolio,
-        &modified_market,
-        config,
-        &Default::default(),
-    )?;
+    let AppliedScenarioState {
+        portfolio,
+        market,
+        as_of,
+        report,
+    } = apply_scenario(portfolio, scenario, market)?;
+    let mut plan = crate::evaluation::PortfolioEvaluationPlan::new(config);
+    let market_state = plan.register_owned_market(market, as_of);
+    let portfolio_state = match portfolio {
+        Cow::Borrowed(portfolio) => plan.register_portfolio(portfolio),
+        Cow::Owned(portfolio) => plan.register_owned_portfolio(portfolio),
+    };
+    let profile = crate::evaluation::EvaluationProfile::from_options(&Default::default());
+    let evaluation = plan.register_evaluation(market_state, portfolio_state, profile)?;
+    let valuation = plan.execute().into_valuation(evaluation)?;
 
     Ok((valuation, report))
 }
@@ -257,6 +356,17 @@ pub struct ScenarioPnlEnvelope {
     pub report: ApplicationReport,
 }
 
+/// One ordered result from [`scenario_pnl_batch`].
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ScenarioPnlBatchItem {
+    /// Identifier copied from the input scenario.
+    pub scenario_id: String,
+    /// Scenario-attributable portfolio P&L.
+    pub pnl: ScenarioPnl,
+    /// Application provenance and warnings for this scenario.
+    pub report: ApplicationReport,
+}
+
 /// Difference two portfolio valuations into a per-position P&L ladder.
 ///
 /// Positions present on only one side are **zero-filled** against the missing
@@ -299,11 +409,12 @@ fn diff_valuations(
 
 /// Compute the profit and loss attributable to a scenario.
 ///
-/// Values the portfolio twice — once against the unstressed `market` and once
-/// against the scenario-stressed market produced by [`apply_and_revalue`] —
-/// and reports the difference per position and in total. This is the standard
+/// Registers an unstressed state and the scenario-applied state with the
+/// request-scoped portfolio evaluation engine, requests PV only for both, and
+/// reports the difference per position and in total. This is the standard
 /// "what does this shock cost me" measure a risk desk runs before sizing a
-/// hedge.
+/// hedge. Unlike [`apply_and_revalue`], this function deliberately does not
+/// compute the standard risk set.
 ///
 /// The arithmetic stays in [`Money`] end to end (Decimal-backed): position
 /// deltas are currency-checked subtractions of the base-currency position
@@ -329,9 +440,9 @@ fn diff_valuations(
 /// * `scenario` - Scenario specification describing the shocks to apply.
 /// * `market` - Unstressed market snapshot; used as the base leg and as the
 ///   source the scenario operations are applied to.
-/// * `config` - Configuration forwarded to
-///   [`value_portfolio`](crate::valuation::value_portfolio) on both legs, so
-///   the two valuations share one rounding and convention policy.
+/// * `config` - Configuration used by both registered PV-only jobs, so the
+///   base and stressed legs share one rounding and convention policy while
+///   retaining separate immutable market states and calibration caches.
 ///
 /// # Returns
 ///
@@ -341,9 +452,9 @@ fn diff_valuations(
 /// # Errors
 ///
 /// Returns [`Error::ScenarioError`] when the scenario engine fails, any
-/// valuation error raised by [`value_portfolio`](crate::valuation::value_portfolio)
-/// on either leg, and [`Error::Core`] when a position's stressed and base
-/// values carry different currencies.
+/// valuation error raised by the shared evaluation executor on either leg,
+/// and [`Error::Core`] when a position's stressed and base values carry
+/// different currencies.
 ///
 /// # Examples
 ///
@@ -368,10 +479,118 @@ pub fn scenario_pnl(
     market: &MarketContext,
     config: &finstack_quant_core::config::FinstackConfig,
 ) -> Result<(ScenarioPnl, ApplicationReport)> {
-    let base = crate::valuation::value_portfolio(portfolio, market, config, &Default::default())?;
-    let (stressed, report) = apply_and_revalue(portfolio, scenario, market, config)?;
-    let pnl = diff_valuations(&base, &stressed)?;
-    Ok((pnl, report))
+    let mut results =
+        scenario_pnl_batch(portfolio, std::slice::from_ref(scenario), market, config)?;
+    let result = results
+        .pop()
+        .ok_or_else(|| Error::ScenarioError("scenario batch returned no result".to_string()))?;
+    Ok((result.pnl, result.report))
+}
+
+/// Compute ordered P&L results for multiple scenarios while sharing one base valuation.
+///
+/// The base portfolio is valued once with a PV-only profile. Stressed states
+/// are evaluated in bounded waves, so retained memory is proportional to the
+/// active wave plus the returned P&L ladders rather than the full
+/// positions-by-scenarios valuation cube.
+///
+/// # Arguments
+///
+/// * `portfolio` - Portfolio to value for the shared base and every scenario.
+/// * `scenarios` - Ordered scenario specifications. An empty slice returns an
+///   empty vector without performing valuation.
+/// * `market` - Unstressed market snapshot used for the shared base and as the
+///   source for each independently applied scenario.
+/// * `config` - Valuation configuration used by every executor state.
+///
+/// # Returns
+///
+/// Ordered results matching `scenarios`, including each scenario identifier,
+/// P&L ladder, and application report.
+///
+/// # Errors
+///
+/// Returns the first scenario-application or valuation error in input order,
+/// or a currency error while differencing base and stressed values.
+pub fn scenario_pnl_batch(
+    portfolio: &Portfolio,
+    scenarios: &[ScenarioSpec],
+    market: &MarketContext,
+    config: &finstack_quant_core::config::FinstackConfig,
+) -> Result<Vec<ScenarioPnlBatchItem>> {
+    if scenarios.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let options = crate::valuation::PortfolioValuationOptions {
+        strict_risk: false,
+        metrics: crate::valuation::RequestedMetrics::Only(Vec::new()),
+    };
+    let base = crate::valuation::value_portfolio(portfolio, market, config, &options)?;
+    let profile = crate::evaluation::EvaluationProfile::from_options(&options);
+    let mut results = Vec::with_capacity(scenarios.len());
+
+    for wave in scenarios.chunks(SCENARIO_BATCH_MAX_ACTIVE_STATES) {
+        let mut applied = Vec::with_capacity(wave.len());
+        let mut application_error = None;
+        for scenario in wave {
+            match apply_scenario(portfolio, scenario, market) {
+                Ok(state) => applied.push((scenario.id.clone(), state)),
+                Err(error) => {
+                    application_error = Some(error);
+                    break;
+                }
+            }
+        }
+
+        let mut plan = crate::evaluation::PortfolioEvaluationPlan::new(config);
+        let shared_portfolio = plan.register_portfolio(portfolio);
+        let mut jobs = Vec::with_capacity(applied.len());
+        for (
+            scenario_id,
+            AppliedScenarioState {
+                portfolio: stressed_portfolio,
+                market: stressed_market,
+                as_of,
+                report,
+            },
+        ) in applied
+        {
+            let invalidation = selective_invalidation(stressed_portfolio.as_ref(), &report.changes);
+            let market_state = plan.register_owned_market(stressed_market, as_of);
+            let portfolio_state = match stressed_portfolio {
+                Cow::Borrowed(_) => shared_portfolio,
+                Cow::Owned(portfolio) => plan.register_owned_portfolio(portfolio),
+            };
+            let evaluation = if let Some(invalidation) = invalidation {
+                plan.register_selective_evaluation(
+                    market_state,
+                    portfolio_state,
+                    profile.clone(),
+                    crate::evaluation::ParentResult::External(&base),
+                    invalidation,
+                )?
+            } else {
+                plan.register_evaluation(market_state, portfolio_state, profile.clone())?
+            };
+            jobs.push((scenario_id, report, evaluation));
+        }
+
+        let outcome = plan.execute();
+        for (scenario_id, report, evaluation) in jobs {
+            let stressed = outcome.get(evaluation)?;
+            results.push(ScenarioPnlBatchItem {
+                scenario_id,
+                pnl: diff_valuations(&base, stressed)?,
+                report,
+            });
+        }
+        if let Some(error) = application_error {
+            return Err(error);
+        }
+    }
+
+    Ok(results)
 }
 
 /// Compute scenario P&L and return the canonical JSON envelope shape.
@@ -411,8 +630,65 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_scenarios::spec::{CurveKind, OperationSpec};
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-    use std::sync::Arc;
+    use finstack_quant_valuations::instruments::{Attributes, Instrument};
+    use finstack_quant_valuations::pricer::InstrumentType;
+    use std::any::Any;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
     use time::macros::date;
+
+    #[derive(Clone)]
+    struct CountingPvInstrument {
+        id: String,
+        calls: Arc<AtomicUsize>,
+        attributes: Attributes,
+    }
+
+    finstack_quant_valuations::impl_empty_cashflow_provider!(
+        CountingPvInstrument,
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
+    );
+
+    impl Instrument for CountingPvInstrument {
+        fn id(&self) -> &str {
+            &self.id
+        }
+
+        fn key(&self) -> InstrumentType {
+            InstrumentType::Basket
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+
+        fn attributes(&self) -> &Attributes {
+            &self.attributes
+        }
+
+        fn attributes_mut(&mut self) -> &mut Attributes {
+            &mut self.attributes
+        }
+
+        fn clone_box(&self) -> Box<dyn Instrument> {
+            Box::new(self.clone())
+        }
+
+        fn base_value(
+            &self,
+            _market: &MarketContext,
+            _as_of: finstack_quant_core::dates::Date,
+        ) -> finstack_quant_core::Result<Money> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(Money::new(100.0, Currency::USD))
+        }
+    }
 
     #[test]
     fn test_apply_scenario_basic() {
@@ -468,8 +744,9 @@ mod tests {
         let result = apply_scenario(&portfolio, &scenario, &market);
         assert!(result.is_ok());
 
-        let (_modified_portfolio, _modified_market, report) = result.expect("test should succeed");
-        assert!(report.operations_applied > 0);
+        let applied = result.expect("test should succeed");
+        assert!(applied.report.operations_applied > 0);
+        assert!(matches!(applied.portfolio, Cow::Borrowed(_)));
     }
 
     #[test]
@@ -635,6 +912,58 @@ mod tests {
     }
 
     #[test]
+    fn scenario_batch_values_the_base_once_and_reuses_no_op_children() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let instrument = CountingPvInstrument {
+            id: "COUNTING_PV".to_string(),
+            calls: Arc::clone(&calls),
+            attributes: Attributes::new(),
+        };
+        let position = Position::new(
+            "POS_COUNT",
+            "ENTITY_A",
+            "COUNTING_PV",
+            Arc::new(instrument),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("counting position");
+        let portfolio = PortfolioBuilder::new("COUNTING_SCENARIO_BATCH")
+            .base_ccy(Currency::USD)
+            .as_of(date!(2024 - 01 - 01))
+            .entity(Entity::new("ENTITY_A"))
+            .position(position)
+            .build()
+            .expect("counting portfolio");
+        let scenarios: Vec<ScenarioSpec> = (0..10)
+            .map(|index| ScenarioSpec {
+                id: format!("NO_OP_{index}"),
+                name: None,
+                description: None,
+                operations: Vec::new(),
+                priority: 0,
+                resolution_mode: Default::default(),
+            })
+            .collect();
+
+        let results = scenario_pnl_batch(
+            &portfolio,
+            &scenarios,
+            &build_test_market(),
+            &FinstackConfig::default(),
+        )
+        .expect("no-op batch");
+
+        assert_eq!(results.len(), scenarios.len());
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "the shared base should be the only PV call for no-op children"
+        );
+        assert!(results.iter().all(|item| item.pnl.total.amount() == 0.0));
+    }
+
+    #[test]
     fn scenario_pnl_by_position_reconciles_to_total() {
         let portfolio = single_position_portfolio();
         let market = build_test_market();
@@ -725,6 +1054,7 @@ mod tests {
             by_entity: IndexMap::new(),
             degraded_positions: Vec::new(),
             fx_collapse_policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            provenance: None,
         }
     }
 

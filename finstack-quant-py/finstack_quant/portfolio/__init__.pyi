@@ -61,6 +61,7 @@ __all__ = [
     "position_what_if",
     "roll_effective_spread",
     "scenario_pnl",
+    "scenario_pnl_batch",
     "twrr_linked",
     "twrr_modified_dietz",
     "validate_allocation_json",
@@ -1307,6 +1308,56 @@ def scenario_pnl(
     --------
     >>> from finstack_quant.portfolio import scenario_pnl
     >>> callable(scenario_pnl)
+    True
+    """
+    ...
+
+def scenario_pnl_batch(
+    portfolio: Portfolio | str,
+    scenarios_json: str,
+    market: MarketContext | str,
+) -> str:
+    """
+    Compute ordered scenario P&L results while reusing one base valuation.
+
+    The Rust portfolio engine values the unshocked portfolio once, applies
+    each scenario independently, and returns results in the same order as the
+    input JSON array. It is the batch counterpart to :func:`scenario_pnl`;
+    use it when more than one scenario is evaluated against one portfolio and
+    market snapshot.
+
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        Built portfolio or canonical ``PortfolioSpec`` JSON. The typed form
+        avoids rebuilding the portfolio for the batch.
+    scenarios_json : str
+        Canonical JSON array of ``ScenarioSpec`` objects. Array order is
+        preserved exactly. ``"[]"`` returns ``"[]"`` without valuation.
+    market : MarketContext or str
+        Unshocked market context or canonical market JSON used for the shared
+        base valuation and each scenario application.
+
+    Returns
+    -------
+    str
+        Canonical JSON array. Each item has ``scenario_id``, ``pnl`` (the same
+        base-currency ``ScenarioPnl`` shape returned by :func:`scenario_pnl`),
+        and ``report`` (the corresponding scenario application report).
+
+    Raises
+    ------
+    ValueError
+        If ``scenarios_json`` is malformed or cannot deserialize to an ordered
+        array of valid ``ScenarioSpec`` values.
+    PortfolioError
+        If scenario application, valuation, or base-currency P&L differencing
+        fails. The reported error is for the earliest failing input scenario.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import scenario_pnl_batch
+    >>> callable(scenario_pnl_batch)
     True
     """
     ...

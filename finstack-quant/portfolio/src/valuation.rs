@@ -1,75 +1,17 @@
 //! Portfolio valuation and aggregation.
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::portfolio::Portfolio;
 use crate::types::{EntityId, PositionId};
 use finstack_quant_core::config::FinstackConfig;
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::results::ValuationResult;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-
-/// Minimum number of dirty positions before `revalue_affected` considers
-/// parallel repricing.
-const REVALUE_AFFECTED_PARALLEL_MIN_AFFECTED: usize = 64;
-
-/// Minimum number of positions before full portfolio valuation uses Rayon.
-const VALUE_PORTFOLIO_PARALLEL_MIN_POSITIONS: usize = 64;
-
-/// Portfolio config extension key for selective-repricing debug checks.
-pub const PORTFOLIO_SELECTIVE_REPRICING_EXTENSION_KEY: &str = "portfolio.selective_repricing.v1";
-
-const SELECTIVE_REPRICING_VERIFY_TOL: f64 = 1e-10;
-
-fn should_value_portfolio_use_parallel(position_count: usize) -> bool {
-    position_count >= VALUE_PORTFOLIO_PARALLEL_MIN_POSITIONS
-}
-
-fn should_verify_selective_repricing(config: &FinstackConfig) -> bool {
-    config
-        .extensions
-        .get(PORTFOLIO_SELECTIVE_REPRICING_EXTENSION_KEY)
-        .and_then(|value| value.get("verify_full_eval"))
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(false)
-}
-
-fn verify_selective_repricing_matches_full(
-    selective: &PortfolioValuation,
-    full: &PortfolioValuation,
-) -> Result<()> {
-    let total_delta = (selective.total_base_ccy.amount() - full.total_base_ccy.amount()).abs();
-    if total_delta > SELECTIVE_REPRICING_VERIFY_TOL {
-        return Err(Error::invalid_input(format!(
-            "Selective repricing verification failed: total delta {total_delta} exceeds tolerance {SELECTIVE_REPRICING_VERIFY_TOL}"
-        )));
-    }
-
-    for (position_id, full_value) in &full.position_values {
-        let selective_value = selective
-            .get_position_value(position_id.as_str())
-            .ok_or_else(|| {
-                Error::invalid_input(format!(
-                    "Selective repricing verification failed: missing position '{position_id}'"
-                ))
-            })?;
-        let delta = (selective_value.value_base.amount() - full_value.value_base.amount()).abs();
-        if delta > SELECTIVE_REPRICING_VERIFY_TOL {
-            return Err(Error::invalid_input(format!(
-                "Selective repricing verification failed for position '{position_id}': delta {delta} exceeds tolerance {SELECTIVE_REPRICING_VERIFY_TOL}"
-            )));
-        }
-    }
-
-    Ok(())
-}
 
 /// Result of valuing a single position.
 ///
@@ -138,6 +80,14 @@ pub struct PortfolioValuation {
     /// policy-visibility invariant (the FX strategy is stamped, not implied).
     #[serde(default = "default_fx_collapse_policy")]
     pub fx_collapse_policy: FxConversionPolicy,
+
+    /// Request-local compatibility stamp used only for safe selective reuse.
+    ///
+    /// The stamp is deliberately omitted from serialization: a deserialized
+    /// valuation cannot prove that it still belongs to the same immutable
+    /// portfolio state and therefore falls back to a full evaluation.
+    #[serde(skip)]
+    pub(crate) provenance: Option<crate::evaluation::EvaluationProvenance>,
 }
 
 /// Default FX policy stamped on a [`PortfolioValuation`]: the spot-equivalent
@@ -198,97 +148,6 @@ impl PortfolioValuation {
     }
 }
 
-/// Standard metrics to compute for portfolio positions.
-///
-/// Note: Using Theta, DV01, and CS01 which are widely supported as scalar metrics.
-fn standard_portfolio_metrics() -> Vec<MetricId> {
-    // Core risk set chosen to align with common portfolio risk reports:
-    // - Theta: carry / time-decay
-    // - Dv01 / BucketedDv01: parallel and key-rate IR risk
-    // - Cs01 / BucketedCs01: credit spread / hazard risk
-    // - Delta / Gamma / Vega / Rho: standard option Greeks
-    //
-    // Instruments that do not support a given metric simply omit it from
-    // `ValuationResult::measures`; aggregation remains robust to missing keys.
-    vec![
-        MetricId::Theta,
-        MetricId::Dv01,
-        MetricId::BucketedDv01,
-        MetricId::Cs01,
-        MetricId::BucketedCs01,
-        MetricId::Delta,
-        MetricId::Gamma,
-        MetricId::Vega,
-        MetricId::Rho,
-        MetricId::Pv01,
-    ]
-}
-
-/// Resolve the metric set to request based on valuation options.
-fn resolve_metrics(options: &PortfolioValuationOptions) -> Vec<MetricId> {
-    match &options.metrics {
-        RequestedMetrics::Standard => standard_portfolio_metrics(),
-        RequestedMetrics::Only(metrics) => metrics.clone(),
-        RequestedMetrics::StandardPlus(extra) => {
-            let mut merged = standard_portfolio_metrics();
-            for m in extra {
-                if !merged.contains(m) {
-                    merged.push(m.clone());
-                }
-            }
-            merged
-        }
-    }
-}
-
-fn batch_pricing_options(config: &FinstackConfig) -> PricingOptions {
-    PricingOptions::default()
-        .with_config(config)
-        .with_new_hazard_recalibration_cache()
-}
-
-/// Assemble final valuation from per-position results.
-fn assemble_valuation(
-    position_values_vec: Vec<PositionValue>,
-    base_ccy: Currency,
-    as_of: finstack_quant_core::dates::Date,
-) -> Result<PortfolioValuation> {
-    let n = position_values_vec.len();
-    let mut position_values = IndexMap::with_capacity(n);
-    let mut entity_amounts: IndexMap<EntityId, Vec<f64>> = IndexMap::new();
-
-    for pv in position_values_vec {
-        entity_amounts
-            .entry(pv.entity_id.clone())
-            .or_default()
-            .push(pv.value_base.amount());
-        position_values.insert(pv.position_id.clone(), pv);
-    }
-
-    let by_entity: IndexMap<EntityId, Money> = entity_amounts
-        .into_iter()
-        .map(|(entity_id, amounts)| (entity_id, Money::new(neumaier_sum(amounts), base_ccy)))
-        .collect();
-
-    let total_amount = neumaier_sum(by_entity.values().map(|v| v.amount()));
-    let total_base_ccy = Money::new(total_amount, base_ccy);
-
-    let degraded_positions = position_values
-        .values()
-        .filter(|pv| !pv.risk_metrics_complete)
-        .map(|pv| pv.position_id.clone())
-        .collect();
-
-    Ok(PortfolioValuation {
-        as_of,
-        position_values,
-        total_base_ccy,
-        by_entity,
-        degraded_positions,
-        fx_collapse_policy: default_fx_collapse_policy(),
-    })
-}
-
 /// Which metric set to request for every position in the portfolio.
 ///
 /// This replaces the legacy tri-state combination of `additional_metrics`
@@ -297,8 +156,7 @@ fn assemble_valuation(
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(tag = "mode", content = "metrics", rename_all = "snake_case")]
 pub enum RequestedMetrics {
-    /// Standard portfolio metric set only (see the internal
-    /// `standard_portfolio_metrics` helper).
+    /// Standard portfolio metric set only.
     #[default]
     Standard,
     /// Standard set plus the listed extra metrics (de-duplicated).
@@ -351,12 +209,12 @@ pub struct PortfolioValuationOptions {
 ///
 /// # Errors
 ///
-/// Returns [`Error`] in the following cases:
+/// Returns [`crate::error::Error`] in the following cases:
 ///
-/// - [`Error::ValuationError`] - Instrument pricing failed for a position
-/// - [`Error::MissingMarketData`] - FX matrix unavailable for cross-currency conversion
-/// - [`Error::FxConversionFailed`] - Required FX rate not found in the matrix
-/// - [`Error::Core`] - Monetary arithmetic overflow during aggregation
+/// - [`crate::error::Error::ValuationError`] - Instrument pricing failed for a position
+/// - [`crate::error::Error::MissingMarketData`] - FX matrix unavailable for cross-currency conversion
+/// - [`crate::error::Error::FxConversionFailed`] - Required FX rate not found in the matrix
+/// - [`crate::error::Error::Core`] - Monetary arithmetic overflow during aggregation
 ///
 /// # Parallelism
 ///
@@ -437,187 +295,31 @@ pub fn value_portfolio_at(
     options: &PortfolioValuationOptions,
     as_of: Date,
 ) -> Result<PortfolioValuation> {
-    if !should_value_portfolio_use_parallel(portfolio.positions.len()) {
-        return value_portfolio_serial_at(portfolio, market, config, options, as_of);
-    }
-
-    let metrics = resolve_metrics(options);
-    let pricing_options = batch_pricing_options(config);
-
-    use rayon::prelude::*;
-    let position_values_vec: Vec<PositionValue> = portfolio
-        .positions
-        .par_iter()
-        .map(|position| {
-            value_single_position(
-                position,
-                market,
-                portfolio,
-                as_of,
-                &metrics,
-                options.strict_risk,
-                &pricing_options,
-            )
-        })
-        .collect::<Result<Vec<_>>>()?;
-
-    assemble_valuation(position_values_vec, portfolio.base_ccy, as_of)
+    value_portfolio_with_execution_at(
+        portfolio,
+        market,
+        config,
+        options,
+        as_of,
+        crate::evaluation::PositionExecution::Auto,
+    )
 }
 
-/// Serial counterpart to [`value_portfolio`] for nested-parallel call sites.
-///
-/// When an outer loop (e.g. [`crate::replay::replay_portfolio`] over a
-/// historical timeline of snapshots) is parallelized across its own work
-/// items, calling the parallel [`value_portfolio`] for each item would spawn
-/// nested Rayon work and often hurt throughput due to thread-pool contention.
-/// This variant runs the per-position pricing step serially so the outer
-/// `par_iter` owns the available parallelism.
-///
-/// Results are numerically identical to [`value_portfolio`] (same Neumaier
-/// aggregation of per-position contributions in positional order).
-pub(crate) fn value_portfolio_serial_at(
+fn value_portfolio_with_execution_at(
     portfolio: &Portfolio,
     market: &MarketContext,
     config: &FinstackConfig,
     options: &PortfolioValuationOptions,
     as_of: Date,
+    execution: crate::evaluation::PositionExecution,
 ) -> Result<PortfolioValuation> {
-    let metrics = resolve_metrics(options);
-    let pricing_options = batch_pricing_options(config);
-
-    let position_values_vec: Vec<PositionValue> = portfolio
-        .positions
-        .iter()
-        .map(|position| {
-            value_single_position(
-                position,
-                market,
-                portfolio,
-                as_of,
-                &metrics,
-                options.strict_risk,
-                &pricing_options,
-            )
-        })
-        .collect::<Result<Vec<_>>>()?;
-
-    assemble_valuation(position_values_vec, portfolio.base_ccy, as_of)
-}
-
-/// Value a single position with metrics and FX conversion.
-///
-/// This helper function is used by both serial and parallel implementations.
-fn value_single_position(
-    position: &crate::position::Position,
-    market: &MarketContext,
-    portfolio: &Portfolio,
-    as_of: Date,
-    metrics: &[MetricId],
-    strict_risk: bool,
-    pricing_options: &PricingOptions,
-) -> Result<PositionValue> {
-    // Price the instrument with metrics.
-    //
-    // When `strict_risk` is `false`, metric failures fall back to PV-only
-    // valuation for the position. When `true`, any metric failure bubbles up
-    // as a portfolio error.
-    let (valuation_result, risk_metrics_complete, risk_error) = if strict_risk {
-        (
-            position
-                .instrument
-                .price_with_metrics(market, as_of, metrics, pricing_options.clone())
-                .map_err(|e: finstack_quant_core::Error| Error::ValuationError {
-                    position_id: position.position_id.clone(),
-                    message: e.to_string(),
-                })?,
-            true,
-            None,
-        )
-    } else {
-        match position.instrument.price_with_metrics(
-            market,
-            as_of,
-            metrics,
-            pricing_options.clone(),
-        ) {
-            Ok(result) => (result, true, None),
-            Err(metric_error) => {
-                let fallback_config = match pricing_options.config.as_deref() {
-                    Some(config) => config.clone(),
-                    None => FinstackConfig::default(),
-                };
-                let value = position.instrument.value(market, as_of).map_err(
-                    |e: finstack_quant_core::Error| Error::ValuationError {
-                        position_id: position.position_id.clone(),
-                        // Both pricing paths failed: metrics first, then the
-                        // PV-only fallback. Surface both so the operator knows
-                        // the position is fully un-priceable, not just missing
-                        // risk metrics.
-                        message: format!(
-                            "instrument '{}' failed PV-only fallback ({e}) after \
-                             metric pricing also failed ({metric_error})",
-                            position.instrument.id()
-                        ),
-                    },
-                )?;
-                (
-                    ValuationResult::stamped_with_config(
-                        position.instrument.id(),
-                        as_of,
-                        value,
-                        &fallback_config,
-                    ),
-                    false,
-                    Some(metric_error.to_string()),
-                )
-            }
-        }
-    };
-
-    let value_native = valuation_result.value;
-
-    // Scale by quantity using unit-aware scaling logic.
-    let scaled_native = position.scale_value(value_native);
-
-    // Convert to base currency via the shared FX helper so error semantics and
-    // FxMatrix lookup conventions stay aligned with cashflows / attribution /
-    // margin aggregation.
-    let value_base = crate::fx::convert_to_base(scaled_native, as_of, market, portfolio.base_ccy)?;
-
-    Ok(PositionValue {
-        position_id: position.position_id.clone(),
-        entity_id: position.entity_id.clone(),
-        value_native: scaled_native,
-        value_base,
-        metric_scale: position.scale_factor(),
-        risk_metrics_complete,
-        risk_error,
-        valuation_result: Some(valuation_result),
-    })
-}
-
-fn reuse_prior_or_value_position(
-    position: &crate::position::Position,
-    market: &MarketContext,
-    portfolio: &Portfolio,
-    metrics: &[MetricId],
-    strict_risk: bool,
-    pricing_options: &PricingOptions,
-    prior: &PortfolioValuation,
-) -> Result<PositionValue> {
-    if let Some(pv) = prior.position_values.get(position.position_id.as_str()) {
-        Ok(pv.clone())
-    } else {
-        value_single_position(
-            position,
-            market,
-            portfolio,
-            portfolio.as_of,
-            metrics,
-            strict_risk,
-            pricing_options,
-        )
-    }
+    let mut plan = crate::evaluation::PortfolioEvaluationPlan::new(config);
+    let market_state = plan.register_market(market, as_of);
+    let portfolio_state = plan.register_portfolio(portfolio);
+    let profile = crate::evaluation::EvaluationProfile::from_options(options);
+    let evaluation =
+        plan.register_evaluation_with_execution(market_state, portfolio_state, profile, execution)?;
+    plan.execute().into_valuation(evaluation)
 }
 
 // =============================================================================
@@ -675,131 +377,22 @@ pub fn revalue_affected(
         "dependency index is stale: positions were mutated without updating \
          the index — call Portfolio::rebuild_index after direct mutation"
     );
-    let positions = &portfolio.positions;
-    let pricing_options = batch_pricing_options(config);
-    let affected_indices = if changed
+    let affected_indices = portfolio.dependency_index().affected_positions(changed);
+    let refresh_base_currency = changed
         .iter()
-        .any(|key| matches!(key, crate::dependencies::MarketFactorKey::Fx { .. }))
-    {
-        (0..positions.len()).collect()
-    } else {
-        portfolio.dependency_index().affected_positions(changed)
-    };
-
-    if affected_indices.is_empty() {
-        let prior_matches_current_positions = prior.position_values.len() == positions.len()
-            && positions.iter().all(|position| {
-                prior
-                    .get_position_value(position.position_id.as_str())
-                    .is_some()
-            });
-        if prior_matches_current_positions {
-            return Ok(prior.clone());
-        }
-        let metrics = resolve_metrics(options);
-        let position_values_vec = positions
-            .iter()
-            .map(|position| {
-                reuse_prior_or_value_position(
-                    position,
-                    market,
-                    portfolio,
-                    &metrics,
-                    options.strict_risk,
-                    &pricing_options,
-                    prior,
-                )
-            })
-            .collect::<Result<Vec<_>>>()?;
-        return assemble_valuation(position_values_vec, portfolio.base_ccy, portfolio.as_of);
-    }
-
-    let metrics = resolve_metrics(options);
-    let use_parallel = affected_indices.len() >= REVALUE_AFFECTED_PARALLEL_MIN_AFFECTED
-        && affected_indices.len().saturating_mul(4) >= positions.len();
-
-    let position_values_vec: Vec<PositionValue> = if use_parallel {
-        use rayon::prelude::*;
-
-        let mut affected_mask = vec![false; positions.len()];
-        for &idx in &affected_indices {
-            affected_mask[idx] = true;
-        }
-
-        // Broad shocks dirty enough of the book that it is worth building a
-        // one-byte mask and letting Rayon fan out across positions. Unaffected
-        // rows still reuse the prior valuation result in place.
-        positions
-            .par_iter()
-            .enumerate()
-            .map(|(idx, position)| {
-                if affected_mask[idx] {
-                    value_single_position(
-                        position,
-                        market,
-                        portfolio,
-                        portfolio.as_of,
-                        &metrics,
-                        options.strict_risk,
-                        &pricing_options,
-                    )
-                } else {
-                    reuse_prior_or_value_position(
-                        position,
-                        market,
-                        portfolio,
-                        &metrics,
-                        options.strict_risk,
-                        &pricing_options,
-                        prior,
-                    )
-                }
-            })
-            .collect::<Result<Vec<_>>>()?
-    } else {
-        // Sparse shocks stay on a cheap serial path so the work remains
-        // proportional to the dirty subset instead of paying Rayon overhead on
-        // every position. `affected_indices` is sorted, so a single forward
-        // scan avoids per-row binary searches.
-        let mut next_affected = affected_indices.iter().copied().peekable();
-        let mut values = Vec::with_capacity(positions.len());
-
-        for (idx, position) in positions.iter().enumerate() {
-            let should_reprice =
-                matches!(next_affected.peek(), Some(&affected_idx) if affected_idx == idx);
-            if should_reprice {
-                next_affected.next();
-                values.push(value_single_position(
-                    position,
-                    market,
-                    portfolio,
-                    portfolio.as_of,
-                    &metrics,
-                    options.strict_risk,
-                    &pricing_options,
-                )?);
-            } else {
-                values.push(reuse_prior_or_value_position(
-                    position,
-                    market,
-                    portfolio,
-                    &metrics,
-                    options.strict_risk,
-                    &pricing_options,
-                    prior,
-                )?);
-            }
-        }
-
-        values
-    };
-
-    let selective = assemble_valuation(position_values_vec, portfolio.base_ccy, portfolio.as_of)?;
-    if should_verify_selective_repricing(config) {
-        let full = value_portfolio(portfolio, market, config, options)?;
-        verify_selective_repricing_matches_full(&selective, &full)?;
-    }
-    Ok(selective)
+        .any(|key| matches!(key, crate::dependencies::MarketFactorKey::Fx { .. }));
+    let profile = crate::evaluation::EvaluationProfile::from_options(options);
+    let mut plan = crate::evaluation::PortfolioEvaluationPlan::new(config);
+    let market_state = plan.register_market(market, portfolio.as_of);
+    let portfolio_state = plan.register_portfolio(portfolio);
+    let evaluation = plan.register_selective_evaluation(
+        market_state,
+        portfolio_state,
+        profile,
+        crate::evaluation::ParentResult::External(prior),
+        crate::evaluation::PositionInvalidation::new(affected_indices, refresh_base_currency),
+    )?;
+    plan.execute().into_valuation(evaluation)
 }
 
 #[cfg(test)]
@@ -814,18 +407,6 @@ mod tests {
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use std::sync::Arc;
     use time::macros::date;
-
-    #[test]
-    fn small_portfolios_stay_on_serial_path() {
-        assert!(!should_value_portfolio_use_parallel(0));
-        assert!(!should_value_portfolio_use_parallel(1));
-        assert!(!should_value_portfolio_use_parallel(
-            VALUE_PORTFOLIO_PARALLEL_MIN_POSITIONS - 1
-        ));
-        assert!(should_value_portfolio_use_parallel(
-            VALUE_PORTFOLIO_PARALLEL_MIN_POSITIONS
-        ));
-    }
 
     #[test]
     fn test_value_single_position() {

@@ -1613,7 +1613,7 @@ fn optimize_portfolio_typed(
     market: &Bound<'_, PyAny>,
 ) -> PyResult<PyPortfolioOptimizationResult> {
     let spec = spec.inner.clone();
-    let market = crate::bindings::extract::extract_market(market)?;
+    let market = crate::bindings::extract::extract_market(py, market)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     // Release the GIL for the (potentially multi-second) LP solve. The owned
     // spec and market move into the closure so it stays `Send` with no pyclass

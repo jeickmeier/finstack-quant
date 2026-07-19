@@ -86,6 +86,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "aggregate_full_cashflows",
         "apply_scenario_and_revalue",
         "scenario_pnl",
+        "scenario_pnl_batch",
         "attribute_portfolio_pnl",
         "allocate_weights",
         "optimize_portfolio",

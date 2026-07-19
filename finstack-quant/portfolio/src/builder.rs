@@ -379,6 +379,7 @@ impl PortfolioBuilder {
             books: self.books,
             tags: self.tags,
             meta: self.meta,
+            evaluation_state_id: 0,
         };
 
         portfolio.rebuild_index();

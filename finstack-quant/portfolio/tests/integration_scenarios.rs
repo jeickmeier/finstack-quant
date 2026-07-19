@@ -5,12 +5,22 @@ mod common;
 use common::*;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::PortfolioBuilder;
 use finstack_quant_scenarios::spec::{CurveKind, OperationSpec, ScenarioSpec};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
+use finstack_quant_valuations::instruments::{
+    Attributes, Instrument, MarketDependencies, PricingOptions,
+};
+use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::pricer::InstrumentType;
+use finstack_quant_valuations::results::ValuationResult;
+use std::any::Any;
 use std::sync::Arc;
 use time::Duration;
 
@@ -243,5 +253,203 @@ fn scenario_pnl_no_op_scenario_is_flat() {
     assert_eq!(pnl.total.amount(), 0.0);
     for (position_id, delta) in &pnl.by_position {
         assert_eq!(delta.amount(), 0.0, "position '{position_id}' must be flat");
+    }
+
+    let shock = ScenarioSpec {
+        id: "shock".to_string(),
+        name: None,
+        description: None,
+        operations: vec![OperationSpec::CurveParallelBp {
+            curve_kind: CurveKind::Discount,
+            curve_id: "USD".into(),
+            discount_curve_id: None,
+            bp: 25.0,
+        }],
+        priority: 0,
+        resolution_mode: Default::default(),
+    };
+    let market = market_with_usd();
+    let config = FinstackConfig::default();
+    let batch = finstack_quant_portfolio::scenarios::scenario_pnl_batch(
+        &portfolio,
+        &[scenario, shock.clone()],
+        &market,
+        &config,
+    )
+    .expect("scenario batch");
+    let (standalone, _) =
+        finstack_quant_portfolio::scenarios::scenario_pnl(&portfolio, &shock, &market, &config)
+            .expect("standalone scenario");
+
+    assert_eq!(
+        batch
+            .iter()
+            .map(|item| item.scenario_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["noop", "shock"],
+    );
+    assert_eq!(batch[0].pnl.total.amount(), 0.0);
+    assert!(
+        (batch[1].pnl.total.amount() - standalone.total.amount()).abs() < 1e-10,
+        "batched and standalone P&L must match"
+    );
+}
+
+#[derive(Clone)]
+struct ScenarioFailureInstrument {
+    attributes: Attributes,
+}
+
+finstack_quant_valuations::impl_empty_cashflow_provider!(
+    ScenarioFailureInstrument,
+    finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
+);
+
+impl ScenarioFailureInstrument {
+    fn checked_value(&self, market: &MarketContext) -> finstack_quant_core::Result<Money> {
+        let flag = match market.get_price("SCENARIO_FAILURE_FLAG")? {
+            MarketScalar::Unitless(value) => *value,
+            MarketScalar::Price(value) => value.amount(),
+        };
+        if flag < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "earlier scenario valuation failure".to_string(),
+            ));
+        }
+        Ok(Money::new(flag, Currency::USD))
+    }
+}
+
+impl Instrument for ScenarioFailureInstrument {
+    fn id(&self) -> &str {
+        "SCENARIO_FAILURE_INSTRUMENT"
+    }
+
+    fn key(&self) -> InstrumentType {
+        InstrumentType::Basket
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn attributes(&self) -> &Attributes {
+        &self.attributes
+    }
+
+    fn attributes_mut(&mut self) -> &mut Attributes {
+        &mut self.attributes
+    }
+
+    fn clone_box(&self) -> Box<dyn Instrument> {
+        Box::new(self.clone())
+    }
+
+    fn base_value(
+        &self,
+        market: &MarketContext,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
+        self.checked_value(market)
+    }
+
+    fn price_with_metrics(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        _metrics: &[MetricId],
+        options: PricingOptions,
+    ) -> finstack_quant_core::Result<ValuationResult> {
+        let config = options.config.as_deref().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "scenario test expected the executor request config".to_string(),
+            )
+        })?;
+        Ok(ValuationResult::stamped_with_config(
+            self.id(),
+            as_of,
+            self.checked_value(market)?,
+            config,
+        ))
+    }
+
+    fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
+        let mut dependencies = MarketDependencies::new();
+        dependencies.add_spot_id("SCENARIO_FAILURE_FLAG");
+        Ok(dependencies)
+    }
+}
+
+#[test]
+fn scenario_batch_reports_earliest_error_across_application_and_valuation_phases() {
+    let portfolio = PortfolioBuilder::new("ERROR_ORDER_PORTFOLIO")
+        .base_ccy(Currency::USD)
+        .as_of(base_date())
+        .entity(Entity::new("ENTITY"))
+        .position(
+            Position::new(
+                "ERROR_ORDER_POSITION",
+                "ENTITY",
+                "SCENARIO_FAILURE_INSTRUMENT",
+                Arc::new(ScenarioFailureInstrument {
+                    attributes: Attributes::new(),
+                }),
+                1.0,
+                PositionUnit::Units,
+            )
+            .expect("valid error-order position"),
+        )
+        .build()
+        .expect("valid error-order portfolio");
+    let market =
+        market_with_usd().insert_price("SCENARIO_FAILURE_FLAG", MarketScalar::Unitless(1.0));
+    let scenarios = vec![
+        ScenarioSpec {
+            id: "earlier_valuation_error".to_string(),
+            name: None,
+            description: None,
+            operations: vec![OperationSpec::EquityPricePct {
+                ids: vec!["SCENARIO_FAILURE_FLAG".to_string()],
+                pct: -200.0,
+            }],
+            priority: 0,
+            resolution_mode: Default::default(),
+        },
+        ScenarioSpec {
+            id: "later_application_error".to_string(),
+            name: None,
+            description: None,
+            operations: vec![OperationSpec::CurveParallelBp {
+                curve_kind: CurveKind::Discount,
+                curve_id: "MISSING_CURVE".into(),
+                discount_curve_id: None,
+                bp: 10.0,
+            }],
+            priority: 0,
+            resolution_mode: Default::default(),
+        },
+    ];
+
+    for _ in 0..8 {
+        let error = finstack_quant_portfolio::scenarios::scenario_pnl_batch(
+            &portfolio,
+            &scenarios,
+            &market,
+            &FinstackConfig::default(),
+        )
+        .expect_err("both scenarios are configured to fail");
+        let message = error.to_string();
+        assert!(
+            message.contains("earlier scenario valuation failure"),
+            "the first logical scenario error must win across phases: {message}"
+        );
+        assert!(
+            !message.contains("MISSING_CURVE"),
+            "a later application error must not mask an earlier valuation error: {message}"
+        );
     }
 }

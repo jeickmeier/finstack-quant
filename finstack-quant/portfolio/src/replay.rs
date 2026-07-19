@@ -5,13 +5,22 @@
 //!
 //! This module is only available when the `scenarios` feature is enabled.
 
-use crate::attribution::PortfolioAttribution;
+use crate::attribution::{
+    attribution_endpoint_profile, reduce_method_owned_prepared, reduce_metrics_based_prepared,
+    PortfolioAttribution,
+};
 use crate::error::{Error, Result};
-use crate::valuation::PortfolioValuation;
+use crate::evaluation::{EvaluationMetricProfile, EvaluationProfile, PortfolioEvaluationPlan};
+use crate::valuation::{PortfolioValuation, RequestedMetrics};
+use finstack_quant_attribution::{default_attribution_metrics, AttributionMethod};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::ops::RangeInclusive;
+
+const STRICT_ENDPOINT_BATCH_SIZE: usize = 8;
 
 /// What to compute at each replay step.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -50,7 +59,7 @@ pub struct ReplayConfig {
     /// Attribution method (only used in `FullAttribution` mode).
     #[serde(default)]
     pub attribution_method: finstack_quant_attribution::AttributionMethod,
-    /// Valuation options forwarded to `value_portfolio`.
+    /// Valuation options compiled into each replay evaluation profile.
     #[serde(default)]
     pub valuation_options: crate::valuation::PortfolioValuationOptions,
     /// Strict-vs-best-effort handling of per-snapshot failures.
@@ -210,20 +219,125 @@ pub struct ReplayResult {
 }
 
 use crate::portfolio::Portfolio;
-use crate::valuation::{value_portfolio_at, value_portfolio_serial_at};
 use finstack_quant_core::config::FinstackConfig;
 
-/// Portfolios below this position count benefit more from parallelizing the
-/// outer replay loop (one Rayon task per timeline snapshot) than from the
-/// inner per-position parallelism inside [`value_portfolio`]. Above the
-/// threshold the inner parallelism is left in place to avoid oversubscribing
-/// the Rayon thread pool.
-const REPLAY_OUTER_PARALLEL_POSITION_THRESHOLD: usize = 256;
+fn replay_phase_profile(config: &ReplayConfig, metrics_attribution: bool) -> EvaluationProfile {
+    let mut options = config.valuation_options.clone();
+    if metrics_attribution {
+        match &mut options.metrics {
+            RequestedMetrics::Standard => {
+                options.metrics = RequestedMetrics::StandardPlus(default_attribution_metrics());
+            }
+            RequestedMetrics::StandardPlus(extra) => {
+                extra.extend(default_attribution_metrics());
+            }
+            RequestedMetrics::Only(_) => {}
+        }
+    }
+    EvaluationProfile::from_options(&options)
+}
 
-/// Minimum number of replay snapshots at which outer-loop parallelism is
-/// considered; for very short timelines the serial path is clearer and the
-/// work per date is amortized by the benchmark loop anyway.
-const REPLAY_OUTER_PARALLEL_SNAPSHOT_THRESHOLD: usize = 8;
+fn phase_a_results(
+    portfolio: &Portfolio,
+    timeline: &ReplayTimeline,
+    profile: EvaluationProfile,
+    config: &FinstackConfig,
+) -> Result<Vec<Result<PortfolioValuation>>> {
+    let mut plan = PortfolioEvaluationPlan::new(config);
+    let portfolio_state = plan.register_portfolio(portfolio);
+    let jobs = timeline
+        .snapshots
+        .iter()
+        .map(|(date, market)| {
+            let market_state = plan.register_market(market, *date);
+            plan.register_evaluation(market_state, portfolio_state, profile.clone())
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut outcome = plan.execute();
+    Ok(jobs
+        .into_iter()
+        .map(|job| outcome.take_valuation(job))
+        .collect())
+}
+
+fn attribution_endpoint_batch(
+    portfolio: &Portfolio,
+    surviving: &[(Date, &MarketContext, Option<PortfolioValuation>)],
+    endpoint_needed: &[bool],
+    indices: RangeInclusive<usize>,
+    profile: &EvaluationProfile,
+    config: &FinstackConfig,
+) -> Result<IndexMap<usize, Result<PortfolioValuation>>> {
+    let needed: Vec<usize> = indices
+        .filter(|&index| endpoint_needed.get(index).copied().unwrap_or(false))
+        .collect();
+    if needed.is_empty() {
+        return Ok(IndexMap::new());
+    }
+
+    let mut plan = PortfolioEvaluationPlan::new(config);
+    let portfolio_state = plan.register_portfolio(portfolio);
+    let jobs = needed
+        .iter()
+        .map(|&index| {
+            let (date, market, _) = &surviving[index];
+            let market_state = plan.register_market(market, *date);
+            plan.register_evaluation(market_state, portfolio_state, profile.clone())
+                .map(|job| (index, job))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut outcome = plan.execute();
+    let mut endpoints = IndexMap::with_capacity(jobs.len());
+    for (index, job) in jobs {
+        endpoints.insert(index, outcome.take_valuation(job));
+    }
+    Ok(endpoints)
+}
+
+fn valuation_matches_endpoint_profile(
+    portfolio: &Portfolio,
+    valuation: &PortfolioValuation,
+    profile: &EvaluationProfile,
+    allow_complete_metric_superset: bool,
+) -> bool {
+    valuation.provenance.as_ref().is_some_and(|provenance| {
+        let same_state = provenance.portfolio_state_id == portfolio.evaluation_state_id
+            && provenance.base_ccy == portfolio.base_ccy
+            && provenance.profile.base_currency_policy == profile.base_currency_policy;
+        if !same_state {
+            return false;
+        }
+        if provenance.profile == *profile {
+            return true;
+        }
+        if !allow_complete_metric_superset
+            || !valuation
+                .position_values
+                .values()
+                .all(|value| value.risk_metrics_complete)
+        {
+            return false;
+        }
+        match (&provenance.profile.metrics, &profile.metrics) {
+            (
+                EvaluationMetricProfile::Metrics(actual),
+                EvaluationMetricProfile::Metrics(required),
+            ) => required.iter().all(|metric| actual.contains(metric)),
+            _ => false,
+        }
+    })
+}
+
+fn endpoint_or_fallback<'a>(
+    endpoint: Option<&'a Result<PortfolioValuation>>,
+    fallback: &'a PortfolioValuation,
+) -> Result<&'a PortfolioValuation> {
+    match endpoint {
+        Some(Ok(valuation)) => Ok(valuation),
+        Some(Err(error)) => Err(error.clone()),
+        None => Ok(fallback),
+    }
+}
 
 /// Replay a portfolio through a sequence of dated market snapshots.
 ///
@@ -270,57 +384,23 @@ pub fn replay_portfolio(
         ReplayMode::PvAndPnl | ReplayMode::FullAttribution
     );
     let compute_attribution = matches!(config.mode, ReplayMode::FullAttribution);
-
-    // Decide where to spend Rayon parallelism: small portfolios benefit from
-    // parallelizing the outer (per-date) loop and running each valuation
-    // serially; large portfolios already saturate the thread pool via
-    // per-position parallelism inside `value_portfolio`, so the outer loop
-    // runs serially to avoid nested dispatch overhead.
-    let use_outer_parallel = portfolio.positions.len() < REPLAY_OUTER_PARALLEL_POSITION_THRESHOLD
-        && timeline.snapshots.len() >= REPLAY_OUTER_PARALLEL_SNAPSHOT_THRESHOLD;
+    let metrics_attribution =
+        compute_attribution && matches!(config.attribution_method, AttributionMethod::MetricsBased);
+    let phase_profile = replay_phase_profile(config, metrics_attribution);
 
     // Phase A: value the portfolio at every snapshot date. Per-snapshot
     // results are kept as `Result<_>` so the strict / best-effort branch
     // below can decide whether a single failure aborts the run.
-    let valuation_results: Vec<Result<PortfolioValuation>> = if use_outer_parallel {
-        use rayon::prelude::*;
-        timeline
-            .snapshots
-            .par_iter()
-            .map(|(date, market)| {
-                value_portfolio_serial_at(
-                    portfolio,
-                    market,
-                    finstack_config,
-                    &config.valuation_options,
-                    *date,
-                )
-            })
-            .collect()
-    } else {
-        timeline
-            .snapshots
-            .iter()
-            .map(|(date, market)| {
-                value_portfolio_at(
-                    portfolio,
-                    market,
-                    finstack_config,
-                    &config.valuation_options,
-                    *date,
-                )
-            })
-            .collect()
-    };
+    let valuation_results = phase_a_results(portfolio, timeline, phase_profile, finstack_config)?;
 
     // Pair each result with its dated snapshot so best-effort skipping can
     // record which dates dropped out without losing the alignment.
     let mut skipped_dates: Vec<(Date, String)> = Vec::new();
-    let mut surviving: Vec<(Date, &MarketContext, PortfolioValuation)> =
+    let mut surviving: Vec<(Date, &MarketContext, Option<PortfolioValuation>)> =
         Vec::with_capacity(timeline.len());
     for ((date, market), result) in timeline.snapshots.iter().zip(valuation_results) {
         match result {
-            Ok(v) => surviving.push((*date, market, v)),
+            Ok(v) => surviving.push((*date, market, Some(v))),
             Err(e) => match config.on_error {
                 ReplayErrorPolicy::Strict => return Err(e),
                 ReplayErrorPolicy::BestEffort => {
@@ -345,15 +425,38 @@ pub fn replay_portfolio(
         )));
     }
 
-    // Phase B: assemble ReplayStep entries with P&L and (optionally)
-    // attribution. Runs serially — the per-step work is cheap (subtractions
-    // and one attribution call) and serial ordering keeps tracing output
-    // deterministic. Attribution itself already fans out over positions via
-    // `attribute_portfolio_pnl`.
-    let mut steps = Vec::with_capacity(surviving.len());
+    let endpoint_profile =
+        compute_attribution.then(|| attribution_endpoint_profile(&config.attribution_method));
+    let allow_complete_metric_superset = metrics_attribution
+        && matches!(
+            config.valuation_options.metrics,
+            RequestedMetrics::Standard | RequestedMetrics::StandardPlus(_)
+        );
+    let endpoint_needed: Vec<bool> = surviving
+        .iter()
+        .map(|(_, _, valuation)| {
+            endpoint_profile.as_ref().is_some_and(|required| {
+                valuation.as_ref().is_none_or(|valuation| {
+                    !valuation_matches_endpoint_profile(
+                        portfolio,
+                        valuation,
+                        required,
+                        allow_complete_metric_superset,
+                    )
+                })
+            })
+        })
+        .collect();
 
-    let mut surviving_iter = surviving.into_iter();
-    let (first_date, mut prev_market, val_0) = surviving_iter.next().ok_or_else(|| {
+    // Phase B: assemble ReplayStep entries with P&L and (optionally)
+    // attribution. Exact-profile attribution endpoints are prepared in
+    // bounded batches only when Phase A is incompatible. This preserves
+    // state-level Rayon parallelism without retaining a second full timeline
+    // or repricing an endpoint once per adjacent attribution interval.
+    let mut steps = Vec::with_capacity(surviving.len());
+    let first_date = surviving[0].0;
+    let mut prev_market = surviving[0].1;
+    let val_0 = surviving[0].2.take().ok_or_else(|| {
         Error::InvalidInput("Replay must have at least one valid step (unreachable)".into())
     })?;
     steps.push(ReplayStep {
@@ -364,77 +467,129 @@ pub fn replay_portfolio(
         attribution: None,
     });
 
-    for (date, market, val_i) in surviving_iter {
-        let prev_step = &steps[steps.len() - 1];
-
-        let daily_pnl = if compute_pnl {
-            Some(
-                val_i
-                    .total_base_ccy
-                    .checked_sub(prev_step.valuation.total_base_ccy)
-                    .map_err(|e| {
-                        Error::InvalidInput(format!(
-                            "daily P&L overflow computing {date} minus {} \
-                             (base {}): {e}",
-                            prev_step.date,
-                            val_i.total_base_ccy.currency()
-                        ))
-                    })?,
-            )
+    let mut next_index = 1;
+    let mut previous_endpoint: Option<Result<PortfolioValuation>> = None;
+    while next_index < surviving.len() {
+        let batch_end = if compute_attribution {
+            next_index
+                .saturating_add(STRICT_ENDPOINT_BATCH_SIZE - 1)
+                .min(surviving.len() - 1)
         } else {
-            None
+            surviving.len() - 1
         };
-
-        let cumulative_pnl = if compute_pnl {
-            Some(
-                val_i
-                    .total_base_ccy
-                    .checked_sub(steps[0].valuation.total_base_ccy)
-                    .map_err(|e| {
-                        Error::InvalidInput(format!(
-                            "cumulative P&L overflow computing {date} minus {} \
-                             (base {}): {e}",
-                            steps[0].date,
-                            val_i.total_base_ccy.currency()
-                        ))
-                    })?,
-            )
-        } else {
-            None
-        };
-
-        let attribution = if compute_attribution {
-            // Attribute step-over-step using the *previous surviving*
-            // market, not `timeline.snapshots[steps.len() - 1]`. The two
-            // diverge under best-effort policy when intermediate snapshots
-            // were skipped: skipping must collapse the prev/curr pair to
-            // the latest pair that actually produced valuations.
-            let attr = crate::attribution::attribute_portfolio_pnl(
+        let preparation_start = if next_index == 1 { 0 } else { next_index };
+        let mut endpoint_batch = if let Some(profile) = endpoint_profile.as_ref() {
+            attribution_endpoint_batch(
                 portfolio,
-                prev_market,
-                market,
-                prev_step.date,
-                date,
+                &surviving,
+                &endpoint_needed,
+                preparation_start..=batch_end,
+                profile,
                 finstack_config,
-                config.attribution_method.clone(),
-            )?;
-            Some(attr)
+            )?
         } else {
-            None
+            IndexMap::new()
         };
+        if next_index == 1 {
+            previous_endpoint = endpoint_batch.shift_remove(&0);
+        }
 
-        steps.push(ReplayStep {
-            date,
-            valuation: val_i,
-            daily_pnl,
-            cumulative_pnl,
-            attribution,
-        });
+        for (offset, (date, market, valuation)) in
+            surviving[next_index..=batch_end].iter_mut().enumerate()
+        {
+            let index = next_index + offset;
+            let date = *date;
+            let market = *market;
+            let val_i = valuation.take().ok_or_else(|| {
+                Error::InvalidInput(format!(
+                    "Replay valuation at surviving index {index} was consumed twice"
+                ))
+            })?;
+            let prev_step = &steps[steps.len() - 1];
 
-        // Advance the prev-market reference for the next iteration; this is
-        // what keeps best-effort attribution aligned even when intermediate
-        // snapshots were skipped.
-        prev_market = market;
+            let daily_pnl = if compute_pnl {
+                Some(
+                    val_i
+                        .total_base_ccy
+                        .checked_sub(prev_step.valuation.total_base_ccy)
+                        .map_err(|e| {
+                            Error::InvalidInput(format!(
+                                "daily P&L overflow computing {date} minus {} \
+                                 (base {}): {e}",
+                                prev_step.date,
+                                val_i.total_base_ccy.currency()
+                            ))
+                        })?,
+                )
+            } else {
+                None
+            };
+
+            let cumulative_pnl = if compute_pnl {
+                Some(
+                    val_i
+                        .total_base_ccy
+                        .checked_sub(steps[0].valuation.total_base_ccy)
+                        .map_err(|e| {
+                            Error::InvalidInput(format!(
+                                "cumulative P&L overflow computing {date} minus {} \
+                                 (base {}): {e}",
+                                steps[0].date,
+                                val_i.total_base_ccy.currency()
+                            ))
+                        })?,
+                )
+            } else {
+                None
+            };
+
+            let attribution = if compute_attribution {
+                // Attribute step-over-step using the previous surviving
+                // market. Best-effort skips therefore collapse to the latest
+                // pair that actually produced valuations.
+                let prev_endpoint =
+                    endpoint_or_fallback(previous_endpoint.as_ref(), &prev_step.valuation)?;
+                let endpoint = endpoint_or_fallback(endpoint_batch.get(&index), &val_i)?;
+                let attr = if metrics_attribution {
+                    reduce_metrics_based_prepared(
+                        portfolio,
+                        prev_market,
+                        market,
+                        prev_step.date,
+                        date,
+                        prev_endpoint,
+                        endpoint,
+                    )?
+                } else {
+                    reduce_method_owned_prepared(
+                        portfolio,
+                        prev_market,
+                        market,
+                        prev_step.date,
+                        date,
+                        finstack_config,
+                        &config.attribution_method,
+                        prev_endpoint,
+                        endpoint,
+                    )?
+                };
+                Some(attr)
+            } else {
+                None
+            };
+
+            let current_endpoint = endpoint_batch.shift_remove(&index);
+            steps.push(ReplayStep {
+                date,
+                valuation: val_i,
+                daily_pnl,
+                cumulative_pnl,
+                attribution,
+            });
+            prev_market = market;
+            previous_endpoint = current_endpoint;
+        }
+        next_index = batch_end + 1;
     }
 
     let summary = compute_summary(&steps);
@@ -512,6 +667,7 @@ mod tests {
                 by_entity: IndexMap::new(),
                 degraded_positions: Vec::new(),
                 fx_collapse_policy: FxConversionPolicy::CashflowDate,
+                provenance: None,
             },
             daily_pnl: None,
             cumulative_pnl: None,

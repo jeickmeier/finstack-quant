@@ -147,6 +147,52 @@ including bit-reproducibility tests, exact-zero sentinels, and values known to
 come from the same deterministic operation. Do not cite a shared comparison
 helper unless that helper exists in the public API.
 
+### 2.6 Portfolio evaluation execution
+
+**Enforced for portfolio valuation, metrics-based attribution, scenario P&L,
+scenario batches, replay, and factor-stress endpoint P&L:** ordinary position
+valuation is performed by the request-scoped portfolio evaluation executor.
+Public compatibility functions and host-language bindings are adapters into
+that executor; they MUST NOT own a second position-pricing loop, valuation
+assembler, calibration cache, or scheduling policy.
+
+**Required:**
+
+- A request registers immutable market states separately from immutable
+  portfolio/instrument states. A changed market, effective valuation date, or
+  instrument set receives a distinct state identity.
+- Each market state creates a fresh hazard-recalibration cache. Cloned pricing
+  options MAY share that cache only within the same immutable state; caches
+  MUST NOT cross market states or requests.
+- Evaluation jobs are distinguished by their exact metric set, strict-risk
+  policy, and base-currency policy. An empty explicit metric set is PV-only and
+  MUST NOT be promoted to the standard risk set. A degraded best-effort result
+  MUST NOT satisfy a strict request. A workflow that explicitly rejects
+  cross-currency positions MUST validate native currency before any FX lookup.
+- Selective repricing MAY reuse a parent result only when the evaluation
+  profile and portfolio shape are compatible and an authoritative dirty set
+  exists. FX invalidation MUST distinguish instrument repricing from
+  base-currency conversion refresh so a reused native PV never leaves a stale
+  base PV. Without an authoritative FX path manifest, any changed FX quote
+  conservatively invalidates every position with any FX dependency because a
+  cross may be triangulated through that quote; base-currency conversion is
+  still refreshed for every reused position.
+- One execution wave selects at most one Rayon axis: states, positions, or
+  factors. Nested state-by-position or factor-by-position fan-out is forbidden.
+- Parallel work collects indexed results before a serial logical-order scan.
+  Position/state order, first-error selection, and Neumaier aggregation order
+  therefore remain deterministic.
+- Evaluation state and caches are request-local. Do not add a global,
+  thread-local, process-wide, persistent, or cross-request valuation cache.
+- Python adapters MAY hold typed borrow guards while extracting plain Rust
+  references, but native evaluation closures MUST capture only Rust state.
+  JSON parsing, portfolio materialization, and large result serialization MUST
+  release the GIL after copying any required Python string input.
+- A migrated workflow MUST delete its superseded compute path. Do not retain a
+  runtime legacy/new switch, dormant fallback engine, or duplicate scheduler.
+  Financially distinct reducers may remain, but any ordinary portfolio
+  valuation they require enters through the shared executor.
+
 ---
 
 ## 3. Sign and perspective conventions

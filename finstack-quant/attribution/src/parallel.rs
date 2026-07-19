@@ -450,9 +450,76 @@ pub fn attribute_pnl_parallel_with_credit_model(
     full_cross_attribution: bool,
     execution_policy: ExecutionPolicy,
 ) -> Result<PnlAttribution> {
+    attribute_pnl_parallel_impl(
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        as_of_t1,
+        _config,
+        model_params_t0,
+        credit_factor_model,
+        credit_factor_detail_options,
+        full_cross_attribution,
+        execution_policy,
+        None,
+    )
+}
+
+/// Run parallel attribution using ordinary endpoint values prepared by the
+/// portfolio evaluation engine.
+///
+/// This is an internal cross-crate integration path. The endpoint values must
+/// be the unscaled values of `instrument` at the supplied markets and dates.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn attribute_pnl_parallel_prepared(
+    instrument: &Arc<dyn Instrument>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    as_of_t0: Date,
+    as_of_t1: Date,
+    config: &FinstackConfig,
+    execution_policy: ExecutionPolicy,
+    val_t0: Money,
+    val_t1: Money,
+) -> Result<PnlAttribution> {
+    attribute_pnl_parallel_impl(
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        as_of_t1,
+        config,
+        None,
+        None,
+        &CreditFactorDetailOptions::default(),
+        false,
+        execution_policy,
+        Some((val_t0, val_t1)),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn attribute_pnl_parallel_impl(
+    instrument: &Arc<dyn Instrument>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    as_of_t0: Date,
+    as_of_t1: Date,
+    _config: &FinstackConfig,
+    model_params_t0: Option<&ModelParamsSnapshot>,
+    credit_factor_model: Option<&CreditFactorModel>,
+    credit_factor_detail_options: &CreditFactorDetailOptions,
+    full_cross_attribution: bool,
+    execution_policy: ExecutionPolicy,
+    prepared_endpoints: Option<(Money, Money)>,
+) -> Result<PnlAttribution> {
     validate_attribution_period(as_of_t0, as_of_t1)?;
 
-    let mut num_repricings = 0;
+    // Endpoint repricings remain part of the workflow's accounting even when
+    // the portfolio engine prepared them. The prepared path removes duplicate
+    // calls; it does not change the logical cost represented in metadata.
+    let mut num_repricings = 2;
 
     // Step 1: Price at T₀ and T₁
     // Use T₀ model parameters for T₀ valuation if available
@@ -461,11 +528,14 @@ pub fn attribute_pnl_parallel_with_credit_model(
     } else {
         Arc::clone(instrument)
     };
-    let val_t0 = reprice_instrument(&instrument_t0, market_t0, as_of_t0)?;
-    num_repricings += 1;
-
-    let val_t1 = reprice_instrument(instrument, market_t1, as_of_t1)?;
-    num_repricings += 1;
+    let (val_t0, val_t1) = if let Some(endpoints) = prepared_endpoints {
+        endpoints
+    } else {
+        (
+            reprice_instrument(&instrument_t0, market_t0, as_of_t0)?,
+            reprice_instrument(instrument, market_t1, as_of_t1)?,
+        )
+    };
 
     // Total P&L (with FX translation)
     let total_pnl = compute_pnl_with_fx(

@@ -552,6 +552,7 @@ mod tests {
             by_entity: IndexMap::new(),
             degraded_positions: Vec::new(),
             fx_collapse_policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            provenance: None,
         }
     }
 

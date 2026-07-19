@@ -67,6 +67,7 @@ fn numpy_row_major(array: &PyReadonlyArray2<'_, f64>) -> Vec<f64> {
 
 /// Extract and flatten an `n x n` covariance-style matrix.
 pub(crate) fn extract_square_matrix(
+    py: Python<'_>,
     matrix: &Bound<'_, PyAny>,
     n: usize,
     label: &str,
@@ -89,12 +90,14 @@ pub(crate) fn extract_square_matrix(
     }
 
     let nested = matrix.extract::<Vec<Vec<f64>>>()?;
-    core_flatten_square_matrix(nested, n, label)
+    let label = label.to_owned();
+    py.detach(move || core_flatten_square_matrix(nested, n, &label))
         .map_err(|error| crate::errors::value_error(error.to_string()))
 }
 
 /// Extract position-major P&Ls from lists or a two-dimensional NumPy array.
 pub(crate) fn extract_position_pnls(
+    py: Python<'_>,
     position_pnls: &Bound<'_, PyAny>,
     n_positions: usize,
 ) -> PyResult<PositionPnlMatrix> {
@@ -121,7 +124,8 @@ pub(crate) fn extract_position_pnls(
     }
 
     let nested = position_pnls.extract::<Vec<Vec<f64>>>()?;
-    let (data, n_scenarios) = core_flatten_position_pnls(nested, n_positions)
+    let (data, n_scenarios) = py
+        .detach(move || core_flatten_position_pnls(nested, n_positions))
         .map_err(|error| crate::errors::value_error(error.to_string()))?;
     Ok(PositionPnlMatrix {
         data,

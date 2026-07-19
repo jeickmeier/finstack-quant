@@ -13,8 +13,9 @@
 
 use crate::adapters::traits::ScenarioEffect;
 use crate::error::Result;
-use crate::spec::{OperationSpec, RateBindingSpec, ScenarioSpec, VolSurfaceKind};
+use crate::spec::{CurveKind, OperationSpec, RateBindingSpec, ScenarioSpec, VolSurfaceKind};
 use crate::warning::Warning;
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::market_data::hierarchy::{
     HierarchyNode, HierarchyTarget, MarketDataHierarchy, ResolutionMode, TagFilter,
@@ -92,6 +93,113 @@ pub struct ExecutionContext<'a> {
     pub as_of: time::Date,
 }
 
+/// A concrete market-data target changed while applying a scenario.
+///
+/// Targets are recorded from hierarchy-expanded operations together with the
+/// effects that were actually accepted by the engine. Consequently, every
+/// identifier is a resolved market identifier rather than an unresolved
+/// hierarchy path or a best-effort reconstruction of the original spec.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ScenarioMarketTarget {
+    /// A discount, forward, credit, inflation, or commodity curve.
+    Curve {
+        /// Curve family used to select the market-data collection.
+        curve_kind: CurveKind,
+        /// Concrete identifier changed in that collection.
+        curve_id: CurveId,
+    },
+    /// A volatility-index curve.
+    VolatilityIndex {
+        /// Concrete volatility-index curve identifier.
+        curve_id: CurveId,
+    },
+    /// A base-correlation surface.
+    BaseCorrelation {
+        /// Concrete base-correlation surface identifier.
+        surface_id: CurveId,
+    },
+    /// A volatility surface.
+    VolSurface {
+        /// Surface family from the expanded operation.
+        surface_kind: VolSurfaceKind,
+        /// Concrete volatility-surface identifier.
+        surface_id: CurveId,
+    },
+    /// An equity or other scalar price entry.
+    EquityPrice {
+        /// Concrete scalar-price identifier.
+        price_id: CurveId,
+    },
+    /// A directed FX pair.
+    Fx {
+        /// Base currency strengthened or weakened by the operation.
+        base: Currency,
+        /// Quote currency used for the shocked rate.
+        quote: Currency,
+    },
+}
+
+/// Authoritative change manifest produced while applying a scenario.
+///
+/// Empty/default manifests preserve the historical wire shape because the
+/// containing report omits this field. Newer readers can use the manifest to
+/// invalidate only the market factors and instruments that actually changed,
+/// while `all_dirty` provides a conservative escape hatch for changes that
+/// cannot be represented precisely.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ScenarioChangeManifest {
+    /// Concrete market-data targets changed by applied effects.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub market_targets: Vec<ScenarioMarketTarget>,
+    /// Zero-based indices of portfolio instruments mutated in place.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub changed_instrument_indices: Vec<usize>,
+    /// Whether the execution context's effective valuation date changed.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub as_of_changed: bool,
+    /// Whether instruments were inserted, removed, or reordered.
+    ///
+    /// Current scenario operations do not change portfolio shape, so this is
+    /// `false`; the field is reserved for future shape-changing effects.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub portfolio_shape_changed: bool,
+    /// Whether callers must conservatively treat every dependency as dirty.
+    ///
+    /// This is set for effective time rolls because date-sensitive values can
+    /// change even when no explicit market or instrument target was mutated.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub all_dirty: bool,
+}
+
+impl ScenarioChangeManifest {
+    fn is_empty(&self) -> bool {
+        self.market_targets.is_empty()
+            && self.changed_instrument_indices.is_empty()
+            && !self.as_of_changed
+            && !self.portfolio_shape_changed
+            && !self.all_dirty
+    }
+
+    fn record_market_target(&mut self, target: ScenarioMarketTarget) {
+        if !self.market_targets.contains(&target) {
+            self.market_targets.push(target);
+        }
+    }
+
+    fn record_instrument_indices(&mut self, indices: impl IntoIterator<Item = usize>) {
+        for index in indices {
+            if let Err(position) = self.changed_instrument_indices.binary_search(&index) {
+                self.changed_instrument_indices.insert(position, index);
+            }
+        }
+    }
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// Report describing what happened during [`ScenarioEngine::apply`].
 ///
 /// # Examples
@@ -102,6 +210,7 @@ pub struct ExecutionContext<'a> {
 ///     operations_applied: 3,
 ///     user_operations: 1,
 ///     expanded_operations: 3,
+///     changes: Default::default(),
 ///     warnings: vec![],
 ///     rounding_context: Some("default".into()),
 ///     time_roll: None,
@@ -130,6 +239,10 @@ pub struct ApplicationReport {
     /// `>= user_operations` and is what should be compared to
     /// `operations_applied` when assessing scenario coverage.
     pub expanded_operations: usize,
+
+    /// Authoritative metadata describing the state changed by applied effects.
+    #[serde(default, skip_serializing_if = "ScenarioChangeManifest::is_empty")]
+    pub changes: ScenarioChangeManifest,
 
     /// Structured warnings generated during application (non-fatal).
     pub warnings: Vec<Warning>,
@@ -161,6 +274,9 @@ pub struct ApplicationEnvelope {
     pub user_operations: usize,
     /// Number of expanded operations the engine attempted.
     pub expanded_operations: usize,
+    /// Authoritative metadata describing the state changed by applied effects.
+    #[serde(default, skip_serializing_if = "ScenarioChangeManifest::is_empty")]
+    pub changes: ScenarioChangeManifest,
     /// Structured warnings produced while applying the scenario.
     pub warnings: Vec<Warning>,
     /// Rounding context stamp from the report (active rounding mode).
@@ -189,6 +305,7 @@ impl ApplicationEnvelope {
             operations_applied: report.operations_applied,
             user_operations: report.user_operations,
             expanded_operations: report.expanded_operations,
+            changes: report.changes,
             warnings: report.warnings,
             rounding_context: report.rounding_context,
             time_roll: report.time_roll,
@@ -907,6 +1024,8 @@ impl ScenarioEngine {
 
         let mut applied = 0;
         let mut warnings: Vec<Warning> = Vec::new();
+        let initial_as_of = ctx.as_of;
+        let mut changes = ScenarioChangeManifest::default();
 
         let user_operations = spec.operations.len();
 
@@ -949,12 +1068,15 @@ impl ScenarioEngine {
 
                 let stop_after_roll = !*apply_shocks;
                 time_roll = Some(roll_report);
+                changes.as_of_changed = ctx.as_of != initial_as_of;
+                changes.all_dirty |= changes.as_of_changed;
 
                 if stop_after_roll {
                     return Ok(ApplicationReport {
                         operations_applied: applied,
                         user_operations,
                         expanded_operations,
+                        changes,
                         warnings,
                         rounding_context: rounding_stamp(&self.config),
                         time_roll,
@@ -984,14 +1106,14 @@ impl ScenarioEngine {
                 // adapter's `ctx.market` reads reflect everything done so far.
                 flush_pending_bumps(&mut pending_bumps, ctx.market)?;
 
-                let effects = generate_effects(op, ctx)?;
                 process_effects(
-                    effects,
+                    op,
                     ctx,
                     &mut pending_bumps,
                     &mut deferred_stmts,
                     &mut warnings,
                     &mut applied,
+                    &mut changes,
                 )?;
             }
 
@@ -1153,10 +1275,14 @@ impl ScenarioEngine {
             }
         }
 
+        changes.as_of_changed = ctx.as_of != initial_as_of;
+        changes.all_dirty |= changes.as_of_changed;
+
         Ok(ApplicationReport {
             operations_applied: applied,
             user_operations,
             expanded_operations,
+            changes,
             warnings,
             rounding_context: rounding_stamp(&self.config),
             time_roll,
@@ -1164,18 +1290,89 @@ impl ScenarioEngine {
     }
 }
 
+fn market_target_for_id(op: &OperationSpec, id: &CurveId) -> Option<ScenarioMarketTarget> {
+    match op {
+        OperationSpec::EquityPricePct { .. } => Some(ScenarioMarketTarget::EquityPrice {
+            price_id: id.clone(),
+        }),
+        OperationSpec::CurveParallelBp { curve_kind, .. }
+        | OperationSpec::CurveNodeBp { curve_kind, .. } => Some(ScenarioMarketTarget::Curve {
+            curve_kind: *curve_kind,
+            curve_id: id.clone(),
+        }),
+        OperationSpec::VolIndexParallelPts { .. } | OperationSpec::VolIndexNodePts { .. } => {
+            Some(ScenarioMarketTarget::VolatilityIndex {
+                curve_id: id.clone(),
+            })
+        }
+        OperationSpec::BaseCorrParallelPts { .. } | OperationSpec::BaseCorrBucketPts { .. } => {
+            Some(ScenarioMarketTarget::BaseCorrelation {
+                surface_id: id.clone(),
+            })
+        }
+        OperationSpec::VolSurfaceParallelPct { surface_kind, .. }
+        | OperationSpec::VolSurfaceBucketPct { surface_kind, .. } => {
+            Some(ScenarioMarketTarget::VolSurface {
+                surface_kind: *surface_kind,
+                surface_id: id.clone(),
+            })
+        }
+        OperationSpec::MarketFxPct { .. }
+        | OperationSpec::StmtForecastPercent { .. }
+        | OperationSpec::StmtForecastAssign { .. }
+        | OperationSpec::RateBinding { .. }
+        | OperationSpec::InstrumentPricePctByType { .. }
+        | OperationSpec::InstrumentPricePctByAttr { .. }
+        | OperationSpec::InstrumentSpreadBpByType { .. }
+        | OperationSpec::InstrumentSpreadBpByAttr { .. }
+        | OperationSpec::AssetCorrelationPts { .. }
+        | OperationSpec::PrepayDefaultCorrelationPts { .. }
+        | OperationSpec::HierarchyCurveParallelBp { .. }
+        | OperationSpec::HierarchyVolSurfaceParallelPct { .. }
+        | OperationSpec::HierarchyEquityPricePct { .. }
+        | OperationSpec::HierarchyBaseCorrParallelPts { .. }
+        | OperationSpec::TimeRollForward { .. } => None,
+    }
+}
+
+fn market_target_for_bump(op: &OperationSpec, bump: &MarketBump) -> Option<ScenarioMarketTarget> {
+    match (op, bump) {
+        (OperationSpec::MarketFxPct { .. }, MarketBump::FxPct { base, quote, .. }) => {
+            Some(ScenarioMarketTarget::Fx {
+                base: *base,
+                quote: *quote,
+            })
+        }
+        (_, MarketBump::Curve { id, .. }) => market_target_for_id(op, id),
+        (_, MarketBump::VolBucketPct { surface_id, .. })
+        | (_, MarketBump::BaseCorrBucketPts { surface_id, .. }) => {
+            market_target_for_id(op, surface_id)
+        }
+        _ => None,
+    }
+}
+
+fn market_target_for_curve_update(
+    op: &OperationSpec,
+    storage: &finstack_quant_core::market_data::context::CurveStorage,
+) -> Option<ScenarioMarketTarget> {
+    market_target_for_id(op, storage.id())
+}
+
 /// Process a single op's effects, threading them through `pending_bumps`,
 /// `deferred_stmts`, and the running counters. Extracted from `apply` to keep
 /// the main pipeline readable; the dispatch is otherwise identical to the
 /// inline match.
 fn process_effects(
-    effects: Vec<ScenarioEffect>,
+    op: &OperationSpec,
     ctx: &mut ExecutionContext,
     pending_bumps: &mut Vec<MarketBump>,
     deferred_stmts: &mut Vec<ScenarioEffect>,
     warnings: &mut Vec<Warning>,
     applied: &mut usize,
+    changes: &mut ScenarioChangeManifest,
 ) -> Result<()> {
+    let effects = generate_effects(op, ctx)?;
     for effect in effects {
         match effect {
             ScenarioEffect::MarketBump(b) => {
@@ -1184,6 +1381,10 @@ fn process_effects(
                 // collapse into one batch entry; flush before queueing if so.
                 if would_conflict_with_pending(pending_bumps, &b) {
                     flush_pending_bumps(pending_bumps, ctx.market)?;
+                }
+                match market_target_for_bump(op, &b) {
+                    Some(target) => changes.record_market_target(target),
+                    None => changes.all_dirty = true,
                 }
                 pending_bumps.push(b);
                 *applied += 1;
@@ -1194,12 +1395,16 @@ fn process_effects(
                 // the bumped market state in the same order as the original
                 // per-effect application.
                 flush_pending_bumps(pending_bumps, ctx.market)?;
+                match market_target_for_curve_update(op, &storage) {
+                    Some(target) => changes.record_market_target(target),
+                    None => changes.all_dirty = true,
+                }
                 *ctx.market = std::mem::take(ctx.market).insert(storage);
                 *applied += 1;
             }
             ScenarioEffect::InstrumentPriceShock { types, attrs, pct } => {
                 flush_pending_bumps(pending_bumps, ctx.market)?;
-                let (c, w) = apply_instrument_shock(
+                let outcome = apply_instrument_shock(
                     types.as_deref(),
                     attrs.as_ref(),
                     pct,
@@ -1208,12 +1413,13 @@ fn process_effects(
                     crate::adapters::instruments::apply_instrument_type_price_shock,
                     crate::adapters::instruments::apply_instrument_attr_price_shock,
                 );
-                *applied += c;
-                warnings.extend(w);
+                *applied += outcome.count;
+                changes.record_instrument_indices(outcome.changed_indices);
+                warnings.extend(outcome.warnings);
             }
             ScenarioEffect::InstrumentSpreadShock { types, attrs, bp } => {
                 flush_pending_bumps(pending_bumps, ctx.market)?;
-                let (c, w) = apply_instrument_shock(
+                let outcome = apply_instrument_shock(
                     types.as_deref(),
                     attrs.as_ref(),
                     bp,
@@ -1222,20 +1428,24 @@ fn process_effects(
                     crate::adapters::instruments::apply_instrument_type_spread_shock,
                     crate::adapters::instruments::apply_instrument_attr_spread_shock,
                 );
-                *applied += c;
-                warnings.extend(w);
+                *applied += outcome.count;
+                changes.record_instrument_indices(outcome.changed_indices);
+                warnings.extend(outcome.warnings);
             }
             ScenarioEffect::AssetCorrelationShock { delta_pts } => {
                 flush_pending_bumps(pending_bumps, ctx.market)?;
-                let (count, ws) = apply_correlation_effect(CorrelationKind::Asset, delta_pts, ctx);
+                let (count, indices, ws) =
+                    apply_correlation_effect(CorrelationKind::Asset, delta_pts, ctx);
                 *applied += count;
+                changes.record_instrument_indices(indices);
                 warnings.extend(ws);
             }
             ScenarioEffect::PrepayDefaultCorrelationShock { delta_pts } => {
                 flush_pending_bumps(pending_bumps, ctx.market)?;
-                let (count, ws) =
+                let (count, indices, ws) =
                     apply_correlation_effect(CorrelationKind::PrepayDefault, delta_pts, ctx);
                 *applied += count;
+                changes.record_instrument_indices(indices);
                 warnings.extend(ws);
             }
             stmt @ (ScenarioEffect::StmtForecastPercent { .. }
@@ -1310,14 +1520,14 @@ type TypeShockFn = fn(
     &mut [Box<dyn Instrument>],
     &[finstack_quant_valuations::pricer::InstrumentType],
     f64,
-) -> (usize, Vec<Warning>);
+) -> crate::adapters::instruments::InstrumentShockOutcome;
 
 /// Function that applies an instrument shock filtered by attributes.
 type AttrShockFn = fn(
     &mut [Box<dyn Instrument>],
     &indexmap::IndexMap<String, String>,
     f64,
-) -> (usize, Vec<Warning>);
+) -> crate::adapters::instruments::InstrumentShockOutcome;
 
 /// Apply an instrument shock (price or spread) dispatching by type and attribute filters.
 fn apply_instrument_shock(
@@ -1328,15 +1538,17 @@ fn apply_instrument_shock(
     instruments: &mut Option<&mut Vec<Box<dyn Instrument>>>,
     type_fn: TypeShockFn,
     attr_fn: AttrShockFn,
-) -> (usize, Vec<Warning>) {
+) -> crate::adapters::instruments::InstrumentShockOutcome {
     let mut applied = 0;
+    let mut changed_indices = Vec::new();
     let mut warnings: Vec<Warning> = Vec::new();
 
     if let Some(ts) = types {
         if let Some(instruments) = instruments.as_mut() {
-            let (c, w) = type_fn(instruments, ts, value);
-            applied += c;
-            warnings.extend(w);
+            let outcome = type_fn(instruments, ts, value);
+            applied += outcome.count;
+            changed_indices.extend(outcome.changed_indices);
+            warnings.extend(outcome.warnings);
         } else {
             warnings.push(Warning::InstrumentShockNoPortfolio {
                 shock_kind: kind.to_string(),
@@ -1347,9 +1559,10 @@ fn apply_instrument_shock(
 
     if let Some(ats) = attrs {
         if let Some(instruments) = instruments.as_mut() {
-            let (count, w) = attr_fn(instruments, ats, value);
-            applied += count;
-            warnings.extend(w);
+            let outcome = attr_fn(instruments, ats, value);
+            applied += outcome.count;
+            changed_indices.extend(outcome.changed_indices);
+            warnings.extend(outcome.warnings);
         } else {
             warnings.push(Warning::InstrumentShockNoPortfolio {
                 shock_kind: kind.to_string(),
@@ -1358,7 +1571,11 @@ fn apply_instrument_shock(
         }
     }
 
-    (applied, warnings)
+    crate::adapters::instruments::InstrumentShockOutcome {
+        count: applied,
+        changed_indices,
+        warnings,
+    }
 }
 
 /// Which structured-credit correlation parameter a shock targets.
@@ -1375,17 +1592,17 @@ fn apply_correlation_effect(
     kind: CorrelationKind,
     delta_pts: f64,
     ctx: &mut ExecutionContext,
-) -> (usize, Vec<Warning>) {
+) -> (usize, Vec<usize>, Vec<Warning>) {
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
 
     let Some(instruments) = ctx.instruments.as_mut() else {
-        return (0, vec![Warning::CorrelationShockNoPortfolio]);
+        return (0, Vec::new(), vec![Warning::CorrelationShockNoPortfolio]);
     };
 
-    let mut count = 0usize;
+    let mut changed_indices = Vec::new();
     let mut warnings = Vec::new();
 
-    for inst in instruments.iter_mut() {
+    for (index, inst) in instruments.iter_mut().enumerate() {
         let Some(sc) = inst.as_any_mut().downcast_mut::<StructuredCredit>() else {
             continue;
         };
@@ -1405,14 +1622,14 @@ fn apply_correlation_effect(
             });
         }
         sc.credit_model.correlation_structure = Some(new_corr);
-        count += 1;
+        changed_indices.push(index);
     }
 
-    if count == 0 {
+    if changed_indices.is_empty() {
         warnings.push(Warning::CorrelationShockNoMatch);
     }
 
-    (count, warnings)
+    (changed_indices.len(), changed_indices, warnings)
 }
 
 #[cfg(test)]
@@ -1619,7 +1836,30 @@ mod tests {
             .expect("market-only scenario should not require a statement model");
 
         assert_eq!(report.operations_applied, 1);
+        assert!(report.changes.as_of_changed);
+        assert!(report.changes.all_dirty);
         assert_eq!(ctx.as_of, date!(2025 - 01 - 02));
+    }
+
+    #[test]
+    fn application_report_change_manifest_preserves_legacy_serde_defaults() {
+        let legacy_json = r#"{
+            "operations_applied": 0,
+            "user_operations": 0,
+            "expanded_operations": 0,
+            "warnings": [],
+            "rounding_context": null
+        }"#;
+
+        let report: ApplicationReport =
+            serde_json::from_str(legacy_json).expect("legacy report should deserialize");
+        assert_eq!(report.changes, ScenarioChangeManifest::default());
+
+        let encoded = serde_json::to_value(&report).expect("report should serialize");
+        assert!(
+            encoded.get("changes").is_none(),
+            "empty manifest must preserve the legacy serialized shape"
+        );
     }
 
     #[test]

@@ -112,6 +112,33 @@ impl ScenarioSpec {
     pub fn builder(id: impl Into<String>) -> crate::templates::ScenarioSpecBuilder {
         crate::templates::ScenarioSpecBuilder::new(id)
     }
+
+    /// Whether applying this scenario needs the portfolio's instruments.
+    ///
+    /// Instrument-mutating shocks and time rolls need instrument access.
+    /// Market-only, statement-only, and rate-binding operations do not.
+    ///
+    /// # Returns
+    ///
+    /// `true` when the execution context must include instruments.
+    pub fn requires_instruments(&self) -> bool {
+        self.operations
+            .iter()
+            .any(OperationSpec::requires_instruments)
+    }
+
+    /// Whether applying this scenario can replace or mutate instruments.
+    ///
+    /// # Returns
+    ///
+    /// `true` for instrument price, spread, or correlation shocks. A time roll
+    /// reads instruments for carry but does not mutate them and therefore
+    /// returns `false`.
+    pub fn mutates_instruments(&self) -> bool {
+        self.operations
+            .iter()
+            .any(OperationSpec::mutates_instruments)
+    }
 }
 
 /// Individual operation within a scenario.
@@ -709,6 +736,34 @@ pub enum OperationSpec {
         #[serde(default)]
         roll_mode: TimeRollMode,
     },
+}
+
+impl OperationSpec {
+    /// Whether this operation needs instrument access during application.
+    ///
+    /// # Returns
+    ///
+    /// `true` for instrument-mutating operations and time rolls.
+    pub fn requires_instruments(&self) -> bool {
+        self.mutates_instruments() || matches!(self, Self::TimeRollForward { .. })
+    }
+
+    /// Whether this operation can replace or mutate portfolio instruments.
+    ///
+    /// # Returns
+    ///
+    /// `true` for price, spread, and structured-credit correlation shocks.
+    pub fn mutates_instruments(&self) -> bool {
+        matches!(
+            self,
+            Self::InstrumentPricePctByAttr { .. }
+                | Self::InstrumentSpreadBpByAttr { .. }
+                | Self::InstrumentPricePctByType { .. }
+                | Self::InstrumentSpreadBpByType { .. }
+                | Self::AssetCorrelationPts { .. }
+                | Self::PrepayDefaultCorrelationPts { .. }
+        )
+    }
 }
 
 fn default_true() -> bool {

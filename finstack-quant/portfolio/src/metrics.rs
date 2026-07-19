@@ -299,7 +299,7 @@ pub fn aggregate_metrics(
 
     let position_entries: Vec<_> = valuation.position_values.iter().collect();
 
-    let collected: Vec<PositionMetricData> = position_entries
+    let collected_results: Vec<Result<PositionMetricData>> = position_entries
         .par_iter()
         .filter_map(|(position_id, position_value)| {
             position_value.valuation_result.as_ref().map(|val_result| {
@@ -323,7 +323,10 @@ pub fn aggregate_metrics(
                 })
             })
         })
-        .collect::<Result<Vec<_>>>()?;
+        .collect();
+    let collected = collected_results
+        .into_iter()
+        .collect::<Result<Vec<PositionMetricData>>>()?;
 
     Ok(aggregate_collected_metrics(collected))
 }
@@ -505,11 +508,13 @@ mod tests {
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market;
     use crate::types::Entity;
-    use crate::valuation::value_portfolio;
+    use crate::valuation::{value_portfolio, PositionValue};
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
+    use finstack_quant_valuations::results::ValuationResult;
     use std::sync::Arc;
     use time::macros::date;
 
@@ -647,6 +652,57 @@ mod tests {
             .get_position_metrics("POS_001")
             .expect("position metrics should be present");
         assert_eq!(position_metrics.currency, Currency::USD);
+    }
+
+    #[test]
+    fn aggregate_metrics_reports_fx_errors_in_position_order() {
+        let as_of = date!(2024 - 01 - 01);
+        let entity_id = EntityId::from("ENTITY".to_string());
+        let mut position_values = IndexMap::new();
+        for (position_id, currency) in [("FIRST_EUR", Currency::EUR), ("SECOND_GBP", Currency::GBP)]
+        {
+            let position_id = PositionId::from(position_id.to_string());
+            let measures = IndexMap::from([(MetricId::Dv01, 1.0)]);
+            let valuation_result =
+                ValuationResult::stamped(position_id.as_str(), as_of, Money::new(0.0, currency))
+                    .with_measures(measures);
+            position_values.insert(
+                position_id.clone(),
+                PositionValue {
+                    position_id,
+                    entity_id: entity_id.clone(),
+                    value_native: Money::new(0.0, currency),
+                    value_base: Money::new(0.0, Currency::USD),
+                    metric_scale: 1.0,
+                    risk_metrics_complete: true,
+                    risk_error: None,
+                    valuation_result: Some(valuation_result),
+                },
+            );
+        }
+        let valuation = PortfolioValuation {
+            as_of,
+            position_values,
+            total_base_ccy: Money::new(0.0, Currency::USD),
+            by_entity: IndexMap::new(),
+            degraded_positions: Vec::new(),
+            fx_collapse_policy: FxConversionPolicy::CashflowDate,
+            provenance: None,
+        };
+        let market =
+            MarketContext::new().insert_fx(FxMatrix::new(Arc::new(SimpleFxProvider::new())));
+
+        let error = aggregate_metrics(&valuation, Currency::USD, &market, as_of)
+            .expect_err("both positions have missing FX quotes");
+        let message = error.to_string();
+        assert!(
+            message.contains("EUR"),
+            "logical first position must win: {message}"
+        );
+        assert!(
+            !message.contains("GBP"),
+            "later position error must not win: {message}"
+        );
     }
 
     // =====================================================================

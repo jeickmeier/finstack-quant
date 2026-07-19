@@ -9,6 +9,16 @@ use crate::warning::Warning;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::pricer::InstrumentType;
 
+/// Result of applying one instrument shock.
+pub(crate) struct InstrumentShockOutcome {
+    /// Number of instruments mutated by the shock.
+    pub(crate) count: usize,
+    /// Zero-based portfolio indices of the mutated instruments.
+    pub(crate) changed_indices: Vec<usize>,
+    /// Non-fatal warnings raised while routing the shock.
+    pub(crate) warnings: Vec<Warning>,
+}
+
 fn accumulate_optional_shock(current: Option<f64>, delta: f64) -> f64 {
     current.unwrap_or(0.0) + delta
 }
@@ -119,15 +129,15 @@ fn apply_shock<M>(
     matcher: M,
     kind: ShockKind,
     raw_value: f64,
-) -> (usize, Vec<Warning>)
+) -> InstrumentShockOutcome
 where
     M: Fn(&Box<dyn Instrument>) -> bool,
 {
     let delta = kind.internal_value(raw_value);
-    let mut count = 0;
+    let mut changed_indices = Vec::new();
     let mut warnings = Vec::new();
 
-    for instrument in instruments.iter_mut() {
+    for (index, instrument) in instruments.iter_mut().enumerate() {
         if !matcher(instrument) {
             continue;
         }
@@ -178,18 +188,22 @@ where
                 }
             }
         }
-        count += 1;
+        changed_indices.push(index);
     }
 
-    (count, warnings)
+    InstrumentShockOutcome {
+        count: changed_indices.len(),
+        changed_indices,
+        warnings,
+    }
 }
 
 /// Apply a percentage price shock to instruments matching the provided types.
-pub fn apply_instrument_type_price_shock(
+pub(crate) fn apply_instrument_type_price_shock(
     instruments: &mut [Box<dyn Instrument>],
     instrument_types: &[InstrumentType],
     pct: f64,
-) -> (usize, Vec<Warning>) {
+) -> InstrumentShockOutcome {
     apply_shock(
         instruments,
         |inst| instrument_types.contains(&inst.key()),
@@ -199,11 +213,11 @@ pub fn apply_instrument_type_price_shock(
 }
 
 /// Apply a spread shock to instruments matching the provided types.
-pub fn apply_instrument_type_spread_shock(
+pub(crate) fn apply_instrument_type_spread_shock(
     instruments: &mut [Box<dyn Instrument>],
     instrument_types: &[InstrumentType],
     bp: f64,
-) -> (usize, Vec<Warning>) {
+) -> InstrumentShockOutcome {
     apply_shock(
         instruments,
         |inst| instrument_types.contains(&inst.key()),
@@ -213,45 +227,45 @@ pub fn apply_instrument_type_spread_shock(
 }
 
 /// Apply a percentage price shock to instruments matching the provided attributes.
-pub fn apply_instrument_attr_price_shock(
+pub(crate) fn apply_instrument_attr_price_shock(
     instruments: &mut [Box<dyn Instrument>],
     attrs: &indexmap::IndexMap<String, String>,
     pct: f64,
-) -> (usize, Vec<Warning>) {
+) -> InstrumentShockOutcome {
     let filters = normalise_filters(attrs);
-    let (count, mut warnings) = apply_shock(
+    let mut outcome = apply_shock(
         instruments,
         |inst| matches_attr_filter(inst.attributes(), &filters),
         ShockKind::Price,
         pct,
     );
-    if count == 0 {
-        warnings.push(Warning::InstrumentShockNoMatch {
+    if outcome.count == 0 {
+        outcome.warnings.push(Warning::InstrumentShockNoMatch {
             filter_desc: format!("{attrs:?}"),
         });
     }
-    (count, warnings)
+    outcome
 }
 
 /// Apply a spread shock to instruments matching the provided attributes.
-pub fn apply_instrument_attr_spread_shock(
+pub(crate) fn apply_instrument_attr_spread_shock(
     instruments: &mut [Box<dyn Instrument>],
     attrs: &indexmap::IndexMap<String, String>,
     bp: f64,
-) -> (usize, Vec<Warning>) {
+) -> InstrumentShockOutcome {
     let filters = normalise_filters(attrs);
-    let (count, mut warnings) = apply_shock(
+    let mut outcome = apply_shock(
         instruments,
         |inst| matches_attr_filter(inst.attributes(), &filters),
         ShockKind::Spread,
         bp,
     );
-    if count == 0 {
-        warnings.push(Warning::InstrumentShockNoMatch {
+    if outcome.count == 0 {
+        outcome.warnings.push(Warning::InstrumentShockNoMatch {
             filter_desc: format!("{attrs:?}"),
         });
     }
-    (count, warnings)
+    outcome
 }
 
 fn matches_attr_filter(attrs: &Attributes, filters: &[(String, String)]) -> bool {

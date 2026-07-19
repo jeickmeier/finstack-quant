@@ -31,4 +31,5 @@ pub use json::{
 };
 pub use positions::{parse_positions_json, pricing_positions, ParsedPosition};
 pub use repricing_engine::{FactorPnlProfile, FullRepricingEngine, ScenarioGrid};
+pub(crate) use traits::exact_factor_market_keys;
 pub use traits::FactorSensitivityEngine;
