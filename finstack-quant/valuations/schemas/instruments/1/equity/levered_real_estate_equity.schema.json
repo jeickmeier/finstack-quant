@@ -6890,6 +6890,36 @@
       ],
       "type": "object"
     },
+    "CoverageTrigger2": {
+      "additionalProperties": false,
+      "description": "Coverage trigger definition used for diversion logic (OC/IC thresholds).",
+      "properties": {
+        "ic_trigger": {
+          "description": "IC trigger level (e.g., 1.10 = 110%)",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "oc_trigger": {
+          "description": "OC trigger level (e.g., 1.15 = 115%)",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "tranche_id": {
+          "description": "Tranche where test applies",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tranche_id"
+      ],
+      "type": "object"
+    },
     "CreditDefaultSwap": {
       "additionalProperties": false,
       "description": "Credit Default Swap instrument.\n\n# Market Standards & Citations (Week 5)\n\n## ISDA Standards\n\nThis implementation follows the **ISDA 2014 Credit Derivatives Definitions**:\n- **Section 1.1:** General Terms and Credit Events\n- **Section 3.2:** Fixed Payments (Premium Leg)\n- **Section 3.3:** Floating Payments (Protection Leg)\n- **Section 7.1:** Settlement Terms\n\n## ISDA CDS Standard Model\n\nThe pricing engine implements the **ISDA CDS Standard Model (2009)**:\n- Quarterly premium payments (20th of Mar/Jun/Sep/Dec - IMM dates)\n- ACT/360 day count\n- Modified Following business day convention\n- Accrual-on-default included in premium leg\n- Settlement: T+3 (North America), T+1 (Europe post-2009)\n\n## Integration Methods\n\nMultiple numerical integration methods available:\n- **ISDA Exact:** Analytical integration at exact cashflow dates (default)\n- **Gaussian Quadrature:** 8-point Gauss-Legendre for smooth integration\n- **Adaptive Simpson:** Adaptive refinement for complex survival curves\n\n## References\n\n- ISDA 2014 Credit Derivatives Definitions\n- \"Modelling Single-name and Multi-name Credit Derivatives\" by O'Kane (2008)\n- ISDA CDS Standard Model Implementation (Markit, 2009)\n- Bloomberg CDSW function documentation\n\nSee unit tests and `examples/` for usage.",
@@ -17305,6 +17335,13 @@
             }
           ],
           "description": "Optional correlation structure for stochastic modeling."
+        },
+        "coverage_triggers": {
+          "description": "Overcollateralization / interest-coverage triggers evaluated each period.\n\nEach entry names a tranche and the OC and/or IC level that must be\nmaintained for it. When a test fails, the cure amount is diverted from\nthe divertible (equity/residual) tier to redeem senior notes — the\ncentral structural protection in a CLO.\n\nSC-C03: before this field existed there was no way to attach triggers to\na deal at all. `Waterfall::add_coverage_trigger` was called only from\nunit tests, and `Tranche::oc_trigger`/`ic_trigger` were write-only, so\n`waterfall.coverage_triggers` was always empty in every production\npricing path. The coverage-test loop never executed, `diversion_active`\nwas permanently false, and no cash trap, turbo or OC/IC diversion ever\nfired — systematically overvaluing equity and junior notes and leaving\nsenior protection unmodelled.\n\nEmpty (the default) reproduces the previous no-trigger behaviour\nexactly, so existing deals and goldens are unaffected.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTrigger;\n\n// Class A must maintain 120% OC and 115% IC.\nlet trigger = CoverageTrigger {\n    tranche_id: \"CLASS_A\".to_string(),\n    oc_trigger: Some(1.20),\n    ic_trigger: Some(1.15),\n};\nassert_eq!(trigger.oc_trigger, Some(1.20));\n```\n\nNote the fully-qualified type: `tranches::CoverageTrigger` (a per-tranche\nbreach-state record) shares this name and is already in scope here, so\nthe waterfall spec type must be named explicitly. The public re-export\n`structured_credit::CoverageTrigger` is this one.",
+          "items": {
+            "$ref": "#/$defs/CoverageTrigger2"
+          },
+          "type": "array"
         },
         "credit_factors": {
           "$ref": "#/$defs/CreditFactors",

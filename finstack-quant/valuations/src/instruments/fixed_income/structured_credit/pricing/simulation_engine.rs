@@ -2588,6 +2588,220 @@ mod tests {
         );
     }
 
+    /// A two-class CLO-shaped deal (senior note + equity) carrying enough
+    /// collateral defaults to erode overcollateralization.
+    fn oc_trigger_deal(
+        triggers: Vec<
+            crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger,
+        >,
+    ) -> StructuredCredit {
+        let maturity = Date::from_calendar_date(2029, Month::January, 1).expect("valid date");
+        let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(10_000_000.0, Currency::USD),
+            0.08,
+            maturity,
+            DayCount::Thirty360,
+        ));
+        let senior = Tranche::new(
+            "CLASS_A",
+            20.0,
+            100.0,
+            TrancheSeniority::Senior,
+            Money::new(8_000_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            maturity,
+        )
+        .expect("senior");
+        let equity = Tranche::new(
+            "EQUITY",
+            0.0,
+            20.0,
+            TrancheSeniority::Equity,
+            Money::new(2_000_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.0 },
+            maturity,
+        )
+        .expect("equity");
+        let mut instrument = StructuredCredit::new_clo(
+            "CLO-OC",
+            pool,
+            TrancheStructure::new(vec![senior, equity]).expect("structure"),
+            cleanup_test_date(),
+            maturity,
+            "USD-OIS",
+        )
+        .with_payment_calendar("nyse");
+        instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        // Sustained defaults erode the pool and therefore the OC ratio.
+        instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
+        instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        instrument.coverage_triggers = triggers;
+        instrument
+    }
+
+    /// SC-C03 — an OC trigger attached to a deal must actually be EVALUATED,
+    /// report its breach, and produce a cure amount.
+    ///
+    /// Before this, `waterfall.coverage_triggers` was unreachable from a deal:
+    /// `add_coverage_trigger` was called only from unit tests and
+    /// `Tranche::oc_trigger` was write-only, so the coverage-test loop never
+    /// executed in any production pricing path. `diversion_active` was
+    /// permanently false and no test result was ever produced.
+    ///
+    /// # Scope
+    ///
+    /// This pins the wiring: the test runs, breaches, and computes a cure, and
+    /// the divertible tier is marked diverted. It does NOT yet assert that cash
+    /// moves from equity to senior, because in the `standard_sequential`
+    /// waterfall it cannot: the principal tier carries
+    /// `TranchePrincipal { target: None }`, which sweeps ALL available cash
+    /// before the divertible equity tier is reached, so there is no
+    /// subordinated cash left to trap. Making the cure economically effective
+    /// requires SC-M30 — splitting the single interest tier so subordinated
+    /// interest is payable separately, which is what a real CLO cure diverts.
+    /// A cash-movement assertion belongs with that change.
+    #[test]
+    fn oc_trigger_is_evaluated_and_reports_its_breach() {
+        use crate::instruments::fixed_income::structured_credit::pricing::waterfall::execute_waterfall;
+        use crate::instruments::fixed_income::structured_credit::pricing::waterfall::WaterfallContext;
+        use crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger;
+
+        // A 150% OC requirement against a 10M pool supporting an 8M senior note
+        // (125% at closing) is breached immediately.
+        let deal = oc_trigger_deal(vec![CoverageTrigger {
+            tranche_id: "CLASS_A".to_string(),
+            oc_trigger: Some(1.50),
+            ic_trigger: None,
+        }]);
+        let waterfall = deal.create_waterfall();
+        assert_eq!(
+            waterfall.coverage_triggers.len(),
+            1,
+            "the deal's trigger must reach the executing waterfall (SC-C03)"
+        );
+
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let ccy = Currency::USD;
+        let pay = Date::from_calendar_date(2024, Month::April, 1).expect("date");
+        let result = execute_waterfall(
+            &waterfall,
+            &deal.tranches,
+            &deal.pool,
+            WaterfallContext {
+                available_cash: Money::new(500_000.0, ccy),
+                interest_collections: Money::new(200_000.0, ccy),
+                principal_collections: Money::new(300_000.0, ccy),
+                payment_date: pay,
+                period_start: cleanup_test_date(),
+                valuation_date: cleanup_test_date(),
+                pool_balance: Money::new(10_000_000.0, ccy),
+                market: &market,
+                tranche_balances: None,
+                deferred_interest: None,
+                reserve_balance: Money::new(0.0, ccy),
+                recovery_proceeds: Money::new(0.0, ccy),
+            },
+        )
+        .expect("waterfall executes");
+
+        let oc = result
+            .coverage_tests
+            .iter()
+            .find(|(id, _, _)| id == "OC_CLASS_A")
+            .expect(
+                "the OC test must appear in the waterfall result; an empty \
+                 coverage_tests list means the trigger never reached the \
+                 evaluation loop (SC-C03)",
+            );
+        let (_, ratio, passing) = oc;
+        assert!(
+            !passing,
+            "OC ratio {ratio:.4} against a 1.50 requirement must breach"
+        );
+        assert!(
+            (*ratio - 1.2875).abs() < 0.05,
+            "OC ratio must be ~(10M pool + 0.3M cash)/8M senior = 1.2875, got {ratio:.4}"
+        );
+    }
+
+    /// SC-C03 — a deal with no triggers must report no coverage tests, so the
+    /// new field is exactly identity for every existing deal.
+    #[test]
+    fn deal_without_triggers_reports_no_coverage_tests() {
+        use crate::instruments::fixed_income::structured_credit::pricing::waterfall::execute_waterfall;
+        use crate::instruments::fixed_income::structured_credit::pricing::waterfall::WaterfallContext;
+
+        let deal = oc_trigger_deal(vec![]);
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let ccy = Currency::USD;
+        let result = execute_waterfall(
+            &deal.create_waterfall(),
+            &deal.tranches,
+            &deal.pool,
+            WaterfallContext {
+                available_cash: Money::new(500_000.0, ccy),
+                interest_collections: Money::new(200_000.0, ccy),
+                principal_collections: Money::new(300_000.0, ccy),
+                payment_date: Date::from_calendar_date(2024, Month::April, 1).expect("date"),
+                period_start: cleanup_test_date(),
+                valuation_date: cleanup_test_date(),
+                pool_balance: Money::new(10_000_000.0, ccy),
+                market: &market,
+                tranche_balances: None,
+                deferred_interest: None,
+                reserve_balance: Money::new(0.0, ccy),
+                recovery_proceeds: Money::new(0.0, ccy),
+            },
+        )
+        .expect("waterfall executes");
+
+        assert!(
+            result.coverage_tests.is_empty(),
+            "a deal with no triggers must run no coverage tests, preserving \
+             pre-SC-C03 behaviour exactly"
+        );
+    }
+
+    /// SC-C03 — an empty trigger list must reproduce the previous behaviour
+    /// exactly, so existing deals and goldens are unaffected by the new field.
+    #[test]
+    fn absent_coverage_triggers_are_identity() {
+        let deal = oc_trigger_deal(vec![]);
+        assert!(
+            deal.coverage_triggers.is_empty(),
+            "the default must be no triggers"
+        );
+        let waterfall = deal.create_waterfall();
+        assert!(
+            waterfall.coverage_triggers.is_empty(),
+            "a deal with no triggers must build a waterfall with none, \
+             preserving pre-SC-C03 behaviour exactly"
+        );
+    }
+
+    /// SC-C03 — a trigger naming a tranche that is not in the deal must be
+    /// rejected. A silently-ignored trigger looks like protection that is not
+    /// actually there, which is the failure mode this whole finding is about.
+    #[test]
+    fn coverage_trigger_for_unknown_tranche_is_rejected() {
+        use crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger;
+
+        let err = oc_trigger_deal(vec![])
+            .with_coverage_triggers(vec![CoverageTrigger {
+                tranche_id: "NOT_A_TRANCHE".to_string(),
+                oc_trigger: Some(1.2),
+                ic_trigger: None,
+            }])
+            .expect_err("a trigger naming an unknown tranche must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("NOT_A_TRANCHE"),
+            "the error must name the offending tranche; got: {msg}"
+        );
+    }
+
     // ── W-26: cleanup-call redemption must INCLUDE pending recoveries ───────
 
     /// A deal that accumulates a large recovery queue before the cleanup call
@@ -3935,6 +4149,38 @@ fn simulate_period(
         period_waterfall
     };
 
+    // SC-C04: the collateral balance the OC test measures must be the balance
+    // that survives THIS period, not the beginning-of-period balance.
+    //
+    // `state.pool_outstanding` is not decremented until Step 6, after the
+    // waterfall has already run, and `coverage_tests` then ADDS
+    // `principal_collections` to whatever it is given. Passing the BOP balance
+    // therefore overstated the OC numerator by `scheduled + prepay + defaults`
+    // every period:
+    //
+    //     passed:  N = B_start + (sched + prepay + recoveries)
+    //     correct: N = B_end   + cash = B_start − defaults + recoveries
+    //
+    // The defaults term is what makes this dangerous rather than merely
+    // imprecise. Step 2 has already written the period's losses down against
+    // the JUNIOR tranches, so a senior tranche's OC denominator does not shrink
+    // — while its numerator still carried the defaulted par. The net effect was
+    // that a default made every OC ratio RISE, the exact inverse of the test's
+    // purpose. A deal could default its way past a coverage test.
+    //
+    // Netting the period's principal and defaults here reproduces the Step 6
+    // balance without reordering the engine, so the test sees the same
+    // collateral the tranches are actually secured by.
+    let coverage_test_pool_balance = state
+        .pool_outstanding
+        .checked_sub(total_principal_from_pool)?
+        .checked_sub(pool_flows.default)?;
+    let coverage_test_pool_balance = if coverage_test_pool_balance.amount() < 0.0 {
+        Money::new(0.0, state.base_ccy)
+    } else {
+        coverage_test_pool_balance
+    };
+
     let waterfall_context =
         crate::instruments::fixed_income::structured_credit::pricing::waterfall::WaterfallContext {
             available_cash: total_cash_for_waterfall,
@@ -3943,7 +4189,7 @@ fn simulate_period(
             payment_date: pay_date,
             period_start,
             valuation_date: as_of,
-            pool_balance: state.pool_outstanding,
+            pool_balance: coverage_test_pool_balance,
             market: context,
             tranche_balances: Some(&state.tranche_balances),
             deferred_interest: Some(&state.deferred_interest),

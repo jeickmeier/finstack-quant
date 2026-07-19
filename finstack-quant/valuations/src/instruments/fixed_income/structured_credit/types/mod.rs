@@ -387,6 +387,47 @@ pub struct StructuredCredit {
     #[serde(default)]
     pub hedge_swaps: Vec<InterestRateSwap>,
 
+    /// Overcollateralization / interest-coverage triggers evaluated each period.
+    ///
+    /// Each entry names a tranche and the OC and/or IC level that must be
+    /// maintained for it. When a test fails, the cure amount is diverted from
+    /// the divertible (equity/residual) tier to redeem senior notes — the
+    /// central structural protection in a CLO.
+    ///
+    /// SC-C03: before this field existed there was no way to attach triggers to
+    /// a deal at all. `Waterfall::add_coverage_trigger` was called only from
+    /// unit tests, and `Tranche::oc_trigger`/`ic_trigger` were write-only, so
+    /// `waterfall.coverage_triggers` was always empty in every production
+    /// pricing path. The coverage-test loop never executed, `diversion_active`
+    /// was permanently false, and no cash trap, turbo or OC/IC diversion ever
+    /// fired — systematically overvaluing equity and junior notes and leaving
+    /// senior protection unmodelled.
+    ///
+    /// Empty (the default) reproduces the previous no-trigger behaviour
+    /// exactly, so existing deals and goldens are unaffected.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTrigger;
+    ///
+    /// // Class A must maintain 120% OC and 115% IC.
+    /// let trigger = CoverageTrigger {
+    ///     tranche_id: "CLASS_A".to_string(),
+    ///     oc_trigger: Some(1.20),
+    ///     ic_trigger: Some(1.15),
+    /// };
+    /// assert_eq!(trigger.oc_trigger, Some(1.20));
+    /// ```
+    ///
+    /// Note the fully-qualified type: `tranches::CoverageTrigger` (a per-tranche
+    /// breach-state record) shares this name and is already in scope here, so
+    /// the waterfall spec type must be named explicitly. The public re-export
+    /// `structured_credit::CoverageTrigger` is this one.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub coverage_triggers: Vec<waterfall::CoverageTrigger>,
+
     /// Clean-up call pool factor threshold (percentage of original balance).
     ///
     /// When the pool factor (current balance / original balance) drops below
@@ -460,6 +501,72 @@ impl StructuredCredit {
         Ok(self)
     }
 
+    /// Attach overcollateralization / interest-coverage triggers to the deal.
+    ///
+    /// Each trigger names a tranche and the OC and/or IC ratio that must be
+    /// maintained for it. When a test fails during simulation, the cure amount
+    /// is diverted from the divertible (equity/residual) tier to redeem senior
+    /// notes — the central structural protection in a CLO.
+    ///
+    /// # Arguments
+    ///
+    /// * `triggers` - Coverage triggers to evaluate each payment period.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` when a trigger level is not finite or not strictly
+    /// positive, or when it names a tranche that is not part of this deal —
+    /// a silently-ignored trigger would look like protection that is not there.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+    /// #     StructuredCredit, CoverageTrigger,
+    /// # };
+    /// # fn example(deal: StructuredCredit) -> finstack_quant_core::Result<()> {
+    /// let deal = deal.with_coverage_triggers(vec![CoverageTrigger {
+    ///     tranche_id: "CLASS_A".to_string(),
+    ///     oc_trigger: Some(1.20),
+    ///     ic_trigger: Some(1.15),
+    /// }])?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_coverage_triggers(
+        mut self,
+        triggers: Vec<waterfall::CoverageTrigger>,
+    ) -> finstack_quant_core::Result<Self> {
+        for trigger in &triggers {
+            if !self
+                .tranches
+                .tranches
+                .iter()
+                .any(|t| t.id.as_str() == trigger.tranche_id)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "coverage trigger references tranche '{}', which is not part \
+                     of deal '{}'",
+                    trigger.tranche_id,
+                    self.id.as_str()
+                )));
+            }
+            for (label, level) in [("oc", trigger.oc_trigger), ("ic", trigger.ic_trigger)] {
+                if let Some(level) = level {
+                    if !level.is_finite() || level <= 0.0 {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "{label}_trigger for tranche '{}' must be finite and \
+                             positive, got {level}",
+                            trigger.tranche_id
+                        )));
+                    }
+                }
+            }
+        }
+        self.coverage_triggers = triggers;
+        Ok(self)
+    }
+
     /// Calculate current loss percentage of the pool.
     ///
     /// Reconstructs the original pool balance as the denominator:
@@ -504,7 +611,17 @@ impl StructuredCredit {
     /// Internal waterfall creation (called by constructors).
     fn create_waterfall_internal(&self) -> Waterfall {
         // Use the standard sequential waterfall as default
-        Waterfall::standard_sequential(self.pool.base_currency(), &self.tranches, vec![])
+        let mut waterfall =
+            Waterfall::standard_sequential(self.pool.base_currency(), &self.tranches, vec![]);
+
+        // SC-C03: attach the deal's OC/IC triggers so the coverage-test loop in
+        // `execute_waterfall` actually has something to evaluate. Without this
+        // `waterfall.coverage_triggers` is always empty, `diversion_active`
+        // stays false, and the divertible equity tier's cash is never trapped.
+        for trigger in &self.coverage_triggers {
+            waterfall = waterfall.add_coverage_trigger(trigger.clone());
+        }
+        waterfall
     }
 
     /// Calculate prepayment rate (SMM) for a given period.
