@@ -2308,6 +2308,60 @@ mod tests {
         }
     }
 
+    /// SC-M01 — loss allocation must run most-junior-first by PAYMENT
+    /// PRIORITY, not by the four-level seniority discriminant.
+    ///
+    /// `TrancheSeniority` has only four levels while a real deal has six or
+    /// more classes, so same-level collisions are the norm. `sort_by` is
+    /// stable, so keying on the discriminant alone left colliding tranches in
+    /// input order — most-senior-first — and wrote down A-1 before A-2.
+    #[test]
+    fn loss_allocation_runs_junior_first_within_a_pari_passu_class() {
+        let maturity = Date::from_calendar_date(2034, Month::January, 1).expect("date");
+        let closing = Date::from_calendar_date(2024, Month::January, 1).expect("date");
+        let (pool, _) = level_pay_pool_and_tranches(maturity, 0.06, 1_000_000.0);
+
+        // Two pari-passu Senior notes plus a Mezzanine and an Equity class —
+        // the seniority enum cannot distinguish A-1 from A-2.
+        let mk = |id: &str, seniority, attach: f64, detach: f64, bal: f64| {
+            Tranche::new(
+                id,
+                attach,
+                detach,
+                seniority,
+                Money::new(bal, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity,
+            )
+            .expect("tranche")
+        };
+        let tranches = TrancheStructure::new(vec![
+            mk("A1", TrancheSeniority::Senior, 60.0, 100.0, 400_000.0),
+            mk("A2", TrancheSeniority::Senior, 30.0, 60.0, 300_000.0),
+            mk("B", TrancheSeniority::Mezzanine, 10.0, 30.0, 200_000.0),
+            mk("E", TrancheSeniority::Equity, 0.0, 10.0, 100_000.0),
+        ])
+        .expect("structure");
+
+        let state = SimulationState::new(&pool, &tranches, closing, closing, 0).expect("state");
+
+        let order: Vec<&str> = state
+            .loss_alloc_order
+            .iter()
+            .map(|&i| state.tranches.tranches[i].id.as_str())
+            .collect();
+
+        assert_eq!(
+            order,
+            vec!["E", "B", "A2", "A1"],
+            "losses must be absorbed most-junior-first; within the pari-passu \
+             Senior class A2 (payment_priority 2) must absorb before A1 \
+             (payment_priority 1). Getting A1 before A2 means the allocation is \
+             keyed on the seniority discriminant and relying on sort stability \
+             (SC-M01)."
+        );
+    }
+
     // ── W-26: cleanup-call redemption must INCLUDE pending recoveries ───────
 
     /// A deal that accumulates a large recovery queue before the cleanup call
@@ -2937,14 +2991,29 @@ impl<'a> SimulationState<'a> {
         // deal structure and should not trigger additional write-downs.
         let performing_pool_balance = pool.performing_balance().unwrap_or(total_pool_balance);
 
-        // Pre-compute loss allocation order once: equity first → senior last.
-        // TrancheSeniority enum: Senior=0, Mezzanine=1, Subordinated=2, Equity=3.
-        // Sort descending so Equity (3) comes first.
+        // Pre-compute loss allocation order once: most junior first → most
+        // senior last, the reverse of the payment waterfall.
+        //
+        // SC-M01: this must key on `payment_priority`, NOT on `seniority`.
+        // `TrancheSeniority` has only four levels (Senior/Mezzanine/
+        // Subordinated/Equity) while a typical deal has six or more classes, so
+        // same-level collisions are the norm, not the exception (B and C both
+        // Mezzanine; A-1 and A-2 both Senior). `sort_by` is a STABLE sort, so
+        // sorting on the seniority discriminant alone left colliding tranches
+        // in their input order — which is most-senior-first — and therefore
+        // wrote down A-1 before A-2, inverting loss allocation within every
+        // pari-passu class.
+        //
+        // `assign_priorities` (types/tranches.rs) already resolves this: it
+        // ranks by seniority ascending with an input-index tie-break and
+        // assigns distinct, contiguous priorities `1..=n` where 1 is the most
+        // senior. Sorting on it descending gives the correct junior-first
+        // order and is total, so the stability of the sort no longer matters.
         let mut loss_alloc_order: Vec<usize> = (0..tranches.tranches.len()).collect();
         loss_alloc_order.sort_by(|&a, &b| {
             tranches.tranches[b]
-                .seniority
-                .cmp(&tranches.tranches[a].seniority)
+                .payment_priority
+                .cmp(&tranches.tranches[a].payment_priority)
         });
 
         // Balance-weighted average collateral age (WALA) at closing. The
