@@ -481,8 +481,6 @@ pub fn calculate_tranche_discount_margin(
     as_of: Date,
     target_pv: Money,
 ) -> Result<f64> {
-    use rust_decimal::prelude::ToPrimitive;
-
     deal.validate_for_pricing()?;
     let tranche = deal
         .tranches
@@ -495,47 +493,55 @@ pub fn calculate_tranche_discount_margin(
             })
         })?;
 
-    let TrancheCoupon::Floating(spec) = &tranche.coupon else {
+    let TrancheCoupon::Floating(_) = &tranche.coupon else {
         return Err(finstack_quant_core::Error::Validation(format!(
             "DiscountMargin is only defined for floating-rate tranches; '{tranche_id}' is fixed-rate"
         )));
     };
-    // Quoted margin (bp), used as the solver's starting point.
-    let quoted_bp = spec.spread_bp.to_f64().unwrap_or(0.0);
 
-    let target = target_pv.amount();
+    // SC-C06. The margin is solved in the DISCOUNT RATE, holding the
+    // contractual coupon fixed.
+    //
+    // Canonical DM (Fabozzi, "Fixed Income Analysis", floating-rate
+    // securities): find `m` such that
+    //
+    //     Σ [(f_i + qm)·τ_i·N + prin_i] / Π(1 + (f_j + m)·τ_j) = P
+    //
+    // where the QUOTED margin `qm` is contractual and stays in the numerator,
+    // and the solved margin `m` appears ONLY in the discounting.
+    //
+    // The previous implementation did the opposite: it SET the tranche's
+    // coupon margin to the trial value and repriced on an unchanged discount
+    // curve, so the margin entered only the numerator. PV was therefore
+    // *increasing* in the solved value and ∂DM/∂Price came out with the WRONG
+    // SIGN — canonical DM falls as price rises, this rose. On the repo's own
+    // test deal (SOFR-3M + 150bp, 2y) a +0.2%-of-PV move in the target
+    // returned ~160bp where canonical DM gives ~139.5bp: a 20bp error on a
+    // 150bp asset, direction reversed. A desk screening for "widest DM" would
+    // have ranked the richest bonds first.
+    //
+    // For a floating-rate note discounted on its own index curve, the
+    // zero-discount margin coincides with the z-spread over that curve — the
+    // projected cashflows already carry the contractual margin — so this
+    // delegates to the shared z-spread kernel rather than duplicating the
+    // solve. That also inherits the kernel's Neumaier accumulation and
+    // cached discount factors.
+    let cashflows =
+        crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows(
+            deal, tranche_id, context, as_of,
+        )?;
 
-    // Objective: PV(tranche whose margin is *set* to `dm_bp`) - target_pv. The
-    // margin is set (not bumped), so the solved value is the absolute discount
-    // margin to price. NAN on pricing/conversion failure so the solver does not
-    // converge to a spurious root on artificial values.
-    let objective = |dm_bp: f64| -> f64 {
-        let mut repriced = deal.clone();
-        if let Some(t) = repriced
-            .tranches
-            .tranches
-            .iter_mut()
-            .find(|t| t.id.as_str() == tranche_id)
-        {
-            if let TrancheCoupon::Floating(spec) = &mut t.coupon {
-                match rust_decimal::Decimal::try_from(dm_bp) {
-                    Ok(d) => spec.spread_bp = d,
-                    Err(_) => return f64::NAN,
-                }
-            }
-        }
-        match repriced.value_tranche(tranche_id, context, as_of) {
-            Ok(pv) => pv.amount() - target,
-            Err(_) => f64::NAN,
-        }
-    };
+    let disc_curve_id = deal.discount_curve_id.as_str();
+    let discount_curve = context.get_discount(disc_curve_id)?;
 
-    let solver = BrentSolver::new()
-        .tolerance(1e-8)
-        .initial_bracket_size(Some(50.0));
-    let dm_bp = solver.solve(objective, quoted_bp)?;
+    let dm_bp = calculate_tranche_z_spread(
+        &cashflows.cashflows,
+        discount_curve.as_ref(),
+        target_pv,
+        as_of,
+    )?;
 
-    if dm_bp.abs() > 5000.0 {
+    if !dm_bp.is_finite() || dm_bp.abs() > 5000.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Discount margin {dm_bp} bp exceeds reasonable bounds (±5000 bp)"
         )));

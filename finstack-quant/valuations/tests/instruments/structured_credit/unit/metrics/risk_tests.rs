@@ -272,43 +272,99 @@ mod discount_margin_tests {
             .with_payment_calendar("nyse")
     }
 
+    /// SC-C06 — canonical DM: the margin is solved in the DISCOUNT RATE with
+    /// the contractual coupon held fixed (Fabozzi, "Fixed Income Analysis").
+    ///
+    /// At the tranche's own model PV — the PV obtained by discounting its
+    /// projected cashflows on the deal's discount curve with no extra spread —
+    /// the discount margin is therefore ZERO by construction. There is no
+    /// additional spread needed to reproduce a price that was computed with
+    /// none.
+    ///
+    /// The pre-fix implementation instead SET the tranche's coupon margin to
+    /// the trial value and repriced on an unchanged curve, so the margin
+    /// entered only the numerator. That made this test report the 150 bp quoted
+    /// margin — a coupon-margin-to-price quantity, not a discount margin — and
+    /// inverted the sign of dDM/dPrice (see the companion test below).
     #[test]
-    fn discount_margin_equals_quoted_margin_at_base_pv() {
-        // The absolute discount margin to price equals the tranche's own quoted
-        // margin (150 bp) when the target is the tranche's base PV.
+    fn discount_margin_is_zero_at_the_model_pv() {
         let sc = deal(true);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
         let dm = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), pv).unwrap();
         assert!(
-            (dm - 0.015).abs() < 1e-6,
-            "DM at base PV should equal the 150 bp quoted margin, got {dm}"
+            dm.abs() < 1e-6,
+            "at the model PV the discount margin must be zero (no spread over \
+             the curve is needed to reproduce a price computed with none), \
+             got {dm}"
         );
     }
 
+    /// SC-C06 — the defining property of a discount margin: it FALLS as price
+    /// rises. Pay more for the same cashflows and you earn less spread.
+    ///
+    /// The pre-fix implementation had this backwards and the old test asserted
+    /// the inversion ("richer target -> wider margin"). A desk screening for
+    /// the widest DM would have ranked the richest bonds first.
     #[test]
-    fn discount_margin_widens_with_price() {
+    fn discount_margin_falls_as_price_rises() {
         let sc = deal(true);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
-        // PV increases with the coupon margin, so a richer (higher) target needs
-        // a wider absolute margin and a cheaper (lower) target a tighter one,
-        // both straddling the 150 bp quoted margin.
         let richer = Money::new(pv.amount() * 1.002, pv.currency());
         let cheaper = Money::new(pv.amount() * 0.998, pv.currency());
         let dm_rich =
             calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), richer).unwrap();
         let dm_cheap =
             calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), cheaper).unwrap();
+
         assert!(
-            dm_rich > 0.015,
-            "richer target -> wider margin, got {dm_rich}"
+            dm_rich < 0.0,
+            "paying ABOVE the model PV must give a NEGATIVE discount margin \
+             (you earn less than the curve implies), got {dm_rich}"
         );
         assert!(
-            dm_cheap < 0.015,
-            "cheaper target -> tighter margin, got {dm_cheap}"
+            dm_cheap > 0.0,
+            "paying BELOW the model PV must give a POSITIVE discount margin, \
+             got {dm_cheap}"
         );
-        assert!(dm_rich > dm_cheap);
+        assert!(
+            dm_rich < dm_cheap,
+            "discount margin must be monotonically DECREASING in price: \
+             rich={dm_rich}, cheap={dm_cheap}. An increasing relationship means \
+             the margin is being applied to the coupon rather than the discount \
+             rate (SC-C06)."
+        );
+    }
+
+    /// SC-C06 — a floater's discount margin must be consistent with the
+    /// z-spread on the same cashflows and the same target, since for a
+    /// floating-rate note discounted on its index curve the zero-discount
+    /// margin IS the z-spread over that curve.
+    #[test]
+    fn discount_margin_agrees_with_z_spread_on_the_same_target() {
+        use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+            calculate_tranche_z_spread, generate_tranche_cashflows,
+        };
+
+        let sc = deal(true);
+        let mkt = market();
+        let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
+        let target = Money::new(pv.amount() * 0.99, pv.currency());
+
+        let dm = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), target).unwrap();
+
+        let flows = generate_tranche_cashflows(&sc, "SR", &mkt, closing()).unwrap();
+        let curve = mkt.get_discount("USD-OIS").unwrap();
+        let z_bp = calculate_tranche_z_spread(&flows.cashflows, curve.as_ref(), target, closing())
+            .unwrap();
+
+        assert!(
+            (dm - z_bp * 1e-4).abs() < 1e-9,
+            "for a floater on its index curve the discount margin must equal \
+             the z-spread: dm={dm}, z={}",
+            z_bp * 1e-4
+        );
     }
 
     #[test]
