@@ -5,6 +5,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::HashMap;
 use finstack_quant_valuations::calibration::api::market_datum::MarketDatum;
@@ -15,8 +17,12 @@ use finstack_quant_valuations::calibration::api::{
         ForwardCurveParams, StepParams, CALIBRATION_SCHEMA,
     },
 };
+use finstack_quant_valuations::calibration::bumps::{
+    bump_hazard_spreads_with_doc_clause_and_valuation_convention, BumpRequest,
+};
 use finstack_quant_valuations::calibration::CalibrationConfig;
 use finstack_quant_valuations::calibration::CalibrationMethod;
+use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations::market::quotes::ids::{Pillar, QuoteId};
 use finstack_quant_valuations::market::quotes::market_quote::MarketQuote;
 use finstack_quant_valuations::market::quotes::rates::RateQuote;
@@ -308,9 +314,43 @@ fn bench_residual_normalization(c: &mut Criterion) {
     });
 }
 
+fn bench_hazard_bootstrap(c: &mut Criterion) {
+    let envelope: CalibrationEnvelope = serde_json::from_str(include_str!(
+        "../examples/market_bootstrap/03_single_name_hazard.json"
+    ))
+    .expect("single-name hazard benchmark envelope should deserialize");
+
+    c.bench_function("calibration_hazard_full_plan_5_pillars", |b| {
+        b.iter(|| engine::execute(black_box(&envelope)).expect("hazard calibration should succeed"))
+    });
+
+    let result = engine::execute(&envelope).expect("hazard calibration setup should succeed");
+    let market =
+        MarketContext::try_from(result.result.final_market).expect("market state should rebuild");
+    let hazard = market
+        .get_hazard("ISSUER-A-CDS")
+        .expect("calibrated hazard curve should exist");
+    let discount_id = CurveId::new("USD-OIS");
+
+    c.bench_function("calibration_hazard_rebootstrap_parallel_5_pillars", |b| {
+        b.iter(|| {
+            bump_hazard_spreads_with_doc_clause_and_valuation_convention(
+                black_box(hazard.as_ref()),
+                black_box(&market),
+                black_box(&BumpRequest::Parallel(1.0)),
+                Some(black_box(&discount_id)),
+                Some(CdsDocClause::IsdaNa),
+                None,
+            )
+            .expect("hazard rebootstrap should succeed")
+        })
+    });
+}
+
 criterion_group!(
     benches,
     bench_discount_and_forward_steps,
-    bench_residual_normalization
+    bench_residual_normalization,
+    bench_hazard_bootstrap
 );
 criterion_main!(benches);

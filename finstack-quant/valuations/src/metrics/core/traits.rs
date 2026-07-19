@@ -17,6 +17,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 
 use finstack_quant_core::config::FinstackConfig;
+use std::borrow::Cow;
 use std::sync::Arc;
 
 /// Core trait for metric calculators.
@@ -52,6 +53,29 @@ pub trait MetricCalculator: Send + Sync {
     /// Slice of metric IDs that must be computed before this metric
     fn dependencies(&self) -> &[MetricId] {
         &[]
+    }
+
+    /// Lists metric IDs this calculator depends on, given the runtime context.
+    ///
+    /// Override this when the dependency set is not statically known — for
+    /// example when it varies with instrument-level pricing overrides. The
+    /// registry calls this (not [`dependencies`](Self::dependencies)) when
+    /// building the computation order, so a calculator that reads
+    /// `context.computed` for a config-dependent metric **must** declare it
+    /// here or it will be missing whenever the caller did not happen to
+    /// request it earlier in the list.
+    ///
+    /// The default implementation defers to
+    /// [`dependencies`](Self::dependencies), so calculators with a static
+    /// dependency set need not implement this.
+    ///
+    /// # Arguments
+    /// * `context` - Metric context, for inspecting the instrument and overrides
+    ///
+    /// # Returns
+    /// Metric IDs that must be computed before this metric
+    fn dynamic_dependencies<'a>(&'a self, _context: &MetricContext) -> Cow<'a, [MetricId]> {
+        Cow::Borrowed(self.dependencies())
     }
 }
 

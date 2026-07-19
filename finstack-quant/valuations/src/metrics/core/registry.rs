@@ -269,7 +269,7 @@ impl MetricRegistry {
 
         // Build dependency graph and compute order for this instrument type
         let instrument_type = context.instrument.key();
-        let order = self.resolve_dependencies(metric_ids, instrument_type)?;
+        let order = self.resolve_dependencies(metric_ids, instrument_type, context)?;
 
         // Compute metrics in dependency order (consume order to avoid cloning MetricId)
         for metric_id in order.into_iter() {
@@ -372,25 +372,21 @@ impl MetricRegistry {
         &self,
         metric_ids: &[MetricId],
         instrument_type: InstrumentType,
+        context: &MetricContext,
     ) -> finstack_quant_core::Result<Vec<MetricId>> {
-        let mut visited = finstack_quant_core::HashSet::default();
-        let mut order = Vec::new();
-        let mut temp_mark = finstack_quant_core::HashSet::default();
-        let mut path = Vec::new();
+        let mut state = TopoSortState {
+            visited: finstack_quant_core::HashSet::default(),
+            temp_mark: finstack_quant_core::HashSet::default(),
+            order: Vec::new(),
+            path: Vec::new(),
+        };
 
         for id in metric_ids {
             // Propagate errors (especially circular dependencies)
-            self.visit_metric(
-                id.clone(),
-                instrument_type,
-                &mut visited,
-                &mut temp_mark,
-                &mut order,
-                &mut path,
-            )?;
+            self.visit_metric(id.clone(), instrument_type, context, &mut state)?;
         }
 
-        Ok(order)
+        Ok(state.order)
     }
 
     /// DFS visit for topological sort with cycle detection.
@@ -401,20 +397,22 @@ impl MetricRegistry {
         &self,
         id: MetricId,
         instrument_type: InstrumentType,
-        visited: &mut finstack_quant_core::HashSet<MetricId>,
-        temp_mark: &mut finstack_quant_core::HashSet<MetricId>,
-        order: &mut Vec<MetricId>,
-        path: &mut Vec<MetricId>,
+        context: &MetricContext,
+        state: &mut TopoSortState,
     ) -> finstack_quant_core::Result<()> {
-        if visited.contains(&id) {
+        if state.visited.contains(&id) {
             return Ok(());
         }
 
-        if temp_mark.contains(&id) {
+        if state.temp_mark.contains(&id) {
             // Cycle: `id` is already on `path`; push again and slice from its first occurrence.
-            path.push(id.clone());
-            let cycle_start = path.iter().position(|m| m == &id).unwrap_or(path.len() - 1);
-            let cycle_path: Vec<String> = path[cycle_start..]
+            state.path.push(id.clone());
+            let cycle_start = state
+                .path
+                .iter()
+                .position(|m| m == &id)
+                .unwrap_or(state.path.len() - 1);
+            let cycle_path: Vec<String> = state.path[cycle_start..]
                 .iter()
                 .map(|m| m.as_str().to_string())
                 .collect();
@@ -422,36 +420,47 @@ impl MetricRegistry {
             return Err(finstack_quant_core::Error::circular_dependency(cycle_path));
         }
 
-        temp_mark.insert(id.clone());
-        path.push(id.clone());
+        state.temp_mark.insert(id.clone());
+        state.path.push(id.clone());
 
         // Get calculator and process dependencies
         // If metric not found or not applicable, just skip it gracefully
         if let Some(entry) = self.entries.get(&id) {
             if let Some(calc) = entry.get_for(instrument_type) {
-                let deps = calc.dependencies();
+                // Context-aware so calculators whose dependency set varies with
+                // instrument overrides (e.g. Breakeven's sensitivity metric)
+                // declare what they actually read from `context.computed`.
+                let deps = calc.dynamic_dependencies(context);
                 for dep_id in deps.iter() {
                     // Propagate errors from dependencies
-                    self.visit_metric(
-                        dep_id.clone(),
-                        instrument_type,
-                        visited,
-                        temp_mark,
-                        order,
-                        path,
-                    )?;
+                    self.visit_metric(dep_id.clone(), instrument_type, context, state)?;
                 }
             }
         }
 
-        temp_mark.remove(&id);
-        path.pop();
-        visited.insert(id.clone());
+        state.temp_mark.remove(&id);
+        state.path.pop();
+        state.visited.insert(id.clone());
         // Move id into order (last use)
-        order.push(id);
+        state.order.push(id);
 
         Ok(())
     }
+}
+
+/// Mutable traversal state for the dependency topological sort.
+///
+/// Bundled into one struct so [`MetricRegistry::visit_metric`] stays within a
+/// sane argument count as it recurses.
+struct TopoSortState {
+    /// Metrics already emitted to `order`.
+    visited: finstack_quant_core::HashSet<MetricId>,
+    /// Metrics on the current DFS stack, for cycle detection.
+    temp_mark: finstack_quant_core::HashSet<MetricId>,
+    /// Resolved computation order, dependencies first.
+    order: Vec<MetricId>,
+    /// Current DFS path, for circular-dependency diagnostics.
+    path: Vec<MetricId>,
 }
 
 #[cfg(test)]
