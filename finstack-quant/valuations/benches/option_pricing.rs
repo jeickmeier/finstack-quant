@@ -211,10 +211,28 @@ fn bench_barrier_option_fd_greeks(c: &mut Criterion) {
     });
 }
 
+fn bench_option_bucketed_vega(c: &mut Criterion) {
+    let market = create_market();
+    let option = create_call_option(12);
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+
+    c.bench_function("equity_option_bucketed_vega_7x7", |b| {
+        b.iter(|| {
+            option.price_with_metrics(
+                black_box(&market),
+                black_box(as_of),
+                black_box(&[MetricId::BucketedVega]),
+                finstack_quant_valuations::instruments::PricingOptions::default(),
+            )
+        });
+    });
+}
+
 criterion_group!(
     benches,
     bench_option_pv,
     bench_option_greeks,
-    bench_barrier_option_fd_greeks
+    bench_barrier_option_fd_greeks,
+    bench_option_bucketed_vega
 );
 criterion_main!(benches);

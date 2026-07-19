@@ -159,6 +159,9 @@ pub struct MetricContext {
     hazard_recalibration_cache:
         Option<Arc<crate::calibration::bumps::hazard::HazardRecalibrationCache>>,
 
+    /// Batch-local rate recalibrations shared across position metric contexts.
+    rate_recalibration_cache: Option<Arc<crate::calibration::bumps::rates::RateRecalibrationCache>>,
+
     /// Optional market history for historical scenario revaluation (e.g., Historical VaR).
     ///
     /// This is intentionally **not** stored inside `finstack_quant_core::MarketContext` to keep
@@ -269,6 +272,7 @@ impl MetricContext {
             curves,
             market_scratch: None,
             hazard_recalibration_cache: None,
+            rate_recalibration_cache: None,
             market_history: None,
             pricing_model: None,
             pricer_registry: None,
@@ -364,6 +368,62 @@ impl MetricContext {
         cache: Option<Arc<crate::calibration::bumps::hazard::HazardRecalibrationCache>>,
     ) {
         self.hazard_recalibration_cache = cache;
+    }
+
+    /// Attach the batch-local rate recalibration cache.
+    pub(crate) fn set_rate_recalibration_cache(
+        &mut self,
+        cache: Option<Arc<crate::calibration::bumps::rates::RateRecalibrationCache>>,
+    ) {
+        self.rate_recalibration_cache = cache;
+    }
+
+    /// Recalibrate linked discount and forward curves, reusing a batch result.
+    pub(crate) fn bump_rate_market_cached(
+        &self,
+        discount_curve_id: &CurveId,
+        forward_curve_id: &CurveId,
+        bump_bp: f64,
+    ) -> finstack_quant_core::Result<Arc<MarketContext>> {
+        crate::calibration::bumps::rates::bump_market_via_rate_quote_shock_cached(
+            self.rate_recalibration_cache.as_deref(),
+            self.curves.as_ref(),
+            discount_curve_id,
+            forward_curve_id,
+            bump_bp,
+        )
+    }
+
+    /// Recalibrate a single OIS curve, reusing a batch result.
+    pub(crate) fn bump_single_ois_rate_market_cached(
+        &self,
+        curve_id: &CurveId,
+        bump_bp: f64,
+    ) -> finstack_quant_core::Result<Arc<MarketContext>> {
+        crate::calibration::bumps::rates::bump_single_ois_market_via_rate_quote_shock_cached(
+            self.rate_recalibration_cache.as_deref(),
+            self.curves.as_ref(),
+            curve_id,
+            bump_bp,
+        )
+    }
+
+    /// Recalibrate one discount curve, reusing a batch result.
+    pub(crate) fn bump_discount_rate_quotes_cached(
+        &self,
+        curve: &finstack_quant_core::market_data::term_structures::DiscountCurve,
+        calibration: &finstack_quant_core::market_data::term_structures::DiscountCurveRateCalibration,
+        bump: &crate::calibration::bumps::BumpRequest,
+    ) -> finstack_quant_core::Result<
+        Arc<finstack_quant_core::market_data::term_structures::DiscountCurve>,
+    > {
+        crate::calibration::bumps::rates::bump_discount_curve_from_rate_calibration_cached(
+            self.rate_recalibration_cache.as_deref(),
+            curve,
+            calibration,
+            self.curves.as_ref(),
+            bump,
+        )
     }
 
     /// Recalibrate a hazard curve, reusing an identical batch-local result.

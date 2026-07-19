@@ -2,12 +2,14 @@
 //!
 //! This benchmark suite focuses on the plan-driven calibration step engine.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
+use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::HashMap;
 use finstack_quant_valuations::calibration::api::market_datum::MarketDatum;
 use finstack_quant_valuations::calibration::api::{
@@ -22,10 +24,15 @@ use finstack_quant_valuations::calibration::bumps::{
 };
 use finstack_quant_valuations::calibration::CalibrationConfig;
 use finstack_quant_valuations::calibration::CalibrationMethod;
+use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
+use finstack_quant_valuations::instruments::rates::irs::PayReceive;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations::market::quotes::ids::{Pillar, QuoteId};
 use finstack_quant_valuations::market::quotes::market_quote::MarketQuote;
 use finstack_quant_valuations::market::quotes::rates::RateQuote;
+use finstack_quant_valuations::metrics::MetricId;
+use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
 
@@ -347,10 +354,93 @@ fn bench_hazard_bootstrap(c: &mut Criterion) {
     });
 }
 
+fn bench_base_correlation_bootstrap(c: &mut Criterion) {
+    let envelope: CalibrationEnvelope = serde_json::from_str(include_str!(
+        "../examples/market_bootstrap/05_cdx_base_correlation.json"
+    ))
+    .expect("base-correlation benchmark envelope should deserialize");
+
+    c.bench_function("calibration_base_correlation_full_plan_5_knots", |b| {
+        b.iter(|| {
+            engine::execute(black_box(&envelope))
+                .expect("base-correlation calibration should succeed")
+        })
+    });
+}
+
+fn bench_rate_quote_risk_cache(c: &mut Criterion) {
+    let envelope: CalibrationEnvelope = serde_json::from_str(include_str!(
+        "../examples/market_bootstrap/02_usd_3m_forward_curve.json"
+    ))
+    .expect("rate replay benchmark envelope should deserialize");
+    let result = engine::execute(&envelope).expect("rate replay benchmark market should calibrate");
+    let market =
+        MarketContext::try_from(result.result.final_market).expect("market state should rebuild");
+    let as_of = Date::from_calendar_date(2026, Month::May, 8).expect("base date");
+    let start = as_of + time::Duration::days(90);
+    let maturity = as_of + time::Duration::days(180);
+    let fras = (0..4)
+        .map(|index| {
+            ForwardRateAgreement::builder()
+                .id(InstrumentId::new(format!("CACHE-BENCH-FRA-{index}")))
+                .notional(Money::new(10_000_000.0, Currency::USD))
+                .start_date(start)
+                .maturity(maturity)
+                .fixed_rate(Decimal::try_from(0.047).expect("decimal rate"))
+                .day_count(DayCount::Act360)
+                .reset_lag(2)
+                .discount_curve_id(CurveId::new("USD-OIS"))
+                .forward_curve_id(CurveId::new("USD-SOFR-3M"))
+                .side(PayReceive::Pay)
+                .attributes(Default::default())
+                .build()
+                .expect("benchmark FRA")
+        })
+        .collect::<Vec<_>>();
+
+    let mut group = c.benchmark_group("rate_quote_risk_portfolio");
+    group.sample_size(10);
+    group.bench_function("4_fras_uncached", |b| {
+        b.iter(|| {
+            fras.iter()
+                .map(|fra| {
+                    fra.price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        black_box(&[MetricId::Dv01]),
+                        PricingOptions::default(),
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+    });
+    group.bench_function("4_fras_batch_cached", |b| {
+        b.iter_batched(
+            || PricingOptions::default().with_new_rate_recalibration_cache(),
+            |options| {
+                fras.iter()
+                    .map(|fra| {
+                        fra.price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            black_box(&[MetricId::Dv01]),
+                            options.clone(),
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            },
+            BatchSize::SmallInput,
+        )
+    });
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_discount_and_forward_steps,
     bench_residual_normalization,
-    bench_hazard_bootstrap
+    bench_hazard_bootstrap,
+    bench_base_correlation_bootstrap,
+    bench_rate_quote_risk_cache
 );
 criterion_main!(benches);

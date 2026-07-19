@@ -1,8 +1,8 @@
 //! Generic sequential bootstrapping algorithm.
 
-use super::bracket_solve_1d_with_diagnostics;
 use super::helpers::BracketDiagnostics;
 use super::traits::BootstrapTarget;
+use super::{bracket_solve_1d_nearest_first_with_diagnostics, bracket_solve_1d_with_diagnostics};
 use crate::calibration::constants::{OBJECTIVE_VALID_ABS_MAX, RESIDUAL_PENALTY_ABS_MIN};
 use crate::calibration::report::{CalibrationDiagnostics, QuoteQuality};
 use crate::calibration::{CalibrationConfig, CalibrationReport};
@@ -545,7 +545,12 @@ impl SequentialBootstrapper {
         let scan_points = normalize_scan_points(scan_points, initial_guess, time)?;
 
         // Solve
-        let (tentative, diag) = bracket_solve_1d_with_diagnostics(
+        let solve = if target.supports_nearest_first_bracketing() {
+            bracket_solve_1d_nearest_first_with_diagnostics
+        } else {
+            bracket_solve_1d_with_diagnostics
+        };
+        let (tentative, diag) = solve(
             &objective,
             initial_guess,
             &scan_points,

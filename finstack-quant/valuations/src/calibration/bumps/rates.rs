@@ -25,12 +25,129 @@ use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::{CurveId, IndexId};
 #[cfg(test)]
 use std::cell::Cell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 use time::Duration;
 
 #[cfg(test)]
 std::thread_local! {
     static DISCOUNT_CALIBRATION_RUNS: Cell<usize> = const { Cell::new(0) };
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum RateMarketRecalibrationKind {
+    DiscountAndForward {
+        discount_curve_id: String,
+        forward_curve_id: String,
+    },
+    SingleOis {
+        curve_id: String,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct RateMarketRecalibrationKey {
+    kind: RateMarketRecalibrationKind,
+    bump_bp: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct DiscountRateRecalibrationKey {
+    curve_id: String,
+    bump: RateBumpKey,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum RateBumpKey {
+    Parallel(u64),
+    Tenors(Vec<(u64, u64)>),
+}
+
+impl From<&BumpRequest> for RateBumpKey {
+    fn from(bump: &BumpRequest) -> Self {
+        match bump {
+            BumpRequest::Parallel(bp) => Self::Parallel(bp.to_bits()),
+            BumpRequest::Tenors(tenors) => Self::Tenors(
+                tenors
+                    .iter()
+                    .map(|(tenor, bp)| (tenor.to_bits(), bp.to_bits()))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+type CachedRateMarket = Arc<Mutex<Option<Arc<MarketContext>>>>;
+type CachedDiscountCurve = Arc<Mutex<Option<Arc<DiscountCurve>>>>;
+
+/// Batch-local cache for rate-curve recalibrations used by quote-shock risk.
+///
+/// A cache instance is scoped to one immutable market snapshot. Per-key locks
+/// allow unrelated curve sets and bump scenarios to calibrate concurrently,
+/// while identical portfolio requests share the in-flight result. Failed
+/// calibrations are not cached.
+#[derive(Default)]
+pub(crate) struct RateRecalibrationCache {
+    market_entries: Mutex<HashMap<RateMarketRecalibrationKey, CachedRateMarket>>,
+    discount_entries: Mutex<HashMap<DiscountRateRecalibrationKey, CachedDiscountCurve>>,
+}
+
+impl RateRecalibrationCache {
+    fn get_or_recalibrate_market(
+        &self,
+        key: RateMarketRecalibrationKey,
+        calibrate: impl FnOnce() -> finstack_quant_core::Result<MarketContext>,
+    ) -> finstack_quant_core::Result<Arc<MarketContext>> {
+        let entry = {
+            let mut entries = match self.market_entries.lock() {
+                Ok(entries) => entries,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            Arc::clone(
+                entries
+                    .entry(key)
+                    .or_insert_with(|| Arc::new(Mutex::new(None))),
+            )
+        };
+        let mut cached = match entry.lock() {
+            Ok(cached) => cached,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(market) = cached.as_ref() {
+            return Ok(Arc::clone(market));
+        }
+        let market = Arc::new(calibrate()?);
+        *cached = Some(Arc::clone(&market));
+        Ok(market)
+    }
+
+    fn get_or_recalibrate_discount(
+        &self,
+        key: DiscountRateRecalibrationKey,
+        calibrate: impl FnOnce() -> finstack_quant_core::Result<DiscountCurve>,
+    ) -> finstack_quant_core::Result<Arc<DiscountCurve>> {
+        let entry = {
+            let mut entries = match self.discount_entries.lock() {
+                Ok(entries) => entries,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            Arc::clone(
+                entries
+                    .entry(key)
+                    .or_insert_with(|| Arc::new(Mutex::new(None))),
+            )
+        };
+        let mut cached = match entry.lock() {
+            Ok(cached) => cached,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(curve) = cached.as_ref() {
+            return Ok(Arc::clone(curve));
+        }
+        let curve = Arc::new(calibrate()?);
+        *cached = Some(Arc::clone(&curve));
+        Ok(curve)
+    }
 }
 
 /// Infer currency from a discount curve ID using token-by-token heuristics.
@@ -121,6 +238,26 @@ pub(crate) fn bump_discount_curve_from_rate_calibration(
         None,
         DiscountReplayShape::DeltaOverlay,
     )
+}
+
+pub(crate) fn bump_discount_curve_from_rate_calibration_cached(
+    cache: Option<&RateRecalibrationCache>,
+    curve: &DiscountCurve,
+    calibration: &DiscountCurveRateCalibration,
+    context: &MarketContext,
+    bump: &BumpRequest,
+) -> finstack_quant_core::Result<Arc<DiscountCurve>> {
+    let key = DiscountRateRecalibrationKey {
+        curve_id: curve.id().to_string(),
+        bump: bump.into(),
+    };
+    match cache {
+        Some(cache) => cache.get_or_recalibrate_discount(key, || {
+            bump_discount_curve_from_rate_calibration(curve, calibration, context, bump)
+        }),
+        None => bump_discount_curve_from_rate_calibration(curve, calibration, context, bump)
+            .map(Arc::new),
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -931,6 +1068,31 @@ pub(crate) fn bump_market_via_rate_quote_shock(
     Ok(seeded_with_discount.insert(bumped_forward))
 }
 
+pub(crate) fn bump_market_via_rate_quote_shock_cached(
+    cache: Option<&RateRecalibrationCache>,
+    market: &MarketContext,
+    discount_curve_id: &CurveId,
+    forward_curve_id: &CurveId,
+    bump_bp: f64,
+) -> finstack_quant_core::Result<Arc<MarketContext>> {
+    let key = RateMarketRecalibrationKey {
+        kind: RateMarketRecalibrationKind::DiscountAndForward {
+            discount_curve_id: discount_curve_id.to_string(),
+            forward_curve_id: forward_curve_id.to_string(),
+        },
+        bump_bp: bump_bp.to_bits(),
+    };
+    match cache {
+        Some(cache) => cache.get_or_recalibrate_market(key, || {
+            bump_market_via_rate_quote_shock(market, discount_curve_id, forward_curve_id, bump_bp)
+        }),
+        None => {
+            bump_market_via_rate_quote_shock(market, discount_curve_id, forward_curve_id, bump_bp)
+                .map(Arc::new)
+        }
+    }
+}
+
 /// Re-bootstrap a single OIS discount curve under a parallel market-quote shock.
 ///
 /// This path is used when discounting and compounded-overnight projection are
@@ -978,6 +1140,28 @@ pub(crate) fn bump_single_ois_market_via_rate_quote_shock(
         DiscountReplayShape::CalibratedOnSourceGrid,
     )?;
     Ok(seeded.insert(bumped))
+}
+
+pub(crate) fn bump_single_ois_market_via_rate_quote_shock_cached(
+    cache: Option<&RateRecalibrationCache>,
+    market: &MarketContext,
+    curve_id: &CurveId,
+    bump_bp: f64,
+) -> finstack_quant_core::Result<Arc<MarketContext>> {
+    let key = RateMarketRecalibrationKey {
+        kind: RateMarketRecalibrationKind::SingleOis {
+            curve_id: curve_id.to_string(),
+        },
+        bump_bp: bump_bp.to_bits(),
+    };
+    match cache {
+        Some(cache) => cache.get_or_recalibrate_market(key, || {
+            bump_single_ois_market_via_rate_quote_shock(market, curve_id, bump_bp)
+        }),
+        None => {
+            bump_single_ois_market_via_rate_quote_shock(market, curve_id, bump_bp).map(Arc::new)
+        }
+    }
 }
 
 /// Seed bootstrap-time fixings for both curve and index identifiers so the
@@ -1663,6 +1847,38 @@ mod tests {
                 .expect("source discount curve")
                 .knots(),
             "single calibration must still be sampled on the source discount grid"
+        );
+    }
+
+    #[test]
+    fn rate_recalibration_cache_reuses_identical_market_shock() {
+        let (market, discount_curve_id, forward_curve_id, _) =
+            linked_single_curve_ois_market(CurveId::new("USD-OIS"));
+        let cache = RateRecalibrationCache::default();
+        DISCOUNT_CALIBRATION_RUNS.with(|runs| runs.set(0));
+
+        let first = bump_market_via_rate_quote_shock_cached(
+            Some(&cache),
+            &market,
+            &discount_curve_id,
+            &forward_curve_id,
+            5.0,
+        )
+        .expect("first cached quote shock");
+        let second = bump_market_via_rate_quote_shock_cached(
+            Some(&cache),
+            &market,
+            &discount_curve_id,
+            &forward_curve_id,
+            5.0,
+        )
+        .expect("reused cached quote shock");
+
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(
+            DISCOUNT_CALIBRATION_RUNS.with(Cell::get),
+            1,
+            "an identical batch request must share one calibration"
         );
     }
 

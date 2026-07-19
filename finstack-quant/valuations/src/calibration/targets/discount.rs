@@ -1039,6 +1039,10 @@ impl BootstrapTarget for DiscountCurveTarget {
         Ok(grid)
     }
 
+    fn supports_nearest_first_bracketing(&self) -> bool {
+        true
+    }
+
     fn validate_knot(&self, time: f64, value: f64) -> Result<()> {
         if !value.is_finite() || value <= 0.0 {
             return Err(finstack_quant_core::Error::Calibration {

@@ -103,6 +103,17 @@ pub enum ContextScratchBump {
         /// Pre-bump surface.
         previous: Arc<VolSurface>,
     },
+    /// One bumped volatility-surface grid point.
+    SurfacePoint {
+        /// Surface identifier that was bumped.
+        id: CurveId,
+        /// Expiry coordinate used to select the nearest grid point.
+        expiry: f64,
+        /// Strike coordinate used to select the nearest grid point.
+        strike: f64,
+        /// Original volatility restored when the token is reverted.
+        original_vol: f64,
+    },
     /// A bumped scalar/price.
     Price {
         /// Scalar identifier that was bumped.

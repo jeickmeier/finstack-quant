@@ -59,6 +59,9 @@ pub struct PricingOptions {
     /// Batch-local cache shared by finite-difference credit-risk calculations.
     pub(crate) hazard_recalibration_cache:
         Option<Arc<crate::calibration::bumps::hazard::HazardRecalibrationCache>>,
+    /// Batch-local cache shared by quote-shock rate-risk calculations.
+    pub(crate) rate_recalibration_cache:
+        Option<Arc<crate::calibration::bumps::rates::RateRecalibrationCache>>,
 }
 
 impl PricingOptions {
@@ -105,6 +108,17 @@ impl PricingOptions {
     pub fn with_new_hazard_recalibration_cache(mut self) -> Self {
         self.hazard_recalibration_cache = Some(Arc::new(
             crate::calibration::bumps::hazard::HazardRecalibrationCache::default(),
+        ));
+        self
+    }
+
+    /// Attach a new rate-recalibration cache for one immutable pricing batch.
+    ///
+    /// Clones of the returned options share the cache. Callers must create a
+    /// fresh cache when the market snapshot changes.
+    pub fn with_new_rate_recalibration_cache(mut self) -> Self {
+        self.rate_recalibration_cache = Some(Arc::new(
+            crate::calibration::bumps::rates::RateRecalibrationCache::default(),
         ));
         self
     }

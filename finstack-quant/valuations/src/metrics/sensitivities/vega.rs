@@ -277,23 +277,31 @@ where
             let mut raw_total = NeumaierAccumulator::new();
             let mut row_labels = Vec::new();
 
-            for ((surface_id, vol_surface), strike_grid) in
+            for ((surface_id, _vol_surface), strike_grid) in
                 vol_surfaces.iter().zip(&surface_strike_grids)
             {
                 for &expiry in &self.expiries {
                     let mut row = Vec::new();
                     for &strike in strike_grid {
                         // Central differences: O(h²) accuracy, consistent with other Greeks.
-                        let bumped_up = vol_surface.bump_point(expiry, strike, bump_pct)?;
-                        let bumped_down = vol_surface.bump_point(expiry, strike, -bump_pct)?;
-                        scratch.insert_surface_mut(bumped_up);
+                        let token_up = scratch.apply_surface_point_bump_in_place(
+                            surface_id.as_str(),
+                            expiry,
+                            strike,
+                            bump_pct,
+                        )?;
                         let pv_up = ctx.reprice_money(scratch, as_of);
-                        scratch.insert_surface_mut(std::sync::Arc::clone(vol_surface));
+                        scratch.revert_scratch_bump(token_up)?;
                         let pv_up = pv_up?;
 
-                        scratch.insert_surface_mut(bumped_down);
+                        let token_down = scratch.apply_surface_point_bump_in_place(
+                            surface_id.as_str(),
+                            expiry,
+                            strike,
+                            -bump_pct,
+                        )?;
                         let pv_down = ctx.reprice_money(scratch, as_of);
-                        scratch.insert_surface_mut(std::sync::Arc::clone(vol_surface));
+                        scratch.revert_scratch_bump(token_down)?;
                         let pv_down = pv_down?;
 
                         let vega = (pv_up.amount() - pv_down.amount())

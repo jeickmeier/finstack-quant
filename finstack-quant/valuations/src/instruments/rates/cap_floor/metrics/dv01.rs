@@ -2,12 +2,9 @@
 //!
 //! When the discount and forward curves carry rate-calibration metadata, this
 //! reports quote-shock/rebootstrap DV01 via the shared
-//! [`bump_market_via_rate_quote_shock`] helper. Otherwise it falls back to the
+//! `bump_market_via_rate_quote_shock` helper. Otherwise it falls back to the
 //! generic fitted-curve bump path provided by [`UnifiedDv01Calculator`].
 
-use crate::calibration::bumps::rates::{
-    bump_market_via_rate_quote_shock, bump_single_ois_market_via_rate_quote_shock,
-};
 use crate::instruments::rates::cap_floor::CapFloor;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::sensitivity_central_diff;
@@ -44,18 +41,12 @@ impl MetricCalculator for Dv01Calculator {
                 context.get_metric_overrides(),
             )?
             .rate_bump_bp;
-            let bumped_up = bump_single_ois_market_via_rate_quote_shock(
-                market,
-                &cap_floor.discount_curve_id,
-                bump_bp,
-            )?;
-            let pv_up = context.reprice_raw(&bumped_up, context.as_of)?;
-            let bumped_down = bump_single_ois_market_via_rate_quote_shock(
-                market,
-                &cap_floor.discount_curve_id,
-                -bump_bp,
-            )?;
-            let pv_down = context.reprice_raw(&bumped_down, context.as_of)?;
+            let bumped_up = context
+                .bump_single_ois_rate_market_cached(&cap_floor.discount_curve_id, bump_bp)?;
+            let pv_up = context.reprice_raw(bumped_up.as_ref(), context.as_of)?;
+            let bumped_down = context
+                .bump_single_ois_rate_market_cached(&cap_floor.discount_curve_id, -bump_bp)?;
+            let pv_down = context.reprice_raw(bumped_down.as_ref(), context.as_of)?;
             return Ok(sensitivity_central_diff(pv_up, pv_down, bump_bp));
         }
 
@@ -76,12 +67,11 @@ impl MetricCalculator for Dv01Calculator {
         let discount_id = &cap_floor.discount_curve_id;
         let forward_id = &cap_floor.forward_curve_id;
 
-        let bumped_up = bump_market_via_rate_quote_shock(market, discount_id, forward_id, bump_bp)?;
-        let pv_up = context.reprice_raw(&bumped_up, context.as_of)?;
+        let bumped_up = context.bump_rate_market_cached(discount_id, forward_id, bump_bp)?;
+        let pv_up = context.reprice_raw(bumped_up.as_ref(), context.as_of)?;
 
-        let bumped_down =
-            bump_market_via_rate_quote_shock(market, discount_id, forward_id, -bump_bp)?;
-        let pv_down = context.reprice_raw(&bumped_down, context.as_of)?;
+        let bumped_down = context.bump_rate_market_cached(discount_id, forward_id, -bump_bp)?;
+        let pv_down = context.reprice_raw(bumped_down.as_ref(), context.as_of)?;
 
         Ok(sensitivity_central_diff(pv_up, pv_down, bump_bp))
     }

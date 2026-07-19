@@ -187,6 +187,53 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
     tol: f64,
     max_iters: usize,
 ) -> Result<(Option<f64>, BracketDiagnostics)> {
+    bracket_solve_1d_impl(
+        objective,
+        initial,
+        scan_points,
+        tol,
+        max_iters,
+        ScanStrategy::Exhaustive,
+    )
+}
+
+/// Solve using scan points ordered by distance from the initial guess.
+///
+/// The scan stops as soon as the evaluated points contain a sign-changing
+/// bracket. If no bracket is found, every point is still evaluated and the
+/// same no-bracket fallback as the exhaustive solver is used. Callers must
+/// restrict this path to objectives known to be monotone in the solved knot.
+pub(crate) fn bracket_solve_1d_nearest_first_with_diagnostics(
+    objective: &dyn Fn(f64) -> f64,
+    initial: f64,
+    scan_points: &[f64],
+    tol: f64,
+    max_iters: usize,
+) -> Result<(Option<f64>, BracketDiagnostics)> {
+    bracket_solve_1d_impl(
+        objective,
+        initial,
+        scan_points,
+        tol,
+        max_iters,
+        ScanStrategy::NearestFirst,
+    )
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ScanStrategy {
+    Exhaustive,
+    NearestFirst,
+}
+
+fn bracket_solve_1d_impl(
+    objective: &dyn Fn(f64) -> f64,
+    initial: f64,
+    scan_points: &[f64],
+    tol: f64,
+    max_iters: usize,
+    scan_strategy: ScanStrategy,
+) -> Result<(Option<f64>, BracketDiagnostics)> {
     // The adaptive geometric expansion previously embedded here was removed;
     // callers must now provide a grid dense enough to bracket the root. Catch
     // sparse grids early in debug builds so the regression surfaces in tests
@@ -210,7 +257,21 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
         valid_points.push((initial, v0));
     }
 
-    for &point in scan_points {
+    let mut nearest_first_points = Vec::new();
+    let ordered_scan_points = if scan_strategy == ScanStrategy::NearestFirst {
+        nearest_first_points.extend_from_slice(scan_points);
+        nearest_first_points.sort_by(|a, b| {
+            (a - initial)
+                .abs()
+                .total_cmp(&(b - initial).abs())
+                .then_with(|| a.total_cmp(b))
+        });
+        nearest_first_points.as_slice()
+    } else {
+        scan_points
+    };
+
+    for &point in ordered_scan_points {
         // The initial guess is typically also a scan-grid point (callers seed
         // the grid with it); reuse the already-computed f(initial) instead of
         // re-pricing — one objective evaluation (e.g. a full CDS repricing)
@@ -226,6 +287,22 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
             continue;
         }
         valid_points.push((point, value));
+
+        if scan_strategy == ScanStrategy::NearestFirst {
+            // An exact zero is conclusive. Otherwise stop only after observing
+            // a true crossing; a no-bracket case must still exhaust the grid so
+            // diagnostics and best-effort behavior remain unchanged.
+            if value == 0.0 {
+                break;
+            }
+            valid_points.sort_by(|a, b| a.0.total_cmp(&b.0));
+            if valid_points
+                .windows(2)
+                .any(|pair| opposite_signs(pair[0].1, pair[1].1))
+            {
+                break;
+            }
+        }
     }
 
     if valid_points.is_empty() {
@@ -563,6 +640,47 @@ mod tests {
             "eval_count {} < scan grid size {}",
             diag.eval_count,
             scan.len()
+        );
+    }
+
+    #[test]
+    fn nearest_first_scan_stops_after_local_bracket() {
+        use std::cell::Cell;
+
+        let evals = Cell::new(0_usize);
+        let f = |x: f64| {
+            evals.set(evals.get() + 1);
+            x - 0.5
+        };
+        let scan = dense_scan(-10.0, 10.0, &[0.49, 0.50, 0.51]);
+        let (root, diag) =
+            bracket_solve_1d_nearest_first_with_diagnostics(&f, 0.49, &scan, 1e-12, 100)
+                .expect("solver error");
+
+        let root = root.expect("root should be found");
+        assert!((root - 0.5).abs() < 1e-12);
+        assert!(diag.is_sign_change_bracket);
+        assert!(
+            diag.eval_count < scan.len(),
+            "nearest-first scan evaluated the full grid: {} evaluations for {} points",
+            diag.eval_count,
+            scan.len()
+        );
+        assert_eq!(diag.eval_count, evals.get());
+    }
+
+    #[test]
+    fn nearest_first_no_bracket_still_exhausts_scan() {
+        let f = |x: f64| x * x + 1.0;
+        let scan = dense_scan(-2.0, 2.0, &[0.0]);
+        let (root, diag) =
+            bracket_solve_1d_nearest_first_with_diagnostics(&f, 0.0, &scan, 1e-12, 100)
+                .expect("solver error");
+
+        assert!(root.is_none());
+        assert!(
+            diag.eval_count >= scan.len(),
+            "no-bracket path must evaluate the authoritative grid"
         );
     }
 

@@ -7,7 +7,6 @@
 
 use super::{hazard_with_deal_quote, market_doc_clause};
 use crate::calibration::bumps::hazard::bump_hazard_spreads_with_doc_clause_and_valuation_convention;
-use crate::calibration::bumps::rates::bump_discount_curve_from_rate_calibration;
 use crate::calibration::bumps::BumpRequest;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use crate::metrics::sensitivities::config as sens_config;
@@ -33,13 +32,12 @@ impl CdsDv01Calculator {
             .curves
             .get_discount(cds.premium.discount_curve_id.as_str())?;
         if let Some(calibration) = base_discount.rate_calibration() {
-            let bumped_discount = bump_discount_curve_from_rate_calibration(
+            let bumped_discount = context.bump_discount_rate_quotes_cached(
                 base_discount.as_ref(),
                 calibration,
-                context.curves.as_ref(),
                 &BumpRequest::Parallel(bump_bp),
             )?;
-            bumped_market = bumped_market.insert(bumped_discount);
+            bumped_market = bumped_market.insert(bumped_discount.as_ref().clone());
         } else {
             bumped_market.apply_curve_bump_in_place(
                 &cds.premium.discount_curve_id,

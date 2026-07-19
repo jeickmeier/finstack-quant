@@ -66,6 +66,16 @@ pub(crate) trait BootstrapTarget {
         Ok(Vec::new())
     }
 
+    /// Whether the target can stop its scan at the nearest sign-changing bracket.
+    ///
+    /// This optimization is valid only when the residual is monotone in the
+    /// knot currently being solved. Targets default to the exhaustive scan so
+    /// non-monotone objectives retain closest-bracket selection across the
+    /// entire caller-supplied grid.
+    fn supports_nearest_first_bracketing(&self) -> bool {
+        false
+    }
+
     /// Optional: Validate the solved value before accepting it.
     ///
     /// Allows enforcing domain constraints (e.g. positive hazard rates)

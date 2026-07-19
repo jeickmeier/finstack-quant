@@ -412,6 +412,7 @@ impl PricerRegistry {
             config: cfg,
             market_history,
             hazard_recalibration_cache,
+            rate_recalibration_cache,
             ..
         } = options;
 
@@ -454,6 +455,7 @@ impl PricerRegistry {
             cfg,
             market_history,
             hazard_recalibration_cache,
+            rate_recalibration_cache,
             pricer_registry: shared.registry.unwrap_or_else(|| Arc::new(self.clone())),
             base_result,
         })

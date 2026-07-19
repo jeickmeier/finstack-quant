@@ -41,6 +41,7 @@ use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::MetricCalculator;
 use crate::metrics::{MetricContext, MetricId};
 
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::neumaier_sum;
@@ -445,9 +446,24 @@ where
 
         let base = self.config.series_id.as_str();
         let mut curve_totals = Vec::with_capacity(curves.len());
+        // Cashflow schedules are a conservative risk-horizon source. Empty or
+        // unavailable schedules disable pruning so this optimization cannot
+        // change support for options or model-driven instruments.
+        let should_resolve_cashflow_horizon = cashflow_horizon_can_prune(context, curves, buckets);
+        let last_cashflow_date = if should_resolve_cashflow_horizon {
+            context
+                .cashflows_cached()
+                .ok()
+                .and_then(|flows| flows.iter().map(|(date, _)| *date).max())
+        } else {
+            None
+        };
 
-        for (curve_id, _kind) in curves.iter() {
+        for (curve_id, kind) in curves.iter() {
             let curve_metric_id = MetricId::custom(format!("{}::{}", base, curve_id.as_str()));
+            let risk_horizon = last_cashflow_date.and_then(|date| {
+                curve_risk_horizon_years(context.curves.as_ref(), curve_id, *kind, date)
+            });
 
             let curve_total = self.compute_triangular_for_curve(
                 context,
@@ -455,6 +471,7 @@ where
                 curve_metric_id,
                 bump_bp,
                 buckets,
+                risk_horizon,
             )?;
 
             curve_totals.push(curve_total);
@@ -476,6 +493,7 @@ where
         metric_id: MetricId,
         bump_bp: f64,
         buckets: &[f64],
+        risk_horizon: Option<f64>,
     ) -> finstack_quant_core::Result<f64> {
         let as_of = context.as_of;
 
@@ -498,6 +516,10 @@ where
         context.with_market_scratch(|context, scratch| {
             for (i, &target_time) in buckets.iter().enumerate() {
                 let label = super::config::format_bucket_label_cow(target_time);
+                if !triangular_bucket_affects_horizon(i, buckets, risk_horizon) {
+                    series.push((label, 0.0));
+                    continue;
+                }
 
                 // Build bucket-shaped bumps with half-triangle wings at the
                 // first and last buckets so the bump-set partitions unity
@@ -545,6 +567,101 @@ where
     }
 }
 
+fn cashflow_horizon_can_prune(
+    context: &MetricContext,
+    curves: &[(CurveId, RatesCurveKind)],
+    buckets: &[f64],
+) -> bool {
+    let Some(last_support_start) = buckets.iter().rev().nth(1).copied() else {
+        return false;
+    };
+    let Some(expiry) = context.instrument.expiry() else {
+        // With no cheap date bound, retain the conservative cashflow lookup.
+        return true;
+    };
+    curves.iter().any(|(curve_id, kind)| {
+        curve_risk_horizon_years(context.curves.as_ref(), curve_id, *kind, expiry)
+            .is_some_and(|horizon| horizon <= last_support_start)
+    })
+}
+
+fn curve_risk_horizon_years(
+    market: &MarketContext,
+    curve_id: &CurveId,
+    kind: RatesCurveKind,
+    last_cashflow_date: Date,
+) -> Option<f64> {
+    match kind {
+        RatesCurveKind::Discount => {
+            let curve = market.get_discount(curve_id.as_str()).ok()?;
+            interpolated_curve_risk_horizon(
+                curve.base_date(),
+                curve.day_count(),
+                curve.knots(),
+                last_cashflow_date,
+            )
+        }
+        RatesCurveKind::Forward => {
+            let curve = market.get_forward(curve_id.as_str()).ok()?;
+            interpolated_curve_risk_horizon(
+                curve.base_date(),
+                curve.day_count(),
+                curve.knots(),
+                last_cashflow_date,
+            )
+        }
+        RatesCurveKind::Credit | RatesCurveKind::Inflation => None,
+    }
+}
+
+fn interpolated_curve_risk_horizon(
+    base_date: Date,
+    day_count: DayCount,
+    knots: &[f64],
+    last_cashflow_date: Date,
+) -> Option<f64> {
+    let cashflow_horizon = DayCount::year_fraction(
+        day_count,
+        base_date,
+        last_cashflow_date,
+        DayCountContext::default(),
+    )
+    .ok()
+    .filter(|horizon| horizon.is_finite() && *horizon >= 0.0)?;
+
+    // Curve interpolation can make knots beyond the final cashflow influence
+    // values inside the cashflow horizon. Preserve two right-hand neighbours:
+    // local cubic/monotone schemes may use the first neighbour's slope, which
+    // in turn depends on the second. Sparse curves therefore prune less
+    // aggressively, while normal tenor-dense curves still skip distant wings.
+    let mut right_neighbours = knots
+        .iter()
+        .copied()
+        .filter(|knot| *knot > cashflow_horizon);
+    let first_right = right_neighbours.next();
+    let second_right = right_neighbours.next();
+    Some(
+        second_right
+            .or(first_right)
+            .unwrap_or(cashflow_horizon)
+            .max(cashflow_horizon),
+    )
+}
+
+#[inline]
+fn triangular_bucket_affects_horizon(
+    bucket_index: usize,
+    buckets: &[f64],
+    risk_horizon: Option<f64>,
+) -> bool {
+    let Some(risk_horizon) = risk_horizon else {
+        return true;
+    };
+    // The first half-triangle is non-zero from time zero. Every later bucket
+    // starts at its previous neighbour; at that exact point its weight is zero.
+    bucket_index == 0 || buckets[bucket_index - 1] < risk_horizon
+}
+
 /// Calculate DV01 from PV changes using central differencing (high-precision f64 version).
 ///
 /// Uses raw f64 values to avoid Money rounding precision loss in sensitivity calculations.
@@ -584,6 +701,7 @@ fn calculate_dv01_central(pv_up: f64, pv_down: f64, bump_bp: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use super::triangular_bucket_affects_horizon;
     use finstack_quant_core::math::neumaier_sum;
 
     /// Audit item #6: the cross-curve / cross-bucket DV01 totals must use
@@ -616,6 +734,26 @@ mod tests {
             "naive summation is expected to lose precision here (got {naive}, \
              exact {n}); the DV01 cross-curve/bucket totals must therefore use \
              neumaier_sum"
+        );
+    }
+
+    #[test]
+    fn buckets_starting_at_or_after_cashflow_horizon_are_pruned() {
+        let buckets = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
+        let active = buckets
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| triangular_bucket_affects_horizon(*index, &buckets, Some(5.0)))
+            .count();
+
+        assert_eq!(
+            active, 6,
+            "only buckets through the 5Y peak can affect 5Y cashflows"
+        );
+        assert!(
+            (0..buckets.len())
+                .all(|index| { triangular_bucket_affects_horizon(index, &buckets, None) }),
+            "missing cashflow horizons must disable pruning"
         );
     }
 }

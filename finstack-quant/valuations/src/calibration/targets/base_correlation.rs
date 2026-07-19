@@ -6,6 +6,7 @@ use crate::calibration::prepared::{CDSTrancheCalibrationQuote, CalibrationQuote}
 use crate::calibration::solver::bootstrap::SequentialBootstrapper;
 use crate::calibration::solver::traits::BootstrapTarget;
 use crate::calibration::CalibrationReport;
+use crate::instruments::credit_derivatives::cds_tranche::pricer::CDSTranchePricer;
 use crate::market::build::cds_tranche::{build_cds_tranche_instrument, CDSTrancheBuildOverrides};
 use crate::market::build::context::BuildCtx;
 use crate::market::build::prepared::PreparedQuote;
@@ -188,6 +189,8 @@ pub(crate) struct BaseCorrelationTarget {
     pub params: BaseCorrelationParams,
     /// Reusable sequential bootstrap scratch context.
     reuse_context: RefCell<MarketContext>,
+    /// Reusable tranche pricer retaining lazy copula and quadrature caches.
+    pricer: CDSTranchePricer,
 }
 
 impl BaseCorrelationTarget {
@@ -197,6 +200,7 @@ impl BaseCorrelationTarget {
         Self {
             params,
             reuse_context,
+            pricer: CDSTranchePricer::new(),
         }
     }
 
@@ -496,7 +500,9 @@ impl BootstrapTarget for BaseCorrelationTarget {
             })?;
 
         // Fit to the market upfront quote directly (vendor-style).
-        let model_upfront = tranche.upfront(&temp_context, self.params.base_date)?;
+        let model_upfront =
+            self.pricer
+                .calculate_upfront(tranche, &temp_context, self.params.base_date)?;
         let market_upfront = upfront.as_ref().map(|m| m.amount()).unwrap_or(0.0);
         Ok((model_upfront - market_upfront) / self.params.notional)
     }
@@ -551,6 +557,10 @@ impl BootstrapTarget for BaseCorrelationTarget {
         pts.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         pts.dedup_by(|a, b| (*a - *b).abs() < 1e-12);
         Ok(pts)
+    }
+
+    fn supports_nearest_first_bracketing(&self) -> bool {
+        true
     }
 
     fn validate_knot(&self, _time: f64, value: f64) -> Result<()> {

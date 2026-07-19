@@ -70,4 +70,5 @@ fn state_pricing_options(config: &FinstackConfig) -> PricingOptions {
     PricingOptions::default()
         .with_config(config)
         .with_new_hazard_recalibration_cache()
+        .with_new_rate_recalibration_cache()
 }

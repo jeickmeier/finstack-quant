@@ -2,15 +2,12 @@
 //!
 //! When the discount and forward curves carry rate-calibration metadata, this
 //! reports quote-shock/rebootstrap DV01: the shared
-//! [`bump_market_via_rate_quote_shock`] helper handles the standard
+//! `bump_market_via_rate_quote_shock` helper handles the standard
 //! (deposit/FRA/swap) case, while a local basis rebuild handles forward curves
 //! calibrated from tenor-basis quotes (which the shared helper does not
 //! support). When metadata is unavailable, falls back to the generic
 //! fitted-curve bump path.
 
-use crate::calibration::bumps::rates::{
-    bump_discount_curve_from_rate_calibration, bump_market_via_rate_quote_shock,
-};
 use crate::calibration::bumps::BumpRequest;
 use crate::instruments::rates::fra::ForwardRateAgreement;
 use crate::metrics::sensitivities::config as sens_config;
@@ -60,13 +57,12 @@ impl MetricCalculator for FraRateCurveDv01Calculator {
                 // Basis forwards aren't supported by the shared helper; use the
                 // shared discount path and rebuild the forward locally.
                 let make_market = |bp: f64| -> Result<MarketContext> {
-                    let bumped_discount = bump_discount_curve_from_rate_calibration(
+                    let bumped_discount = context.bump_discount_rate_quotes_cached(
                         discount.as_ref(),
                         discount_cal,
-                        market,
                         &BumpRequest::Parallel(bp),
                     )?;
-                    let with_discount = market.clone().insert(bumped_discount);
+                    let with_discount = market.clone().insert(bumped_discount.as_ref().clone());
                     let bumped_discount_ref = with_discount.get_discount(discount_id.as_str())?;
                     let rebuilt_forward = rebuild_forward_curve_from_basis_quotes(
                         forward.as_ref(),
@@ -82,11 +78,10 @@ impl MetricCalculator for FraRateCurveDv01Calculator {
             }
         }
 
-        let bumped_up = bump_market_via_rate_quote_shock(market, discount_id, forward_id, bump_bp)?;
-        let pv_up = context.reprice_raw(&bumped_up, context.as_of)?;
-        let bumped_down =
-            bump_market_via_rate_quote_shock(market, discount_id, forward_id, -bump_bp)?;
-        let pv_down = context.reprice_raw(&bumped_down, context.as_of)?;
+        let bumped_up = context.bump_rate_market_cached(discount_id, forward_id, bump_bp)?;
+        let pv_up = context.reprice_raw(bumped_up.as_ref(), context.as_of)?;
+        let bumped_down = context.bump_rate_market_cached(discount_id, forward_id, -bump_bp)?;
+        let pv_down = context.reprice_raw(bumped_down.as_ref(), context.as_of)?;
         Ok(sensitivity_central_diff(pv_up, pv_down, bump_bp))
     }
 }
