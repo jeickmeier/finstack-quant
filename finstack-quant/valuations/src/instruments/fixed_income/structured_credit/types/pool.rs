@@ -20,6 +20,7 @@ use finstack_quant_core::types::CreditRating;
 /// Monetary fields use the asset's native currency. Rates are annual decimal
 /// rates unless a field explicitly says basis points.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct PoolAsset {
     /// Stable identifier used to match the asset to diagnostics and scenarios.
     pub id: InstrumentId,
@@ -321,6 +322,7 @@ impl PoolAsset {
 
 /// Reinvestment period and rules
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ReinvestmentPeriod {
     /// End date of reinvestment period
     #[schemars(with = "String")]
@@ -333,6 +335,7 @@ pub struct ReinvestmentPeriod {
 
 /// Criteria for reinvestment during revolving period
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ReinvestmentCriteria {
     /// Maximum purchase price (% of par)
     pub max_price: f64,
@@ -360,6 +363,7 @@ impl Default for ReinvestmentCriteria {
 
 /// AssetPool-level performance statistics
 #[derive(Debug, Clone, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct PoolStats {
     /// Weighted average coupon
     pub weighted_avg_coupon: f64,
@@ -434,6 +438,7 @@ pub struct AssetPool {
 
 /// Representative line for aggregated pool modeling
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RepLine {
     /// Unique identifier for the rep line
     pub id: String,

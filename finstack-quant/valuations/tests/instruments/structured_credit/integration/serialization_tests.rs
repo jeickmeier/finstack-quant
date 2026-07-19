@@ -723,3 +723,109 @@ fn waterfall_rules_round_trip_and_price_through_json() {
     price_instrument_json(&json, &market, "2024-01-01", "default")
         .expect("a waterfall_rules deal must price through the JSON binding path");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SC-C02 — nested serde strictness
+//
+// `#[serde(deny_unknown_fields)]` does NOT propagate from an outer type to the
+// types nested inside it; each type must carry the attribute itself. Before
+// this was fixed, `StructuredCredit` carried it but the risk-bearing nested
+// structs did not, so a misspelled field inside a pool asset or the default
+// assumptions block was accepted silently and the field fell back to its
+// `#[serde(default)]`. The deal then parsed, priced, and returned a confident
+// number computed from assumptions the user never supplied.
+//
+// These tests inject a typo at each nesting depth and assert it is rejected.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Parse the canonical full fixture as mutable JSON.
+fn full_example_value() -> serde_json::Value {
+    let json = include_str!("../../json_examples/structured_credit_full.json");
+    serde_json::from_str(json).expect("fixture must be valid JSON")
+}
+
+/// Assert that a mutated fixture is REJECTED by the deserializer, and that the
+/// error names the offending field.
+fn assert_rejected(value: &serde_json::Value, bad_field: &str, context: &str) {
+    let text = serde_json::to_string(value).expect("re-serialize mutated fixture");
+    let result: Result<InstrumentEnvelope, _> = serde_json::from_str(&text);
+    let err = match result {
+        Ok(_) => panic!(
+            "SC-C02 regression: the unknown field `{bad_field}` in {context} was \
+             ACCEPTED SILENTLY. The value falls back to its serde default, so \
+             the deal prices off assumptions the user never supplied. The \
+             enclosing type needs #[serde(deny_unknown_fields)]."
+        ),
+        Err(e) => e.to_string(),
+    };
+    assert!(
+        err.contains(bad_field),
+        "rejection of `{bad_field}` in {context} must name the offending \
+         field so the user can find the typo; got: {err}"
+    );
+}
+
+/// A misspelled per-asset prepayment override must be rejected, not silently
+/// dropped back to the pool-level assumption.
+#[test]
+fn typo_in_pool_asset_field_is_rejected() {
+    let mut v = full_example_value();
+    let asset = &mut v["instrument"]["spec"]["pool"]["assets"][0];
+    // One missing 'r' — the classic failure this guards.
+    asset["smm_overide"] = serde_json::json!(0.02);
+    assert_rejected(&v, "smm_overide", "PoolAsset");
+}
+
+/// A field that simply does not exist on `PoolAsset` must be rejected rather
+/// than looking as though it configured something.
+#[test]
+fn unknown_pool_asset_field_is_rejected() {
+    let mut v = full_example_value();
+    v["instrument"]["spec"]["pool"]["assets"][0]["recovery_rate"] = serde_json::json!(0.4);
+    assert_rejected(&v, "recovery_rate", "PoolAsset");
+}
+
+/// A misspelled per-asset-type recovery map must be rejected, not silently
+/// collapsed to the flat `base_recovery_rate`.
+#[test]
+fn typo_in_default_assumptions_field_is_rejected() {
+    let mut v = full_example_value();
+    let da = &mut v["instrument"]["spec"]["default_assumptions"];
+    da["recovery_by_asset_typ"] = serde_json::json!({});
+    assert_rejected(&v, "recovery_by_asset_typ", "DefaultAssumptions");
+}
+
+/// Strictness must reach nested collections, not just the top two levels.
+#[test]
+fn typo_in_nested_pool_configuration_is_rejected() {
+    let mut v = full_example_value();
+    v["instrument"]["spec"]["pool"]["reinvestment_period"]["end_dat"] =
+        serde_json::json!("2027-01-01");
+    assert_rejected(&v, "end_dat", "ReinvestmentPeriod");
+}
+
+/// The top-level deny must still work (guards against a regression that
+/// removes it while adding the nested ones).
+#[test]
+fn typo_in_top_level_field_is_rejected() {
+    let mut v = full_example_value();
+    v["instrument"]["spec"]["cleanup_call_pc"] = serde_json::json!(0.1);
+    assert_rejected(&v, "cleanup_call_pc", "StructuredCredit");
+}
+
+/// The unmutated fixture must still parse — strictness must not have broken
+/// any legitimate field.
+#[test]
+fn canonical_fixture_still_parses_under_strict_nested_serde() {
+    let v = full_example_value();
+    let text = serde_json::to_string(&v).expect("serialize");
+    let envelope: InstrumentEnvelope = serde_json::from_str(&text)
+        .expect("the canonical fixture must still parse with nested deny_unknown_fields");
+    match envelope.instrument {
+        InstrumentJson::StructuredCredit(sc) => {
+            assert_eq!(sc.id.as_str(), "FULL-CLO");
+            assert_eq!(sc.pool.assets.len(), 2);
+        }
+        other => panic!("Unexpected instrument variant: {other:?}"),
+    }
+}

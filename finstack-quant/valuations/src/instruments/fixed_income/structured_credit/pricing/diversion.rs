@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 /// Condition that triggers a diversion.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[non_exhaustive]
+#[serde(deny_unknown_fields)]
 pub enum DiversionCondition {
     /// Triggered when a coverage test fails.
     CoverageTestFailed {
@@ -33,6 +34,7 @@ pub enum DiversionCondition {
 
 /// A diversion rule that redirects cash from one tier to another.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct DiversionRule {
     /// Unique identifier for this rule.
     pub id: String,
@@ -105,6 +107,7 @@ impl DiversionRule {
 
 /// Engine for managing and validating diversion rules.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct DiversionEngine {
     /// Collection of diversion rules.
     rules: Vec<DiversionRule>,

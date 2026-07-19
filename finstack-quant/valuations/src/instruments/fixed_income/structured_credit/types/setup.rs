@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 
 /// Complete deal configuration for structured credit instruments
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct DealConfig {
     /// Key deal dates
     pub dates: DealDates,
@@ -37,6 +38,7 @@ pub struct DealConfig {
 
 /// Key dates for a structured credit deal
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct DealDates {
     /// Deal closing date
     #[schemars(with = "String")]
@@ -80,6 +82,7 @@ impl DealDates {
 
 /// Fee structure for structured credit deals
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct DealFees {
     /// Annual trustee fee (fixed amount)
     pub trustee_fee_annual: Money,
@@ -131,6 +134,7 @@ impl DealFees {
 
 /// Coverage test configuration
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CoverageTestConfig {
     /// OC trigger levels by tranche ID
     pub oc_triggers: HashMap<String, f64>,
@@ -203,6 +207,7 @@ impl Default for CoverageTestConfig {
 
 /// Default assumptions for structured credit modeling
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct DefaultAssumptions {
     /// Base annual CDR (Constant Default Rate)
     pub base_cdr_annual: f64,

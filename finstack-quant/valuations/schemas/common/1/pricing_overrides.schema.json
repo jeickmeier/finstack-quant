@@ -287,46 +287,46 @@
       "type": "object"
     },
     "BreakevenMode": {
-      "description": "Linear (first-order) or iterative (full-reprice root-find) solve mode.",
+      "description": "Linear (first-order) or iterative (full-reprice root-find) solve mode.\n\n# Why the two modes disagree\n\nThe gap between them is usually **not** dominated by convexity. `Linear`\ndivides by the sensitivity measured at `as_of`, whereas `Iterative`\nreprices at the horizon date, where the instrument has less remaining time\nand therefore a different sensitivity. On a 5Y bond over a 6M horizon the\ntwo differ by several percent even though convexity over the ~9bp solved\nshift contributes only a fraction of that. The gap grows with horizon\nlength, not just with curvature.\n\n`Iterative` is the more accurate answer where it is supported; `Linear` is\nthe fast approximation and the default.",
       "oneOf": [
         {
           "const": "linear",
-          "description": "`-(carry_total) / sensitivity`. Fast, ignores convexity.",
+          "description": "`-(carry_total) / sensitivity`, using the sensitivity at `as_of`.\n\nFast, first-order: ignores both convexity and the change in sensitivity\nover the horizon.",
           "type": "string"
         },
         {
           "const": "iterative",
-          "description": "Brent root-find with full reprice at horizon. Accounts for convexity.",
+          "description": "Brent root-find with a full reprice at the horizon date.\n\nCaptures convexity *and* the horizon change in sensitivity. Not\nsupported for [`BreakevenTarget::BaseCorrelation`], nor for\ncredit-curve instruments under `ZSpread`/`Oas` — see\n[`BreakevenTarget`] and the calculator docs for why.",
           "type": "string"
         }
       ]
     },
     "BreakevenTarget": {
-      "description": "Which valuation parameter to solve the breakeven for.",
+      "description": "Which valuation parameter to solve the breakeven for.\n\n# Result units\n\nThe breakeven metric is a bare `f64` whose unit depends on the target. Read\nthe per-variant docs before interpreting a value:\n\n| Target             | Sensitivity     | Result unit          |\n|--------------------|-----------------|----------------------|\n| `ZSpread`          | CS01            | basis points         |\n| `Ytm`              | DV01            | basis points         |\n| `Oas`              | CS01            | basis points         |\n| `ImpliedVol`       | Vega            | vol points (1 = 1%)  |\n| `BaseCorrelation`  | Correlation01   | correlation points   |",
       "oneOf": [
         {
           "const": "z_spread",
-          "description": "Z-spread breakeven (sensitivity: CS01).",
+          "description": "Z-spread breakeven, in **basis points** (sensitivity: CS01).",
           "type": "string"
         },
         {
           "const": "ytm",
-          "description": "Yield-to-maturity breakeven (sensitivity: DV01).",
+          "description": "Yield-to-maturity breakeven, in **basis points** (sensitivity: DV01).",
           "type": "string"
         },
         {
           "const": "implied_vol",
-          "description": "Implied volatility breakeven (sensitivity: Vega).",
+          "description": "Implied volatility breakeven, in **vol points** where 1.0 = 1% absolute\nvol (sensitivity: Vega).",
           "type": "string"
         },
         {
           "const": "base_correlation",
-          "description": "Base correlation breakeven (sensitivity: Correlation01).",
+          "description": "Base correlation breakeven, in **correlation points** (sensitivity:\nCorrelation01).\n\nOnly [`BreakevenMode::Linear`] is supported. Base-correlation skew is\nstrongly non-linear, so a first-order breakeven here is a coarser\napproximation than for spread or yield targets.",
           "type": "string"
         },
         {
           "const": "oas",
-          "description": "OAS breakeven (sensitivity: CS01).",
+          "description": "OAS breakeven, in **basis points** (sensitivity: CS01).\n\nNote that under [`BreakevenMode::Iterative`] the solve applies a\nparallel discount-curve shift. For an instrument with embedded\noptionality that is a duration-space answer, not a true OAS shift,\nbecause OAS is defined relative to the option model.",
           "type": "string"
         }
       ]

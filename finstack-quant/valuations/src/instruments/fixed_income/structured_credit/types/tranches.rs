@@ -17,6 +17,7 @@ use finstack_quant_core::types::CreditRating;
 /// Tranche behavioral type used by the structured-credit waterfall.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[non_exhaustive]
+#[serde(deny_unknown_fields)]
 pub enum TrancheBehaviorType {
     /// Standard debt tranche that receives interest and principal payments.
     Standard,
@@ -28,6 +29,7 @@ fn default_behavior_type() -> TrancheBehaviorType {
 
 /// Coverage-test trigger specification for a tranche or deal.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CoverageTrigger {
     /// Breach threshold, expressed as a coverage ratio (1.20 means 120%).
     pub trigger_level: f64,
@@ -76,6 +78,7 @@ impl CoverageTrigger {
 
 /// Credit-enhancement amounts and flags available to a tranche.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CreditEnhancement {
     /// Principal subordination supplied by junior tranches.
     pub subordination: Money,
@@ -107,6 +110,7 @@ impl Default for CreditEnhancement {
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[non_exhaustive]
 #[allow(clippy::large_enum_variant)]
+#[serde(deny_unknown_fields)]
 pub enum TrancheCoupon {
     /// Fixed rate coupon (rate as decimal, e.g., 0.05 for 5%)
     Fixed {

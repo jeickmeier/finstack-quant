@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 /// Primary structured credit deal classification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 #[non_exhaustive]
+#[serde(deny_unknown_fields)]
 pub enum DealType {
     /// Collateralized Loan Obligation
     CLO,
@@ -61,6 +62,7 @@ impl core::fmt::Display for DealType {
     schemars::JsonSchema,
 )]
 #[non_exhaustive]
+#[serde(deny_unknown_fields)]
 pub enum TrancheSeniority {
     /// Most senior debt tranche
     Senior = 0,
@@ -91,6 +93,7 @@ impl core::fmt::Display for TrancheSeniority {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "type")]
 #[non_exhaustive]
+#[serde(deny_unknown_fields)]
 pub enum AssetType {
     // ========== LOAN TYPES ==========
     /// First lien corporate loan
@@ -250,6 +253,7 @@ pub enum AssetType {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "mode")]
 #[non_exhaustive]
+#[serde(deny_unknown_fields)]
 pub enum PaymentMode {
     /// Normal pro-rata payments to all tranches
     ProRata,
@@ -300,6 +304,7 @@ impl AssetType {
 /// Consequences when triggers are breached
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[non_exhaustive]
+#[serde(deny_unknown_fields)]
 pub enum TriggerConsequence {
     /// Divert Cash Flow variant.
     DivertCashFlow,

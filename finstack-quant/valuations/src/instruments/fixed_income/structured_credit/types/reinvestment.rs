@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 /// Manages reinvestment during the reinvestment period (price-only selection)
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ReinvestmentManager {
     /// End date of reinvestment period
     #[schemars(with = "String")]

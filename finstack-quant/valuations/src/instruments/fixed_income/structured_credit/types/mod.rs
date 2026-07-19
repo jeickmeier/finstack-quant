@@ -125,6 +125,7 @@ use serde::{Deserialize, Serialize};
 
 /// Market conditions that affect prepayment behavior.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct MarketConditions {
     /// Current refinancing rate.
     pub refi_rate: f64,
@@ -156,6 +157,7 @@ impl Default for MarketConditions {
 
 /// Credit factors affecting default probability.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CreditFactors {
     /// Current FICO/credit score.
     pub credit_score: Option<u32>,
@@ -183,6 +185,7 @@ pub struct CreditFactors {
 
 /// Deal metadata (counterparties and identifiers).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Metadata {
     /// Manager identifier (for CLO).
     pub manager_id: Option<String>,
@@ -198,6 +201,7 @@ pub struct Metadata {
 
 /// Behavioral overrides for prepayment, default, and recovery assumptions.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Overrides {
     /// Override prepayment with constant annual CPR.
     pub cpr_annual: Option<f64>,

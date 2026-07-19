@@ -124,6 +124,7 @@
       "description": "Asset type classification for pool composition (flattened hierarchy)",
       "oneOf": [
         {
+          "additionalProperties": false,
           "description": "First lien corporate loan",
           "properties": {
             "industry": {
@@ -144,6 +145,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Second lien corporate loan",
           "properties": {
             "industry": {
@@ -164,6 +166,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Revolving credit facility",
           "properties": {
             "industry": {
@@ -184,6 +187,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Bridge loan",
           "properties": {
             "industry": {
@@ -204,6 +208,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Mezzanine loan",
           "properties": {
             "industry": {
@@ -224,6 +229,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "High yield bond",
           "properties": {
             "industry": {
@@ -244,6 +250,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Investment grade bond",
           "properties": {
             "industry": {
@@ -264,6 +271,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Distressed bond",
           "properties": {
             "industry": {
@@ -284,6 +292,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Emerging markets bond",
           "properties": {
             "industry": {
@@ -304,6 +313,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Single family residential mortgage",
           "properties": {
             "ltv": {
@@ -325,6 +335,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Multifamily residential mortgage",
           "properties": {
             "ltv": {
@@ -346,6 +357,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Commercial real estate mortgage",
           "properties": {
             "ltv": {
@@ -367,6 +379,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Industrial property mortgage",
           "properties": {
             "ltv": {
@@ -388,6 +401,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Retail property mortgage",
           "properties": {
             "ltv": {
@@ -409,6 +423,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Office property mortgage",
           "properties": {
             "ltv": {
@@ -430,6 +445,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Hotel property mortgage",
           "properties": {
             "ltv": {
@@ -451,6 +467,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Other property type mortgage",
           "properties": {
             "ltv": {
@@ -477,6 +494,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "New vehicle auto loan",
           "properties": {
             "ltv": {
@@ -498,6 +516,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Used vehicle auto loan",
           "properties": {
             "ltv": {
@@ -519,6 +538,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Vehicle lease",
           "properties": {
             "ltv": {
@@ -540,6 +560,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Fleet vehicle loan",
           "properties": {
             "ltv": {
@@ -561,6 +582,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Prime credit card receivables",
           "properties": {
             "type": {
@@ -574,6 +596,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Subprime credit card receivables",
           "properties": {
             "type": {
@@ -587,6 +610,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Super prime credit card receivables",
           "properties": {
             "type": {
@@ -600,6 +624,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Commercial credit card receivables",
           "properties": {
             "type": {
@@ -613,6 +638,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Federal student loan",
           "properties": {
             "type": {
@@ -626,6 +652,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Private student loan",
           "properties": {
             "type": {
@@ -639,6 +666,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "FFELP student loan",
           "properties": {
             "type": {
@@ -652,6 +680,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Consolidation student loan",
           "properties": {
             "type": {
@@ -665,6 +694,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Equipment financing",
           "properties": {
             "equipment_type": {
@@ -683,6 +713,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Generic asset placeholder",
           "properties": {
             "asset_class": {
@@ -990,6 +1021,7 @@
       ]
     },
     "CoverageTrigger": {
+      "additionalProperties": false,
       "description": "Coverage-test trigger specification for a tranche or deal.",
       "properties": {
         "breach_date": {
@@ -1025,6 +1057,7 @@
       "type": "object"
     },
     "CreditEnhancement": {
+      "additionalProperties": false,
       "description": "Credit-enhancement amounts and flags available to a tranche.",
       "properties": {
         "cash_trap_active": {
@@ -1059,6 +1092,7 @@
       "type": "object"
     },
     "CreditFactors": {
+      "additionalProperties": false,
       "description": "Credit factors affecting default probability.",
       "properties": {
         "annual_debt_service": {
@@ -1353,6 +1387,7 @@
       ]
     },
     "DefaultAssumptions": {
+      "additionalProperties": false,
       "description": "Default assumptions for structured credit modeling",
       "properties": {
         "abs_speed_monthly": {
@@ -2148,6 +2183,7 @@
       ]
     },
     "MarketConditions": {
+      "additionalProperties": false,
       "description": "Market conditions that affect prepayment behavior.",
       "properties": {
         "custom_factors": {
@@ -2226,6 +2262,7 @@
       "type": "object"
     },
     "Metadata": {
+      "additionalProperties": false,
       "description": "Deal metadata (counterparties and identifiers).",
       "properties": {
         "manager_id": {
@@ -2408,6 +2445,7 @@
       ]
     },
     "Overrides": {
+      "additionalProperties": false,
       "description": "Behavioral overrides for prepayment, default, and recovery assumptions.",
       "properties": {
         "abs_speed": {
@@ -2509,6 +2547,7 @@
       ]
     },
     "PoolAsset": {
+      "additionalProperties": false,
       "description": "Individual asset held in a structured-credit collateral pool.\n\nMonetary fields use the asset's native currency. Rates are annual decimal\nrates unless a field explicitly says basis points.",
       "properties": {
         "acquisition_date": {
@@ -2654,6 +2693,7 @@
       "type": "object"
     },
     "ReinvestmentCriteria": {
+      "additionalProperties": false,
       "description": "Criteria for reinvestment during revolving period",
       "properties": {
         "apply_eligibility_criteria": {
@@ -2689,6 +2729,7 @@
       "type": "object"
     },
     "ReinvestmentPeriod": {
+      "additionalProperties": false,
       "description": "Reinvestment period and rules",
       "properties": {
         "criteria": {
@@ -2713,6 +2754,7 @@
       "type": "object"
     },
     "RepLine": {
+      "additionalProperties": false,
       "description": "Representative line for aggregated pool modeling",
       "properties": {
         "balance": {
@@ -3386,6 +3428,7 @@
           "description": "Fixed rate coupon (rate as decimal, e.g., 0.05 for 5%)",
           "properties": {
             "Fixed": {
+              "additionalProperties": false,
               "properties": {
                 "rate": {
                   "description": "Fixed interest rate as decimal (e.g., 0.05 for 5%)",

@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 /// Result containing tranche-specific cashflows and metadata.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct TrancheCashflows {
     /// Tranche identifier.
     pub tranche_id: String,
@@ -47,6 +48,7 @@ pub struct TrancheCashflows {
 
 /// Tranche-specific valuation result.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct TrancheValuation {
     /// Tranche identifier.
     pub tranche_id: String,
