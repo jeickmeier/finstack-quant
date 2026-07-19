@@ -349,7 +349,7 @@ fn scenarios_dts_matches_json_bridge_surface() {
     assert!(contains_ignoring_ws(&dts, "warnings: ScenarioWarning[];"));
     assert!(contains_ignoring_ws(
         &dts,
-        "computeHorizonReturn(instrumentJson: string, marketJson: string, asOf: string, scenarioJson: string, method?: string, configJson?: string): string;",
+        "computeHorizonReturn(instrumentJson: string, marketJson: string, asOf: string, scenarioJson: string, method?: string, configJson?: string, calendarId?: string): string;",
     ));
     assert!(dts.contains("export declare const scenarios: ScenariosNamespace;"));
 }
