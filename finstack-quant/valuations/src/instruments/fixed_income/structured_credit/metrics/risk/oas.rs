@@ -145,7 +145,28 @@ pub fn calculate_tranche_oas(
         .max()
         .unwrap_or(as_of);
     let num_months = as_of.months_until(maturity) as usize + 12;
-    let base_rate = initial_short_rate(disc.as_ref(), as_of, maturity, &day_count)?;
+    // SC-M11: the prepayment multiplier is `exp(-beta * (r - base_rate))`, so
+    // `base_rate` must be measured in the SAME units as the rate path it is
+    // compared against. `rate_path[m]` is a one-month FORWARD; `base_rate` was
+    // `-ln(DF(as_of, maturity))/T`, the average ZERO rate to final maturity.
+    //
+    // On any non-flat curve those differ, so the multiplier was not 1 even at
+    // t = 0 and even at zero volatility: an upward curve with a 3.0% one-month
+    // forward against a 4.5% average zero rate gives `exp(7 * 0.015) = 1.11` —
+    // an 11% prepayment speed-up appearing purely from enabling a rate model
+    // with sigma = 0. The module docs claimed a sigma = 0 anchor test that did
+    // not exist.
+    //
+    // Anchoring on `forwards[0]` — the current short rate — makes the
+    // multiplier exactly 1 at t = 0 and dimensionally consistent thereafter.
+    // Note this does NOT make `stochastic_rates: true, hw_sigma: 0` identical
+    // to `stochastic_rates: false`: the former still lets prepayment follow the
+    // deterministic forward curve, which is what a zero-vol rate model MEANS.
+    // What it removes is the spurious level offset.
+    let base_rate = monthly_forwards(disc.as_ref(), 1)
+        .first()
+        .copied()
+        .unwrap_or(0.0);
 
     let stochastic = config.stochastic_rates || config.stochastic_credit;
     // Cap path count: each path runs a full deterministic deal simulation.
@@ -212,7 +233,12 @@ pub fn calculate_tranche_oas(
             None
         };
         let rate_path = match (&forwards, &deviation) {
-            (Some(fwd), Some(dev)) => Some(absolute_rate_path(fwd, dev)),
+            (Some(fwd), Some(dev)) => Some(absolute_rate_path(
+                fwd,
+                dev,
+                config.hw_kappa,
+                config.hw_sigma,
+            )),
             _ => None,
         };
         let credit_z = if config.stochastic_credit {
@@ -320,22 +346,6 @@ pub fn calculate_tranche_oas(
     })
 }
 
-/// Flat proxy for the initial short rate: the continuously-compounded average
-/// zero rate from `as_of` to `maturity`.
-fn initial_short_rate(
-    curve: &DiscountCurve,
-    as_of: Date,
-    maturity: Date,
-    day_count: &DayCount,
-) -> Result<f64> {
-    let t = day_count.year_fraction(as_of, maturity, DayCountContext::default())?;
-    if t <= 0.0 {
-        return Ok(0.0);
-    }
-    let df = curve.df_between_dates(as_of, maturity)?;
-    Ok(-df.ln() / t)
-}
-
 /// Monthly continuously-compounded forward rates from the discount curve over
 /// `[m/12, (m+1)/12]` for `m` in `0..num_months`. These are the deterministic
 /// term-structure anchor for the Hull-White short rate `r(t) = forward(t) + x(t)`.
@@ -379,12 +389,49 @@ fn simulate_ou_deviation(
 
 /// Absolute monthly short-rate path `r_m = forward_m + x_m` for the prepayment
 /// model. Length matches `forwards`.
-fn absolute_rate_path(forwards: &[f64], deviation: &[f64]) -> Vec<f64> {
+/// Absolute Hull-White short-rate path, `r(t) = f(0,t) + alpha(t) + x(t)`.
+///
+/// SC-M12: `alpha(t) = sigma^2/(2*kappa^2) * (1 - e^{-kappa*t})^2` is the
+/// deterministic drift the HW1F risk-neutral short rate carries in addition to
+/// the initial forward curve (Brigo & Mercurio 2006, "Interest Rate Models",
+/// section 3.3). It was previously omitted, so the rate driving prepayment was
+/// biased LOW by that amount at every horizon.
+///
+/// At the shipped defaults (kappa = 0.05, sigma = 0.01) the omitted term is
+/// 31 bp at 10y and 121 bp at 30y. With the default prepay beta of 7.0 that is
+/// a multiplier bias of `exp(7 * 0.0031) = 1.022` at 10y and
+/// `exp(7 * 0.0121) = 1.088` at 30y — systematically fast prepayment on the
+/// long end of an RMBS, which is exactly where extension risk is priced.
+///
+/// Note the discounting leg was already de-biased correctly by
+/// `ou_integral_convexity_adjustments`; only the rate fed to the prepayment
+/// model was missing this.
+fn absolute_rate_path(forwards: &[f64], deviation: &[f64], kappa: f64, sigma: f64) -> Vec<f64> {
     forwards
         .iter()
         .enumerate()
-        .map(|(m, f)| f + deviation.get(m).copied().unwrap_or(0.0))
+        .map(|(m, f)| {
+            let t = m as f64 / 12.0;
+            f + hull_white_alpha(kappa, sigma, t) + deviation.get(m).copied().unwrap_or(0.0)
+        })
         .collect()
+}
+
+/// Hull-White deterministic drift `alpha(t) = sigma^2/(2*kappa^2)*(1-e^{-kappa t})^2`.
+///
+/// Reduces to the `kappa -> 0` limit `sigma^2 * t^2 / 2` (a driftless Ho-Lee
+/// short rate), so a zero mean-reversion configuration stays finite rather than
+/// dividing by zero.
+fn hull_white_alpha(kappa: f64, sigma: f64, t: f64) -> f64 {
+    if sigma == 0.0 || t <= 0.0 {
+        return 0.0;
+    }
+    if kappa.abs() < 1e-8 {
+        // lim_{k->0} (1-e^{-kt})^2 / (2k^2) = t^2/2
+        return sigma * sigma * t * t / 2.0;
+    }
+    let decay = 1.0 - (-kappa * t).exp();
+    sigma * sigma * decay * decay / (2.0 * kappa * kappa)
 }
 
 /// Stochastic (OU) contribution to the discount factor at `month`:
@@ -443,6 +490,94 @@ fn ou_integral_convexity_adjustments(kappa: f64, sigma: f64, num_months: usize) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::math::interp::InterpStyle;
+    use time::Month;
+
+    /// A deliberately STEEP curve: on a flat curve the one-month forward and
+    /// the average zero rate coincide, which is exactly the case that hid
+    /// SC-M11.
+    fn steep_curve() -> DiscountCurve {
+        DiscountCurve::builder("USD-STEEP")
+            .base_date(Date::from_calendar_date(2024, Month::January, 1).expect("date"))
+            .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.80), (10.0, 0.58)])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("curve")
+    }
+
+    /// SC-M11 — the prepayment reference rate must be dimensionally consistent
+    /// with the rate path, so the multiplier is exactly 1 at t = 0.
+    ///
+    /// The multiplier is `exp(-beta * (r - base_rate))`. `rate_path[0]` is the
+    /// current one-month forward; `base_rate` used to be the average ZERO rate
+    /// to final maturity, so on any non-flat curve the two differed and the
+    /// multiplier was off at t = 0 even at zero volatility.
+    #[test]
+    fn rate_path_starts_at_the_reference_rate() {
+        let curve = steep_curve();
+        let forwards = monthly_forwards(&curve, 12);
+        // Zero vol: the path is the forward curve plus a zero drift.
+        let path = absolute_rate_path(&forwards, &[0.0; 12], 0.05, 0.0);
+        let base_rate = monthly_forwards(&curve, 1)[0];
+
+        assert!(
+            (path[0] - base_rate).abs() < 1e-12,
+            "at t=0 the rate path {} must equal the reference rate {base_rate}, \
+             so the prepayment multiplier is exactly 1 (SC-M11)",
+            path[0]
+        );
+    }
+
+    /// SC-M12 — the Hull-White drift `alpha(t)` must be present in the rate
+    /// path, and must match its closed form.
+    ///
+    /// `alpha(t) = sigma^2/(2*kappa^2) * (1 - e^{-kappa t})^2` (Brigo &
+    /// Mercurio 2006, section 3.3). Omitting it biased the rate driving
+    /// prepayment LOW at every horizon — 31 bp at 10y and 121 bp at 30y at the
+    /// shipped defaults, which with beta = 7.0 is a 2.2% and 8.8% prepayment
+    /// speed-up respectively.
+    #[test]
+    fn rate_path_carries_the_hull_white_drift() {
+        const KAPPA: f64 = 0.05;
+        const SIGMA: f64 = 0.01;
+
+        // Closed form at 10 years.
+        let t = 10.0_f64;
+        let decay = 1.0 - (-KAPPA * t).exp();
+        let expected = SIGMA * SIGMA * decay * decay / (2.0 * KAPPA * KAPPA);
+        assert!(
+            (hull_white_alpha(KAPPA, SIGMA, t) - expected).abs() < 1e-15,
+            "alpha(10y) must match the closed form"
+        );
+        assert!(
+            (expected - 0.0031).abs() < 0.0005,
+            "alpha(10y) at the shipped defaults should be ~31 bp, got {expected}"
+        );
+
+        // It must actually reach the path.
+        let forwards = vec![0.03_f64; 121];
+        let with_drift = absolute_rate_path(&forwards, &[0.0; 121], KAPPA, SIGMA);
+        let without_drift = absolute_rate_path(&forwards, &[0.0; 121], KAPPA, 0.0);
+        assert!(
+            with_drift[120] > without_drift[120] + 0.002,
+            "the 10y point of the rate path must carry the drift: {} vs {}",
+            with_drift[120],
+            without_drift[120]
+        );
+
+        // Zero volatility means no drift, at any horizon.
+        assert!(
+            hull_white_alpha(KAPPA, 0.0, 30.0).abs() < 1e-15,
+            "sigma = 0 must give zero drift"
+        );
+        // And kappa -> 0 must stay finite (the Ho-Lee limit sigma^2 t^2 / 2).
+        let ho_lee = hull_white_alpha(0.0, SIGMA, 10.0);
+        assert!(
+            (ho_lee - SIGMA * SIGMA * 100.0 / 2.0).abs() < 1e-12,
+            "the kappa -> 0 limit must be sigma^2 t^2 / 2, got {ho_lee}"
+        );
+    }
 
     /// With the convexity correction, the Monte-Carlo mean of the stochastic
     /// discount factor `exp(-∫x)·adj` must equal 1 (so `E[stochastic DF] = curve
