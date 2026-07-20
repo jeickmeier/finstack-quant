@@ -26,6 +26,21 @@ use serde::{Deserialize, Serialize};
 pub struct TrancheMetrics {
     /// Identifier of the tranche.
     pub tranche_id: String,
+    /// ISO-4217 code of the currency `pv` and `cs01` are denominated in.
+    ///
+    /// SC-M26: those two fields are bare `f64` documented as "currency units",
+    /// while `Money` elsewhere in this crate serializes as
+    /// `{"amount": "...", "currency": "USD"}`. A caller holding a
+    /// `TrancheMetrics` could not tell what currency it was looking at without
+    /// separately parsing the deal — and a portfolio summing tranche PVs
+    /// across a multi-currency book had no way to detect the mismatch.
+    ///
+    /// The input side already got this right: `target_pv` is stamped with the
+    /// tranche currency via `tranche_currency()`. This closes the output side.
+    /// Serde-defaulted, so payloads written before this field existed still
+    /// deserialize.
+    #[serde(default)]
+    pub currency: String,
     /// Present value of the tranche (currency units).
     pub pv: f64,
     /// Model price as a percentage of original balance.
@@ -138,6 +153,7 @@ pub fn calculate_tranche_metrics(
 
     Ok(TrancheMetrics {
         tranche_id: tranche_id.to_string(),
+        currency: pv_money.currency().to_string(),
         pv,
         price_pct,
         wal,
@@ -148,4 +164,66 @@ pub fn calculate_tranche_metrics(
         convexity,
         target_price_pct,
     })
+}
+
+#[cfg(test)]
+mod currency_stamp_tests {
+    use super::*;
+
+    /// SC-M26 — monetary outputs must carry their currency.
+    ///
+    /// `pv` and `cs01` are bare `f64` documented as "currency units", while
+    /// `Money` elsewhere in this crate serializes as
+    /// `{"amount": "...", "currency": "USD"}`. A caller holding a
+    /// `TrancheMetrics` could not tell what currency it held without separately
+    /// parsing the deal, and a portfolio summing tranche PVs across a
+    /// multi-currency book had no way to detect the mismatch.
+    #[test]
+    fn tranche_metrics_carry_their_currency() {
+        let metrics = TrancheMetrics {
+            tranche_id: "A".to_string(),
+            currency: "EUR".to_string(),
+            pv: 1_000.0,
+            price_pct: 100.0,
+            wal: 3.0,
+            z_spread_bp: 0.0,
+            cs01: -1.0,
+            spread_duration: 3.0,
+            modified_duration: 3.0,
+            convexity: 12.0,
+            target_price_pct: 100.0,
+        };
+        let json = serde_json::to_string(&metrics).expect("serialize");
+        assert!(
+            json.contains("\"currency\":\"EUR\""),
+            "the currency must reach the wire alongside pv/cs01; got {json}"
+        );
+
+        let parsed: TrancheMetrics = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.currency, "EUR");
+    }
+
+    /// SC-M26 — the field is serde-defaulted, so payloads written before it
+    /// existed still deserialize rather than hard-failing on upgrade.
+    #[test]
+    fn metrics_without_a_currency_field_still_deserialize() {
+        let legacy = r#"{
+            "tranche_id": "A",
+            "pv": 1000.0,
+            "price_pct": 100.0,
+            "wal": 3.0,
+            "z_spread_bp": 0.0,
+            "cs01": -1.0,
+            "spread_duration": 3.0,
+            "modified_duration": 3.0,
+            "convexity": 12.0,
+            "target_price_pct": 100.0
+        }"#;
+        let parsed: TrancheMetrics =
+            serde_json::from_str(legacy).expect("a pre-SC-M26 payload must still parse");
+        assert!(
+            parsed.currency.is_empty(),
+            "an absent currency defaults to empty rather than failing the parse"
+        );
+    }
 }
