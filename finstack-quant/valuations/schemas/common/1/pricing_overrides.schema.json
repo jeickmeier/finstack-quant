@@ -1534,6 +1534,14 @@
         "null"
       ]
     },
+    "quoted_price_pct": {
+      "description": "Externally-quoted price as a percentage of original balance (100.0 = par).\n\nSC-M02: spread-to-price metrics need a price that did NOT come from the\nmodel, or they are circular. For structured credit the registry's\n`ZSpread` derived its target from `MetricId::DirtyPrice`, which is\n`base_value / notional * 100` — so the objective was\n`PV(curve + z) == PV(curve)` and the answer was identically zero by\nconstruction, silently taking `Cs01`, `BucketedCs01` and\n`SpreadDuration` with it.\n\nSupplying a quote here breaks the loop. Absent one, `ZSpread` still\nreports the degenerate zero rather than erroring, because the\ndeal-level metric registry evaluates it unconditionally; that is\ndocumented at the calculator.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
     "quoted_ytm": {
       "description": "Quoted yield-to-maturity in decimal (e.g., `0.055` = 5.5%).",
       "format": "double",

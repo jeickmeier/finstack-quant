@@ -270,6 +270,7 @@ mod tests {
             theta_period: None,
             breakeven_config: None,
             bond_risk_basis: None,
+            quoted_price_pct: None,
             var_config: None,
         }
         .with_rate_bump(2.0)

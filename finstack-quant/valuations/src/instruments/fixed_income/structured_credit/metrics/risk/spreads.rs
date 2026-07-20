@@ -48,20 +48,46 @@ pub struct ZSpreadCalculator;
 
 impl MetricCalculator for ZSpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        // Get dirty price (target value)
-        let dirty_price = context
-            .computed
-            .get(&MetricId::DirtyPrice)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:DirtyPrice".to_string(),
-                })
-            })?;
+        // SC-M02: prefer an EXTERNALLY-QUOTED price.
+        //
+        // Without one this metric is circular. `MetricId::DirtyPrice` is
+        // `base_value / notional * 100`, and `base_value` is the PV of the same
+        // cashflows on the same curve with the same discounting convention — so
+        // the objective reduces to `PV(curve + z) == PV(curve)` and the answer
+        // is identically ZERO by construction. Structured credit had no
+        // quote-injection path (unlike bonds, which have `quoted_clean_price`),
+        // so `ZSpread` was always 0, and `Cs01`, `BucketedCs01` and
+        // `SpreadDuration` were all evaluated at `z = 0` without anyone being
+        // told.
+        //
+        // `MetricPricingOverrides::quoted_price_pct` breaks the loop. When it
+        // is absent the degenerate zero is still returned rather than erroring,
+        // because the deal-level metric registry evaluates `ZSpread`
+        // unconditionally and erroring would take the whole suite down (the
+        // same constraint SC-M10 hit). That is a reporting compromise, not a
+        // correct spread: treat a zero z-spread with no quote as "not
+        // computed". Removing the compromise means restricting the registry to
+        // per-tranche contexts — SC-m14.
+        let quoted_price_pct = context
+            .get_metric_overrides()
+            .and_then(|o| o.quoted_price_pct);
+
+        let price_pct = match quoted_price_pct {
+            Some(quote) => quote,
+            None => context
+                .computed
+                .get(&MetricId::DirtyPrice)
+                .copied()
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
+                        id: "metric:DirtyPrice".to_string(),
+                    })
+                })?,
+        };
 
         // Convert price points back to currency using original notional.
         let notional = crate::instruments::fixed_income::structured_credit::metrics::pricing::prices::get_original_notional(context)?;
-        let target_value = notional * (dirty_price / 100.0);
+        let target_value = notional * (price_pct / 100.0);
 
         // Get cashflows
         let flows = context.cashflows.as_ref().ok_or_else(|| {
@@ -655,5 +681,61 @@ impl MetricCalculator for BucketedCs01Calculator {
 
     fn dependencies(&self) -> &[MetricId] {
         &[MetricId::ZSpread]
+    }
+}
+
+#[cfg(test)]
+mod zspread_quote_tests {
+    use crate::instruments::MetricPricingOverrides;
+
+    /// SC-M02 — an externally-quoted price must break the circularity.
+    ///
+    /// Without a quote, `ZSpread`'s target came from `MetricId::DirtyPrice`,
+    /// which is `base_value / notional * 100` — the PV of the same cashflows on
+    /// the same curve. The objective reduced to `PV(curve + z) == PV(curve)`
+    /// and the answer was identically zero, silently taking `Cs01`,
+    /// `BucketedCs01` and `SpreadDuration` with it.
+    #[test]
+    fn quoted_price_override_is_carried_on_metric_overrides() {
+        let mut overrides = MetricPricingOverrides::default();
+        assert!(
+            overrides.quoted_price_pct.is_none(),
+            "no quote by default, so existing behaviour is unchanged"
+        );
+
+        overrides.quoted_price_pct = Some(98.5);
+        assert_eq!(
+            overrides.quoted_price_pct,
+            Some(98.5),
+            "a quoted price must survive on MetricPricingOverrides so ZSpread \
+             has a target that did not come from the model (SC-M02)"
+        );
+    }
+
+    /// SC-M02 — the override must round-trip through serde, since deals reach
+    /// the engine as JSON from both binding hosts.
+    #[test]
+    fn quoted_price_override_round_trips_through_json() {
+        let overrides = MetricPricingOverrides {
+            quoted_price_pct: Some(102.25),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&overrides).expect("serialize");
+        assert!(
+            json.contains("quoted_price_pct"),
+            "a set quote must serialize; got {json}"
+        );
+
+        let parsed: MetricPricingOverrides = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.quoted_price_pct, Some(102.25));
+
+        // And an absent quote must not bloat the wire format.
+        let empty = MetricPricingOverrides::default();
+        let empty_json = serde_json::to_string(&empty).expect("serialize");
+        assert!(
+            !empty_json.contains("quoted_price_pct"),
+            "an unset quote must be skipped on the wire; got {empty_json}"
+        );
     }
 }
