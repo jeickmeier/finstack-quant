@@ -453,12 +453,37 @@ fn test_ic_test_no_cure_amount() {
     // Act
     let result = test.calculate(&context).expect("coverage calculation");
 
-    // Assert: IC breaches report the senior interest shortfall as the cure.
-    // interest due = 100M * 5% / 4 = 1.25M; cure = 1.20 * 1.25M - 1.0M = 0.5M.
+    // SC-M08: the cure is a PRINCIPAL PAYDOWN, because that is how the
+    // diversion applies it — paying down senior principal adds nothing to
+    // interest collections, so a cash-shortfall cure cured nothing.
+    //
+    // De-levering: I_coll / (I_due - X*r*tau) >= R  =>  X >= (I_due - I_coll/R)/(r*tau).
+    // I_due = 100M * 5% / 4 = 1.25M; I_coll = 1.0M; R = 1.20; r*tau = 0.05/4.
+    //   X = (1.25M - 1.0M/1.20) / 0.0125 = (1.25M - 833,333) / 0.0125
+    //     = 416,667 / 0.0125 = 33,333,333
+    //
+    // This test previously asserted 500,000 — the cash shortfall
+    // `1.20*1.25M - 1.0M`. That is the right answer to a different question
+    // ("how much extra interest cash would clear the test") and under-cured
+    // the breach by ~67x.
     let cure = result
         .cure_amount
         .expect("IC breach should calculate a cure amount");
-    assert!((cure.amount() - 500_000.0).abs() < 1.0);
+    let expected = (1_250_000.0 - 1_000_000.0 / 1.20) / (0.05 / 4.0);
+    assert!(
+        (cure.amount() - expected).abs() < 1.0,
+        "IC cure must be the de-levering paydown {expected:.2}, got {:.2}. \
+         500,000 would be the pre-SC-M08 cash shortfall.",
+        cure.amount()
+    );
+
+    // Sanity: paying down exactly the cure must clear the test.
+    let due_after = (100_000_000.0 - cure.amount()) * 0.05 / 4.0;
+    assert!(
+        1_000_000.0 / due_after >= 1.20 - 1e-9,
+        "after the cure the IC ratio {:.4} must meet the 1.20 requirement",
+        1_000_000.0 / due_after
+    );
 }
 
 // ============================================================================

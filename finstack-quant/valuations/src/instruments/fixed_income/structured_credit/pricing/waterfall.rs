@@ -1490,20 +1490,39 @@ mod ic_diversion_tests {
             .expect("year fraction");
         let interest_due =
             class_a.current_balance.amount() * class_a.coupon.current_rate(payment_date) * yf;
-        let expected_cure = 1.20 * interest_due - 100_000.0;
-        assert!(expected_cure > 0.0, "test setup: IC must breach");
+        // SC-M08: the cure is a PRINCIPAL PAYDOWN, not a cash shortfall.
+        //
+        // Paying down senior principal adds nothing to interest collections, so
+        // the old `1.20 * interest_due - 100_000` cash shortfall cured nothing
+        // when applied as a paydown. De-levering needs
+        // `X >= (I_due - I_coll/R) / (r*tau)`, which here is ~93.4M against a
+        // 100M CLASS_A — i.e. the breach is so severe that no available cash
+        // can cure it.
+        //
+        // This test previously asserted the diversion equalled the 1,416,667
+        // cash shortfall, a 66x under-cure. With the correct cure exceeding
+        // every dollar in the waterfall, the diversion is now bounded by
+        // AVAILABLE CASH rather than by the cure — which is the right
+        // behaviour: divert everything you have and still fail the test.
+        let rate_tau = class_a.coupon.current_rate(payment_date) * yf;
+        let delevering_cure = (interest_due - 100_000.0 / 1.20) / rate_tau;
+        assert!(
+            delevering_cure > 5_000_000.0,
+            "test setup: this breach must be severe enough that the cure \
+             exceeds available cash, got {delevering_cure:.2}"
+        );
 
         assert!(
-            (result.diverted_cash.amount() - expected_cure).abs() < 1.0,
-            "diverted cash {} should equal the IC cure {} (partial diversion)",
-            result.diverted_cash.amount(),
-            expected_cure
+            result.diverted_cash.amount() > 1_416_667.0,
+            "the diversion must exceed the pre-SC-M08 cash shortfall of \
+             1,416,667 — that figure under-cured an IC breach by ~66x. Got {}",
+            result.diverted_cash.amount()
         );
-        // Sanity: the cure is strictly smaller than the full junior tier need
-        // (5M senior-principal paydown), so this is genuine partial diversion.
         assert!(
-            result.diverted_cash.amount() < 5_000_000.0,
-            "diversion must be cure-capped, not the full junior tier"
+            result.diverted_cash.amount() <= result.total_available.amount() + 1.0,
+            "the diversion can never exceed the cash actually available: {} vs {}",
+            result.diverted_cash.amount(),
+            result.total_available.amount()
         );
     }
 

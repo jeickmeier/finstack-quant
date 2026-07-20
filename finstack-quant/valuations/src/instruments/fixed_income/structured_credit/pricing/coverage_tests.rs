@@ -331,6 +331,62 @@ impl CoverageTest {
         );
 
         let senior_tranches = context.tranches.senior_to(context.tranche_id);
+
+        // SC-M08: average `rate * tau` across the notes a cure paydown would
+        // actually retire, so the cure can be expressed as a PRINCIPAL paydown
+        // rather than a cash shortfall. See the cure computation below.
+        //
+        // The set is the TEST TRANCHE plus everything senior to it — the same
+        // set that forms the IC denominator, and the same set the senior
+        // principal tier pays down. Restricting it to strictly-senior notes
+        // would make `rate*tau` zero for the most senior class (which has
+        // nothing above it), silently falling back to the cash shortfall for
+        // precisely the test that matters most.
+        let mut senior_rate_tau_weight = 0.0_f64;
+        let mut delevering_set = vec![tranche];
+        delevering_set.extend(senior_tranches.iter().copied());
+        for t in &delevering_set {
+            let rate = t.coupon.current_rate(context.as_of);
+            let tau = if let Some(period_start) = context.period_start {
+                t.day_count
+                    .year_fraction(
+                        period_start,
+                        context.as_of,
+                        finstack_quant_core::dates::DayCountContext::default(),
+                    )
+                    .unwrap_or_else(|_| 1.0 / frequency_periods_per_year(t.frequency))
+            } else {
+                1.0 / frequency_periods_per_year(t.frequency)
+            };
+            let bal = context
+                .tranche_balances
+                .and_then(|b| b.get(t.id.as_str()))
+                .copied()
+                .unwrap_or(t.current_balance);
+            if bal.amount() > 0.0 {
+                senior_rate_tau_weight += rate * tau;
+            }
+        }
+        // Average rate*tau across the senior notes actually outstanding; a
+        // paydown of X reduces next period's senior interest due by X*r*tau.
+        let outstanding_senior = delevering_set
+            .iter()
+            .filter(|t| {
+                context
+                    .tranche_balances
+                    .and_then(|b| b.get(t.id.as_str()))
+                    .copied()
+                    .unwrap_or(t.current_balance)
+                    .amount()
+                    > 0.0
+            })
+            .count();
+        let senior_rate_tau = if outstanding_senior > 0 {
+            senior_rate_tau_weight / outstanding_senior as f64
+        } else {
+            0.0
+        };
+
         let senior_interest_due = senior_tranches.iter().try_fold(
             Money::new(0.0, interest_due.currency()),
             |acc, t| {
@@ -380,19 +436,40 @@ impl CoverageTest {
 
         let is_passing = ratio >= required_ratio;
 
-        // W-21: IC cure = cash that must be diverted to senior interest so the
-        // test clears. The IC test passes when
-        //   (interest_collections + X) / total_interest_due >= required_ratio
-        //   => X >= required_ratio * total_interest_due - interest_collections
-        // This is the senior interest shortfall against the required coverage
-        // level; without it an IC-only breach diverts zero cash.
+        // SC-M08: the IC cure must be expressed in the units it is APPLIED in.
+        //
+        // The diversion pays down SENIOR PRINCIPAL (see `execute_waterfall`),
+        // which does not add to interest collections at all. The previous cure
+        // was the cash shortfall `R*I_due - I_coll` — the right answer to a
+        // different question, namely "how much extra interest cash would clear
+        // the test". Diverting that amount to principal cured nothing.
+        //
+        // Restoring IC by DE-LEVERING: paying down `X` of senior principal
+        // reduces the interest due by `X * r * tau`, so the test clears when
+        //
+        //     I_coll / (I_due - X*r*tau) >= R
+        //     => X >= (I_due - I_coll/R) / (r*tau)
+        //
+        // On this repo's own fixture (100M @ 5%, tau = 0.252778,
+        // I_due = 1,263,889, I_coll = 100,000, R = 1.20) the old formula gave
+        // 1,416,667 where de-levering needs 93,406,593 — a 66x under-cure, so
+        // an IC breach was effectively never remedied.
+        //
+        // When no senior note is outstanding (`r*tau` is zero) de-levering
+        // cannot restore the ratio at all; fall back to the cash shortfall so
+        // the breach still surfaces a non-zero cure rather than silently
+        // reporting none.
         let cure_amount = if !is_passing {
-            let shortfall = required_ratio * total_interest_due.amount()
-                - context.interest_collections.amount();
-            Some(Money::new(
-                shortfall.max(0.0),
-                context.interest_collections.currency(),
-            ))
+            let cash_shortfall = (required_ratio * total_interest_due.amount()
+                - context.interest_collections.amount())
+            .max(0.0);
+            let cure = if senior_rate_tau > 1e-12 && required_ratio > 0.0 {
+                let target_due = context.interest_collections.amount() / required_ratio;
+                ((total_interest_due.amount() - target_due) / senior_rate_tau).max(0.0)
+            } else {
+                cash_shortfall
+            };
+            Some(Money::new(cure, context.interest_collections.currency()))
         } else {
             None
         };
@@ -922,6 +999,75 @@ mod haircut_tests {
         let mut m = HashMap::default();
         m.insert(CreditRating::CCC, 0.5);
         m
+    }
+
+    /// SC-M08 — the IC cure must be a PRINCIPAL paydown, since that is how the
+    /// diversion applies it.
+    ///
+    /// The old cure was the cash shortfall `R*I_due - I_coll`, which answers
+    /// "how much extra interest cash would clear the test" — but the diversion
+    /// pays down senior PRINCIPAL, which adds nothing to interest collections.
+    /// Restoring IC by de-levering needs `X >= (I_due - I_coll/R) / (r*tau)`,
+    /// which is larger by roughly `1/(r*tau)` — two orders of magnitude at a
+    /// quarterly 5% coupon.
+    #[test]
+    fn ic_cure_is_a_delevering_paydown_not_a_cash_shortfall() {
+        let pool = rated_pool();
+        let market = MarketContext::new();
+        let as_of = Date::from_calendar_date(2025, Month::April, 1).expect("date");
+        let period_start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+
+        // Single senior note, 5% coupon, quarterly.
+        let tranches = single_tranche();
+        let mut balances = HashMap::default();
+        balances.insert("A".to_string(), Money::new(500_000.0, Currency::USD));
+
+        let ctx = TestContext {
+            pool: &pool,
+            tranches: &tranches,
+            tranche_id: "A",
+            as_of,
+            period_start: Some(period_start),
+            cash_balance: Money::new(0.0, Currency::USD),
+            // Collections far below what the coupon demands => a hard breach.
+            interest_collections: Money::new(100.0, Currency::USD),
+            haircuts: None,
+            par_value_threshold: None,
+            market: Some(&market),
+            tranche_balances: Some(&balances),
+            current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
+        };
+
+        let result = CoverageTest::new_ic(1.20).calculate(&ctx).expect("ic test");
+        assert!(!result.is_passing, "the IC test must breach");
+
+        let cure = result
+            .cure_amount
+            .expect("a breach must produce a cure")
+            .amount();
+
+        // The cash shortfall for comparison: R*I_due - I_coll. With a 500k
+        // balance at 5% over ~a quarter, I_due is on the order of 6k, so the
+        // shortfall is a few thousand. De-levering must be far larger, because
+        // it has to retire principal whose COUPON is the problem.
+        let interest_due = 500_000.0 * 0.05 * 0.25;
+        let cash_shortfall = 1.20 * interest_due - 100.0;
+        assert!(
+            cure > cash_shortfall * 10.0,
+            "the de-levering cure {cure:.2} must be far larger than the cash \
+             shortfall {cash_shortfall:.2} — they are different quantities, and \
+             using the shortfall under-cures an IC breach by roughly 1/(r*tau) \
+             (SC-M08)"
+        );
+
+        // Sanity: paying down exactly `cure` of principal must clear the test.
+        let remaining_balance = (500_000.0 - cure).max(0.0);
+        let due_after = remaining_balance * 0.05 * 0.25;
+        assert!(
+            due_after <= 100.0 / 1.20 + 1e-6,
+            "after paying down the cure the interest due {due_after:.4} must be \
+             coverable by collections at the required ratio"
+        );
     }
 
     /// SC-M09 — a configured haircut must track the CURRENT pool balance, not
