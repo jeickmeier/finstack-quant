@@ -428,8 +428,12 @@ impl CoverageTest {
 
         let total_interest_due = interest_due.checked_add(senior_interest_due)?;
 
+        // SC-M29: net of senior fees, which rank ahead of every note.
+        let net_collections =
+            (context.interest_collections.amount() - context.senior_fees.amount()).max(0.0);
+
         let ratio = if total_interest_due.amount() > 0.0 {
-            context.interest_collections.amount() / total_interest_due.amount()
+            net_collections / total_interest_due.amount()
         } else {
             f64::INFINITY
         };
@@ -460,11 +464,10 @@ impl CoverageTest {
         // the breach still surfaces a non-zero cure rather than silently
         // reporting none.
         let cure_amount = if !is_passing {
-            let cash_shortfall = (required_ratio * total_interest_due.amount()
-                - context.interest_collections.amount())
-            .max(0.0);
+            let cash_shortfall =
+                (required_ratio * total_interest_due.amount() - net_collections).max(0.0);
             let cure = if senior_rate_tau > 1e-12 && required_ratio > 0.0 {
-                let target_due = context.interest_collections.amount() / required_ratio;
+                let target_due = net_collections / required_ratio;
                 ((total_interest_due.amount() - target_due) / senior_rate_tau).max(0.0)
             } else {
                 cash_shortfall
@@ -510,6 +513,12 @@ pub struct TestContext<'a> {
     pub tranche_balances: Option<&'a HashMap<String, Money>>,
     /// Current pool balance override (used when asset-level balances are stale).
     pub current_pool_balance: Option<Money>,
+    /// Senior fees payable this period, deducted from the IC numerator.
+    ///
+    /// SC-M29: these rank AHEAD of every note, so cash spent on them is not
+    /// available to cover note interest. Market convention is
+    /// `(collections − senior fees) / interest due`.
+    pub senior_fees: Money,
 }
 
 /// Result of a coverage test calculation.
@@ -613,6 +622,7 @@ mod tests {
             market: None,
             tranche_balances: None,
             current_pool_balance: None,
+            senior_fees: Money::new(0.0, Currency::USD),
         };
 
         let result = test
@@ -654,6 +664,7 @@ mod tests {
             market: None,
             tranche_balances: None,
             current_pool_balance: None,
+            senior_fees: Money::new(0.0, Currency::USD),
         };
 
         let result = test
@@ -702,6 +713,7 @@ mod tests {
             market: None,
             tranche_balances: None,
             current_pool_balance: Some(Money::new(collateral, Currency::USD)),
+            senior_fees: Money::new(0.0, Currency::USD),
         };
 
         let result = test
@@ -773,6 +785,7 @@ mod tests {
             market: None,
             tranche_balances: None,
             current_pool_balance: Some(Money::new(collateral, Currency::USD)),
+            senior_fees: Money::new(0.0, Currency::USD),
         };
 
         let result = test
@@ -930,6 +943,7 @@ mod tests {
             market: None,
             tranche_balances: None,
             current_pool_balance: None,
+            senior_fees: Money::new(0.0, Currency::USD),
         };
 
         let result = test
@@ -1001,6 +1015,65 @@ mod haircut_tests {
         m
     }
 
+    /// SC-M29 — senior fees must be deducted from the IC numerator.
+    ///
+    /// Fees rank AHEAD of every note, so cash spent on them is not available to
+    /// cover note interest. Market convention is
+    /// `(collections − senior fees) / interest due`. Using raw collections
+    /// overstates IC and lets a deal pass a test it should fail.
+    ///
+    /// This was latent until SC-M03 wired the fee tier — with no fees modelled
+    /// the deduction was always zero.
+    #[test]
+    fn senior_fees_tighten_the_ic_test() {
+        let pool = rated_pool();
+        let tranches = single_tranche();
+        let market = MarketContext::new();
+        let as_of = Date::from_calendar_date(2025, Month::April, 1).expect("date");
+        let period_start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let mut balances = HashMap::default();
+        balances.insert("A".to_string(), Money::new(500_000.0, Currency::USD));
+
+        let ratio_with_fees = |fees: f64| {
+            let ctx = TestContext {
+                pool: &pool,
+                tranches: &tranches,
+                tranche_id: "A",
+                as_of,
+                period_start: Some(period_start),
+                cash_balance: Money::new(0.0, Currency::USD),
+                interest_collections: Money::new(10_000.0, Currency::USD),
+                haircuts: None,
+                par_value_threshold: None,
+                market: Some(&market),
+                tranche_balances: Some(&balances),
+                current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
+                senior_fees: Money::new(fees, Currency::USD),
+            };
+            CoverageTest::new_ic(1.20)
+                .calculate(&ctx)
+                .expect("ic test")
+                .current_ratio
+        };
+
+        let without = ratio_with_fees(0.0);
+        let with = ratio_with_fees(4_000.0);
+
+        assert!(
+            with < without,
+            "senior fees must REDUCE the IC ratio: {with:.4} with a 4,000 fee \
+             vs {without:.4} without. Equal values mean the numerator is still \
+             raw collections (SC-M29)."
+        );
+        // 10,000 collections less 4,000 of fees is 60% of the un-netted figure.
+        assert!(
+            (with / without - 0.6).abs() < 1e-9,
+            "the ratio must fall exactly in proportion to the fee deduction: \
+             expected 0.60x, got {:.4}x",
+            with / without
+        );
+    }
+
     /// SC-M08 — the IC cure must be a PRINCIPAL paydown, since that is how the
     /// diversion applies it.
     ///
@@ -1036,6 +1109,7 @@ mod haircut_tests {
             market: Some(&market),
             tranche_balances: Some(&balances),
             current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
+            senior_fees: Money::new(0.0, Currency::USD),
         };
 
         let result = CoverageTest::new_ic(1.20).calculate(&ctx).expect("ic test");
@@ -1101,6 +1175,7 @@ mod haircut_tests {
             market: Some(&market),
             tranche_balances: None,
             current_pool_balance: Some(current),
+            senior_fees: Money::new(0.0, Currency::USD),
         };
 
         let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("oc test");
@@ -1142,6 +1217,7 @@ mod haircut_tests {
             market: Some(&market),
             tranche_balances: None,
             current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
+            senior_fees: Money::new(0.0, Currency::USD),
         };
 
         let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("oc test");

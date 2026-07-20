@@ -44,6 +44,7 @@ fn context_for_tranche<'a>(
         market: None,
         tranche_balances: None,
         current_pool_balance: None,
+        senior_fees: Money::new(0.0, Currency::USD),
     }
 }
 

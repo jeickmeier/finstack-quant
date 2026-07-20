@@ -155,6 +155,48 @@ fn execute_waterfall_core(
         reserve_balance: context.reserve_balance,
     };
 
+    // SC-M29: senior fees payable this period, deducted from the IC numerator.
+    //
+    // Market convention is
+    //   IC = (interest collections − senior fees/admin expenses)
+    //        / (interest due on this class and senior)
+    // because those fees rank AHEAD of every note: cash spent on them is not
+    // available to cover note interest. Using raw collections overstates IC and
+    // lets a deal pass a test it should fail.
+    //
+    // This was latent until SC-M03 wired the fee tier — with no fees modelled
+    // the deduction was always zero. Computed here, before the tests, using the
+    // same `calculate_payment_amount` the fee tier itself will use, so the two
+    // cannot drift.
+    let empty_in_period: HashMap<String, Money> = HashMap::default();
+    let mut senior_fees = Money::new(0.0, waterfall.base_currency);
+    for tier in waterfall
+        .tiers
+        .iter()
+        .filter(|t| t.payment_type == PaymentType::Fee)
+    {
+        for recipient in &tier.recipients {
+            let amount = calculate_payment_amount(
+                waterfall.base_currency,
+                &recipient.calculation,
+                context.interest_collections,
+                tranches,
+                &allocation_ctx.tranche_index,
+                context.tranche_balances,
+                context.deferred_interest,
+                context.pool_balance,
+                context.period_start,
+                context.payment_date,
+                context.valuation_date,
+                context.market,
+                context.reserve_balance,
+                &empty_in_period,
+                false,
+            )?;
+            senior_fees = senior_fees.checked_add(amount)?;
+        }
+    }
+
     // Evaluate coverage tests (M4: pass current balances)
     let coverage_test_results = evaluate_coverage_tests(
         waterfall,
@@ -167,6 +209,7 @@ fn execute_waterfall_core(
         context.pool_balance,
         context.market,
         context.tranche_balances,
+        senior_fees,
     )?;
 
     // Check if diversions are active and compute the binding cure amount.
@@ -967,6 +1010,7 @@ fn evaluate_coverage_tests(
     current_pool_balance: Money,
     market: &MarketContext,
     tranche_balances: Option<&HashMap<String, Money>>,
+    senior_fees: Money,
 ) -> Result<Vec<CoverageTestResult>> {
     let mut results = Vec::with_capacity(waterfall.coverage_triggers.len() * 2);
 
@@ -997,6 +1041,7 @@ fn evaluate_coverage_tests(
                 market: Some(market),
                 tranche_balances,
                 current_pool_balance: Some(current_pool_balance),
+                senior_fees,
             };
 
             let oc_test = CoverageTest::new_oc(oc_trigger_level);
@@ -1023,6 +1068,7 @@ fn evaluate_coverage_tests(
                 market: Some(market),
                 tranche_balances,
                 current_pool_balance: Some(current_pool_balance),
+                senior_fees,
             };
 
             let ic_test = CoverageTest::new_ic(ic_trigger_level);
