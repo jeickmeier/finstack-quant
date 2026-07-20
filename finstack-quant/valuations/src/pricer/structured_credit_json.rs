@@ -170,7 +170,18 @@ pub fn structured_credit_tranche_oas_json(
             .map_err(|e| Error::Validation(format!("invalid OAS config JSON: {e}")))?,
         None => OasConfig::default(),
     };
-    calculate_tranche_oas(&deal, tranche_id, market_price_pct, market, as_of, &config)
+    let result =
+        calculate_tranche_oas(&deal, tranche_id, market_price_pct, market, as_of, &config)?;
+    ensure_finite(
+        &[
+            ("oas", result.oas),
+            ("model_price", result.model_price),
+            ("market_price", result.market_price),
+            ("price_std_error", result.price_std_error),
+        ],
+        "structured-credit tranche OAS",
+    )?;
+    Ok(result)
 }
 
 /// Per-tranche risk/spread metrics ([`TrancheMetrics`]) for a tranche from
@@ -206,7 +217,47 @@ pub fn structured_credit_tranche_metrics_json(
 ) -> Result<TrancheMetrics> {
     let deal = structured_credit_from_json(instrument_json)?;
     let as_of = parse_iso_date(as_of)?;
-    calculate_tranche_metrics(&deal, tranche_id, market, as_of, market_price_pct)
+    let metrics = calculate_tranche_metrics(&deal, tranche_id, market, as_of, market_price_pct)?;
+    ensure_finite(
+        &[
+            ("pv", metrics.pv),
+            ("price_pct", metrics.price_pct),
+            ("wal", metrics.wal),
+            ("z_spread_bp", metrics.z_spread_bp),
+            ("spread_duration", metrics.spread_duration),
+            ("modified_duration", metrics.modified_duration),
+            ("convexity", metrics.convexity),
+            ("target_price_pct", metrics.target_price_pct),
+        ],
+        "structured-credit tranche metrics",
+    )?;
+    Ok(metrics)
+}
+
+/// SC-M18 — reject a non-finite metric at the boundary instead of letting it
+/// serialize.
+///
+/// `serde_json` emits `null` for a non-finite `f64` rather than erroring, so a
+/// NaN or infinity in any of these result structs crossed the JSON boundary as
+/// `{"pv": null, ...}`. In JavaScript `null` coerces to `0` in arithmetic, so a
+/// failed computation became a confident zero downstream. The two SCALAR entry
+/// points (discount margin, break-even CDR) return `f64` directly and surface a
+/// visible `NaN`, which meant the same library had two opposite failure modes
+/// for the same underlying condition.
+///
+/// Failing here makes both paths behave the same way: a metric that could not
+/// be computed is an error, not a silent zero.
+fn ensure_finite(fields: &[(&str, f64)], metric: &str) -> Result<()> {
+    for (name, value) in fields {
+        if !value.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{metric} produced a non-finite `{name}` ({value}). Serializing \
+                 it would emit JSON `null`, which downstream consumers coerce to \
+                 0 — a failed computation must not read as a valid result."
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Scenario (CPR × CDR × severity) price/WAL/writedown table for a tranche from
@@ -242,6 +293,53 @@ pub fn structured_credit_tranche_scenario_table_json(
 
 #[cfg(test)]
 mod tests {
+    /// SC-M18 — a non-finite metric must be an ERROR, not JSON `null`.
+    ///
+    /// `serde_json` emits `null` for a non-finite `f64` rather than erroring,
+    /// so a NaN crossed the boundary as `{"pv": null, ...}` and in JavaScript
+    /// `null` coerces to `0` in arithmetic — a failed computation reading as a
+    /// confident zero. The scalar entry points return `f64` directly and
+    /// surface a visible `NaN`, so the same library had two opposite failure
+    /// modes for the same condition.
+    #[test]
+    fn non_finite_metric_is_rejected_at_the_boundary() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let err = ensure_finite(&[("pv", bad)], "test metric")
+                .expect_err("a non-finite metric must be rejected");
+            let msg = err.to_string();
+            assert!(
+                msg.contains("pv") && msg.contains("non-finite"),
+                "the error must name the offending field; got: {msg}"
+            );
+        }
+    }
+
+    /// SC-M18 — finite metrics pass through untouched, including zero and
+    /// negatives (a negative OAS or spread duration is legitimate).
+    #[test]
+    fn finite_metrics_pass_the_boundary_check() {
+        assert!(
+            ensure_finite(
+                &[("oas", 0.0), ("spread_duration", -1.5), ("pv", 1.0e9)],
+                "test metric"
+            )
+            .is_ok(),
+            "zero, negative and large finite values must all be accepted"
+        );
+    }
+
+    /// SC-M18 — confirms the premise: serde_json really does emit `null` for a
+    /// non-finite f64 rather than failing, which is why the guard is needed.
+    #[test]
+    fn serde_json_emits_null_for_non_finite_which_is_why_we_guard() {
+        let encoded = serde_json::to_string(&f64::NAN).expect("serde_json does not error on NaN");
+        assert_eq!(
+            encoded, "null",
+            "if this ever starts erroring instead, the ensure_finite guard \
+             becomes belt-and-braces rather than load-bearing"
+        );
+    }
+
     use super::*;
     use finstack_quant_core::currency::Currency;
 
