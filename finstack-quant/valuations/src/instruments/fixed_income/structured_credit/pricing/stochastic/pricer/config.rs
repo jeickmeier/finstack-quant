@@ -9,24 +9,47 @@ use std::sync::Arc;
 
 /// Pricing mode selection.
 ///
-/// All three modes are first-class supported pricers. Test coverage:
-/// - **Tree**: exercised by `tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}` and `tests/support/structured_credit_stochastic.rs`. Default mode.
-/// - **MonteCarlo**: exercised by the same test suites and the convergence tests.
-/// - **Hybrid**: exercised by structured-credit pricer integration tests.
-///
-/// Choose based on horizon × dimensionality: `Tree` for short-horizon
-/// non-recombining stochastic CLO/RMBS deals (deterministic, low variance),
+/// Choose based on horizon × dimensionality: `Tree` for SHORT-horizon
+/// non-recombining stochastic deals (deterministic, low variance),
 /// `MonteCarlo` for long-horizon or high-dimensional pools, `Hybrid` to
 /// front-load tree precision and tail with MC.
+///
+/// # Tree mode is bounded by construction — read this before selecting it
+///
+/// SC-M25: path-preserving tree pricing keeps `3^n` terminal nodes for `n`
+/// periods, checked against `max_tree_paths` (default 100,000). `3^11 =
+/// 177,147`, so **Tree hard-errors for any deal with more than ten periods
+/// remaining** — which is essentially every real deal, since
+/// `build_scenario_tree_config` sets `num_periods` to months-to-maturity.
+///
+/// This type previously documented Tree as "Default mode" and all three modes
+/// as "first-class supported pricers". That was not true of Tree at any
+/// realistic horizon, and it only escaped notice because the public
+/// `price_stochastic` entry point overrides the default to Monte Carlo before
+/// the mode is ever used.
+///
+/// The default is therefore [`PricingMode::MonteCarlo`] — the mode that can
+/// actually price the deals this module is built for. Tree remains available
+/// and correct for genuinely short horizons; select it explicitly.
+///
+/// Test coverage:
+/// - **Tree**: `tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`, at horizons within the node bound.
+/// - **MonteCarlo**: the same suites plus the convergence tests.
+/// - **Hybrid**: structured-credit pricer integration tests.
 #[derive(
-    Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+    Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
 #[non_exhaustive]
 pub enum PricingMode {
-    /// Tree-based pricing (exact, non-recombining)
-    #[default]
+    /// Tree-based pricing (exact, non-recombining).
+    ///
+    /// Bounded to roughly ten periods by the `3^n` node count — see the type
+    /// docs. Not the default for that reason.
     Tree,
-    /// Monte Carlo pricing with specified number of paths
+    /// Monte Carlo pricing with specified number of paths.
+    ///
+    /// The default, because it is the only mode that can price a deal at a
+    /// realistic horizon.
     MonteCarlo {
         /// Number of simulation paths
         num_paths: usize,
@@ -40,6 +63,26 @@ pub enum PricingMode {
         /// MC paths for tail
         mc_paths: usize,
     },
+}
+
+impl Default for PricingMode {
+    /// SC-M25: Monte Carlo, not Tree.
+    ///
+    /// Tree is bounded to roughly ten periods by its `3^n` node count, so it
+    /// cannot price a deal at any realistic horizon. Defaulting to it made the
+    /// type's own documentation wrong; the only reason nothing broke is that
+    /// `price_stochastic` overrode the default before it was used.
+    ///
+    /// 10,000 paths with antithetic variates matches what
+    /// `default_stochastic_pricing_mode` already selects, so this changes no
+    /// behaviour on the public entry point — it makes the standalone default
+    /// agree with it.
+    fn default() -> Self {
+        PricingMode::MonteCarlo {
+            num_paths: 10_000,
+            antithetic: true,
+        }
+    }
 }
 
 impl PricingMode {
@@ -216,10 +259,38 @@ mod tests {
         );
     }
 
+    /// SC-M25 — the default must be a mode that can actually price a deal.
+    ///
+    /// Tree keeps `3^n` terminal nodes against a 100,000 cap, so it hard-errors
+    /// past ten periods — essentially every real deal. Defaulting to it made
+    /// this type's own docs wrong; nothing broke only because
+    /// `price_stochastic` overrode the default before it was used.
     #[test]
-    fn test_pricing_mode_default() {
+    fn test_pricing_mode_default_is_monte_carlo() {
         let mode = PricingMode::default();
-        assert!(matches!(mode, PricingMode::Tree));
+        assert!(
+            matches!(mode, PricingMode::MonteCarlo { .. }),
+            "the default pricing mode must be Monte Carlo, not Tree — Tree \
+             cannot price a deal at a realistic horizon (SC-M25)"
+        );
+        // And it must agree with what `default_stochastic_pricing_mode`
+        // already selects, so the standalone default is not a second opinion.
+        assert!(
+            matches!(
+                mode,
+                PricingMode::MonteCarlo {
+                    num_paths: 10_000,
+                    antithetic: true
+                }
+            ),
+            "the default must match the public entry point's choice"
+        );
+    }
+
+    /// Tree remains selectable and correct within its node bound.
+    #[test]
+    fn tree_mode_is_still_available_explicitly() {
+        assert!(matches!(PricingMode::tree(), PricingMode::Tree));
     }
 
     #[test]
@@ -237,7 +308,10 @@ mod tests {
         let config = StochasticPricerConfig::new(today, curve, tree_config);
 
         assert_eq!(config.valuation_date, today);
-        assert!(matches!(config.pricing_mode, PricingMode::Tree));
+        assert!(matches!(
+            config.pricing_mode,
+            PricingMode::MonteCarlo { .. }
+        ));
         assert!(config.compute_risk_metrics);
     }
 

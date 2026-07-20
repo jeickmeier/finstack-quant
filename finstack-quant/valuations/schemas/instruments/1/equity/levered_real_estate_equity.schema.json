@@ -17483,7 +17483,7 @@
               "type": "null"
             }
           ],
-          "description": "Senior transaction fees paid ahead of every note.\n\n`None` (the default) skips the fee tier. Use [`Self::with_standard_fees`] to apply the deal-type calibration from `types/constants.rs`."
+          "description": "Senior transaction fees paid ahead of every note.\n\n`None` (the default) skips the fee tier. Use [`Self::with_standard_fees`]\nto apply the deal-type calibration from `types/constants.rs`."
         },
         "first_payment_date": {
           "description": "First payment date to tranches.",
