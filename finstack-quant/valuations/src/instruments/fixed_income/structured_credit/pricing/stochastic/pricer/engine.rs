@@ -658,6 +658,9 @@ impl StochasticPricer {
         })? as usize;
         let months_per_period = months_per_period.max(1);
         let payment_periods = self.payment_period_count(instrument);
+        // SC-M24: burnout is PATH state — it accumulates across the whole
+        // path, so it is seeded once here and advanced month by month.
+        let mut burnout = 1.0_f64;
         let mut shocks = Vec::with_capacity(payment_periods);
 
         // When the default model is a copula, build it once to source the
@@ -680,7 +683,7 @@ impl StochasticPricer {
             } else {
                 &[][..]
             };
-            let mut shock = self.aggregate_monthly_shocks(start as u32, month_slice);
+            let mut shock = self.aggregate_monthly_shocks(start as u32, month_slice, &mut burnout);
             shock.per_name =
                 self.copula_period_input(copula_model.as_deref(), start as u32, month_slice);
             shocks.push(shock);
@@ -741,16 +744,25 @@ impl StochasticPricer {
         })
     }
 
-    fn aggregate_monthly_shocks(&self, start_month: u32, factors: &[f64]) -> PeriodPoolShock {
+    fn aggregate_monthly_shocks(
+        &self,
+        start_month: u32,
+        factors: &[f64],
+        burnout: &mut f64,
+    ) -> PeriodPoolShock {
         if factors.is_empty() {
-            return self.monthly_shock(start_month.saturating_add(1), 0.0);
+            return self.monthly_shock(start_month.saturating_add(1), 0.0, burnout);
         }
 
         let mut prepay_survival = 1.0;
         let mut default_survival = 1.0;
         let mut recovery_sum = 0.0;
         for (offset, factor) in factors.iter().enumerate() {
-            let shock = self.monthly_shock(start_month.saturating_add(offset as u32 + 1), *factor);
+            let shock = self.monthly_shock(
+                start_month.saturating_add(offset as u32 + 1),
+                *factor,
+                burnout,
+            );
             prepay_survival *= 1.0 - shock.smm;
             default_survival *= 1.0 - shock.mdr;
             recovery_sum += shock.recovery_rate;
@@ -764,7 +776,7 @@ impl StochasticPricer {
         )
     }
 
-    fn monthly_shock(&self, month_offset: u32, z: f64) -> PeriodPoolShock {
+    fn monthly_shock(&self, month_offset: u32, z: f64, burnout: &mut f64) -> PeriodPoolShock {
         let factor = if self.has_stochastic_rates() { z } else { 0.0 };
         let seasoning = self
             .config
@@ -774,23 +786,40 @@ impl StochasticPricer {
         let factors = [factor];
 
         PeriodPoolShock::pool_wide(
-            self.conditional_smm(seasoning, &factors),
+            self.conditional_smm(seasoning, &factors, burnout),
             self.conditional_mdr(seasoning, &factors),
             self.recovery_rate(factor),
         )
     }
 
-    fn conditional_smm(&self, seasoning: u32, factors: &[f64]) -> f64 {
+    /// Conditional SMM for one month, advancing the path's burnout state.
+    ///
+    /// SC-M24: `burnout` was previously hard-coded to 1.0 at this call site and
+    /// `update_burnout` had ZERO production callers, so the burnout channel of
+    /// Richard-Roll was inert. Seasoned pools that had already refinanced
+    /// heavily were modelled with full prepayment propensity, while
+    /// `has_burnout()` cheerfully returned true.
+    ///
+    /// Burnout is path-state: it accumulates as realized prepayment runs above
+    /// or below expectation, so it must be threaded through the month loop
+    /// rather than recomputed. `expected_smm` is the unconditional speed at
+    /// this seasoning, and the realized/expected ratio is what drives the
+    /// update (fast prepayers leave the pool; slow ones rejuvenate it).
+    fn conditional_smm(&self, seasoning: u32, factors: &[f64], burnout: &mut f64) -> f64 {
         if let Some(model) = self.config.tree_config.prepay_spec.build() {
-            return model
+            let realized = model
                 .conditional_smm(
                     seasoning,
                     factors,
-                    // Market refi rate for `incentive = pool_coupon − market_rate`.
                     self.config.tree_config.market_refi_rate,
-                    1.0,
+                    *burnout,
                 )
                 .clamp(0.0, 0.50);
+            if model.has_burnout() {
+                let expected = model.expected_smm(seasoning);
+                *burnout = model.update_burnout(*burnout, realized, expected);
+            }
+            return realized;
         }
         match &self.config.tree_config.prepay_spec {
             StochasticPrepaySpec::Deterministic(spec) => {
@@ -1600,7 +1629,10 @@ mod tests {
             let pricer = StochasticPricer::new(config);
 
             let zs = [-2.0, -1.0, 0.0, 1.0, 2.0];
-            let shocks: Vec<_> = zs.iter().map(|&z| pricer.monthly_shock(36, z)).collect();
+            let shocks: Vec<_> = zs
+                .iter()
+                .map(|&z| pricer.monthly_shock(36, z, &mut 1.0))
+                .collect();
             let mdrs: Vec<f64> = shocks.iter().map(|s| s.mdr).collect();
             let recoveries: Vec<f64> = shocks.iter().map(|s| s.recovery_rate).collect();
 
@@ -2183,6 +2215,45 @@ mod per_name_copula_tests {
             "UL at 45% override ({high:.0}) must exceed baseline at 10% \
              ({baseline:.0}) by more than 10%"
         );
+    }
+
+    /// SC-M24 — burnout must ACCUMULATE across a path, not sit at 1.0.
+    ///
+    /// `update_burnout` had zero production callers and the engine passed a
+    /// hard-coded 1.0, so the burnout channel of Richard-Roll was inert:
+    /// seasoned pools that had already refinanced heavily were modelled with
+    /// full prepayment propensity, while `has_burnout()` returned true.
+    ///
+    /// Burnout is PATH state — it accumulates as realized prepayment runs
+    /// above or below expectation — so it must be threaded through the month
+    /// loop rather than recomputed per month.
+    #[test]
+    fn burnout_accumulates_across_a_path() {
+        let deal = clo_deal(60);
+        let mut cfg = copula_config(0.06, 0.20, 36, PoolGranularity::PerName, 16);
+        // Richard-Roll with a live burnout rate.
+        cfg.tree_config.prepay_spec = StochasticPrepaySpec::rmbs_agency(0.06);
+        let pricer = StochasticPricer::new(cfg);
+
+        // Drive a strongly-prepaying path so realized runs above expected.
+        let factors: Vec<f64> = (0..24).map(|_| 1.5_f64).collect();
+        let mut burnout = 1.0_f64;
+        let _ = pricer
+            .path_shocks_from_factors(&deal, &factors)
+            .expect("path shocks");
+
+        // Exercise the month loop directly so the state is observable.
+        for month in 1..=24u32 {
+            let _ = pricer.monthly_shock(month, 1.5, &mut burnout);
+        }
+
+        assert!(
+            burnout < 1.0,
+            "after 24 months of above-expectation prepayment the burnout factor \
+             must have decayed below 1.0, got {burnout}. A value pinned at 1.0 \
+             means the channel is still inert (SC-M24)."
+        );
+        assert!(burnout > 0.0, "burnout must stay in (0, 1], got {burnout}");
     }
 
     /// `period_factor_scale` hits its analytic limits at φ = 0 and φ = 1.
