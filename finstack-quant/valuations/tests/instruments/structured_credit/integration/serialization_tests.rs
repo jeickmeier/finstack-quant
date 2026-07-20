@@ -724,19 +724,8 @@ fn waterfall_rules_round_trip_and_price_through_json() {
         .expect("a waterfall_rules deal must price through the JSON binding path");
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SC-C02 — nested serde strictness
-//
-// `#[serde(deny_unknown_fields)]` does NOT propagate from an outer type to the
-// types nested inside it; each type must carry the attribute itself. Before
-// this was fixed, `StructuredCredit` carried it but the risk-bearing nested
-// structs did not, so a misspelled field inside a pool asset or the default
-// assumptions block was accepted silently and the field fell back to its
-// `#[serde(default)]`. The deal then parsed, priced, and returned a confident
-// number computed from assumptions the user never supplied.
-//
-// These tests inject a typo at each nesting depth and assert it is rejected.
-// ═══════════════════════════════════════════════════════════════════════════
+// Nested serde strictness: `deny_unknown_fields` does not propagate to nested
+// types. Inject a typo at each nesting depth and assert rejection.
 
 /// Parse the canonical full fixture as mutable JSON.
 fn full_example_value() -> serde_json::Value {
@@ -751,10 +740,8 @@ fn assert_rejected(value: &serde_json::Value, bad_field: &str, context: &str) {
     let result: Result<InstrumentEnvelope, _> = serde_json::from_str(&text);
     let err = match result {
         Ok(_) => panic!(
-            "SC-C02 regression: the unknown field `{bad_field}` in {context} was \
-             ACCEPTED SILENTLY. The value falls back to its serde default, so \
-             the deal prices off assumptions the user never supplied. The \
-             enclosing type needs #[serde(deny_unknown_fields)]."
+            "unknown field `{bad_field}` in {context} was accepted; \
+             enclosing type needs #[serde(deny_unknown_fields)]"
         ),
         Err(e) => e.to_string(),
     };

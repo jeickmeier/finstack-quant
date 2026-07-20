@@ -943,33 +943,11 @@ impl Waterfall {
         let mut sorted_tranches = tranches.tranches.clone();
         sorted_tranches.sort_by_key(|t| t.payment_priority);
 
-        // SC-M30: the debt-interest tier is split at the senior/subordinated
-        // boundary, and the SUBORDINATED half is marked divertible.
-        //
-        // A real CLO overcollateralization cure diverts *subordinated interest
-        // proceeds* to redeem senior notes (INTEX/Bloomberg convention): the
-        // junior noteholders give up their coupon so the senior notes
-        // de-lever, which is what restores the ratio. With a single combined
-        // interest tier there was nothing subordinated to divert — the only
-        // divertible tier was the equity residual, which sits AFTER the
-        // principal tier, and that tier carries `TranchePrincipal { target:
-        // None }` and sweeps all remaining cash. So `remaining` was always
-        // zero by the time the divertible tier was reached and a failing OC
-        // test, even once wired up (SC-C03), moved no cash at all.
-        //
-        // Splitting here is exactly identity while no test is failing:
-        // sequential allocation pays recipients in `payment_priority` order
-        // bounded by the cash carried forward, so processing the same ordered
-        // recipients as two consecutive tiers gives the same distribution as
-        // one tier. Only when `diversion_active` flips does the second tier
-        // behave differently — which is the whole point.
-        //
-        // KNOWN LIMIT: a deal whose only debt is `Senior` (senior note plus
-        // equity, no mezzanine) still has no subordinated interest to divert.
-        // Curing that case needs the interest and principal waterfalls
-        // separated, so principal collections pay principal while surplus
-        // interest flows on to the residual tier where it can be trapped.
-        // That is a larger change and remains open.
+        // Split debt interest at the senior/subordinated boundary and mark the
+        // subordinated half divertible so an OC cure can trap junior coupon
+        // (INTEX/Bloomberg). Sequential allocation makes the split an identity
+        // when no test is failing. Senior-only deals (no mezz) still have no
+        // subordinated interest to divert.
         let mut senior_interest_recipients = Vec::new();
         let mut subordinated_interest_recipients = Vec::new();
         for tranche in &sorted_tranches {

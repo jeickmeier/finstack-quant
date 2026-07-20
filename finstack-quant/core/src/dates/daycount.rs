@@ -1979,8 +1979,7 @@ mod tests {
             ..Default::default()
         };
 
-        // Context → state → JSON → state → context preserves coupon_period
-        // (previously silently dropped; ).
+        // Context → state → JSON → state → context preserves coupon_period.
         let state: DayCountContextState = ctx.into();
         assert_eq!(state.coupon_period, Some(coupon));
 

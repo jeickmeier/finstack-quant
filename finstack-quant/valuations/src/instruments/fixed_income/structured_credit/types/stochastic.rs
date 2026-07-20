@@ -69,11 +69,9 @@ impl StructuredCredit {
     pub fn enable_stochastic_defaults(&mut self) -> &mut Self {
         let (prepay, default, corr) = match self.deal_type {
             DealType::RMBS => (
-                StochasticPrepaySpec::rmbs_agency(if self.market_conditions.refi_rate > 0.0 {
-                    self.market_conditions.refi_rate
-                } else {
-                    0.045 // Default mortgage rate
-                }),
+                // Pool WAC is the coupon side of the Richard-Roll incentive;
+                // market rate arrives via `tree_config.market_refi_rate`.
+                StochasticPrepaySpec::rmbs_agency(self.pool.weighted_avg_coupon()),
                 StochasticDefaultSpec::rmbs_standard(),
                 CorrelationStructure::rmbs_standard(),
             ),

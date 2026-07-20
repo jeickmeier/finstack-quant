@@ -499,33 +499,13 @@ pub fn calculate_tranche_discount_margin(
         )));
     };
 
-    // SC-C06. The margin is solved in the DISCOUNT RATE, holding the
-    // contractual coupon fixed.
-    //
-    // Canonical DM (Fabozzi, "Fixed Income Analysis", floating-rate
-    // securities): find `m` such that
+    // Canonical DM (Fabozzi): solve `m` in the discount rate, holding the
+    // contractual quoted margin `qm` in the numerator:
     //
     //     Σ [(f_i + qm)·τ_i·N + prin_i] / Π(1 + (f_j + m)·τ_j) = P
     //
-    // where the QUOTED margin `qm` is contractual and stays in the numerator,
-    // and the solved margin `m` appears ONLY in the discounting.
-    //
-    // The previous implementation did the opposite: it SET the tranche's
-    // coupon margin to the trial value and repriced on an unchanged discount
-    // curve, so the margin entered only the numerator. PV was therefore
-    // *increasing* in the solved value and ∂DM/∂Price came out with the WRONG
-    // SIGN — canonical DM falls as price rises, this rose. On the repo's own
-    // test deal (SOFR-3M + 150bp, 2y) a +0.2%-of-PV move in the target
-    // returned ~160bp where canonical DM gives ~139.5bp: a 20bp error on a
-    // 150bp asset, direction reversed. A desk screening for "widest DM" would
-    // have ranked the richest bonds first.
-    //
-    // For a floating-rate note discounted on its own index curve, the
-    // zero-discount margin coincides with the z-spread over that curve — the
-    // projected cashflows already carry the contractual margin — so this
-    // delegates to the shared z-spread kernel rather than duplicating the
-    // solve. That also inherits the kernel's Neumaier accumulation and
-    // cached discount factors.
+    // For a floater on its index curve, zero-DM equals the z-spread, so this
+    // delegates to the shared z-spread kernel.
     let cashflows =
         crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows(
             deal, tranche_id, context, as_of,

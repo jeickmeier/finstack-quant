@@ -967,13 +967,9 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
         // holder may exercise an optional redemption. Redemption pays tranches
         // in seniority order (senior first), bounded by the remaining pool value.
         //
-        // A real cleanup-call redemption settles each note at its *full claim*:
-        // par balance + accrued interest for the stub period + any deferred
-        // (PIK) interest carried forward (+ an optional call premium). Booking
-        // the whole amount as principal — as the engine previously did —
-        // understates the holder's interest income and overstates principal
-        // repayment. The interest portion is recorded as an interest flow and
-        // does NOT retire notional; only the principal portion does.
+        // Cleanup-call redemption settles at full claim: par + accrued stub
+        // interest + deferred (PIK) interest (+ optional call premium). Interest
+        // is recorded as an interest flow and does not retire notional.
         if let Some(cleanup_threshold) = instrument.cleanup_call_pct {
             let pool_factor = if state.total_pool_balance.amount() > 0.0 {
                 state.pool_outstanding.amount() / state.total_pool_balance.amount()
@@ -1108,21 +1104,9 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
                     }
                 }
 
-                // SC-M22: any cash left after every tranche has been fully
-                // redeemed is residual value belonging to the equity /
-                // most-junior holder, not cash to be dropped on the floor.
-                //
-                // A cleanup call is exercised precisely when the remaining
-                // collateral is worth more than the outstanding notes, so an
-                // excess here is the normal case, not an edge case: the caller
-                // buys the pool at par-plus-accrued and whatever the pool is
-                // worth above the notes' total claim is the residual. Dropping
-                // it at the `break` destroyed that value and understated the
-                // equity tranche on every called deal.
-                //
-                // Mirrors the equity backstop in `drain_pending_recoveries_at_end`
-                // and the terminal sweeps for the spread, funding and reserve
-                // accounts, so no termination path can strand cash.
+                // Residual after full redemption goes to equity / most-junior
+                // (cleanup calls normally leave pool value above note claim).
+                // Mirrors `drain_pending_recoveries_at_end` and terminal sweeps.
                 if available_for_redemption > WRITEDOWN_DE_MINIMIS {
                     let residual_id = state
                         .tranches
@@ -1654,12 +1638,7 @@ mod tests {
     /// W-25 — a cleanup-call redemption must settle the note at par PLUS
     /// accrued interest for the stub period, not at par balance only.
     ///
-    /// The pre-fix code booked the entire redemption as principal and recorded
-    /// no interest flow on the cleanup date. This test runs a deal that hits
-    /// its cleanup call mid-period and asserts (a) an interest flow IS recorded
-    /// on the final (cleanup) date, and (b) the total cashflow on that date
-    /// strictly exceeds the principal retired — the difference being accrued
-    /// interest.
+    /// Cleanup-call redemption records accrued interest on the cleanup date.
     #[test]
     fn cleanup_call_redemption_includes_accrued_interest() {
         let instrument = cleanup_call_deal();
@@ -1714,9 +1693,7 @@ mod tests {
         );
         assert!(
             interest_on_cleanup > WRITEDOWN_DE_MINIMIS,
-            "cleanup-call redemption must record accrued interest on the \
-             cleanup date; got {interest_on_cleanup} (pre-fix booked the whole \
-             redemption as principal and recorded no interest)"
+            "cleanup-call redemption must record accrued interest; got {interest_on_cleanup}"
         );
         // Total redemption cash must exceed the par balance retired by exactly
         // the accrued-interest component.
@@ -1752,15 +1729,7 @@ mod tests {
             .expect("curve")
     }
 
-    /// Item 1 — reinvestment-period collateral principal must be recycled into
-    /// new collateral (pool held flat net of defaults), NOT silently vanish.
-    ///
-    /// A CLO with a high CPR and an active reinvestment period. With the
-    /// pre-fix engine the collected principal is neither distributed nor
-    /// reinvested: the asset balances shrink, the reinvestment-end
-    /// reconciliation snaps `pool_outstanding` down to the shrunken sum, and
-    /// the cash is lost. The fix recycles it, so the pool keeps generating
-    /// interest and the senior tranche collects materially more total cash.
+    /// Reinvestment-period principal is recycled into collateral (not dropped).
     #[test]
     fn reinvestment_period_principal_is_recycled_not_lost() {
         let maturity = Date::from_calendar_date(2034, Month::January, 1).expect("valid date");
@@ -1830,17 +1799,10 @@ mod tests {
             .map(|(_, m)| m.amount())
             .sum();
 
-        // With recycling, the $100M of notional is held flat through the 6y
-        // reinvestment period, so it keeps throwing off 5% coupons. Interest
-        // on a flat $100M for ~6y of reinvestment plus amortization after is
-        // far above what a vanishing-principal pool would pay.
-        // Pre-fix (principal lost): the senior tranche collects only a small
-        // fraction of its principal back. Post-fix it must be repaid in full.
         assert!(
             total_principal > 99_000_000.0,
-            "with reinvestment recycling the senior tranche must be repaid \
-             nearly in full; got principal {total_principal:.0} (pre-fix the \
-             reinvested principal vanishes and is never returned)"
+            "with reinvestment recycling senior must be repaid nearly in full; \
+             got principal {total_principal:.0}"
         );
         assert!(
             total_interest > 25_000_000.0,
@@ -1855,22 +1817,7 @@ mod tests {
         );
     }
 
-    /// Item 2 — loss allocation must not double-count notional already retired
-    /// by principal repayment. A tranche's notional is consumed by exactly two
-    /// channels — principal repayment and write-down — and the sum can never
-    /// exceed its original face.
-    ///
-    /// The pre-fix engine allocated *cumulative* expected loss against a cap
-    /// of `original_balance` every period. A tranche written down early (when
-    /// little principal had been repaid) keeps that write-down recorded, while
-    /// the waterfall keeps paying it principal in later periods — so
-    /// `principal_repaid + write-down` could exceed face. The fix allocates
-    /// only this period's incremental net loss and caps each tranche's
-    /// incremental write-down at its CURRENT balance.
-    ///
-    /// The loss-bearing tranche here is a **subordinated** tranche (paid via
-    /// bounded `TranchePrincipal`, not the uncapped equity residual), so the
-    /// `principal + write-down ≤ face` invariant is the genuine test.
+    /// Write-downs are capped at current balance; principal + write-down ≤ face.
     #[test]
     fn loss_allocation_caps_writedown_by_face_net_of_principal_repaid() {
         let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
@@ -1955,7 +1902,7 @@ mod tests {
                 total_principal + total_writedown <= face + WRITEDOWN_DE_MINIMIS,
                 "{id}: principal repaid ({total_principal:.0}) + write-down \
                  ({total_writedown:.0}) = {:.0} must not exceed original face \
-                 ({face:.0}); the pre-fix cap double-counts repaid face",
+                 ({face:.0})",
                 total_principal + total_writedown
             );
             // A write-down can never exceed the tranche's own face.
@@ -2050,17 +1997,7 @@ mod tests {
         );
     }
 
-    /// Item 6 — the contractual level payment must be FROZEN once computed.
-    ///
-    /// A level-pay loan's scheduled payment is fixed at origination;
-    /// prepayments shorten the loan, they do not shrink the scheduled payment.
-    /// White-box test: build a `SimulationState` with one amortizing mortgage,
-    /// run period 1 (pure scheduled amortization), then simulate an external
-    /// prepayment by shrinking the asset balance and run period 2. The frozen
-    /// level payment must be unchanged, and period-2 scheduled principal must
-    /// equal `frozen_LP − shrunk_balance·period_rate` — strictly LARGER than
-    /// the pre-fix recomputed value (which scales the whole payment down with
-    /// the balance).
+    /// Contractual level payment is frozen; prepayments do not shrink it.
     #[test]
     fn level_pay_scheduled_principal_uses_frozen_contractual_payment() {
         use crate::instruments::fixed_income::structured_credit::types::AssetType;
@@ -2163,10 +2100,8 @@ mod tests {
         // (prepaid-down) balance. With the bug the level payment would be
         // recomputed off the halved balance, roughly halving it.
         //
-        // Convention: the level-pay
-        // annuity uses the NOMINAL periodic rate `rate × months/12` (US
-        // mortgage convention, matching mbs_passthrough/pricer.rs), not the
-        // effective-compounding `(1+rate)^(months/12) − 1` previously pinned.
+        // Level-pay annuity uses nominal periodic rate `rate × months/12`
+        // (US mortgage convention; matches mbs_passthrough/pricer.rs).
         let period_rate = rate * months_per_period / 12.0;
         let expected_sched2 = level_payment - balance_after_prepay * period_rate;
         let sched2 = flows2.scheduled_principal.amount();
@@ -2277,21 +2212,10 @@ mod tests {
         (weighted / total, total, payoff_month)
     }
 
-    /// SC-C01 — a rep-line's contractual level payment must scale by the
-    /// PREPAYMENT survival fraction as well as the default survival fraction.
+    /// Rep-line level payment scales by prepayment and default survival (SIFMA).
     ///
-    /// SMM is Single Monthly Mortality: the fraction of the line that pays off
-    /// in full and leaves the pool. Under the SIFMA/BMA pool convention the
-    /// pool's scheduled principal is the underlying loan's amortization *rate*
-    /// applied to the current pool balance, so scheduled principal scales down
-    /// with the balance as loans prepay away.
-    ///
-    /// The pre-fix engine scaled the frozen payment only by `(1 − mdr)`, so with
-    /// prepayments the payment stayed flat while the balance shrank — the
-    /// rep-line behaved like a SINGLE loan receiving perpetual curtailments and
-    /// amortized far too fast. This test pins the corrected behavior and, via
-    /// the explicit `assert!(wal > ...)` bound, fails loudly if the regression
-    /// returns.
+    /// Scheduled principal is the loan amortization rate applied to current
+    /// pool balance, so it shrinks as loans prepay away.
     #[test]
     fn level_pay_amortization_scales_payment_by_prepayment_survival() {
         let closing = Date::from_calendar_date(2024, Month::January, 1).expect("date");
@@ -2328,30 +2252,18 @@ mod tests {
             "SIFMA-convention WAL at ~5.8% CPR must be 10.750y, got {wal_prepay:.3}"
         );
 
-        // Regression guard: the pre-fix engine reported 7.007y and retired the
-        // pool at month 168. Both are far outside the tolerance above, but pin
-        // them explicitly so the failure message names the bug.
         assert!(
             wal_prepay > 9.0,
-            "WAL {wal_prepay:.3}y is near the pre-fix value of 7.007y — the \
-             contractual level payment is not scaling by prepayment survival \
-             (SC-C01). Scheduled principal is overstated and the pool is \
-             amortizing as a single curtailed loan rather than a rep-line."
+            "WAL {wal_prepay:.3}y is too short — level payment is not scaling \
+             by prepayment survival"
         );
         assert_eq!(
             payoff_prepay, 360,
-            "under the SIFMA convention a 30y pool at 5.8% CPR must run to its \
-             360-month maturity, retiring only on the final balloon — the \
-             pre-fix engine retired it early at month 168"
+            "under SIFMA a 30y pool at 5.8% CPR must run to month 360"
         );
     }
 
-    /// SC-C01 — cross-check against the workspace's other implementation of the
-    /// same math. `mbs_passthrough/pricer.rs` re-derives the level payment from
-    /// the current balance and remaining term each period, which is the SIFMA
-    /// convention expressed differently. Both must produce the same scheduled
-    /// principal for the same pool state, or the workspace disagrees with
-    /// itself about how a mortgage pool amortizes.
+    /// Scheduled principal matches the mbs_passthrough SIFMA re-derivation.
     #[test]
     fn level_pay_scheduled_principal_matches_mbs_passthrough_convention() {
         let closing = Date::from_calendar_date(2024, Month::January, 1).expect("date");
@@ -2406,13 +2318,7 @@ mod tests {
         }
     }
 
-    /// SC-M01 — loss allocation must run most-junior-first by PAYMENT
-    /// PRIORITY, not by the four-level seniority discriminant.
-    ///
-    /// `TrancheSeniority` has only four levels while a real deal has six or
-    /// more classes, so same-level collisions are the norm. `sort_by` is
-    /// stable, so keying on the discriminant alone left colliding tranches in
-    /// input order — most-senior-first — and wrote down A-1 before A-2.
+    /// Loss allocation is junior-first by `payment_priority` (not seniority enum).
     #[test]
     fn loss_allocation_runs_junior_first_within_a_pari_passu_class() {
         let maturity = Date::from_calendar_date(2034, Month::January, 1).expect("date");
@@ -2452,11 +2358,7 @@ mod tests {
         assert_eq!(
             order,
             vec!["E", "B", "A2", "A1"],
-            "losses must be absorbed most-junior-first; within the pari-passu \
-             Senior class A2 (payment_priority 2) must absorb before A1 \
-             (payment_priority 1). Getting A1 before A2 means the allocation is \
-             keyed on the seniority discriminant and relying on sort stability \
-             (SC-M01)."
+            "losses must be junior-first; within Senior, A2 before A1"
         );
     }
 
@@ -2513,13 +2415,7 @@ mod tests {
             .sum()
     }
 
-    /// SC-C07 — a funded reserve account must reach investors.
-    ///
-    /// The reserve was a pure sink: the only mutation anywhere was the
-    /// `checked_add` booking deposits, so every dollar was destroyed and
-    /// lifetime distributions were understated by the full balance. An
-    /// otherwise-identical deal with a funded reserve must distribute that
-    /// reserve on top of what the unfunded deal distributes.
+    /// Funded reserve is released to investors (not destroyed as a sink).
     #[test]
     fn funded_reserve_account_is_released_to_investors_not_destroyed() {
         const RESERVE: f64 = 250_000.0;
@@ -2528,9 +2424,7 @@ mod tests {
 
         assert!(
             with > without,
-            "a funded reserve must increase lifetime distributions; got \
-             {with:.2} with a {RESERVE:.0} reserve vs {without:.2} without — \
-             the reserve is being destroyed (SC-C07)"
+            "funded reserve must increase distributions: {with:.2} vs {without:.2}"
         );
         assert!(
             (with - without - RESERVE).abs() < 1.0,
@@ -2540,18 +2434,10 @@ mod tests {
         );
     }
 
-    /// SC-C07 — the reserve must be DRAWN to cover a debt-interest shortfall,
-    /// which is the whole purpose of the account as credit enhancement.
+    /// Reserve is drawn to cover a current-period debt-interest shortfall.
     ///
-    /// The tranche coupon (9%) exceeds the collateral coupon (6%), so pool
-    /// interest cannot cover the note interest and the deal runs a shortfall in
-    /// every period before maturity.
-    ///
-    /// This asserts on the FIRST period's interest, not the lifetime total.
-    /// Lifetime interest is the same either way: without a reserve the
-    /// shortfall is merely deferred and then cured out of the maturity balloon,
-    /// so the totals converge. What credit enhancement actually buys the
-    /// noteholder is being paid ON TIME, and that is what the draw delivers.
+    /// Asserts first-period interest (not lifetime totals): without a draw the
+    /// shortfall is deferred and cured at maturity, so lifetime totals match.
     #[test]
     fn reserve_account_is_drawn_to_cover_interest_shortfall() {
         fn first_period_interest(reserve: f64) -> f64 {
@@ -2580,11 +2466,7 @@ mod tests {
 
         assert!(
             with > without + 1.0,
-            "a funded reserve must be drawn to cure the CURRENT period's \
-             interest shortfall: first-period interest was {with:.2} with a \
-             {RESERVE:.0} reserve vs {without:.2} without. Equal values mean \
-             the reserve is never drawn and is inert as credit enhancement \
-             (SC-C07)."
+            "reserve must cure current-period interest: {with:.2} vs {without:.2}"
         );
     }
 
@@ -2727,18 +2609,7 @@ mod tests {
             .unwrap_or(0.0)
     }
 
-    /// SC-M30 — a failing OC test must actually MOVE CASH: subordinated
-    /// interest is diverted to redeem senior notes.
-    ///
-    /// This is the payoff for SC-C03 (wiring the triggers) and SC-M30
-    /// (splitting the debt-interest tier at the senior/subordinated boundary).
-    /// Before the split the only divertible tier was the equity residual,
-    /// which sits after a principal tier that sweeps all remaining cash — so
-    /// `remaining` was always zero there and a breaching OC test, though
-    /// correctly evaluated and producing a cure amount, moved nothing.
-    ///
-    /// With a mezzanine class present the cure has a genuine source: CLASS_B's
-    /// coupon is trapped and paid to CLASS_A principal instead.
+    /// Failing OC test traps subordinated interest and accelerates senior principal.
     #[test]
     fn failing_oc_test_diverts_subordinated_interest_to_senior_principal() {
         use crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger;
@@ -2757,12 +2628,8 @@ mod tests {
 
         assert!(
             mezz_without - mezz_with > 1_000.0,
-            "a breaching OC test must trap SUBORDINATED interest: CLASS_B \
-             received {mezz_with:.2} with the trigger vs {mezz_without:.2} \
-             without (trapped {:.2}). An equal or trivially-different value \
-             means the cure still has no source — the debt-interest tier is \
-             not split at the senior/subordinated boundary, or the divertible \
-             tier is unreachable (SC-M30).",
+            "breaching OC must trap subordinated interest: CLASS_B {mezz_with:.2} \
+             with trigger vs {mezz_without:.2} without (trapped {:.2})",
             mezz_without - mezz_with
         );
 
@@ -2808,11 +2675,7 @@ mod tests {
         );
     }
 
-    /// SC-M30 — the tier split must be exact identity when nothing is failing.
-    ///
-    /// Sequential allocation pays recipients in `payment_priority` order
-    /// bounded by the cash carried forward, so splitting one ordered tier into
-    /// two consecutive tiers must not change a single distribution.
+    /// Interest-tier split is identity when no coverage test is failing.
     #[test]
     fn interest_tier_split_is_identity_without_triggers() {
         let deal = clo_with_mezz(vec![]);
@@ -2860,27 +2723,7 @@ mod tests {
         );
     }
 
-    /// SC-C03 — an OC trigger attached to a deal must actually be EVALUATED,
-    /// report its breach, and produce a cure amount.
-    ///
-    /// Before this, `waterfall.coverage_triggers` was unreachable from a deal:
-    /// `add_coverage_trigger` was called only from unit tests and
-    /// `Tranche::oc_trigger` was write-only, so the coverage-test loop never
-    /// executed in any production pricing path. `diversion_active` was
-    /// permanently false and no test result was ever produced.
-    ///
-    /// # Scope
-    ///
-    /// This pins the wiring: the test runs, breaches, and computes a cure, and
-    /// the divertible tier is marked diverted. It does NOT yet assert that cash
-    /// moves from equity to senior, because in the `standard_sequential`
-    /// waterfall it cannot: the principal tier carries
-    /// `TranchePrincipal { target: None }`, which sweeps ALL available cash
-    /// before the divertible equity tier is reached, so there is no
-    /// subordinated cash left to trap. Making the cure economically effective
-    /// requires SC-M30 — splitting the single interest tier so subordinated
-    /// interest is payable separately, which is what a real CLO cure diverts.
-    /// A cash-movement assertion belongs with that change.
+    /// Deal-attached OC trigger is evaluated and reports a breach.
     #[test]
     fn oc_trigger_is_evaluated_and_reports_its_breach() {
         use crate::instruments::fixed_income::structured_credit::pricing::waterfall::execute_waterfall;
@@ -2898,7 +2741,7 @@ mod tests {
         assert_eq!(
             waterfall.coverage_triggers.len(),
             1,
-            "the deal's trigger must reach the executing waterfall (SC-C03)"
+            "deal trigger must reach the executing waterfall"
         );
 
         let market = MarketContext::new().insert(cleanup_discount_curve());
@@ -2929,11 +2772,7 @@ mod tests {
             .coverage_tests
             .iter()
             .find(|(id, _, _)| id == "OC_CLASS_A")
-            .expect(
-                "the OC test must appear in the waterfall result; an empty \
-                 coverage_tests list means the trigger never reached the \
-                 evaluation loop (SC-C03)",
-            );
+            .expect("OC test must appear in the waterfall result");
         let (_, ratio, passing) = oc;
         assert!(
             !passing,
@@ -2945,8 +2784,7 @@ mod tests {
         );
     }
 
-    /// SC-C03 — a deal with no triggers must report no coverage tests, so the
-    /// new field is exactly identity for every existing deal.
+    /// Deal with no triggers reports no coverage tests.
     #[test]
     fn deal_without_triggers_reports_no_coverage_tests() {
         use crate::instruments::fixed_income::structured_credit::pricing::waterfall::execute_waterfall;
@@ -2978,13 +2816,11 @@ mod tests {
 
         assert!(
             result.coverage_tests.is_empty(),
-            "a deal with no triggers must run no coverage tests, preserving \
-             pre-SC-C03 behaviour exactly"
+            "deal with no triggers must run no coverage tests"
         );
     }
 
-    /// SC-C03 — an empty trigger list must reproduce the previous behaviour
-    /// exactly, so existing deals and goldens are unaffected by the new field.
+    /// Empty trigger list builds a waterfall with no coverage triggers.
     #[test]
     fn absent_coverage_triggers_are_identity() {
         let deal = oc_trigger_deal(vec![]);
@@ -2995,14 +2831,11 @@ mod tests {
         let waterfall = deal.create_waterfall();
         assert!(
             waterfall.coverage_triggers.is_empty(),
-            "a deal with no triggers must build a waterfall with none, \
-             preserving pre-SC-C03 behaviour exactly"
+            "deal with no triggers must build a waterfall with none"
         );
     }
 
-    /// SC-C03 — a trigger naming a tranche that is not in the deal must be
-    /// rejected. A silently-ignored trigger looks like protection that is not
-    /// actually there, which is the failure mode this whole finding is about.
+    /// Trigger naming an unknown tranche is rejected.
     #[test]
     fn coverage_trigger_for_unknown_tranche_is_rejected() {
         use crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger;
@@ -3650,24 +3483,8 @@ impl<'a> SimulationState<'a> {
         // deal structure and should not trigger additional write-downs.
         let performing_pool_balance = pool.performing_balance().unwrap_or(total_pool_balance);
 
-        // Pre-compute loss allocation order once: most junior first → most
-        // senior last, the reverse of the payment waterfall.
-        //
-        // SC-M01: this must key on `payment_priority`, NOT on `seniority`.
-        // `TrancheSeniority` has only four levels (Senior/Mezzanine/
-        // Subordinated/Equity) while a typical deal has six or more classes, so
-        // same-level collisions are the norm, not the exception (B and C both
-        // Mezzanine; A-1 and A-2 both Senior). `sort_by` is a STABLE sort, so
-        // sorting on the seniority discriminant alone left colliding tranches
-        // in their input order — which is most-senior-first — and therefore
-        // wrote down A-1 before A-2, inverting loss allocation within every
-        // pari-passu class.
-        //
-        // `assign_priorities` (types/tranches.rs) already resolves this: it
-        // ranks by seniority ascending with an input-index tie-break and
-        // assigns distinct, contiguous priorities `1..=n` where 1 is the most
-        // senior. Sorting on it descending gives the correct junior-first
-        // order and is total, so the stability of the sort no longer matters.
+        // Junior-first loss order by `payment_priority` (total order from
+        // `assign_priorities`), not the four-level seniority enum.
         let mut loss_alloc_order: Vec<usize> = (0..tranches.tranches.len()).collect();
         loss_alloc_order.sort_by(|&a, &b| {
             tranches.tranches[b]
@@ -4127,10 +3944,8 @@ fn simulate_period(
     // excess-spread account capture interest it should instead leave behind to
     // cure that shortfall.
     //
-    // Computed once and shared by the excess-spread capture/draw and the
-    // reserve-account draw (SC-C07), which both key off the same shortfall.
-    // Only computed when one of those features is live, so deals with neither
-    // pay nothing for it.
+    // Shared by excess-spread capture/draw and reserve-account draw (same
+    // shortfall). Computed only when one of those features is live.
     let needs_interest_due = instrument
         .waterfall_rules
         .as_ref()
@@ -4232,23 +4047,9 @@ fn simulate_period(
         );
     }
 
-    // ── Reserve-account draw (SC-C07) ────────────────────────────────
-    //
-    // A reserve account is credit enhancement: it is funded at closing (and
-    // topped up by `ReserveAccount` waterfall recipients) precisely so it can
-    // be DRAWN to cover debt-interest shortfalls. Before this the account was a
-    // pure sink — the only mutation anywhere was the `checked_add` that books
-    // deposits after the waterfall — so every dollar deposited was destroyed,
-    // never reaching any tranche or the residual holder, and total distributions
-    // were understated by the full reserve balance.
-    //
-    // Drawn AFTER the excess-spread account, against whatever shortfall that
-    // account did not cover: excess spread is the first loss-absorbing layer
-    // (it is skimmed from surplus interest that would otherwise reach equity),
-    // while the reserve is structural enhancement held against the notes. The
-    // draw is bounded by both the shortfall and the balance, so it can never
-    // manufacture cash, and `reserve_net_capture` (negative for a draw) feeds
-    // the cash-conservation identity alongside the other side accounts.
+    // Reserve draw: credit enhancement drawn after excess-spread capture to
+    // cover remaining debt-interest shortfall. Bounded by shortfall and
+    // balance; `reserve_net_capture` (negative on draw) feeds cash conservation.
     let mut reserve_net_capture = 0.0_f64;
     if state.reserve_balance.amount() > 0.0 {
         let interest_available = pool_flows.interest.amount() - spread_net_capture;
@@ -4368,28 +4169,12 @@ fn simulate_period(
         period_waterfall
     };
 
-    // SC-C04: the collateral balance the OC test measures must be the balance
-    // that survives THIS period, not the beginning-of-period balance.
+    // OC numerator uses end-of-period collateral. `pool_outstanding` is not
+    // decremented until Step 6, and coverage tests add `principal_collections`,
+    // so BOP would overstate the numerator. Net principal + defaults here to
+    // match the balance the tranches are secured by:
     //
-    // `state.pool_outstanding` is not decremented until Step 6, after the
-    // waterfall has already run, and `coverage_tests` then ADDS
-    // `principal_collections` to whatever it is given. Passing the BOP balance
-    // therefore overstated the OC numerator by `scheduled + prepay + defaults`
-    // every period:
-    //
-    //     passed:  N = B_start + (sched + prepay + recoveries)
-    //     correct: N = B_end   + cash = B_start − defaults + recoveries
-    //
-    // The defaults term is what makes this dangerous rather than merely
-    // imprecise. Step 2 has already written the period's losses down against
-    // the JUNIOR tranches, so a senior tranche's OC denominator does not shrink
-    // — while its numerator still carried the defaulted par. The net effect was
-    // that a default made every OC ratio RISE, the exact inverse of the test's
-    // purpose. A deal could default its way past a coverage test.
-    //
-    // Netting the period's principal and defaults here reproduces the Step 6
-    // balance without reordering the engine, so the test sees the same
-    // collateral the tranches are actually secured by.
+    //     N = B_end + cash = B_start − defaults + recoveries
     let coverage_test_pool_balance = state
         .pool_outstanding
         .checked_sub(total_principal_from_pool)?
@@ -5092,12 +4877,8 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
                 )));
             }
             // period_rate = NOMINAL periodic rate: annual rate × months in the
-            // payment period / 12. This is the US mortgage market convention
-            // (e.g. a 6% 30-year mortgage pays 0.5% per month, not
-            // 1.06^(1/12) − 1 ≈ 0.487%); the effective-compounding formula
-            // previously used here understated the level payment by ~2.6%
-            // relative error at typical coupons. Matches the MBS passthrough
-            // pricer (mbs_passthrough/pricer.rs, `wac / 12.0`).
+            // Nominal periodic rate `rate × months/12` (US mortgage convention;
+            // matches mbs_passthrough/pricer.rs `wac / 12.0`).
             let period_rate = rate * request.months_per_period / 12.0;
             if !period_rate.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(

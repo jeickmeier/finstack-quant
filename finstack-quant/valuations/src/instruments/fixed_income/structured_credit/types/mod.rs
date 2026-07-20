@@ -391,20 +391,8 @@ pub struct StructuredCredit {
     ///
     /// Each entry names a tranche and the OC and/or IC level that must be
     /// maintained for it. When a test fails, the cure amount is diverted from
-    /// the divertible (equity/residual) tier to redeem senior notes — the
-    /// central structural protection in a CLO.
-    ///
-    /// SC-C03: before this field existed there was no way to attach triggers to
-    /// a deal at all. `Waterfall::add_coverage_trigger` was called only from
-    /// unit tests, and `Tranche::oc_trigger`/`ic_trigger` were write-only, so
-    /// `waterfall.coverage_triggers` was always empty in every production
-    /// pricing path. The coverage-test loop never executed, `diversion_active`
-    /// was permanently false, and no cash trap, turbo or OC/IC diversion ever
-    /// fired — systematically overvaluing equity and junior notes and leaving
-    /// senior protection unmodelled.
-    ///
-    /// Empty (the default) reproduces the previous no-trigger behaviour
-    /// exactly, so existing deals and goldens are unaffected.
+    /// the divertible (subordinated-interest / residual) tier to redeem senior
+    /// notes. Empty (the default) means no coverage tests run.
     ///
     /// # Examples
     ///
@@ -420,10 +408,9 @@ pub struct StructuredCredit {
     /// assert_eq!(trigger.oc_trigger, Some(1.20));
     /// ```
     ///
-    /// Note the fully-qualified type: `tranches::CoverageTrigger` (a per-tranche
-    /// breach-state record) shares this name and is already in scope here, so
-    /// the waterfall spec type must be named explicitly. The public re-export
-    /// `structured_credit::CoverageTrigger` is this one.
+    /// Use the fully-qualified waterfall type here: `tranches::CoverageTrigger`
+    /// is a different per-tranche breach-state record that shares the name.
+    /// The public re-export `structured_credit::CoverageTrigger` is this one.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub coverage_triggers: Vec<waterfall::CoverageTrigger>,
@@ -614,10 +601,7 @@ impl StructuredCredit {
         let mut waterfall =
             Waterfall::standard_sequential(self.pool.base_currency(), &self.tranches, vec![]);
 
-        // SC-C03: attach the deal's OC/IC triggers so the coverage-test loop in
-        // `execute_waterfall` actually has something to evaluate. Without this
-        // `waterfall.coverage_triggers` is always empty, `diversion_active`
-        // stays false, and the divertible equity tier's cash is never trapped.
+        // Attach deal OC/IC triggers for the waterfall coverage-test loop.
         for trigger in &self.coverage_triggers {
             waterfall = waterfall.add_coverage_trigger(trigger.clone());
         }
@@ -805,6 +789,12 @@ impl StructuredCredit {
                 .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
         tree_config.correlation = correlation;
         tree_config.pool_coupon = self.pool.weighted_avg_coupon();
+        // Market refi rate for Richard-Roll; 4.5% fallback matches RMBS defaults.
+        tree_config.market_refi_rate = if self.market_conditions.refi_rate > 0.0 {
+            self.market_conditions.refi_rate
+        } else {
+            0.045
+        };
         tree_config.initial_balance = self.pool.total_balance()?.amount().max(1.0);
         let seasoning = if as_of > self.closing_date {
             self.closing_date.months_until(as_of)

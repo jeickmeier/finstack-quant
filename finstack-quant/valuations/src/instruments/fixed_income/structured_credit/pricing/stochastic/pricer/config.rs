@@ -111,19 +111,8 @@ impl StochasticPricerConfig {
         discount_curve: Arc<DiscountCurve>,
         tree_config: ScenarioTreeConfig,
     ) -> Self {
-        // SC-M05: adopt the scenario-tree seed rather than a hardcoded
-        // constant. `StructuredCredit::build_scenario_tree_config` derives that
-        // seed from the deal id and valuation date (`derive_seed`), but the
-        // engine reads `config.seed` — a different field — so before this every
-        // deal and every valuation date shared the same Philox realizations.
-        //
-        // Identical seeds mean identical factor draws, so Monte Carlo error is
-        // perfectly correlated across a portfolio: aggregate error scales as
-        // `n` rather than `sqrt(n)`, day-over-day P&L carries a common
-        // non-cancelling simulation bias, and each deal's reported
-        // `pv_std_error` understates the aggregate uncertainty. Sourcing the
-        // seed here fixes every construction site at once and keeps a single
-        // seed of record.
+        // Adopt the scenario-tree seed (per deal / valuation date via
+        // `derive_seed`) so portfolio Monte Carlo error diversifies.
         let seed = tree_config.seed;
         Self {
             valuation_date,
@@ -196,11 +185,7 @@ mod tests {
         Date::from_calendar_date(2024, Month::January, 15).expect("Valid date")
     }
 
-    /// SC-M05 — the pricer must adopt the scenario-tree seed, not a hardcoded
-    /// constant. `build_scenario_tree_config` derives a per-deal, per-date seed
-    /// via `derive_seed`; if the pricer ignores it, every deal and every
-    /// valuation date shares identical Philox draws and portfolio Monte Carlo
-    /// error stops diversifying.
+    /// Pricer config adopts the scenario-tree seed (not a hardcoded constant).
     #[test]
     fn pricer_config_adopts_the_scenario_tree_seed() {
         use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::BranchingSpec;
@@ -211,9 +196,7 @@ mod tests {
         let config = StochasticPricerConfig::new(test_date(), test_discount_curve(), seeded);
         assert_eq!(
             config.seed, 987_654_321,
-            "the pricer must take its seed from the scenario-tree config; a \
-             hardcoded seed makes every deal share the same MC realizations \
-             (SC-M05)"
+            "pricer seed must come from the scenario-tree config"
         );
 
         // Two distinct tree seeds must yield two distinct pricer seeds.

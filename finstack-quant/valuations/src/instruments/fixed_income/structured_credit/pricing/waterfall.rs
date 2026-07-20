@@ -249,20 +249,10 @@ fn execute_waterfall_core(
     for tier in &waterfall.tiers {
         let (target_recipients, tier_diverted): (&[Recipient], bool) =
             if tier.divertible && diversion_active {
-                // The cure always pays down the most-senior principal tier.
-                //
-                // SC-M30: this deliberately does NOT require the principal tier to
-                // sit earlier in the waterfall. A real CLO cure diverts
-                // SUBORDINATED INTEREST to senior principal, and the subordinated
-                // interest tier necessarily runs BEFORE the principal tier — so a
-                // `priority < tier.priority` filter found nothing and silently
-                // disabled the diversion for exactly the tier that is supposed to
-                // fund it.
-                //
-                // Paying senior principal "early" from this slot is safe:
-                // `record_in_period_principal` books it into
-                // `principal_paid_in_period`, so when the principal tier itself
-                // runs it nets the amount already paid and cannot double-pay.
+                // Cure pays the most-senior principal tier (may sit later in
+                // the waterfall than this divertible interest tier). Early
+                // principal is booked in `principal_paid_in_period` so the
+                // principal tier nets it and cannot double-pay.
                 let senior_tier = waterfall
                     .tiers
                     .iter()
@@ -1652,8 +1642,7 @@ mod ic_diversion_tests {
         assert!(
             diverted <= binding + 1.0,
             "diverted cash {diverted:.0} must not exceed the binding (max) \
-             cure {binding:.0}; pre-fix the cap was the SUM {summed:.0} which \
-             over-diverts"
+             cure {binding:.0} (sum of cures would be {summed:.0})"
         );
         assert!(
             diverted < summed - 1_000_000.0,

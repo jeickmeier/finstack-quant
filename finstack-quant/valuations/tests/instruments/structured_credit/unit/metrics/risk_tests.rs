@@ -272,20 +272,7 @@ mod discount_margin_tests {
             .with_payment_calendar("nyse")
     }
 
-    /// SC-C06 — canonical DM: the margin is solved in the DISCOUNT RATE with
-    /// the contractual coupon held fixed (Fabozzi, "Fixed Income Analysis").
-    ///
-    /// At the tranche's own model PV — the PV obtained by discounting its
-    /// projected cashflows on the deal's discount curve with no extra spread —
-    /// the discount margin is therefore ZERO by construction. There is no
-    /// additional spread needed to reproduce a price that was computed with
-    /// none.
-    ///
-    /// The pre-fix implementation instead SET the tranche's coupon margin to
-    /// the trial value and repriced on an unchanged curve, so the margin
-    /// entered only the numerator. That made this test report the 150 bp quoted
-    /// margin — a coupon-margin-to-price quantity, not a discount margin — and
-    /// inverted the sign of dDM/dPrice (see the companion test below).
+    /// At the model PV (no extra spread), canonical discount margin is zero.
     #[test]
     fn discount_margin_is_zero_at_the_model_pv() {
         let sc = deal(true);
@@ -300,12 +287,7 @@ mod discount_margin_tests {
         );
     }
 
-    /// SC-C06 — the defining property of a discount margin: it FALLS as price
-    /// rises. Pay more for the same cashflows and you earn less spread.
-    ///
-    /// The pre-fix implementation had this backwards and the old test asserted
-    /// the inversion ("richer target -> wider margin"). A desk screening for
-    /// the widest DM would have ranked the richest bonds first.
+    /// Discount margin falls as price rises (richer target → tighter DM).
     #[test]
     fn discount_margin_falls_as_price_rises() {
         let sc = deal(true);
@@ -330,17 +312,11 @@ mod discount_margin_tests {
         );
         assert!(
             dm_rich < dm_cheap,
-            "discount margin must be monotonically DECREASING in price: \
-             rich={dm_rich}, cheap={dm_cheap}. An increasing relationship means \
-             the margin is being applied to the coupon rather than the discount \
-             rate (SC-C06)."
+            "discount margin must decrease in price: rich={dm_rich}, cheap={dm_cheap}"
         );
     }
 
-    /// SC-C06 — a floater's discount margin must be consistent with the
-    /// z-spread on the same cashflows and the same target, since for a
-    /// floating-rate note discounted on its index curve the zero-discount
-    /// margin IS the z-spread over that curve.
+    /// For a floater on its index curve, DM equals z-spread on the same target.
     #[test]
     fn discount_margin_agrees_with_z_spread_on_the_same_target() {
         use finstack_quant_valuations::instruments::fixed_income::structured_credit::{

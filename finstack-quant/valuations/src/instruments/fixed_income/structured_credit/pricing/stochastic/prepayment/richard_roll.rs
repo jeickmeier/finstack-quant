@@ -378,6 +378,40 @@ impl StochasticPrepayment for RichardRollPrepay {
 
 #[cfg(test)]
 mod tests {
+    /// Refi incentive moves SMM in the right direction: above-market coupons
+    /// prepay faster; below-market coupons prepay slower.
+    #[test]
+    fn refi_incentive_moves_prepayment_speed_in_the_right_direction() {
+        let pool_coupon = 0.06_f64;
+        let model = RichardRollPrepay::new(0.06, 2.0, pool_coupon, 0.0);
+
+        // No incentive: coupon exactly at market.
+        let at_market = model.refi_multiplier(pool_coupon);
+        // In the money: market rates 200bp BELOW the pool coupon.
+        let in_the_money = model.refi_multiplier(pool_coupon - 0.02);
+        // Out of the money: market rates 200bp ABOVE the pool coupon.
+        let out_of_the_money = model.refi_multiplier(pool_coupon + 0.02);
+
+        assert!(
+            (at_market - 1.0).abs() < 1e-12,
+            "at market the refi multiplier must be exactly 1, got {at_market}"
+        );
+        assert!(
+            in_the_money > at_market * 1.05,
+            "a pool 200bp in the money must prepay faster: \
+             multiplier {in_the_money} vs {at_market} at market"
+        );
+        assert!(
+            out_of_the_money < at_market * 0.95,
+            "a pool 200bp OUT OF THE MONEY must prepay materially slower: \
+             multiplier {out_of_the_money} vs {at_market} at market"
+        );
+        assert!(
+            in_the_money > out_of_the_money,
+            "refi response must be monotone in the incentive"
+        );
+    }
+
     use super::*;
 
     #[test]

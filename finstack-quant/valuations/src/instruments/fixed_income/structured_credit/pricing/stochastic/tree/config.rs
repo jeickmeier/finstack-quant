@@ -155,8 +155,13 @@ pub(crate) struct ScenarioTreeConfig {
     /// Initial pool seasoning (months)
     pub initial_seasoning: u32,
 
-    /// AssetPool coupon rate
+    /// AssetPool coupon rate (the collateral WAC).
     pub pool_coupon: f64,
+
+    /// Prevailing market refinancing rate for the Richard-Roll incentive
+    /// `pool_coupon − market_rate`, sourced from
+    /// `StructuredCredit::market_conditions.refi_rate`.
+    pub market_refi_rate: f64,
 }
 
 impl ScenarioTreeConfig {
@@ -175,6 +180,7 @@ impl ScenarioTreeConfig {
             initial_balance: 1_000_000.0,
             initial_seasoning: 0,
             pool_coupon: 0.05,
+            market_refi_rate: 0.045,
         }
     }
 
@@ -194,6 +200,7 @@ impl ScenarioTreeConfig {
             initial_balance: 1_000_000.0,
             initial_seasoning: 0,
             pool_coupon,
+            market_refi_rate: 0.045,
         }
     }
 
@@ -219,6 +226,7 @@ impl ScenarioTreeConfig {
             initial_balance: 1_000_000.0,
             initial_seasoning: 0,
             pool_coupon: 0.06,
+            market_refi_rate: 0.045,
         }
     }
 

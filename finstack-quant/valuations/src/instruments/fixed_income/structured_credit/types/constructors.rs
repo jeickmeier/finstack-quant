@@ -159,9 +159,7 @@ impl StructuredCredit {
         Self {
             id: InstrumentId::new(id_str),
             deal_type,
-            // OC/IC triggers are opt-in: attach them with
-            // `with_coverage_triggers` or by setting the field directly. Empty
-            // reproduces the pre-SC-C03 no-trigger behaviour.
+            // OC/IC triggers are opt-in via `with_coverage_triggers`.
             coverage_triggers: Vec::new(),
             pool: params.pool,
             tranches: params.tranches,
