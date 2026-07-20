@@ -387,6 +387,23 @@ pub struct StructuredCredit {
     #[serde(default)]
     pub hedge_swaps: Vec<InterestRateSwap>,
 
+    /// Senior transaction fees paid ahead of every note.
+    ///
+    /// SC-M03: `create_waterfall_internal` previously passed `vec![]` for the
+    /// fee recipients, so `standard_sequential` skipped the fee tier entirely
+    /// and NO management, trustee or servicing fee was ever modelled. All pool
+    /// interest reached the notes, systematically overstating equity and
+    /// junior cashflows — typically by 40-60bp per annum on collateral for a
+    /// CLO. `DealFees` and the per-deal-type constants in `types/constants.rs`
+    /// already existed but had zero consumers on the pricing path.
+    ///
+    /// `None` (the default) reproduces the previous fee-free behaviour exactly,
+    /// so existing deals and goldens are unaffected. Use
+    /// [`Self::with_standard_fees`] to apply the deal-type calibration.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fees: Option<DealFees>,
+
     /// Overcollateralization / interest-coverage triggers evaluated each period.
     ///
     /// Each entry names a tranche and the OC and/or IC level that must be
@@ -486,6 +503,115 @@ impl StructuredCredit {
         }
         self.cleanup_call_pct = Some(threshold);
         Ok(self)
+    }
+
+    /// Build the senior fee recipients for the waterfall's fee tier.
+    ///
+    /// Returns an empty vector when no [`DealFees`] are attached, which makes
+    /// `standard_sequential` skip the fee tier entirely — the pre-SC-M03
+    /// behaviour, preserved as the default.
+    ///
+    /// Basis-point fees are expressed as [`PaymentCalculation::PercentageOfCollateral`]
+    /// with `annualized: true`, so the waterfall applies the correct
+    /// day-counted period fraction rather than charging the annual rate every
+    /// period. The trustee fee is a fixed ANNUAL amount, so it is divided by
+    /// the number of payment periods per year here; charging it unscaled would
+    /// bill a quarterly deal four times over.
+    fn fee_recipients(&self) -> Vec<Recipient> {
+        let Some(fees) = self.fees.as_ref() else {
+            return Vec::new();
+        };
+        let ccy = self.pool.base_currency();
+        let mut recipients = Vec::new();
+
+        fn bps_recipient(id: &str, name: &str, bps: f64) -> Option<Recipient> {
+            (bps > 0.0 && bps.is_finite()).then(|| {
+                Recipient::new(
+                    id,
+                    RecipientType::ServiceProvider(name.to_string()),
+                    PaymentCalculation::PercentageOfCollateral {
+                        rate: bps / 10_000.0,
+                        annualized: true,
+                        day_count: None,
+                        rounding: None,
+                    },
+                )
+            })
+        }
+
+        // Trustee fee first: a flat administrative charge senior to everything.
+        let periods_per_year = f64::from(self.frequency.months().unwrap_or(12).max(1));
+        let periods_per_year = (12.0 / periods_per_year).max(1.0);
+        let trustee_period = fees.trustee_fee_annual.amount() / periods_per_year;
+        if trustee_period > 0.0 && trustee_period.is_finite() {
+            recipients.push(Recipient::new(
+                "trustee_fee",
+                RecipientType::ServiceProvider("Trustee".to_string()),
+                PaymentCalculation::FixedAmount {
+                    amount: Money::new(trustee_period, ccy),
+                    rounding: None,
+                },
+            ));
+        }
+
+        recipients.extend(bps_recipient(
+            "senior_mgmt_fee",
+            "Manager",
+            fees.senior_mgmt_fee_bps,
+        ));
+        recipients.extend(bps_recipient(
+            "servicing_fee",
+            "Servicer",
+            fees.servicing_fee_bps,
+        ));
+        if let Some(bps) = fees.master_servicer_fee_bps {
+            recipients.extend(bps_recipient("master_servicer_fee", "MasterServicer", bps));
+        }
+        if let Some(bps) = fees.special_servicer_fee_bps {
+            recipients.extend(bps_recipient(
+                "special_servicer_fee",
+                "SpecialServicer",
+                bps,
+            ));
+        }
+        // NOTE: the SUBORDINATED management fee is deliberately omitted from
+        // this senior tier. In a real CLO it sits below the notes (often below
+        // the OC/IC tests), so paying it here would invert its priority.
+        // Modelling it correctly needs a junior fee tier — a follow-up.
+
+        recipients
+    }
+
+    /// Attach the deal-type standard fee calibration.
+    ///
+    /// Pulls the registry-backed [`DealFees`] for this deal's type — the same
+    /// constants exposed by `types::constants` (CLO senior management, ABS
+    /// servicing, CMBS master/special servicing, RMBS servicing).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
+    /// let deal = StructuredCredit::example().with_standard_fees();
+    /// assert!(deal.fees.is_some());
+    /// ```
+    #[must_use]
+    pub fn with_standard_fees(mut self) -> Self {
+        let ccy = self.pool.base_currency();
+        self.fees = Some(match self.deal_type {
+            DealType::CLO | DealType::CBO => DealFees::clo_standard(ccy),
+            DealType::CMBS => DealFees::cmbs_standard(ccy),
+            DealType::RMBS => DealFees::rmbs_standard(ccy),
+            _ => DealFees::abs_standard(ccy),
+        });
+        self
+    }
+
+    /// Attach explicit transaction fees.
+    #[must_use]
+    pub fn with_fees(mut self, fees: DealFees) -> Self {
+        self.fees = Some(fees);
+        self
     }
 
     /// Attach overcollateralization / interest-coverage triggers to the deal.
@@ -597,9 +723,12 @@ impl StructuredCredit {
 
     /// Internal waterfall creation (called by constructors).
     fn create_waterfall_internal(&self) -> Waterfall {
-        // Use the standard sequential waterfall as default
-        let mut waterfall =
-            Waterfall::standard_sequential(self.pool.base_currency(), &self.tranches, vec![]);
+        // SC-M03: senior transaction fees, paid ahead of every note.
+        let mut waterfall = Waterfall::standard_sequential(
+            self.pool.base_currency(),
+            &self.tranches,
+            self.fee_recipients(),
+        );
 
         // Attach deal OC/IC triggers for the waterfall coverage-test loop.
         for trigger in &self.coverage_triggers {

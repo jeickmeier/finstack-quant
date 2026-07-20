@@ -2854,6 +2854,122 @@ mod tests {
         );
     }
 
+    /// SC-M03 — senior transaction fees must actually be built and PAID.
+    ///
+    /// `create_waterfall_internal` previously passed `vec![]` for the fee
+    /// recipients, so `standard_sequential` skipped the fee tier entirely and
+    /// no management, trustee or servicing fee was ever modelled. All pool
+    /// interest reached the notes. The `DealFees` type and the per-deal-type
+    /// constants already existed but had zero consumers on the pricing path.
+    ///
+    /// The assertion is on cash reaching the SERVICE PROVIDERS, not on a fall
+    /// in the notes' lifetime cash. On this waterfall the principal tier
+    /// carries `TranchePrincipal { target: None }` and sweeps surplus interest
+    /// into principal, so fees — by reducing excess spread — SLOW the note's
+    /// paydown, leaving it outstanding longer and accruing MORE total interest
+    /// (measured here: 2,522,335 with fees against 2,479,009 without, on an
+    /// unchanged 10,000,000 of principal). That is the same timing effect the
+    /// OC cure shows, and it makes lifetime nominal cash the wrong yardstick.
+    #[test]
+    fn attached_fees_are_built_and_paid_ahead_of_the_notes() {
+        use crate::instruments::fixed_income::structured_credit::pricing::waterfall::{
+            execute_waterfall, WaterfallContext,
+        };
+
+        let without = reserve_account_deal(0.0);
+        let with_fees = reserve_account_deal(0.0).with_standard_fees();
+
+        assert!(
+            with_fees.fees.is_some(),
+            "with_standard_fees must attach the deal-type calibration"
+        );
+
+        let fee_tiers = |deal: &StructuredCredit| {
+            deal.create_waterfall()
+                .tiers
+                .iter()
+                .filter(|t| t.id == "fees")
+                .count()
+        };
+        assert_eq!(
+            fee_tiers(&without),
+            0,
+            "a deal with no fees must have NO fee tier, preserving pre-SC-M03 \
+             behaviour exactly"
+        );
+        assert_eq!(fee_tiers(&with_fees), 1, "fees must build a fee tier");
+
+        // Execute one period and confirm the service providers are paid.
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let ccy = Currency::USD;
+        let run = |deal: &StructuredCredit| {
+            execute_waterfall(
+                &deal.create_waterfall(),
+                &deal.tranches,
+                &deal.pool,
+                WaterfallContext {
+                    available_cash: Money::new(500_000.0, ccy),
+                    interest_collections: Money::new(500_000.0, ccy),
+                    principal_collections: Money::new(0.0, ccy),
+                    payment_date: Date::from_calendar_date(2024, Month::April, 1).expect("date"),
+                    period_start: cleanup_test_date(),
+                    valuation_date: cleanup_test_date(),
+                    pool_balance: Money::new(10_000_000.0, ccy),
+                    market: &market,
+                    tranche_balances: None,
+                    deferred_interest: None,
+                    reserve_balance: Money::new(0.0, ccy),
+                    recovery_proceeds: Money::new(0.0, ccy),
+                },
+            )
+            .expect("waterfall executes")
+        };
+
+        let service_provider_cash = |result: &WaterfallDistribution| -> f64 {
+            result
+                .distributions
+                .iter()
+                .filter(|(recipient, _)| matches!(recipient, RecipientType::ServiceProvider(_)))
+                .map(|(_, amount)| amount.amount())
+                .sum()
+        };
+
+        let fees_paid = service_provider_cash(&run(&with_fees));
+        let none_paid = service_provider_cash(&run(&without));
+
+        assert!(
+            none_paid.abs() < 1e-9,
+            "a deal with no fees must pay service providers nothing, got {none_paid:.2}"
+        );
+        // ABS standard: 25,000 annual trustee (monthly-scaled) + 50bp servicing
+        // on a 10,000,000 pool over a quarter.
+        assert!(
+            fees_paid > 1_000.0,
+            "senior fees must actually be PAID to the service providers: got \
+             {fees_paid:.2}. Zero means the fee tier is built but never funded \
+             (SC-M03)."
+        );
+
+        // And that cash is taken ahead of the notes in the same period.
+        let to_notes_with = run(&with_fees)
+            .distributions
+            .iter()
+            .filter(|(r, _)| !matches!(r, RecipientType::ServiceProvider(_)))
+            .map(|(_, m)| m.amount())
+            .sum::<f64>();
+        let to_notes_without = run(&without)
+            .distributions
+            .iter()
+            .filter(|(r, _)| !matches!(r, RecipientType::ServiceProvider(_)))
+            .map(|(_, m)| m.amount())
+            .sum::<f64>();
+        assert!(
+            to_notes_with < to_notes_without,
+            "within a period, fees must reduce cash reaching the notes: \
+             {to_notes_with:.2} with fees vs {to_notes_without:.2} without"
+        );
+    }
+
     // ── W-26: cleanup-call redemption must INCLUDE pending recoveries ───────
 
     /// A deal that accumulates a large recovery queue before the cleanup call
