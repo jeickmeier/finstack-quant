@@ -136,13 +136,37 @@ impl PerNameCopulaDefault {
                     .into(),
             ));
         }
+        // SC-M21: reject an out-of-range asset correlation rather than
+        // silently clamping it.
+        //
+        // The `StochasticDefaultSpec` constructors clamp to [0, 0.99], but the
+        // enum has public fields, so DESERIALIZATION bypasses them entirely: a
+        // JSON `correlation: 1.5` previously arrived here and was quietly
+        // turned into 0.99, and a legitimate negative correlation became 0.0.
+        // Either way the user received a price computed from inputs they did
+        // not supply, with no diagnostic anywhere.
+        //
+        // The bound is not cosmetic: the latent construction is
+        // `sqrt(rho)*Z + sqrt(1-rho)*eps`, so rho > 1 makes the idiosyncratic
+        // term `sqrt` of a negative number. Validating here catches every
+        // path — constructor, JSON, or a direct struct literal — at the point
+        // the value would corrupt the math.
+        if !correlation.is_finite() || !(0.0..=0.99).contains(&correlation) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "asset correlation {correlation} is outside the supported \
+                 range [0.0, 0.99]. The single-factor latent variable is \
+                 sqrt(rho)*Z + sqrt(1-rho)*eps, which requires rho in [0, 1); \
+                 0.99 is the practical ceiling for a numerically stable \
+                 idiosyncratic term."
+            )));
+        }
         Ok(Self {
             copula: copula_spec.build().map_err(|e| {
                 finstack_quant_core::Error::Validation(format!(
                     "per-name copula construction failed for {copula_spec:?}: {e}"
                 ))
             })?,
-            correlation: correlation.clamp(0.0, 0.99),
+            correlation,
             threshold_kind: ThresholdKind::from_spec(copula_spec),
         })
     }
@@ -265,6 +289,45 @@ impl PerNameCopulaDefault {
 
 #[cfg(test)]
 mod tests {
+    /// SC-M21 — an out-of-range asset correlation must be REJECTED, not
+    /// silently clamped.
+    ///
+    /// The `StochasticDefaultSpec` constructors clamp to [0, 0.99], but the
+    /// enum has public fields so deserialization bypasses them: a JSON
+    /// `correlation: 1.5` reached the copula and was quietly turned into 0.99,
+    /// and a legitimate negative correlation became 0.0. The user got a price
+    /// computed from inputs they never supplied, with no diagnostic.
+    #[test]
+    fn out_of_range_correlation_is_rejected_not_clamped() {
+        for bad in [1.5_f64, -0.3, f64::NAN, f64::INFINITY] {
+            let Err(err) = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, bad) else {
+                panic!("an out-of-range asset correlation {bad} must be rejected");
+            };
+            let msg = err.to_string();
+            assert!(
+                msg.contains("correlation") && msg.contains("0.99"),
+                "the error must name the offending value and the supported \
+                 range; got: {msg}"
+            );
+        }
+    }
+
+    /// SC-M21 — in-range correlations are unaffected, including the endpoints.
+    #[test]
+    fn in_range_correlation_is_accepted_unchanged() {
+        for good in [0.0_f64, 0.20, 0.99] {
+            let Ok(model) = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, good) else {
+                panic!("an in-range asset correlation {good} must be accepted");
+            };
+            assert!(
+                (model.correlation - good).abs() < 1e-12,
+                "an in-range correlation must pass through unchanged: expected \
+                 {good}, got {}",
+                model.correlation
+            );
+        }
+    }
+
     use super::*;
 
     /// The per-name realization, averaged over the systematic factor and a
