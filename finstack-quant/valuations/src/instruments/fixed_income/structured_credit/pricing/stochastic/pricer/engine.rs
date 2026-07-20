@@ -341,10 +341,7 @@ impl StochasticPricer {
                 correlation,
                 ..
             } => {
-                // SC-M06: an explicit `CorrelationStructure` on the deal takes
-                // precedence over the copula spec's scalar. Before this the
-                // structure was write-only and `.with_correlation(...)` could
-                // not move a price at all.
+                // Explicit deal `CorrelationStructure` overrides the copula scalar.
                 let rho = self
                     .config
                     .tree_config
@@ -2160,17 +2157,7 @@ mod per_name_copula_tests {
         );
     }
 
-    /// SC-M06 — an explicit `CorrelationStructure` on the deal must move the
-    /// price.
-    ///
-    /// `tree_config.correlation` was written by `build_scenario_tree_config`
-    /// and never read: `asset_correlation()`, `pairwise_correlation()` and
-    /// `default_factor_loading()` had no production callers, and the copula
-    /// took its correlation from `StochasticDefaultSpec::Copula { correlation }`
-    /// instead. So `.with_correlation(CorrelationStructure::clo_standard())` —
-    /// documented in both READMEs — produced a bit-identical price, and the
-    /// `Sectored` and `Matrix` variants including their PSD validation were
-    /// decorative.
+    /// Explicit deal `CorrelationStructure` override moves unexpected loss.
     #[test]
     fn explicit_correlation_structure_changes_the_price() {
         let market = MarketContext::new().insert((*discount_curve()).clone());
@@ -2193,10 +2180,8 @@ mod per_name_copula_tests {
 
         assert!(
             high > baseline * 1.10,
-            "an explicit CorrelationStructure must drive the copula: UL at a \
-             45% override was {high:.0} against {baseline:.0} at the spec's own \
-             10%. Equal values mean the structure is still write-only and \
-             `.with_correlation(...)` cannot move a price (SC-M06)."
+            "UL at 45% override ({high:.0}) must exceed baseline at 10% \
+             ({baseline:.0}) by more than 10%"
         );
     }
 

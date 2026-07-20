@@ -150,11 +150,7 @@ impl MetricCalculator for ZSpreadCalculator {
                     .tolerance(Z_SPREAD_SOLVER_TOLERANCE)
                     .initial_bracket_size(Some(0.20)); // ±2000 bps
 
-                // SC-M27: the fallback must respect the same validity range as
-                // the three attempts above. `find_bracket` expands toward
-                // +/-1e6, so returning this unchecked could hand back a
-                // z-spread of 5.0 (50,000 bp) or -0.9 with no diagnostic at
-                // all — a number that looks like a spread and is not one.
+                // Wide-bracket fallback must still respect `valid_range`.
                 let z = wide_solver.solve(objective, 0.05)?;
                 if valid_range.contains(&z) {
                     Ok(z)

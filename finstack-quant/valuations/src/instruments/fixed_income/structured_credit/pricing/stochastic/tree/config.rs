@@ -158,27 +158,15 @@ pub(crate) struct ScenarioTreeConfig {
     /// AssetPool coupon rate (the collateral WAC).
     pub pool_coupon: f64,
 
+    /// Asset correlation from an explicit deal [`CorrelationStructure`].
+    ///
+    /// When `Some`, takes precedence over the copula spec's scalar. `None`
+    /// keeps the correlation on `StochasticDefaultSpec::Copula`.
+    pub asset_correlation_override: Option<f64>,
+
     /// Prevailing market refinancing rate for the Richard-Roll incentive
     /// `pool_coupon − market_rate`, sourced from
     /// `StructuredCredit::market_conditions.refi_rate`.
-    /// Asset correlation taken from an EXPLICIT [`CorrelationStructure`] on
-    /// the deal, when one was set.
-    ///
-    /// SC-M06: `correlation` above is written by `build_scenario_tree_config`
-    /// and never read by the pricer — `asset_correlation()`,
-    /// `pairwise_correlation()` and `default_factor_loading()` have no
-    /// production callers. The correlation that actually reached the copula
-    /// came from `StochasticDefaultSpec::Copula { correlation }` instead, so
-    /// `.with_correlation(CorrelationStructure::clo_standard())` produced a
-    /// bit-identical price and the `Sectored` / `Matrix` variants — including
-    /// their PSD validation — were entirely decorative.
-    ///
-    /// `Some` here means the DEAL carried an explicit correlation structure
-    /// (`credit_model.correlation_structure`), which then takes precedence
-    /// over the copula spec's scalar. `None` (a deal-type default, or a
-    /// directly-constructed tree config) preserves the previous behaviour.
-    pub asset_correlation_override: Option<f64>,
-
     pub market_refi_rate: f64,
 }
 

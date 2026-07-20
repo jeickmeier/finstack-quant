@@ -30,33 +30,10 @@ impl MetricCalculator for AccruedCalculator {
             }
         }
 
-        // SC-M10: the aggregate-cashflow fallback no longer FABRICATES an
-        // accrued figure.
-        //
-        // It used to pro-rate the next payment from `context.cashflows`, which
-        // is interest AND PRINCIPAL combined. On an amortizing tranche that is
-        // not an approximation — it is a different quantity by an order of
-        // magnitude. A $10m tranche whose next payment is $3m principal +
-        // $100k interest, valued halfway through the period, has a true
-        // accrued of $50k (0.5 points); the fallback computed $1.55m (15.5
-        // points). `CleanPriceCalculator` subtracts that from the dirty price,
-        // so the clean price printed ~15 points below dirty instead of 0.5 —
-        // a wholly fabricated quote, plausible enough to trade off.
-        //
-        // Returning zero instead is a deliberate, bounded degradation: clean
-        // price collapses to dirty, understating accrued by at most one
-        // period's genuine interest rather than overstating it by the
-        // principal share of the payment. It is wrong in a small, predictable
-        // direction instead of a large, unpredictable one.
-        //
-        // Erroring outright would be better still, but the deal-level metric
-        // registry evaluates `Accrued`/`CleanPrice` on the aggregate of every
-        // tranche's flows and never populates `detailed_tranche_cashflows`, so
-        // an error there would take down the whole metric suite. Fixing that
-        // properly means restricting the registry to per-tranche contexts —
-        // SC-m14 — at which point this branch should become an error.
-        // A genuinely absent cashflow series is still an error — that is a
-        // missing input, not a degraded one.
+        // Aggregate `context.cashflows` mixes principal with interest, so it
+        // cannot be pro-rated into accrued. Return 0.0 (clean ≈ dirty) when
+        // only aggregates are available; a missing cashflow series still errors.
+        // Prefer per-tranche `detailed_tranche_cashflows.interest_flows` above.
         context.cashflows.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
                 id: "context.cashflows".to_string(),
@@ -162,13 +139,7 @@ mod tests {
         assert!(result.is_err(), "missing cashflows should error");
     }
 
-    /// SC-M10 — aggregate cashflows must NOT be pro-rated into accrued.
-    ///
-    /// `context.cashflows` is interest AND principal combined. Pro-rating it
-    /// produced an accrued figure that `CleanPriceCalculator` then subtracted
-    /// from the dirty price, printing a clean price up to ~15 points wrong on
-    /// an amortizing tranche. This test previously asserted that fabricated
-    /// value (45.0 from a 90.0 combined payment); it now asserts the error.
+    /// Aggregate cashflows are not pro-rated into accrued (return 0.0).
     #[test]
     fn accrued_from_aggregated_cashflows_does_not_fabricate() {
         let mut ctx = context(date!(2025 - 02 - 15));
@@ -184,10 +155,7 @@ mod tests {
             .expect("aggregate-only accrual degrades to zero rather than erroring");
         assert_eq!(
             accrued, 0.0,
-            "aggregate cashflows mix principal into interest, so no accrued \
-             figure may be derived from them. The pre-fix fallback returned \
-             45.0 here by pro-rating a 90.0 COMBINED payment, which \
-             CleanPriceCalculator then subtracted from the dirty price."
+            "aggregate cashflows mix principal into interest; accrued must be 0.0"
         );
     }
 
@@ -224,11 +192,7 @@ mod tests {
         }
     }
 
-    /// SC-M10 — outside the cashflow window the answer is still an error, not
-    /// zero, when only aggregate flows are available. Returning 0.0 here would
-    /// be indistinguishable from a genuine "no accrual" and would silently
-    /// feed a wrong clean price. With per-tranche interest flows supplied, the
-    /// out-of-window zero is handled by `accrued_from_interest_flows`.
+    /// Outside the cashflow window with only aggregates, accrued is 0.0.
     #[test]
     fn accrued_outside_window_without_interest_flows_is_zero() {
         let mut ctx = context(date!(2025 - 08 - 01));

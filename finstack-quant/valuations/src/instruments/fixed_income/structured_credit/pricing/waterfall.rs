@@ -1636,8 +1636,7 @@ mod ic_diversion_tests {
              materially distinguishable (sum={summed:.0}, max={binding:.0})"
         );
 
-        // The diverted cash is capped at the binding (max) cure, NOT the sum.
-        // Pre-fix it was capped at the sum, over-diverting.
+        // Diverted cash is capped at the binding (max) cure, not the sum.
         let diverted = result.diverted_cash.amount();
         assert!(
             diverted <= binding + 1.0,
@@ -1652,12 +1651,7 @@ mod ic_diversion_tests {
         );
     }
 
-    /// In-period diversion must net out principal already paid this period:
-    /// a small senior tranche whose regular principal tier pays it to zero
-    /// must NOT receive additional diverted principal (the period-start
-    /// balance snapshot is stale after the regular pass). Pre-fix the
-    /// diversion re-requested the full period-start balance and drove the
-    /// tranche balance negative.
+    /// Diversion nets principal already paid this period (no over-pay / negative balance).
     #[test]
     fn diversion_never_over_pays_senior_principal() {
         let currency = Currency::USD;

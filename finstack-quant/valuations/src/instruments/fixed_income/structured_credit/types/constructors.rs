@@ -159,8 +159,7 @@ impl StructuredCredit {
         Self {
             id: InstrumentId::new(id_str),
             deal_type,
-            // Senior fees are opt-in via `with_fees` / `with_standard_fees`;
-            // None reproduces the pre-SC-M03 fee-free waterfall.
+            // Senior fees are opt-in via `with_fees` / `with_standard_fees`.
             fees: None,
             // OC/IC triggers are opt-in via `with_coverage_triggers`.
             coverage_triggers: Vec::new(),

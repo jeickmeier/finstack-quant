@@ -148,9 +148,7 @@ pub fn calculate_tranche_oas(
     let base_rate = initial_short_rate(disc.as_ref(), as_of, maturity, &day_count)?;
 
     let stochastic = config.stochastic_rates || config.stochastic_credit;
-    // SC-M17: bound the path count. Each path runs a full deterministic deal
-    // simulation, so an unbounded `num_paths` from JSON is an unbounded-compute
-    // vector.
+    // Cap path count: each path runs a full deterministic deal simulation.
     const MAX_OAS_PATHS: usize = 100_000;
     if config.num_paths > MAX_OAS_PATHS {
         return Err(finstack_quant_core::Error::Validation(format!(

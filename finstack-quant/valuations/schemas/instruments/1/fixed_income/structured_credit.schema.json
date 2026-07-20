@@ -4095,7 +4095,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Senior transaction fees paid ahead of every note.\n\nSC-M03: `create_waterfall_internal` previously passed `vec![]` for the\nfee recipients, so `standard_sequential` skipped the fee tier entirely\nand NO management, trustee or servicing fee was ever modelled. All pool\ninterest reached the notes, systematically overstating equity and\njunior cashflows — typically by 40-60bp per annum on collateral for a\nCLO. `DealFees` and the per-deal-type constants in `types/constants.rs`\nalready existed but had zero consumers on the pricing path.\n\n`None` (the default) reproduces the previous fee-free behaviour exactly,\nso existing deals and goldens are unaffected. Use\n[`Self::with_standard_fees`] to apply the deal-type calibration."
+              "description": "Senior transaction fees paid ahead of every note.\n\n`None` (the default) skips the fee tier. Use [`Self::with_standard_fees`] to apply the deal-type calibration from `types/constants.rs`."
             },
             "first_payment_date": {
               "description": "First payment date to tranches.",

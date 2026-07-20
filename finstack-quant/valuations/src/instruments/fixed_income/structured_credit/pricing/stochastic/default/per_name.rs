@@ -136,21 +136,8 @@ impl PerNameCopulaDefault {
                     .into(),
             ));
         }
-        // SC-M21: reject an out-of-range asset correlation rather than
-        // silently clamping it.
-        //
-        // The `StochasticDefaultSpec` constructors clamp to [0, 0.99], but the
-        // enum has public fields, so DESERIALIZATION bypasses them entirely: a
-        // JSON `correlation: 1.5` previously arrived here and was quietly
-        // turned into 0.99, and a legitimate negative correlation became 0.0.
-        // Either way the user received a price computed from inputs they did
-        // not supply, with no diagnostic anywhere.
-        //
-        // The bound is not cosmetic: the latent construction is
-        // `sqrt(rho)*Z + sqrt(1-rho)*eps`, so rho > 1 makes the idiosyncratic
-        // term `sqrt` of a negative number. Validating here catches every
-        // path — constructor, JSON, or a direct struct literal — at the point
-        // the value would corrupt the math.
+        // Latent factor uses `sqrt(rho)*Z + sqrt(1-rho)*eps`; reject values
+        // outside [0, 0.99] (constructors clamp, but public fields / JSON do not).
         if !correlation.is_finite() || !(0.0..=0.99).contains(&correlation) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "asset correlation {correlation} is outside the supported \
@@ -289,14 +276,7 @@ impl PerNameCopulaDefault {
 
 #[cfg(test)]
 mod tests {
-    /// SC-M21 — an out-of-range asset correlation must be REJECTED, not
-    /// silently clamped.
-    ///
-    /// The `StochasticDefaultSpec` constructors clamp to [0, 0.99], but the
-    /// enum has public fields so deserialization bypasses them: a JSON
-    /// `correlation: 1.5` reached the copula and was quietly turned into 0.99,
-    /// and a legitimate negative correlation became 0.0. The user got a price
-    /// computed from inputs they never supplied, with no diagnostic.
+    /// Out-of-range asset correlation is rejected (not silently clamped).
     #[test]
     fn out_of_range_correlation_is_rejected_not_clamped() {
         for bad in [1.5_f64, -0.3, f64::NAN, f64::INFINITY] {
@@ -312,7 +292,7 @@ mod tests {
         }
     }
 
-    /// SC-M21 — in-range correlations are unaffected, including the endpoints.
+    /// In-range correlations (including endpoints) pass through unchanged.
     #[test]
     fn in_range_correlation_is_accepted_unchanged() {
         for good in [0.0_f64, 0.20, 0.99] {
@@ -458,13 +438,7 @@ mod tests {
         );
     }
 
-    /// The Student-t LHP fast-path, averaged over the systematic factor,
-    /// must recover the unconditional marginal PD.
-    ///
-    /// `conditional_default_prob` draws a fresh shared mixing `W` per call and
-    /// returns `Φ((c·√W − √ρ·Z)/√(1−ρ))`; averaging over `(Z, W)` must equal
-    /// PD. The pre-fix path fed the Gaussian `Z` into the slot expecting the
-    /// `t(ν)` factor `M = Z/√W`, biasing this average ~14-17% low.
+    /// Student-t LHP fast-path recovers unconditional marginal PD over `(Z, W)`.
     #[test]
     fn student_t_lhp_marginal_recovers_pd() {
         let sim = PerNameCopulaDefault::new(
@@ -491,20 +465,9 @@ mod tests {
         );
     }
 
-    /// **Student-t LHP-limit parity** — the regression anchor for the
-    /// corrected Student-t LHP conditional default probability.
+    /// Large-pool Student-t per-name rate converges to the LHP fast-path.
     ///
-    /// A large granular pool simulated per-name and the Student-t LHP
-    /// fast-path must agree: per-name → LHP as `N → ∞`, because both now
-    /// realize the *same* `(Z, W)` latent construction
-    /// `Aᵢ = (√ρ·Z + √(1−ρ)·εᵢ)/√W`. The two streams share the period `Z`
-    /// but draw `W` independently — both `W` draws are `χ²(ν)/ν`, so the
-    /// period-averaged rates estimate the same `PD` and must converge.
-    ///
-    /// On the pre-fix engine the bug this anchors FAILS empirically: the LHP
-    /// path fed the Gaussian `Z` into the slot expecting the `t(ν)` factor
-    /// `M = Z/√W`, so the LHP rate (≈ 0.0423) sat ~17% below the per-name
-    /// rate (≈ 0.0513) — both verified by a scratch Monte Carlo run.
+    /// Both use `Aᵢ = (√ρ·Z + √(1−ρ)·εᵢ)/√W` (LHP must condition on `M = Z/√W`).
     #[test]
     #[ignore = "slow: covered by mise rust-test-slow"]
     fn student_t_lhp_limit_parity() {
@@ -537,8 +500,7 @@ mod tests {
         let pn_rate = pn_defaults as f64 / (periods * n) as f64;
         let lhp_rate = lhp_sum / periods as f64;
 
-        // Both recover PD, and per-name ⇄ LHP agree within MC error. The
-        // pre-fix LHP rate was ~0.043 — a ~14% gap that blows this tolerance.
+        // Both recover PD; per-name and LHP agree within MC error.
         assert!(
             (pn_rate - pd).abs() < 0.0025,
             "Student-t per-name rate {pn_rate} should recover PD {pd}"
@@ -549,24 +511,13 @@ mod tests {
         );
         assert!(
             (pn_rate - lhp_rate).abs() < 0.0025,
-            "Student-t per-name rate {pn_rate} and LHP rate {lhp_rate} must \
-             converge (N → ∞ limit); pre-fix LHP ≈ 0.043 fails this"
+            "Student-t per-name rate {pn_rate} and LHP rate {lhp_rate} must converge"
         );
     }
 
-    /// Item 5 — `simulate_period_antithetic` produces the antithetic variate.
+    /// Antithetic per-name mask is the complement of the normal mask at PD=0.5.
     ///
-    /// With a Gaussian copula and `PD = 0.5` the default barrier is exactly
-    /// `c = Φ⁻¹(0.5) = 0`, so a name defaults iff its latent `Aᵢ ≤ 0`. The
-    /// antithetic partner negates BOTH the systematic `Z` and every
-    /// idiosyncratic `εᵢ`, so its latent variable is `−Aᵢ`. For a barrier of
-    /// 0, `Aᵢ ≤ 0` and `−Aᵢ ≤ 0` are complementary (one true, one false,
-    /// barring the measure-zero `Aᵢ = 0`). The antithetic default mask must
-    /// therefore be the exact bitwise complement of the normal mask.
-    ///
-    /// The pre-fix engine gave antithetic partners *independent* per-name
-    /// substreams, so the masks were uncorrelated rather than complementary —
-    /// no idiosyncratic-channel variance reduction.
+    /// With barrier `c = 0`, negating `Z` and every `εᵢ` flips each default bit.
     #[test]
     fn antithetic_per_name_mask_is_complement_of_normal() {
         let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.30).expect("copula builds");
@@ -641,12 +592,7 @@ mod tests {
         );
     }
 
-    /// M2.5 convergence anchor: a large RFL pool simulated per-name must
-    /// converge to the RFL LHP conditional — both realize the same (Z, η)
-    /// latent construction `Aᵢ = β(η)·Z + √(1−β(η)²)·εᵢ`. On the pre-fix
-    /// engine the per-name path ignored η entirely (plain Gaussian with the
-    /// full ρ), so the conditional default fractions disagreed with the LHP
-    /// fast-path whenever η ≠ 0.
+    /// Large RFL per-name pool converges to the RFL LHP conditional on `(Z, η)`.
     #[test]
     fn rfl_large_pool_converges_to_lhp_conditional() {
         let spec = CopulaSpec::RandomFactorLoading {

@@ -96,12 +96,8 @@ pub fn scenario_table(
         .original_balance
         .amount();
 
-    // SC-M17: bound the grid before allocating. The triple loop below clones
-    // the ENTIRE deal per cell and reprices it, so an unbounded grid is both an
-    // out-of-memory and an unbounded-compute vector from a small JSON payload
-    // (three axes of 10k floats request 10^12 cells). On wasm32 `usize` is
-    // 32-bit, so the product can also WRAP before reaching `with_capacity`,
-    // silently allocating a tiny buffer for an enormous loop.
+    // Cap grid size before allocating: each cell clones and reprices the deal.
+    // Use checked mul so a huge product cannot wrap on wasm32 `usize`.
     const MAX_SCENARIO_CELLS: usize = 10_000;
     let cell_count = grid
         .cprs
@@ -167,10 +163,7 @@ pub fn scenario_table(
 mod scenario_guard_tests {
     use super::*;
 
-    /// SC-M17 — an oversized scenario grid must be rejected, not attempted.
-    ///
-    /// Each cell clones the entire deal and reprices it, so an unbounded grid
-    /// is an unbounded-compute vector reachable from a small JSON payload.
+    /// Oversized scenario grids are rejected before allocation / repricing.
     #[test]
     fn oversized_scenario_grid_is_rejected() {
         let deal = StructuredCredit::example();

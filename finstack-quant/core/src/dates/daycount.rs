@@ -199,10 +199,8 @@ pub struct DayCountContextState {
     /// Optional reference coupon period `(start, end)` for ACT/ACT ISMA,
     /// serialized as two ISO dates.
     ///
-    /// Previously this field was silently dropped on serialization, downgrading
-    /// exact ICMA accrual to the drifting frequency-only path on round-trip.
-    /// The `#[serde(default)]` keeps the addition wire-compatible: payloads
-    /// written before this field existed deserialize with `None`.
+    /// Required for exact ICMA accrual on round-trip. `#[serde(default)]` keeps
+    /// older payloads wire-compatible (`None` → frequency-only path).
     #[serde(default)]
     pub coupon_period: Option<(Date, Date)>,
     /// Whether the accrual end is the instrument termination date.
@@ -1402,9 +1400,6 @@ fn year_fraction_act_act_isma(start: Date, end: Date, freq: Tenor) -> crate::Res
 /// - **Annual** (or no frequency supplied): 366 if February 29 falls in the
 ///   interval `(start, end]` (exclusive of start, inclusive of end), else 365.
 /// - **Non-annual**: 366 if the period END date falls in a leap year, else 365.
-///
-/// Previously the Feb-29 window was `[start, end)` and the frequency rule was
-/// ignored .
 fn year_fraction_act_365l(start: Date, end: Date, ctx: DayCountContext<'_>) -> f64 {
     if start == end {
         return 0.0;
@@ -1759,9 +1754,7 @@ mod tests {
     fn act365l_period_ending_on_feb29_uses_366() {
         use super::{DayCount, DayCountContext};
 
-        // (2024-02-01, 2024-02-29]: end date Feb 29 is INCLUDED in the ICMA
-        // window → denominator 366. (Previously pinned to 365 under the
-        // incorrect [start, end) window.)
+        // (2024-02-01, 2024-02-29]: end date Feb 29 is included → denom 366.
         let start = date!(2024 - 02 - 01);
         let end = date!(2024 - 02 - 29);
         let yf = DayCount::Act365L
@@ -1780,9 +1773,7 @@ mod tests {
     fn act365l_period_starting_on_feb29_uses_365() {
         use super::{DayCount, DayCountContext};
 
-        // (2024-02-29, 2024-03-15]: Feb 29 is the start, excluded from the
-        // ICMA window → denominator 365. (Previously the [start, end) window
-        // wrongly included it.)
+        // (2024-02-29, 2024-03-15]: Feb 29 is the start, excluded → denom 365.
         let start = date!(2024 - 02 - 29);
         let end = date!(2024 - 03 - 15);
         let yf = DayCount::Act365L

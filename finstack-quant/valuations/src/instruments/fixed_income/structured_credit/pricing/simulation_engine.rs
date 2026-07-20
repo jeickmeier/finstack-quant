@@ -1890,10 +1890,7 @@ mod tests {
         )
         .expect("simulation");
 
-        // The core invariant for every bounded-principal tranche: principal
-        // repaid + write-down must never exceed the original face. Pre-fix the
-        // cumulative-loss cap ignored principal repaid, so this sum could
-        // exceed face (double-counting retired notional as loss-absorbing).
+        // Principal repaid + write-down must never exceed original face.
         for (id, face) in [("A", 70_000_000.0_f64), ("B", 22_000_000.0_f64)] {
             let tranche = results.get(id).unwrap_or_else(|| panic!("tranche {id}"));
             let total_writedown = tranche.total_writedown.amount();
@@ -2854,22 +2851,7 @@ mod tests {
         );
     }
 
-    /// SC-M03 — senior transaction fees must actually be built and PAID.
-    ///
-    /// `create_waterfall_internal` previously passed `vec![]` for the fee
-    /// recipients, so `standard_sequential` skipped the fee tier entirely and
-    /// no management, trustee or servicing fee was ever modelled. All pool
-    /// interest reached the notes. The `DealFees` type and the per-deal-type
-    /// constants already existed but had zero consumers on the pricing path.
-    ///
-    /// The assertion is on cash reaching the SERVICE PROVIDERS, not on a fall
-    /// in the notes' lifetime cash. On this waterfall the principal tier
-    /// carries `TranchePrincipal { target: None }` and sweeps surplus interest
-    /// into principal, so fees — by reducing excess spread — SLOW the note's
-    /// paydown, leaving it outstanding longer and accruing MORE total interest
-    /// (measured here: 2,522,335 with fees against 2,479,009 without, on an
-    /// unchanged 10,000,000 of principal). That is the same timing effect the
-    /// OC cure shows, and it makes lifetime nominal cash the wrong yardstick.
+    /// Attached senior fees build a fee tier and pay service providers first.
     #[test]
     fn attached_fees_are_built_and_paid_ahead_of_the_notes() {
         use crate::instruments::fixed_income::structured_credit::pricing::waterfall::{
@@ -2894,8 +2876,7 @@ mod tests {
         assert_eq!(
             fee_tiers(&without),
             0,
-            "a deal with no fees must have NO fee tier, preserving pre-SC-M03 \
-             behaviour exactly"
+            "a deal with no fees must have no fee tier"
         );
         assert_eq!(fee_tiers(&with_fees), 1, "fees must build a fee tier");
 
@@ -2945,9 +2926,7 @@ mod tests {
         // on a 10,000,000 pool over a quarter.
         assert!(
             fees_paid > 1_000.0,
-            "senior fees must actually be PAID to the service providers: got \
-             {fees_paid:.2}. Zero means the fee tier is built but never funded \
-             (SC-M03)."
+            "senior fees must be paid to service providers; got {fees_paid:.2}"
         );
 
         // And that cash is taken ahead of the notes in the same period.
@@ -3247,15 +3226,7 @@ mod tests {
         );
     }
 
-    /// M15 — lagged recoveries still pending at simulation end must be
-    /// drained and distributed, not silently dropped by `finalize()`.
-    ///
-    /// With a 12-month recovery lag and defaults occurring in every period
-    /// (including the final year), the recovery queue is non-empty when the
-    /// final scheduled payment date is reached. Pre-fix, that pending
-    /// recovery cash was dropped — losses overstated for any deal with
-    /// defaults near maturity. The cleanup-call branch already realized the
-    /// pending queue; the two normal termination paths now do too.
+    /// Lagged recoveries still pending at simulation end are drained, not dropped.
     #[test]
     fn pending_recoveries_at_simulation_end_are_drained_not_dropped() {
         let closing = Date::from_calendar_date(2024, Month::January, 1).expect("date");
@@ -3325,12 +3296,7 @@ mod tests {
         let lagged = run(12);
         let immediate = run(0);
 
-        // (a) No dropped recovery cash on the senior note: its face must be
-        // fully consumed by principal repaid + net-loss write-downs, and its
-        // final balance must be zero. Pre-fix, the pending tail recoveries
-        // were dropped, leaving the senior under-repaid by exactly the
-        // pending queue (defaulted × recovery rate from the final lag
-        // window).
+        // Senior face must be fully consumed by principal + write-downs.
         let senior = lagged.get("A").expect("senior tranche");
         let retired = senior.total_principal.amount() + senior.total_writedown.amount();
         assert!(
@@ -3984,17 +3950,8 @@ fn simulate_period(
             }
         }
 
-        // Cumulative net loss above the structure's total absorbable notional
-        // cannot be written down further (every tranche is fully impaired).
-        // Surface it rather than silently dropping it: the engine accumulates
-        // it on `cumulative_loss_unallocated` so it is observable and the
-        // post-loss invariant below can be checked. `remaining_loss` here is
-        // the portion of THIS period's incremental net loss that no tranche
-        // could absorb, so it is accumulated, not overwritten.
-        // SC-M20: `remaining_loss` here is the CUMULATIVE unallocated amount
-        // (it was seeded from `cumulative_realized_loss - already_allocated`),
-        // not this period's increment, so accumulating it with `+=` double
-        // counted across periods. Assign instead.
+        // Unallocated loss after every tranche is fully impaired. Assign
+        // (do not `+=`): `remaining_loss` is already the cumulative residual.
         if remaining_loss > WRITEDOWN_DE_MINIMIS {
             state.cumulative_loss_unallocated = remaining_loss;
         }

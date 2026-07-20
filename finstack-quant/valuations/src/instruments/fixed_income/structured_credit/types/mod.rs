@@ -389,17 +389,8 @@ pub struct StructuredCredit {
 
     /// Senior transaction fees paid ahead of every note.
     ///
-    /// SC-M03: `create_waterfall_internal` previously passed `vec![]` for the
-    /// fee recipients, so `standard_sequential` skipped the fee tier entirely
-    /// and NO management, trustee or servicing fee was ever modelled. All pool
-    /// interest reached the notes, systematically overstating equity and
-    /// junior cashflows — typically by 40-60bp per annum on collateral for a
-    /// CLO. `DealFees` and the per-deal-type constants in `types/constants.rs`
-    /// already existed but had zero consumers on the pricing path.
-    ///
-    /// `None` (the default) reproduces the previous fee-free behaviour exactly,
-    /// so existing deals and goldens are unaffected. Use
-    /// [`Self::with_standard_fees`] to apply the deal-type calibration.
+    /// `None` (the default) skips the fee tier. Use [`Self::with_standard_fees`]
+    /// to apply the deal-type calibration from `types/constants.rs`.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fees: Option<DealFees>,
@@ -507,16 +498,10 @@ impl StructuredCredit {
 
     /// Build the senior fee recipients for the waterfall's fee tier.
     ///
-    /// Returns an empty vector when no [`DealFees`] are attached, which makes
-    /// `standard_sequential` skip the fee tier entirely — the pre-SC-M03
-    /// behaviour, preserved as the default.
-    ///
-    /// Basis-point fees are expressed as [`PaymentCalculation::PercentageOfCollateral`]
-    /// with `annualized: true`, so the waterfall applies the correct
-    /// day-counted period fraction rather than charging the annual rate every
-    /// period. The trustee fee is a fixed ANNUAL amount, so it is divided by
-    /// the number of payment periods per year here; charging it unscaled would
-    /// bill a quarterly deal four times over.
+    /// Returns an empty vector when no [`DealFees`] are attached (fee tier
+    /// skipped). Basis-point fees use [`PaymentCalculation::PercentageOfCollateral`]
+    /// with `annualized: true`. The trustee fee is annual and is divided by
+    /// payment periods per year.
     fn fee_recipients(&self) -> Vec<Recipient> {
         let Some(fees) = self.fees.as_ref() else {
             return Vec::new();
@@ -723,7 +708,7 @@ impl StructuredCredit {
 
     /// Internal waterfall creation (called by constructors).
     fn create_waterfall_internal(&self) -> Waterfall {
-        // SC-M03: senior transaction fees, paid ahead of every note.
+        // Senior transaction fees, paid ahead of every note.
         let mut waterfall = Waterfall::standard_sequential(
             self.pool.base_currency(),
             &self.tranches,
@@ -918,8 +903,7 @@ impl StructuredCredit {
                 .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
         tree_config.correlation = correlation;
         tree_config.pool_coupon = self.pool.weighted_avg_coupon();
-        // SC-M06: an explicit correlation structure on the deal drives the
-        // copula. `None` (deal-type default) keeps the copula spec's scalar.
+        // Explicit deal correlation overrides the copula spec's scalar.
         tree_config.asset_correlation_override = self
             .credit_model
             .correlation_structure

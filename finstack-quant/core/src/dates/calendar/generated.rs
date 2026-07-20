@@ -12,9 +12,8 @@ include!("../../generated/holiday_generated.rs");
 /// Helper to compute nth weekday of month.
 ///
 /// Returns `None` when the requested occurrence does not exist in the month
-/// (e.g. a 5th Monday in a month with only four Mondays). Previously the raw
-/// arithmetic result silently spilled into the adjacent month, which could
-/// mark phantom holiday dates .
+/// (e.g. a 5th Monday in a month with only four Mondays), rather than spilling
+/// into the adjacent month.
 #[inline]
 #[allow(clippy::unreachable)] // Gregorian month boundaries used below are valid by construction.
 pub(crate) fn nth_weekday_of_month(

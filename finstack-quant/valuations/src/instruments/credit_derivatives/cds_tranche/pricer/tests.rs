@@ -2301,10 +2301,8 @@ fn super_senior_tranche(attach: f64, detach: f64) -> CDSTranche {
     .expect("Valid tranche parameters")
 }
 
-/// with zero recovery there is NO recovered notional, so the
-/// senior-side writedown curve must be identically zero and the defaulted
-/// fraction equals the loss (`X = L`) — i.e. the pre-fix behavior is
-/// reproduced exactly at `R = 0`.
+/// At zero recovery there is no recovered notional: senior writedown is zero
+/// and the defaulted fraction equals the loss (`X = L`).
 #[test]
 fn zero_recovery_has_no_senior_writedown() {
     let ctx = recovery_market_context(0.0, 1.0);
