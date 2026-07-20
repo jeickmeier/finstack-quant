@@ -918,6 +918,13 @@ impl StructuredCredit {
                 .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
         tree_config.correlation = correlation;
         tree_config.pool_coupon = self.pool.weighted_avg_coupon();
+        // SC-M06: an explicit correlation structure on the deal drives the
+        // copula. `None` (deal-type default) keeps the copula spec's scalar.
+        tree_config.asset_correlation_override = self
+            .credit_model
+            .correlation_structure
+            .as_ref()
+            .map(super::pricing::CorrelationStructure::asset_correlation);
         // Market refi rate for Richard-Roll; 4.5% fallback matches RMBS defaults.
         tree_config.market_refi_rate = if self.market_conditions.refi_rate > 0.0 {
             self.market_conditions.refi_rate

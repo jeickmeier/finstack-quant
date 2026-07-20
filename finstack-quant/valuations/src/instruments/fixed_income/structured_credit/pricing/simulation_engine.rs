@@ -3991,8 +3991,12 @@ fn simulate_period(
         // post-loss invariant below can be checked. `remaining_loss` here is
         // the portion of THIS period's incremental net loss that no tranche
         // could absorb, so it is accumulated, not overwritten.
+        // SC-M20: `remaining_loss` here is the CUMULATIVE unallocated amount
+        // (it was seeded from `cumulative_realized_loss - already_allocated`),
+        // not this period's increment, so accumulating it with `+=` double
+        // counted across periods. Assign instead.
         if remaining_loss > WRITEDOWN_DE_MINIMIS {
-            state.cumulative_loss_unallocated += remaining_loss;
+            state.cumulative_loss_unallocated = remaining_loss;
         }
 
         // Invariant: unallocated loss can only be non-zero once every tranche

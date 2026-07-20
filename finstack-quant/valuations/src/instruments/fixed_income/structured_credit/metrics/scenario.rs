@@ -96,7 +96,33 @@ pub fn scenario_table(
         .original_balance
         .amount();
 
-    let mut cells = Vec::with_capacity(grid.cprs.len() * grid.cdrs.len() * grid.severities.len());
+    // SC-M17: bound the grid before allocating. The triple loop below clones
+    // the ENTIRE deal per cell and reprices it, so an unbounded grid is both an
+    // out-of-memory and an unbounded-compute vector from a small JSON payload
+    // (three axes of 10k floats request 10^12 cells). On wasm32 `usize` is
+    // 32-bit, so the product can also WRAP before reaching `with_capacity`,
+    // silently allocating a tiny buffer for an enormous loop.
+    const MAX_SCENARIO_CELLS: usize = 10_000;
+    let cell_count = grid
+        .cprs
+        .len()
+        .checked_mul(grid.cdrs.len())
+        .and_then(|n| n.checked_mul(grid.severities.len()))
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation("scenario grid size overflows usize".to_string())
+        })?;
+    if cell_count > MAX_SCENARIO_CELLS {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "scenario grid requests {cell_count} cells ({} CPR x {} CDR x {} \
+             severity), exceeding the {MAX_SCENARIO_CELLS} cap; each cell \
+             reprices the entire deal",
+            grid.cprs.len(),
+            grid.cdrs.len(),
+            grid.severities.len()
+        )));
+    }
+
+    let mut cells = Vec::with_capacity(cell_count);
     for &cpr in &grid.cprs {
         for &cdr in &grid.cdrs {
             for &severity in &grid.severities {
@@ -135,4 +161,34 @@ pub fn scenario_table(
         tranche_id: tranche_id.to_string(),
         cells,
     })
+}
+
+#[cfg(test)]
+mod scenario_guard_tests {
+    use super::*;
+
+    /// SC-M17 — an oversized scenario grid must be rejected, not attempted.
+    ///
+    /// Each cell clones the entire deal and reprices it, so an unbounded grid
+    /// is an unbounded-compute vector reachable from a small JSON payload.
+    #[test]
+    fn oversized_scenario_grid_is_rejected() {
+        let deal = StructuredCredit::example();
+        let market = MarketContext::new();
+        let as_of = deal.closing_date;
+
+        let grid = ScenarioGrid {
+            cprs: vec![0.05; 100],
+            cdrs: vec![0.02; 100],
+            severities: vec![0.4; 100],
+            recovery_lag: None,
+        };
+        let err = scenario_table(&deal, "CLONOTES-A", &market, as_of, &grid)
+            .expect_err("a 1,000,000-cell grid must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("1000000") && msg.contains("cap"),
+            "the error must state the requested cell count and the cap; got: {msg}"
+        );
+    }
 }

@@ -340,7 +340,18 @@ impl StochasticPricer {
                 copula_spec,
                 correlation,
                 ..
-            } => Some((copula_spec.clone(), *correlation)),
+            } => {
+                // SC-M06: an explicit `CorrelationStructure` on the deal takes
+                // precedence over the copula spec's scalar. Before this the
+                // structure was write-only and `.with_correlation(...)` could
+                // not move a price at all.
+                let rho = self
+                    .config
+                    .tree_config
+                    .asset_correlation_override
+                    .unwrap_or(*correlation);
+                Some((copula_spec.clone(), rho))
+            }
             _ => None,
         }
     }
@@ -2146,6 +2157,46 @@ mod per_name_copula_tests {
             persistent > independent * 1.10,
             "persistent UL {persistent:.0} should exceed i.i.d. UL \
              {independent:.0} by more than 10%"
+        );
+    }
+
+    /// SC-M06 — an explicit `CorrelationStructure` on the deal must move the
+    /// price.
+    ///
+    /// `tree_config.correlation` was written by `build_scenario_tree_config`
+    /// and never read: `asset_correlation()`, `pairwise_correlation()` and
+    /// `default_factor_loading()` had no production callers, and the copula
+    /// took its correlation from `StochasticDefaultSpec::Copula { correlation }`
+    /// instead. So `.with_correlation(CorrelationStructure::clo_standard())` —
+    /// documented in both READMEs — produced a bit-identical price, and the
+    /// `Sectored` and `Matrix` variants including their PSD validation were
+    /// decorative.
+    #[test]
+    fn explicit_correlation_structure_changes_the_price() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let deal = clo_deal(60);
+
+        let unexpected_loss_for = |override_rho: Option<f64>| -> f64 {
+            let mut cfg = copula_config(0.06, 0.10, 24, PoolGranularity::PerName, 4_000);
+            cfg.tree_config.asset_correlation_override = override_rho;
+            StochasticPricer::new(cfg)
+                .price(&deal, &market)
+                .expect("per-name copula pricing")
+                .unexpected_loss
+                .amount()
+        };
+
+        // No override: the copula spec's own 10% correlation applies.
+        let baseline = unexpected_loss_for(None);
+        // An explicit structure at 45% must widen the loss distribution.
+        let high = unexpected_loss_for(Some(0.45));
+
+        assert!(
+            high > baseline * 1.10,
+            "an explicit CorrelationStructure must drive the copula: UL at a \
+             45% override was {high:.0} against {baseline:.0} at the spec's own \
+             10%. Equal values mean the structure is still write-only and \
+             `.with_correlation(...)` cannot move a price (SC-M06)."
         );
     }
 
