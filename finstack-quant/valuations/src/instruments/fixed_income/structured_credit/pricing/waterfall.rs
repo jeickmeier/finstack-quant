@@ -301,11 +301,58 @@ fn execute_waterfall_core(
             )?,
         };
 
+        let mut tier_cash = tier_cash;
         if tier_diverted {
             total_diverted = total_diverted.checked_add(tier_cash)?;
             cure_remaining = cure_remaining
                 .checked_sub(tier_cash)
                 .unwrap_or(Money::new(0.0, waterfall.base_currency));
+
+            // SC-M07: after the cure is satisfied, the divertible tier must
+            // still pay ITS OWN recipients from what is left.
+            //
+            // The diversion REPLACES `target_recipients` with the senior
+            // principal tier's, so the tier's own recipients were skipped
+            // entirely — not just for the cure amount, but for the whole
+            // period. Everything above the cure then flowed past them to the
+            // next, MORE JUNIOR tier, or (when the divertible tier is last, as
+            // in `standard_sequential`) became `remaining_cash`, which nothing
+            // consumes.
+            //
+            // Concretely, on this repo's own `ic_only_breach_diverts_cash`
+            // fixture: CLASS_B — 30M of outstanding subordinated debt —
+            // received ZERO principal while equity took 11.71M in the same
+            // period. A partial diversion is supposed to redirect only enough
+            // cash to cure the breach; the remainder belongs to the tier it
+            // was taken from, not to whoever sits below it.
+            let leftover = remaining.checked_sub(tier_cash)?;
+            if leftover.amount() > 0.0 && !tier.recipients.is_empty() {
+                let own_cash = match tier.allocation_mode {
+                    AllocationMode::Sequential => allocate_sequential(
+                        &allocation_ctx,
+                        tier,
+                        &tier.recipients[..],
+                        leftover,
+                        context.period_start,
+                        false,
+                        &mut allocation_output,
+                        &explain,
+                        &mut principal_paid_in_period,
+                    )?,
+                    AllocationMode::ProRata => allocate_pro_rata(
+                        &allocation_ctx,
+                        tier,
+                        &tier.recipients[..],
+                        leftover,
+                        context.period_start,
+                        false,
+                        &mut allocation_output,
+                        &explain,
+                        &mut principal_paid_in_period,
+                    )?,
+                };
+                tier_cash = tier_cash.checked_add(own_cash)?;
+            }
         }
 
         tier_allocations.push((tier.id.clone(), tier_cash));

@@ -172,8 +172,7 @@ impl CoverageTest {
         // change and is not what this finding is about.
         let mut numerator = match context.current_pool_balance {
             Some(current) if context.haircuts.is_some_and(|h| !h.is_empty()) => {
-                let gross =
-                    collateral_balance_with_haircuts(context.pool, performing_only, None)?;
+                let gross = collateral_balance_with_haircuts(context.pool, performing_only, None)?;
                 let haircut = collateral_balance_with_haircuts(
                     context.pool,
                     performing_only,

@@ -2591,21 +2591,6 @@ mod tests {
         instrument
     }
 
-    /// Total cash reaching a named tranche over the life of a deal.
-    fn tranche_total(instrument: &StructuredCredit, tranche_id: &str) -> f64 {
-        let market = MarketContext::new().insert(cleanup_discount_curve());
-        let results = crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
-            instrument,
-            &market,
-            cleanup_test_date(),
-        )
-        .expect("simulation");
-        results
-            .get(tranche_id)
-            .map(|tc| tc.cashflows.iter().map(|(_, m)| m.amount()).sum())
-            .unwrap_or(0.0)
-    }
-
     /// Failing OC test traps subordinated interest and accelerates senior principal.
     #[test]
     fn failing_oc_test_diverts_subordinated_interest_to_senior_principal() {
@@ -2620,14 +2605,53 @@ mod tests {
             ic_trigger: None,
         }]);
 
-        let mezz_without = tranche_total(&untriggered, "CLASS_B");
-        let mezz_with = tranche_total(&triggered, "CLASS_B");
+        // SC-M07 note — assert on TIMING, not lifetime totals.
+        //
+        // Once the cure shrinks below the subordinated tier's cash, SC-M07
+        // correctly returns the excess to CLASS_B, so its interest is DEFERRED
+        // rather than forfeited and its lifetime nominal cash converges back to
+        // the untriggered value. That is the third time this waterfall has
+        // shown the same thing (see the OC cure's effect on senior cash, and
+        // the fee tier's on note interest): `TranchePrincipal { target: None }`
+        // sweeping surplus into principal makes lifetime totals a bad yardstick
+        // for any structural feature. What a cash trap actually does is move
+        // cash EARLIER for the senior and LATER for the subordinate.
+        let interest_wal = |deal: &StructuredCredit, tranche: &str| -> f64 {
+            let market = MarketContext::new().insert(cleanup_discount_curve());
+            let results =
+                crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
+                    deal,
+                    &market,
+                    cleanup_test_date(),
+                )
+                .expect("simulation");
+            let flows = &results
+                .get(tranche)
+                .expect("tranche results")
+                .interest_flows;
+            let (mut weighted, mut total) = (0.0_f64, 0.0_f64);
+            for (date, amount) in flows {
+                let years = (*date - cleanup_test_date()).whole_days() as f64 / 365.0;
+                weighted += years * amount.amount();
+                total += amount.amount();
+            }
+            if total > 0.0 {
+                weighted / total
+            } else {
+                0.0
+            }
+        };
 
+        let mezz_wal_without = interest_wal(&untriggered, "CLASS_B");
+        let mezz_wal_with = interest_wal(&triggered, "CLASS_B");
         assert!(
-            mezz_without - mezz_with > 1_000.0,
-            "breaching OC must trap subordinated interest: CLASS_B {mezz_with:.2} \
-             with trigger vs {mezz_without:.2} without (trapped {:.2})",
-            mezz_without - mezz_with
+            mezz_wal_with > mezz_wal_without,
+            "a breaching OC test must DEFER subordinated interest: CLASS_B \
+             interest WAL was {mezz_wal_with:.4}y with the trigger vs \
+             {mezz_wal_without:.4}y without. Equal values mean the cure has no \
+             source — the debt-interest tier is not split at the \
+             senior/subordinated boundary, or the divertible tier is \
+             unreachable (SC-M30)."
         );
 
         // The trapped cash must ACCELERATE senior principal. Note the senior's
