@@ -910,6 +910,34 @@ impl StructuredCredit {
             .as_ref()
             .map(super::pricing::CorrelationStructure::asset_correlation);
         // Market refi rate for Richard-Roll; 4.5% fallback matches RMBS defaults.
+        // SC-M15: the intensity model's mean-reversion speed drives the
+        // SYSTEMATIC FACTOR's mean reversion.
+        //
+        // `IntensityProcessDefault` documents `dX = kappa(theta - X)dt +
+        // sigma dW` (Duffie-Singleton 1999; Lando 1998) and its intensity is
+        // `lambda_0 * exp(-beta*sigma*X - 0.5*beta^2*sigma^2)`. But `kappa` was
+        // stored, clamped, exposed by a getter — and used in NO computation:
+        // `intensity()` is a static function of a single scalar `X`, with no
+        // state, no time step and no theta. The parameter was inert and the
+        // citation unearned.
+        //
+        // After SC-C05 the factor `X` IS a mean-reverting OU path, so the
+        // documented model is realizable without threading new per-path state:
+        // an exponential function of an OU factor is exactly the
+        // exponential-OU intensity the header describes. Sourcing the factor's
+        // kappa from the intensity spec makes the user's parameter drive the
+        // process it names.
+        if let StochasticDefaultSpec::IntensityProcess { mean_reversion, .. } =
+            &tree_config.default_spec
+        {
+            if *mean_reversion > 0.0 {
+                tree_config.factor_spec = crate::correlation::LatentFactorSpec::SingleFactor {
+                    volatility: 1.0,
+                    mean_reversion: *mean_reversion,
+                };
+            }
+        }
+
         tree_config.market_refi_rate = if self.market_conditions.refi_rate > 0.0 {
             self.market_conditions.refi_rate
         } else {

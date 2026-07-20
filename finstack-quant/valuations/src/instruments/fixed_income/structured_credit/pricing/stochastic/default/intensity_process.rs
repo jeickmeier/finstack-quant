@@ -19,6 +19,24 @@
 //! dX = κ(θ - X)dt + σ dW
 //! ```
 //!
+//! # Where the mean reversion actually lives (SC-M15)
+//!
+//! `X(t)` is the engine's SYSTEMATIC FACTOR path, not state held by this type.
+//! `intensity()` is deliberately a pure function of the factor realization;
+//! the OU dynamics are produced upstream by
+//! `StochasticPricer::evolved_factors`, which generates a stationary AR(1)
+//! path with autocorrelation `φ^h = e^{−κh/12}`.
+//!
+//! `StructuredCredit::build_scenario_tree_config` sources that `κ` from this
+//! spec's `mean_reversion`, so the parameter drives the process it names.
+//! Before that wiring it was stored, clamped, exposed by a getter and used in
+//! no computation at all — the model was a static lognormal shock wearing a
+//! Duffie-Singleton citation.
+//!
+//! An exponential function of an OU factor is exactly the exponential-OU
+//! intensity described above, so this composition realizes the documented
+//! model rather than approximating it.
+//!
 //! # Sign Convention
 //!
 //! The systematic factor follows the canonical copula convention: a LOW

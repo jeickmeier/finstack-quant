@@ -2217,6 +2217,36 @@ mod per_name_copula_tests {
         );
     }
 
+    /// SC-M15 — the intensity model's `mean_reversion` must drive the factor.
+    ///
+    /// `IntensityProcessDefault` documents `dX = kappa(theta - X)dt + sigma dW`
+    /// and cites Duffie-Singleton, but `kappa` was stored, clamped, exposed by
+    /// a getter and used in NO computation — the model was a static lognormal
+    /// shock. After SC-C05 the systematic factor is a genuine OU path, so
+    /// sourcing its kappa from this spec realizes the documented model.
+    #[test]
+    fn intensity_mean_reversion_drives_the_systematic_factor() {
+        let mut deal = clo_deal(20);
+        deal.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::intensity_process(
+            0.03, 0.8, 2.5, 0.4,
+        ));
+
+        let as_of = deal.closing_date;
+        let tree_config = deal
+            .build_scenario_tree_config(as_of)
+            .expect("scenario tree config");
+
+        match tree_config.factor_spec {
+            LatentFactorSpec::SingleFactor { mean_reversion, .. } => assert!(
+                (mean_reversion - 2.5).abs() < 1e-12,
+                "the factor's kappa must come from the intensity spec (2.5), \
+                 got {mean_reversion}. Zero means the parameter is still inert \
+                 (SC-M15)."
+            ),
+            other => panic!("expected a single-factor spec, got {other:?}"),
+        }
+    }
+
     /// SC-M24 — burnout must ACCUMULATE across a path, not sit at 1.0.
     ///
     /// `update_burnout` had zero production callers and the engine passed a
