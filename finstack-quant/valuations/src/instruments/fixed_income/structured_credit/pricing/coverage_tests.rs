@@ -148,14 +148,48 @@ impl CoverageTest {
             context.tranches.senior_balance(context.tranche_id)
         };
 
-        // Use current pool balance override when available and no haircuts
-        let mut numerator = if let (Some(pool_bal), true) = (
-            context.current_pool_balance,
-            context.haircuts.map(|h| h.is_empty()).unwrap_or(true),
-        ) {
-            pool_bal
-        } else {
-            collateral_balance_with_haircuts(context.pool, performing_only, context.haircuts)?
+        // SC-M09: the haircut must be applied to the CURRENT pool balance.
+        //
+        // `collateral_balance_with_haircuts` sums `pool.assets[].balance`, and
+        // `context.pool` is `&instrument.pool` — the closing-date snapshot,
+        // never mutated during simulation (live balances live in
+        // `state.pool_state.balances`). So whenever any haircut was configured
+        // — the realistic CLO CCC case — the `current_pool_balance` override
+        // was bypassed and the OC numerator FROZE at closing while the
+        // denominator amortized down. The ratio then inflated monotonically
+        // and the test could never breach, silently disabling the very
+        // protection a haircut exists to tighten.
+        //
+        // Applying the haircut as a FACTOR keeps its economic meaning (a
+        // proportional markdown reflecting the rating mix) while tracking the
+        // amortizing balance.
+        //
+        // Known limitation: the rating MIX is taken from the closing pool,
+        // since only the aggregate current balance is threaded into the test
+        // context. If the pool's composition drifts materially — heavy
+        // downgrades concentrated in one bucket — the factor is stale. Exact
+        // treatment needs per-asset current balances here; that is a larger
+        // change and is not what this finding is about.
+        let mut numerator = match context.current_pool_balance {
+            Some(current) if context.haircuts.is_some_and(|h| !h.is_empty()) => {
+                let gross =
+                    collateral_balance_with_haircuts(context.pool, performing_only, None)?;
+                let haircut = collateral_balance_with_haircuts(
+                    context.pool,
+                    performing_only,
+                    context.haircuts,
+                )?;
+                let factor = if gross.amount() > 0.0 {
+                    (haircut.amount() / gross.amount()).clamp(0.0, 1.0)
+                } else {
+                    1.0
+                };
+                Money::new(current.amount() * factor, current.currency())
+            }
+            Some(current) => current,
+            None => {
+                collateral_balance_with_haircuts(context.pool, performing_only, context.haircuts)?
+            }
         };
 
         if include_cash {
@@ -833,6 +867,143 @@ mod tests {
             cure.amount() > 0.0,
             "IC cure must be positive (the interest shortfall), got {}",
             cure.amount()
+        );
+    }
+}
+
+#[cfg(test)]
+mod haircut_tests {
+    use super::*;
+    use crate::instruments::fixed_income::structured_credit::types::{
+        AssetPool, DealType, PoolAsset, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::money::Money;
+    use time::Month;
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2034, Month::January, 1).expect("date")
+    }
+
+    /// Pool of two 500k assets: one AAA, one CCC.
+    fn rated_pool() -> AssetPool {
+        let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
+        for (id, rating) in [("AAA1", CreditRating::AAA), ("CCC1", CreditRating::CCC)] {
+            let mut asset = PoolAsset::fixed_rate_bond(
+                id,
+                Money::new(500_000.0, Currency::USD),
+                0.07,
+                maturity(),
+                DayCount::Thirty360,
+            );
+            asset.credit_quality = Some(rating);
+            pool.assets.push(asset);
+        }
+        pool
+    }
+
+    fn single_tranche() -> TrancheStructure {
+        TrancheStructure::new(vec![Tranche::new(
+            "A",
+            0.0,
+            100.0,
+            TrancheSeniority::Senior,
+            Money::new(500_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            maturity(),
+        )
+        .expect("tranche")])
+        .expect("structure")
+    }
+
+    /// Carry CCC collateral at 50% of par — the standard CLO convention.
+    fn ccc_haircuts() -> HashMap<CreditRating, f64> {
+        let mut m = HashMap::default();
+        m.insert(CreditRating::CCC, 0.5);
+        m
+    }
+
+    /// SC-M09 — a configured haircut must track the CURRENT pool balance, not
+    /// freeze at the closing-date snapshot.
+    ///
+    /// `context.pool` is `&instrument.pool`, never mutated during simulation.
+    /// Before this fix, setting any haircut bypassed the `current_pool_balance`
+    /// override entirely, so the OC numerator stayed at its closing value while
+    /// the denominator amortized — the ratio inflated monotonically and the
+    /// test could never breach.
+    #[test]
+    fn haircut_applies_to_the_current_pool_balance() {
+        let pool = rated_pool();
+        let tranches = single_tranche();
+        let market = MarketContext::new();
+        let haircuts = ccc_haircuts();
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+
+        // The pool has amortized from 1,000,000 to 400,000.
+        let current = Money::new(400_000.0, Currency::USD);
+        let ctx = TestContext {
+            pool: &pool,
+            tranches: &tranches,
+            tranche_id: "A",
+            as_of,
+            period_start: None,
+            cash_balance: Money::new(0.0, Currency::USD),
+            interest_collections: Money::new(0.0, Currency::USD),
+            haircuts: Some(&haircuts),
+            par_value_threshold: None,
+            market: Some(&market),
+            tranche_balances: None,
+            current_pool_balance: Some(current),
+        };
+
+        let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("oc test");
+
+        // Haircut factor: (500k + 0.5*500k) / 1,000k = 0.75.
+        // Numerator must be 400k * 0.75 = 300k against a 500k tranche => 0.60.
+        assert!(
+            (result.current_ratio - 0.60).abs() < 1e-9,
+            "the haircut must scale the CURRENT balance: expected 0.60 \
+             (400k x 0.75 / 500k), got {}. A ratio near 1.5 means the numerator \
+             is still the frozen closing pool (SC-M09).",
+            result.current_ratio
+        );
+        assert!(
+            !result.is_passing,
+            "a 0.60 OC ratio against a 1.0 requirement must breach"
+        );
+    }
+
+    /// SC-M09 — without haircuts the current-balance override is used directly,
+    /// so this path is unchanged.
+    #[test]
+    fn absent_haircuts_use_the_current_balance_unscaled() {
+        let pool = rated_pool();
+        let tranches = single_tranche();
+        let market = MarketContext::new();
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+
+        let ctx = TestContext {
+            pool: &pool,
+            tranches: &tranches,
+            tranche_id: "A",
+            as_of,
+            period_start: None,
+            cash_balance: Money::new(0.0, Currency::USD),
+            interest_collections: Money::new(0.0, Currency::USD),
+            haircuts: None,
+            par_value_threshold: None,
+            market: Some(&market),
+            tranche_balances: None,
+            current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
+        };
+
+        let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("oc test");
+        assert!(
+            (result.current_ratio - 0.80).abs() < 1e-9,
+            "without haircuts the ratio is 400k / 500k = 0.80, got {}",
+            result.current_ratio
         );
     }
 }
