@@ -486,6 +486,11 @@ public = [
     "list_standard_metrics_grouped",
     "price_instrument",
     "price_instrument_with_metrics",
+    "structured_credit_tranche_breakeven_cdr",
+    "structured_credit_tranche_discount_margin",
+    "structured_credit_tranche_metrics",
+    "structured_credit_tranche_oas",
+    "structured_credit_tranche_scenario_table",
     "validate_instrument_json",
 ]
 

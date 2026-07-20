@@ -11,6 +11,7 @@ mod exotic_rates;
 mod fourier;
 mod pricing;
 mod sabr;
+mod structured_credit;
 
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::display_to_py;
@@ -241,6 +242,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     m.getattr("bond_from_cashflows_json")?
         .setattr("__module__", "finstack_quant.valuations.instruments")?;
     pricing::register(py, &m)?;
+    structured_credit::register(py, &m)?;
     let all = PyList::new(
         py,
         [
@@ -252,6 +254,12 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
             "list_standard_metrics_grouped",
             "price_instrument",
             "price_instrument_with_metrics",
+            // Structured-credit tranche analytics (mirrors WASM entry points).
+            "structured_credit_tranche_breakeven_cdr",
+            "structured_credit_tranche_discount_margin",
+            "structured_credit_tranche_metrics",
+            "structured_credit_tranche_oas",
+            "structured_credit_tranche_scenario_table",
             "validate_instrument_json",
         ],
     )?;

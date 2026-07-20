@@ -24,6 +24,13 @@ list_models_grouped = _valuations.instruments.list_models_grouped
 list_standard_metrics = _valuations.instruments.list_standard_metrics
 list_standard_metrics_grouped = _valuations.instruments.list_standard_metrics_grouped
 
+# Structured-credit tranche analytics (mirrors WASM; takes a tranche id).
+structured_credit_tranche_discount_margin = _valuations.instruments.structured_credit_tranche_discount_margin
+structured_credit_tranche_breakeven_cdr = _valuations.instruments.structured_credit_tranche_breakeven_cdr
+structured_credit_tranche_oas = _valuations.instruments.structured_credit_tranche_oas
+structured_credit_tranche_metrics = _valuations.instruments.structured_credit_tranche_metrics
+structured_credit_tranche_scenario_table = _valuations.instruments.structured_credit_tranche_scenario_table
+
 __all__: list[str] = [
     "bond_from_cashflows_json",
     "instrument_cashflows_json",
@@ -33,5 +40,10 @@ __all__: list[str] = [
     "list_standard_metrics_grouped",
     "price_instrument",
     "price_instrument_with_metrics",
+    "structured_credit_tranche_breakeven_cdr",
+    "structured_credit_tranche_discount_margin",
+    "structured_credit_tranche_metrics",
+    "structured_credit_tranche_oas",
+    "structured_credit_tranche_scenario_table",
     "validate_instrument_json",
 ]

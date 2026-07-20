@@ -21,6 +21,11 @@ __all__ = [
     "list_standard_metrics_grouped",
     "price_instrument",
     "price_instrument_with_metrics",
+    "structured_credit_tranche_breakeven_cdr",
+    "structured_credit_tranche_discount_margin",
+    "structured_credit_tranche_metrics",
+    "structured_credit_tranche_oas",
+    "structured_credit_tranche_scenario_table",
     "validate_instrument_json",
 ]
 
@@ -296,6 +301,215 @@ def list_standard_metrics_grouped() -> dict[str, list[str]]:
     --------
     >>> from finstack_quant.valuations.instruments import list_standard_metrics_grouped
     >>> callable(list_standard_metrics_grouped)
+    True
+    """
+    ...
+
+def structured_credit_tranche_discount_margin(
+    instrument_json: str,
+    tranche_id: str,
+    market: MarketContext,
+    as_of: str,
+    target_pv: float,
+) -> float:
+    """Solve the discount margin that prices a floating-rate tranche at a target PV.
+
+    Returns the margin in decimal (0.015 = 150 bp).
+
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged JSON for a ``StructuredCredit`` deal.
+    tranche_id : str
+        Identifier of the tranche within the deal.
+    market : MarketContext
+        Market context supplying curves and fixings.
+    as_of : str
+        ISO 8601 valuation date.
+    target_pv : float
+        Target present value, in the tranche's own currency.
+
+    Returns
+    -------
+    float
+        Discount margin in decimal (0.015 = 150 bp).
+
+    Raises
+    ------
+    ValueError
+        If the instrument JSON is malformed, the deal fails validation, the
+        tranche id is not part of the deal, or required market data is missing.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_discount_margin
+    >>> callable(structured_credit_tranche_discount_margin)
+    True
+    """
+    ...
+
+def structured_credit_tranche_breakeven_cdr(
+    instrument_json: str,
+    tranche_id: str,
+    market: MarketContext,
+    as_of: str,
+) -> float:
+    """Solve the constant default rate at which a tranche first takes a writedown.
+
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged JSON for a ``StructuredCredit`` deal.
+    tranche_id : str
+        Identifier of the tranche within the deal.
+    market : MarketContext
+        Market context supplying curves and fixings.
+    as_of : str
+        ISO 8601 valuation date.
+
+    Returns
+    -------
+    float
+        Break-even annual CDR in decimal.
+
+    Raises
+    ------
+    ValueError
+        If the instrument JSON is malformed, the deal fails validation, the
+        tranche id is not part of the deal, or required market data is missing.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_breakeven_cdr
+    >>> callable(structured_credit_tranche_breakeven_cdr)
+    True
+    """
+    ...
+
+def structured_credit_tranche_oas(
+    instrument_json: str,
+    tranche_id: str,
+    market_price_pct: float,
+    market: MarketContext,
+    as_of: str,
+    config_json: str | None = None,
+) -> str:
+    """Compute option-adjusted spread for a tranche. Returns JSON ``OasResult``.
+
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged JSON for a ``StructuredCredit`` deal.
+    tranche_id : str
+        Identifier of the tranche within the deal.
+    market_price_pct : float
+        Market price as a percentage of original balance (100.0 = par).
+    market : MarketContext
+        Market context supplying curves and fixings.
+    as_of : str
+        ISO 8601 valuation date.
+    config_json : str or None, optional
+        Serialized ``OasConfig``. All fields are required when supplied.
+
+    Returns
+    -------
+    str
+        JSON-serialized ``OasResult``.
+
+    Raises
+    ------
+    ValueError
+        If the instrument JSON is malformed, the deal fails validation, the
+        tranche id is not part of the deal, or required market data is missing.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_oas
+    >>> callable(structured_credit_tranche_oas)
+    True
+    """
+    ...
+
+def structured_credit_tranche_metrics(
+    instrument_json: str,
+    tranche_id: str,
+    market: MarketContext,
+    as_of: str,
+    market_price_pct: float | None = None,
+) -> str:
+    """Summary risk/pricing metrics for a tranche. Returns JSON ``TrancheMetrics``.
+
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged JSON for a ``StructuredCredit`` deal.
+    tranche_id : str
+        Identifier of the tranche within the deal.
+    market : MarketContext
+        Market context supplying curves and fixings.
+    as_of : str
+        ISO 8601 valuation date.
+    market_price_pct : float or None, optional
+        Market price as a percentage of original balance; the model price is
+        used when omitted.
+
+    Returns
+    -------
+    str
+        JSON-serialized ``TrancheMetrics``.
+
+    Raises
+    ------
+    ValueError
+        If the instrument JSON is malformed, the deal fails validation, the
+        tranche id is not part of the deal, or required market data is missing.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_metrics
+    >>> callable(structured_credit_tranche_metrics)
+    True
+    """
+    ...
+
+def structured_credit_tranche_scenario_table(
+    instrument_json: str,
+    tranche_id: str,
+    market: MarketContext,
+    as_of: str,
+    grid_json: str,
+) -> str:
+    """Price a tranche across a CPR x CDR x severity grid. Returns JSON ``ScenarioTable``.
+
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged JSON for a ``StructuredCredit`` deal.
+    tranche_id : str
+        Identifier of the tranche within the deal.
+    market : MarketContext
+        Market context supplying curves and fixings.
+    as_of : str
+        ISO 8601 valuation date.
+    grid_json : str
+        Serialized ``ScenarioGrid``. Capped at 10,000 cells because each cell
+        reprices the entire deal.
+
+    Returns
+    -------
+    str
+        JSON-serialized ``ScenarioTable``.
+
+    Raises
+    ------
+    ValueError
+        If the instrument JSON is malformed, the deal fails validation, the
+        tranche id is not part of the deal, or required market data is missing.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_scenario_table
+    >>> callable(structured_credit_tranche_scenario_table)
     True
     """
     ...
