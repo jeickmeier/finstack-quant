@@ -4226,7 +4226,11 @@ fn simulate_period(
     } else {
         let metrics = step_down_metrics(state);
         crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_step_down(
-            waterfall, rules, pay_date, &metrics,
+            waterfall,
+            rules,
+            pay_date,
+            &metrics,
+            &state.tranche_balances,
         )
     };
 

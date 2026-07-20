@@ -115,11 +115,12 @@ fn step_down_active(spec: &StepDownSpec, date: Date, metrics: &StepDownMetrics) 
 /// which case it returns a copy with every principal tier switched to pro-rata
 /// allocation, releasing subordination to the junior tranches. While any
 /// trigger is breached the deal reverts to sequential (re-evaluated each period).
-pub(crate) fn apply_step_down<'w>(
+pub(crate) fn apply_step_down<'w, S: std::hash::BuildHasher>(
     base: &'w Waterfall,
     rules: Option<&WaterfallRules>,
     date: Date,
     metrics: &StepDownMetrics,
+    tranche_balances: &HashMap<String, Money, S>,
 ) -> Cow<'w, Waterfall> {
     let Some(sd) = rules.and_then(|r| r.step_down.as_ref()) else {
         return Cow::Borrowed(base);
@@ -131,11 +132,54 @@ pub(crate) fn apply_step_down<'w>(
 
     let mut waterfall = base.clone();
     for tier in &mut waterfall.tiers {
-        if tier.payment_type == PaymentType::Principal {
-            tier.allocation_mode = AllocationMode::ProRata;
+        if tier.payment_type != PaymentType::Principal {
+            continue;
+        }
+        tier.allocation_mode = AllocationMode::ProRata;
+
+        // SC-M16: pro-rata means BY CURRENT BALANCE, not equal shares.
+        //
+        // Flipping the allocation mode without setting weights left
+        // `allocate_pro_rata` falling back to `weight.unwrap_or(1.0)`, i.e. an
+        // equal split across recipients. On a 500M/50M A/B stack receiving 55M
+        // of principal that pays 27.5M/27.5M instead of 50M/5M — the junior
+        // gets 5.5x its entitlement, and the senior is starved, which is the
+        // opposite of what a step-down is meant to control.
+        //
+        // `apply_shifting_interest` already weights by balance; this mirrors
+        // it. A recipient whose tranche has no outstanding balance gets a zero
+        // weight so it is skipped rather than claiming an equal share of the
+        // remaining cash.
+        for recipient in &mut tier.recipients {
+            let balance = tranche_id_of(recipient)
+                .and_then(|id| tranche_balances.get(id))
+                .map_or(0.0, |m| m.amount().max(0.0));
+            recipient.weight = Some(balance);
+        }
+
+        // Degenerate case: every referenced tranche is retired. Leave the tier
+        // at equal weights rather than emitting an all-zero weight vector,
+        // which `validate_tiers` rejects as an invalid pro-rata tier.
+        if tier
+            .recipients
+            .iter()
+            .all(|r| r.weight.unwrap_or(0.0) <= 0.0)
+        {
+            for recipient in &mut tier.recipients {
+                recipient.weight = None;
+            }
         }
     }
     Cow::Owned(waterfall)
+}
+
+/// Tranche id a principal recipient pays down, when it is a tranche payment.
+fn tranche_id_of(recipient: &Recipient) -> Option<&str> {
+    match &recipient.calculation {
+        PaymentCalculation::TranchePrincipal { tranche_id, .. }
+        | PaymentCalculation::TrancheInterest { tranche_id, .. } => Some(tranche_id.as_str()),
+        _ => None,
+    }
 }
 
 /// Apply per-period shifting-interest weights to the principal tiers.
@@ -273,5 +317,143 @@ fn principal_tranche_id(recipient: &Recipient) -> Option<&str> {
     match &recipient.calculation {
         PaymentCalculation::TranchePrincipal { tranche_id, .. } => Some(tranche_id.as_str()),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod step_down_weight_tests {
+    use super::*;
+    use crate::instruments::fixed_income::structured_credit::types::{StepDownSpec, WaterfallTier};
+    use finstack_quant_core::currency::Currency;
+    use time::Month;
+
+    fn principal_tier() -> WaterfallTier {
+        WaterfallTier::new("principal", 1, PaymentType::Principal)
+            .allocation_mode(AllocationMode::Sequential)
+            .add_recipient(Recipient::tranche_principal("A_principal", "A", None))
+            .add_recipient(Recipient::tranche_principal("B_principal", "B", None))
+    }
+
+    /// Metrics that pass every trigger, so the date alone drives activation.
+    fn healthy_metrics() -> StepDownMetrics {
+        StepDownMetrics {
+            cumulative_loss_fraction: 0.0,
+            oc_ratio: 2.0,
+            credit_enhancement: 0.5,
+        }
+    }
+
+    fn balances(a: f64, b: f64) -> HashMap<String, Money> {
+        let mut m = HashMap::new();
+        m.insert("A".to_string(), Money::new(a, Currency::USD));
+        m.insert("B".to_string(), Money::new(b, Currency::USD));
+        m
+    }
+
+    fn stepped_down_rules(date: Date) -> WaterfallRules {
+        WaterfallRules {
+            step_down: Some(StepDownSpec {
+                step_down_date: date,
+                triggers: Vec::new(),
+            }),
+            ..Default::default()
+        }
+    }
+
+    /// SC-M16 — an active step-down must allocate principal pro-rata BY
+    /// CURRENT BALANCE, not in equal shares.
+    ///
+    /// Flipping `allocation_mode` to `ProRata` without setting weights left
+    /// `allocate_pro_rata` falling back to `weight.unwrap_or(1.0)`. On a
+    /// 500M/50M A/B stack that splits principal 50/50 instead of 10:1 — the
+    /// junior receives 5.5x its entitlement while the senior is starved, the
+    /// opposite of what a step-down controls.
+    #[test]
+    fn step_down_weights_principal_by_current_balance() {
+        let date = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+        let base = Waterfall::new(Currency::USD).add_tier(principal_tier());
+        let rules = stepped_down_rules(date);
+        let metrics = healthy_metrics();
+
+        let resolved = apply_step_down(&base, Some(&rules), date, &metrics, &balances(500.0, 50.0));
+
+        let tier = resolved
+            .tiers
+            .iter()
+            .find(|t| t.payment_type == PaymentType::Principal)
+            .expect("principal tier");
+        assert_eq!(tier.allocation_mode, AllocationMode::ProRata);
+
+        let weight = |id: &str| {
+            tier.recipients
+                .iter()
+                .find(|r| r.id == id)
+                .and_then(|r| r.weight)
+                .unwrap_or(f64::NAN)
+        };
+        assert!(
+            (weight("A_principal") - 500.0).abs() < 1e-9,
+            "senior weight must be its current balance, got {}",
+            weight("A_principal")
+        );
+        assert!(
+            (weight("B_principal") - 50.0).abs() < 1e-9,
+            "junior weight must be its current balance, got {}",
+            weight("B_principal")
+        );
+        assert!(
+            weight("A_principal") > weight("B_principal") * 9.0,
+            "a 10:1 balance ratio must produce a ~10:1 weight ratio, not the \
+             1:1 the pre-fix equal-share fallback gave (SC-M16)"
+        );
+    }
+
+    /// SC-M16 — when every referenced tranche is retired, fall back to equal
+    /// weights rather than emitting an all-zero vector, which `validate_tiers`
+    /// rejects as an invalid pro-rata tier.
+    #[test]
+    fn step_down_with_all_tranches_retired_leaves_weights_unset() {
+        let date = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+        let base = Waterfall::new(Currency::USD).add_tier(principal_tier());
+        let rules = stepped_down_rules(date);
+
+        let resolved = apply_step_down(
+            &base,
+            Some(&rules),
+            date,
+            &healthy_metrics(),
+            &balances(0.0, 0.0),
+        );
+
+        let tier = resolved
+            .tiers
+            .iter()
+            .find(|t| t.payment_type == PaymentType::Principal)
+            .expect("principal tier");
+        assert!(
+            tier.recipients.iter().all(|r| r.weight.is_none()),
+            "a fully-retired structure must not emit an all-zero weight vector"
+        );
+    }
+
+    /// An inactive step-down must be exact identity — no clone, no weights.
+    #[test]
+    fn inactive_step_down_is_identity() {
+        let future = Date::from_calendar_date(2030, Month::January, 1).expect("date");
+        let now = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+        let base = Waterfall::new(Currency::USD).add_tier(principal_tier());
+        let rules = stepped_down_rules(future);
+
+        let resolved = apply_step_down(
+            &base,
+            Some(&rules),
+            now,
+            &healthy_metrics(),
+            &balances(500.0, 50.0),
+        );
+        assert!(
+            matches!(resolved, Cow::Borrowed(_)),
+            "an inactive step-down must borrow the base waterfall unchanged"
+        );
     }
 }
