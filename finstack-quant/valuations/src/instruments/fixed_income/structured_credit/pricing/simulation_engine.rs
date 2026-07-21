@@ -1659,11 +1659,13 @@ mod tests {
             interest_flows: Vec::new(),
             principal_flows: Vec::new(),
             pik_flows: Vec::new(),
+            deferred_flows: Vec::new(),
             writedown_flows: Vec::new(),
             final_balance: Money::new(0.0, currency),
             total_interest: Money::new(0.0, currency),
             total_principal: Money::new(0.0, currency),
             total_pik: Money::new(0.0, currency),
+            total_deferred: Money::new(0.0, currency),
             total_writedown: Money::new(0.0, currency),
         }
     }
@@ -2643,12 +2645,14 @@ mod tests {
         )
         .expect("simulation");
 
-        let total_pik: f64 = results.values().map(|tc| tc.total_pik.amount()).sum();
+        // SC-m11: the tranche is NOT pik_enabled, so its shortfalls land in
+        // `total_deferred`. Reading `total_pik` here would pass vacuously.
+        let total_deferred: f64 = results.values().map(|tc| tc.total_deferred.amount()).sum();
         assert!(
-            total_pik < 1.0,
+            total_deferred < 1.0,
             "6% collateral against a 2% coupon leaves ample spread for both the \
              fee tier and note interest, so the notes must not defer. Deferred \
-             {total_pik:.2} means the capture is skimming cash fees need (N1)."
+             {total_deferred:.2} means the capture is skimming cash fees need (N1)."
         );
     }
 
@@ -3780,11 +3784,13 @@ impl<'a> SimulationState<'a> {
                         interest_flows: Vec::new(),
                         principal_flows: Vec::new(),
                         pik_flows: Vec::new(),
+                        deferred_flows: Vec::new(),
                         writedown_flows: Vec::new(),
                         final_balance: t.current_balance,
                         total_interest: Money::new(0.0, base_ccy),
                         total_principal: Money::new(0.0, base_ccy),
                         total_pik: Money::new(0.0, base_ccy),
+                        total_deferred: Money::new(0.0, base_ccy),
                         total_writedown: Money::new(0.0, base_ccy),
                     },
                 )
@@ -4793,10 +4799,22 @@ fn simulate_period(
                 res.principal_flows.push((pay_date, principal_payment));
                 res.total_principal = res.total_principal.checked_add(principal_payment)?;
             }
-            // Record PIK (interest shortfall deferred to future periods)
+            // SC-m11: PIK and DEFERRED interest are different things and are
+            // now recorded separately. PIK capitalizes the shortfall into the
+            // tranche balance (it accrues thereafter and enlarges the OC
+            // denominator); a non-PIK deferral is a separate senior claim that
+            // leaves notional untouched. Booking both under `pik_flows` made
+            // `total_pik` unusable as a measure of capitalized balance.
             if current_interest_shortfall.amount() > 0.0 {
-                res.pik_flows.push((pay_date, current_interest_shortfall));
-                res.total_pik = res.total_pik.checked_add(current_interest_shortfall)?;
+                if tranche.pik_enabled {
+                    res.pik_flows.push((pay_date, current_interest_shortfall));
+                    res.total_pik = res.total_pik.checked_add(current_interest_shortfall)?;
+                } else {
+                    res.deferred_flows
+                        .push((pay_date, current_interest_shortfall));
+                    res.total_deferred =
+                        res.total_deferred.checked_add(current_interest_shortfall)?;
+                }
             }
         }
 

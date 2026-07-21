@@ -174,11 +174,13 @@ mod tests {
             ],
             principal_flows: vec![],
             pik_flows: vec![],
+            deferred_flows: Vec::new(),
             writedown_flows: vec![],
             final_balance: Money::new(0.0, Currency::USD),
             total_interest: Money::new(30.0, Currency::USD),
             total_principal: Money::new(0.0, Currency::USD),
             total_pik: Money::new(0.0, Currency::USD),
+            total_deferred: Money::new(0.0, Currency::USD),
             total_writedown: Money::new(0.0, Currency::USD),
         });
         ctx.day_count = Some(DayCount::Act360);

@@ -276,11 +276,13 @@ mod tests {
             interest_flows: Vec::new(),
             principal_flows: principal_flows.clone(),
             pik_flows: Vec::new(),
+            deferred_flows: Vec::new(),
             writedown_flows: Vec::new(),
             final_balance: zero,
             total_interest: zero,
             total_principal: Money::new(100.0, Currency::USD),
             total_pik: zero,
+            total_deferred: zero,
             total_writedown: zero,
         };
         let schedule = CashFlowSchedule::from_parts(

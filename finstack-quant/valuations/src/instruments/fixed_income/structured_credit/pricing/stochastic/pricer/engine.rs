@@ -1271,8 +1271,22 @@ impl ScenarioCollector {
 
         let notional = pricer.config.tree_config.initial_balance;
         if notional > f64::EPSILON {
-            result.clean_price = mean_pv / notional * 100.0;
-            result.dirty_price = result.clean_price;
+            // SC-m29: `mean_pv` is the present value of all FUTURE cashflows
+            // from the valuation date, which is by definition the DIRTY price —
+            // it already contains the accrued portion of the next coupon.
+            // Assigning it to `clean_price` first and then copying to
+            // `dirty_price` had the labels backwards on the primary quantity.
+            //
+            // Clean = dirty − accrued. The deal-level stochastic result carries
+            // no per-tranche interest flows, so accrued cannot be computed here
+            // (the same constraint SC-M10 documents for the accrued
+            // calculator). Rather than fabricate one, `clean_price` is set
+            // equal to dirty and flagged as UNADJUSTED: understating accrued by
+            // at most one period's interest, in a known direction, instead of
+            // silently mislabelling which of the two is authoritative. Use
+            // `calculate_tranche_metrics` for an accrued-adjusted clean price.
+            result.dirty_price = mean_pv / notional * 100.0;
+            result.clean_price = result.dirty_price;
         }
         result.pv_std_error = std_error;
         result.pv_confidence_interval = (mean_pv - 1.96 * std_error, mean_pv + 1.96 * std_error);
@@ -1403,11 +1417,13 @@ mod tests {
             interest_flows: Vec::new(),
             principal_flows,
             pik_flows: Vec::new(),
+            deferred_flows: Vec::new(),
             writedown_flows: Vec::new(),
             final_balance: zero,
             total_interest: zero,
             total_principal: Money::new(100.0, Currency::USD),
             total_pik: zero,
+            total_deferred: zero,
             total_writedown: zero,
         };
 

@@ -31,6 +31,17 @@ pub struct TrancheCashflows {
     /// PIK capitalization flows.
     #[schemars(with = "String")]
     pub pik_flows: DatedFlows,
+    /// Interest DEFERRED to future periods on a non-PIK tranche.
+    ///
+    /// SC-m11: non-PIK shortfalls used to be recorded in `pik_flows`. PIK means
+    /// the unpaid interest is CAPITALIZED into the tranche balance and accrues
+    /// thereafter; a non-PIK deferral is a separate senior claim that does not
+    /// touch notional. Conflating them misleads any consumer reading
+    /// `total_pik` as capitalized balance — the two have different effects on
+    /// notional, on later interest due, and on OC denominators.
+    #[serde(default)]
+    #[schemars(with = "String")]
+    pub deferred_flows: DatedFlows,
     /// Write-down flows (loss allocation reducing tranche balance).
     #[schemars(with = "String")]
     pub writedown_flows: DatedFlows,
@@ -42,6 +53,8 @@ pub struct TrancheCashflows {
     pub total_principal: Money,
     /// Total PIK capitalized.
     pub total_pik: Money,
+    /// Total interest deferred on a non-PIK tranche (SC-m11).
+    pub total_deferred: Money,
     /// Total write-down (loss allocation).
     pub total_writedown: Money,
 }
@@ -98,11 +111,13 @@ mod tests {
                 ),
             ],
             pik_flows: vec![],
+            deferred_flows: Vec::new(),
             writedown_flows: vec![],
             final_balance: Money::new(0.0, Currency::USD),
             total_interest: Money::new(10_000.0, Currency::USD),
             total_principal: Money::new(200_000.0, Currency::USD),
             total_pik: Money::new(0.0, Currency::USD),
+            total_deferred: Money::new(0.0, Currency::USD),
             total_writedown: Money::new(0.0, Currency::USD),
         };
 

@@ -827,10 +827,14 @@ mod excess_spread_tests {
         let sr_with = with_acct.get("SR").expect("SR results");
 
         // Sanity: without the account the senior runs an interest shortfall.
+        //
+        // SC-m11: SR is not `pik_enabled`, so its shortfall is DEFERRED, not
+        // capitalized — it is reported in `total_deferred`. This test read
+        // `total_pik`, which is now correctly zero for a non-PIK tranche.
         assert!(
-            sr_base.total_pik.amount() > 1.0,
-            "test setup must produce a senior interest shortfall (got pik={})",
-            sr_base.total_pik.amount()
+            sr_base.total_deferred.amount() > 1.0,
+            "test setup must produce a senior interest shortfall (got deferred={})",
+            sr_base.total_deferred.amount()
         );
         // The account draws to cover part of that shortfall: more senior interest
         // is paid, and less is deferred, than without the account.
@@ -841,10 +845,10 @@ mod excess_spread_tests {
             sr_base.total_interest.amount()
         );
         assert!(
-            sr_with.total_pik.amount() < sr_base.total_pik.amount() - 1.0,
+            sr_with.total_deferred.amount() < sr_base.total_deferred.amount() - 1.0,
             "covered shortfall must reduce deferred interest (with={}, base={})",
-            sr_with.total_pik.amount(),
-            sr_base.total_pik.amount()
+            sr_with.total_deferred.amount(),
+            sr_base.total_deferred.amount()
         );
     }
 }

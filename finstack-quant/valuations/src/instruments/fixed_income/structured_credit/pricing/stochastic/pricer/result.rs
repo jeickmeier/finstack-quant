@@ -8,10 +8,22 @@ pub struct StochasticPricingResult {
     /// Net present value of the deal
     pub npv: Money,
 
-    /// Clean price (as percentage of notional)
+    /// Clean price (percentage of notional), UNADJUSTED for accrued interest.
+    ///
+    /// SC-m29: this equals [`Self::dirty_price`]. The deal-level stochastic
+    /// result carries no per-tranche interest flows, so accrued cannot be
+    /// computed here (the same constraint documented on the accrued
+    /// calculator). It is reported unadjusted rather than fabricated: the
+    /// error is at most one period's accrued interest, in a known direction.
+    /// Use `calculate_tranche_metrics` when an accrued-adjusted clean price is
+    /// required.
     pub clean_price: f64,
 
-    /// Dirty price (including accrued interest)
+    /// Dirty price (percentage of notional), including accrued interest.
+    ///
+    /// This is the authoritative price: it is the present value of all future
+    /// cashflows from the valuation date, which by definition contains the
+    /// accrued portion of the next coupon.
     pub dirty_price: f64,
 
     /// Expected loss (probability-weighted average loss)
