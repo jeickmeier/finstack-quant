@@ -250,12 +250,12 @@
       "description": "Stochastic pricing result for a structured credit deal.",
       "properties": {
         "clean_price": {
-          "description": "Clean price (as percentage of notional)",
+          "description": "Clean price (percentage of notional), UNADJUSTED for accrued interest.\n\nSC-m29: this equals [`Self::dirty_price`]. The deal-level stochastic\nresult carries no per-tranche interest flows, so accrued cannot be\ncomputed here (the same constraint documented on the accrued\ncalculator). It is reported unadjusted rather than fabricated: the\nerror is at most one period's accrued interest, in a known direction.\nUse `calculate_tranche_metrics` when an accrued-adjusted clean price is\nrequired.",
           "format": "double",
           "type": "number"
         },
         "dirty_price": {
-          "description": "Dirty price (including accrued interest)",
+          "description": "Dirty price (percentage of notional), including accrued interest.\n\nThis is the authoritative price: it is the present value of all future\ncashflows from the valuation date, which by definition contains the\naccrued portion of the next coupon.",
           "format": "double",
           "type": "number"
         },

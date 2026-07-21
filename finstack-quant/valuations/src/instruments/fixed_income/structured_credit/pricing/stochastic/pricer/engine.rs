@@ -23,7 +23,6 @@ use finstack_quant_core::Result;
 use finstack_quant_monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_monte_carlo::traits::RandomStream;
 use rayon::prelude::*;
-use std::cmp::Ordering;
 use std::sync::Arc;
 
 /// Seed salt for the per-name idiosyncratic-draw RNG.
@@ -35,6 +34,14 @@ use std::sync::Arc;
 /// two never collide regardless of path count or pricing mode. The salt value
 /// itself is arbitrary; only its disjointness from `0` matters.
 const PER_NAME_SEED_SALT: u64 = 0x5350_4552_4E41_4D45; // "SPERNAME"
+
+/// Salt for the INDEPENDENT component of the prepayment factor (SC-M23).
+///
+/// XOR-salting keeps this stream disjoint from the credit-factor,
+/// per-name and tree-tail streams, so adding it leaves every existing draw
+/// sequence bit-identical — the credit factors, and therefore all existing
+/// default results, are unchanged.
+const PREPAY_FACTOR_SEED_SALT: u64 = 0x5052_4550_4159_5A32; // "PREPAYZ2"
 
 /// Seed salt for the tree-mode tail-month RNG.
 ///
@@ -270,7 +277,8 @@ impl StochasticPricer {
             .into_par_iter()
             .enumerate()
             .map(|(path_index, factors)| {
-                let shocks = self.path_shocks_from_factors(instrument, &factors)?;
+                let shocks =
+                    self.path_shocks_from_factors(instrument, &factors, path_index as u64)?;
                 let per_name_engine = per_name_simulator
                     .as_ref()
                     .map(|sim| self.per_name_engine(sim, path_index, antithetic));
@@ -483,7 +491,7 @@ impl StochasticPricer {
     ) -> Result<Vec<PeriodPoolShock>> {
         let month_count = self.month_count(instrument);
         let factors = self.tree_path_factors(path_index, path_count, branch_count, month_count);
-        self.path_shocks_from_factors(instrument, &factors)
+        self.path_shocks_from_factors(instrument, &factors, path_index as u64)
     }
 
     fn tree_path_factors(
@@ -571,6 +579,18 @@ impl StochasticPricer {
         }
     }
 
+    /// Configured prepay/default factor correlation, when a two-factor spec is
+    /// in force (SC-M23). `None` keeps the single-factor behaviour.
+    fn factor_correlation(&self) -> Option<f64> {
+        match &self.config.tree_config.factor_spec {
+            LatentFactorSpec::TwoFactor { correlation, .. } => {
+                let rho = correlation.clamp(-1.0, 1.0);
+                (rho.abs() > f64::EPSILON).then_some(rho)
+            }
+            _ => None,
+        }
+    }
+
     /// Monthly factor autocorrelation `φ = e^{−κ/12}`.
     fn factor_phi(&self) -> f64 {
         (-self.factor_mean_reversion() / 12.0).exp()
@@ -644,12 +664,60 @@ impl StochasticPricer {
         &self,
         instrument: &StructuredCredit,
         factors: &[f64],
+        path_index: u64,
     ) -> Result<Vec<PeriodPoolShock>> {
         // AR(1)/OU persistence for MC, tree, and hybrid paths: monthly draws
         // are innovations. Applied unconditionally — persistence is a property
         // of the factor, not of which channels are simulated.
         let evolved_storage = Self::evolved_factors(factors, self.factor_mean_reversion());
-        let factors: &[f64] = &evolved_storage;
+        let credit_factors: &[f64] = &evolved_storage;
+
+        // SC-M23: a SECOND factor for prepayment, correlated with the credit
+        // factor at the configured level.
+        //
+        // `monthly_shock` previously built `let factors = [factor]` — ONE
+        // scalar handed to both `conditional_smm` and `conditional_mdr` — so
+        // prepayment and default were driven by the same realization and their
+        // implied correlation was +1 (or -1 through a negative loading),
+        // regardless of the -0.30 configured in the shipped RMBS/CLO
+        // calibrations. `LatentFactorSpec::TwoFactor`'s correlation was read
+        // only by `branching_variance_proxy` for branch counting, so a user
+        // calibrating a two-factor model got a single-factor one.
+        //
+        // Construction is the standard two-factor decomposition
+        //     Z_prepay = rho * Z_credit + sqrt(1 - rho^2) * Z_indep
+        // which gives `Z_prepay` a unit-variance standard-normal marginal (so
+        // the prepayment model's calibration is untouched) and exactly `rho`
+        // correlation with the credit factor.
+        //
+        // `Z_indep` comes from a SALTED stream keyed by path, so every existing
+        // draw sequence is bit-identical and only the prepayment channel moves.
+        // The transform is linear in both inputs, so antithetic negation still
+        // commutes: negating the raw draws negates `Z_prepay` too, preserving
+        // the pairing.
+        let prepay_storage;
+        let prepay_factors: &[f64] = match self.factor_correlation() {
+            Some(rho) => {
+                let mut rng = PhiloxRng::new(self.config.seed ^ PREPAY_FACTOR_SEED_SALT)
+                    .substream(path_index);
+                let independent: Vec<f64> = (0..credit_factors.len())
+                    .map(|_| rng.next_std_normal())
+                    .collect();
+                let evolved_independent =
+                    Self::evolved_factors(&independent, self.factor_mean_reversion());
+                let scale = (1.0 - rho * rho).max(0.0).sqrt();
+                prepay_storage = credit_factors
+                    .iter()
+                    .zip(evolved_independent.iter())
+                    .map(|(zc, zi)| rho * zc + scale * zi)
+                    .collect::<Vec<f64>>();
+                &prepay_storage
+            }
+            // No configured correlation: prepayment shares the credit factor,
+            // preserving the previous single-factor behaviour exactly.
+            None => credit_factors,
+        };
+        let factors: &[f64] = credit_factors;
         let months_per_period = instrument.frequency.months().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "Structured credit stochastic pricing requires month-based payment frequencies"
@@ -683,7 +751,19 @@ impl StochasticPricer {
             } else {
                 &[][..]
             };
-            let mut shock = self.aggregate_monthly_shocks(start as u32, month_slice, &mut burnout);
+            // SC-M23: prepayment reads its OWN factor slice, correlated with
+            // the credit one at the configured rho.
+            let prepay_slice = if start < end {
+                &prepay_factors[start..end]
+            } else {
+                &[][..]
+            };
+            let mut shock = self.aggregate_monthly_shocks(
+                start as u32,
+                month_slice,
+                prepay_slice,
+                &mut burnout,
+            );
             shock.per_name =
                 self.copula_period_input(copula_model.as_deref(), start as u32, month_slice);
             shocks.push(shock);
@@ -748,19 +828,22 @@ impl StochasticPricer {
         &self,
         start_month: u32,
         factors: &[f64],
+        prepay_factors: &[f64],
         burnout: &mut f64,
     ) -> PeriodPoolShock {
         if factors.is_empty() {
-            return self.monthly_shock(start_month.saturating_add(1), 0.0, burnout);
+            return self.monthly_shock(start_month.saturating_add(1), 0.0, 0.0, burnout);
         }
 
         let mut prepay_survival = 1.0;
         let mut default_survival = 1.0;
         let mut recovery_sum = 0.0;
         for (offset, factor) in factors.iter().enumerate() {
+            let prepay_factor = prepay_factors.get(offset).copied().unwrap_or(*factor);
             let shock = self.monthly_shock(
                 start_month.saturating_add(offset as u32 + 1),
                 *factor,
+                prepay_factor,
                 burnout,
             );
             prepay_survival *= 1.0 - shock.smm;
@@ -776,18 +859,33 @@ impl StochasticPricer {
         )
     }
 
-    fn monthly_shock(&self, month_offset: u32, z: f64, burnout: &mut f64) -> PeriodPoolShock {
-        let factor = if self.has_stochastic_rates() { z } else { 0.0 };
+    fn monthly_shock(
+        &self,
+        month_offset: u32,
+        z: f64,
+        z_prepay: f64,
+        burnout: &mut f64,
+    ) -> PeriodPoolShock {
+        let stochastic = self.has_stochastic_rates();
+        let factor = if stochastic { z } else { 0.0 };
+        // SC-M23: prepayment reads its own factor. With no configured
+        // correlation the caller passes the credit factor through, so this is
+        // exact identity with the previous single-factor behaviour.
+        let prepay_factor = if stochastic { z_prepay } else { 0.0 };
         let seasoning = self
             .config
             .tree_config
             .initial_seasoning
             .saturating_add(month_offset);
-        let factors = [factor];
+        let credit_factors = [factor];
+        let prepay_factors = [prepay_factor];
 
         PeriodPoolShock::pool_wide(
-            self.conditional_smm(seasoning, &factors, burnout),
-            self.conditional_mdr(seasoning, &factors),
+            self.conditional_smm(seasoning, &prepay_factors, burnout),
+            self.conditional_mdr(seasoning, &credit_factors),
+            // Recovery is a CREDIT quantity and stays on the credit factor, so
+            // defaults and recoveries continue to co-move as the sign
+            // convention requires.
             self.recovery_rate(factor),
         )
     }
@@ -1173,8 +1271,22 @@ impl ScenarioCollector {
 
         let notional = pricer.config.tree_config.initial_balance;
         if notional > f64::EPSILON {
-            result.clean_price = mean_pv / notional * 100.0;
-            result.dirty_price = result.clean_price;
+            // SC-m29: `mean_pv` is the present value of all FUTURE cashflows
+            // from the valuation date, which is by definition the DIRTY price —
+            // it already contains the accrued portion of the next coupon.
+            // Assigning it to `clean_price` first and then copying to
+            // `dirty_price` had the labels backwards on the primary quantity.
+            //
+            // Clean = dirty − accrued. The deal-level stochastic result carries
+            // no per-tranche interest flows, so accrued cannot be computed here
+            // (the same constraint SC-M10 documents for the accrued
+            // calculator). Rather than fabricate one, `clean_price` is set
+            // equal to dirty and flagged as UNADJUSTED: understating accrued by
+            // at most one period's interest, in a known direction, instead of
+            // silently mislabelling which of the two is authoritative. Use
+            // `calculate_tranche_metrics` for an accrued-adjusted clean price.
+            result.dirty_price = mean_pv / notional * 100.0;
+            result.clean_price = result.dirty_price;
         }
         result.pv_std_error = std_error;
         result.pv_confidence_interval = (mean_pv - 1.96 * std_error, mean_pv + 1.96 * std_error);
@@ -1236,7 +1348,21 @@ fn expected_shortfall(losses: &mut [f64], confidence: f64) -> f64 {
     if losses.is_empty() {
         return 0.0;
     }
-    losses.sort_by(|a, b| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+    // SC-m06: `total_cmp`, not `partial_cmp(..).unwrap_or(Equal)`.
+    //
+    // The old comparator is not a total order when a NaN is present — NaN
+    // compares Equal to everything while the finite values retain their own
+    // ordering — which violates `sort_by`'s contract. Since Rust 1.81 the
+    // standard sort detects that and PANICS rather than producing garbage.
+    // A NaN can reach here through `convert_clamped` (utils/rates.rs), so this
+    // was a live panic path in a pricing loop, not a theoretical one.
+    //
+    // `total_cmp` is a genuine total order over all f64 including NaN, so the
+    // sort is always well-defined. NaN sorts to the front under the reversed
+    // comparator, which is the conservative placement for a tail-loss measure:
+    // a corrupted path shows up as an extreme loss rather than being silently
+    // averaged into the middle of the distribution.
+    losses.sort_by(|a, b| b.total_cmp(a));
     let tail = (1.0 - confidence).clamp(0.0, 1.0);
     let tail_count = (tail * losses.len() as f64).ceil().max(1.0) as usize;
     let tail_count = tail_count.min(losses.len());
@@ -1291,11 +1417,13 @@ mod tests {
             interest_flows: Vec::new(),
             principal_flows,
             pik_flows: Vec::new(),
+            deferred_flows: Vec::new(),
             writedown_flows: Vec::new(),
             final_balance: zero,
             total_interest: zero,
             total_principal: Money::new(100.0, Currency::USD),
             total_pik: zero,
+            total_deferred: zero,
             total_writedown: zero,
         };
 
@@ -1631,7 +1759,7 @@ mod tests {
             let zs = [-2.0, -1.0, 0.0, 1.0, 2.0];
             let shocks: Vec<_> = zs
                 .iter()
-                .map(|&z| pricer.monthly_shock(36, z, &mut 1.0))
+                .map(|&z| pricer.monthly_shock(36, z, z, &mut 1.0))
                 .collect();
             let mdrs: Vec<f64> = shocks.iter().map(|s| s.mdr).collect();
             let recoveries: Vec<f64> = shocks.iter().map(|s| s.recovery_rate).collect();
@@ -1669,6 +1797,43 @@ mod tests {
 /// fast-path for genuinely granular pools.
 #[cfg(test)]
 mod per_name_copula_tests {
+    /// SC-m06 — the expected-shortfall sort must use a TOTAL order.
+    ///
+    /// `partial_cmp(..).unwrap_or(Equal)` is not a total order when a NaN is
+    /// present: NaN compares Equal to everything while the finite values keep
+    /// their own ordering. Since Rust 1.81 the standard sort detects that and
+    /// PANICS. A NaN can reach here via `convert_clamped`, so this was a live
+    /// panic path in a pricing loop.
+    ///
+    /// This test does NOT discriminate: the standard sort's total-order
+    /// violation check is a heuristic that fires on some orderings and not
+    /// others, so the old comparator happens to survive this input. The test
+    /// pins that ES tolerates NaN at all; the correctness argument for
+    /// `total_cmp` is that it is a genuine total order, not that this input
+    /// reproduces the panic.
+    #[test]
+    fn expected_shortfall_survives_a_nan_loss() {
+        let mut losses = vec![10.0, f64::NAN, 5.0, 100.0, 1.0, f64::NAN, 50.0];
+        // Must not panic.
+        let es = expected_shortfall(&mut losses, 0.95);
+        assert!(
+            es.is_nan() || es.is_finite(),
+            "expected shortfall must return a value rather than panicking, got {es}"
+        );
+    }
+
+    /// SC-m06 — with clean input the measure is unchanged.
+    #[test]
+    fn expected_shortfall_is_unchanged_for_finite_losses() {
+        let mut losses = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+        // 95% confidence over 10 paths -> ceil(0.5) = 1 worst loss.
+        let es = expected_shortfall(&mut losses, 0.95);
+        assert!(
+            (es - 10.0).abs() < 1e-12,
+            "the 95% ES over 10 sorted losses is the single worst (10.0), got {es}"
+        );
+    }
+
     use super::*;
     use crate::instruments::fixed_income::structured_credit::pricing::stochastic::default::PoolGranularity;
     use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::{
@@ -2078,7 +2243,7 @@ mod per_name_copula_tests {
         // month-1-only systematic factor would miss that stress entirely.
         let factors = vec![0.10_f64, -2.0, -1.5, 0.3, 0.4, 0.5];
         let shocks = pricer
-            .path_shocks_from_factors(&deal, &factors)
+            .path_shocks_from_factors(&deal, &factors, 0)
             .expect("path shocks");
 
         assert!(!shocks.is_empty(), "must produce at least one period shock");
@@ -2247,6 +2412,116 @@ mod per_name_copula_tests {
         }
     }
 
+    /// SC-M23 — prepayment and default must be driven by SEPARATE factors
+    /// correlated at the configured level.
+    ///
+    /// `monthly_shock` built `let factors = [factor]` — one scalar handed to
+    /// both `conditional_smm` and `conditional_mdr` — so the implied
+    /// prepay/default correlation was +/-1 regardless of the -0.30 configured
+    /// in the shipped RMBS/CLO calibrations. `TwoFactor.correlation` was read
+    /// only by `branching_variance_proxy` for branch counting, so a user
+    /// calibrating a two-factor model silently got a single-factor one.
+    ///
+    /// The correlation is measured ACROSS PATHS, not across months. Under the
+    /// canonical single-draw copula (SC-C05: kappa = 0 is a random walk) each
+    /// path's factor is constant over the horizon, so a time-series
+    /// correlation is degenerate — any two constant series correlate at 1.
+    /// Cross-sectional is also the quantity that matters: it is the dependence
+    /// between the two channels' realizations.
+    #[test]
+    fn prepay_factor_is_correlated_not_identical_to_the_credit_factor() {
+        const RHO: f64 = -0.30;
+        const PATHS: usize = 20_000;
+
+        let mut cfg = copula_config(0.06, 0.20, 12, PoolGranularity::PerName, 16);
+        cfg.tree_config.factor_spec = LatentFactorSpec::two_factor(0.20, 0.25, RHO);
+        let pricer = StochasticPricer::new(cfg);
+
+        let rho = pricer
+            .factor_correlation()
+            .expect("a two-factor spec must expose its correlation");
+        assert!(
+            (rho - RHO).abs() < 1e-12,
+            "the configured correlation must reach the engine, got {rho}"
+        );
+        let scale = (1.0 - rho * rho).sqrt();
+
+        // Reconstruct each path's period-0 credit and prepay factor exactly as
+        // the engine builds them.
+        let (mut sum_c, mut sum_p, mut sum_cc, mut sum_pp, mut sum_cp) =
+            (0.0_f64, 0.0_f64, 0.0_f64, 0.0_f64, 0.0_f64);
+        for path in 0..PATHS as u64 {
+            let mut credit_rng = PhiloxRng::new(pricer.config.seed).substream(path);
+            let credit = credit_rng.next_std_normal();
+
+            let mut indep_rng =
+                PhiloxRng::new(pricer.config.seed ^ PREPAY_FACTOR_SEED_SALT).substream(path);
+            let indep = indep_rng.next_std_normal();
+
+            let prepay = rho * credit + scale * indep;
+
+            sum_c += credit;
+            sum_p += prepay;
+            sum_cc += credit * credit;
+            sum_pp += prepay * prepay;
+            sum_cp += credit * prepay;
+        }
+
+        let n = PATHS as f64;
+        let mean_c = sum_c / n;
+        let mean_p = sum_p / n;
+        let var_c = sum_cc / n - mean_c * mean_c;
+        let var_p = sum_pp / n - mean_p * mean_p;
+        let cov = sum_cp / n - mean_c * mean_p;
+        let realized = cov / (var_c.sqrt() * var_p.sqrt());
+
+        assert!(
+            (realized - RHO).abs() < 0.02,
+            "realized prepay/default factor correlation {realized:.4} must be \
+             near the configured {RHO}. A value near +/-1 means both channels \
+             still share one factor (SC-M23)."
+        );
+        assert!(
+            (var_p - 1.0).abs() < 0.05,
+            "the prepay factor must keep a unit-variance marginal so the \
+             prepayment model's calibration is untouched, got {var_p:.4}"
+        );
+
+        // The formula above is only meaningful if the ENGINE actually consumes
+        // the second factor. Same deal, same seed, same credit factors — only
+        // the factor spec differs, so any difference in realized prepayment
+        // proves the prepay channel is reading its own series.
+        let deal = clo_deal(40);
+        let smm_for = |spec: LatentFactorSpec| -> f64 {
+            let mut cfg = copula_config(0.06, 0.20, 24, PoolGranularity::PerName, 16);
+            cfg.tree_config.factor_spec = spec;
+            // A STOCHASTIC prepay model, or the factor is ignored entirely and
+            // the comparison is vacuous.
+            cfg.tree_config.prepay_spec = StochasticPrepaySpec::rmbs_agency(0.06);
+            let pricer = StochasticPricer::new(cfg);
+            let factors: Vec<f64> = (0..24).map(|m| ((m as f64) * 0.37).sin()).collect();
+            pricer
+                .path_shocks_from_factors(&deal, &factors, 0)
+                .expect("path shocks")
+                .iter()
+                .map(|s| s.smm)
+                .sum()
+        };
+
+        let two_factor = smm_for(LatentFactorSpec::two_factor(0.20, 0.25, RHO));
+        let single_factor = smm_for(LatentFactorSpec::SingleFactor {
+            volatility: 1.0,
+            mean_reversion: 0.0,
+        });
+        assert!(
+            (two_factor - single_factor).abs() > 1e-9,
+            "a two-factor spec must produce different prepayment from a \
+             single-factor one on identical credit factors: {two_factor} vs \
+             {single_factor}. Equal values mean the engine is still handing one \
+             scalar to both channels (SC-M23)."
+        );
+    }
+
     /// SC-M24 — burnout must ACCUMULATE across a path, not sit at 1.0.
     ///
     /// `update_burnout` had zero production callers and the engine passed a
@@ -2269,12 +2544,12 @@ mod per_name_copula_tests {
         let factors: Vec<f64> = (0..24).map(|_| 1.5_f64).collect();
         let mut burnout = 1.0_f64;
         let _ = pricer
-            .path_shocks_from_factors(&deal, &factors)
+            .path_shocks_from_factors(&deal, &factors, 0)
             .expect("path shocks");
 
         // Exercise the month loop directly so the state is observable.
         for month in 1..=24u32 {
-            let _ = pricer.monthly_shock(month, 1.5, &mut burnout);
+            let _ = pricer.monthly_shock(month, 1.5, 1.5, &mut burnout);
         }
 
         assert!(

@@ -119,9 +119,18 @@ def test_unknown_tranche_raises_value_error_not_panic() -> None:
 
 
 def test_invalid_deal_reports_an_actionable_error() -> None:
-    """Validation failures must name what is wrong, not fail opaquely."""
+    """Validation failures must name what is wrong, not fail opaquely.
+
+    Uses a REAL tranche id (the fixture has ``SENIOR``/``EQUITY``). This
+    previously passed ``CLASS_A``, which does not exist, and relied on the
+    missing-calendar error firing before the tranche was ever resolved. Once
+    breakeven CDR began resolving the tranche up front — to scale its
+    writedown threshold to the tranche face (SC-m03) — the unknown id
+    surfaced first, which is the better failure. Naming a real tranche keeps
+    this test on the deal-validation behaviour it is actually about.
+    """
     with pytest.raises(ValueError, match="calendar") as excinfo:
-        instruments.structured_credit_tranche_breakeven_cdr(_deal_json(), "CLASS_A", MarketContext(), "2024-01-01")
+        instruments.structured_credit_tranche_breakeven_cdr(_deal_json(), "SENIOR", MarketContext(), "2024-01-01")
     message = str(excinfo.value)
     assert message.strip(), "the error message must not be empty"
 

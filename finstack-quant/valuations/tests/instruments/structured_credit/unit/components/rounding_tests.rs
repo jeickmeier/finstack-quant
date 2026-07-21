@@ -60,6 +60,7 @@ fn run_rounding_test(amount: f64, rounding: RoundingConvention) -> f64 {
         asset_balances: None,
         deferred_interest: None,
         reserve_balance: Money::new(0.0, currency),
+        restricted_cash: Money::new(0.0, Currency::USD),
         recovery_proceeds: Money::new(0.0, currency),
     };
 

@@ -30,8 +30,31 @@ impl MetricCalculator for AccruedCalculator {
             }
         }
 
-        // Aggregate flows mix principal and interest and cannot support accrued.
-        // Preserve the missing-input error, otherwise degrade to clean ≈ dirty.
+        // SC-m14: at DEAL level there is no single tranche, so
+        // `detailed_tranche_cashflows` is absent — but the deal context does
+        // carry TAGGED flows, and `CFKind` distinguishes coupon kinds from
+        // `Notional`. Filtering to the interest kinds recovers a correct
+        // aggregate accrued without needing per-tranche flows.
+        //
+        // This removes the SC-M10 degradation (accrued silently returning 0,
+        // which made CleanPrice collapse to DirtyPrice at deal level). The
+        // earlier fix could only degrade because it looked at
+        // `context.cashflows`, which is the cash-only view with principal and
+        // interest already summed; the tagged view keeps them separable.
+        if let Some(tagged) = context.tagged_cashflows.as_ref() {
+            let interest_flows: Vec<(Date, Money)> = tagged
+                .iter()
+                .filter(|flow| is_interest_kind(flow.kind))
+                .map(|flow| (flow.date, flow.amount))
+                .collect();
+            if !interest_flows.is_empty() {
+                return self.accrued_from_interest_flows(&interest_flows, context);
+            }
+        }
+
+        // No separable interest anywhere: a genuinely absent cashflow series is
+        // a missing input; otherwise degrade to clean ≈ dirty rather than
+        // pro-rating a principal-contaminated payment (SC-M10).
         context.cashflows.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
                 id: "context.cashflows".to_string(),
@@ -39,6 +62,20 @@ impl MetricCalculator for AccruedCalculator {
         })?;
         Ok(0.0)
     }
+}
+
+/// Whether a classified cashflow is an INTEREST payment.
+///
+/// SC-m14: `Notional` is principal and the fee kinds are transaction expenses;
+/// only the coupon kinds accrue. `PIK` is deliberately excluded — capitalized
+/// interest is added to notional rather than settled in cash, so it is not
+/// part of accrued for a cash buyer.
+fn is_interest_kind(kind: finstack_quant_core::cashflow::CFKind) -> bool {
+    use finstack_quant_core::cashflow::CFKind;
+    matches!(
+        kind,
+        CFKind::Fixed | CFKind::FloatReset | CFKind::InflationCoupon
+    )
 }
 
 impl AccruedCalculator {
@@ -137,6 +174,69 @@ mod tests {
         assert!(result.is_err(), "missing cashflows should error");
     }
 
+    /// SC-m14 — at DEAL level, accrued must be recovered from the TAGGED
+    /// flows rather than degrading to zero.
+    ///
+    /// The deal context has no `detailed_tranche_cashflows` (there is no single
+    /// tranche), but it does carry classified flows, and `CFKind` separates the
+    /// coupon kinds from `Notional`. Filtering to interest recovers a correct
+    /// aggregate accrued — which in turn stops `CleanPrice` collapsing onto
+    /// `DirtyPrice` at deal level.
+    #[test]
+    fn accrued_uses_tagged_interest_flows_at_deal_level() {
+        use finstack_quant_core::cashflow::{CFKind, CashFlow};
+
+        let mut ctx = context(date!(2025 - 02 - 15));
+        // No per-tranche detail, exactly like the deal-level registry path.
+        ctx.detailed_tranche_cashflows = None;
+        ctx.cashflows = Some(vec![
+            (date!(2025 - 01 - 01), Money::new(0.0, Currency::USD)),
+            // A COMBINED payment: 3,000 principal + 90 interest.
+            (date!(2025 - 04 - 01), Money::new(3_090.0, Currency::USD)),
+        ]);
+        ctx.tagged_cashflows = Some(vec![
+            CashFlow::new(
+                date!(2025 - 01 - 01),
+                None,
+                Money::new(0.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            ),
+            CashFlow::new(
+                date!(2025 - 04 - 01),
+                None,
+                Money::new(90.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            ),
+            CashFlow::new(
+                date!(2025 - 04 - 01),
+                None,
+                Money::new(3_000.0, Currency::USD),
+                CFKind::Notional,
+                0.25,
+                None,
+            ),
+        ]);
+        ctx.day_count = Some(DayCount::Act360);
+
+        let accrued = AccruedCalculator
+            .calculate(&mut ctx)
+            .expect("tagged flows must yield an accrued figure");
+
+        // Halfway through the period on the 90 of INTEREST — the 3,000 of
+        // principal must not contribute.
+        assert!(
+            (accrued - 45.0).abs() < 1e-9,
+            "accrued must pro-rate the interest leg only: expected ~45.0 from \
+             the 90.0 coupon, got {accrued:.4}. A value near 1545 means \
+             principal is being included; 0.0 means the tagged flows are being \
+             ignored and accrued has degraded (SC-m14)."
+        );
+    }
+
     /// Aggregate cashflows are not pro-rated into accrued.
     #[test]
     fn accrued_from_aggregated_cashflows_does_not_fabricate() {
@@ -174,11 +274,13 @@ mod tests {
             ],
             principal_flows: vec![],
             pik_flows: vec![],
+            deferred_flows: Vec::new(),
             writedown_flows: vec![],
             final_balance: Money::new(0.0, Currency::USD),
             total_interest: Money::new(30.0, Currency::USD),
             total_principal: Money::new(0.0, Currency::USD),
             total_pik: Money::new(0.0, Currency::USD),
+            total_deferred: Money::new(0.0, Currency::USD),
             total_writedown: Money::new(0.0, Currency::USD),
         });
         ctx.day_count = Some(DayCount::Act360);

@@ -8,7 +8,7 @@ use crate::instruments::fixed_income::structured_credit::types::constants::{
 use crate::instruments::fixed_income::structured_credit::{StructuredCredit, TrancheCoupon};
 use crate::instruments::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
@@ -83,7 +83,8 @@ impl MetricCalculator for ZSpreadCalculator {
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
         let as_of = context.as_of;
-        let day_count = finstack_quant_core::dates::DayCount::Act365F;
+        let day_count =
+            crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
 
         // Pre-compute (t, df, amount) for deterministic, fallible date handling.
         // Discount from the valuation date `as_of` (settlement convention) so the
@@ -246,7 +247,8 @@ impl MetricCalculator for Cs01Calculator {
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
         let as_of = context.as_of;
-        let day_count = finstack_quant_core::dates::DayCount::Act365F;
+        let day_count =
+            crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
 
         // CS01 must be marginal: PV(z) - PV(z + 1bp), not PV(0) - PV(z + 1bp).
         // Compute both base PV (at Z-spread) and bumped PV (at Z-spread + 1bp).
@@ -362,7 +364,7 @@ pub fn calculate_tranche_z_spread(
     target_pv: Money,
     as_of: Date,
 ) -> Result<f64> {
-    let day_count = DayCount::Act365F;
+    let day_count = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
     let cached_flows: Vec<(f64, f64, f64)> = cashflows
         .iter()
         .filter(|(date, _)| *date > as_of)
@@ -428,7 +430,7 @@ pub fn calculate_tranche_cs01(
     z_spread: f64,
     as_of: Date,
 ) -> Result<f64> {
-    let day_count = DayCount::Act365F;
+    let day_count = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
 
     // Calculate base PV
     let mut base_pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
@@ -610,7 +612,8 @@ impl MetricCalculator for BucketedCs01Calculator {
                 })
             })?;
             let disc = context.curves.get_discount(disc_curve_id.as_str())?;
-            let day_count = DayCount::Act365F;
+            let day_count =
+                crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
             // Discount from `as_of` (settlement) so bucketed CS01 reconciles to the
             // parallel z-spread CS01, which now uses the same convention.
             flows

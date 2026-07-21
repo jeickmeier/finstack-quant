@@ -1,10 +1,37 @@
 //! Metrics for structured credit instruments.
 //!
+
 //! This module organizes metrics by category:
 //! - pricing: Valuation-focused metrics (prices, accrued, WAL)
 //! - risk: Risk and sensitivity metrics (duration, spreads, YTM)
 //! - pool: Collateral pool characteristics (WAM, CPR, CDR, WARF, WAS)
 //! - deal_specific: Deal-type specific metrics (ABS, CLO, CMBS, RMBS)
+
+/// Time basis shared by every structured-credit risk metric.
+///
+/// SC-m02: duration measured time with the DISCOUNT CURVE's day count while
+/// convexity, z-spread, CS01, discount margin, OAS and WAL all hardcoded
+/// Act/365F. On an Act/360 curve that is a 1.39% relative difference in `t`,
+/// so the second-order price expansion
+///
+///     dP/P ~= -D*dy + 0.5*C*dy^2
+///
+/// mixed two clocks: `D` and `C` were not measured against the same yield
+/// unit, and combining them was internally inconsistent.
+///
+/// Act/365F is the right common basis here rather than the curve's own
+/// convention:
+///   * The bump metrics (z-spread, CS01, convexity) DEFINE their shocks in
+///     this basis, and duration is compared against them in the expansion.
+///   * A duration quoted "in years" conventionally means Act/365-style years.
+///
+/// Aligning duration to the majority also leaves nine of eleven call sites
+/// untouched, so pinned golden values move only where they were inconsistent.
+///
+/// Use this constant rather than naming a convention inline, so the metrics
+/// cannot drift apart again.
+pub(crate) const METRIC_TIME_BASIS: finstack_quant_core::dates::DayCount =
+    finstack_quant_core::dates::DayCount::Act365F;
 
 pub(crate) mod deal_specific;
 pub(crate) mod pool;

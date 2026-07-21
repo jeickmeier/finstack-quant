@@ -47,6 +47,7 @@ fn context_for_tranche<'a>(
         asset_balances: None,
         current_pool_balance: None,
         senior_fees: Money::new(0.0, Currency::USD),
+        restricted_cash: Money::new(0.0, Currency::USD),
     }
 }
 

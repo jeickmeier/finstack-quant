@@ -28,7 +28,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::simulation_eng
 };
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::instruments::Instrument;
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
@@ -136,7 +136,7 @@ pub fn calculate_tranche_oas(
     let original_balance = tranche.original_balance.amount();
     let target_pv = market_price_pct / 100.0 * original_balance;
 
-    let day_count = DayCount::Act365F;
+    let day_count = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
     let maturity = deal
         .tranches
         .tranches
@@ -215,6 +215,18 @@ pub fn calculate_tranche_oas(
             )),
             _ => None,
         };
+        // SC-M13: the path's departure from the deterministic forward curve,
+        // applied to FLOATING coupon projection so a floater's coupons move
+        // with the same rates that drive its discount factors.
+        let rate_shift_path = match (&forwards, &rate_path) {
+            (Some(fwd), Some(path)) => Some(
+                path.iter()
+                    .zip(fwd.iter())
+                    .map(|(r, f)| r - f)
+                    .collect::<Vec<f64>>(),
+            ),
+            _ => None,
+        };
         let credit_z = if config.stochastic_credit {
             let mut sub = rng.substream(2 * path as u64 + 1);
             Some(sub.next_std_normal())
@@ -225,6 +237,7 @@ pub fn calculate_tranche_oas(
         let mut source = OasPathFlowSource::new(
             as_of,
             rate_path,
+            rate_shift_path,
             credit_z,
             config.prepay_beta,
             base_rate,

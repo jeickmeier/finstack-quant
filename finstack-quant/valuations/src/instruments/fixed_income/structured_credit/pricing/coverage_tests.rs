@@ -195,6 +195,11 @@ impl CoverageTest {
         if include_cash {
             numerator = numerator.checked_add(context.cash_balance)?;
         }
+        // N2: trust-held collateral cash counts regardless of `include_cash`,
+        // which governs whether this period's principal COLLECTIONS are
+        // included. The funding account is an accumulated balance, not a
+        // collection, and secures the notes either way.
+        numerator = numerator.checked_add(context.restricted_cash)?;
 
         // OC denominator = test tranche balance + all senior tranche balances
         // i.e., Sum(all tranche balances at this seniority level and above)
@@ -481,6 +486,18 @@ pub struct TestContext<'a> {
     pub current_pool_balance: Option<Money>,
     /// Senior fees payable ahead of every note and deducted from the IC numerator.
     pub senior_fees: Money,
+    /// Trust-held collateral cash outside the asset balances — currently the
+    /// controlled-accumulation funding account.
+    ///
+    /// N2: during accumulation, collected principal leaves the asset balances
+    /// and is diverted into the funding account, so it appeared in NEITHER the
+    /// collateral term NOR the cash term of the test. The OC ratio decayed by
+    /// exactly the accumulated amount while the denominator stayed flat,
+    /// producing a breach that does not exist — which then overrode the
+    /// accumulation lockout, since a diverted pass zeroes principal targets.
+    /// Real indentures count principal-collection-account cash in par-value
+    /// tests.
+    pub restricted_cash: Money,
 }
 
 /// Result of a coverage test calculation.
@@ -609,6 +626,7 @@ mod tests {
             asset_balances: None,
             current_pool_balance: None,
             senior_fees: Money::new(0.0, Currency::USD),
+            restricted_cash: Money::new(0.0, Currency::USD),
         };
 
         let result = test
@@ -653,6 +671,7 @@ mod tests {
             asset_balances: None,
             current_pool_balance: None,
             senior_fees: Money::new(0.0, Currency::USD),
+            restricted_cash: Money::new(0.0, Currency::USD),
         };
 
         let result = test
@@ -704,6 +723,7 @@ mod tests {
             asset_balances: None,
             current_pool_balance: Some(Money::new(collateral, Currency::USD)),
             senior_fees: Money::new(0.0, Currency::USD),
+            restricted_cash: Money::new(0.0, Currency::USD),
         };
 
         let result = test
@@ -778,6 +798,7 @@ mod tests {
             asset_balances: None,
             current_pool_balance: Some(Money::new(collateral, Currency::USD)),
             senior_fees: Money::new(0.0, Currency::USD),
+            restricted_cash: Money::new(0.0, Currency::USD),
         };
 
         let result = test
@@ -938,6 +959,7 @@ mod tests {
             asset_balances: None,
             current_pool_balance: None,
             senior_fees: Money::new(0.0, Currency::USD),
+            restricted_cash: Money::new(0.0, Currency::USD),
         };
 
         let result = test
@@ -1051,6 +1073,7 @@ mod haircut_tests {
                 asset_balances: None,
                 current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
                 senior_fees: Money::new(fees, Currency::USD),
+                restricted_cash: Money::new(0.0, Currency::USD),
             };
             CoverageTest::new_ic(1.20)
                 .calculate(&ctx)
@@ -1114,6 +1137,7 @@ mod haircut_tests {
             asset_balances: None,
             current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
             senior_fees: Money::new(0.0, Currency::USD),
+            restricted_cash: Money::new(0.0, Currency::USD),
         };
 
         let result = CoverageTest::new_ic(1.20).calculate(&ctx).expect("ic test");
@@ -1194,6 +1218,7 @@ mod haircut_tests {
             asset_balances: None,
             current_pool_balance: None,
             senior_fees: Money::new(0.0, Currency::USD),
+            restricted_cash: Money::new(0.0, Currency::USD),
         };
 
         let result = CoverageTest::new_ic(required_ratio)
@@ -1292,6 +1317,7 @@ mod haircut_tests {
             asset_balances: None,
             current_pool_balance: None,
             senior_fees: Money::new(0.0, Currency::USD),
+            restricted_cash: Money::new(0.0, Currency::USD),
         };
 
         let result = CoverageTest::new_ic(required_ratio)
@@ -1347,6 +1373,7 @@ mod haircut_tests {
             asset_balances: None,
             current_pool_balance: Some(current),
             senior_fees: Money::new(0.0, Currency::USD),
+            restricted_cash: Money::new(0.0, Currency::USD),
         };
 
         let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("oc test");
@@ -1392,6 +1419,7 @@ mod haircut_tests {
             asset_balances: Some(&live_asset_balances),
             current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
             senior_fees: Money::new(0.0, Currency::USD),
+            restricted_cash: Money::new(0.0, Currency::USD),
         };
 
         let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("OC test");
@@ -1428,6 +1456,7 @@ mod haircut_tests {
             asset_balances: None,
             current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
             senior_fees: Money::new(0.0, Currency::USD),
+            restricted_cash: Money::new(0.0, Currency::USD),
         };
 
         let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("oc test");

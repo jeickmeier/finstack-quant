@@ -827,10 +827,14 @@ mod excess_spread_tests {
         let sr_with = with_acct.get("SR").expect("SR results");
 
         // Sanity: without the account the senior runs an interest shortfall.
+        //
+        // SC-m11: SR is not `pik_enabled`, so its shortfall is DEFERRED, not
+        // capitalized — it is reported in `total_deferred`. This test read
+        // `total_pik`, which is now correctly zero for a non-PIK tranche.
         assert!(
-            sr_base.total_pik.amount() > 1.0,
-            "test setup must produce a senior interest shortfall (got pik={})",
-            sr_base.total_pik.amount()
+            sr_base.total_deferred.amount() > 1.0,
+            "test setup must produce a senior interest shortfall (got deferred={})",
+            sr_base.total_deferred.amount()
         );
         // The account draws to cover part of that shortfall: more senior interest
         // is paid, and less is deferred, than without the account.
@@ -841,10 +845,10 @@ mod excess_spread_tests {
             sr_base.total_interest.amount()
         );
         assert!(
-            sr_with.total_pik.amount() < sr_base.total_pik.amount() - 1.0,
+            sr_with.total_deferred.amount() < sr_base.total_deferred.amount() - 1.0,
             "covered shortfall must reduce deferred interest (with={}, base={})",
-            sr_with.total_pik.amount(),
-            sr_base.total_pik.amount()
+            sr_with.total_deferred.amount(),
+            sr_base.total_deferred.amount()
         );
     }
 }
@@ -1702,6 +1706,114 @@ mod controlled_accumulation_tests {
             sp_bullet > 300_000.0,
             "the bullet must release the accumulated principal to the senior \
              (got {sp_bullet})"
+        );
+    }
+
+    /// N2 — accumulated principal must count toward the OC numerator.
+    ///
+    /// During accumulation the collected principal leaves the asset balances
+    /// and sits in the funding account, appearing in NEITHER the collateral nor
+    /// the cash term of the coverage test. The OC ratio decayed by exactly the
+    /// accumulated amount while the denominator stayed flat, producing a breach
+    /// that does not exist — which then overrides the accumulation lockout,
+    /// since a diverted pass zeroes principal targets.
+    ///
+    /// With a trigger set just below the true OC ratio, a correct engine never
+    /// breaches and the senior stays flat; a blind one breaches and pays the
+    /// senior down.
+    #[test]
+    fn accumulated_principal_counts_toward_the_oc_test() {
+        use finstack_quant_valuations::instruments::fixed_income::structured_credit::waterfall::CoverageTrigger;
+
+        let mut accum = deal(Some(ControlledAccumulationSpec {
+            start_date: closing(),
+            bullet_date: bullet(),
+        }));
+        // The deal is heavily over-collateralized, so any OC breach during
+        // accumulation is spurious.
+        accum.coverage_triggers = vec![CoverageTrigger {
+            tranche_id: accum.tranches.tranches[0].id.as_str().to_string(),
+            oc_trigger: Some(1.02),
+            ic_trigger: None,
+        }];
+
+        let senior_paid = senior_principal_between(&accum, closing(), bullet());
+        assert!(
+            senior_paid < 1.0,
+            "with accumulated principal counted, OC stays above a 1.02 trigger \
+             and the lockout holds the senior flat; the senior received \
+             {senior_paid:.2}, which means a spurious breach diverted cash and \
+             broke the lockout (N2)"
+        );
+    }
+
+    /// N3 — early amortization must RELEASE the already-accumulated balance,
+    /// not strand it until the terminal sweep.
+    ///
+    /// The release previously required `!early_amortization`, so a deal that
+    /// breached into early am only saw the accumulated cash at deal end. Early
+    /// amortization exists to ACCELERATE principal, so withholding
+    /// already-collected principal inverts the trigger's purpose. Total cash is
+    /// conserved either way — the defect is timing.
+    ///
+    /// The loss threshold is set so accumulation runs for a while and builds a
+    /// material balance BEFORE the breach. A threshold of 0 breaches
+    /// immediately, leaving nothing accumulated to strand, which is why that
+    /// variant does not discriminate.
+    #[test]
+    fn early_amortization_releases_the_accumulated_balance() {
+        use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+            DefaultModelSpec, EarlyAmortizationSpec,
+        };
+
+        let build = |max_loss: f64| {
+            let mut sc = deal(Some(ControlledAccumulationSpec {
+                start_date: closing(),
+                bullet_date: bullet(),
+            }));
+            if let Some(rules) = sc.waterfall_rules.as_mut() {
+                rules.early_amortization = Some(EarlyAmortizationSpec {
+                    max_cumulative_loss_pct: max_loss,
+                });
+            }
+            sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.03);
+            sc
+        };
+
+        // 2% cumulative losses at 3% CDR takes roughly a year, by which point
+        // the funding account holds a substantial balance. A threshold above
+        // any achievable loss never breaches, giving the control.
+        let breaching = build(0.02);
+        let never_breaching = build(0.99);
+
+        // Principal-weighted average time to the senior. Stranding the
+        // accumulated balance until the terminal sweep pushes this OUT; early
+        // amortization is supposed to pull it IN.
+        let senior_principal_wal = |sc: &StructuredCredit| -> f64 {
+            let results = run_simulation(sc, &market(), closing()).unwrap();
+            let flows = &results.get("SR").expect("SR results").principal_flows;
+            let (mut weighted, mut total) = (0.0_f64, 0.0_f64);
+            for (date, amount) in flows {
+                let years = (*date - closing()).whole_days() as f64 / 365.0;
+                weighted += years * amount.amount();
+                total += amount.amount();
+            }
+            if total > 0.0 {
+                weighted / total
+            } else {
+                0.0
+            }
+        };
+
+        let wal_breaching = senior_principal_wal(&breaching);
+        let wal_control = senior_principal_wal(&never_breaching);
+
+        assert!(
+            wal_breaching < wal_control,
+            "early amortization must return senior principal EARLIER than a \
+             deal that keeps accumulating: WAL {wal_breaching:.4}y breaching vs \
+             {wal_control:.4}y control. A breaching deal that is no faster means \
+             the accumulated balance is stranded until the terminal sweep (N3)."
         );
     }
 

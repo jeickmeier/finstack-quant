@@ -19,7 +19,7 @@
 
 use crate::cashflow::traits::DatedFlows;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::Result;
@@ -52,7 +52,7 @@ pub fn calculate_tranche_convexity(
     discount_curve: &DiscountCurve,
     as_of: Date,
 ) -> Result<f64> {
-    let day_count = DayCount::Act365F;
+    let day_count = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
     let mut pv0 = NeumaierAccumulator::new();
     let mut pv_up = NeumaierAccumulator::new();
     let mut pv_dn = NeumaierAccumulator::new();
@@ -71,7 +71,20 @@ pub fn calculate_tranche_convexity(
     }
 
     let p0 = pv0.total();
-    if p0.abs() < f64::EPSILON {
+    // SC-m04: guard relative to the cashflow scale, not `f64::EPSILON`.
+    //
+    // `f64::EPSILON` is 2.2e-16 — an absolute threshold on a CURRENCY amount.
+    // A tranche whose PV has collapsed to a residual 1e-12 sails past it and
+    // divides by that residual, producing an astronomically large convexity
+    // from what is numerically zero. Scaling to the undiscounted cashflow
+    // magnitude makes the guard meaningful at any notional, from a JPY deal to
+    // a small equity strip.
+    let scale: f64 = cashflows
+        .iter()
+        .filter(|(date, _)| *date > as_of)
+        .map(|(_, amount)| amount.amount().abs())
+        .sum();
+    if p0.abs() <= scale * 1e-12 {
         return Ok(0.0);
     }
     Ok((pv_up.total() + pv_dn.total() - 2.0 * p0) / (p0 * CONVEXITY_BUMP * CONVEXITY_BUMP))

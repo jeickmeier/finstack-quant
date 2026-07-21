@@ -93,6 +93,9 @@ pub struct WaterfallContext<'a> {
     /// Current reserve account balance (passed dynamically each period).
     /// Used by `PaymentCalculation::ReserveReplenishment` to compute shortfall.
     pub reserve_balance: Money,
+    /// Trust-held collateral cash outside the asset balances (N2): the
+    /// controlled-accumulation funding account. Counted in the OC numerator.
+    pub restricted_cash: Money,
     /// Recovery proceeds released this period (tracked separately for reporting).
     pub recovery_proceeds: Money,
 }
@@ -174,36 +177,23 @@ fn execute_waterfall_core(
     }
 
     // Senior fees rank ahead of every note, so IC uses
-    // `(interest collections − senior fees) / note interest due`. Compute fees
-    // with the same payment kernel used by the waterfall.
-    let empty_in_period: HashMap<String, Money> = HashMap::default();
-    let mut senior_fees = Money::new(0.0, waterfall.base_currency);
-    for tier in waterfall
-        .tiers
-        .iter()
-        .take_while(|t| t.payment_type == PaymentType::Fee)
-    {
-        for recipient in &tier.recipients {
-            let amount = calculate_payment_amount(
-                waterfall.base_currency,
-                &recipient.calculation,
-                context.interest_collections,
-                tranches,
-                &allocation_ctx.tranche_index,
-                context.tranche_balances,
-                context.deferred_interest,
-                context.pool_balance,
-                context.period_start,
-                context.payment_date,
-                context.valuation_date,
-                context.market,
-                context.reserve_balance,
-                &empty_in_period,
-                false,
-            )?;
-            senior_fees = senior_fees.checked_add(amount)?;
-        }
-    }
+    // `(interest collections − senior fees) / note interest due`.
+    let senior_fees = senior_fee_accrual(
+        waterfall,
+        tranches,
+        &allocation_ctx.tranche_index,
+        SeniorFeeInputs {
+            available: context.interest_collections,
+            tranche_balances: context.tranche_balances,
+            deferred_interest: context.deferred_interest,
+            pool_balance: context.pool_balance,
+            period_start: context.period_start,
+            payment_date: context.payment_date,
+            valuation_date: context.valuation_date,
+            market: context.market,
+            reserve_balance: context.reserve_balance,
+        },
+    )?;
 
     // Evaluate coverage tests against current balances.
     let coverage_test_results = evaluate_coverage_tests(
@@ -220,6 +210,7 @@ fn execute_waterfall_core(
         context.asset_balances,
         &payable_principal_tranche_ids,
         senior_fees,
+        context.restricted_cash,
     )?;
 
     // Coverage tests share senior balances, so one paydown de-leverages every
@@ -257,6 +248,7 @@ fn execute_waterfall_core(
 
         AllocationOutput {
             distributions: std::mem::take(&mut ws.distributions),
+            principal_distributions: HashMap::default(),
             payment_records: std::mem::take(&mut ws.payment_records),
             trace: if explain.enabled {
                 Some(ExplanationTrace::new("waterfall"))
@@ -407,6 +399,7 @@ fn execute_waterfall_core(
         total_available: context.available_cash,
         tier_allocations: tier_allocations.clone(),
         distributions: allocation_output.distributions.clone(),
+        principal_distributions: allocation_output.principal_distributions.clone(),
         payment_records: allocation_output.payment_records.clone(),
         coverage_tests: coverage_tests_public.clone(),
         diverted_cash: total_diverted,
@@ -447,28 +440,6 @@ pub fn execute_waterfall_with_explanation(
     explain: ExplainOpts,
 ) -> Result<WaterfallDistribution> {
     execute_waterfall_core(waterfall, tranches, pool, context, explain, None)
-}
-
-/// Execute waterfall using a pre-allocated workspace for zero-allocation hot paths.
-///
-/// # Arguments
-///
-/// * `waterfall` - Ordered payment rules, base currency, and diversion logic.
-/// * `tranches` - Tranche structure receiving the calculated distributions.
-/// * `pool` - Asset pool supplying collateral and coverage-test data.
-/// * `context` - Period cash, dates, market data, and dynamic balance state.
-/// * `explain` - Trace configuration for the resulting allocation explanation.
-/// * `workspace` - Caller-owned reusable buffers overwritten during execution
-///   and retained for subsequent zero-allocation waterfall calls.
-pub fn execute_waterfall_with_workspace(
-    waterfall: &Waterfall,
-    tranches: &TrancheStructure,
-    pool: &AssetPool,
-    context: WaterfallContext,
-    explain: ExplainOpts,
-    workspace: &mut WaterfallWorkspace,
-) -> Result<WaterfallDistribution> {
-    execute_waterfall_core(waterfall, tranches, pool, context, explain, Some(workspace))
 }
 
 // ============================================================================
@@ -547,6 +518,8 @@ impl<'a> AllocationContext<'a> {
 pub(crate) struct AllocationOutput {
     /// Accumulated distributions by recipient
     pub(crate) distributions: HashMap<RecipientType, Money>,
+    /// The PRINCIPAL portion of `distributions`, per recipient (SC-M28).
+    pub(crate) principal_distributions: HashMap<RecipientType, Money>,
     /// Payment records for audit trail
     pub(crate) payment_records: Vec<PaymentRecord>,
     /// Optional explanation trace
@@ -560,6 +533,7 @@ impl AllocationOutput {
         distributions.reserve(estimated_recipients);
         Self {
             distributions,
+            principal_distributions: HashMap::default(),
             payment_records: Vec::with_capacity(estimated_recipients),
             trace: if explain.enabled {
                 Some(ExplanationTrace::new("waterfall"))
@@ -639,6 +613,23 @@ fn allocate_sequential(
             }
             Entry::Vacant(e) => {
                 e.insert(paid);
+            }
+        }
+        // SC-M28: record the PRINCIPAL portion separately, keyed off the
+        // payment calculation that produced it, so the engine never has to
+        // re-derive the split from an aggregate.
+        if is_principal_payment(&recipient.calculation) {
+            match output
+                .principal_distributions
+                .entry(recipient.recipient_type.clone())
+            {
+                Entry::Occupied(mut e) => {
+                    let next = e.get().checked_add(paid)?;
+                    e.insert(next);
+                }
+                Entry::Vacant(e) => {
+                    e.insert(paid);
+                }
             }
         }
 
@@ -793,6 +784,23 @@ fn allocate_pro_rata(
             }
             Entry::Vacant(e) => {
                 e.insert(paid);
+            }
+        }
+        // SC-M28: record the PRINCIPAL portion separately, keyed off the
+        // payment calculation that produced it, so the engine never has to
+        // re-derive the split from an aggregate.
+        if is_principal_payment(&recipient.calculation) {
+            match output
+                .principal_distributions
+                .entry(recipient.recipient_type.clone())
+            {
+                Entry::Occupied(mut e) => {
+                    let next = e.get().checked_add(paid)?;
+                    e.insert(next);
+                }
+                Entry::Vacant(e) => {
+                    e.insert(paid);
+                }
             }
         }
 
@@ -974,6 +982,98 @@ fn water_fill_allocation(total_units: i64, weights: &[f64], caps: &[i64]) -> Vec
 ///
 /// `principal_collections` is the cash component of the OC numerator
 /// (standard CLO par-OC counts only principal proceeds, never interest).
+/// Whether a payment calculation pays PRINCIPAL rather than interest.
+///
+/// SC-M28: the waterfall's own classification, decided in exactly one place.
+/// `RecipientType::Tranche(id)` is the same map key for a tranche's interest
+/// and its principal, so `distributions` aggregates them; without this the
+/// engine had to guess the split by assuming interest is satisfied first.
+///
+/// `ResidualCash` counts as principal: it is the equity/residual distribution,
+/// which the engine books against notional rather than as a coupon.
+fn is_principal_payment(calculation: &PaymentCalculation) -> bool {
+    matches!(
+        calculation,
+        PaymentCalculation::TranchePrincipal { .. } | PaymentCalculation::ResidualCash
+    )
+}
+
+/// Inputs the senior-fee kernel needs beyond the waterfall and tranche index.
+pub(crate) struct SeniorFeeInputs<'a> {
+    /// Cash the fee tier is measured against (pool interest for a period).
+    pub available: Money,
+    /// Current tranche balances, when known.
+    pub tranche_balances: Option<&'a HashMap<String, Money>>,
+    /// Outstanding deferred interest, when known.
+    pub deferred_interest: Option<&'a HashMap<String, Money>>,
+    /// Collateral balance the percentage-of-collateral fees accrue on.
+    pub pool_balance: Money,
+    /// Accrual period start.
+    pub period_start: Date,
+    /// Payment date.
+    pub payment_date: Date,
+    /// Valuation date.
+    pub valuation_date: Date,
+    /// Market context for any index-linked fee.
+    pub market: &'a MarketContext,
+    /// Reserve balance, for reserve-linked calculations.
+    pub reserve_balance: Money,
+}
+
+/// Senior fees accruing this period, i.e. the fee tiers that rank ahead of
+/// every note.
+///
+/// `take_while` deliberately stops at the first non-Fee tier: only fees that
+/// sit ABOVE the notes are senior claims. A junior fee tier placed below the
+/// notes is not a senior claim and must not be counted here.
+///
+/// This is the single source of truth for "what the fee tier will take",
+/// shared by three call sites that previously would have drifted:
+///   * the IC numerator (SC-M29), which nets it from interest collections;
+///   * the excess-spread capture/draw and the reserve draw (N1), which must
+///     treat it as a senior claim ranking ahead of note interest;
+///   * the waterfall itself, which actually pays it.
+///
+/// Computing it with `calculate_payment_amount` — the same kernel the fee tier
+/// uses to pay — is what makes the measured and paid amounts identical by
+/// construction rather than by coincidence.
+pub(crate) fn senior_fee_accrual(
+    waterfall: &Waterfall,
+    tranches: &TrancheStructure,
+    tranche_index: &HashMap<&str, usize>,
+    inputs: SeniorFeeInputs<'_>,
+) -> Result<Money> {
+    let empty_in_period: HashMap<String, Money> = HashMap::default();
+    let mut total = Money::new(0.0, waterfall.base_currency);
+    for tier in waterfall
+        .tiers
+        .iter()
+        .take_while(|t| t.payment_type == PaymentType::Fee)
+    {
+        for recipient in &tier.recipients {
+            let amount = calculate_payment_amount(
+                waterfall.base_currency,
+                &recipient.calculation,
+                inputs.available,
+                tranches,
+                tranche_index,
+                inputs.tranche_balances,
+                inputs.deferred_interest,
+                inputs.pool_balance,
+                inputs.period_start,
+                inputs.payment_date,
+                inputs.valuation_date,
+                inputs.market,
+                inputs.reserve_balance,
+                &empty_in_period,
+                false,
+            )?;
+            total = total.checked_add(amount)?;
+        }
+    }
+    Ok(total)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn evaluate_coverage_tests(
     waterfall: &Waterfall,
@@ -989,6 +1089,7 @@ fn evaluate_coverage_tests(
     asset_balances: Option<&[f64]>,
     payable_principal_tranche_ids: &[&str],
     senior_fees: Money,
+    restricted_cash: Money,
 ) -> Result<Vec<CoverageTestResult>> {
     let mut results = Vec::with_capacity(waterfall.coverage_triggers.len() * 2);
 
@@ -1022,6 +1123,7 @@ fn evaluate_coverage_tests(
                 asset_balances,
                 current_pool_balance: Some(current_pool_balance),
                 senior_fees,
+                restricted_cash,
             };
 
             let oc_test = CoverageTest::new_oc(oc_trigger_level);
@@ -1051,6 +1153,7 @@ fn evaluate_coverage_tests(
                 asset_balances,
                 current_pool_balance: Some(current_pool_balance),
                 senior_fees,
+                restricted_cash,
             };
 
             let ic_test = CoverageTest::new_ic(ic_trigger_level);
@@ -1469,6 +1572,7 @@ mod ic_diversion_tests {
             asset_balances: None,
             deferred_interest: None,
             reserve_balance: Money::new(0.0, currency),
+            restricted_cash: Money::new(0.0, Currency::USD),
             recovery_proceeds: Money::new(0.0, currency),
         };
 
@@ -1694,6 +1798,7 @@ mod ic_diversion_tests {
             asset_balances: None,
             deferred_interest: None,
             reserve_balance: Money::new(0.0, currency),
+            restricted_cash: Money::new(0.0, Currency::USD),
             recovery_proceeds: Money::new(0.0, currency),
         };
 
@@ -1870,6 +1975,7 @@ mod ic_diversion_tests {
             asset_balances: None,
             deferred_interest: None,
             reserve_balance: Money::new(0.0, currency),
+            restricted_cash: Money::new(0.0, Currency::USD),
             recovery_proceeds: Money::new(0.0, currency),
         };
 
@@ -1960,6 +2066,7 @@ mod ic_diversion_tests {
                     asset_balances: None,
                     deferred_interest: None,
                     reserve_balance: Money::new(0.0, currency),
+                    restricted_cash: Money::new(0.0, Currency::USD),
                     recovery_proceeds: Money::new(0.0, currency),
                 },
             )
@@ -2061,6 +2168,7 @@ mod ic_diversion_tests {
                 asset_balances: None,
                 deferred_interest: None,
                 reserve_balance: Money::new(0.0, currency),
+                restricted_cash: Money::new(0.0, Currency::USD),
                 recovery_proceeds: Money::new(0.0, currency),
             },
         )
@@ -2161,6 +2269,7 @@ mod ic_diversion_tests {
                 asset_balances: None,
                 deferred_interest: None,
                 reserve_balance: Money::new(0.0, currency),
+                restricted_cash: Money::new(0.0, Currency::USD),
                 recovery_proceeds: Money::new(0.0, currency),
             },
         )
@@ -2190,6 +2299,117 @@ mod ic_diversion_tests {
 
 #[cfg(test)]
 mod water_fill_tests {
+    use super::*;
+    use crate::instruments::fixed_income::structured_credit::types::{
+        AllocationMode, AssetPool, DealType, PaymentType, Recipient, Tranche, TrancheCoupon,
+        TrancheSeniority, TrancheStructure, Waterfall, WaterfallTier,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::money::Money;
+    use time::Month;
+
+    /// SC-M28 — the waterfall must report its OWN interest/principal split.
+    ///
+    /// `distributions` keys a tranche's interest and principal under the same
+    /// `RecipientType::Tranche(id)`, so the engine's Step 5 had to reconstruct
+    /// the split by assuming interest is satisfied first. That reclassified
+    /// principal as interest whenever a tranche carried a shortfall — the exact
+    /// state an OC cure addresses — leaving the balance unretired so the cure
+    /// could not de-lever the ratio it was sized to fix.
+    ///
+    /// This pins the contract that removes the guesswork: for a tranche paid
+    /// from BOTH an interest tier and a principal tier, `distributions` holds
+    /// the total while `principal_distributions` holds only the principal.
+    #[test]
+    fn distribution_reports_the_principal_portion_separately() {
+        let ccy = Currency::USD;
+        let payment_date = Date::from_calendar_date(2024, Month::April, 1).expect("date");
+        let period_start = Date::from_calendar_date(2024, Month::January, 1).expect("date");
+
+        let tranche = Tranche::new(
+            "A",
+            0.0,
+            100.0,
+            TrancheSeniority::Senior,
+            Money::new(1_000_000.0, ccy),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            Date::from_calendar_date(2030, Month::January, 1).expect("date"),
+        )
+        .expect("tranche");
+        let tranches = TrancheStructure::new(vec![tranche]).expect("structure");
+
+        let waterfall = Waterfall::new(ccy)
+            .add_tier(
+                WaterfallTier::new("interest", 1, PaymentType::Interest)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::tranche_interest("A_int", "A")),
+            )
+            .add_tier(
+                WaterfallTier::new("principal", 2, PaymentType::Principal)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::tranche_principal("A_prin", "A", None)),
+            );
+
+        let market = MarketContext::new();
+        let result = execute_waterfall(
+            &waterfall,
+            &tranches,
+            &AssetPool::new("POOL", DealType::CLO, ccy),
+            WaterfallContext {
+                available_cash: Money::new(300_000.0, ccy),
+                interest_collections: Money::new(300_000.0, ccy),
+                principal_collections: Money::new(0.0, ccy),
+                payment_date,
+                period_start,
+                valuation_date: period_start,
+                pool_balance: Money::new(1_000_000.0, ccy),
+                market: &market,
+                tranche_balances: None,
+                asset_balances: None,
+                deferred_interest: None,
+                reserve_balance: Money::new(0.0, ccy),
+                restricted_cash: Money::new(0.0, ccy),
+                recovery_proceeds: Money::new(0.0, ccy),
+            },
+        )
+        .expect("waterfall executes");
+
+        let key = RecipientType::Tranche("A".to_string());
+        let total = result
+            .distributions
+            .get(&key)
+            .copied()
+            .expect("tranche paid")
+            .amount();
+        let principal = result
+            .principal_distributions
+            .get(&key)
+            .copied()
+            .unwrap_or(Money::new(0.0, ccy))
+            .amount();
+
+        // A quarter's interest on 1,000,000 at 5% is ~12,500; the rest of the
+        // 300,000 retires principal.
+        assert!(
+            total > 290_000.0,
+            "the tranche should receive nearly all available cash, got {total:.2}"
+        );
+        assert!(
+            principal > 250_000.0 && principal < total,
+            "principal_distributions must hold ONLY the principal portion: got \
+             {principal:.2} of {total:.2} total. Equal values mean interest was \
+             misclassified as principal; zero means the split is not being \
+             reported at all (SC-M28)."
+        );
+        let interest = total - principal;
+        assert!(
+            (interest - 12_500.0).abs() < 500.0,
+            "the interest remainder must be ~one quarter's coupon (12,500), \
+             got {interest:.2}"
+        );
+    }
+
     use super::water_fill_allocation;
 
     /// The subordination-inversion case: a small-balance senior carrying a large
