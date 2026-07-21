@@ -4154,6 +4154,17 @@ fn simulate_period(
     // write-down reflect per-name recovery dispersion; it reduces to the old
     // formula when every default recovers at the period systematic rate.
     // This is a permanent, irreversible write-down.
+    // SC-m19 — why there is no writedown REVERSAL (writeup) mechanism.
+    //
+    // The writedown is taken NET of the period's realized recovery, and that
+    // recovery is determined at default time (the lag affects only when the
+    // CASH arrives, not the amount). So there is no later surprise recovery
+    // that a writeup would recognize: adding one would double-count the
+    // recovery already netted here.
+    //
+    // A writeup mechanism would be required under the alternative convention
+    // where writedowns are taken GROSS at default and recoveries restore
+    // notional as they arrive. This engine does not use that convention.
     let period_expected_loss =
         (pool_flows.default.amount() - pool_flows.recovery.amount()).max(0.0);
     state.cumulative_realized_loss += period_expected_loss;
@@ -4884,14 +4895,14 @@ fn simulate_period(
     // side-account capture. Reserve draws are negative capture; controlled-
     // accumulation releases add cash back to the waterfall.
     let side_net_capture = spread_net_capture + reserve_net_capture - funding_net_release;
-    debug_assert_cash_conserved(
+    assert_cash_conserved(
         total_cash_for_waterfall,
         &pool_flows,
         released_recoveries,
         principal_diverted,
         &waterfall_result,
         side_net_capture,
-    );
+    )?;
 
     Ok(())
 }
@@ -4914,17 +4925,27 @@ fn simulate_period(
 /// hot-path cost; it exists to fail loudly in tests and debug runs if a future
 /// change breaks the engine's cash accounting.
 #[inline]
-fn debug_assert_cash_conserved(
+fn assert_cash_conserved(
     total_cash_for_waterfall: Money,
     pool_flows: &PoolFlows,
     released_recoveries: Money,
     principal_diverted: bool,
     waterfall_result: &WaterfallDistribution,
     side_net_capture: f64,
-) {
-    if !cfg!(debug_assertions) {
-        return;
-    }
+) -> Result<()> {
+    // SC-m13: this runs in RELEASE builds, not only under `debug_assertions`.
+    //
+    // It was previously compiled out of every production run, so the one
+    // invariant that catches a cash-accounting regression — the waterfall
+    // neither creating nor destroying cash — was checked only in tests. This
+    // session alone found three ways cash could vanish (the reserve sink
+    // SC-C07, the cleanup-call excess SC-M22, and the spread-account sink N7);
+    // a silently-violated conservation identity corrupts every tranche
+    // cashflow and PV downstream with no diagnostic.
+    //
+    // The cost is a handful of float operations per payment period against a
+    // full waterfall execution, which is not measurable. A violation is now a
+    // hard error naming the discrepancy rather than a wrong number.
 
     // Tolerance scales with deal size: penny-safe pro-rata allocation in the
     // waterfall rounds to the currency's smallest unit per recipient.
@@ -4943,19 +4964,20 @@ fn debug_assert_cash_conserved(
             + pool_flows.prepayment.amount()
             + released_recoveries.amount()
     } - side_net_capture;
-    debug_assert!(
-        (total_cash_for_waterfall.amount() - expected_input).abs() <= tol,
-        "cash-conservation (input): waterfall received {} but distributable \
+    if (total_cash_for_waterfall.amount() - expected_input).abs() > tol {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "cash-conservation (input): waterfall received {} but distributable \
          pool cash is {} (interest={}, scheduled={}, prepay={}, recoveries={}, \
          principal_diverted={})",
-        total_cash_for_waterfall.amount(),
-        expected_input,
-        pool_flows.interest.amount(),
-        pool_flows.scheduled_principal.amount(),
-        pool_flows.prepayment.amount(),
-        released_recoveries.amount(),
-        principal_diverted,
-    );
+            total_cash_for_waterfall.amount(),
+            expected_input,
+            pool_flows.interest.amount(),
+            pool_flows.scheduled_principal.amount(),
+            pool_flows.prepayment.amount(),
+            released_recoveries.amount(),
+            principal_diverted,
+        )));
+    }
 
     // Identity 2: the waterfall neither creates nor destroys cash.
     let distributed: f64 = waterfall_result
@@ -4964,15 +4986,18 @@ fn debug_assert_cash_conserved(
         .map(|m| m.amount())
         .sum();
     let accounted = distributed + waterfall_result.remaining_cash.amount();
-    debug_assert!(
-        (accounted - waterfall_result.total_available.amount()).abs() <= tol,
-        "cash-conservation (output): waterfall distributed {} + residual {} = \
+    if (accounted - waterfall_result.total_available.amount()).abs() > tol {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "cash-conservation (output): waterfall distributed {} + residual {} = \
          {} but had {} available",
-        distributed,
-        waterfall_result.remaining_cash.amount(),
-        accounted,
-        waterfall_result.total_available.amount(),
-    );
+            distributed,
+            waterfall_result.remaining_cash.amount(),
+            accounted,
+            waterfall_result.total_available.amount(),
+        )));
+    }
+
+    Ok(())
 }
 
 /// Recycle reinvestment-period principal back into the surviving pool.
