@@ -95,6 +95,11 @@ pub(crate) struct OasPathFlowSource {
     as_of: Date,
     /// Monthly short-rate path from `as_of` (`None` ⇒ rates not stochastic).
     rate_path: Option<Vec<f64>>,
+    /// SC-M13: per-month departure of the simulated short rate from the
+    /// deterministic forward curve, `rate_path[m] − forwards[m]`. Applied to
+    /// FLOATING coupon projection so a floater's coupons follow the same path
+    /// its discount factors do.
+    rate_shift_path: Option<Vec<f64>>,
     /// Systematic credit factor for the scenario (`None` ⇒ credit not stochastic).
     credit_z: Option<f64>,
     /// Rate-dependent prepayment sensitivity (β in `exp(-β·(r-r₀))`).
@@ -109,6 +114,7 @@ impl OasPathFlowSource {
     pub(crate) fn new(
         as_of: Date,
         rate_path: Option<Vec<f64>>,
+        rate_shift_path: Option<Vec<f64>>,
         credit_z: Option<f64>,
         prepay_beta: f64,
         base_rate: f64,
@@ -117,6 +123,7 @@ impl OasPathFlowSource {
         Self {
             as_of,
             rate_path,
+            rate_shift_path,
             credit_z,
             prepay_beta,
             base_rate,
@@ -128,6 +135,25 @@ impl OasPathFlowSource {
 impl PoolFlowSource for OasPathFlowSource {
     fn calculate_pool_flows(&mut self, request: PoolFlowRequest<'_, '_>) -> Result<PoolFlows> {
         const RATE_CLAMP: f64 = 0.9999;
+
+        // SC-M13: publish this period's rate shift so FLOATING coupons — both
+        // pool assets and tranches — follow the simulated path.
+        //
+        // Without it the OAS applied a stochastic discount factor to
+        // DETERMINISTIC coupons. For a floater that is the wrong instrument
+        // entirely: coupon/discount correlation is exactly what makes a floater
+        // rate-insensitive, and dropping it leaves only the discounting leg. The
+        // martingale correction keeps the mean PV unbiased so the OAS point
+        // estimate survived, but the per-path dispersion — and therefore
+        // `price_std_error` — measured a risk a CLO does not have.
+        {
+            let month = self.as_of.months_until(request.pay_date) as usize;
+            request.state.floating_rate_shift = self
+                .rate_shift_path
+                .as_ref()
+                .and_then(|p| p.get(month).copied())
+                .unwrap_or(0.0);
+        }
         let base_smm = request
             .instrument
             .calculate_prepayment_rate(request.pay_date, request.seasoning_months)?;
@@ -738,6 +764,7 @@ fn collateral_asset_rate_for_period(
     accrual_start: Date,
     fallback_all_in_rate: f64,
     spread_bps: Option<f64>,
+    rate_shift: f64,
 ) -> Result<f64> {
     let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
     let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
@@ -751,12 +778,17 @@ fn collateral_asset_rate_for_period(
                 fixing_date,
                 fwd.base_date(),
             )?;
+            // A PAST fixing is observed, not projected: the simulated path
+            // cannot retroactively change it, so no shift applies.
             return Ok(fixing + spread);
         }
         return Ok(fallback_all_in_rate);
     }
 
-    Ok(term_rate_for_period(fwd, context, accrual_start)? + spread)
+    // SC-M13: shift the PROJECTED forward, so a floating asset's coupon follows
+    // the simulated rate path. Floored at zero — a deeply negative shift must
+    // not manufacture a negative all-in coupon.
+    Ok((term_rate_for_period(fwd, context, accrual_start)? + spread + rate_shift).max(0.0))
 }
 
 fn current_collateral_wac(
@@ -783,6 +815,7 @@ fn current_collateral_wac(
                 period_start,
                 state.pool_state.rates[i],
                 state.pool_state.spread_bps[i],
+                state.floating_rate_shift,
             )?
         } else {
             state.pool_state.rates[i]
@@ -831,11 +864,25 @@ fn tranche_period_interest_due(
     context: &MarketContext,
     afc_cap: f64,
     afc_capped: bool,
+    rate_shift: f64,
 ) -> Result<f64> {
     let raw =
         tranche
             .coupon
             .try_rate_for_period(dates.start, dates.payment, dates.valuation, context)?;
+    // SC-M13: shift FLOATING tranche coupons onto the simulated rate path so a
+    // floating-rate note's coupon and its discount factors move together. A
+    // fixed coupon is contractual and unaffected. Floored at zero so a deeply
+    // negative path cannot manufacture a negative coupon.
+    let raw = match tranche.coupon {
+        crate::instruments::fixed_income::structured_credit::types::TrancheCoupon::Floating(_) => {
+            (raw + rate_shift).max(0.0)
+        }
+        _ => raw,
+    };
+    // The AFC cap is applied AFTER the shift: the cap tracks the collateral's
+    // net WAC, which is itself shifted, so capping the unshifted rate would
+    // compare quantities measured on different rate paths.
     let rate = if afc_capped { raw.min(afc_cap) } else { raw };
     let accrual =
         tranche
@@ -1344,6 +1391,70 @@ mod tests {
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use time::Month;
 
+    /// SC-M13 — an OAS rate shift must move FLOATING coupon projections.
+    ///
+    /// The simulated rate path previously scaled prepayment only; pool-asset
+    /// and tranche floating coupons still projected off the deterministic
+    /// forward curve. A floater therefore got a stochastic discount factor
+    /// applied to deterministic coupons — the wrong instrument, since
+    /// coupon/discount correlation is exactly what makes a floater
+    /// rate-insensitive.
+    #[test]
+    fn rate_shift_moves_floating_collateral_coupons() {
+        let base = Date::from_calendar_date(2024, Month::January, 1).expect("base");
+        let curve = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
+            "SOFR-3M", 0.25,
+        )
+        .base_date(base)
+        .day_count(DayCount::Act360)
+        .reset_lag(2)
+        .knots([(0.0, 0.04), (10.0, 0.04)])
+        .build()
+        .expect("forward curve should build");
+        let accrual_start = Date::from_calendar_date(2024, Month::June, 1).expect("start");
+        let market = MarketContext::new();
+
+        let unshifted = collateral_asset_rate_for_period(
+            &curve,
+            &market,
+            accrual_start,
+            0.05,
+            Some(100.0),
+            0.0,
+        )
+        .expect("unshifted rate");
+        let shifted = collateral_asset_rate_for_period(
+            &curve,
+            &market,
+            accrual_start,
+            0.05,
+            Some(100.0),
+            0.01,
+        )
+        .expect("shifted rate");
+
+        assert!(
+            (shifted - unshifted - 0.01).abs() < 1e-12,
+            "a +100bp path shift must raise the projected floating coupon by \
+             exactly that: {unshifted:.6} -> {shifted:.6} (SC-M13)"
+        );
+
+        // A deeply negative path must not manufacture a negative coupon.
+        let floored = collateral_asset_rate_for_period(
+            &curve,
+            &market,
+            accrual_start,
+            0.05,
+            Some(100.0),
+            -0.50,
+        )
+        .expect("floored rate");
+        assert!(
+            floored >= 0.0,
+            "the all-in coupon must floor at zero, got {floored}"
+        );
+    }
+
     #[test]
     fn collateral_term_rate_is_discount_factor_implied() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid base date");
@@ -1426,6 +1537,7 @@ mod tests {
             accrual_start,
             0.071,
             Some(125.0),
+            0.0, // no OAS rate shift in this unit test
         )
         .expect("stored current coupon is authoritative for an already-reset period");
 
@@ -3581,6 +3693,10 @@ pub(crate) struct SimulationState<'a> {
     /// balances flat) and released as a bullet at the accumulation end. See
     /// `ControlledAccumulationSpec`.
     principal_funding_account: Money,
+    /// SC-M13: additive shift applied to FLOATING rate projections this period,
+    /// so OAS-simulated coupons follow the same rate path as the discounting.
+    /// Zero for every non-OAS run, making this exact identity there.
+    floating_rate_shift: f64,
 }
 
 /// Deal-health metrics for this period's step-down trigger evaluation.
@@ -3775,6 +3891,7 @@ impl<'a> SimulationState<'a> {
             reserve_balance: pool.reserve_account,
             spread_account: Money::new(0.0, base_ccy),
             principal_funding_account: Money::new(0.0, base_ccy),
+            floating_rate_shift: 0.0,
         })
     }
 
@@ -4247,6 +4364,7 @@ fn simulate_period(
                 context,
                 live_afc_cap,
                 afc_capped,
+                state.floating_rate_shift,
             )?;
             if !tranche.pik_enabled {
                 debt_interest_due += state
@@ -4584,6 +4702,7 @@ fn simulate_period(
                 context,
                 afc_cap,
                 afc_capped,
+                state.floating_rate_shift,
             )?,
             state.base_ccy,
         );
@@ -5109,6 +5228,7 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
                 request.prev_date,
                 state.pool_state.rates[i],
                 state.pool_state.spread_bps[i],
+                state.floating_rate_shift,
             )?
         } else {
             state.pool_state.rates[i]

@@ -215,6 +215,18 @@ pub fn calculate_tranche_oas(
             )),
             _ => None,
         };
+        // SC-M13: the path's departure from the deterministic forward curve,
+        // applied to FLOATING coupon projection so a floater's coupons move
+        // with the same rates that drive its discount factors.
+        let rate_shift_path = match (&forwards, &rate_path) {
+            (Some(fwd), Some(path)) => Some(
+                path.iter()
+                    .zip(fwd.iter())
+                    .map(|(r, f)| r - f)
+                    .collect::<Vec<f64>>(),
+            ),
+            _ => None,
+        };
         let credit_z = if config.stochastic_credit {
             let mut sub = rng.substream(2 * path as u64 + 1);
             Some(sub.next_std_normal())
@@ -225,6 +237,7 @@ pub fn calculate_tranche_oas(
         let mut source = OasPathFlowSource::new(
             as_of,
             rate_path,
+            rate_shift_path,
             credit_z,
             config.prepay_beta,
             base_rate,
