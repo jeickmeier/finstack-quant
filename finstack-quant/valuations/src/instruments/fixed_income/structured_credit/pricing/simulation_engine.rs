@@ -524,16 +524,33 @@ fn release_spread_account(
         }
     }
 
-    // Release to the equity tranche as a residual principal flow.
-    let equity_id = state
+    // Release to the residual holder as a residual principal flow.
+    //
+    // N7: this previously required a tranche with `TrancheSeniority::Equity`
+    // and SILENTLY ZEROED the account when none existed — destroying the cash,
+    // the same sink class as the original reserve-account defect (SC-C07). A
+    // deal whose most junior class is Subordinated rather than Equity, which is
+    // a perfectly ordinary structure, lost the entire released balance.
+    //
+    // Falls back to the most-junior tranche by payment priority, matching
+    // `release_reserve_account` and `release_principal_funding_account` so all
+    // three terminal sweeps behave identically and none can strand cash.
+    let residual_id = state
         .tranches
         .tranches
         .iter()
         .find(|t| t.seniority == TrancheSeniority::Equity)
+        .or_else(|| {
+            state
+                .tranches
+                .tranches
+                .iter()
+                .max_by_key(|t| t.payment_priority)
+        })
         .map(|t| t.id.as_str().to_string());
-    if let Some(eq_id) = equity_id {
+    if let Some(id) = residual_id {
         let release_date = state.prev_date.unwrap_or(state.closing_date);
-        append_residual_principal(state, &eq_id, balance, release_date)?;
+        append_residual_principal(state, &id, balance, release_date)?;
     }
     state.spread_account = Money::new(0.0, state.base_ccy);
     Ok(())
@@ -2398,6 +2415,143 @@ mod tests {
             .sum()
     }
 
+    /// Build a deal with an excess-spread account and optional senior fees.
+    fn excess_spread_deal(with_fees: bool) -> StructuredCredit {
+        use crate::instruments::fixed_income::structured_credit::types::{
+            ExcessSpreadSpec, WaterfallRules,
+        };
+        let mut deal = reserve_account_deal(0.0);
+        // Note coupon well below collateral, so genuine excess spread exists.
+        deal.tranches.tranches[0].coupon = TrancheCoupon::Fixed { rate: 0.02 };
+        deal.waterfall_rules = Some(WaterfallRules {
+            excess_spread: Some(ExcessSpreadSpec {
+                target_balance: Money::new(10_000_000.0, Currency::USD),
+                trap_loss_pct: None,
+            }),
+            ..Default::default()
+        });
+        if with_fees {
+            deal = deal.with_standard_fees();
+        }
+        deal
+    }
+
+    /// N7 — the spread account must reach the residual holder even when the
+    /// most junior class is not labelled `Equity`.
+    ///
+    /// `release_spread_account` required a `TrancheSeniority::Equity` tranche
+    /// and silently zeroed the balance otherwise — the same cash-sink class as
+    /// the original reserve defect (SC-C07). A deal whose junior class is
+    /// Subordinated is an ordinary structure and lost the whole balance.
+    ///
+    /// Only the junior tranche's SENIORITY LABEL differs between the two runs,
+    /// so waterfall mechanics and payment ordering are identical and the
+    /// comparison isolates the release path. (A with/without-account comparison
+    /// would not: capturing surplus interest slows the turbo paydown, which
+    /// legitimately changes lifetime totals.)
+    #[test]
+    fn spread_account_releases_to_a_non_equity_residual_holder() {
+        use crate::instruments::fixed_income::structured_credit::types::{
+            ExcessSpreadSpec, WaterfallRules,
+        };
+
+        let build = |junior_seniority: TrancheSeniority| -> StructuredCredit {
+            let maturity = Date::from_calendar_date(2029, Month::January, 1).expect("date");
+            let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+            pool.assets.push(PoolAsset::fixed_rate_bond(
+                "A1",
+                Money::new(10_000_000.0, Currency::USD),
+                0.06,
+                maturity,
+                DayCount::Thirty360,
+            ));
+            let mk = |id: &str, sen, attach: f64, detach: f64, bal: f64| {
+                Tranche::new(
+                    id,
+                    attach,
+                    detach,
+                    sen,
+                    Money::new(bal, Currency::USD),
+                    TrancheCoupon::Fixed { rate: 0.02 },
+                    maturity,
+                )
+                .expect("tranche")
+            };
+            let tranches = TrancheStructure::new(vec![
+                mk("SR", TrancheSeniority::Senior, 20.0, 100.0, 8_000_000.0),
+                mk("JR", junior_seniority, 0.0, 20.0, 2_000_000.0),
+            ])
+            .expect("structure");
+            let mut deal = StructuredCredit::new_abs(
+                "ABS-SPREAD",
+                pool,
+                tranches,
+                cleanup_test_date(),
+                maturity,
+                "USD-OIS",
+            )
+            .with_payment_calendar("nyse");
+            deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+            deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+            deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+            deal.waterfall_rules = Some(WaterfallRules {
+                excess_spread: Some(ExcessSpreadSpec {
+                    target_balance: Money::new(10_000_000.0, Currency::USD),
+                    trap_loss_pct: None,
+                }),
+                ..Default::default()
+            });
+            deal
+        };
+
+        let with_equity = total_distributed(&build(TrancheSeniority::Equity));
+        let with_subordinated = total_distributed(&build(TrancheSeniority::Subordinated));
+
+        assert!(
+            (with_equity - with_subordinated).abs() < 1.0,
+            "the released spread account must reach the residual holder \
+             regardless of its seniority LABEL: {with_equity:.2} with an Equity \
+             junior class vs {with_subordinated:.2} with a Subordinated one. A \
+             shortfall means the balance was zeroed instead of paid out (N7)."
+        );
+    }
+
+    /// N1 — excess-spread capture must rank senior fees ahead of note interest.
+    ///
+    /// `debt_interest_due` predates the fee tier (SC-C07 before SC-M03) and
+    /// summed note coupon + deferred only, so the capture skimmed surplus the
+    /// fee tier needed and the notes deferred despite ample excess spread.
+    #[test]
+    fn fee_aware_capture_does_not_starve_note_interest() {
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let results = crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
+            &excess_spread_deal(true),
+            &market,
+            cleanup_test_date(),
+        )
+        .expect("simulation");
+
+        let total_pik: f64 = results.values().map(|tc| tc.total_pik.amount()).sum();
+        assert!(
+            total_pik < 1.0,
+            "6% collateral against a 2% coupon leaves ample spread for both the \
+             fee tier and note interest, so the notes must not defer. Deferred \
+             {total_pik:.2} means the capture is skimming cash fees need (N1)."
+        );
+    }
+
+    /// N1 — senior fees are real cash leaving the deal, so the notes receive
+    /// strictly less once fees are charged.
+    #[test]
+    fn senior_fees_reduce_cash_reaching_the_notes() {
+        let with_fees = total_distributed(&excess_spread_deal(true));
+        let without_fees = total_distributed(&excess_spread_deal(false));
+        assert!(
+            with_fees < without_fees,
+            "fees must reduce note cash: {with_fees:.2} vs {without_fees:.2}"
+        );
+    }
+
     /// Funded reserve is released to investors (not destroyed as a sink).
     #[test]
     fn funded_reserve_account_is_released_to_investors_not_destroyed() {
@@ -4006,7 +4160,56 @@ fn simulate_period(
         .and_then(|rules| rules.excess_spread.as_ref())
         .is_some()
         || state.reserve_balance.amount() > 0.0;
-    let mut debt_interest_due = 0.0_f64;
+    // N1: senior fees are part of what the waterfall owes AHEAD of the notes.
+    //
+    // `debt_interest_due` below was written for the reserve/excess-spread work
+    // (SC-C07) BEFORE the fee tier existed (SC-M03), and was never revisited
+    // when it did. It summed note coupon + deferred interest only, so the
+    // excess-spread account measured "surplus" against a claim that omitted
+    // every fee the waterfall pays first.
+    //
+    // Concretely, on a revolving deal with pool interest 100, fees 5 and note
+    // interest due 90: capture skimmed 100 − 90 = 10, the waterfall received
+    // 90, the fee tier took its 5 first, and the notes were left 5 short —
+    // deferring interest (or CAPITALIZING it for PIK tranches, compounding the
+    // error into later interest due and OC denominators) while the fee-netted
+    // IC test read (100 − 5)/90 = 1.056 and reported healthy. The capture and
+    // the coverage test disagreed about the senior claim.
+    //
+    // Netting fees here makes the two agree, and uses the same
+    // `senior_fee_accrual` kernel the waterfall pays with, so the measured and
+    // paid amounts cannot drift.
+    let senior_fee_accrual_amount = if needs_interest_due {
+        let mut tranche_index = finstack_quant_core::HashMap::default();
+        for (i, tr) in state.tranches.tranches.iter().enumerate() {
+            tranche_index.insert(tr.id.as_str(), i);
+        }
+        crate::instruments::fixed_income::structured_credit::pricing::waterfall::senior_fee_accrual(
+            // The BASE waterfall: `resolve_waterfall` only rewrites AFC caps
+            // on tranche interest, step-down/shifting weights on principal
+            // tiers, and accumulation lockout targets — it never touches fee
+            // tiers, so the fee accrual is identical either way.
+            waterfall,
+            state.tranches,
+            &tranche_index,
+            crate::instruments::fixed_income::structured_credit::pricing::waterfall::SeniorFeeInputs {
+                available: pool_flows.interest,
+                tranche_balances: Some(&state.tranche_balances),
+                deferred_interest: Some(&state.deferred_interest),
+                pool_balance: state.pool_outstanding,
+                period_start,
+                payment_date: pay_date,
+                valuation_date: as_of,
+                market: context,
+                reserve_balance: state.reserve_balance,
+            },
+        )?
+        .amount()
+    } else {
+        0.0
+    };
+
+    let mut debt_interest_due = senior_fee_accrual_amount;
     if needs_interest_due {
         let afc = instrument
             .waterfall_rules
@@ -4106,8 +4309,26 @@ fn simulate_period(
     // balance; `reserve_net_capture` (negative on draw) feeds cash conservation.
     let mut reserve_net_capture = 0.0_f64;
     if state.reserve_balance.amount() > 0.0 {
-        let interest_available = pool_flows.interest.amount() - spread_net_capture;
-        let shortfall = (debt_interest_due - interest_available).max(0.0);
+        // N4: size the draw against the cash the waterfall will ACTUALLY have,
+        // not pool interest alone.
+        //
+        // This waterfall is fungible: a single sequential sweep applies all
+        // available cash — interest, principal collections and released
+        // recoveries alike — to the fee, interest and principal tiers in order.
+        // Measuring the shortfall against interest only therefore drew the
+        // reserve in periods with no genuine funding gap: with interest 80,
+        // fees + note interest due 90 and principal collections 200, the old
+        // measure drew 10 even though the waterfall would have covered the
+        // claim comfortably. The drawn enhancement then entered at the top and
+        // the marginal cash landed at the first unsatisfied claim — extra
+        // principal paydown, or equity residual once principal was retired.
+        //
+        // Depleting credit enhancement in unstressed periods understates
+        // protection in the stressed ones it was funded for, which is the
+        // opposite of what a reserve is for. `total_cash_for_waterfall` already
+        // reflects this period's excess-spread capture or draw, so it is the
+        // right base.
+        let shortfall = (debt_interest_due - total_cash_for_waterfall.amount()).max(0.0);
         let draw = shortfall.min(state.reserve_balance.amount()).max(0.0);
         if draw > 0.0 {
             let draw_money = Money::new(draw, state.base_ccy);

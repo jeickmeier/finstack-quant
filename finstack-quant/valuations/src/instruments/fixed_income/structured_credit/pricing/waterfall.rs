@@ -174,36 +174,23 @@ fn execute_waterfall_core(
     }
 
     // Senior fees rank ahead of every note, so IC uses
-    // `(interest collections − senior fees) / note interest due`. Compute fees
-    // with the same payment kernel used by the waterfall.
-    let empty_in_period: HashMap<String, Money> = HashMap::default();
-    let mut senior_fees = Money::new(0.0, waterfall.base_currency);
-    for tier in waterfall
-        .tiers
-        .iter()
-        .take_while(|t| t.payment_type == PaymentType::Fee)
-    {
-        for recipient in &tier.recipients {
-            let amount = calculate_payment_amount(
-                waterfall.base_currency,
-                &recipient.calculation,
-                context.interest_collections,
-                tranches,
-                &allocation_ctx.tranche_index,
-                context.tranche_balances,
-                context.deferred_interest,
-                context.pool_balance,
-                context.period_start,
-                context.payment_date,
-                context.valuation_date,
-                context.market,
-                context.reserve_balance,
-                &empty_in_period,
-                false,
-            )?;
-            senior_fees = senior_fees.checked_add(amount)?;
-        }
-    }
+    // `(interest collections − senior fees) / note interest due`.
+    let senior_fees = senior_fee_accrual(
+        waterfall,
+        tranches,
+        &allocation_ctx.tranche_index,
+        SeniorFeeInputs {
+            available: context.interest_collections,
+            tranche_balances: context.tranche_balances,
+            deferred_interest: context.deferred_interest,
+            pool_balance: context.pool_balance,
+            period_start: context.period_start,
+            payment_date: context.payment_date,
+            valuation_date: context.valuation_date,
+            market: context.market,
+            reserve_balance: context.reserve_balance,
+        },
+    )?;
 
     // Evaluate coverage tests against current balances.
     let coverage_test_results = evaluate_coverage_tests(
@@ -974,6 +961,82 @@ fn water_fill_allocation(total_units: i64, weights: &[f64], caps: &[i64]) -> Vec
 ///
 /// `principal_collections` is the cash component of the OC numerator
 /// (standard CLO par-OC counts only principal proceeds, never interest).
+/// Inputs the senior-fee kernel needs beyond the waterfall and tranche index.
+pub(crate) struct SeniorFeeInputs<'a> {
+    /// Cash the fee tier is measured against (pool interest for a period).
+    pub available: Money,
+    /// Current tranche balances, when known.
+    pub tranche_balances: Option<&'a HashMap<String, Money>>,
+    /// Outstanding deferred interest, when known.
+    pub deferred_interest: Option<&'a HashMap<String, Money>>,
+    /// Collateral balance the percentage-of-collateral fees accrue on.
+    pub pool_balance: Money,
+    /// Accrual period start.
+    pub period_start: Date,
+    /// Payment date.
+    pub payment_date: Date,
+    /// Valuation date.
+    pub valuation_date: Date,
+    /// Market context for any index-linked fee.
+    pub market: &'a MarketContext,
+    /// Reserve balance, for reserve-linked calculations.
+    pub reserve_balance: Money,
+}
+
+/// Senior fees accruing this period, i.e. the fee tiers that rank ahead of
+/// every note.
+///
+/// `take_while` deliberately stops at the first non-Fee tier: only fees that
+/// sit ABOVE the notes are senior claims. A junior fee tier placed below the
+/// notes is not a senior claim and must not be counted here.
+///
+/// This is the single source of truth for "what the fee tier will take",
+/// shared by three call sites that previously would have drifted:
+///   * the IC numerator (SC-M29), which nets it from interest collections;
+///   * the excess-spread capture/draw and the reserve draw (N1), which must
+///     treat it as a senior claim ranking ahead of note interest;
+///   * the waterfall itself, which actually pays it.
+///
+/// Computing it with `calculate_payment_amount` — the same kernel the fee tier
+/// uses to pay — is what makes the measured and paid amounts identical by
+/// construction rather than by coincidence.
+pub(crate) fn senior_fee_accrual(
+    waterfall: &Waterfall,
+    tranches: &TrancheStructure,
+    tranche_index: &HashMap<&str, usize>,
+    inputs: SeniorFeeInputs<'_>,
+) -> Result<Money> {
+    let empty_in_period: HashMap<String, Money> = HashMap::default();
+    let mut total = Money::new(0.0, waterfall.base_currency);
+    for tier in waterfall
+        .tiers
+        .iter()
+        .take_while(|t| t.payment_type == PaymentType::Fee)
+    {
+        for recipient in &tier.recipients {
+            let amount = calculate_payment_amount(
+                waterfall.base_currency,
+                &recipient.calculation,
+                inputs.available,
+                tranches,
+                tranche_index,
+                inputs.tranche_balances,
+                inputs.deferred_interest,
+                inputs.pool_balance,
+                inputs.period_start,
+                inputs.payment_date,
+                inputs.valuation_date,
+                inputs.market,
+                inputs.reserve_balance,
+                &empty_in_period,
+                false,
+            )?;
+            total = total.checked_add(amount)?;
+        }
+    }
+    Ok(total)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn evaluate_coverage_tests(
     waterfall: &Waterfall,
