@@ -8,14 +8,13 @@
 //! - Stochastic pricing
 
 pub(crate) mod coverage_tests;
-pub(crate) mod diversion;
 pub(crate) mod resolve;
 pub(crate) mod simulation_engine;
 pub(crate) mod stochastic;
 pub(crate) mod waterfall;
 
 pub use resolve::resolve_waterfall;
-pub use waterfall::{execute_waterfall, execute_waterfall_with_workspace};
+pub use waterfall::execute_waterfall;
 
 use crate::cashflow::traits::DatedFlows;
 use crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::DeterministicPoolFlowSource;

@@ -442,28 +442,6 @@ pub fn execute_waterfall_with_explanation(
     execute_waterfall_core(waterfall, tranches, pool, context, explain, None)
 }
 
-/// Execute waterfall using a pre-allocated workspace for zero-allocation hot paths.
-///
-/// # Arguments
-///
-/// * `waterfall` - Ordered payment rules, base currency, and diversion logic.
-/// * `tranches` - Tranche structure receiving the calculated distributions.
-/// * `pool` - Asset pool supplying collateral and coverage-test data.
-/// * `context` - Period cash, dates, market data, and dynamic balance state.
-/// * `explain` - Trace configuration for the resulting allocation explanation.
-/// * `workspace` - Caller-owned reusable buffers overwritten during execution
-///   and retained for subsequent zero-allocation waterfall calls.
-pub fn execute_waterfall_with_workspace(
-    waterfall: &Waterfall,
-    tranches: &TrancheStructure,
-    pool: &AssetPool,
-    context: WaterfallContext,
-    explain: ExplainOpts,
-    workspace: &mut WaterfallWorkspace,
-) -> Result<WaterfallDistribution> {
-    execute_waterfall_core(waterfall, tranches, pool, context, explain, Some(workspace))
-}
-
 // ============================================================================
 // ALLOCATION CONTEXT
 // ============================================================================
