@@ -645,6 +645,20 @@ pub struct WaterfallDistribution {
 
     /// Distributions by recipient
     pub distributions: HashMap<RecipientType, Money>,
+    /// The PRINCIPAL portion of `distributions`, per recipient.
+    ///
+    /// SC-M28: `distributions` aggregates a tranche's interest and principal
+    /// into one number, because `RecipientType::Tranche(id)` is the same key
+    /// for both. Step 5 therefore had to RE-DERIVE the split by assuming
+    /// interest is satisfied first — which silently reclassified a diverted
+    /// OC-cure principal payment as interest whenever that tranche carried a
+    /// shortfall, leaving the balance unretired so the cure could not reduce
+    /// the very denominator it was sized to fix.
+    ///
+    /// The waterfall already knows the answer: `PaymentCalculation`
+    /// distinguishes `TranchePrincipal` from `TrancheInterest`. Reporting it
+    /// here makes the classification authoritative instead of reconstructed.
+    pub principal_distributions: HashMap<RecipientType, Money>,
     /// Detailed payment records
     pub payment_records: Vec<PaymentRecord>,
 

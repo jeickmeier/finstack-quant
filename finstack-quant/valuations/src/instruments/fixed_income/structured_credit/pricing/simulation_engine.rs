@@ -4599,12 +4599,46 @@ fn simulate_period(
             .copied()
             .unwrap_or(Money::new(0.0, state.base_ccy));
 
-        // Determine how much of this tranche's distribution cures interest
-        // claims before any remainder is classified as principal.
-        let interest_paid = if payment_received.amount() >= total_interest_claim.amount() {
+        // SC-M28: take the waterfall's OWN interest/principal classification
+        // rather than re-deriving it from the aggregate.
+        //
+        // `distributions` keys a tranche's interest and principal under the
+        // same `RecipientType::Tranche(id)`, so this used to reconstruct the
+        // split by assuming interest is satisfied FIRST:
+        //     interest_paid = min(payment_received, total_interest_claim)
+        //     principal     = remainder
+        //
+        // That silently reclassified principal as interest whenever a tranche
+        // carried a shortfall — which is exactly the state an OC cure exists to
+        // address. A cure diverted to senior PRINCIPAL was booked as interest,
+        // the balance was never retired, and the next period's OC denominator
+        // was unchanged: the cure could not de-lever the ratio it was sized to
+        // fix. The defect bound precisely in the stress scenarios the cure
+        // mechanics (SC-M07/M08/M09) were built for.
+        //
+        // The waterfall already knows which payments were `TranchePrincipal`;
+        // `principal_distributions` reports it. Interest is then the remainder,
+        // capped by the claim so a residual/equity distribution against a zero
+        // interest claim cannot be misbooked as a coupon.
+        let principal_from_waterfall = waterfall_result
+            .principal_distributions
+            .get(recipient_key)
+            .copied()
+            .unwrap_or(Money::new(0.0, state.base_ccy));
+        let principal_classified = Money::new(
+            principal_from_waterfall
+                .amount()
+                .min(payment_received.amount())
+                .max(0.0),
+            state.base_ccy,
+        );
+        let interest_portion = payment_received
+            .checked_sub(principal_classified)
+            .unwrap_or(Money::new(0.0, state.base_ccy));
+        let interest_paid = if interest_portion.amount() >= total_interest_claim.amount() {
             total_interest_claim
         } else {
-            payment_received
+            interest_portion
         };
         let deferred_repaid = Money::new(
             interest_paid
@@ -4621,6 +4655,9 @@ fn simulate_period(
             state.base_ccy,
         );
 
+        // Anything the waterfall did not classify as interest retires notional.
+        // (`interest_paid` can be below `interest_portion` when the claim is
+        // smaller than what the interest tiers paid — that excess is principal.)
         let principal_payment = payment_received
             .checked_sub(interest_paid)
             .unwrap_or(Money::new(0.0, state.base_ccy));
