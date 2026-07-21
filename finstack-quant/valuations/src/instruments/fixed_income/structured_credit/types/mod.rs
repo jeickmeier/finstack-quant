@@ -525,8 +525,8 @@ impl StructuredCredit {
         }
 
         // Trustee fee first: a flat administrative charge senior to everything.
-        let periods_per_year = f64::from(self.frequency.months().unwrap_or(12).max(1));
-        let periods_per_year = (12.0 / periods_per_year).max(1.0);
+        let months_per_period = f64::from(self.frequency.months().unwrap_or(12).max(1));
+        let periods_per_year = (12.0 / months_per_period).max(1.0);
         let trustee_period = fees.trustee_fee_annual.amount() / periods_per_year;
         if trustee_period > 0.0 && trustee_period.is_finite() {
             recipients.push(Recipient::new(
@@ -559,10 +559,8 @@ impl StructuredCredit {
                 bps,
             ));
         }
-        // NOTE: the SUBORDINATED management fee is deliberately omitted from
-        // this senior tier. In a real CLO it sits below the notes (often below
-        // the OC/IC tests), so paying it here would invert its priority.
-        // Modelling it correctly needs a junior fee tier — a follow-up.
+        // Subordinated management fees require a junior fee tier; including
+        // them here would incorrectly make them senior to the notes.
 
         recipients
     }
@@ -910,23 +908,11 @@ impl StructuredCredit {
             .as_ref()
             .map(super::pricing::CorrelationStructure::asset_correlation);
         // Market refi rate for Richard-Roll; 4.5% fallback matches RMBS defaults.
-        // SC-M15: the intensity model's mean-reversion speed drives the
-        // SYSTEMATIC FACTOR's mean reversion.
-        //
-        // `IntensityProcessDefault` documents `dX = kappa(theta - X)dt +
-        // sigma dW` (Duffie-Singleton 1999; Lando 1998) and its intensity is
-        // `lambda_0 * exp(-beta*sigma*X - 0.5*beta^2*sigma^2)`. But `kappa` was
-        // stored, clamped, exposed by a getter — and used in NO computation:
-        // `intensity()` is a static function of a single scalar `X`, with no
-        // state, no time step and no theta. The parameter was inert and the
-        // citation unearned.
-        //
-        // After SC-C05 the factor `X` IS a mean-reverting OU path, so the
-        // documented model is realizable without threading new per-path state:
-        // an exponential function of an OU factor is exactly the
-        // exponential-OU intensity the header describes. Sourcing the factor's
-        // kappa from the intensity spec makes the user's parameter drive the
-        // process it names.
+        // The intensity model's κ drives the systematic OU factor in
+        // `dX = κ(θ − X)dt + σdW`, making
+        // `λ = λ₀ exp(-βσX - 0.5β²σ²)` an exponential-OU intensity
+        // (Duffie-Singleton 1999; Lando 1998). κ = 0 intentionally retains the
+        // horizon-persistent factor configured by the base tree.
         if let StochasticDefaultSpec::IntensityProcess { mean_reversion, .. } =
             &tree_config.default_spec
         {

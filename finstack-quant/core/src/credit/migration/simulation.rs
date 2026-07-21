@@ -260,11 +260,8 @@ impl MigrationSimulator {
 
 /// Run Gillespie's competing-exponentials scheme and return the terminal state.
 ///
-/// `on_transition` is invoked for each state change with `(time, new_state)`.
-/// This is the single implementation behind both [`simulate_path`] (which
-/// records transitions) and [`simulate_terminal_state`] (which discards them);
-/// keeping one loop guarantees the two cannot drift and that both consume RNG
-/// draws in exactly the same order.
+/// `on_transition` receives each `(time, new_state)` transition. Both path
+/// recording and terminal-only simulation use this loop and RNG draw order.
 fn simulate_gillespie<R: Rng>(
     gen: &GeneratorMatrix,
     initial_state: usize,
@@ -353,12 +350,7 @@ fn simulate_path<R: Rng>(
     }
 }
 
-/// Simulate one path and return only the state at `horizon`.
-///
-/// Equivalent to `simulate_path(..).state_at(horizon)` but without allocating
-/// (and immediately dropping) the transition `Vec` or touching the scale's
-/// refcount. `empirical_matrix` runs one path per sample -- millions in a
-/// VaR/CVA run -- so the per-sample allocation dominated its cost.
+/// Simulate one path without allocating a transition history.
 fn simulate_terminal_state<R: Rng>(
     gen: &GeneratorMatrix,
     initial_state: usize,

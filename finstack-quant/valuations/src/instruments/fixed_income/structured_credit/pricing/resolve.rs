@@ -137,21 +137,10 @@ pub(crate) fn apply_step_down<'w, S: std::hash::BuildHasher>(
         }
         tier.allocation_mode = AllocationMode::ProRata;
 
-        // SC-M16: pro-rata means BY CURRENT BALANCE, not equal shares.
-        //
-        // Flipping the allocation mode without setting weights left
-        // `allocate_pro_rata` falling back to `weight.unwrap_or(1.0)`, i.e. an
-        // equal split across recipients. On a 500M/50M A/B stack receiving 55M
-        // of principal that pays 27.5M/27.5M instead of 50M/5M — the junior
-        // gets 5.5x its entitlement, and the senior is starved, which is the
-        // opposite of what a step-down is meant to control.
-        //
-        // `apply_shifting_interest` already weights by balance; this mirrors
-        // it. A recipient whose tranche has no outstanding balance gets a zero
-        // weight so it is skipped rather than claiming an equal share of the
-        // remaining cash.
+        // Step-down principal is pro-rata by current balance, matching shifting
+        // interest. Zero-balance recipients receive no allocation.
         for recipient in &mut tier.recipients {
-            let balance = tranche_id_of(recipient)
+            let balance = tranche_id_of(recipient, TrancheRecipientScope::PrincipalOrInterest)
                 .and_then(|id| tranche_balances.get(id))
                 .map_or(0.0, |m| m.amount().max(0.0));
             recipient.weight = Some(balance);
@@ -173,11 +162,21 @@ pub(crate) fn apply_step_down<'w, S: std::hash::BuildHasher>(
     Cow::Owned(waterfall)
 }
 
-/// Tranche id a principal recipient pays down, when it is a tranche payment.
-fn tranche_id_of(recipient: &Recipient) -> Option<&str> {
+#[derive(Clone, Copy)]
+enum TrancheRecipientScope {
+    PrincipalOnly,
+    PrincipalOrInterest,
+}
+
+/// Tranche id referenced by a recipient within the requested payment scope.
+fn tranche_id_of(recipient: &Recipient, scope: TrancheRecipientScope) -> Option<&str> {
     match &recipient.calculation {
-        PaymentCalculation::TranchePrincipal { tranche_id, .. }
-        | PaymentCalculation::TrancheInterest { tranche_id, .. } => Some(tranche_id.as_str()),
+        PaymentCalculation::TranchePrincipal { tranche_id, .. } => Some(tranche_id.as_str()),
+        PaymentCalculation::TrancheInterest { tranche_id, .. }
+            if matches!(scope, TrancheRecipientScope::PrincipalOrInterest) =>
+        {
+            Some(tranche_id.as_str())
+        }
         _ => None,
     }
 }
@@ -232,7 +231,7 @@ pub(crate) fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
         let other_ids: Vec<String> = tier
             .recipients
             .iter()
-            .filter_map(|r| principal_tranche_id(r))
+            .filter_map(|r| tranche_id_of(r, TrancheRecipientScope::PrincipalOnly))
             .filter(|id| *id != si.senior_id.as_str())
             .map(str::to_string)
             .collect();
@@ -241,7 +240,8 @@ pub(crate) fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
             .map(|id| tranche_balances.get(id).map_or(0.0, |m| m.amount()))
             .sum();
         for recipient in &mut tier.recipients {
-            let id = principal_tranche_id(recipient).map(str::to_string);
+            let id =
+                tranche_id_of(recipient, TrancheRecipientScope::PrincipalOnly).map(str::to_string);
             if let Some(id) = id {
                 let weight = if id == si.senior_id {
                     senior_pct
@@ -312,14 +312,6 @@ fn senior_share(schedule: &[ShiftingInterestStep], months: u32) -> f64 {
         .map_or(1.0, |s| s.senior_pct)
 }
 
-/// Tranche id of a principal recipient, if it pays tranche principal.
-fn principal_tranche_id(recipient: &Recipient) -> Option<&str> {
-    match &recipient.calculation {
-        PaymentCalculation::TranchePrincipal { tranche_id, .. } => Some(tranche_id.as_str()),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod step_down_weight_tests {
     use super::*;
@@ -360,14 +352,7 @@ mod step_down_weight_tests {
         }
     }
 
-    /// SC-M16 — an active step-down must allocate principal pro-rata BY
-    /// CURRENT BALANCE, not in equal shares.
-    ///
-    /// Flipping `allocation_mode` to `ProRata` without setting weights left
-    /// `allocate_pro_rata` falling back to `weight.unwrap_or(1.0)`. On a
-    /// 500M/50M A/B stack that splits principal 50/50 instead of 10:1 — the
-    /// junior receives 5.5x its entitlement while the senior is starved, the
-    /// opposite of what a step-down controls.
+    /// Active step-down principal is weighted by current tranche balance.
     #[test]
     fn step_down_weights_principal_by_current_balance() {
         let date = Date::from_calendar_date(2026, Month::January, 1).expect("date");
@@ -404,13 +389,11 @@ mod step_down_weight_tests {
         assert!(
             weight("A_principal") > weight("B_principal") * 9.0,
             "a 10:1 balance ratio must produce a ~10:1 weight ratio, not the \
-             1:1 the pre-fix equal-share fallback gave (SC-M16)"
+             1:1 equal-share fallback"
         );
     }
 
-    /// SC-M16 — when every referenced tranche is retired, fall back to equal
-    /// weights rather than emitting an all-zero vector, which `validate_tiers`
-    /// rejects as an invalid pro-rata tier.
+    /// Fully retired tiers leave weights unset instead of emitting all zeros.
     #[test]
     fn step_down_with_all_tranches_retired_leaves_weights_unset() {
         let date = Date::from_calendar_date(2026, Month::January, 1).expect("date");

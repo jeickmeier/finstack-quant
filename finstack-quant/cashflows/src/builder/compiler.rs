@@ -132,7 +132,7 @@ fn build_periods_with_meta(
     index_period_schedule(periods, params.freq)
 }
 
-/// Latest `accrual_end` across a compiled period map (`None` if empty).
+/// Latest accrual end in a compiled period map.
 fn terminal_accrual_end(prev: &PeriodMap) -> Option<Date> {
     prev.values().map(|period| period.accrual_end).max()
 }
@@ -145,7 +145,7 @@ pub(crate) struct FixedSchedule {
     pub(crate) dates: Vec<Date>,
     pub(crate) prev: PeriodMap,
     pub(crate) first_last: DateSet,
-    /// Latest `accrual_end` in `prev`; identifies the termination period.
+    /// Terminal accrual end.
     pub(crate) terminal_accrual_end: Option<Date>,
 }
 
@@ -160,7 +160,7 @@ pub(crate) struct FloatSchedule {
     pub(crate) prev: PeriodMap,
     /// Payment dates whose accrual period is a genuine stub (irregular span).
     pub(crate) first_last: DateSet,
-    /// Latest `accrual_end` in `prev`; identifies the termination period.
+    /// Terminal accrual end.
     pub(crate) terminal_accrual_end: Option<Date>,
 }
 
@@ -187,7 +187,7 @@ pub(super) struct PeriodicFee {
     pub(super) dates: Vec<Date>,
     pub(super) prev: PeriodMap,
     pub(super) accrual_basis: FeeAccrualBasis,
-    /// Latest `accrual_end` in `prev`; identifies the termination period.
+    /// Terminal accrual end.
     pub(super) terminal_accrual_end: Option<Date>,
 }
 

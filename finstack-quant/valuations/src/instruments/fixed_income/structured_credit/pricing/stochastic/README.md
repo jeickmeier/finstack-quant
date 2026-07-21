@@ -99,6 +99,12 @@ println!("VaR(95%): {:.2}", result.var_95.amount());
 | `CopulaBasedDefault` | Corporate CLO | `asset_correlation`, `copula_type` |
 | `IntensityProcessDefault` | CDS-like modeling | `base_intensity`, `vol`, `mean_reversion` |
 
+### Systematic Factor Persistence
+
+Factor mean reversion `kappa` is annualized, with monthly autocorrelation
+`exp(-kappa / 12)`. `kappa = 0` intentionally holds one systematic draw across
+the full horizon; positive values decay toward independent monthly factors.
+
 ### Correlation Structures
 
 Pre-configured structures for common deal types:

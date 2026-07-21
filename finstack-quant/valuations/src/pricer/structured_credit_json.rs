@@ -22,8 +22,8 @@
 
 use crate::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
-    calculate_tranche_oas, scenario_table, OasConfig, OasResult, ScenarioGrid, ScenarioTable,
-    StructuredCredit, TrancheMetrics,
+    calculate_tranche_oas, scenario_table, OasConfig, OasResult, ScenarioCell, ScenarioGrid,
+    ScenarioTable, StructuredCredit, TrancheMetrics,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::parse_iso_date;
@@ -60,25 +60,33 @@ fn tranche_currency(deal: &StructuredCredit, tranche_id: &str) -> Result<Currenc
         })
 }
 
-/// Discount margin (decimal) for a floating-rate tranche from tagged
-/// instrument JSON.
+/// Z-spread-equivalent discount margin for a floating-rate tranche from tagged
+/// instrument JSON, returned in decimal units (`0.0125` = 125 bp).
 ///
-/// `target_pv` is a scalar amount interpreted in the named tranche's currency.
+/// Contractual cashflows are projected without changing coupon projection, then
+/// a constant additive spread is applied to the discount curve. The result is
+/// zero at model PV, negative for a richer (higher) target PV, and positive for
+/// a cheaper (lower) target PV; it is not the contractual quoted margin.
+/// `target_pv` is interpreted in the named tranche's currency.
 ///
 /// # Errors
 ///
 /// Returns an error if the JSON is not a structured-credit deal, the as-of date
-/// is malformed, the tranche is missing or fixed-rate, or the solve fails.
+/// is malformed, the deal fails validation, the tranche is missing or
+/// fixed-rate, `target_pv` is non-finite, required discount/projection market
+/// data is unavailable, or the spread solve fails or exceeds ±5000 bp.
 ///
 /// # Arguments
 ///
 /// * `instrument_json` - UTF-8 tagged structured-credit instrument JSON.
-/// * `tranche_id` - Identifier of the floating-rate tranche whose margin is
-///   solved.
-/// * `market` - Market context supplying the discount curve and index forwards.
-/// * `as_of` - ISO-8601 valuation date used for cashflow projection.
+/// * `tranche_id` - Identifier of the floating-rate tranche whose contractual
+///   cashflows are spread-discounted.
+/// * `market` - Market context supplying the discount curve and any forward
+///   curves or historical fixings required for contractual cashflow projection.
+/// * `as_of` - ISO-8601 valuation date used for projection and discounting.
 /// * `target_pv` - Observed present-value amount in the named tranche's
-///   currency to match with a total discount margin.
+///   currency. Values above model PV produce a negative result; values below
+///   model PV produce a positive result.
 pub fn structured_credit_tranche_discount_margin_json(
     instrument_json: &str,
     tranche_id: &str,
@@ -218,35 +226,28 @@ pub fn structured_credit_tranche_metrics_json(
     let deal = structured_credit_from_json(instrument_json)?;
     let as_of = parse_iso_date(as_of)?;
     let metrics = calculate_tranche_metrics(&deal, tranche_id, market, as_of, market_price_pct)?;
+    ensure_tranche_metrics_finite(&metrics)?;
+    Ok(metrics)
+}
+
+fn ensure_tranche_metrics_finite(metrics: &TrancheMetrics) -> Result<()> {
     ensure_finite(
         &[
             ("pv", metrics.pv),
             ("price_pct", metrics.price_pct),
             ("wal", metrics.wal),
             ("z_spread_bp", metrics.z_spread_bp),
+            ("cs01", metrics.cs01),
             ("spread_duration", metrics.spread_duration),
             ("modified_duration", metrics.modified_duration),
             ("convexity", metrics.convexity),
             ("target_price_pct", metrics.target_price_pct),
         ],
         "structured-credit tranche metrics",
-    )?;
-    Ok(metrics)
+    )
 }
 
-/// SC-M18 — reject a non-finite metric at the boundary instead of letting it
-/// serialize.
-///
-/// `serde_json` emits `null` for a non-finite `f64` rather than erroring, so a
-/// NaN or infinity in any of these result structs crossed the JSON boundary as
-/// `{"pv": null, ...}`. In JavaScript `null` coerces to `0` in arithmetic, so a
-/// failed computation became a confident zero downstream. The two SCALAR entry
-/// points (discount margin, break-even CDR) return `f64` directly and surface a
-/// visible `NaN`, which meant the same library had two opposite failure modes
-/// for the same underlying condition.
-///
-/// Failing here makes both paths behave the same way: a metric that could not
-/// be computed is an error, not a silent zero.
+/// Reject non-finite metrics before `serde_json` converts them to JSON `null`.
 fn ensure_finite(fields: &[(&str, f64)], metric: &str) -> Result<()> {
     for (name, value) in fields {
         if !value.is_finite() {
@@ -288,19 +289,38 @@ pub fn structured_credit_tranche_scenario_table_json(
     let as_of = parse_iso_date(as_of)?;
     let grid: ScenarioGrid = serde_json::from_str(grid_json)
         .map_err(|e| Error::Validation(format!("invalid scenario grid JSON: {e}")))?;
-    scenario_table(&deal, tranche_id, market, as_of, &grid)
+    let table = scenario_table(&deal, tranche_id, market, as_of, &grid)?;
+    ensure_scenario_table_finite(&table)?;
+    Ok(table)
+}
+
+fn ensure_scenario_table_finite(table: &ScenarioTable) -> Result<()> {
+    for (index, cell) in table.cells.iter().enumerate() {
+        ensure_scenario_cell_finite(cell, index)?;
+    }
+    Ok(())
+}
+
+fn ensure_scenario_cell_finite(cell: &ScenarioCell, index: usize) -> Result<()> {
+    ensure_finite(
+        &[
+            ("cpr", cell.cpr),
+            ("cdr", cell.cdr),
+            ("severity", cell.severity),
+            ("price", cell.price),
+            ("wal", cell.wal),
+            ("writedown", cell.writedown),
+        ],
+        &format!("structured-credit scenario cell {index}"),
+    )
 }
 
 #[cfg(test)]
 mod tests {
-    /// SC-M18 — a non-finite metric must be an ERROR, not JSON `null`.
-    ///
-    /// `serde_json` emits `null` for a non-finite `f64` rather than erroring,
-    /// so a NaN crossed the boundary as `{"pv": null, ...}` and in JavaScript
-    /// `null` coerces to `0` in arithmetic — a failed computation reading as a
-    /// confident zero. The scalar entry points return `f64` directly and
-    /// surface a visible `NaN`, so the same library had two opposite failure
-    /// modes for the same condition.
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+
+    /// Non-finite metrics are errors rather than JSON `null`.
     #[test]
     fn non_finite_metric_is_rejected_at_the_boundary() {
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
@@ -314,8 +334,7 @@ mod tests {
         }
     }
 
-    /// SC-M18 — finite metrics pass through untouched, including zero and
-    /// negatives (a negative OAS or spread duration is legitimate).
+    /// Finite metrics include zero and legitimate negative spreads.
     #[test]
     fn finite_metrics_pass_the_boundary_check() {
         assert!(
@@ -328,8 +347,103 @@ mod tests {
         );
     }
 
-    /// SC-M18 — confirms the premise: serde_json really does emit `null` for a
-    /// non-finite f64 rather than failing, which is why the guard is needed.
+    #[test]
+    fn non_finite_tranche_metrics_cs01_is_rejected_at_the_boundary() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let metrics = TrancheMetrics {
+                tranche_id: "A".to_string(),
+                currency: "USD".to_string(),
+                pv: 100.0,
+                price_pct: 100.0,
+                wal: 3.0,
+                z_spread_bp: 150.0,
+                cs01: bad,
+                spread_duration: 4.0,
+                modified_duration: 3.5,
+                convexity: 12.0,
+                target_price_pct: 98.0,
+            };
+            let err = ensure_tranche_metrics_finite(&metrics)
+                .expect_err("a non-finite cs01 must be rejected");
+            let message = err.to_string();
+            assert!(
+                message.contains("cs01") && message.contains("non-finite"),
+                "the error must identify cs01; got: {message}"
+            );
+        }
+    }
+
+    #[test]
+    fn non_finite_scenario_cell_fields_are_rejected_at_the_boundary() {
+        let finite = ScenarioCell {
+            cpr: 0.05,
+            cdr: 0.02,
+            severity: 0.4,
+            price: 98.0,
+            wal: 3.0,
+            writedown: 0.0,
+        };
+        let cases = [
+            (
+                "cpr",
+                ScenarioCell {
+                    cpr: f64::NAN,
+                    ..finite.clone()
+                },
+            ),
+            (
+                "cdr",
+                ScenarioCell {
+                    cdr: f64::NAN,
+                    ..finite.clone()
+                },
+            ),
+            (
+                "severity",
+                ScenarioCell {
+                    severity: f64::NAN,
+                    ..finite.clone()
+                },
+            ),
+            (
+                "price",
+                ScenarioCell {
+                    price: f64::NAN,
+                    ..finite.clone()
+                },
+            ),
+            (
+                "wal",
+                ScenarioCell {
+                    wal: f64::NAN,
+                    ..finite.clone()
+                },
+            ),
+            (
+                "writedown",
+                ScenarioCell {
+                    writedown: f64::NAN,
+                    ..finite
+                },
+            ),
+        ];
+
+        for (field, cell) in cases {
+            let table = ScenarioTable {
+                tranche_id: "A".to_string(),
+                cells: vec![cell],
+            };
+            let err = ensure_scenario_table_finite(&table)
+                .expect_err("a non-finite scenario cell field must be rejected");
+            let message = err.to_string();
+            assert!(
+                message.contains(field) && message.contains("non-finite"),
+                "the error must identify {field}; got: {message}"
+            );
+        }
+    }
+
+    /// `serde_json` emits `null` for non-finite floats.
     #[test]
     fn serde_json_emits_null_for_non_finite_which_is_why_we_guard() {
         let encoded = serde_json::to_string(&f64::NAN).expect("serde_json does not error on NaN");
@@ -339,9 +453,6 @@ mod tests {
              becomes belt-and-braces rather than load-bearing"
         );
     }
-
-    use super::*;
-    use finstack_quant_core::currency::Currency;
 
     fn invalid_structured_credit_json() -> String {
         let mut deal = StructuredCredit::example();

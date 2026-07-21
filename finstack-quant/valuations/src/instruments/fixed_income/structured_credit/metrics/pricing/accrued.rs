@@ -30,10 +30,8 @@ impl MetricCalculator for AccruedCalculator {
             }
         }
 
-        // Aggregate `context.cashflows` mixes principal with interest, so it
-        // cannot be pro-rated into accrued. Return 0.0 (clean ≈ dirty) when
-        // only aggregates are available; a missing cashflow series still errors.
-        // Prefer per-tranche `detailed_tranche_cashflows.interest_flows` above.
+        // Aggregate flows mix principal and interest and cannot support accrued.
+        // Preserve the missing-input error, otherwise degrade to clean ≈ dirty.
         context.cashflows.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
                 id: "context.cashflows".to_string(),
@@ -139,7 +137,7 @@ mod tests {
         assert!(result.is_err(), "missing cashflows should error");
     }
 
-    /// Aggregate cashflows are not pro-rated into accrued (return 0.0).
+    /// Aggregate cashflows are not pro-rated into accrued.
     #[test]
     fn accrued_from_aggregated_cashflows_does_not_fabricate() {
         let mut ctx = context(date!(2025 - 02 - 15));
@@ -192,7 +190,7 @@ mod tests {
         }
     }
 
-    /// Outside the cashflow window with only aggregates, accrued is 0.0.
+    /// Aggregate-only accrued remains zero outside the cashflow window.
     #[test]
     fn accrued_outside_window_without_interest_flows_is_zero() {
         let mut ctx = context(date!(2025 - 08 - 01));

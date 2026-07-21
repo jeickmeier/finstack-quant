@@ -8,33 +8,43 @@
 use crate::bindings::extract::extract_market;
 use crate::errors::display_to_py;
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyModule};
+use pyo3::types::PyModule;
 
-/// Solve the discount margin that prices a floating-rate tranche at a target PV.
+/// Solve a z-spread-equivalent discount margin for a floating-rate tranche.
+///
+/// Contractual cashflows are projected without changing coupon projection, then
+/// a constant additive spread is applied to the discount curve. The result is
+/// zero at model PV, negative for a richer (higher) target PV, and positive for
+/// a cheaper (lower) target PV; it is not the contractual quoted margin.
 ///
 /// Parameters
 /// ----------
 /// instrument_json : str
 ///     Tagged JSON for a ``StructuredCredit`` deal.
 /// tranche_id : str
-///     Identifier of the floating-rate tranche.
+///     Identifier of the floating-rate tranche whose contractual cashflows are
+///     spread-discounted.
 /// market : MarketContext
-///     Market context supplying curves and fixings.
+///     Market context supplying the discount curve and any forward curves or
+///     historical fixings required for cashflow projection.
 /// as_of : str
-///     Valuation date, ``YYYY-MM-DD``.
+///     Valuation date used for projection and discounting, ``YYYY-MM-DD``.
 /// target_pv : float
-///     Target present value in the tranche's own currency.
+///     Target present value in the tranche's currency. Values above model PV
+///     produce a negative result; values below model PV produce a positive
+///     result.
 ///
 /// Returns
 /// -------
 /// float
-///     Discount margin in decimal (0.015 = 150 bp).
+///     Z-spread-equivalent discount margin in decimal (``0.015`` = 150 bp).
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If the deal is invalid, the tranche is missing or fixed-rate, or
-///     ``target_pv`` is not finite.
+///     If the JSON or date is malformed, the deal is invalid, the tranche is
+///     missing or fixed-rate, ``target_pv`` is not finite, required market data
+///     is unavailable, or the spread solve fails or exceeds ±5000 bp.
 #[pyfunction]
 #[pyo3(
     name = "structured_credit_tranche_discount_margin",
@@ -268,7 +278,7 @@ fn structured_credit_tranche_scenario_table(
 }
 
 /// Names registered by this module, in the order they appear in `__all__`.
-pub(crate) const EXPORTS: [&str; 5] = [
+pub(crate) const EXPORTS: &[&str] = &[
     "structured_credit_tranche_breakeven_cdr",
     "structured_credit_tranche_discount_margin",
     "structured_credit_tranche_metrics",
@@ -277,7 +287,7 @@ pub(crate) const EXPORTS: [&str; 5] = [
 ];
 
 /// Register the structured-credit tranche analytics on the instruments module.
-pub(crate) fn register<'py>(py: Python<'py>, parent: &Bound<'py, PyModule>) -> PyResult<()> {
+pub(crate) fn register(parent: &Bound<'_, PyModule>) -> PyResult<()> {
     parent.add_function(wrap_pyfunction!(
         structured_credit_tranche_discount_margin,
         parent
@@ -292,11 +302,10 @@ pub(crate) fn register<'py>(py: Python<'py>, parent: &Bound<'py, PyModule>) -> P
         structured_credit_tranche_scenario_table,
         parent
     )?)?;
-    for name in EXPORTS {
+    for &name in EXPORTS {
         parent
             .getattr(name)?
             .setattr("__module__", "finstack_quant.valuations.instruments")?;
     }
-    let _ = PyList::empty(py);
     Ok(())
 }

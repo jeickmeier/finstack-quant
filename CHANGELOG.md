@@ -18,6 +18,9 @@ stability contract and schema-version policy.
   keys previously fell back silently; config JSON/dicts with stray keys now
   raise `ValueError` in Python and throw in JavaScript. Remove unrecognized keys
   or move extension data under a namespaced `{crate}.{domain}.v{N}` entry.
+- Nested structured-credit payloads now reject unknown fields. JSON/Python dicts
+  with misspelled or extension keys that were previously ignored now fail
+  deserialization; remove or rename those keys before upgrading.
 
 ### Fixed
 - **`finstack-quant-statements` — swap net interest receipts were booked as
@@ -76,6 +79,15 @@ stability contract and schema-version policy.
   money.
 
 ### Changed
+- **Structured-credit registry spread metrics require a deal-level quote.**
+  `ZSpread` and dependent `Cs01`, `BucketedCs01`, and `SpreadDuration` requests
+  now fail instead of solving against the model's own price. Set
+  `metric_pricing_overrides.quoted_price_pct` (percent of original balance).
+- **Structured-credit systematic factors persist when `kappa = 0`.** Zero mean
+  reversion intentionally holds one standard-normal systematic draw across the
+  full horizon; positive `kappa` produces OU decay, with large values
+  approaching independent monthly factors. Recalibrate scenarios that assumed
+  zero meant monthly independence.
 - **Portfolio analytics share a request-scoped evaluation engine.** Valuation,
   metrics-based attribution, scenario P&L, scenario batches, replay, and
   factor-stress endpoint P&L now reuse immutable prepared states through one

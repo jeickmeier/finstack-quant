@@ -1234,18 +1234,8 @@ fn year_fraction_act_act_isda(start: Date, end: Date) -> crate::Result<f64> {
     let days_start_year = (start_year_end - start).whole_days() as f64;
     let mut frac = days_start_year / days_in_year(start.year()) as f64;
 
-    // Full intermediate years.
-    //
-    // This loop looks like an obvious O(1) rewrite (`frac += (end.year() -
-    // start.year() - 1) as f64`), but it is NOT: IEEE addition is not
-    // associative, and accumulating 1.0 at a time gives a different result from
-    // one bulk add. Concrete counterexample, pinned by
-    // `tests::act_act_isda_per_year_loop_is_not_bulk_addable`: for a period
-    // starting 3 days before a 365-day year end, the two forms differ by 1 ULP
-    // after two years. Rewriting would silently shift golden values.
-    //
-    // The loop is also not hot: ACT/ACT ISDA measures ~5 ns at 1y and ~6 ns at
-    // 10y, i.e. ~0.1 ns per intervening year. Leave it alone.
+    // Preserve per-year addition: bulk addition differs by one ULP for some
+    // seeds because IEEE addition is not associative.
     for _year in (start.year() + 1)..end.year() {
         frac += 1.0; // each full year counts as exactly 1.0
     }
@@ -1574,12 +1564,7 @@ mod tests {
         assert!(matches!(label.parse::<super::DayCount>(), Ok(value) if value == expected));
     }
 
-    /// Pins why `year_fraction_act_act_isda`'s full-year loop must stay a loop.
-    ///
-    /// Accumulating `1.0` per intervening year is NOT equivalent to adding the
-    /// year count in one step: IEEE addition is not associative, so the two forms
-    /// diverge for some seeds. This test records a concrete counterexample so the
-    /// loop is not "optimized" into a silent golden-value shift.
+    /// Per-year and bulk additions differ for a representative ISDA seed.
     #[test]
     fn act_act_isda_per_year_loop_is_not_bulk_addable() {
         // Seed as produced by the first term: 3 days into a 365-day year.
@@ -1594,9 +1579,7 @@ mod tests {
         assert_ne!(
             looped.to_bits(),
             bulk.to_bits(),
-            "per-year accumulation and bulk addition unexpectedly agree; if this \
-             now holds for ALL seeds the loop may be replaced, but verify \
-             exhaustively before doing so"
+            "per-year accumulation must preserve its distinct rounding"
         );
     }
 

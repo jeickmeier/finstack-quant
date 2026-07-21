@@ -43,6 +43,8 @@ fn context_for_tranche<'a>(
         par_value_threshold: None,
         market: None,
         tranche_balances: None,
+        payable_principal_tranche_ids: None,
+        asset_balances: None,
         current_pool_balance: None,
         senior_fees: Money::new(0.0, Currency::USD),
     }

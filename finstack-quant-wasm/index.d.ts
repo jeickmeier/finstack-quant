@@ -4443,16 +4443,20 @@ export interface ValuationInstrumentsNamespace {
    */
   listStandardMetricsGrouped(): Record<string, string[]>;
   /**
-   * Discount margin (decimal) for a floating-rate tranche.
+   * Z-spread-equivalent discount margin for a floating-rate tranche, returned in
+   * decimal units (`0.015` = 150 bp).
    *
-   * `targetPv` is interpreted in the named tranche's currency.
+   * Contractual cashflows are projected without changing coupon projection,
+   * then a constant additive spread is applied to the discount curve. The result
+   * is zero at model PV, negative for a richer (higher) `targetPv`, and positive
+   * for a cheaper (lower) `targetPv`; it is not the contractual quoted margin.
    * @param instrumentJson - Canonical JSON payload representing the instrument consumed by this API.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param trancheId - Stable tranche identifier used to select the required domain object.
-   * @param targetPv - Target tranche present value in the named tranche's currency.
-   * @returns Returns the computed numeric result in the units described above.
-   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   * @param marketJson - Canonical market-context JSON supplying the discount curve and any forward curves or historical fixings required for cashflow projection.
+   * @param asOf - ISO-8601 valuation date used for projection and discounting.
+   * @param trancheId - Identifier of the floating-rate tranche whose contractual cashflows are spread-discounted.
+   * @param targetPv - Target present value in the tranche's currency; values above model PV produce a negative result and values below model PV produce a positive result.
+   * @returns The z-spread-equivalent discount margin in decimal units.
+   * @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, targetPv is non-finite, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
    */
   structuredCreditTrancheDiscountMargin(
     instrumentJson: string,

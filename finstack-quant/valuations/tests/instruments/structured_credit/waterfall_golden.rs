@@ -158,6 +158,7 @@ fn run_waterfall(
         pool_balance,
         market,
         tranche_balances: None,
+        asset_balances: None,
         deferred_interest: None,
         reserve_balance: Money::new(0.0, available_cash.currency()),
         recovery_proceeds: Money::new(0.0, available_cash.currency()),

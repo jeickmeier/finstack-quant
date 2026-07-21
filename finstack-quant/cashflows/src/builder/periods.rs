@@ -98,10 +98,8 @@ fn enrich_period(
     params: &BuildPeriodsParams<'_>,
     cal: &dyn finstack_quant_core::dates::HolidayCalendar,
 ) -> finstack_quant_core::Result<SchedulePeriod> {
-    // When `adjust_accrual_dates` is set, boundaries arrive already adjusted
-    // from date generation, so regularity is assessed on adjusted dates.
-    // That can misclassify regular periods as stubs (ACT/ACT ICMA then falls
-    // back to the quasi-coupon grid). Left as-is: fixing it changes accrual.
+    // Adjusted boundaries can classify a regular period as an ICMA stub;
+    // changing this would alter existing accrual results.
     let regular = is_regular_period(period.accrual_start, period.accrual_end, params.frequency);
     // ACT/ACT ICMA reference period: for regular periods the coupon period is
     // the accrual period itself (exact ISMA accrual). For stub periods the

@@ -767,18 +767,9 @@ pub struct MetricPricingOverrides {
 
     /// Externally-quoted price as a percentage of original balance (100.0 = par).
     ///
-    /// SC-M02: spread-to-price metrics need a price that did NOT come from the
-    /// model, or they are circular. For structured credit the registry's
-    /// `ZSpread` derived its target from `MetricId::DirtyPrice`, which is
-    /// `base_value / notional * 100` — so the objective was
-    /// `PV(curve + z) == PV(curve)` and the answer was identically zero by
-    /// construction, silently taking `Cs01`, `BucketedCs01` and
-    /// `SpreadDuration` with it.
-    ///
-    /// Supplying a quote here breaks the loop. Absent one, `ZSpread` still
-    /// reports the degenerate zero rather than erroring, because the
-    /// deal-level metric registry evaluates it unconditionally; that is
-    /// documented at the calculator.
+    /// Structured-credit spread metrics require this external target to avoid
+    /// the circular objective `PV(curve + z) == PV(curve)`. They return an error
+    /// when it is absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quoted_price_pct: Option<f64>,
 }

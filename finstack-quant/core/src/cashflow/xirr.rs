@@ -305,22 +305,10 @@ pub fn xirr_with_daycount_ctx(
 ///
 /// # Determinism contract
 ///
-/// The flows reaching this function are always time-ordered, so Descartes' rule
-/// of signs applies to the amount sequence and the behaviour splits in two:
-///
-/// * **Exactly one sign change** (the overwhelmingly common outflow-then-inflows
-///   shape): at most one root above `MIN_VALID_RATE` exists, so the first valid
-///   root found is returned immediately. Phase order is fixed (Brent direct,
-///   then Newton seeds in listed order, then Brent seeds in listed order), so
-///   the result is deterministic.
-/// * **Two or more sign changes**: the root may be non-unique, so all solver
-///   phases are run exhaustively. Valid roots are collected, deduplicated within
-///   `1e-9` tolerance, and the one closest to `0.0` is returned.
-///
-/// Both branches are deterministic and independent of solver iteration order.
-/// Note that in the unique-root case the returned value is the first converged
-/// representative rather than the smallest of several; these agree to within
-/// solver tolerance.
+/// With exactly one cashflow sign change, Descartes' rule gives at most one
+/// valid root, so the first converged root is returned. With multiple sign
+/// changes, all solver phases run and the deduplicated root closest to zero is
+/// returned. Solver phase and seed order are fixed.
 ///
 /// # Arguments
 /// * `flows` - Iterator of (time, amount) pairs
@@ -344,13 +332,8 @@ where
     if !has_sign_change(data.iter().map(|&(_, amt)| amt)) {
         return Err(InputError::Invalid.into());
     }
-    // Descartes' rule of signs: the flows reaching this function are always
-    // time-ordered (`irr` enumerates positions; `xirr_with_daycount` sorts by
-    // year fraction before calling), so the sign-change count of the amount
-    // sequence bounds the number of positive real roots of the NPV polynomial.
-    // Exactly one sign change => at most one root above `MIN_VALID_RATE`, so the
-    // first valid root found is *the* root and the remaining phases can only
-    // rediscover it.
+    // Time-ordered flows with one sign change have at most one valid root by
+    // Descartes' rule, so later solver phases can only rediscover it.
     let sign_changes = count_sign_changes(data.iter().map(|&(_, amt)| amt));
     let root_is_unique = sign_changes == 1;
     if sign_changes > 1 {
@@ -365,8 +348,7 @@ where
     // tolerance (DEFAULT_TOLERANCE, in currency units) is scale-free.
     // The IRR root is scale-invariant (NPV(r) = 0 ⇔ k·NPV(r) = 0), so the
     // result is identical; without this, a 1e9-notional stream could fail
-    // the Newton acceptance check that a 1.0-notional stream passes
-    // .
+    // the Newton acceptance check that a 1.0-notional stream passes.
     let max_abs = data
         .iter()
         .map(|&(_, amt)| amt.abs())
@@ -437,7 +419,7 @@ where
         5.0,   // 500%
     ];
 
-    // Collect all valid roots across solver phases, then pick the one closest to 0.
+    // Collect roots only when the sign pattern permits multiple solutions.
     let mut all_roots: Vec<f64> = Vec::new();
 
     let is_valid = |root: f64| root > MIN_VALID_RATE && root.is_finite();

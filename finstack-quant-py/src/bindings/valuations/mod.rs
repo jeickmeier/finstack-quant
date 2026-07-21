@@ -242,27 +242,20 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     m.getattr("bond_from_cashflows_json")?
         .setattr("__module__", "finstack_quant.valuations.instruments")?;
     pricing::register(py, &m)?;
-    structured_credit::register(py, &m)?;
-    let all = PyList::new(
-        py,
-        [
-            "bond_from_cashflows_json",
-            "instrument_cashflows_json",
-            "list_models",
-            "list_models_grouped",
-            "list_standard_metrics",
-            "list_standard_metrics_grouped",
-            "price_instrument",
-            "price_instrument_with_metrics",
-            // Structured-credit tranche analytics (mirrors WASM entry points).
-            "structured_credit_tranche_breakeven_cdr",
-            "structured_credit_tranche_discount_margin",
-            "structured_credit_tranche_metrics",
-            "structured_credit_tranche_oas",
-            "structured_credit_tranche_scenario_table",
-            "validate_instrument_json",
-        ],
-    )?;
+    structured_credit::register(&m)?;
+    let mut exports = vec![
+        "bond_from_cashflows_json",
+        "instrument_cashflows_json",
+        "list_models",
+        "list_models_grouped",
+        "list_standard_metrics",
+        "list_standard_metrics_grouped",
+        "price_instrument",
+        "price_instrument_with_metrics",
+    ];
+    exports.extend_from_slice(structured_credit::EXPORTS);
+    exports.push("validate_instrument_json");
+    let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;
     crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
     Ok(())

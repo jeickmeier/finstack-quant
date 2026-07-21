@@ -105,7 +105,7 @@ fn test_structured_credit_bucketed_cs01_reconciles_to_parallel() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::December, 31).unwrap();
 
-    let sc = StructuredCredit::new_abs(
+    let mut sc = StructuredCredit::new_abs(
         "TEST_ABS",
         create_simple_pool(),
         create_simple_tranches(),
@@ -116,6 +116,18 @@ fn test_structured_credit_bucketed_cs01_reconciles_to_parallel() {
     .with_payment_calendar("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, as_of));
+    let model_price = *sc
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::DirtyPrice],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("model dirty price should compute")
+        .measures
+        .get("dirty_price")
+        .expect("dirty price should be returned");
+    sc.metric_pricing_overrides.quoted_price_pct = Some(model_price);
 
     let result = sc
         .price_with_metrics(

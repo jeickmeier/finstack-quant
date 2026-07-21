@@ -977,21 +977,9 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
                 0.0
             };
             if pool_factor < cleanup_threshold && pool_factor > 0.0 {
-                // Available cash for redemption = remaining pool outstanding
-                // PLUS any pending recoveries in the lag queue.
-                //
-                // `pool_outstanding` has already been debited by gross defaults
-                // each period (line ~2032), so it does NOT include defaulted
-                // notional. `recovery_queue.pending_amount()` holds future cash
-                // *inflows* — lagged recovery proceeds on already-defaulted
-                // collateral that have not yet matured. At the cleanup call the
-                // equity holder purchases the remaining pool, realising these
-                // recoveries immediately. They are therefore ADDITIVE to the
-                // cash available to redeem the notes, not deductive.
-                //
-                // The previous code subtracted them (using the misleading name
-                // `pending_losses`), understating available cash, under-paying
-                // senior tranches, and leaving recovery value stranded.
+                // Cleanup redemption realizes the remaining pool and its
+                // pending recovery rights. The lag queue therefore contributes
+                // cash in addition to current pool outstanding.
                 let pending_recoveries = state.recovery_queue.pending_amount(state.base_ccy);
                 // The cleanup call realizes the pending recoveries immediately
                 // (they fund the redemption below); drain the queue so the
@@ -1055,9 +1043,7 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
                         .map(|m| m.amount())
                         .unwrap_or(0.0);
 
-                    // Optional call premium (currently always par-flat; routed
-                    // through one helper so a future premium is a one-line
-                    // change without touching the StructuredCredit type).
+                    // Cleanup calls currently redeem at par with no premium.
                     let premium = cleanup_call_premium(instrument, balance.amount());
 
                     // Full redemption claim, bounded by available cash.
@@ -2605,17 +2591,8 @@ mod tests {
             ic_trigger: None,
         }]);
 
-        // SC-M07 note — assert on TIMING, not lifetime totals.
-        //
-        // Once the cure shrinks below the subordinated tier's cash, SC-M07
-        // correctly returns the excess to CLASS_B, so its interest is DEFERRED
-        // rather than forfeited and its lifetime nominal cash converges back to
-        // the untriggered value. That is the third time this waterfall has
-        // shown the same thing (see the OC cure's effect on senior cash, and
-        // the fee tier's on note interest): `TranchePrincipal { target: None }`
-        // sweeping surplus into principal makes lifetime totals a bad yardstick
-        // for any structural feature. What a cash trap actually does is move
-        // cash EARLIER for the senior and LATER for the subordinate.
+        // Assert timing: excess cure cash returns to CLASS_B, so lifetime totals
+        // can converge while the trap still delays subordinated interest.
         let interest_wal = |deal: &StructuredCredit, tranche: &str| -> f64 {
             let market = MarketContext::new().insert(cleanup_discount_curve());
             let results =
@@ -2654,12 +2631,8 @@ mod tests {
              unreachable (SC-M30)."
         );
 
-        // The trapped cash must ACCELERATE senior principal. Note the senior's
-        // total nominal cash actually FALLS when the cure fires, which is
-        // correct and not a defect: de-levering faster means less interest
-        // accrues over the deal's life. The benefit to the senior holder is
-        // earlier principal (shorter WAL, less exposure), not more cash — so
-        // the assertion is on timing, not on totals.
+        // Faster delevering reduces lifetime interest, so measure the senior
+        // benefit through earlier principal rather than nominal cash.
         let senior_principal_wal = |deal: &StructuredCredit| -> f64 {
             let market = MarketContext::new().insert(cleanup_discount_curve());
             let results =
@@ -2782,6 +2755,7 @@ mod tests {
                 pool_balance: Money::new(10_000_000.0, ccy),
                 market: &market,
                 tranche_balances: None,
+                asset_balances: None,
                 deferred_interest: None,
                 reserve_balance: Money::new(0.0, ccy),
                 recovery_proceeds: Money::new(0.0, ccy),
@@ -2828,6 +2802,7 @@ mod tests {
                 pool_balance: Money::new(10_000_000.0, ccy),
                 market: &market,
                 tranche_balances: None,
+                asset_balances: None,
                 deferred_interest: None,
                 reserve_balance: Money::new(0.0, ccy),
                 recovery_proceeds: Money::new(0.0, ccy),
@@ -2922,6 +2897,7 @@ mod tests {
                     pool_balance: Money::new(10_000_000.0, ccy),
                     market: &market,
                     tranche_balances: None,
+                    asset_balances: None,
                     deferred_interest: None,
                     reserve_balance: Money::new(0.0, ccy),
                     recovery_proceeds: Money::new(0.0, ccy),
@@ -3378,14 +3354,7 @@ mod tests {
 /// De minimis threshold for write-down recording (avoids noise from fp rounding).
 const WRITEDOWN_DE_MINIMIS: f64 = 0.01;
 
-/// Optional cleanup-call premium paid on top of par + accrued interest.
-///
-/// Real cleanup calls sometimes carry a small make-whole-style premium that
-/// senior holders are effectively short. The [`StructuredCredit`] type carries
-/// no call-premium field today, so this helper returns `0.0` (redeem at par).
-/// Routing the premium through a single function keeps a future premium a
-/// one-line change here, without threading a new field through the public
-/// instrument type.
+/// Cleanup-call premium; currently zero because the deal has no premium term.
 fn cleanup_call_premium(_instrument: &StructuredCredit, _tranche_balance: f64) -> f64 {
     0.0
 }
@@ -3565,9 +3534,6 @@ impl<'a> SimulationState<'a> {
             })
             .collect();
 
-        // Initialize PoolState
-        // Note: For now we convert the full asset list to PoolState.
-        // Future optimization: Support RepLine conversion to PoolState.
         let pool_state = PoolState::from_pool(pool);
 
         let deferred_interest: HashMap<String, Money> = tranches
@@ -3910,23 +3876,10 @@ fn simulate_period(
     if state.cumulative_realized_loss > WRITEDOWN_DE_MINIMIS
         && state.performing_pool_balance.amount() > 0.0
     {
-        // Allocate the *period's* expected net loss bottom-up using the
-        // pre-computed order.
-        //
-        // A tranche's notional is consumed by exactly two channels: principal
-        // repayment (cash retiring face) and write-down (loss retiring face).
-        // The invariant is `principal_repaid + write-down ≤ original_balance`.
-        //
-        // The previous engine allocated *cumulative* expected loss against a
-        // cap of `original_balance` every period. That double-counts retired
-        // face: a tranche written down in an early period (when little
-        // principal had been repaid) keeps that write-down recorded, while the
-        // waterfall continues paying it principal in later periods — so
-        // `principal_repaid + write-down` could exceed face. The robust fix is
-        // to (a) allocate only this period's *incremental* net loss, and
-        // (b) cap each tranche's incremental write-down at its CURRENT balance
-        // — a tranche can never be written down below zero, and any loss it
-        // cannot absorb cascades up to the next-most-senior tranche.
+        // Allocate incremental net loss bottom-up. Cap each tranche's
+        // write-down at current balance so
+        // `principal_repaid + write-down ≤ original_balance`; any excess loss
+        // cascades to the next-most-senior tranche.
         let already_allocated: f64 = state
             .results
             .values()
@@ -4301,6 +4254,7 @@ fn simulate_period(
             pool_balance: coverage_test_pool_balance,
             market: context,
             tranche_balances: Some(&state.tranche_balances),
+            asset_balances: Some(&state.pool_state.balances),
             deferred_interest: Some(&state.deferred_interest),
             reserve_balance: state.reserve_balance,
             recovery_proceeds: released_recoveries,
@@ -4490,17 +4444,9 @@ fn simulate_period(
         state.pool_outstanding = Money::new(0.0, state.base_ccy);
     }
 
-    // ── Item 13: per-period cash-conservation invariant ──────────────
-    // Every dollar of pool cash routed into the waterfall must come out as a
-    // tranche/recipient distribution or be left as residual cash. This is a
-    // debug/test-only assertion (zero release-build cost) that catches
-    // accounting regressions in the waterfall and the engine's pool-flow
-    // aggregation.
-    // Net cash diverted out of the waterfall into side accounts this period:
-    // the excess-spread net capture less any controlled-accumulation bullet
-    // release (which adds cash back from the funding account).
-    // `reserve_net_capture` is negative when the reserve was drawn (cash added
-    // to the waterfall), so it enters with the same sign as the spread capture.
+    // Pool cash must equal recipient distributions plus residual cash and net
+    // side-account capture. Reserve draws are negative capture; controlled-
+    // accumulation releases add cash back to the waterfall.
     let side_net_capture = spread_net_capture + reserve_net_capture - funding_net_release;
     debug_assert_cash_conserved(
         total_cash_for_waterfall,
@@ -4771,23 +4717,9 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
 
     let n = state.pool_state.len();
 
-    // Item 3 — mask/asset-loop alignment guard.
-    //
-    // The per-name default mask is sized by the *builder* (StochasticPathFlowSource)
-    // from the count of still-performing assets (`!is_defaulted && balance > 0`)
-    // at period start. The asset loop below claims one mask entry per asset
-    // that passes the *same* performing-asset gate, in the *same* pool-index
-    // order, so the k-th claim lines up with the k-th drawn idiosyncratic
-    // shock. The asset loop mutates `is_defaulted`/`balances`, but only ever
-    // for the asset it is currently processing (index `i`) and only after
-    // that asset has claimed its slot — a later asset's gate is never
-    // affected. The two counts are therefore equal by construction.
-    //
-    // A silent `unwrap_or(false)` on an out-of-bounds claim would turn any
-    // future regression that breaks this alignment into a wrong-but-quiet
-    // default realization. Instead, validate the mask length up-front and
-    // fail loudly: this makes the deterministic alignment a checked invariant
-    // rather than an implicit assumption.
+    // The per-name mask and recovery slice are ordered over assets performing
+    // at period start. Validate their lengths before mutating asset state so
+    // each idiosyncratic draw remains aligned with its pool index.
     if let Some((mask, recoveries)) = per_name_outcome {
         let performing = (0..n)
             .filter(|&i| state.pool_state.balances[i] > 0.0 && !state.pool_state.is_defaulted[i])
@@ -4883,16 +4815,13 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
             state.pool_state.rates[i]
         };
 
-        // m-FINAL-1: Cap interest accrual at asset maturity for mid-period maturities.
-        // If the asset matures between prev_date and pay_date, accrue interest only up
-        // to the maturity date, not the full period end.
+        // Mid-period maturities accrue interest only through maturity.
         let interest_end = state.pool_state.maturities[i].min(request.pay_date);
 
         let accrual_factor = state.pool_state.day_counts[i]
             .unwrap_or(DayCount::Act360)
             .year_fraction(request.prev_date, interest_end, DayCountContext::default())?;
 
-        // Item 12 — interest must stop accruing when an asset defaults.
         // Defaults in a period are modeled as a rate `period_mdr` (a fraction
         // of the balance), with no explicit intra-period default date. Under
         // the standard market convention defaults are assumed uniformly
@@ -4962,18 +4891,10 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
             global_period_smm
         };
 
-        // Scheduled amortization for amortizing assets, computed on the
-        // SURVIVING (post-default) balance.
-        //
-        // Item 6 — a level-pay loan's scheduled payment is FIXED at
-        // origination. Prepayments shorten the loan; they do not reduce the
-        // scheduled payment. The previous engine recomputed the level payment
-        // every period from the current (post-prepayment) balance and
-        // remaining term, so the payment — and hence scheduled principal —
-        // shrank after every prepayment. The fix freezes the contractual
-        // level payment on first sight and reuses it. Defaulted loans'
-        // contractual payments terminate, so the frozen aggregate payment IS
-        // scaled by each period's survival fraction `(1 − period_mdr)` below.
+        // Level-pay loans retain their contractual payment after prepayment;
+        // prepayment shortens the term rather than recasting the payment.
+        // Defaulted loans stop paying, so scale the frozen aggregate payment by
+        // the period survival fraction `(1 − period_mdr)`.
         let scheduled_principal = if state.pool_state.is_amortizing[i] && rate > 0.0 {
             if !rate.is_finite() || rate <= -1.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -4981,7 +4902,6 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
                     state.pool_state.ids[i]
                 )));
             }
-            // period_rate = NOMINAL periodic rate: annual rate × months in the
             // Nominal periodic rate `rate × months/12` (US mortgage convention;
             // matches mbs_passthrough/pricer.rs `wac / 12.0`).
             let period_rate = rate * request.months_per_period / 12.0;

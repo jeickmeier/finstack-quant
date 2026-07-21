@@ -48,42 +48,20 @@ pub struct ZSpreadCalculator;
 
 impl MetricCalculator for ZSpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        // SC-M02: prefer an EXTERNALLY-QUOTED price.
-        //
-        // Without one this metric is circular. `MetricId::DirtyPrice` is
-        // `base_value / notional * 100`, and `base_value` is the PV of the same
-        // cashflows on the same curve with the same discounting convention — so
-        // the objective reduces to `PV(curve + z) == PV(curve)` and the answer
-        // is identically ZERO by construction. Structured credit had no
-        // quote-injection path (unlike bonds, which have `quoted_clean_price`),
-        // so `ZSpread` was always 0, and `Cs01`, `BucketedCs01` and
-        // `SpreadDuration` were all evaluated at `z = 0` without anyone being
-        // told.
-        //
-        // `MetricPricingOverrides::quoted_price_pct` breaks the loop. When it
-        // is absent the degenerate zero is still returned rather than erroring,
-        // because the deal-level metric registry evaluates `ZSpread`
-        // unconditionally and erroring would take the whole suite down (the
-        // same constraint SC-M10 hit). That is a reporting compromise, not a
-        // correct spread: treat a zero z-spread with no quote as "not
-        // computed". Removing the compromise means restricting the registry to
-        // per-tranche contexts — SC-m14.
-        let quoted_price_pct = context
+        // Z-spread requires an external quote. Using model `DirtyPrice`
+        // (`base_value / notional * 100`) would make the objective
+        // `PV(curve + z) == PV(curve)` and force a circular zero spread.
+        let price_pct = context
             .get_metric_overrides()
-            .and_then(|o| o.quoted_price_pct);
-
-        let price_pct = match quoted_price_pct {
-            Some(quote) => quote,
-            None => context
-                .computed
-                .get(&MetricId::DirtyPrice)
-                .copied()
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                        id: "metric:DirtyPrice".to_string(),
-                    })
-                })?,
-        };
+            .and_then(|overrides| overrides.quoted_price_pct)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "structured-credit ZSpread requires \
+                     MetricPricingOverrides.quoted_price_pct (price as a percentage of original \
+                     balance); a model DirtyPrice cannot be used as its own spread target"
+                        .to_string(),
+                )
+            })?;
 
         // Convert price points back to currency using original notional.
         let notional = crate::instruments::fixed_income::structured_credit::metrics::pricing::prices::get_original_notional(context)?;
@@ -193,7 +171,7 @@ impl MetricCalculator for ZSpreadCalculator {
     }
 
     fn dependencies(&self) -> &[MetricId] {
-        &[MetricId::DirtyPrice]
+        &[]
     }
 }
 
@@ -346,10 +324,7 @@ impl MetricCalculator for SpreadDurationCalculator {
                 })
             })?;
 
-        // Note: We use base_npv directly instead of dirty_price for spread duration
-        // since we're measuring dollar value change, not percentage change
-
-        // Get base NPV
+        // Normalize the dollar CS01 by the context's base NPV.
         let base_npv = context.base_value.amount();
 
         if base_npv == 0.0 {
@@ -362,7 +337,7 @@ impl MetricCalculator for SpreadDurationCalculator {
     }
 
     fn dependencies(&self) -> &[MetricId] {
-        &[MetricId::Cs01, MetricId::DirtyPrice]
+        &[MetricId::Cs01]
     }
 }
 
@@ -480,37 +455,39 @@ pub fn calculate_tranche_cs01(
     Ok(bumped_pv.total() - base_pv.total())
 }
 
-/// Calculate the discount margin to price (DM) for a floating-rate tranche.
+/// Calculate a z-spread-equivalent discount margin for a floating-rate tranche.
 ///
-/// The discount margin is the **absolute** constant spread (returned in decimal;
-/// `0.01` = 100 bps) over the tranche's reference index such that projecting the
-/// tranche's floating coupon at that margin and repricing on the deal's discount
-/// curve reproduces `target_pv`. Following the full-reprice convention, the
-/// margin flows through coupon projection, so the result is consistent with the
-/// tranche's actual cashflow structure rather than a pure discounting spread.
+/// The tranche's contractual cashflows are projected once without changing its
+/// coupon projection. The solver then applies a constant additive spread to the
+/// discount curve until those cashflows reproduce `target_pv`. The result is
+/// therefore a z-spread-equivalent discount margin, not the tranche's
+/// contractual quoted margin.
 ///
-/// Unlike an *incremental* spread to the quoted coupon, this is the total
-/// margin-to-price: a `target_pv` equal to the tranche's own base PV returns the
-/// tranche's quoted margin; a richer (higher) target returns a wider margin and
-/// a cheaper (lower) target a tighter one.
+/// The returned decimal is zero when `target_pv` equals the model PV. A richer
+/// (higher) target PV produces a negative margin; a cheaper (lower) target PV
+/// produces a positive margin.
 ///
 /// # Arguments
 ///
-/// * `deal` - The structured-credit deal owning the tranche.
-/// * `tranche_id` - Identifier of the floating-rate tranche to solve for.
-/// * `context` - Market context (discount curve plus any index forwards).
-/// * `as_of` - Valuation date used to project floating coupon resets and
-///   discount the tranche cashflows.
-/// * `target_pv` - The observed/target present value (price) to match.
+/// * `deal` - Structured-credit deal owning the tranche and defining its
+///   contractual cashflows and discount-curve identifier.
+/// * `tranche_id` - Identifier of the floating-rate tranche whose projected
+///   cashflows are spread-discounted.
+/// * `context` - Market context supplying the discount curve and any forward
+///   curves or historical fixings required to project contractual cashflows.
+/// * `as_of` - Valuation date used for cashflow projection and discounting.
+/// * `target_pv` - Target present value in the tranche's currency. The sign of
+///   the result is negative above model PV and positive below model PV.
 ///
 /// # Returns
 ///
-/// Discount margin in decimal units (e.g. `0.0125` = 125 bps).
+/// Z-spread-equivalent discount margin in decimal units (`0.0125` = 125 bp).
 ///
 /// # Errors
 ///
-/// Returns an error if the tranche is missing, is not floating-rate, or the
-/// solver fails to converge within reasonable bounds (±5000 bp).
+/// Returns an error if the deal fails validation, the tranche is missing or is
+/// fixed-rate, required discount/projection market data is unavailable, or the
+/// spread solve fails or exceeds the ±5000 bp bound.
 pub fn calculate_tranche_discount_margin(
     deal: &StructuredCredit,
     tranche_id: &str,
@@ -536,13 +513,8 @@ pub fn calculate_tranche_discount_margin(
         )));
     };
 
-    // Canonical DM (Fabozzi): solve `m` in the discount rate, holding the
-    // contractual quoted margin `qm` in the numerator:
-    //
-    //     Σ [(f_i + qm)·τ_i·N + prin_i] / Π(1 + (f_j + m)·τ_j) = P
-    //
-    // For a floater on its index curve, zero-DM equals the z-spread, so this
-    // delegates to the shared z-spread kernel.
+    // Project contractual cashflows once, then solve an additive discount
+    // spread through the shared z-spread kernel.
     let cashflows =
         crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows(
             deal, tranche_id, context, as_of,
@@ -551,20 +523,20 @@ pub fn calculate_tranche_discount_margin(
     let disc_curve_id = deal.discount_curve_id.as_str();
     let discount_curve = context.get_discount(disc_curve_id)?;
 
-    let dm_bp = calculate_tranche_z_spread(
+    let z_spread_bp = calculate_tranche_z_spread(
         &cashflows.cashflows,
         discount_curve.as_ref(),
         target_pv,
         as_of,
     )?;
 
-    if !dm_bp.is_finite() || dm_bp.abs() > 5000.0 {
+    if !z_spread_bp.is_finite() || z_spread_bp.abs() > 5000.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "Discount margin {dm_bp} bp exceeds reasonable bounds (±5000 bp)"
+            "Discount margin {z_spread_bp} bp exceeds reasonable bounds (±5000 bp)"
         )));
     }
 
-    Ok(dm_bp * 1e-4)
+    Ok(z_spread_bp * 1e-4)
 }
 
 /// Locate the tenor bucket(s) for year fraction `t`, with a triangular weight.
@@ -686,15 +658,66 @@ impl MetricCalculator for BucketedCs01Calculator {
 
 #[cfg(test)]
 mod zspread_quote_tests {
+    use super::*;
     use crate::instruments::MetricPricingOverrides;
+    use crate::metrics::standard_registry;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use std::sync::Arc;
+    use time::Month;
 
-    /// SC-M02 — an externally-quoted price must break the circularity.
-    ///
-    /// Without a quote, `ZSpread`'s target came from `MetricId::DirtyPrice`,
-    /// which is `base_value / notional * 100` — the PV of the same cashflows on
-    /// the same curve. The objective reduced to `PV(curve + z) == PV(curve)`
-    /// and the answer was identically zero, silently taking `Cs01`,
-    /// `BucketedCs01` and `SpreadDuration` with it.
+    fn context_without_quote() -> MetricContext {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let payment_date = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
+        let deal = StructuredCredit::example();
+        let discount_curve_id = deal.discount_curve_id.clone();
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder(discount_curve_id.as_str())
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (1.0, 0.95)])
+                .build()
+                .expect("valid curve"),
+        );
+        let mut context = MetricContext::new(
+            Arc::new(deal),
+            Arc::new(market),
+            as_of,
+            Money::new(95.0, Currency::USD),
+            MetricContext::default_config(),
+        );
+        context.cashflows = Some(vec![(payment_date, Money::new(100.0, Currency::USD))]);
+        context.discount_curve_id = Some(discount_curve_id);
+        context.notional = Some(Money::new(100.0, Currency::USD));
+        context.computed.insert(MetricId::DirtyPrice, 95.0);
+        context
+    }
+
+    #[test]
+    fn registry_quote_dependent_spread_metrics_reject_a_missing_quote() {
+        for requested in [
+            MetricId::ZSpread,
+            MetricId::Cs01,
+            MetricId::BucketedCs01,
+            MetricId::SpreadDuration,
+        ] {
+            let mut context = context_without_quote();
+            let err = standard_registry()
+                .compute(std::slice::from_ref(&requested), &mut context)
+                .expect_err("quote-dependent spread metrics must require an external quote");
+            let message = err.to_string();
+            assert!(
+                message.contains("quoted_price_pct"),
+                "{requested} must identify the missing quote; got: {message}"
+            );
+        }
+    }
+
+    #[test]
+    fn spread_duration_depends_only_on_cs01() {
+        assert_eq!(SpreadDurationCalculator.dependencies(), &[MetricId::Cs01]);
+    }
+
+    /// An external quote breaks the model-price spread circularity.
     #[test]
     fn quoted_price_override_is_carried_on_metric_overrides() {
         let mut overrides = MetricPricingOverrides::default();
@@ -708,12 +731,11 @@ mod zspread_quote_tests {
             overrides.quoted_price_pct,
             Some(98.5),
             "a quoted price must survive on MetricPricingOverrides so ZSpread \
-             has a target that did not come from the model (SC-M02)"
+             has a target that did not come from the model"
         );
     }
 
-    /// SC-M02 — the override must round-trip through serde, since deals reach
-    /// the engine as JSON from both binding hosts.
+    /// The external quote round-trips through JSON binding inputs.
     #[test]
     fn quoted_price_override_round_trips_through_json() {
         let overrides = MetricPricingOverrides {

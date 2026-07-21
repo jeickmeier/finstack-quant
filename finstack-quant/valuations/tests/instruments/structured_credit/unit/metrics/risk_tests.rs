@@ -168,8 +168,9 @@ mod discount_margin_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        calculate_tranche_discount_margin, AssetPool, DealType, PoolAsset, StructuredCredit,
-        Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        calculate_tranche_discount_margin, calculate_tranche_z_spread, generate_tranche_cashflows,
+        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
+        TrancheStructure,
     };
     use time::Month;
 
@@ -319,10 +320,6 @@ mod discount_margin_tests {
     /// For a floater on its index curve, DM equals z-spread on the same target.
     #[test]
     fn discount_margin_agrees_with_z_spread_on_the_same_target() {
-        use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-            calculate_tranche_z_spread, generate_tranche_cashflows,
-        };
-
         let sc = deal(true);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();

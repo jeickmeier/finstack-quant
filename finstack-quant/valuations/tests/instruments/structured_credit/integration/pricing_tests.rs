@@ -261,7 +261,7 @@ fn test_structured_credit_tranche_value_computation() {
 #[test]
 fn test_structured_credit_full_metric_suite() {
     // Arrange
-    let sc = StructuredCredit::new_clo(
+    let mut sc = StructuredCredit::new_clo(
         "TEST_CLO",
         create_simple_pool(),
         create_simple_tranches(),
@@ -272,6 +272,18 @@ fn test_structured_credit_full_metric_suite() {
     .with_payment_calendar("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
+    let model_price = *sc
+        .price_with_metrics(
+            &market,
+            test_date(),
+            &[MetricId::DirtyPrice],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("model dirty price should compute")
+        .measures
+        .get("dirty_price")
+        .expect("dirty price should be returned");
+    sc.metric_pricing_overrides.quoted_price_pct = Some(model_price);
 
     // Act: Request comprehensive metrics
     let result = sc.price_with_metrics(

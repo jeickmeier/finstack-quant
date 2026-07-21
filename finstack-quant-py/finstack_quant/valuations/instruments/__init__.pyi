@@ -312,33 +312,43 @@ def structured_credit_tranche_discount_margin(
     as_of: str,
     target_pv: float,
 ) -> float:
-    """Solve the discount margin that prices a floating-rate tranche at a target PV.
+    """Solve a z-spread-equivalent discount margin for a floating-rate tranche.
 
-    Returns the margin in decimal (0.015 = 150 bp).
+    Contractual cashflows are projected without changing coupon projection,
+    then a constant additive spread is applied to the discount curve. The
+    result is zero at model PV, negative for a richer (higher) target PV, and
+    positive for a cheaper (lower) target PV; it is not the contractual quoted
+    margin.
 
     Parameters
     ----------
     instrument_json : str
         Tagged JSON for a ``StructuredCredit`` deal.
     tranche_id : str
-        Identifier of the tranche within the deal.
+        Identifier of the floating-rate tranche whose contractual cashflows
+        are spread-discounted.
     market : MarketContext
-        Market context supplying curves and fixings.
+        Market context supplying the discount curve and any forward curves or
+        historical fixings required for cashflow projection.
     as_of : str
-        ISO 8601 valuation date.
+        ISO 8601 valuation date used for projection and discounting.
     target_pv : float
-        Target present value, in the tranche's own currency.
+        Target present value in the tranche's currency. Values above model PV
+        produce a negative result; values below model PV produce a positive
+        result.
 
     Returns
     -------
     float
-        Discount margin in decimal (0.015 = 150 bp).
+        Z-spread-equivalent discount margin in decimal (``0.015`` = 150 bp).
 
     Raises
     ------
     ValueError
-        If the instrument JSON is malformed, the deal fails validation, the
-        tranche id is not part of the deal, or required market data is missing.
+        If the JSON or date is malformed, the deal fails validation, the
+        tranche is missing or fixed-rate, ``target_pv`` is not finite, required
+        market data is unavailable, or the spread solve fails or exceeds
+        ±5000 bp.
 
     Examples
     --------
