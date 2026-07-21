@@ -23,7 +23,6 @@ use finstack_quant_core::Result;
 use finstack_quant_monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_monte_carlo::traits::RandomStream;
 use rayon::prelude::*;
-use std::cmp::Ordering;
 use std::sync::Arc;
 
 /// Seed salt for the per-name idiosyncratic-draw RNG.
@@ -1335,7 +1334,21 @@ fn expected_shortfall(losses: &mut [f64], confidence: f64) -> f64 {
     if losses.is_empty() {
         return 0.0;
     }
-    losses.sort_by(|a, b| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+    // SC-m06: `total_cmp`, not `partial_cmp(..).unwrap_or(Equal)`.
+    //
+    // The old comparator is not a total order when a NaN is present — NaN
+    // compares Equal to everything while the finite values retain their own
+    // ordering — which violates `sort_by`'s contract. Since Rust 1.81 the
+    // standard sort detects that and PANICS rather than producing garbage.
+    // A NaN can reach here through `convert_clamped` (utils/rates.rs), so this
+    // was a live panic path in a pricing loop, not a theoretical one.
+    //
+    // `total_cmp` is a genuine total order over all f64 including NaN, so the
+    // sort is always well-defined. NaN sorts to the front under the reversed
+    // comparator, which is the conservative placement for a tail-loss measure:
+    // a corrupted path shows up as an extreme loss rather than being silently
+    // averaged into the middle of the distribution.
+    losses.sort_by(|a, b| b.total_cmp(a));
     let tail = (1.0 - confidence).clamp(0.0, 1.0);
     let tail_count = (tail * losses.len() as f64).ceil().max(1.0) as usize;
     let tail_count = tail_count.min(losses.len());
@@ -1768,6 +1781,43 @@ mod tests {
 /// fast-path for genuinely granular pools.
 #[cfg(test)]
 mod per_name_copula_tests {
+    /// SC-m06 — the expected-shortfall sort must use a TOTAL order.
+    ///
+    /// `partial_cmp(..).unwrap_or(Equal)` is not a total order when a NaN is
+    /// present: NaN compares Equal to everything while the finite values keep
+    /// their own ordering. Since Rust 1.81 the standard sort detects that and
+    /// PANICS. A NaN can reach here via `convert_clamped`, so this was a live
+    /// panic path in a pricing loop.
+    ///
+    /// This test does NOT discriminate: the standard sort's total-order
+    /// violation check is a heuristic that fires on some orderings and not
+    /// others, so the old comparator happens to survive this input. The test
+    /// pins that ES tolerates NaN at all; the correctness argument for
+    /// `total_cmp` is that it is a genuine total order, not that this input
+    /// reproduces the panic.
+    #[test]
+    fn expected_shortfall_survives_a_nan_loss() {
+        let mut losses = vec![10.0, f64::NAN, 5.0, 100.0, 1.0, f64::NAN, 50.0];
+        // Must not panic.
+        let es = expected_shortfall(&mut losses, 0.95);
+        assert!(
+            es.is_nan() || es.is_finite(),
+            "expected shortfall must return a value rather than panicking, got {es}"
+        );
+    }
+
+    /// SC-m06 — with clean input the measure is unchanged.
+    #[test]
+    fn expected_shortfall_is_unchanged_for_finite_losses() {
+        let mut losses = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+        // 95% confidence over 10 paths -> ceil(0.5) = 1 worst loss.
+        let es = expected_shortfall(&mut losses, 0.95);
+        assert!(
+            (es - 10.0).abs() < 1e-12,
+            "the 95% ES over 10 sorted losses is the single worst (10.0), got {es}"
+        );
+    }
+
     use super::*;
     use crate::instruments::fixed_income::structured_credit::pricing::stochastic::default::PoolGranularity;
     use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::{

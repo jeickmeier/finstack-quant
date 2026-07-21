@@ -71,7 +71,20 @@ pub fn calculate_tranche_convexity(
     }
 
     let p0 = pv0.total();
-    if p0.abs() < f64::EPSILON {
+    // SC-m04: guard relative to the cashflow scale, not `f64::EPSILON`.
+    //
+    // `f64::EPSILON` is 2.2e-16 — an absolute threshold on a CURRENCY amount.
+    // A tranche whose PV has collapsed to a residual 1e-12 sails past it and
+    // divides by that residual, producing an astronomically large convexity
+    // from what is numerically zero. Scaling to the undiscounted cashflow
+    // magnitude makes the guard meaningful at any notional, from a JPY deal to
+    // a small equity strip.
+    let scale: f64 = cashflows
+        .iter()
+        .filter(|(date, _)| *date > as_of)
+        .map(|(_, amount)| amount.amount().abs())
+        .sum();
+    if p0.abs() <= scale * 1e-12 {
         return Ok(0.0);
     }
     Ok((pv_up.total() + pv_dn.total() - 2.0 * p0) / (p0 * CONVEXITY_BUMP * CONVEXITY_BUMP))

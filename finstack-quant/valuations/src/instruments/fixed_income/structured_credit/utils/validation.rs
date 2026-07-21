@@ -12,7 +12,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::diversion::{
     DiversionCondition, DiversionEngine, DiversionRule,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
-    AllocationMode, PaymentType, Waterfall, WaterfallTier,
+    AllocationMode, PaymentCalculation, PaymentType, Waterfall, WaterfallTier,
 };
 use finstack_quant_core::HashSet;
 use finstack_quant_core::Result;
@@ -223,15 +223,44 @@ fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
                 });
             }
 
-            // Check recipient weights
+            // Check recipient weights.
+            //
+            // SC-m10: `weight < 0.0` is FALSE for NaN, so a NaN weight passed
+            // validation and reached `allocate_pro_rata`, where it poisons the
+            // weight total and every share derived from it. `Money::new` then
+            // panics on the non-finite result (core/src/money/types.rs), so a
+            // malformed weight took down the pricing call rather than being
+            // reported. Testing for non-finite explicitly closes that.
             if let Some(weight) = recipient.weight {
-                if weight < 0.0 {
+                if !weight.is_finite() || weight < 0.0 {
                     errors.push(ValidationError::InvalidWeight {
                         tier_id: tier.id.clone(),
                         recipient_id: recipient.id.clone(),
                         weight,
                     });
                 }
+            }
+            // SC-m10: a non-finite payment PARAMETER reaches `Money::new` in
+            // `calculate_payment_amount` and panics there. Validation is the
+            // right place to reject it, with the tier and recipient named.
+            let bad_amount = match &recipient.calculation {
+                PaymentCalculation::FixedAmount { amount, .. } => !amount.amount().is_finite(),
+                PaymentCalculation::PercentageOfCollateral { rate, .. } => !rate.is_finite(),
+                PaymentCalculation::CappedTrancheInterest { cap_rate, .. } => !cap_rate.is_finite(),
+                PaymentCalculation::ReserveReplenishment { target_balance } => {
+                    !target_balance.amount().is_finite()
+                }
+                PaymentCalculation::TranchePrincipal { target_balance, .. } => target_balance
+                    .as_ref()
+                    .is_some_and(|b| !b.amount().is_finite()),
+                _ => false,
+            };
+            if bad_amount {
+                errors.push(ValidationError::InvalidWeight {
+                    tier_id: tier.id.clone(),
+                    recipient_id: recipient.id.clone(),
+                    weight: f64::NAN,
+                });
             }
         }
 

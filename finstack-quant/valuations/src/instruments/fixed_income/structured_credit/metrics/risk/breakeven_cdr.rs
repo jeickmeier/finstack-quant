@@ -32,8 +32,15 @@ const MAX_CDR: f64 = 1.0;
 /// Bisection tolerance on the CDR axis (1e-5 = 0.1 bp of CDR).
 const CDR_TOL: f64 = 1e-5;
 
-/// Writedown (currency units) treated as the first dollar of principal loss.
-const WRITEDOWN_EPS: f64 = 1.0;
+/// Writedown treated as the first dollar of principal loss, as a FRACTION of
+/// the tranche's original balance.
+///
+/// SC-m03: this was an absolute `1.0` in currency units, which means different
+/// things at different scales — noise on a ¥10bn tranche, and material on a
+/// $2m equity strip, where 1.0 of writedown is a real impairment the search
+/// should detect. One basis point of the tranche's own face is scale-free and
+/// carries the same economic meaning everywhere.
+const WRITEDOWN_EPS_FRACTION: f64 = 1e-4;
 
 /// Calculate the break-even CDR for a tranche.
 ///
@@ -62,6 +69,25 @@ pub fn calculate_tranche_breakeven_cdr(
     as_of: Date,
 ) -> Result<f64> {
     deal.validate_for_pricing()?;
+
+    // SC-m03: scale the "first dollar of loss" threshold to this tranche.
+    let original_balance = deal
+        .tranches
+        .tranches
+        .iter()
+        .find(|t| t.id.as_str() == tranche_id)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
+                id: format!("tranche:{tranche_id}"),
+            })
+        })?
+        .original_balance
+        .amount()
+        .abs();
+    // A zero-face tranche has no meaningful relative threshold; fall back to a
+    // currency unit so the search still terminates.
+    let writedown_eps = (original_balance * WRITEDOWN_EPS_FRACTION).max(1e-9);
+
     let writedown = |cdr: f64| -> Result<f64> {
         let mut bumped = deal.clone();
         bumped.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
@@ -72,11 +98,11 @@ pub fn calculate_tranche_breakeven_cdr(
     };
 
     // Loss-remote within the search range: report the upper bound.
-    if writedown(MAX_CDR)? <= WRITEDOWN_EPS {
+    if writedown(MAX_CDR)? <= writedown_eps {
         return Ok(MAX_CDR);
     }
     // Already impaired at zero defaults (e.g. pre-existing losses).
-    if writedown(0.0)? > WRITEDOWN_EPS {
+    if writedown(0.0)? > writedown_eps {
         return Ok(0.0);
     }
 
@@ -85,7 +111,7 @@ pub fn calculate_tranche_breakeven_cdr(
     let mut hi = MAX_CDR;
     while hi - lo > CDR_TOL {
         let mid = 0.5 * (lo + hi);
-        if writedown(mid)? > WRITEDOWN_EPS {
+        if writedown(mid)? > writedown_eps {
             hi = mid;
         } else {
             lo = mid;

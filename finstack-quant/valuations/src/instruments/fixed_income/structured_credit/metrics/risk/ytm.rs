@@ -145,9 +145,27 @@ impl MetricCalculator for YtmCalculator {
                     continue;
                 }
 
-                let t = day_count
-                    .year_fraction(context.as_of, *date, DayCountContext::default())
-                    .unwrap_or(0.0);
+                // SC-m09: a failed date conversion previously became `0.0`,
+                // and the `t > 0.0` guard below then DROPPED that cashflow from
+                // the PV entirely — silently solving a yield against a
+                // different bond. Skipping is only correct when the flow is
+                // genuinely non-future; a conversion failure is a broken input
+                // and must not masquerade as one.
+                // SC-m09: a failed date conversion previously became `0.0`,
+                // and the `t > 0.0` guard below then DROPPED that cashflow from
+                // the PV entirely — silently solving a yield against a
+                // different bond. Skipping is only correct for a genuinely
+                // non-future flow; a conversion failure is a broken input.
+                //
+                // The objective must stay `f64`, so signal with NaN:
+                // `BrentSolver::find_bracket` rejects a non-finite objective
+                // and surfaces `SolverConvergenceFailed`, which is a loud
+                // failure rather than a confident wrong number.
+                let Ok(t) =
+                    day_count.year_fraction(context.as_of, *date, DayCountContext::default())
+                else {
+                    return f64::NAN;
+                };
 
                 if t > 0.0 {
                     let df = base.powf(-periods_per_year * t);
