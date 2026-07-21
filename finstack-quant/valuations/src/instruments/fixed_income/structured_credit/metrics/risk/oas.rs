@@ -28,7 +28,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::simulation_eng
 };
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::instruments::Instrument;
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
@@ -136,7 +136,7 @@ pub fn calculate_tranche_oas(
     let original_balance = tranche.original_balance.amount();
     let target_pv = market_price_pct / 100.0 * original_balance;
 
-    let day_count = DayCount::Act365F;
+    let day_count = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
     let maturity = deal
         .tranches
         .tranches

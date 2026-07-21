@@ -19,7 +19,7 @@
 
 use crate::cashflow::traits::DatedFlows;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::Result;
@@ -52,7 +52,7 @@ pub fn calculate_tranche_convexity(
     discount_curve: &DiscountCurve,
     as_of: Date,
 ) -> Result<f64> {
-    let day_count = DayCount::Act365F;
+    let day_count = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
     let mut pv0 = NeumaierAccumulator::new();
     let mut pv_up = NeumaierAccumulator::new();
     let mut pv_dn = NeumaierAccumulator::new();
