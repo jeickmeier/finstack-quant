@@ -161,6 +161,7 @@ fn run_waterfall(
         asset_balances: None,
         deferred_interest: None,
         reserve_balance: Money::new(0.0, available_cash.currency()),
+        restricted_cash: Money::new(0.0, Currency::USD),
         recovery_proceeds: Money::new(0.0, available_cash.currency()),
     };
     finstack_quant_valuations::instruments::fixed_income::structured_credit::execute_waterfall(

@@ -2912,6 +2912,7 @@ mod tests {
                 asset_balances: None,
                 deferred_interest: None,
                 reserve_balance: Money::new(0.0, ccy),
+                restricted_cash: Money::new(0.0, Currency::USD),
                 recovery_proceeds: Money::new(0.0, ccy),
             },
         )
@@ -2959,6 +2960,7 @@ mod tests {
                 asset_balances: None,
                 deferred_interest: None,
                 reserve_balance: Money::new(0.0, ccy),
+                restricted_cash: Money::new(0.0, Currency::USD),
                 recovery_proceeds: Money::new(0.0, ccy),
             },
         )
@@ -3054,6 +3056,7 @@ mod tests {
                     asset_balances: None,
                     deferred_interest: None,
                     reserve_balance: Money::new(0.0, ccy),
+                    restricted_cash: Money::new(0.0, Currency::USD),
                     recovery_proceeds: Money::new(0.0, ccy),
                 },
             )
@@ -3591,7 +3594,12 @@ pub(crate) struct SimulationState<'a> {
 fn step_down_metrics(
     state: &SimulationState,
 ) -> crate::instruments::fixed_income::structured_credit::pricing::resolve::StepDownMetrics {
-    let pool = state.pool_outstanding.amount();
+    // N2: include the controlled-accumulation funding account. That principal
+    // has left the asset balances but is still collateral for the notes, so
+    // omitting it depresses both the OC ratio and credit enhancement during
+    // accumulation and can trip a step-down trigger that has not truly fired.
+    // Same reasoning as the coverage-test numerator in `simulate_period`.
+    let pool = state.pool_outstanding.amount() + state.principal_funding_account.amount();
     let cumulative_loss_fraction = if state.total_pool_balance.amount() > 0.0 {
         state.cumulative_realized_loss / state.total_pool_balance.amount()
     } else {
@@ -4353,10 +4361,19 @@ fn simulate_period(
                 state.principal_funding_account.amount() + captured,
                 state.base_ccy,
             );
-        } else if !early_amortization
-            && pay_date >= spec.bullet_date
+        } else if (early_amortization || pay_date >= spec.bullet_date)
             && state.principal_funding_account.amount() > 0.0
         {
+            // N3: early amortization RELEASES the account, it does not strand
+            // it. The release previously required `!early_amortization`, so a
+            // deal that breached into early am with a funded account only saw
+            // that cash at the terminal sweep — dated at the final simulated
+            // period. Early amortization exists precisely to accelerate
+            // principal to investors, so withholding already-collected
+            // principal until deal end inverts the trigger's purpose and
+            // mis-states senior WAL, duration and price in exactly the stress
+            // scenario the feature models. Total cash was conserved; its
+            // timing was not.
             funding_net_release = state.principal_funding_account.amount();
             state.principal_funding_account = Money::new(0.0, state.base_ccy);
             let release = Money::new(funding_net_release, state.base_ccy);
@@ -4464,6 +4481,28 @@ fn simulate_period(
         coverage_test_pool_balance
     };
 
+    // N2: principal held in the controlled-accumulation funding account is
+    // still collateral for the notes and must count toward the OC numerator.
+    //
+    // During accumulation the collected principal leaves the asset balances
+    // (Step 1 amortizes them) and is diverted into the account, so it appears
+    // in NEITHER the collateral term NOR the cash term of the test. The OC
+    // ratio therefore decayed by exactly the accumulated amount each period
+    // while the denominator stayed flat — a pool of 1000 against 900 of rated
+    // notes with a 1.05 trigger reads 1.044 after only 60 accumulates, a
+    // breach that does not exist.
+    //
+    // That spurious breach then does real damage: the diverted pass sets
+    // principal targets to zero, overriding the accumulation lockout whose
+    // whole job is to hold investor balances flat. At the bullet date the
+    // account lands in `principal_collections` and the ratio snaps back,
+    // giving a sawtooth OC path.
+    //
+    // Real indentures count principal-collection-account cash in par-value
+    // tests, so including it is also the market convention.
+    let coverage_test_pool_balance =
+        coverage_test_pool_balance.checked_add(state.principal_funding_account)?;
+
     let waterfall_context =
         crate::instruments::fixed_income::structured_credit::pricing::waterfall::WaterfallContext {
             available_cash: total_cash_for_waterfall,
@@ -4478,6 +4517,8 @@ fn simulate_period(
             asset_balances: Some(&state.pool_state.balances),
             deferred_interest: Some(&state.deferred_interest),
             reserve_balance: state.reserve_balance,
+            // N2: funding-account principal is still collateral for the notes.
+            restricted_cash: state.principal_funding_account,
             recovery_proceeds: released_recoveries,
         };
 

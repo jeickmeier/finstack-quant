@@ -93,6 +93,9 @@ pub struct WaterfallContext<'a> {
     /// Current reserve account balance (passed dynamically each period).
     /// Used by `PaymentCalculation::ReserveReplenishment` to compute shortfall.
     pub reserve_balance: Money,
+    /// Trust-held collateral cash outside the asset balances (N2): the
+    /// controlled-accumulation funding account. Counted in the OC numerator.
+    pub restricted_cash: Money,
     /// Recovery proceeds released this period (tracked separately for reporting).
     pub recovery_proceeds: Money,
 }
@@ -207,6 +210,7 @@ fn execute_waterfall_core(
         context.asset_balances,
         &payable_principal_tranche_ids,
         senior_fees,
+        context.restricted_cash,
     )?;
 
     // Coverage tests share senior balances, so one paydown de-leverages every
@@ -1052,6 +1056,7 @@ fn evaluate_coverage_tests(
     asset_balances: Option<&[f64]>,
     payable_principal_tranche_ids: &[&str],
     senior_fees: Money,
+    restricted_cash: Money,
 ) -> Result<Vec<CoverageTestResult>> {
     let mut results = Vec::with_capacity(waterfall.coverage_triggers.len() * 2);
 
@@ -1085,6 +1090,7 @@ fn evaluate_coverage_tests(
                 asset_balances,
                 current_pool_balance: Some(current_pool_balance),
                 senior_fees,
+                restricted_cash,
             };
 
             let oc_test = CoverageTest::new_oc(oc_trigger_level);
@@ -1114,6 +1120,7 @@ fn evaluate_coverage_tests(
                 asset_balances,
                 current_pool_balance: Some(current_pool_balance),
                 senior_fees,
+                restricted_cash,
             };
 
             let ic_test = CoverageTest::new_ic(ic_trigger_level);
@@ -1532,6 +1539,7 @@ mod ic_diversion_tests {
             asset_balances: None,
             deferred_interest: None,
             reserve_balance: Money::new(0.0, currency),
+            restricted_cash: Money::new(0.0, Currency::USD),
             recovery_proceeds: Money::new(0.0, currency),
         };
 
@@ -1757,6 +1765,7 @@ mod ic_diversion_tests {
             asset_balances: None,
             deferred_interest: None,
             reserve_balance: Money::new(0.0, currency),
+            restricted_cash: Money::new(0.0, Currency::USD),
             recovery_proceeds: Money::new(0.0, currency),
         };
 
@@ -1933,6 +1942,7 @@ mod ic_diversion_tests {
             asset_balances: None,
             deferred_interest: None,
             reserve_balance: Money::new(0.0, currency),
+            restricted_cash: Money::new(0.0, Currency::USD),
             recovery_proceeds: Money::new(0.0, currency),
         };
 
@@ -2023,6 +2033,7 @@ mod ic_diversion_tests {
                     asset_balances: None,
                     deferred_interest: None,
                     reserve_balance: Money::new(0.0, currency),
+                    restricted_cash: Money::new(0.0, Currency::USD),
                     recovery_proceeds: Money::new(0.0, currency),
                 },
             )
@@ -2124,6 +2135,7 @@ mod ic_diversion_tests {
                 asset_balances: None,
                 deferred_interest: None,
                 reserve_balance: Money::new(0.0, currency),
+                restricted_cash: Money::new(0.0, Currency::USD),
                 recovery_proceeds: Money::new(0.0, currency),
             },
         )
@@ -2224,6 +2236,7 @@ mod ic_diversion_tests {
                 asset_balances: None,
                 deferred_interest: None,
                 reserve_balance: Money::new(0.0, currency),
+                restricted_cash: Money::new(0.0, Currency::USD),
                 recovery_proceeds: Money::new(0.0, currency),
             },
         )
