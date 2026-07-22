@@ -185,6 +185,10 @@ impl TermLoanDiscountingPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
+        if loan.settlement_date(as_of)? >= loan.maturity {
+            return Ok(Money::new(0.0, loan.currency));
+        }
+
         // Retrieve discount curve and discount the holder-view flows to the
         // settlement date using date-based DF mapping. This anchors valuation on
         // the settlement date rather than the trade date, consistent with
@@ -244,16 +248,7 @@ impl TermLoanDiscountingPricer {
     }
 
     /// Replace forward-projected rates with historical fixings for seasoned
-    /// floating-rate periods.
-    ///
-    /// For each `FloatReset` cashflow whose `reset_date` is before `as_of`,
-    /// looks up the historical fixing from the market context and recalculates
-    /// the coupon amount using:
-    ///   `amount = notional * all_in_rate * accrual_factor`
-    ///
-    /// The all-in rate is computed from the raw fixing using the same floor/cap/
-    /// gearing/spread logic as forward projection (via `calculate_floating_rate`).
-    ///
+    /// floating-rate periods while retaining each period's effective margin.
     fn apply_fixings(
         loan: &TermLoan,
         market: &MarketContext,
@@ -262,15 +257,13 @@ impl TermLoanDiscountingPricer {
     ) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::cashflow::CFKind;
         use rust_decimal::prelude::ToPrimitive;
+        use std::collections::BTreeMap;
 
-        // Only applies to floating-rate loans.
         let float_spec = match &loan.rate {
             RateSpec::Floating(spec) => spec,
             RateSpec::Fixed { .. } => return Ok(()),
         };
 
-        // A reset lag can place the first observation before the issue date.
-        // The loan is not seasoned until its contractual accrual has begun.
         if loan.issue_date >= as_of {
             return Ok(());
         }
@@ -281,40 +274,43 @@ impl TermLoanDiscountingPricer {
         if !has_past_reset {
             return Ok(());
         }
+
         let fixing_series = finstack_quant_core::market_data::fixings::get_fixing_series(
             market,
             float_spec.index_id.as_str(),
         )?;
 
-        // Build FloatingRateParams from the loan's floating rate spec.
-        // These parameters encode spread, gearing, floors, and caps for
-        // consistent rate calculation between forward projection and fixing paths.
-        let spread_bp_f64 = float_spec.spread_bp.to_f64().unwrap_or_default();
-        let gearing_f64 = float_spec.gearing.to_f64().unwrap_or(1.0);
-        let index_floor_bp = float_spec.index_floor_bp.and_then(|d| d.to_f64());
-        let index_cap_bp = float_spec.index_cap_bp.and_then(|d| d.to_f64());
-        let all_in_floor_bp = float_spec.all_in_floor_bp.and_then(|d| d.to_f64());
-        let all_in_cap_bp = float_spec.all_in_cap_bp.and_then(|d| d.to_f64());
+        // Margin events are effective from the start of the contractual accrual
+        // period. Combine coincident covenant and override changes before lookup.
+        let mut margin_deltas = BTreeMap::<finstack_quant_core::dates::Date, i32>::new();
+        if let Some(covenants) = &loan.covenants {
+            for step in &covenants.margin_stepups {
+                *margin_deltas.entry(step.date).or_default() += step.delta_bp;
+            }
+        }
+        if let Some(overrides) = &loan.instrument_pricing_overrides.term_loan {
+            for (date, delta_bp) in &overrides.margin_add_bp_by_date {
+                *margin_deltas.entry(*date).or_default() += *delta_bp;
+            }
+        }
 
-        let params = crate::cashflow::builder::FloatingRateParams {
-            spread_bp: spread_bp_f64,
-            gearing: gearing_f64,
+        let base_params = crate::cashflow::builder::FloatingRateParams {
+            spread_bp: float_spec.spread_bp.to_f64().unwrap_or_default(),
+            gearing: float_spec.gearing.to_f64().unwrap_or(1.0),
             gearing_includes_spread: float_spec.gearing_includes_spread,
-            index_floor_bp,
-            index_cap_bp,
-            all_in_floor_bp,
-            all_in_cap_bp,
+            index_floor_bp: float_spec.index_floor_bp.and_then(|value| value.to_f64()),
+            index_cap_bp: float_spec.index_cap_bp.and_then(|value| value.to_f64()),
+            all_in_floor_bp: float_spec.all_in_floor_bp.and_then(|value| value.to_f64()),
+            all_in_cap_bp: float_spec.all_in_cap_bp.and_then(|value| value.to_f64()),
         };
 
-        // Build outstanding path for notional lookup at each flow date.
         let outstanding_path = schedule.outstanding_by_date()?;
         let initial_notional = schedule.get_notional().initial.amount();
-        // Helper: find outstanding notional immediately before a payment date.
         let notional_before = |target: finstack_quant_core::dates::Date| -> f64 {
             let mut last = initial_notional;
-            for (d, amt) in &outstanding_path {
-                if *d < target {
-                    last = amt.amount();
+            for (date, amount) in &outstanding_path {
+                if *date < target {
+                    last = amount.amount();
                 } else {
                     break;
                 }
@@ -323,12 +319,11 @@ impl TermLoanDiscountingPricer {
         };
 
         schedule.try_update_flows(|flow| {
-            // Only process FloatReset flows with a reset date before the valuation date.
             if flow.kind != CFKind::FloatReset {
                 return Ok(());
             }
             let reset_date = match flow.reset_date {
-                Some(rd) if rd < as_of => rd,
+                Some(date) if date < as_of => date,
                 _ => return Ok(()),
             };
 
@@ -338,21 +333,26 @@ impl TermLoanDiscountingPricer {
                 reset_date,
                 as_of,
             )?;
+            let accrual_start = flow.accrual.map_or(reset_date, |accrual| accrual.start);
+            let active_delta_bp: i32 = margin_deltas
+                .range(..=accrual_start)
+                .map(|(_, delta_bp)| *delta_bp)
+                .sum();
+            let mut params = base_params.clone();
+            params.spread_bp += f64::from(active_delta_bp);
             let all_in_rate = crate::cashflow::builder::rate_helpers::calculate_floating_rate(
                 raw_fixing, &params,
             );
 
-            // Preserve the builder's accrual notional by rescaling the already
-            // projected coupon. This also preserves any intra-period balance
-            // segmentation. Fall back to the pre-payment balance only when the
-            // original projected rate is effectively zero.
+            // Rescaling retains the builder's accrual notional and any
+            // intra-period balance segmentation. The balance fallback handles
+            // a projected coupon whose original rate was exactly zero.
             let new_amount = match flow.rate {
                 Some(old_rate) if old_rate.is_finite() && old_rate.abs() > 1.0e-14 => {
                     flow.amount.amount() * all_in_rate / old_rate
                 }
                 _ => notional_before(flow.date) * all_in_rate * flow.accrual_factor,
             };
-
             flow.rate = Some(all_in_rate);
             flow.amount = Money::new(new_amount, flow.amount.currency());
             Ok(())
@@ -538,6 +538,7 @@ mod tests {
                 (date(2024, 7, 1), 0.02),  // Q3 2024 reset
                 (date(2024, 10, 1), 0.02), // Q4 2024 reset
                 (date(2025, 1, 1), 0.02),  // Q1 2025 reset
+                (date(2025, 4, 1), 0.02),  // Q2 2025 reset
             ],
             None,
         )
@@ -553,9 +554,9 @@ mod tests {
         let loan = floating_loan_for_fixings();
         let market = market_with_fixings(as_of);
 
-        // Generate cashflows and apply fixings (via the pricer's internal schedule).
-        let mut schedule = generate_cashflows(&loan, &market, as_of).expect("cashflows");
-        TermLoanDiscountingPricer::apply_fixings(&loan, &market, as_of, &mut schedule)
+        // The shared builder resolves historical fixings while constructing the
+        // canonical pricing schedule.
+        let schedule = TermLoanDiscountingPricer::pricing_schedule(&loan, &market, as_of)
             .expect("complete fixing history");
 
         // Check that FloatReset flows with reset_date < as_of use the fixing rate.
@@ -592,6 +593,37 @@ mod tests {
         let err = TermLoanDiscountingPricer::price(&loan, &market_no_fix, as_of)
             .expect_err("seasoned floating loan must require historical fixings");
         assert!(err.to_string().contains("FIXING:USD-SOFR-3M"));
+    }
+
+    #[test]
+    fn seasoned_fixing_preserves_active_margin_step_up() {
+        let as_of = date(2025, 4, 15);
+        let mut loan = floating_loan_for_fixings();
+        loan.covenants = Some(
+            crate::instruments::fixed_income::term_loan::TermLoanCovenantEvents {
+                margin_stepups: vec![crate::instruments::fixed_income::term_loan::MarginStepUp {
+                    date: date(2025, 1, 1),
+                    delta_bp: 200,
+                }],
+                ..Default::default()
+            },
+        );
+        let market = market_with_fixings(as_of);
+        let schedule = TermLoanDiscountingPricer::pricing_schedule(&loan, &market, as_of)
+            .expect("seasoned stepped schedule");
+
+        let current_coupon = schedule
+            .get_flows()
+            .iter()
+            .find(|flow| {
+                flow.kind == CFKind::FloatReset && flow.reset_date == Some(date(2025, 4, 1))
+            })
+            .expect("current reset coupon");
+        let rate = current_coupon.rate.expect("all-in rate");
+        assert!(
+            (rate - 0.07).abs() < 1e-12,
+            "2% fixing + 300bp base margin + 200bp step-up must equal 7%, got {rate}"
+        );
     }
 
     #[test]

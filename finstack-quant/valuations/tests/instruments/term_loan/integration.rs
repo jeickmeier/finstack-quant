@@ -11,6 +11,7 @@ use finstack_quant_valuations::instruments::fixed_income::term_loan::{
     self, LoanCall, LoanCallSchedule, LoanCallType, RateSpec, TermLoan,
 };
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 use time::macros::date;
@@ -135,6 +136,35 @@ fn test_term_loan_yields_to_horizons() {
 
     // YT4Y equals YTM when maturity is 4 years
     assert!((yt4y - ytm).abs() < 1e-8);
+}
+
+#[test]
+fn horizon_yields_use_quoted_clean_price() {
+    let as_of = date!(2025 - 01 - 01);
+    let maturity = date!(2029 - 01 - 01);
+    let market = MarketContext::new().insert(build_flat_discount_curve(0.05, as_of, "USD-OIS"));
+
+    let yield_at = |clean_price: f64| {
+        let mut loan = build_simple_term_loan(as_of, maturity);
+        loan.instrument_pricing_overrides =
+            InstrumentPricingOverrides::default().with_quoted_clean_price(clean_price);
+        let result = loan
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::custom("yt2y")],
+                finstack_quant_valuations::instruments::PricingOptions::default(),
+            )
+            .expect("quoted horizon yield");
+        *result.measures.get("yt2y").expect("yt2y")
+    };
+
+    let near_par = yield_at(99.0);
+    let discounted = yield_at(80.0);
+    assert!(
+        discounted > near_par,
+        "a lower purchase price must increase the horizon yield: 80={discounted}, 99={near_par}"
+    );
 }
 
 /// End-to-end floating-rate term loan yield and discount margin test.

@@ -63,6 +63,7 @@ use crate::metrics::sensitivities::cs01::{
 use crate::metrics::{
     GenericBucketedCs01, GenericParallelCs01, MetricCalculator, MetricContext, MetricId,
 };
+use crate::pricer::ModelKey;
 
 /// Cashflow inputs an instrument exposes for z-spread CS01.
 ///
@@ -252,24 +253,27 @@ fn has_credit_curve<I: Instrument>(instrument: &I) -> finstack_quant_core::Resul
 /// z-spread bump, keyed `cs01::<instrument_id>`.
 pub(crate) struct ZSpreadParallelCs01<I> {
     delegate_to_hazard_when_credit_curve: bool,
+    require_credit_consuming_model: bool,
     _phantom: PhantomData<I>,
 }
 
 impl<I> ZSpreadParallelCs01<I> {
-    /// Always use the z-spread bump (the instrument's pricer never consumes a
-    /// hazard curve — e.g. term loans).
-    pub(crate) fn always() -> Self {
-        Self {
-            delegate_to_hazard_when_credit_curve: false,
-            _phantom: PhantomData,
-        }
-    }
-
     /// Delegate to the canonical hazard CS01 when a credit curve is present,
     /// falling back to the z-spread bump otherwise (e.g. revolving credit).
     pub(crate) fn hazard_when_credit_curve() -> Self {
         Self {
             delegate_to_hazard_when_credit_curve: true,
+            require_credit_consuming_model: false,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Delegate only when both a credit curve is present and the selected
+    /// valuation model consumes that curve (e.g. term-loan credit trees).
+    pub(crate) fn hazard_when_credit_curve_and_model() -> Self {
+        Self {
+            delegate_to_hazard_when_credit_curve: true,
+            require_credit_consuming_model: true,
             _phantom: PhantomData,
         }
     }
@@ -286,7 +290,11 @@ where
             .downcast_ref::<I>()
             .ok_or(finstack_quant_core::InputError::Invalid)?;
 
-        if self.delegate_to_hazard_when_credit_curve && has_credit_curve(instrument)? {
+        if self.delegate_to_hazard_when_credit_curve
+            && has_credit_curve(instrument)?
+            && (!self.require_credit_consuming_model
+                || active_model_consumes_credit(context, instrument))
+        {
             return GenericParallelCs01::<I>::default().calculate(context);
         }
 
@@ -336,23 +344,27 @@ where
 /// and a credit curve is present (revolving credit).
 pub(crate) struct ZSpreadBucketedCs01<I> {
     delegate_to_hazard_when_credit_curve: bool,
+    require_credit_consuming_model: bool,
     _phantom: PhantomData<I>,
 }
 
 impl<I> ZSpreadBucketedCs01<I> {
-    /// Always use the z-spread bump (term loans).
-    pub(crate) fn always() -> Self {
-        Self {
-            delegate_to_hazard_when_credit_curve: false,
-            _phantom: PhantomData,
-        }
-    }
-
     /// Delegate to the canonical hazard bucketed CS01 when a credit curve is
     /// present, falling back to the z-spread bump otherwise (revolving credit).
     pub(crate) fn hazard_when_credit_curve() -> Self {
         Self {
             delegate_to_hazard_when_credit_curve: true,
+            require_credit_consuming_model: false,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Delegate only when both a credit curve is present and the selected
+    /// valuation model consumes that curve (e.g. term-loan credit trees).
+    pub(crate) fn hazard_when_credit_curve_and_model() -> Self {
+        Self {
+            delegate_to_hazard_when_credit_curve: true,
+            require_credit_consuming_model: true,
             _phantom: PhantomData,
         }
     }
@@ -369,7 +381,11 @@ where
             .downcast_ref::<I>()
             .ok_or(finstack_quant_core::InputError::Invalid)?;
 
-        if self.delegate_to_hazard_when_credit_curve && has_credit_curve(instrument)? {
+        if self.delegate_to_hazard_when_credit_curve
+            && has_credit_curve(instrument)?
+            && (!self.require_credit_consuming_model
+                || active_model_consumes_credit(context, instrument))
+        {
             return GenericBucketedCs01::<I>::default().calculate(context);
         }
 
@@ -426,6 +442,17 @@ where
         context.store_bucketed_series(series_id, series);
         Ok(total.total())
     }
+}
+
+fn active_model_consumes_credit<I: Instrument + ?Sized>(
+    context: &MetricContext,
+    instrument: &I,
+) -> bool {
+    let model = context
+        .clone_pricer_dispatch()
+        .0
+        .unwrap_or_else(|| instrument.default_model());
+    matches!(model, ModelKey::Tree | ModelKey::HazardRate)
 }
 
 #[cfg(test)]

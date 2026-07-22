@@ -30,6 +30,14 @@ fn bond_instrument_json() -> String {
     serde_json::to_string(&InstrumentJson::Bond(bond)).unwrap()
 }
 
+fn term_loan_instrument_json() -> String {
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
+    use finstack_quant_valuations::instruments::InstrumentJson;
+
+    let loan = TermLoan::example().expect("term loan example");
+    serde_json::to_string(&InstrumentJson::TermLoan(loan)).unwrap()
+}
+
 fn market_context_json() -> String {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -175,6 +183,25 @@ fn price_instrument_with_metrics_accepts_pricing_options() {
     assert!(!result.is_empty());
     let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
     assert!(parsed.is_object());
+}
+
+#[wasm_bindgen_test]
+fn registered_term_loan_metrics_cross_wasm_json_boundary() {
+    let metrics =
+        serde_wasm_bindgen::to_value(&vec!["all_in_rate".to_string(), "yt2y".to_string()]).unwrap();
+    let result = price_instrument_with_metrics(
+        &term_loan_instrument_json(),
+        &market_context_json(),
+        "2024-01-01",
+        "discounting",
+        metrics,
+        None,
+        None,
+    )
+    .expect("registered custom metrics");
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    assert!(parsed["measures"].get("all_in_rate").is_some());
+    assert!(parsed["measures"].get("yt2y").is_some());
 }
 
 #[wasm_bindgen_test]

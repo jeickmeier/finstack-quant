@@ -156,6 +156,18 @@ fn term_loan_commitment_fee_step_downs() {
 
     let ratio = after / before;
     assert!(ratio > 0.4 && ratio < 0.6, "fee ratio: {}", ratio);
+
+    let fee_at_step_down = fees
+        .iter()
+        .find(|cf| cf.date == step_down)
+        .expect("fee for interval ending on step-down date")
+        .amount
+        .amount();
+    let expected = 10_000_000.0 * 0.01 * (91.0 / 360.0);
+    assert!(
+        (fee_at_step_down - expected).abs() < 1e-8,
+        "pre-step-down interval must use the old commitment: actual={fee_at_step_down}, expected={expected}"
+    );
 }
 
 #[test]
@@ -331,6 +343,68 @@ fn term_loan_pik_toggle_and_cash_sweep() {
     // outstanding rather than paying cash to the holder.
     let has_pik = sched.get_flows().iter().any(|cf| cf.kind == CFKind::PIK);
     assert!(!has_pik);
+
+    let cash_coupon_dates: Vec<_> = sched
+        .get_flows()
+        .iter()
+        .filter(|cf| cf.kind == CFKind::Fixed)
+        .map(|cf| cf.date)
+        .collect();
+    let toggle_date = Date::from_calendar_date(2025, time::Month::July, 1).unwrap();
+    assert!(cash_coupon_dates.iter().any(|date| *date <= toggle_date));
+    assert!(
+        cash_coupon_dates.iter().all(|date| *date <= toggle_date),
+        "cash interest must stop after PIK is enabled: {cash_coupon_dates:?}"
+    );
+}
+
+#[test]
+fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
+    let issue = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+    let step_date = Date::from_calendar_date(2025, time::Month::July, 1).unwrap();
+    let maturity = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
+    let covenants = term_loan::TermLoanCovenantEvents {
+        margin_stepups: vec![term_loan::MarginStepUp {
+            date: step_date,
+            delta_bp: 200,
+        }],
+        ..Default::default()
+    };
+    let loan = TermLoan::builder()
+        .id("TL-FIXED-STEP".into())
+        .currency(Currency::USD)
+        .notional_limit(Money::new(5_000_000.0, Currency::USD))
+        .issue_date(issue)
+        .maturity(maturity)
+        .rate(term_loan::RateSpec::Fixed { rate_bp: 600 })
+        .frequency(Tenor::quarterly())
+        .day_count(DayCount::Act360)
+        .bdc(finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing)
+        .calendar_id_opt(None)
+        .stub(finstack_quant_core::dates::StubKind::None)
+        .discount_curve_id(CurveId::from("USD-OIS"))
+        .amortization(term_loan::AmortizationSpec::None)
+        .coupon_type(finstack_quant_cashflows::builder::specs::CouponType::Cash)
+        .upfront_fee_opt(None)
+        .ddtl_opt(None)
+        .covenants_opt(Some(covenants))
+        .attributes(Default::default())
+        .build()
+        .unwrap();
+
+    let schedule = loan.cashflow_schedule(&mc(), issue).unwrap();
+    let coupons: Vec<_> = schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| flow.kind == CFKind::Fixed)
+        .map(|flow| (flow.date, flow.rate.expect("fixed coupon rate")))
+        .collect();
+    assert!(coupons
+        .iter()
+        .any(|(date, rate)| { *date <= step_date && (*rate - 0.06).abs() < 1e-12 }));
+    assert!(coupons
+        .iter()
+        .any(|(date, rate)| { *date > step_date && (*rate - 0.08).abs() < 1e-12 }));
 }
 
 #[test]

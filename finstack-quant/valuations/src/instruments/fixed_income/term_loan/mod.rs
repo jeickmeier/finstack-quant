@@ -90,7 +90,7 @@ pub(crate) mod types;
 pub use overrides::TermLoanOverrides;
 pub use spec::{
     AmortizationSpec, CashSweepEvent, CommitmentFeeBase, CommitmentStepDown, DdtlSpec, DrawEvent,
-    LoanCall, LoanCallSchedule, LoanCallType, OidEirSpec, OidPolicy, PikToggle,
+    LoanCall, LoanCallSchedule, LoanCallType, MarginStepUp, OidEirSpec, OidPolicy, PikToggle,
     TermLoanCovenantEvents, TermLoanSpec,
 };
 pub use types::{RateSpec, TermLoan};

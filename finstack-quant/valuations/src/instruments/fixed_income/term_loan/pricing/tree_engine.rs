@@ -30,7 +30,8 @@ use finstack_quant_core::Result;
 #[derive(Debug, Clone)]
 pub(crate) struct TermLoanTreePricerConfig {
     pub(crate) tree_steps: usize,
-    pub(crate) volatility: f64,
+    pub(crate) rate_volatility: f64,
+    pub(crate) hazard_volatility: f64,
     pub(crate) tolerance: f64,
     pub(crate) max_iterations: usize,
     pub(crate) initial_bracket_size_bp: Option<f64>,
@@ -40,7 +41,8 @@ impl Default for TermLoanTreePricerConfig {
     fn default() -> Self {
         Self {
             tree_steps: 100,
-            volatility: 0.01,
+            rate_volatility: 0.01,
+            hazard_volatility: 0.20,
             tolerance: 1e-6,
             max_iterations: 50,
             initial_bracket_size_bp: Some(1000.0),
@@ -164,7 +166,10 @@ impl TermLoanValuator {
         };
 
         for cf in schedule.get_flows() {
-            if cf.date < origin {
+            // The tree is valued immediately after settlement. Contractual
+            // funding and other flows on the settlement date have already
+            // exchanged and must not enter the holder's forward value.
+            if cf.date <= origin {
                 continue;
             }
             let t = dc_curve.year_fraction(
@@ -251,42 +256,51 @@ impl TermLoanValuator {
         let mut call_vec: Vec<Option<f64>> = vec![None; num_steps];
         let mut call_outstanding_vec: Vec<Option<f64>> = vec![None; num_steps];
         if let Some(ref cs) = loan.call_schedule {
-            for c in &cs.calls {
-                if c.date < origin || c.date > loan.maturity {
+            let mut call_boundaries = Vec::with_capacity(cs.calls.len());
+            for call in &cs.calls {
+                if call.date > loan.maturity {
                     continue;
                 }
+                let start_step = if call.date <= origin {
+                    0
+                } else {
+                    let t = dc_curve.year_fraction(
+                        origin,
+                        call.date,
+                        finstack_quant_core::dates::DayCountContext::default(),
+                    )?;
+                    let raw = (t / time_to_maturity) * tree_steps as f64;
+                    (raw.clamp(0.0, tree_steps as f64).ceil() as usize).clamp(0, num_steps - 1)
+                };
+                call_boundaries.push((start_step, call));
+            }
+
+            // Each call entry is an effective-dated provision. It remains active
+            // at every subsequent exercise step until the next entry replaces it.
+            // Make-whole entries still act as boundaries, but are not represented
+            // as an economic option in this tree.
+            let mut boundary_index = 0usize;
+            let mut active_call = None;
+            for step in 0..num_steps {
+                while boundary_index < call_boundaries.len()
+                    && call_boundaries[boundary_index].0 <= step
+                {
+                    active_call = Some(call_boundaries[boundary_index].1);
+                    boundary_index += 1;
+                }
+                let Some(call) = active_call else {
+                    continue;
+                };
                 if matches!(
-                    c.call_type,
+                    call.call_type,
                     crate::instruments::fixed_income::term_loan::LoanCallType::MakeWhole { .. }
                 ) {
                     continue;
                 }
-                let t = dc_curve.year_fraction(
-                    origin,
-                    c.date,
-                    finstack_quant_core::dates::DayCountContext::default(),
-                )?;
-                let raw = (t / time_to_maturity) * tree_steps as f64;
-                let step =
-                    (raw.clamp(0.0, tree_steps as f64).ceil() as usize).clamp(0, num_steps - 1);
 
-                let out = outstanding_before(c.date).max(0.0);
-                let redemption = out * (c.price_pct_of_par / 100.0);
-
-                // If multiple calls map to the same step, use the minimum redemption (most issuer-friendly),
-                // which is conservative for the lender (lower PV).
-                match call_vec[step] {
-                    Some(existing) => {
-                        if redemption < existing {
-                            call_vec[step] = Some(redemption);
-                            call_outstanding_vec[step] = Some(out);
-                        }
-                    }
-                    None => {
-                        call_vec[step] = Some(redemption);
-                        call_outstanding_vec[step] = Some(out);
-                    }
-                }
+                let out = outstanding_vec[step].max(0.0);
+                call_vec[step] = Some(out * (call.price_pct_of_par / 100.0));
+                call_outstanding_vec[step] = Some(out);
             }
         }
 
@@ -462,17 +476,19 @@ impl TermLoanTreePricer {
                 .model_config
                 .tree_steps
                 .unwrap_or(self.config.tree_steps),
-            volatility: loan
+            rate_volatility: loan
                 .instrument_pricing_overrides
-                .market_quotes
-                .implied_volatility
-                .unwrap_or(self.config.volatility),
+                .model_config
+                .hw1f_sigma
+                .unwrap_or(self.config.rate_volatility),
+            hazard_volatility: self.config.hazard_volatility,
             tolerance: self.config.tolerance,
             max_iterations: self.config.max_iterations,
             initial_bracket_size_bp: self.config.initial_bracket_size_bp,
         };
         let steps = cfg.tree_steps;
-        let vol = cfg.volatility;
+        let rate_volatility = cfg.rate_volatility;
+        let hazard_volatility = cfg.hazard_volatility;
 
         // Choose model: if hazard curve is available, use the rates+credit tree; otherwise short-rate.
         // Precedence mirrors TermLoan's `credit_curve_id` semantics.
@@ -491,7 +507,7 @@ impl TermLoanTreePricer {
             let mut tree = RatesCreditTree::new(RatesCreditConfig {
                 steps,
                 rate_vol: 0.0,
-                hazard_vol: vol,
+                hazard_vol: hazard_volatility,
                 ..Default::default()
             });
             tree.calibrate(disc.as_ref(), hc.as_ref(), time_to_maturity)?;
@@ -502,7 +518,7 @@ impl TermLoanTreePricer {
             // Short-rate tree calibrated to the discount curve.
             let mut tree = ShortRateTree::new(ShortRateTreeConfig {
                 steps,
-                volatility: vol,
+                volatility: rate_volatility,
                 ..Default::default()
             });
             tree.calibrate(&loan.discount_curve_id, disc.as_ref(), time_to_maturity)?;
@@ -568,17 +584,19 @@ impl TermLoanTreePricer {
                 .model_config
                 .tree_steps
                 .unwrap_or(self.config.tree_steps),
-            volatility: loan
+            rate_volatility: loan
                 .instrument_pricing_overrides
-                .market_quotes
-                .implied_volatility
-                .unwrap_or(self.config.volatility),
+                .model_config
+                .hw1f_sigma
+                .unwrap_or(self.config.rate_volatility),
+            hazard_volatility: self.config.hazard_volatility,
             tolerance: self.config.tolerance,
             max_iterations: self.config.max_iterations,
             initial_bracket_size_bp: self.config.initial_bracket_size_bp,
         };
         let steps = cfg.tree_steps;
-        let vol = cfg.volatility;
+        let rate_volatility = cfg.rate_volatility;
+        let hazard_volatility = cfg.hazard_volatility;
 
         // Choose model based on hazard availability.
         let hazard_curve = loan
@@ -596,7 +614,7 @@ impl TermLoanTreePricer {
             let mut tree = RatesCreditTree::new(RatesCreditConfig {
                 steps,
                 rate_vol: 0.0,
-                hazard_vol: vol,
+                hazard_vol: hazard_volatility,
                 ..Default::default()
             });
             tree.calibrate(disc.as_ref(), hc.as_ref(), time_to_maturity)?;
@@ -615,7 +633,7 @@ impl TermLoanTreePricer {
         } else {
             let mut tree = ShortRateTree::new(ShortRateTreeConfig {
                 steps,
-                volatility: vol,
+                volatility: rate_volatility,
                 ..Default::default()
             });
             tree.calibrate(&loan.discount_curve_id, disc.as_ref(), time_to_maturity)

@@ -379,9 +379,20 @@ fn price_instrument_json_request(
     let instrument = parse_boxed_instrument_json(instrument_json, pricing_options)?;
     let as_of = finstack_quant_core::dates::parse_iso_date(as_of)?;
     let model = resolve_model_key(instrument.as_ref(), model)?;
+    let registry = shared_standard_registry();
+    let metric_registry = registry.get_metric_registry();
     let metric_ids: Vec<MetricId> = metrics
         .iter()
-        .map(|metric| MetricId::parse_strict(metric))
+        .map(|metric| {
+            MetricId::parse_strict(metric).or_else(|strict_error| {
+                let registered = MetricId::custom(metric.to_lowercase());
+                if metric_registry.has_metric(registered.clone()) {
+                    Ok(registered)
+                } else {
+                    Err(strict_error)
+                }
+            })
+        })
         .collect::<finstack_quant_core::Result<_>>()?;
     let pricing_options = if let Some(json) = market_history_json {
         let history: crate::metrics::risk::MarketHistory = serde_json::from_str(json)
@@ -391,7 +402,6 @@ fn price_instrument_json_request(
     } else {
         crate::instruments::PricingOptions::default()
     };
-    let registry = shared_standard_registry();
     PricerRegistry::price_with_metrics_shared(
         &registry,
         instrument.as_ref(),
@@ -1014,6 +1024,25 @@ mod tests {
         )
         .expect("price");
         assert_eq!(result.instrument_id, "TEST-BOND");
+    }
+
+    #[test]
+    fn json_pricing_accepts_registered_custom_term_loan_metrics() {
+        let loan = TermLoan::example().expect("term loan");
+        let json = serde_json::to_string(&InstrumentJson::TermLoan(loan)).expect("serialize");
+        let result = price_instrument_json_with_metrics_and_history(
+            &json,
+            &market_context(),
+            "2024-01-01",
+            "discounting",
+            &["all_in_rate".to_string(), "yt2y".to_string()],
+            None,
+            None,
+        )
+        .expect("registered custom metrics must cross the JSON boundary");
+
+        assert!(result.measures.contains_key("all_in_rate"));
+        assert!(result.measures.contains_key("yt2y"));
     }
 
     #[test]

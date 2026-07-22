@@ -6,7 +6,7 @@
 
 use crate::cashflow::builder::schedule::{merge_cashflow_schedules, CashFlowSchedule};
 use crate::cashflow::builder::specs::{
-    CouponType, FeeBase, FeeSpec, FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec,
+    CouponType, FeeBase, FeeSpec, FloatingCouponSpec, FloatingRateSpec, StepUpCouponSpec,
 };
 use crate::cashflow::builder::{CashFlowBuilder, PrincipalEvent, ScheduleParams};
 use crate::cashflow::primitives::{CFKind, CashFlow};
@@ -312,13 +312,33 @@ pub(crate) fn generate_cashflows(
         super::types::RateSpec::Fixed { rate_bp } => {
             // Convert rate from basis points to decimal using exact Decimal arithmetic
             // to avoid f64 representation errors (e.g., 333 bp → 0.0333 exactly).
-            let rate_decimal = Decimal::from(*rate_bp) / Decimal::from(10_000);
-            let spec = FixedCouponSpec {
+            let initial_rate = Decimal::from(*rate_bp) / Decimal::from(10_000);
+            let mut dated_deltas = BTreeMap::<Date, i32>::new();
+            if let Some(cov) = &loan.covenants {
+                for step in &cov.margin_stepups {
+                    *dated_deltas.entry(step.date).or_default() += step.delta_bp;
+                }
+            }
+            if let Some(ov) = &loan.instrument_pricing_overrides.term_loan {
+                for (date, delta_bp) in &ov.margin_add_bp_by_date {
+                    *dated_deltas.entry(*date).or_default() += *delta_bp;
+                }
+            }
+
+            let mut running_rate = initial_rate;
+            let mut step_schedule = Vec::with_capacity(dated_deltas.len());
+            for (date, delta_bp) in dated_deltas {
+                running_rate += Decimal::from(delta_bp) / Decimal::from(10_000);
+                step_schedule.push((date, running_rate));
+            }
+
+            let spec = StepUpCouponSpec {
                 coupon_type: loan.coupon_type,
-                rate: rate_decimal,
+                initial_rate,
+                step_schedule,
                 schedule: loan_schedule_params(loan),
             };
-            let _ = builder.fixed_cf(spec);
+            let _ = builder.step_up_cf(spec);
         }
         super::types::RateSpec::Floating(spec) => {
             // Build margin step-up schedule for `float_margin_stepup`.
@@ -331,25 +351,24 @@ pub(crate) fn generate_cashflows(
             // Covenant step-ups and pricing overrides are deltas added at their
             // effective dates.  We push a breakpoint BEFORE applying the delta so
             // that the preceding window has the pre-step-up margin.
-            let mut step_ups: Vec<(Date, Decimal)> = Vec::new();
+            let mut step_ups = BTreeMap::<Date, Decimal>::new();
             if let Some(cov) = &loan.covenants {
                 for step in &cov.margin_stepups {
-                    step_ups.push((step.date, Decimal::from(step.delta_bp)));
+                    *step_ups.entry(step.date).or_default() += Decimal::from(step.delta_bp);
                 }
             }
             if let Some(ov) = &loan.instrument_pricing_overrides.term_loan {
                 for (dt, bp) in &ov.margin_add_bp_by_date {
-                    step_ups.push((*dt, Decimal::from(*bp)));
+                    *step_ups.entry(*dt).or_default() += Decimal::from(*bp);
                 }
             }
-            step_ups.sort_by_key(|(d, _)| *d);
 
             let mut steps: Vec<(Date, Decimal)> = Vec::new();
             let mut running = spec.spread_bp;
-            for (d, delta) in &step_ups {
+            for (date, delta) in step_ups {
                 // Close the preceding window at the step-up date with the
                 // current running margin (before the step-up takes effect).
-                steps.push((*d, running));
+                steps.push((date, running));
                 running += delta;
             }
             // Final window extends to maturity with the final running margin.
@@ -390,27 +409,43 @@ pub(crate) fn generate_cashflows(
     // Payment split windows for PIK toggles.
     // Handle both enable (→ PIK) and disable (→ Cash) events so that
     // a loan can transition back to cash interest after a PIK period.
-    let mut payment_steps: Vec<(Date, CouponType)> = Vec::new();
+    let mut toggle_events = BTreeMap::<Date, bool>::new();
     if let Some(cov) = &loan.covenants {
         for t in &cov.pik_toggles {
-            if t.enable_pik {
-                payment_steps.push((t.date, CouponType::PIK));
-            } else {
-                payment_steps.push((t.date, CouponType::Cash));
-            }
+            toggle_events.insert(t.date, t.enable_pik);
         }
     }
     if let Some(ov) = &loan.instrument_pricing_overrides.term_loan {
         for (dt, en) in &ov.pik_toggle_by_date {
-            if *en {
-                payment_steps.push((*dt, CouponType::PIK));
-            } else {
-                payment_steps.push((*dt, CouponType::Cash));
-            }
+            // Instrument pricing overrides take precedence over covenant events
+            // when both target the same effective date.
+            toggle_events.insert(*dt, *en);
         }
     }
-    payment_steps.sort_by_key(|(d, _)| *d);
-    if !payment_steps.is_empty() {
+
+    if !toggle_events.is_empty() {
+        // `payment_split_program` consumes end-dated windows, whereas PIK
+        // toggles are effective-dated state transitions. Close each preceding
+        // window with the state that applied before the transition, then carry
+        // the final state to maturity.
+        let mut payment_steps = Vec::with_capacity(toggle_events.len() + 1);
+        let mut active_coupon_type = loan.coupon_type;
+        for (date, enable_pik) in toggle_events {
+            if date > loan.issue_date {
+                payment_steps.push((date, active_coupon_type));
+            }
+            active_coupon_type = if enable_pik {
+                CouponType::PIK
+            } else {
+                CouponType::Cash
+            };
+        }
+        if payment_steps
+            .last()
+            .is_none_or(|(date, _)| *date < loan.maturity)
+        {
+            payment_steps.push((loan.maturity, active_coupon_type));
+        }
         let _ = builder.payment_split_program(&payment_steps);
     }
 
@@ -552,7 +587,9 @@ fn build_commitment_fee_flows(
         let yf = loan
             .day_count
             .year_fraction(prev, d, DayCountContext::default())?;
-        let limit = commitment_limit_at(ddtl, d);
+        // The sub-period is [prev, d), so a step-down effective on `d` must not
+        // reduce the commitment base for the interval that ends on `d`.
+        let limit = commitment_limit_at(ddtl, prev);
         if limit.currency() != loan.currency {
             return Err(finstack_quant_core::InputError::Invalid.into());
         }

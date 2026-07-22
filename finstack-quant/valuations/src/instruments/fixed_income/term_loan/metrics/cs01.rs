@@ -1,13 +1,10 @@
 //! Z-spread CS01 inputs for term loans.
 //!
-//! Term loans are valued by [`TermLoanDiscountingPricer`], which discounts
-//! contractual cashflows on a single discount curve and never consumes a
-//! hazard curve. A hazard-curve bump therefore never moves the PV, so the
-//! canonical par-spread CS01 is identically zero for loans. Credit-spread risk
-//! is instead reported via the market-standard z-spread bump in
-//! [`ZSpreadParallelCs01`] / [`ZSpreadBucketedCs01`]; this module supplies the
-//! holder-view cashflows that bump reprices, and the quoted dirty price used to
-//! anchor the spread solve.
+//! Explicit deterministic discounting values contractual cashflows on a single
+//! discount curve, so this module supplies holder-view inputs for the
+//! market-standard z-spread CS01 fallback. When the active model is the default
+//! rates-credit tree, the metric registry delegates to canonical hazard-curve
+//! CS01 instead.
 //!
 //! [`TermLoanDiscountingPricer`]: crate::instruments::fixed_income::term_loan::pricing::TermLoanDiscountingPricer
 //! [`ZSpreadParallelCs01`]: crate::metrics::ZSpreadParallelCs01

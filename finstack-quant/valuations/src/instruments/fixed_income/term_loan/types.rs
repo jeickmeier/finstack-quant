@@ -1201,16 +1201,16 @@ impl finstack_quant_covenants::InstrumentMutator for TermLoan {
     fn set_default_status(
         &mut self,
         is_default: bool,
-        as_of: Date,
+        _as_of: Date,
     ) -> finstack_quant_core::Result<()> {
-        self.attributes
-            .meta
-            .insert("defaulted".to_string(), is_default.to_string());
         if is_default {
-            self.attributes
-                .meta
-                .insert("default_date".to_string(), as_of.to_string());
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Term loan '{}' cannot apply a realized default consequence without explicit recovery amount and settlement date",
+                self.id.as_str()
+            )));
         }
+        self.attributes.meta.remove("defaulted");
+        self.attributes.meta.remove("default_date");
         Ok(())
     }
 
@@ -1228,9 +1228,13 @@ impl finstack_quant_covenants::InstrumentMutator for TermLoan {
     }
 
     fn set_cash_sweep(&mut self, percentage: f64) -> finstack_quant_core::Result<()> {
-        self.attributes
-            .meta
-            .insert("cash_sweep_pct".to_string(), percentage.to_string());
+        if percentage != 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Term loan '{}' cannot apply a percentage cash sweep without a dated excess-cash-flow amount; use a typed CashSweepEvent",
+                self.id.as_str()
+            )));
+        }
+        self.attributes.meta.remove("cash_sweep_pct");
         Ok(())
     }
 
@@ -1254,6 +1258,26 @@ mod tests {
     use crate::instruments::fixed_income::term_loan::spec::CommitmentFeeBase;
     use finstack_quant_core::dates::Date;
     use time::Month;
+
+    #[test]
+    fn unsupported_realized_covenant_consequences_fail_explicitly() {
+        use finstack_quant_covenants::InstrumentMutator;
+
+        let mut loan = TermLoan::example().expect("example loan");
+        let as_of = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+
+        let default_error = loan
+            .set_default_status(true, as_of)
+            .expect_err("default without settlement economics must fail");
+        assert!(default_error.to_string().contains("recovery amount"));
+        assert!(!loan.attributes.meta.contains_key("defaulted"));
+
+        let sweep_error = loan
+            .set_cash_sweep(1.0)
+            .expect_err("percentage sweep without a cash-flow base must fail");
+        assert!(sweep_error.to_string().contains("CashSweepEvent"));
+        assert!(!loan.attributes.meta.contains_key("cash_sweep_pct"));
+    }
 
     #[test]
     fn floating_term_loan_uses_the_canonical_fixing_series_id() {

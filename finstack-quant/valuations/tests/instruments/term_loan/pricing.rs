@@ -132,3 +132,12 @@ fn test_premium_pricing() {
     // Should trade at premium (above par)
     assert!(pv.amount() > 10_000_000.0);
 }
+
+#[test]
+fn expired_term_loan_prices_at_zero_without_market_history() {
+    let loan = TermLoan::example().expect("example loan");
+    let value = loan
+        .value(&MarketContext::new(), date!(2030 - 01 - 01))
+        .expect("expired loan should price without curves or historical fixings");
+    assert_eq!(value, Money::new(0.0, Currency::USD));
+}

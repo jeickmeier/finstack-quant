@@ -123,17 +123,22 @@ pub(crate) fn register_term_loan_metrics(registry: &mut MetricRegistry) {
                 crate::instruments::TermLoan,
             >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
 
-            // CS01: the term-loan discounting pricer never consumes a hazard
-            // curve, so a par-spread / hazard bump leaves PV unchanged (CS01 =
-            // 0). Report credit-spread risk via the market-standard z-spread
-            // bump instead, anchored to the quoted price when supplied. See
-            // `metrics::sensitivities::cs01_z_spread`.
+            // CS01 follows the active valuation model. The default credit-tree
+            // path consumes the hazard curve and therefore delegates to the
+            // canonical hazard rebootstrap. Explicit deterministic discounting
+            // uses the market-standard z-spread fallback instead.
             (Cs01, crate::metrics::ZSpreadParallelCs01::<
                 crate::instruments::TermLoan,
-            >::always()),
+            >::hazard_when_credit_curve_and_model()),
             (BucketedCs01, crate::metrics::ZSpreadBucketedCs01::<
                 crate::instruments::TermLoan,
-            >::always()),
+            >::hazard_when_credit_curve_and_model()),
+            (Cs01Hazard, crate::metrics::GenericParallelCs01Hazard::<
+                crate::instruments::TermLoan,
+            >::with_empty_credit_curve_zero()),
+            (BucketedCs01Hazard, crate::metrics::GenericBucketedCs01Hazard::<
+                crate::instruments::TermLoan,
+            >::with_empty_credit_curve_zero()),
         ]
     }
 

@@ -323,3 +323,85 @@ fn call_at_settlement_date_produces_nonzero_pv() {
         pv
     );
 }
+
+#[test]
+fn hard_call_remains_exercisable_until_replaced() {
+    let as_of = date!(2025 - 01 - 01);
+    let market = base_market(as_of);
+    let pricer =
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer::new();
+
+    let single_effective_date = build_callable_loan(as_of);
+    let mut repeated_schedule = single_effective_date.clone();
+    repeated_schedule.call_schedule = Some(LoanCallSchedule {
+        calls: vec![
+            LoanCall {
+                date: date!(2027 - 01 - 01),
+                price_pct_of_par: 101.0,
+                call_type: LoanCallType::Hard,
+            },
+            LoanCall {
+                date: date!(2028 - 01 - 01),
+                price_pct_of_par: 101.0,
+                call_type: LoanCallType::Hard,
+            },
+            LoanCall {
+                date: date!(2029 - 01 - 01),
+                price_pct_of_par: 101.0,
+                call_type: LoanCallType::Hard,
+            },
+        ],
+    });
+
+    let single_pv = pricer
+        .price_callable(&single_effective_date, &market, as_of)
+        .expect("single effective-date call")
+        .amount();
+    let repeated_pv = pricer
+        .price_callable(&repeated_schedule, &market, as_of)
+        .expect("repeated equivalent call schedule")
+        .amount();
+    assert!(
+        (single_pv - repeated_pv).abs() < 1e-8,
+        "an on-or-after call provision must remain active between schedule entries: single={single_pv}, repeated={repeated_pv}"
+    );
+}
+
+#[test]
+fn tree_uses_short_rate_sigma_not_option_implied_volatility() {
+    let as_of = date!(2025 - 01 - 01);
+    let market = base_market(as_of);
+    let pricer =
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer::new();
+
+    let baseline = build_callable_loan(as_of);
+    let base_pv = pricer
+        .price_callable(&baseline, &market, as_of)
+        .expect("baseline")
+        .amount();
+
+    let mut option_vol = baseline.clone();
+    option_vol
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(0.20);
+    let option_vol_pv = pricer
+        .price_callable(&option_vol, &market, as_of)
+        .expect("option-vol quote must not configure the rate tree")
+        .amount();
+    assert_eq!(base_pv.to_bits(), option_vol_pv.to_bits());
+
+    let mut rate_vol = baseline;
+    rate_vol
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma = Some(0.03);
+    let rate_vol_pv = pricer
+        .price_callable(&rate_vol, &market, as_of)
+        .expect("short-rate sigma override")
+        .amount();
+    assert!(
+        (rate_vol_pv - base_pv).abs() > 1e-4,
+        "the dedicated short-rate sigma must reach the tree: base={base_pv}, overridden={rate_vol_pv}"
+    );
+}
