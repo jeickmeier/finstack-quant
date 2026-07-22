@@ -45,7 +45,11 @@ depends = ["rust-build", "python-build", "wasm-build"]
 
 [tasks.all-test]
 description = "Run all tests (Rust + Python + WASM)"
-depends = ["rust-test", "python-test-all", "wasm-test"]
+run = [
+  { task = "rust-test" },
+  { task = "python-test-all" },
+  { task = "wasm-test" },
+]
 
 [tasks.goldens-test]
 description = "Run golden tests (Rust + Python layers)"
