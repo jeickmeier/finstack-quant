@@ -435,6 +435,25 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
     } else {
         tranche.coupon.current_rate(context.as_of)
     };
+    // SC-M13: a floating coupon rides the simulated rate path (shift-then-floor,
+    // matching the engine's interest-due kernel). Fixed coupons are contractual.
+    let rate = match tranche.coupon {
+        crate::instruments::fixed_income::structured_credit::types::TrancheCoupon::Floating(_) => {
+            (rate + context.floating_rate_shift).max(0.0)
+        }
+        _ => rate,
+    };
+    // The waterfall spec defines the CLAIM the test measures coverage of:
+    // capped claims accrue at the capped rate (applied after the shift, like
+    // the AFC cap), and a tranche with no interest recipient owes nothing.
+    let rate = match context.interest_claim_caps {
+        None => rate,
+        Some(caps) => match caps.get(tranche.id.as_str()) {
+            None => 0.0,
+            Some(None) => rate,
+            Some(Some(cap)) => rate.min(*cap),
+        },
+    };
     // Use actual day-count accrual when period_start is available (m3 fix);
     // fall back to periods-per-year approximation as default behavior.
     let accrual = if let Some(period_start) = context.period_start {
@@ -498,6 +517,19 @@ pub struct TestContext<'a> {
     /// Real indentures count principal-collection-account cash in par-value
     /// tests.
     pub restricted_cash: Money,
+    /// Per-tranche interest-claim caps extracted from the waterfall spec
+    /// (see `pricing::waterfall::interest_claim_caps`): value `None` =
+    /// uncapped claim, `Some(cap)` = coupon capped at `cap`, absent key = the
+    /// waterfall defines no interest claim for the tranche.
+    ///
+    /// When this field is `None` the test falls back to legacy behavior —
+    /// every tranche owes its full uncapped coupon — which is exact for the
+    /// template waterfall. The engine always supplies the spec-derived map so
+    /// IC measures coverage of what the structure actually owes.
+    pub interest_claim_caps: Option<&'a HashMap<&'a str, Option<f64>>>,
+    /// Simulated floating-coupon shift (SC-M13 OAS rate path); zero outside
+    /// OAS runs. Keeps the IC due on the same rate path as collections.
+    pub floating_rate_shift: f64,
 }
 
 /// Result of a coverage test calculation.
@@ -627,6 +659,8 @@ mod tests {
             current_pool_balance: None,
             senior_fees: Money::new(0.0, Currency::USD),
             restricted_cash: Money::new(0.0, Currency::USD),
+            interest_claim_caps: None,
+            floating_rate_shift: 0.0,
         };
 
         let result = test
@@ -672,6 +706,8 @@ mod tests {
             current_pool_balance: None,
             senior_fees: Money::new(0.0, Currency::USD),
             restricted_cash: Money::new(0.0, Currency::USD),
+            interest_claim_caps: None,
+            floating_rate_shift: 0.0,
         };
 
         let result = test
@@ -724,6 +760,8 @@ mod tests {
             current_pool_balance: Some(Money::new(collateral, Currency::USD)),
             senior_fees: Money::new(0.0, Currency::USD),
             restricted_cash: Money::new(0.0, Currency::USD),
+            interest_claim_caps: None,
+            floating_rate_shift: 0.0,
         };
 
         let result = test
@@ -799,6 +837,8 @@ mod tests {
             current_pool_balance: Some(Money::new(collateral, Currency::USD)),
             senior_fees: Money::new(0.0, Currency::USD),
             restricted_cash: Money::new(0.0, Currency::USD),
+            interest_claim_caps: None,
+            floating_rate_shift: 0.0,
         };
 
         let result = test
@@ -960,6 +1000,8 @@ mod tests {
             current_pool_balance: None,
             senior_fees: Money::new(0.0, Currency::USD),
             restricted_cash: Money::new(0.0, Currency::USD),
+            interest_claim_caps: None,
+            floating_rate_shift: 0.0,
         };
 
         let result = test
@@ -1074,6 +1116,8 @@ mod haircut_tests {
                 current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
                 senior_fees: Money::new(fees, Currency::USD),
                 restricted_cash: Money::new(0.0, Currency::USD),
+                interest_claim_caps: None,
+                floating_rate_shift: 0.0,
             };
             CoverageTest::new_ic(1.20)
                 .calculate(&ctx)
@@ -1138,6 +1182,8 @@ mod haircut_tests {
             current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
             senior_fees: Money::new(0.0, Currency::USD),
             restricted_cash: Money::new(0.0, Currency::USD),
+            interest_claim_caps: None,
+            floating_rate_shift: 0.0,
         };
 
         let result = CoverageTest::new_ic(1.20).calculate(&ctx).expect("ic test");
@@ -1219,6 +1265,8 @@ mod haircut_tests {
             current_pool_balance: None,
             senior_fees: Money::new(0.0, Currency::USD),
             restricted_cash: Money::new(0.0, Currency::USD),
+            interest_claim_caps: None,
+            floating_rate_shift: 0.0,
         };
 
         let result = CoverageTest::new_ic(required_ratio)
@@ -1318,6 +1366,8 @@ mod haircut_tests {
             current_pool_balance: None,
             senior_fees: Money::new(0.0, Currency::USD),
             restricted_cash: Money::new(0.0, Currency::USD),
+            interest_claim_caps: None,
+            floating_rate_shift: 0.0,
         };
 
         let result = CoverageTest::new_ic(required_ratio)
@@ -1374,6 +1424,8 @@ mod haircut_tests {
             current_pool_balance: Some(current),
             senior_fees: Money::new(0.0, Currency::USD),
             restricted_cash: Money::new(0.0, Currency::USD),
+            interest_claim_caps: None,
+            floating_rate_shift: 0.0,
         };
 
         let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("oc test");
@@ -1420,6 +1472,8 @@ mod haircut_tests {
             current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
             senior_fees: Money::new(0.0, Currency::USD),
             restricted_cash: Money::new(0.0, Currency::USD),
+            interest_claim_caps: None,
+            floating_rate_shift: 0.0,
         };
 
         let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("OC test");
@@ -1457,6 +1511,8 @@ mod haircut_tests {
             current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
             senior_fees: Money::new(0.0, Currency::USD),
             restricted_cash: Money::new(0.0, Currency::USD),
+            interest_claim_caps: None,
+            floating_rate_shift: 0.0,
         };
 
         let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("oc test");

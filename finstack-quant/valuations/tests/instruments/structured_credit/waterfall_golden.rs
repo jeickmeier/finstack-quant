@@ -163,6 +163,7 @@ fn run_waterfall(
         reserve_balance: Money::new(0.0, available_cash.currency()),
         restricted_cash: Money::new(0.0, Currency::USD),
         recovery_proceeds: Money::new(0.0, available_cash.currency()),
+        floating_rate_shift: 0.0,
     };
     finstack_quant_valuations::instruments::fixed_income::structured_credit::execute_waterfall(
         waterfall, tranches, pool, context,

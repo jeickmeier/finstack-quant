@@ -144,6 +144,16 @@ pub struct AgencyTba {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settlement_class: Option<SifmaSettlementClass>,
+    /// Explicit settlement date override.
+    ///
+    /// When set, bypasses the SIFMA calendar lookup for
+    /// `settlement_year`/`settlement_month` in
+    /// [`AgencyTba::get_settlement_date`]. Dollar rolls use this to keep leg
+    /// pricing consistent with explicit roll settlement dates.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    pub settlement_date: Option<Date>,
     /// Trade notional (par amount).
     pub notional: Money,
     /// Trade price (percentage of par, e.g., 98.5).
@@ -268,11 +278,16 @@ impl AgencyTba {
         self
     }
 
-    /// Get the settlement date using the SIFMA calendar.
+    /// Get the settlement date.
     ///
-    /// Uses the explicit `settlement_class` if set, otherwise infers the
-    /// class from `agency` and `term`.
+    /// Returns the explicit `settlement_date` override when set. Otherwise
+    /// resolves the date from the SIFMA calendar, using the explicit
+    /// `settlement_class` if set or inferring the class from `agency` and
+    /// `term`.
     pub fn get_settlement_date(&self) -> finstack_quant_core::Result<Date> {
+        if let Some(date) = self.settlement_date {
+            return Ok(date);
+        }
         let month = time::Month::try_from(self.settlement_month)
             .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
         let class = self.effective_settlement_class();

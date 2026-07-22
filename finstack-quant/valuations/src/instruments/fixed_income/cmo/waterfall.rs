@@ -24,8 +24,16 @@ pub struct TrancheAllocation {
     /// Unpaid interest this period (coupon demand minus allocated interest).
     ///
     /// Non-zero when the collateral interest is insufficient to cover the
-    /// tranche's coupon (interest-deficient structures).
+    /// tranche's coupon (interest-deficient structures). For an accrual (Z)
+    /// tranche during the accretion phase this is the unfunded portion of the
+    /// period accrual (which is not capitalized).
     pub interest_shortfall: f64,
+    /// Interest capitalized into the balance this period.
+    ///
+    /// Non-zero only for accrual (Z) tranches during the accretion phase: the
+    /// funded accrual is added to the tranche balance and an equal amount of
+    /// interest collections is redirected as accretion-directed principal.
+    pub accreted_interest: f64,
     /// Beginning balance
     pub beginning_balance: f64,
     /// Ending balance
@@ -138,6 +146,28 @@ pub fn execute_waterfall_with_pac(
 ///   amortize IO strip notional.
 /// * `pac_context` - Optional PAC schedule, period index, and realized PSA;
 ///   `None` applies no PAC collar constraint.
+///
+/// # Accrual (Z) tranches
+///
+/// While any current-pay (non-accrual) principal tranche is outstanding at the
+/// start of the period ("accretion phase"), an accrual tranche receives no
+/// cash. Its period accrual (`balance × coupon / 12`) is funded from the
+/// interest collections remaining after the current-pay coupons are paid,
+/// capitalized into its balance, and an equal amount is redirected as
+/// accretion-directed principal to the current-pay tranches in the normal
+/// principal order. If remaining interest cannot fully fund the accrual, only
+/// the funded portion is capitalized and the unfunded remainder is reported as
+/// `interest_shortfall` on the accrual tranche. Once every current-pay tranche
+/// is retired, the accrual tranche becomes current-pay: it receives cash
+/// interest on its accreted balance plus principal until retired.
+///
+/// Accretion-directed principal is classified as *scheduled* principal in the
+/// scheduled/prepayment breakdown: it is a deterministic, coupon-driven amount
+/// (independent of prepayment behavior), so it joins the pool scheduled bucket
+/// before the pro-rata source attribution.
+///
+/// Reference: Fabozzi, *The Handbook of Mortgage-Backed Securities* (7th
+/// ed.), Ch. 21, accrual (Z) bonds in sequential-pay CMO structures.
 pub fn execute_waterfall_with_principal_breakdown(
     waterfall: &mut CmoWaterfall,
     scheduled_principal: f64,
@@ -148,6 +178,15 @@ pub fn execute_waterfall_with_principal_breakdown(
 ) -> WaterfallPeriodResult {
     let mut remaining_principal = scheduled_principal + prepayment_principal;
     let mut remaining_interest = available_interest;
+
+    // Accretion phase: determined at period start — an accrual (Z) tranche
+    // capitalizes interest while any current-pay (non-accrual) principal
+    // tranche is still outstanding.
+    let accretion_phase = waterfall.tranches.iter().any(|t| {
+        t.receives_principal()
+            && t.tranche_type != CmoTrancheType::Accrual
+            && t.current_face.amount() > 0.0
+    });
 
     // First pass: distribute interest to interest-bearing tranches.
     // Iterate in ascending `priority` order (lower priority value = paid
@@ -165,6 +204,11 @@ pub fn execute_waterfall_with_principal_breakdown(
 
     for tranche in interest_order {
         if !tranche.is_interest_bearing() {
+            continue;
+        }
+        // Accrual (Z) tranches receive no cash interest during the accretion
+        // phase; their accrual is capitalized after this loop.
+        if accretion_phase && tranche.tranche_type == CmoTrancheType::Accrual {
             continue;
         }
         // An IO strip's notional is not a principal balance — it amortizes
@@ -189,11 +233,47 @@ pub fn execute_waterfall_with_principal_breakdown(
         );
     }
 
+    // Accretion pass: fund each accrual (Z) tranche's period accrual from the
+    // interest remaining after the current-pay coupons. The funded accrual is
+    // capitalized into the Z balance (applied in the output loop below) and an
+    // equal cash amount joins the principal pool as accretion-directed
+    // principal — interest collections redirected, not new money, so per-period
+    // cash is conserved. An unfunded remainder is reported as
+    // `interest_shortfall` and is NOT capitalized (accrete only what is
+    // funded).
+    let mut accretion_amounts: HashMap<String, f64> = HashMap::default();
+    let mut accretion_directed = 0.0;
+    if accretion_phase {
+        let mut accrual_order: Vec<&CmoTranche> = waterfall
+            .tranches
+            .iter()
+            .filter(|t| t.tranche_type == CmoTrancheType::Accrual)
+            .collect();
+        accrual_order.sort_by_key(|t| t.priority);
+        for tranche in accrual_order {
+            let balance = tranche.current_face.amount();
+            if balance <= 0.0 || tranche.coupon <= 0.0 {
+                continue;
+            }
+            let accrual = balance * tranche.coupon / 12.0;
+            let funded = accrual.min(remaining_interest);
+            remaining_interest -= funded;
+            accretion_directed += funded;
+            accretion_amounts.insert(tranche.id.clone(), funded);
+            interest_shortfalls.insert(tranche.id.clone(), (accrual - funded).max(0.0));
+        }
+        remaining_principal += accretion_directed;
+    }
+
     // Second pass: distribute principal based on tranche type and priority
-    // Group tranches by priority
+    // Group tranches by priority. During the accretion phase accrual (Z)
+    // tranches are locked out of principal — they only receive principal via
+    // the sweep below once every current-pay tranche is retired.
     let mut priority_groups: HashMap<u32, Vec<&CmoTranche>> = HashMap::default();
     for tranche in &waterfall.tranches {
-        if tranche.receives_principal() {
+        if tranche.receives_principal()
+            && !(accretion_phase && tranche.tranche_type == CmoTrancheType::Accrual)
+        {
             priority_groups
                 .entry(tranche.priority)
                 .or_default()
@@ -241,12 +321,17 @@ pub fn execute_waterfall_with_principal_breakdown(
     // `residual_principal` is non-zero only when every principal-receiving
     // tranche is fully retired.
     if remaining_principal > 1e-12 {
+        // Accrual (Z) tranches sort behind every current-pay tranche: they
+        // absorb leftover principal only after all current-pay balances are
+        // exhausted (e.g. the transition period in which the last senior
+        // retires). A Z's capacity includes the accretion capitalized this
+        // period, which has not yet been applied to `current_face`.
         let mut sweep_order: Vec<&CmoTranche> = waterfall
             .tranches
             .iter()
             .filter(|t| t.receives_principal())
             .collect();
-        sweep_order.sort_by_key(|t| t.priority);
+        sweep_order.sort_by_key(|t| (t.tranche_type == CmoTrancheType::Accrual, t.priority));
         for tranche in sweep_order {
             if remaining_principal <= 1e-12 {
                 break;
@@ -255,7 +340,8 @@ pub fn execute_waterfall_with_principal_breakdown(
                 .get(&tranche.id)
                 .copied()
                 .unwrap_or(0.0);
-            let capacity = (tranche.current_face.amount() - already).max(0.0);
+            let accreted = accretion_amounts.get(&tranche.id).copied().unwrap_or(0.0);
+            let capacity = (tranche.current_face.amount() + accreted - already).max(0.0);
             let extra = capacity.min(remaining_principal);
             if extra > 0.0 {
                 *principal_allocations
@@ -273,10 +359,13 @@ pub fn execute_waterfall_with_principal_breakdown(
     // The remaining pool scheduled/prepayment is then split pro-rata across
     // every other tranche's allocation, which is order-independent and
     // conserves both pool buckets exactly.
+    // Accretion-directed principal joins the scheduled bucket: it is a
+    // deterministic coupon-driven redirection of interest collections, not a
+    // function of prepayment behavior (see function docs).
     let scheduled_attribution = attribute_scheduled_principal(
         waterfall,
         &principal_allocations,
-        scheduled_principal,
+        scheduled_principal + accretion_directed,
         prepayment_principal,
         pac_context,
     );
@@ -307,13 +396,17 @@ pub fn execute_waterfall_with_principal_breakdown(
             .cloned()
             .unwrap_or((0.0, 0.0));
 
+        let accreted_interest = accretion_amounts.get(&tranche.id).cloned().unwrap_or(0.0);
+
         let beginning = tranche.current_face.amount();
         // IO strips receive no principal: their notional amortizes with the
-        // collateral factor instead of via principal payments.
+        // collateral factor instead of via principal payments. An accrual (Z)
+        // tranche's balance grows by the funded accrual capitalized this
+        // period before any principal paydown.
         let ending = if tranche.tranche_type == CmoTrancheType::InterestOnly {
             tranche.original_face.amount() * collateral_factor.clamp(0.0, 1.0)
         } else {
-            (beginning - principal).max(0.0)
+            (beginning + accreted_interest - principal).max(0.0)
         };
 
         tranche.current_face = Money::new(ending, tranche.current_face.currency());
@@ -325,6 +418,7 @@ pub fn execute_waterfall_with_principal_breakdown(
             prepayment_principal,
             interest,
             interest_shortfall,
+            accreted_interest,
             beginning_balance: beginning,
             ending_balance: ending,
         });
@@ -955,6 +1049,283 @@ mod tests {
             "total prepayment should equal pool's 3,000, got {}",
             result_a.total_prepayment_principal
         );
+    }
+
+    /// Hand-computed accrual (Z) pin: A (current-pay) + Z over two periods.
+    ///
+    /// Structure: A 100,000 @ 6% (priority 1), Z 60,000 @ 6% accrual
+    /// (priority 2). Monthly coupon rate = 0.06 / 12 = 0.005.
+    ///
+    /// Period 1 (scheduled 1,000, prepay 0, interest 900):
+    ///   A cash interest  = 100,000 × 0.005 = 500
+    ///   Z accrual        =  60,000 × 0.005 = 300 (funded: 400 remains ≥ 300)
+    ///   principal pool   = 1,000 + 300 (accretion-directed) = 1,300 → all to A
+    ///   A ending         = 100,000 − 1,300 = 98,700
+    ///   Z ending         =  60,000 + 300   = 60,300 = 60,000 × 1.005
+    ///   residual interest = 900 − 500 − 300 = 100
+    ///
+    /// Period 2 (same collateral cash):
+    ///   A cash interest  = 98,700 × 0.005 = 493.50
+    ///   Z accrual        = 60,300 × 0.005 = 301.50
+    ///   A principal      = 1,000 + 301.50 = 1,301.50 → A ending 97,398.50
+    ///   Z ending         = 60,300 + 301.50 = 60,601.50 = 60,000 × 1.005²
+    #[test]
+    fn accrual_z_pin_hand_computed() {
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::new(100_000.0, Currency::USD), 0.06, 1),
+            CmoTranche::accrual("Z", Money::new(60_000.0, Currency::USD), 0.06, 2),
+        ];
+        let mut waterfall = CmoWaterfall::new(tranches);
+        let tol = 1e-9;
+
+        // Period 1
+        let r1 = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            1_000.0,
+            0.0,
+            900.0,
+            1.0,
+            None,
+        );
+        let a1 = r1
+            .allocations
+            .iter()
+            .find(|a| a.tranche_id == "A")
+            .expect("A allocation");
+        let z1 = r1
+            .allocations
+            .iter()
+            .find(|a| a.tranche_id == "Z")
+            .expect("Z allocation");
+        assert!(
+            (a1.interest - 500.0).abs() < tol,
+            "A interest {}",
+            a1.interest
+        );
+        assert!(z1.interest.abs() < tol, "Z receives no cash interest");
+        assert!(z1.principal.abs() < tol, "Z receives no principal");
+        assert!(
+            (z1.accreted_interest - 300.0).abs() < tol,
+            "Z accretes 300, got {}",
+            z1.accreted_interest
+        );
+        assert!(
+            (a1.principal - 1_300.0).abs() < tol,
+            "A principal = 1,000 collateral + 300 accretion-directed, got {}",
+            a1.principal
+        );
+        assert!((a1.ending_balance - 98_700.0).abs() < tol);
+        assert!(
+            (z1.ending_balance - 60_000.0 * 1.005).abs() < tol,
+            "Z balance accretes at (1 + coupon/12), got {}",
+            z1.ending_balance
+        );
+        assert!((r1.residual_interest - 100.0).abs() < tol);
+
+        // Period 2
+        let r2 = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            1_000.0,
+            0.0,
+            900.0,
+            1.0,
+            None,
+        );
+        let a2 = r2
+            .allocations
+            .iter()
+            .find(|a| a.tranche_id == "A")
+            .expect("A allocation");
+        let z2 = r2
+            .allocations
+            .iter()
+            .find(|a| a.tranche_id == "Z")
+            .expect("Z allocation");
+        assert!((a2.interest - 493.50).abs() < tol);
+        assert!((z2.accreted_interest - 301.50).abs() < tol);
+        assert!((a2.principal - 1_301.50).abs() < tol);
+        assert!((a2.ending_balance - 97_398.50).abs() < tol);
+        assert!(
+            (z2.ending_balance - 60_000.0 * 1.005 * 1.005).abs() < tol,
+            "Z balance = 60,000 × 1.005², got {}",
+            z2.ending_balance
+        );
+    }
+
+    /// Transition period: the last current-pay tranche retires and leftover
+    /// principal (including accretion-directed cash beyond A's capacity)
+    /// flows to the Z via the sweep; the following period the Z is
+    /// current-pay and receives cash interest on its accreted balance.
+    ///
+    /// Period 1: A 1,000 @ 6%, Z 60,000 @ 6%; scheduled 800, interest 400.
+    ///   A interest = 1,000 × 0.005 = 5
+    ///   Z accrual  = 60,000 × 0.005 = 300 (funded)
+    ///   pool       = 800 + 300 = 1,100; A absorbs 1,000; sweep → Z gets 100
+    ///   Z ending   = 60,000 + 300 − 100 = 60,200
+    ///
+    /// Period 2 (A retired → accretion phase over): scheduled 500, interest 310.
+    ///   Z cash interest = 60,200 × 0.005 = 301; Z principal = 500
+    #[test]
+    fn accrual_transition_to_current_pay() {
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::new(1_000.0, Currency::USD), 0.06, 1),
+            CmoTranche::accrual("Z", Money::new(60_000.0, Currency::USD), 0.06, 2),
+        ];
+        let mut waterfall = CmoWaterfall::new(tranches);
+        let tol = 1e-9;
+
+        let r1 = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            800.0,
+            0.0,
+            400.0,
+            1.0,
+            None,
+        );
+        let a1 = r1
+            .allocations
+            .iter()
+            .find(|a| a.tranche_id == "A")
+            .expect("A allocation");
+        let z1 = r1
+            .allocations
+            .iter()
+            .find(|a| a.tranche_id == "Z")
+            .expect("Z allocation");
+        assert!((a1.principal - 1_000.0).abs() < tol, "A retires fully");
+        assert!(a1.ending_balance.abs() < tol);
+        assert!((z1.accreted_interest - 300.0).abs() < tol);
+        assert!(
+            (z1.principal - 100.0).abs() < tol,
+            "leftover principal sweeps to the Z, got {}",
+            z1.principal
+        );
+        assert!((z1.ending_balance - 60_200.0).abs() < tol);
+        assert!(
+            r1.residual_principal.abs() < tol,
+            "no principal stranded, got {}",
+            r1.residual_principal
+        );
+
+        // Period 2: Z is now current-pay.
+        let r2 = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            500.0,
+            0.0,
+            310.0,
+            1.0,
+            None,
+        );
+        let z2 = r2
+            .allocations
+            .iter()
+            .find(|a| a.tranche_id == "Z")
+            .expect("Z allocation");
+        assert!(
+            (z2.interest - 301.0).abs() < tol,
+            "Z pays cash interest on its accreted balance, got {}",
+            z2.interest
+        );
+        assert!(z2.accreted_interest.abs() < tol, "no further accretion");
+        assert!((z2.principal - 500.0).abs() < tol);
+        assert!((z2.ending_balance - 59_700.0).abs() < tol);
+    }
+
+    /// Interest-short accretion: when remaining interest cannot fully fund
+    /// the Z accrual, only the funded portion is capitalized and the
+    /// unfunded remainder is reported as `interest_shortfall`.
+    ///
+    /// A 100,000 @ 6%, Z 60,000 @ 6%; interest 600 only.
+    ///   A interest = 500; remaining 100 < Z accrual 300
+    ///   Z accretes 100 (funded), shortfall 200; Z ending 60,100
+    ///   A receives the 100 as accretion-directed principal.
+    #[test]
+    fn accrual_shortfall_accretes_only_funded_amount() {
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::new(100_000.0, Currency::USD), 0.06, 1),
+            CmoTranche::accrual("Z", Money::new(60_000.0, Currency::USD), 0.06, 2),
+        ];
+        let mut waterfall = CmoWaterfall::new(tranches);
+        let tol = 1e-9;
+
+        let r =
+            execute_waterfall_with_principal_breakdown(&mut waterfall, 0.0, 0.0, 600.0, 1.0, None);
+        let a = r
+            .allocations
+            .iter()
+            .find(|x| x.tranche_id == "A")
+            .expect("A allocation");
+        let z = r
+            .allocations
+            .iter()
+            .find(|x| x.tranche_id == "Z")
+            .expect("Z allocation");
+        assert!((a.interest - 500.0).abs() < tol);
+        assert!((z.accreted_interest - 100.0).abs() < tol);
+        assert!(
+            (z.interest_shortfall - 200.0).abs() < tol,
+            "unfunded accrual reported as shortfall, got {}",
+            z.interest_shortfall
+        );
+        assert!(
+            (z.ending_balance - 60_100.0).abs() < tol,
+            "only funded accrual capitalized"
+        );
+        assert!(
+            (a.principal - 100.0).abs() < tol,
+            "funded accretion redirected to A"
+        );
+        assert!(r.residual_interest.abs() < tol);
+    }
+
+    /// Per-period cash conservation with a Z tranche: total cash distributed
+    /// to tranches plus residuals equals total collateral cash received. The
+    /// accretion-directed principal is not new money — it is interest
+    /// collections redirected — so
+    /// `Σ tranche interest + Σ tranche principal + residual_interest +
+    ///  residual_principal == collateral principal + collateral interest`.
+    #[test]
+    fn accrual_cash_conservation_per_period() {
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::new(50_000.0, Currency::USD), 0.05, 1),
+            CmoTranche::sequential("B", Money::new(30_000.0, Currency::USD), 0.055, 2),
+            CmoTranche::accrual("Z", Money::new(20_000.0, Currency::USD), 0.06, 3),
+        ];
+        let mut waterfall = CmoWaterfall::new(tranches);
+
+        // Run enough periods to cross the A and B retirements.
+        for period in 0..120 {
+            let scheduled = 1_500.0;
+            let prepay = 500.0;
+            let interest = 450.0;
+            let r = execute_waterfall_with_principal_breakdown(
+                &mut waterfall,
+                scheduled,
+                prepay,
+                interest,
+                1.0,
+                None,
+            );
+            let cash_out: f64 = r.allocations.iter().map(|a| a.interest + a.principal).sum();
+            let cash_in = scheduled + prepay + interest;
+            assert!(
+                (cash_out + r.residual_interest + r.residual_principal - cash_in).abs() < 1e-6,
+                "period {period}: cash out {cash_out} + residuals ({}, {}) != cash in {cash_in}",
+                r.residual_interest,
+                r.residual_principal
+            );
+            // Scheduled/prepay breakdown stays consistent with the total.
+            let breakdown: f64 = r
+                .allocations
+                .iter()
+                .map(|a| a.scheduled_principal + a.prepayment_principal)
+                .sum();
+            assert!(
+                (breakdown - r.total_principal).abs() < 1e-6,
+                "period {period}: scheduled+prepay {breakdown} != principal {}",
+                r.total_principal
+            );
+        }
     }
 
     /// Test 2: Residual-conservation assertion.

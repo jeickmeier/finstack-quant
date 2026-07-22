@@ -807,10 +807,11 @@ fn test_fi_index_trs_duration_dv01_defaults_when_duration_id_is_none() {
         .unwrap();
 
     let dv01 = *result.measures.get("duration_dv01").unwrap();
-    // Expected: 10_000_000 × 5.0 × 0.0001 = 5_000
+    // Expected: -(10_000_000 × 5.0 × 0.0001) = -5_000
+    // (negative: default side is ReceiveTotalReturn, i.e. long the bond index)
     assert_approx_eq(
         dv01,
-        5_000.0,
+        -5_000.0,
         1.0, // $1 tolerance
         "DurationDv01 should use 5.0Y default when duration_id is None",
     );

@@ -1,6 +1,7 @@
 //! Unit tests for structured credit components and metrics.
 
 pub mod components;
+pub mod config_sensitivity_tests;
 pub mod constructors_tests;
 pub mod metrics;
 pub mod per_name_copula_tests;

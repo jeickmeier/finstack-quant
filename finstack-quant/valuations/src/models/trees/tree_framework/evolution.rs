@@ -154,6 +154,33 @@ impl EvolutionParams {
             prob_middle: Some(p_m),
         })
     }
+
+    /// Recompute the risk-neutral branch probabilities for a different (per-step)
+    /// drift, keeping the up/down (and middle) factors fixed.
+    ///
+    /// The up/down factors of the CRR and trinomial lattices depend only on
+    /// `volatility` and `dt`, so re-deriving the parameters with a new drift
+    /// leaves the node grid unchanged and the lattice recombining; only the
+    /// branch probabilities vary. This lets a pricer drive each step's drift
+    /// from the same per-step forward rate it uses for discounting, keeping the
+    /// tree's stock forward consistent with a non-flat discount curve
+    /// (martingale property holds step by step).
+    ///
+    /// `drift` is the net risk-neutral drift for the step (e.g. `r_i - q`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when the implied
+    /// probabilities for the new drift fall outside `[0, 1]` (same checks as
+    /// [`EvolutionParams::equity_crr`] / [`EvolutionParams::equity_trinomial`]).
+    pub fn with_drift(&self, drift: f64, dt: f64) -> finstack_quant_core::Result<Self> {
+        // Passing the drift as the rate with q = 0 reproduces the same net
+        // drift; u/d/middle depend only on (volatility, dt) and are identical.
+        match self.middle_factor {
+            None => Self::equity_crr(self.volatility, drift, 0.0, dt),
+            Some(_) => Self::equity_trinomial(self.volatility, drift, 0.0, dt),
+        }
+    }
 }
 
 #[cfg(test)]

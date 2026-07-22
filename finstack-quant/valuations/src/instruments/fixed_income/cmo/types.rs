@@ -36,6 +36,10 @@ pub enum CmoTrancheType {
     InterestOnly,
     /// Principal-Only strip
     PrincipalOnly,
+    /// Accrual (Z) bond - capitalizes interest while senior tranches
+    /// are outstanding; the accrual is redirected as accretion-directed
+    /// principal to the current-pay tranches
+    Accrual,
 }
 
 impl std::fmt::Display for CmoTrancheType {
@@ -46,6 +50,7 @@ impl std::fmt::Display for CmoTrancheType {
             CmoTrancheType::Support => write!(f, "SUP"),
             CmoTrancheType::InterestOnly => write!(f, "IO"),
             CmoTrancheType::PrincipalOnly => write!(f, "PO"),
+            CmoTrancheType::Accrual => write!(f, "Z"),
         }
     }
 }
@@ -134,6 +139,29 @@ impl CmoTranche {
         }
     }
 
+    /// Create an accrual (Z) tranche.
+    ///
+    /// While any other principal-receiving tranche is outstanding, the Z
+    /// receives no cash: its coupon accrual is capitalized into its balance
+    /// and an equal amount of interest collections is redirected as
+    /// accretion-directed principal to the current-pay tranches. Once all
+    /// current-pay tranches retire, the Z pays cash interest on its accreted
+    /// balance plus principal until retired.
+    ///
+    /// See Fabozzi, *The Handbook of Mortgage-Backed Securities* (7th ed.),
+    /// Ch. 21 "Accrual Bonds" (Z bonds in sequential-pay CMO structures).
+    pub fn accrual(id: &str, face: Money, coupon: f64, priority: u32) -> Self {
+        Self {
+            id: id.to_string(),
+            tranche_type: CmoTrancheType::Accrual,
+            original_face: face,
+            current_face: face,
+            coupon,
+            priority,
+            pac_collar: None,
+        }
+    }
+
     /// Create an IO strip.
     pub fn io_strip(id: &str, notional: Money, coupon: f64) -> Self {
         Self {
@@ -173,11 +201,18 @@ impl CmoTranche {
     }
 
     /// Check if tranche is interest-bearing.
+    ///
+    /// An accrual (Z) tranche is interest-bearing: its coupon accrues every
+    /// period, although during the accretion phase the accrual is capitalized
+    /// into its balance rather than paid in cash.
     pub fn is_interest_bearing(&self) -> bool {
         self.coupon > 0.0 && self.tranche_type != CmoTrancheType::PrincipalOnly
     }
 
     /// Check if tranche receives principal.
+    ///
+    /// An accrual (Z) tranche receives principal, but only after every
+    /// current-pay (non-accrual) principal tranche has been retired.
     pub fn receives_principal(&self) -> bool {
         self.tranche_type != CmoTrancheType::InterestOnly
     }
@@ -343,7 +378,10 @@ impl AgencyCmo {
             }
             if matches!(
                 tranche.tranche_type,
-                CmoTrancheType::Sequential | CmoTrancheType::Pac | CmoTrancheType::Support
+                CmoTrancheType::Sequential
+                    | CmoTrancheType::Pac
+                    | CmoTrancheType::Support
+                    | CmoTrancheType::Accrual
             ) && tranche.priority == 0
             {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -411,13 +449,14 @@ impl AgencyCmo {
     /// Create a canonical example CMO for testing.
     pub fn example() -> finstack_quant_core::Result<Self> {
         use time::macros::date;
-        // Create sequential structure: A (front), B (middle), Z (last).
-        // Coupons average 3.95% on a 4.5% WAC pool (4.0% pass-through after
-        // 50bp fees), so the structure is interest-covered.
+        // Create sequential structure: A (front), B (middle), C (last).
+        // Every tranche coupon is at or below the 4.0% net pass-through
+        // (4.5% WAC less 50bp of fees), so the structure stays
+        // interest-covered for the life of the deal.
         let tranches = vec![
             CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
             CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.04, 2),
-            CmoTranche::sequential("Z", Money::new(30_000_000.0, Currency::USD), 0.045, 3),
+            CmoTranche::sequential("C", Money::new(30_000_000.0, Currency::USD), 0.04, 3),
         ];
 
         Self::builder()
@@ -436,6 +475,32 @@ impl AgencyCmo {
                     .with_tag("agency")
                     .with_meta("deal", "fnr-2024-1"),
             )
+            .build()
+    }
+
+    /// Create an example sequential structure with an accrual (Z) tranche.
+    ///
+    /// A and B are current-pay sequentials; Z accretes at its coupon while
+    /// they are outstanding, redirecting the accrual as accretion-directed
+    /// principal that retires A and B faster than in `example()`.
+    pub fn example_accrual() -> finstack_quant_core::Result<Self> {
+        use time::macros::date;
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
+            CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.04, 2),
+            CmoTranche::accrual("Z", Money::new(30_000_000.0, Currency::USD), 0.04, 3),
+        ];
+
+        Self::builder()
+            .id(InstrumentId::new("FNR-2024-3-Z"))
+            .deal_name("FNR 2024-3".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("Z".to_string())
+            .collateral_wac(0.045)
+            .collateral_wam(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
     }
 
@@ -494,16 +559,34 @@ impl AgencyCmo {
     }
 
     /// Validate that the deal's tranche coupon demand does not exceed the
-    /// collateral interest supply at issue (interest conservation).
+    /// collateral interest supply (interest conservation).
     ///
-    /// A structure whose tranches demand more coupon than the collateral
-    /// pass-through delivers is interest-deficient: every period some tranche
-    /// records an interest shortfall. Such deals are rejected at build time.
+    /// Two checks run, both against the net pass-through coupon (collateral
+    /// WAC less servicing and guarantee fees):
+    ///
+    /// 1. **Structural (per tranche)**: every principal-bearing tranche with a
+    ///    fixed coupon (sequential, PAC, support) must have
+    ///    `coupon <= net pass-through`. The aggregate weighted-average test
+    ///    alone is insufficient: in a sequential structure the surviving
+    ///    pool's weighted coupon rises toward the maximum tranche coupon as
+    ///    front tranches retire, so a deal that is covered at t=0 can become
+    ///    interest-deficient later. IO strips are excluded (their notional
+    ///    references the pass-through and total demand is bounded by check 2);
+    ///    PO strips carry no coupon. Accrual (Z) tranches are included: during
+    ///    the accretion phase the Z's accrual is funded from interest
+    ///    collections (as accretion-directed principal), and after seniors
+    ///    retire it is paid cash interest — in both phases its funding demand
+    ///    is `coupon × balance`, exactly like a current-pay tranche, so the
+    ///    same `coupon <= net pass-through` bound applies.
+    /// 2. **Aggregate (t=0)**: total annual coupon demand across all
+    ///    interest-bearing tranches (including IO strips) must not exceed
+    ///    `pass_through_rate × collateral face`.
     ///
     /// # Errors
     ///
-    /// Returns a validation error when annual tranche coupon demand exceeds
-    /// `pass_through_rate × collateral face`.
+    /// Returns a validation error when any principal-bearing tranche coupon
+    /// exceeds the net pass-through coupon, or when aggregate annual coupon
+    /// demand exceeds `pass_through_rate × collateral face`.
     fn validate_interest_coverage(cmo: &AgencyCmo) -> finstack_quant_core::Result<()> {
         let (pass_through, collateral_face) = match &cmo.collateral {
             Some(pool) => (pool.pass_through_rate, pool.current_face.amount()),
@@ -516,6 +599,27 @@ impl AgencyCmo {
                 (pass_through, cmo.waterfall.total_current_face().amount())
             }
         };
+
+        // Structural check: a fixed-coupon tranche owed interest on its
+        // principal balance can never demand more than the net pass-through,
+        // otherwise it goes interest-short once higher-priority tranches
+        // retire even if the deal is covered in aggregate at t=0.
+        for tranche in &cmo.waterfall.tranches {
+            if tranche.is_interest_bearing()
+                && tranche.receives_principal()
+                && tranche.coupon > pass_through * (1.0 + 1e-9)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Interest-deficient CMO {}: tranche '{}' coupon {:.4} exceeds the net \
+                     pass-through coupon {:.4}; a fixed-coupon principal tranche cannot be \
+                     covered once senior tranches retire",
+                    cmo.id.as_str(),
+                    tranche.id,
+                    tranche.coupon,
+                    pass_through
+                )));
+            }
+        }
 
         let annual_supply = pass_through * collateral_face;
         let annual_demand: f64 = cmo
@@ -659,8 +763,9 @@ mod tests {
     }
 
     /// Finding 17: deals whose tranche coupon demand exceeds the collateral
-    /// pass-through interest are interest-deficient and rejected at build.
-    /// (This was the pre-fix `example()`: Z at 5% on a 4% pass-through pool.)
+    /// pass-through interest are interest-deficient and rejected at build
+    /// (here B/Z coupons exceed the 4% pass-through and aggregate demand
+    /// is 4.45% of face against a 4% supply).
     #[test]
     fn interest_deficient_deal_rejected_at_build() {
         use time::macros::date;
@@ -685,6 +790,114 @@ mod tests {
         let err = result.expect_err("interest-deficient deal must be rejected");
         assert!(
             err.to_string().contains("Interest-deficient"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Structural per-tranche coverage: a deal can satisfy the aggregate t=0
+    /// weighted-average test yet still carry a tranche coupon above the net
+    /// pass-through. In sequential pay that tranche goes interest-short once
+    /// senior tranches retire, so validation must reject it.
+    ///
+    /// This is the pre-fix `example()` structure: A 3.5%/40M, B 4.0%/30M,
+    /// Z 4.5%/30M on a 4.0% net pass-through — aggregate demand $3.95M is
+    /// under the $4.0M supply, but the 4.5% tranche exceeds the pass-through.
+    #[test]
+    fn tranche_coupon_above_pass_through_rejected_even_if_aggregate_covered() {
+        use time::macros::date;
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
+            CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.04, 2),
+            CmoTranche::sequential("Z", Money::new(30_000_000.0, Currency::USD), 0.045, 3),
+        ];
+
+        let result = AgencyCmo::builder()
+            .id(InstrumentId::new("FNR-STRUCTURAL"))
+            .deal_name("FNR STRUCTURAL".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("A".to_string())
+            .collateral_wac(0.045) // net pass-through 4.0% < Z's 4.5% coupon
+            .collateral_wam(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build();
+
+        let err = result.expect_err("tranche coupon above pass-through must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("tranche 'Z'") && msg.contains("pass-through"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_accrual_example_structure() {
+        let cmo = AgencyCmo::example_accrual().expect("accrual example is valid");
+        let z = cmo.waterfall.get_tranche("Z").expect("Z exists");
+        assert_eq!(z.tranche_type, CmoTrancheType::Accrual);
+        assert!(z.is_interest_bearing());
+        assert!(z.receives_principal());
+        assert_eq!(cmo.reference_tranche_id, "Z");
+    }
+
+    /// An accrual (Z) tranche's coupon must not exceed the net pass-through:
+    /// its accrual is funded from interest collections (accretion-directed
+    /// principal during accretion, cash interest after seniors retire), so
+    /// the same structural bound as current-pay tranches applies.
+    #[test]
+    fn accrual_coupon_above_pass_through_rejected() {
+        use time::macros::date;
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
+            CmoTranche::accrual("Z", Money::new(30_000_000.0, Currency::USD), 0.045, 2),
+        ];
+
+        let result = AgencyCmo::builder()
+            .id(InstrumentId::new("FNR-Z-DEFICIENT"))
+            .deal_name("FNR Z DEFICIENT".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("Z".to_string())
+            .collateral_wac(0.045) // net pass-through 4.0% < Z's 4.5% coupon
+            .collateral_wam(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build();
+
+        let err = result.expect_err("accrual coupon above pass-through must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("tranche 'Z'") && msg.contains("pass-through"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Accrual tranches participate in the waterfall principal order and so
+    /// require a positive priority, like other principal-paying classes.
+    #[test]
+    fn accrual_zero_priority_rejected() {
+        use time::macros::date;
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
+            CmoTranche::accrual("Z", Money::new(30_000_000.0, Currency::USD), 0.04, 0),
+        ];
+
+        let result = AgencyCmo::builder()
+            .id(InstrumentId::new("FNR-Z-PRIORITY"))
+            .deal_name("FNR Z PRIORITY".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("Z".to_string())
+            .collateral_wac(0.045)
+            .collateral_wam(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build();
+
+        let err = result.expect_err("zero-priority accrual tranche must be rejected");
+        assert!(
+            err.to_string().contains("positive priority"),
             "unexpected error: {err}"
         );
     }

@@ -4265,6 +4265,149 @@ export declare class Market {
 }
 
 /**
+ * TypeScript view of the typed `Bond` WebAssembly instrument.
+ *
+ * Thin wrapper over the canonical Rust `Bond`. Serialize with `toJson()` and
+ * pass the result to `valuations.instruments.priceInstrument` (or the other
+ * generic pricing entry points) to price it.
+ */
+export interface Bond extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Returns the requested string representation or JSON payload.
+   */
+  readonly id: string;
+  /**
+   * Serialize to tagged instrument JSON (`{"type": "bond", "spec": ...}`).
+   * @returns Returns the requested string representation or JSON payload.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  toJson(): string;
+}
+
+/**
+ * Constructor surface for the typed `Bond` WebAssembly instrument.
+ * @example
+ * ```typescript
+ * import init, { core, valuations } from "finstack-quant-wasm";
+ * await init();
+ * const usd = new core.Currency("USD");
+ * const bond = valuations.instruments.Bond.fixed(
+ *   "BOND-1",
+ *   new core.Money(1_000_000, usd),
+ *   new core.Rate(0.05),
+ *   "2024-01-01",
+ *   "2034-01-01",
+ *   "USD-OIS"
+ * );
+ * const result = valuations.instruments.priceInstrument(bond.toJson(), marketJson, "2024-06-30", "default");
+ * ```
+ */
+export interface BondConstructor {
+  /**
+   * Create a standard fixed-rate bond (semi-annual, 30/360, T+2). Mirrors Rust `Bond::fixed`.
+   * @param id - Unique instrument identifier.
+   * @param notional - Principal amount of the bond.
+   * @param couponRate - Annual coupon rate.
+   * @param issue - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param discountCurveId - Discount curve identifier used for pricing.
+   * @returns Returns the resulting typed instrument or WebAssembly handle.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  fixed(
+    id: string,
+    notional: Money,
+    couponRate: Rate,
+    issue: string,
+    maturity: string,
+    discountCurveId: string
+  ): Bond;
+  /**
+   * Create a floating-rate bond (FRN) linked to a forward index. Mirrors Rust `Bond::floating`.
+   * @param id - Unique instrument identifier.
+   * @param notional - Principal amount of the bond.
+   * @param indexId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
+   * @param marginBp - Spread over the index in basis points.
+   * @param issue - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param freq - Payment frequency (e.g. `Tenor.quarterly()`).
+   * @param dc - Day count convention (e.g. `DayCount.act360()`).
+   * @param discountCurveId - Discount curve identifier used for pricing.
+   * @returns Returns the resulting typed instrument or WebAssembly handle.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  floating(
+    id: string,
+    notional: Money,
+    indexId: string,
+    marginBp: Bps,
+    issue: string,
+    maturity: string,
+    freq: Tenor,
+    dc: DayCount,
+    discountCurveId: string
+  ): Bond;
+  /**
+   * Deserialize a bond from tagged instrument JSON (`{"type": "bond", "spec": ...}`).
+   * @param json - Canonical JSON string defining the object to deserialize or normalize.
+   * @returns Returns the resulting typed instrument or WebAssembly handle.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  fromJson(json: string): Bond;
+}
+
+/**
+ * TypeScript view of the typed `TermLoan` WebAssembly instrument.
+ *
+ * Thin wrapper over the canonical Rust `TermLoan`. Serialize with `toJson()`
+ * and pass the result to `valuations.instruments.priceInstrument` (or the
+ * other generic pricing entry points) to price it.
+ */
+export interface TermLoan extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Returns the requested string representation or JSON payload.
+   */
+  readonly id: string;
+  /**
+   * Serialize to tagged instrument JSON (`{"type": "term_loan", "spec": ...}`).
+   * @returns Returns the requested string representation or JSON payload.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  toJson(): string;
+}
+
+/**
+ * Constructor surface for the typed `TermLoan` WebAssembly instrument.
+ *
+ * Rust has no `fixed`/`floating` convenience constructors for term loans;
+ * construct via `fromJson` with tagged JSON or start from `example()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const loan = valuations.instruments.TermLoan.example();
+ * const result = valuations.instruments.priceInstrument(loan.toJson(), marketJson, "2024-06-30", "default");
+ * ```
+ */
+export interface TermLoanConstructor {
+  /**
+   * Deserialize a term loan from tagged instrument JSON (`{"type": "term_loan", "spec": ...}`).
+   * @param json - Canonical JSON string defining the object to deserialize or normalize.
+   * @returns Returns the resulting typed instrument or WebAssembly handle.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  fromJson(json: string): TermLoan;
+  /**
+   * Canonical example term loan (mirrors Rust `TermLoan::example`).
+   * @returns Returns the resulting typed instrument or WebAssembly handle.
+   * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
+   */
+  example(): TermLoan;
+}
+
+/**
  * Namespaced TypeScript entry points for valuation instruments calculations and types.
  * @example
  * ```typescript
@@ -4275,6 +4418,14 @@ export declare class Market {
  * ```
  */
 export interface ValuationInstrumentsNamespace {
+  /**
+   * Typed `Bond` instrument class (see `BondConstructor`).
+   */
+  Bond: BondConstructor;
+  /**
+   * Typed `TermLoan` instrument class (see `TermLoanConstructor`).
+   */
+  TermLoan: TermLoanConstructor;
   /**
    * Construct tagged bond instrument JSON from a cashflow schedule.
    * @param instrumentId - Stable instrument identifier used for pricing and metric keys.
@@ -4451,35 +4602,35 @@ export interface ValuationInstrumentsNamespace {
    * is zero at model PV, negative for a richer (higher) `targetPv`, and positive
    * for a cheaper (lower) `targetPv`; it is not the contractual quoted margin.
    * @param instrumentJson - Canonical JSON payload representing the instrument consumed by this API.
+   * @param trancheId - Identifier of the floating-rate tranche whose contractual cashflows are spread-discounted.
    * @param marketJson - Canonical market-context JSON supplying the discount curve and any forward curves or historical fixings required for cashflow projection.
    * @param asOf - ISO-8601 valuation date used for projection and discounting.
-   * @param trancheId - Identifier of the floating-rate tranche whose contractual cashflows are spread-discounted.
    * @param targetPv - Target present value in the tranche's currency; values above model PV produce a negative result and values below model PV produce a positive result.
    * @returns The z-spread-equivalent discount margin in decimal units.
    * @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, targetPv is non-finite, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
    */
   structuredCreditTrancheDiscountMargin(
     instrumentJson: string,
+    trancheId: string,
     marketJson: string,
     asOf: string,
-    trancheId: string,
     targetPv: number
   ): number;
   /**
    * Break-even constant default rate (CDR, decimal) for a tranche — the highest
    * CDR at which the tranche takes no principal writedown.
    * @param instrumentJson - Canonical JSON payload representing the instrument consumed by this API.
+   * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @returns Returns the computed numeric result in the units described above.
    * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
    */
   structuredCreditTrancheBreakevenCdr(
     instrumentJson: string,
+    trancheId: string,
     marketJson: string,
-    asOf: string,
-    trancheId: string
+    asOf: string
   ): number;
   /**
    * Option-adjusted spread for a tranche; returns a JSON `OasResult`.
@@ -4487,20 +4638,20 @@ export interface ValuationInstrumentsNamespace {
    * `marketPricePct` is the quoted price as a percentage of original balance.
    * `config`, when present, is a JSON `OasConfig`; the default is used otherwise.
    * @param instrumentJson - Canonical JSON payload representing the instrument consumed by this API.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketPricePct - Tranche market price as a percentage of original balance.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param config - Optional OasConfig JSON; omit to use the default OAS solver configuration.
    * @returns Returns the requested string representation or JSON payload.
    * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
    */
   structuredCreditTrancheOas(
     instrumentJson: string,
-    marketJson: string,
-    asOf: string,
     trancheId: string,
     marketPricePct: number,
+    marketJson: string,
+    asOf: string,
     config?: string | null
   ): string;
   /**
@@ -4508,18 +4659,18 @@ export interface ValuationInstrumentsNamespace {
    * `ScenarioTable`. `grid` is a JSON `ScenarioGrid` (`cprs`, `cdrs`,
    * `severities`).
    * @param instrumentJson - Canonical JSON payload representing the instrument consumed by this API.
+   * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param grid - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.
    * @returns Returns the requested string representation or JSON payload.
    * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
    */
   structuredCreditTrancheScenarioTable(
     instrumentJson: string,
+    trancheId: string,
     marketJson: string,
     asOf: string,
-    trancheId: string,
     grid: string
   ): string;
   /**
@@ -4530,18 +4681,18 @@ export interface ValuationInstrumentsNamespace {
    * the z-spread and CS01 are solved against; otherwise the tranche's own model
    * price is used (zero z-spread). Returns a JSON-serialized `TrancheMetrics`.
    * @param instrumentJson - Canonical JSON payload representing the instrument consumed by this API.
+   * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketPricePct - Optional tranche market price as a percentage of original balance; omit for model price.
    * @returns Returns the requested string representation or JSON payload.
    * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
    */
   structuredCreditTrancheMetrics(
     instrumentJson: string,
+    trancheId: string,
     marketJson: string,
     asOf: string,
-    trancheId: string,
     marketPricePct?: number | null
   ): string;
 }

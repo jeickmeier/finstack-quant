@@ -53,6 +53,7 @@ mod schema_roundtrip {
     test_roundtrip!(plain: agency_mbs_passthrough, AgencyMbsPassthrough, AgencyMbsPassthrough::example().expect("mbs"));
     test_roundtrip!(plain: agency_tba, AgencyTba, AgencyTba::example().expect("tba"));
     test_roundtrip!(plain: agency_cmo, AgencyCmo, AgencyCmo::example().expect("cmo"));
+    test_roundtrip!(plain: agency_cmo_accrual, AgencyCmo, AgencyCmo::example_accrual().expect("cmo z"));
     test_roundtrip!(plain: dollar_roll, DollarRoll, DollarRoll::example().expect("dr"));
     test_roundtrip!(plain: trs_fixed_income_index, TrsFixedIncomeIndex, FIIndexTotalReturnSwap::example().expect("fitrs"));
     test_roundtrip!(boxed: structured_credit, StructuredCredit, StructuredCredit::example());

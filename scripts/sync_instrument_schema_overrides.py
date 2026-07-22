@@ -33,7 +33,9 @@ def _load_json(path: Path) -> dict:
 
 def _write_json(path: Path, payload: dict) -> None:
     with path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
+        # Match serde_json's pretty-printer so running this override step after
+        # the Rust generators does not escape otherwise unchanged Unicode text.
+        json.dump(payload, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
 

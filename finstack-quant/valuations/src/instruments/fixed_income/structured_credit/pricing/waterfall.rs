@@ -5,9 +5,9 @@
 
 use super::coverage_tests::{CoverageTest, TestContext};
 use crate::instruments::fixed_income::structured_credit::types::{
-    AllocationMode, AssetPool, DiversionRecord, PaymentCalculation, PaymentRecord, PaymentType,
-    Recipient, RecipientType, RoundingConvention, TrancheStructure, Waterfall,
-    WaterfallDistribution, WaterfallTier, WaterfallWorkspace,
+    AfcSpec, AllocationMode, AssetPool, DiversionRecord, PaymentCalculation, PaymentRecord,
+    PaymentType, Recipient, RecipientType, RoundingConvention, Tranche, TrancheCoupon,
+    TrancheStructure, Waterfall, WaterfallDistribution, WaterfallTier, WaterfallWorkspace,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -98,6 +98,11 @@ pub struct WaterfallContext<'a> {
     pub restricted_cash: Money,
     /// Recovery proceeds released this period (tracked separately for reporting).
     pub recovery_proceeds: Money,
+    /// Simulated shift applied to FLOATING tranche coupons (SC-M13 OAS rate
+    /// path). Zero outside OAS runs. Applied before any available-funds cap so
+    /// the interest the waterfall allocates matches the interest the engine
+    /// records on the same rate path.
+    pub floating_rate_shift: f64,
 }
 
 /// Execute waterfall to distribute available cash.
@@ -158,6 +163,7 @@ fn execute_waterfall_core(
         tranche_balances: context.tranche_balances,
         deferred_interest: context.deferred_interest,
         reserve_balance: context.reserve_balance,
+        floating_rate_shift: context.floating_rate_shift,
     };
 
     let diversion_principal_tier = waterfall
@@ -192,6 +198,7 @@ fn execute_waterfall_core(
             valuation_date: context.valuation_date,
             market: context.market,
             reserve_balance: context.reserve_balance,
+            floating_rate_shift: context.floating_rate_shift,
         },
     )?;
 
@@ -211,6 +218,7 @@ fn execute_waterfall_core(
         &payable_principal_tranche_ids,
         senior_fees,
         context.restricted_cash,
+        context.floating_rate_shift,
     )?;
 
     // Coverage tests share senior balances, so one paydown de-leverages every
@@ -471,6 +479,11 @@ pub(crate) struct AllocationContext<'a> {
     pub(crate) deferred_interest: Option<&'a HashMap<String, Money>>,
     /// Current reserve account balance (passed dynamically each period)
     pub(crate) reserve_balance: Money,
+    /// Simulated shift applied to FLOATING tranche coupons (SC-M13 OAS rate
+    /// path); zero outside OAS runs. Threading it here keeps the cash the
+    /// waterfall *allocates* on the same rate path as the interest the engine
+    /// *records* in Step 5.
+    pub(crate) floating_rate_shift: f64,
 }
 
 impl<'a> AllocationContext<'a> {
@@ -508,6 +521,7 @@ impl<'a> AllocationContext<'a> {
             tranche_balances,
             deferred_interest,
             reserve_balance,
+            floating_rate_shift: 0.0,
         }
     }
 }
@@ -585,6 +599,7 @@ fn allocate_sequential(
             ctx.reserve_balance,
             principal_paid_in_period,
             diverted,
+            ctx.floating_rate_shift,
         )?;
 
         let paid = if requested.amount() <= available.amount() {
@@ -717,6 +732,7 @@ fn allocate_pro_rata(
             ctx.reserve_balance,
             principal_paid_in_period,
             diverted,
+            ctx.floating_rate_shift,
         )?;
         total_requested = total_requested.checked_add(requested)?;
         recipient_requests.push((recipient, requested));
@@ -998,6 +1014,78 @@ fn is_principal_payment(calculation: &PaymentCalculation) -> bool {
     )
 }
 
+/// Contractual coupon for the period with the simulated rate-path shift applied.
+///
+/// SC-M13: a FLOATING tranche's coupon moves with the simulated short-rate path
+/// (`floating_rate_shift`), floored at zero; a fixed coupon is contractual and
+/// unaffected. This is the same shift-then-floor rule as the engine's
+/// interest-due kernel, so allocation and recording cannot diverge on the path.
+fn shifted_tranche_rate(
+    tranche: &Tranche,
+    period_start: Date,
+    payment_date: Date,
+    valuation_date: Date,
+    market: &MarketContext,
+    floating_rate_shift: f64,
+) -> Result<f64> {
+    let raw =
+        tranche
+            .coupon
+            .try_rate_for_period(period_start, payment_date, valuation_date, market)?;
+    Ok(match tranche.coupon {
+        TrancheCoupon::Floating(_) => (raw + floating_rate_shift).max(0.0),
+        _ => raw,
+    })
+}
+
+/// Per-tranche interest-claim definition extracted from a waterfall spec.
+///
+/// The waterfall is the single source of truth for what interest a tranche is
+/// *owed* each period, not merely how cash is allocated:
+///
+/// - `Some(None)` — an uncapped [`PaymentCalculation::TrancheInterest`]
+///   recipient: the tranche is owed its full coupon accrual.
+/// - `Some(Some(cap))` — a [`PaymentCalculation::CappedTrancheInterest`]
+///   recipient: the claim itself is capped at `cap` (available-funds style),
+///   so the capped-off portion is never owed and never defers.
+/// - absent key — the waterfall defines **no** interest claim for the tranche
+///   (e.g. a principal-only class): nothing accrues, nothing defers.
+///
+/// When `afc` names a tranche whose recipient is still the uncapped variant,
+/// `live_afc_cap` is applied — exactly the rewrite `resolve_waterfall` performs
+/// on the period waterfall, so claims extracted from the base waterfall agree
+/// with the allocation the resolved waterfall executes.
+///
+/// `StructuredCredit::validate_custom_waterfall` enforces at most one
+/// interest-type recipient per tranche, so the extraction is unambiguous.
+pub(crate) fn interest_claim_caps<'w>(
+    waterfall: &'w Waterfall,
+    afc: Option<&AfcSpec>,
+    live_afc_cap: f64,
+) -> HashMap<&'w str, Option<f64>> {
+    let mut caps: HashMap<&'w str, Option<f64>> = HashMap::default();
+    for tier in &waterfall.tiers {
+        for recipient in &tier.recipients {
+            match &recipient.calculation {
+                PaymentCalculation::TrancheInterest { tranche_id, .. } => {
+                    let afc_capped = afc
+                        .is_some_and(|spec| spec.capped_tranches.iter().any(|t| t == tranche_id));
+                    caps.insert(tranche_id.as_str(), afc_capped.then_some(live_afc_cap));
+                }
+                PaymentCalculation::CappedTrancheInterest {
+                    tranche_id,
+                    cap_rate,
+                    ..
+                } => {
+                    caps.insert(tranche_id.as_str(), Some(*cap_rate));
+                }
+                _ => {}
+            }
+        }
+    }
+    caps
+}
+
 /// Inputs the senior-fee kernel needs beyond the waterfall and tranche index.
 pub(crate) struct SeniorFeeInputs<'a> {
     /// Cash the fee tier is measured against (pool interest for a period).
@@ -1018,6 +1106,8 @@ pub(crate) struct SeniorFeeInputs<'a> {
     pub market: &'a MarketContext,
     /// Reserve balance, for reserve-linked calculations.
     pub reserve_balance: Money,
+    /// Simulated floating-coupon shift (SC-M13); zero outside OAS runs.
+    pub floating_rate_shift: f64,
 }
 
 /// Senior fees accruing this period, i.e. the fee tiers that rank ahead of
@@ -1067,6 +1157,7 @@ pub(crate) fn senior_fee_accrual(
                 inputs.reserve_balance,
                 &empty_in_period,
                 false,
+                inputs.floating_rate_shift,
             )?;
             total = total.checked_add(amount)?;
         }
@@ -1090,8 +1181,16 @@ fn evaluate_coverage_tests(
     payable_principal_tranche_ids: &[&str],
     senior_fees: Money,
     restricted_cash: Money,
+    floating_rate_shift: f64,
 ) -> Result<Vec<CoverageTestResult>> {
     let mut results = Vec::with_capacity(waterfall.coverage_triggers.len() * 2);
+
+    // The waterfall spec defines each tranche's interest CLAIM (uncapped,
+    // capped, or absent); the IC test must measure coverage of those claims,
+    // not of raw coupons the structure never owes. Caps in this waterfall are
+    // already resolved (the live AFC cap is baked in by `resolve_waterfall`),
+    // so no AFC override applies here.
+    let claim_caps = interest_claim_caps(waterfall, None, 0.0);
 
     let (haircuts, par_value_threshold) = match waterfall.coverage_rules.as_ref() {
         Some(rules) if !rules.is_empty() => (
@@ -1124,6 +1223,8 @@ fn evaluate_coverage_tests(
                 current_pool_balance: Some(current_pool_balance),
                 senior_fees,
                 restricted_cash,
+                interest_claim_caps: Some(&claim_caps),
+                floating_rate_shift,
             };
 
             let oc_test = CoverageTest::new_oc(oc_trigger_level);
@@ -1154,6 +1255,8 @@ fn evaluate_coverage_tests(
                 current_pool_balance: Some(current_pool_balance),
                 senior_fees,
                 restricted_cash,
+                interest_claim_caps: Some(&claim_caps),
+                floating_rate_shift,
             };
 
             let ic_test = CoverageTest::new_ic(ic_trigger_level);
@@ -1219,6 +1322,7 @@ fn calculate_payment_amount(
     reserve_balance: Money,
     principal_paid_in_period: &HashMap<String, Money>,
     diverted: bool,
+    floating_rate_shift: f64,
 ) -> Result<Money> {
     let (raw_amount, rounding) = match calculation {
         PaymentCalculation::FixedAmount { amount, rounding } => (amount.amount(), *rounding),
@@ -1256,11 +1360,13 @@ fn calculate_payment_amount(
                 .and_then(|b| b.get(tranche_id.as_str()))
                 .copied()
                 .unwrap_or(tranche.current_balance);
-            let rate = tranche.coupon.try_rate_for_period(
+            let rate = shifted_tranche_rate(
+                tranche,
                 period_start,
                 payment_date,
                 valuation_date,
                 market,
+                floating_rate_shift,
             )?;
             let accrual_fraction = tranche.day_count.year_fraction(
                 period_start,
@@ -1293,10 +1399,17 @@ fn calculate_payment_amount(
                 .copied()
                 .unwrap_or(tranche.current_balance);
             // Available-funds cap: the effective coupon cannot exceed `cap_rate`.
-            let rate = tranche
-                .coupon
-                .try_rate_for_period(period_start, payment_date, valuation_date, market)?
-                .min(*cap_rate);
+            // The cap applies AFTER the rate-path shift, matching the engine's
+            // interest-due kernel (the cap tracks the shifted net WAC).
+            let rate = shifted_tranche_rate(
+                tranche,
+                period_start,
+                payment_date,
+                valuation_date,
+                market,
+                floating_rate_shift,
+            )?
+            .min(*cap_rate);
             let accrual_fraction = tranche.day_count.year_fraction(
                 period_start,
                 payment_date,
@@ -1574,6 +1687,7 @@ mod ic_diversion_tests {
             reserve_balance: Money::new(0.0, currency),
             restricted_cash: Money::new(0.0, Currency::USD),
             recovery_proceeds: Money::new(0.0, currency),
+            floating_rate_shift: 0.0,
         };
 
         let result =
@@ -1800,6 +1914,7 @@ mod ic_diversion_tests {
             reserve_balance: Money::new(0.0, currency),
             restricted_cash: Money::new(0.0, Currency::USD),
             recovery_proceeds: Money::new(0.0, currency),
+            floating_rate_shift: 0.0,
         };
 
         let result =
@@ -1977,6 +2092,7 @@ mod ic_diversion_tests {
             reserve_balance: Money::new(0.0, currency),
             restricted_cash: Money::new(0.0, Currency::USD),
             recovery_proceeds: Money::new(0.0, currency),
+            floating_rate_shift: 0.0,
         };
 
         let result =
@@ -2068,6 +2184,7 @@ mod ic_diversion_tests {
                     reserve_balance: Money::new(0.0, currency),
                     restricted_cash: Money::new(0.0, Currency::USD),
                     recovery_proceeds: Money::new(0.0, currency),
+                    floating_rate_shift: 0.0,
                 },
             )
             .expect("waterfall execution")
@@ -2170,6 +2287,7 @@ mod ic_diversion_tests {
                 reserve_balance: Money::new(0.0, currency),
                 restricted_cash: Money::new(0.0, Currency::USD),
                 recovery_proceeds: Money::new(0.0, currency),
+                floating_rate_shift: 0.0,
             },
         )
         .expect("waterfall execution");
@@ -2271,6 +2389,7 @@ mod ic_diversion_tests {
                 reserve_balance: Money::new(0.0, currency),
                 restricted_cash: Money::new(0.0, Currency::USD),
                 recovery_proceeds: Money::new(0.0, currency),
+                floating_rate_shift: 0.0,
             },
         )
         .expect("waterfall execution");
@@ -2371,6 +2490,7 @@ mod water_fill_tests {
                 reserve_balance: Money::new(0.0, ccy),
                 restricted_cash: Money::new(0.0, ccy),
                 recovery_proceeds: Money::new(0.0, ccy),
+                floating_rate_shift: 0.0,
             },
         )
         .expect("waterfall executes");

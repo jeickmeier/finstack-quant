@@ -611,6 +611,134 @@ mod tests {
         );
     }
 
+    /// Accrual (Z) acceleration: with the Z accreting, the front tranche A
+    /// retires strictly faster than in the identical deal where the third
+    /// tranche is a plain current-pay sequential (`example()` vs
+    /// `example_accrual()` differ only in the third tranche's type).
+    #[test]
+    fn z_accretion_accelerates_senior_retirement() {
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+
+        let retirement_period = |cmo: &AgencyCmo| -> usize {
+            let mut cmo = cmo.clone();
+            cmo.reference_tranche_id = "A".to_string();
+            let cfs = generate_tranche_cashflows(&cmo, as_of, None).expect("cashflows");
+            cfs.iter()
+                .position(|cf| cf.ending_balance < 0.01)
+                .expect("A retires within the projection")
+        };
+
+        let plain = AgencyCmo::example().expect("plain sequential example");
+        let accrual = AgencyCmo::example_accrual().expect("accrual example");
+
+        let plain_retire = retirement_period(&plain);
+        let accrual_retire = retirement_period(&accrual);
+        assert!(
+            accrual_retire < plain_retire,
+            "A must retire strictly earlier with a Z accrual ({accrual_retire}) than with a \
+             plain sequential third tranche ({plain_retire})"
+        );
+    }
+
+    /// Deal-level cash conservation with a Z tranche: across every period,
+    /// cash distributed to tranches plus residuals equals collateral cash
+    /// received. The accretion-directed principal is redirected interest, not
+    /// new money.
+    #[test]
+    fn z_deal_cash_conservation_across_periods() {
+        let cmo = AgencyCmo::example_accrual().expect("accrual example");
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+
+        let collateral = resolve_collateral(&cmo, as_of).expect("collateral resolves");
+        let collateral_cfs =
+            generate_cashflows(&collateral, as_of, None).expect("collateral cashflows");
+        let original_collateral = collateral.current_face.amount();
+
+        let mut waterfall = cmo.waterfall;
+        let mut total_in = 0.0;
+        let mut total_out = 0.0;
+        for cf in &collateral_cfs {
+            let collateral_factor = cf.beginning_balance / original_collateral;
+            let result = execute_waterfall_with_principal_breakdown(
+                &mut waterfall,
+                cf.scheduled_principal,
+                cf.prepayment,
+                cf.interest,
+                collateral_factor,
+                None,
+            );
+            total_in += cf.scheduled_principal + cf.prepayment + cf.interest;
+            total_out += result
+                .allocations
+                .iter()
+                .map(|a| a.interest + a.principal)
+                .sum::<f64>()
+                + result.residual_interest
+                + result.residual_principal;
+        }
+        assert!(
+            (total_in - total_out).abs() < 1e-4,
+            "tranche cash + residuals {total_out} must equal collateral cash {total_in}"
+        );
+    }
+
+    /// Priced Z cashflows are cash-only: no phantom interest while the
+    /// current-pay tranches are outstanding, positive cash after they retire,
+    /// and a positive PV discounted from actual cash.
+    #[test]
+    fn z_tranche_priced_on_cash_only() {
+        let cmo = AgencyCmo::example_accrual().expect("accrual example");
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+        let market = create_test_market(as_of);
+
+        let cfs = generate_tranche_cashflows(&cmo, as_of, None).expect("Z cashflows");
+        assert!(!cfs.is_empty());
+
+        // During the accretion phase (balance strictly growing) the Z pays no
+        // cash at all; afterwards it pays cash interest + principal.
+        let original = 30_000_000.0;
+        assert!(
+            cfs[0].total.abs() < 1e-9 && cfs[0].ending_balance > original,
+            "period 0 must be pure accretion: total {} balance {}",
+            cfs[0].total,
+            cfs[0].ending_balance
+        );
+        let first_cash = cfs
+            .iter()
+            .position(|cf| cf.total > 0.0)
+            .expect("Z eventually pays cash");
+        assert!(first_cash > 0, "Z must not pay cash in period 0");
+        for cf in &cfs[..first_cash] {
+            assert!(
+                cf.interest.abs() < 1e-9 && cf.principal.abs() < 1e-9,
+                "no phantom cash during accretion"
+            );
+        }
+        // Balance accretes strictly during the accretion phase.
+        for window in cfs[..first_cash].windows(2) {
+            assert!(
+                window[1].ending_balance > window[0].ending_balance,
+                "Z balance must grow during accretion"
+            );
+        }
+        // Once current-pay, the Z receives cash interest on its accreted
+        // balance.
+        assert!(
+            cfs[first_cash..].iter().any(|cf| cf.interest > 0.0),
+            "Z must receive cash interest after seniors retire"
+        );
+        // And it is fully retired by the end of the projection.
+        let last = cfs.last().expect("non-empty");
+        assert!(
+            last.ending_balance < 1.0,
+            "Z must be retired at the end, balance {}",
+            last.ending_balance
+        );
+
+        let pv = price_cmo(&cmo, &market, as_of).expect("Z prices");
+        assert!(pv.amount() > 0.0, "Z PV must be positive");
+    }
+
     #[test]
     fn test_price_po_strip() {
         let cmo = AgencyCmo::example_io_po().expect("AgencyCmo IO/PO example is valid");

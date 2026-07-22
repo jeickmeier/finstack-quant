@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationInterpolation, InflationLag,
 };
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
+use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
@@ -87,22 +87,10 @@ fn bench_inflation_index() -> InflationIndex {
         .with_lag(InflationLag::Months(3))
 }
 
-/// Discount (USD-OIS), real discount (USD-REAL), CPI curve, CPI index, and inflation vol surface.
+/// Nominal discount (USD-OIS), CPI curve, CPI index, and inflation vol surface.
 fn create_inflation_market() -> MarketContext {
     let as_of = base_date();
     let disc_ois = test_utils::flat_discount("USD-OIS", as_of, 0.04);
-    let disc_real = DiscountCurve::builder("USD-REAL")
-        .base_date(as_of)
-        .knots([
-            (0.0, 1.0),
-            (0.5, 0.99),
-            (1.0, 0.98),
-            (2.0, 0.96),
-            (5.0, 0.90),
-            (10.0, 0.82),
-        ])
-        .build()
-        .expect("USD-REAL");
     let infl_curve = bench_flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.02);
     let index = bench_inflation_index();
     let vol = test_utils::flat_vol_surface(
@@ -114,7 +102,6 @@ fn create_inflation_market() -> MarketContext {
 
     MarketContext::new()
         .insert(disc_ois)
-        .insert(disc_real)
         .insert(infl_curve)
         .insert_inflation_index("US-CPI-U", index)
         .insert_surface(vol)
@@ -184,7 +171,7 @@ fn tips_benchmark(id: &str, maturity: Date) -> InflationLinkedBond {
         .deflation_protection(DeflationProtection::MaturityOnly)
         .bdc(BusinessDayConvention::Following)
         .stub(StubKind::None)
-        .discount_curve_id(CurveId::new("USD-REAL"))
+        .discount_curve_id(CurveId::new("USD-OIS"))
         .inflation_index_id(CurveId::new("US-CPI-U"))
         .attributes(Attributes::new())
         .build()

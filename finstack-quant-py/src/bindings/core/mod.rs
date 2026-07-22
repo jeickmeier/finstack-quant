@@ -8,7 +8,7 @@ pub mod market_data;
 mod math;
 pub(crate) mod money;
 mod rating_scales;
-mod types;
+pub(crate) mod types;
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;

@@ -1,26 +1,36 @@
 //! Discount Margin for floating-rate term loans.
 //!
-//! Solves for an additive spread (decimal) to the loan's base spread such that
-//! discounted PV of all cashflows (coupons + principal) matches observed price.
+//! Definition (Fabozzi; Bloomberg YAS convention): the discount margin is the
+//! constant additive spread (decimal, e.g. `0.025` = 250 bp) over the loan's
+//! **discount curve** such that the PV of the loan's projected cashflows —
+//! projected at the **contractual margin**, with step-ups, PIK, DDTL draws,
+//! amortization, and fees exactly as contracted — equals the observed dirty
+//! market price. PV is strictly **decreasing** in DM, so a loan quoted below
+//! par solves to a DM above its contractual margin, and vice versa. On a flat,
+//! consistent curve where the discount curve equals the projection index
+//! curve, a loan priced at par has DM equal to its contractual margin.
 //!
-//! # Market-Standard Implementation
+//! # Implementation
 //!
-//! This implementation uses **full-fidelity re-pricing**:
-//! - Clones the TermLoan and adjusts the spread by DM
-//! - Re-runs complete cashflow generation including:
-//!   * DDTL draw timing and fees
-//!   * Amortization schedules
-//!   * PIK capitalization
-//!   * Cash sweeps and covenants
-//!   * Principal redemptions
-//! - Uses the actual pricer to compute PV
-//! - Solves for DM using Brent's method
-//!
-//! This ensures DM is consistent with the loan's true cashflow structure.
+//! - Cashflows are generated **unchanged** by the full-fidelity term-loan
+//!   engine (DDTL draw timing, amortization, PIK capitalization, sweeps,
+//!   covenant margin step-ups) at the contractual margin.
+//! - Each flow is then re-discounted with the DM added to the
+//!   periodically-compounded zero rate derived from the loan's discount
+//!   curve — the same mechanics as the bond Z-spread/DM path (see
+//!   `z_spread_discount_factor` and the FRN `price_from_dm`). This keeps the
+//!   term-loan DM methodologically identical to the FRN DM.
+//! - Because this is a **curve DM** (a spread over the loan's *discount*
+//!   curve), any basis between the discount curve and the projection index
+//!   curve is included in the solved DM.
 
+use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::z_spread_discount_factor;
 use crate::instruments::TermLoan;
 use crate::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::summation::NeumaierAccumulator;
+use rust_decimal::prelude::ToPrimitive;
 
 /// Discount margin calculator for floating rate term loans.
 ///
@@ -29,49 +39,63 @@ use finstack_quant_core::math::solver::{BrentSolver, Solver};
 pub(crate) struct DiscountMarginCalculator;
 
 impl DiscountMarginCalculator {
-    /// Compute PV of term loan with adjusted spread (base_spread + dm_bp).
+    /// PV of the loan's **unchanged** contractual cashflows with `dm` (decimal)
+    /// added to the discount rate.
     ///
-    /// Clones the loan, adds `dm_bp` to the floating spread, and re-prices using
-    /// the full cashflow engine and pricer.
+    /// Uses the same holder-view flows the base discounting pricer values
+    /// (PIK capitalization and pre-settlement flows excluded), anchored at the
+    /// loan's settlement date. Each flow is discounted with the DM applied on
+    /// the periodically-compounded zero rate implied by the base discount
+    /// factor at the loan's coupon frequency (Z-spread mechanics), so
+    /// `pv_given_dm(loan, m, 0.0)` reproduces the base model PV exactly.
     ///
     /// # Errors
     ///
-    /// Returns `InputError::Invalid` if called on a fixed-rate loan.
+    /// Returns an error if the discount curve is missing, a discount factor is
+    /// invalid, or the spread-adjusted compounding base is non-positive.
     fn pv_given_dm(
         loan: &TermLoan,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        dm_bp: f64,
+        dm: f64,
     ) -> finstack_quant_core::Result<f64> {
-        use crate::instruments::fixed_income::term_loan::types::RateSpec;
+        use crate::instruments::fixed_income::term_loan::pricing::TermLoanDiscountingPricer;
 
-        // Clone loan and adjust spread
-        let mut loan_with_dm = loan.clone();
+        // Contractual flows, unchanged: coupons stay projected at the
+        // contractual margin (including step-ups); PIK and pre-settlement
+        // flows are excluded exactly as in the base pricer.
+        let (settlement_date, flows) =
+            TermLoanDiscountingPricer::pricing_flows(loan, curves, as_of)?;
+        let disc = curves.get_discount(loan.discount_curve_id.as_str())?;
+        let compounds_per_year = loan_compounding_frequency(loan);
 
-        match &mut loan_with_dm.rate {
-            RateSpec::Floating(spec) => {
-                // Add DM (in bp) to base spread.
-                // Propagate conversion error to surface solver divergence (NaN/Inf).
-                use rust_decimal::Decimal;
-                let dm_decimal = Decimal::try_from(dm_bp)
-                    .map_err(|_| finstack_quant_core::InputError::Invalid)?;
-                spec.spread_bp += dm_decimal;
+        let mut pv = NeumaierAccumulator::new();
+        for (date, amount) in &flows {
+            if *date <= settlement_date {
+                continue;
             }
-            RateSpec::Fixed { .. } => {
-                // DM is not defined for fixed-rate loans
-                return Err(finstack_quant_core::InputError::Invalid.into());
-            }
-        }
-
-        // Re-price using full cashflow engine and pricer
-        let pv =
-            crate::instruments::fixed_income::term_loan::pricing::TermLoanDiscountingPricer::price(
-                &loan_with_dm,
-                curves,
-                as_of,
+            let t = disc.day_count().year_fraction(
+                settlement_date,
+                *date,
+                DayCountContext::default(),
             )?;
+            let df = disc.df_between_dates(settlement_date, *date)?;
+            let df_dm = z_spread_discount_factor(df, t, dm, compounds_per_year)?;
+            pv.add(amount.amount() * df_dm);
+        }
+        Ok(pv.total())
+    }
+}
 
-        Ok(pv.amount())
+/// Periodic compounding frequency for the DM zero-rate shift, from the loan's
+/// contractual coupon frequency (e.g. quarterly → 4). Mirrors the FRN
+/// `bond_z_spread_compounding_frequency` helper.
+fn loan_compounding_frequency(loan: &TermLoan) -> f64 {
+    let years = loan.frequency.to_years_simple();
+    if years > 0.0 && years.is_finite() {
+        (1.0 / years).round().max(1.0)
+    } else {
+        1.0
     }
 }
 
@@ -81,11 +105,17 @@ impl MetricCalculator for DiscountMarginCalculator {
 
         // DM is only defined for floating-rate loans; fixed-rate instruments
         // should not request this metric.
-        if let crate::instruments::fixed_income::term_loan::types::RateSpec::Fixed { .. } =
-            loan.rate
-        {
-            return Err(finstack_quant_core::InputError::Invalid.into());
-        }
+        let contractual_margin = match &loan.rate {
+            crate::instruments::fixed_income::term_loan::types::RateSpec::Floating(spec) => {
+                spec.spread_bp
+                    .to_f64()
+                    .ok_or(finstack_quant_core::InputError::Invalid)?
+                    * 1e-4
+            }
+            crate::instruments::fixed_income::term_loan::types::RateSpec::Fixed { .. } => {
+                return Err(finstack_quant_core::InputError::Invalid.into());
+            }
+        };
 
         // Callable loans require a quoted price for DM: without an observed market price,
         // the DM would trivially be zero (model PV == target PV) and is not meaningful.
@@ -117,34 +147,37 @@ impl MetricCalculator for DiscountMarginCalculator {
         };
         let loan: &TermLoan = context.instrument_as()?;
 
-        // Objective function: PV(dm) - target_price
+        // Objective function: PV(dm) - target_price. PV is strictly decreasing
+        // in dm (higher discount spread → lower PV).
         // Return NAN on pricing errors so the solver does not converge to a
         // wrong root based on artificial large values.
-        let objective = |dm_bp: f64| -> f64 {
-            match Self::pv_given_dm(loan, &context.curves, context.as_of, dm_bp) {
+        let objective = |dm: f64| -> f64 {
+            match Self::pv_given_dm(loan, &context.curves, context.as_of, dm) {
                 Ok(pv) => pv - target,
                 Err(_) => f64::NAN,
             }
         };
 
-        // Solve for DM in basis points.
-        // Tolerance of 1e-8 provides sub-basis-point accuracy (1e-8 bp = 1e-12 decimal)
-        // without exceeding f64 precision limits.
+        // Solve for DM on the decimal spread axis. Tolerance 1e-10 (~0.001 bp)
+        // matches the bond DM/Z-spread solvers; the initial guess is the
+        // contractual margin (the exact solution for a par-quoted loan on a
+        // flat consistent curve) with a ±500 bp starting bracket.
         let solver = BrentSolver::new()
-            .tolerance(1e-8)
-            .initial_bracket_size(Some(50.0)); // Start with +/- 50bp bracket
+            .tolerance(1e-10)
+            .initial_bracket_size(Some(0.05));
 
-        let dm_bp = solver.solve(objective, 0.0)?;
+        let dm = solver.solve(objective, contractual_margin)?;
 
-        // Validate DM is within reasonable bounds
-        if dm_bp.abs() > 2000.0 {
+        // Validate DM is within reasonable bounds (±2000 bp).
+        if dm.abs() > 0.20 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Discount margin {} bp exceeds reasonable bounds (±2000 bp)",
-                dm_bp
+                dm * 1e4
             )));
         }
 
-        // Return DM as decimal (bp / 10000)
-        Ok(dm_bp * 1e-4)
+        // DM as decimal (e.g. 0.025 = 250 bp), directly comparable to the
+        // contractual margin.
+        Ok(dm)
     }
 }

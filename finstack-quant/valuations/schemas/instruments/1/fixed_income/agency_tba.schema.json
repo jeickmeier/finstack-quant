@@ -205,6 +205,14 @@
               ],
               "description": "SIFMA settlement class override.\n\nWhen `None`, inferred from agency + term using\n[`SifmaSettlementClass::from_agency_term`]."
             },
+            "settlement_date": {
+              "description": "Explicit settlement date override.\n\nWhen set, bypasses the SIFMA calendar lookup for\n`settlement_year`/`settlement_month` in\n[`AgencyTba::get_settlement_date`]. Dollar rolls use this to keep leg\npricing consistent with explicit roll settlement dates.",
+              "format": "date",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "settlement_month": {
               "description": "Settlement month (1-12).",
               "format": "uint8",

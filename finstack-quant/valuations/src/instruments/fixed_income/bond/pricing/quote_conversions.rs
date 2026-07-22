@@ -1247,21 +1247,37 @@ pub fn price_from_oas(
     pricer.price_at_oas(bond, curves, as_of, oas_bp)
 }
 
-/// Price from Discount Margin for FRNs by adding DM (decimal) to float margin and delegating to pricer.
+/// Price from Discount Margin for FRNs by adding DM (decimal) to the **discount rate**.
 ///
-/// This helper prices against the model PV, independent of any price-from-quote
-/// override on the bond. It is used by the DM metric solver that seeks a DM
-/// reproducing a quoted price, so it must not short-circuit via the quote.
+/// Cashflows are projected **unchanged** at the contractual quoted margin
+/// (forward index + `spread_bp` from `FloatingCouponSpec`); the discount
+/// margin is then applied as a constant spread on the discount side,
+/// following the standard definition (Fabozzi; Bloomberg YAS): PV is
+/// strictly **decreasing** in DM, and an FRN priced at par on a flat,
+/// consistent curve has DM equal to its quoted margin.
+///
+/// The discounting mechanics are identical to [`price_from_z_spread`]: the
+/// periodically-compounded zero rate is derived from the bond's discount
+/// curve and each flow is re-discounted at `rate + dm` (see
+/// `z_spread_discount_factor`). This is therefore a **curve DM** — a spread
+/// over the bond's *discount* curve. If the discount curve differs from the
+/// projection index curve, the solved DM includes that discount/projection
+/// basis.
+///
+/// This helper prices against the model PV, independent of any
+/// price-from-quote override on the bond. It is used by the DM metric solver
+/// that seeks a DM reproducing a quoted price, so it must not short-circuit
+/// via the quote.
 ///
 /// # Arguments
 ///
-/// * `bond` - Floating-rate bond whose contractual reference coupon is shifted
-///   by the supplied discount margin.
+/// * `bond` - Floating-rate bond whose contractual cashflows are projected at
+///   the quoted margin and re-discounted at the shifted rate.
 /// * `curves` - Market context supplying discounting and floating-rate reset
 ///   data.
 /// * `as_of` - Valuation date used for schedule construction and discounting.
-/// * `dm` - Annual discount margin as a decimal added to the floating coupon
-///   margin for model pricing.
+/// * `dm` - Annual discount margin as a decimal added to the discount rate
+///   (`0.01` = 100 bp).
 pub fn price_from_dm(
     bond: &Bond,
     curves: &MarketContext,
@@ -1271,7 +1287,8 @@ pub fn price_from_dm(
     let mut b = bond.clone();
     clear_price_driving_overrides(&mut b);
 
-    // Check if it's a floating rate bond
+    // DM discounting semantics apply to floating-rate bonds only; other
+    // cashflow specs fall back to the plain model PV.
     let is_floating = matches!(
         &b.cashflow_spec,
         crate::instruments::fixed_income::bond::CashflowSpec::Floating(_)
@@ -1279,14 +1296,9 @@ pub fn price_from_dm(
     if !is_floating {
         return Ok(b.value(curves, as_of)?.amount());
     }
-    if let crate::instruments::fixed_income::bond::CashflowSpec::Floating(spec) =
-        &mut b.cashflow_spec
-    {
-        // Convert dm (in decimal) to basis points and add to spread_bp (Decimal)
-        let dm_bp = finstack_quant_core::decimal::f64_to_decimal(dm * 1e4)?;
-        spec.rate_spec.spread_bp += dm_bp;
-    }
-    Ok(b.value(curves, as_of)?.amount())
+    // Coupons stay at the contractual quoted margin; the DM shifts the
+    // discount rate via the shared Z-spread discounting mechanics.
+    price_from_z_spread(&b, curves, as_of, dm)
 }
 
 /// Clear all price-driving market-quote overrides on a bond so downstream
@@ -1678,11 +1690,14 @@ fn par_swap_rate_from_discount(
 /// approximation as `AssetSwapMarketCalculator` for non-custom,
 /// fixed-rate bonds:
 ///
-/// `ASW_mkt = (coupon - par_rate) + (1.0 - price_pct) / annuity`
+/// `ASW_mkt = [(coupon - par_rate) * fixed_annuity + (1.0 - price_pct)] / float_annuity`
 ///
-/// where `price_pct = dirty / notional`. Inverting:
+/// where `price_pct = dirty / notional` and both the fixed-annuity-weighted
+/// running term and the upfront are amortized over the floating-leg annuity
+/// (par-par derivation). Without a forward curve the floating leg is proxied
+/// on the fixed-leg schedule with the discount curve's day count. Inverting:
 ///
-/// `price_pct = 1.0 - (ASW_mkt - (coupon - par_rate)) * annuity`.
+/// `price_pct = 1.0 + (coupon - par_rate) * fixed_annuity - ASW_mkt * float_annuity`.
 fn price_from_asw_market(
     bond: &Bond,
     curves: &MarketContext,
@@ -1772,8 +1787,18 @@ fn price_from_asw_market(
     let price_pct = if let Some((float_pv, fixed_ann, float_ann)) = forward_components {
         1.0 + coupon * fixed_ann - float_pv - asw_market * float_ann
     } else {
-        let par_asw = coupon - par_rate;
-        1.0 - (asw_market - par_asw) * ann
+        // Mirror the AssetSwapMarketCalculator fallback (exact par-par form
+        // with the floating leg proxied on the same schedule using the
+        // discount curve's day count): invert
+        // asw = [(C - par)·Ann_fixed + (1 - p)] / Ann_float for p.
+        let float_ann = fixed_leg_annuity(disc.as_ref(), disc.day_count(), None, &sched)?;
+        if float_ann.abs() < 1e-12 {
+            return Err(finstack_quant_core::Error::Validation(
+                "ASW market price inversion is undefined for near-zero floating-leg annuity"
+                    .to_string(),
+            ));
+        }
+        1.0 + (coupon - par_rate) * ann - asw_market * float_ann
     };
     Ok(price_pct * bond.notional.amount())
 }

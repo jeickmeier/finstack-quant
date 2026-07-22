@@ -54,7 +54,7 @@ pub fn sample_tips() -> InflationLinkedBond {
         .deflation_protection(DeflationProtection::MaturityOnly)
         .bdc(BusinessDayConvention::Following)
         .stub(StubKind::ShortBack)
-        .discount_curve_id(CurveId::new("USD-REAL"))
+        .discount_curve_id(CurveId::new("USD-OIS"))
         .inflation_index_id(CurveId::new("US-CPI-U"))
         .attributes(Attributes::new())
         .build()
@@ -93,7 +93,7 @@ pub fn sample_uk_linker() -> InflationLinkedBond {
 
 /// Create a market context with inflation index (linear interpolation for TIPS)
 pub fn market_context_with_index() -> (MarketContext, InflationIndex) {
-    let disc = DiscountCurve::builder("USD-REAL")
+    let disc = DiscountCurve::builder("USD-OIS")
         .base_date(d(2025, 1, 2))
         .knots([
             (0.0, 1.0),
@@ -122,7 +122,7 @@ pub fn market_context_with_index() -> (MarketContext, InflationIndex) {
 
 /// Create a market context with inflation curve (for forward projections)
 pub fn market_context_with_curve() -> (MarketContext, InflationCurve) {
-    let disc = DiscountCurve::builder("USD-REAL")
+    let disc = DiscountCurve::builder("USD-OIS")
         .base_date(d(2025, 1, 2))
         .knots([
             (0.0, 1.0),

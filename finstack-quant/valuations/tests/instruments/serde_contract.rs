@@ -348,6 +348,12 @@ serde_contract!(
         .expect("example")
 );
 serde_contract!(
+    serde_cmo_accrual,
+    finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo,
+    finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo::example_accrual()
+        .expect("example")
+);
+serde_contract!(
     serde_convertible,
     finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond,
     finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond::example()

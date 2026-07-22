@@ -62,6 +62,7 @@ fn run_rounding_test(amount: f64, rounding: RoundingConvention) -> f64 {
         reserve_balance: Money::new(0.0, currency),
         restricted_cash: Money::new(0.0, Currency::USD),
         recovery_proceeds: Money::new(0.0, currency),
+        floating_rate_shift: 0.0,
     };
 
     let result =

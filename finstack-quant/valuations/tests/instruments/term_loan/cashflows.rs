@@ -575,3 +575,235 @@ fn test_commitment_fees_use_correct_kind() {
         generic_fees.len()
     );
 }
+
+// ---------------------------------------------------------------------------
+// Margin step-up period semantics: LSTA convention says a margin change
+// applies from the start of the NEXT interest period, never mid-period, and
+// the fixed and floating branches must agree on this.
+// ---------------------------------------------------------------------------
+
+mod margin_stepup_period_semantics {
+    use super::*;
+    use finstack_quant_cashflows::builder::FloatingRateSpec;
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::{
+        MarginStepUp, TermLoanCovenantEvents,
+    };
+    use rust_decimal::Decimal;
+
+    /// Off-cycle step date in the middle of the second quarterly period.
+    const STEP_DATE: time::Date = date!(2025 - 05 - 15);
+    /// First period start on/after the step date (LSTA effective boundary).
+    const NEXT_PERIOD_START: time::Date = date!(2025 - 07 - 01);
+
+    fn stepup_covenants() -> TermLoanCovenantEvents {
+        TermLoanCovenantEvents {
+            margin_stepups: vec![MarginStepUp {
+                date: STEP_DATE,
+                delta_bp: 100,
+            }],
+            ..Default::default()
+        }
+    }
+
+    fn build_floating_loan(id: &str, covenants: Option<TermLoanCovenantEvents>) -> TermLoan {
+        TermLoan::builder()
+            .id(id.into())
+            .currency(Currency::USD)
+            .notional_limit(Money::new(10_000_000.0, Currency::USD))
+            .issue_date(date!(2025 - 01 - 01))
+            .maturity(date!(2026 - 01 - 01))
+            .rate(RateSpec::Floating(FloatingRateSpec {
+                index_id: CurveId::from("USD-SOFR"),
+                spread_bp: Decimal::from(200),
+                gearing: Decimal::from(1),
+                gearing_includes_spread: true,
+                index_floor_bp: None,
+                all_in_floor_bp: None,
+                all_in_cap_bp: None,
+                index_cap_bp: None,
+                overnight_index_constraints: Default::default(),
+                reset_freq: Tenor::quarterly(),
+                index_tenor: None,
+                reset_lag_days: 0,
+                fixing_calendar_id: None,
+                overnight_compounding: None,
+                overnight_basis: None,
+                fallback: Default::default(),
+            }))
+            .frequency(Tenor::quarterly())
+            .day_count(DayCount::Act360)
+            .bdc(BusinessDayConvention::ModifiedFollowing)
+            .calendar_id_opt(None)
+            .stub(StubKind::None)
+            .discount_curve_id(CurveId::from("USD-OIS"))
+            .amortization(AmortizationSpec::None)
+            .coupon_type(CouponType::Cash)
+            .upfront_fee_opt(None)
+            .ddtl_opt(None)
+            .covenants_opt(covenants)
+            .attributes(Default::default())
+            .build()
+            .unwrap()
+    }
+
+    fn build_fixed_loan(id: &str, covenants: Option<TermLoanCovenantEvents>) -> TermLoan {
+        TermLoan::builder()
+            .id(id.into())
+            .currency(Currency::USD)
+            .notional_limit(Money::new(10_000_000.0, Currency::USD))
+            .issue_date(date!(2025 - 01 - 01))
+            .maturity(date!(2026 - 01 - 01))
+            .rate(RateSpec::Fixed { rate_bp: 650 })
+            .frequency(Tenor::quarterly())
+            .day_count(DayCount::Act360)
+            .bdc(BusinessDayConvention::ModifiedFollowing)
+            .calendar_id_opt(None)
+            .stub(StubKind::None)
+            .discount_curve_id(CurveId::from("USD-OIS"))
+            .amortization(AmortizationSpec::None)
+            .coupon_type(CouponType::Cash)
+            .upfront_fee_opt(None)
+            .ddtl_opt(None)
+            .covenants_opt(covenants)
+            .attributes(Default::default())
+            .build()
+            .unwrap()
+    }
+
+    fn market_with_forward() -> MarketContext {
+        let fwd = ForwardCurve::builder("USD-SOFR", 0.25)
+            .base_date(date!(2025 - 01 - 01))
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.045), (10.0, 0.045)])
+            .build()
+            .unwrap();
+        build_market_context().insert(fwd)
+    }
+
+    /// `(accrual_start, accrual_end)` for every interest-like flow, in date order.
+    fn accrual_periods(loan: &TermLoan, market: &MarketContext) -> Vec<(time::Date, time::Date)> {
+        let schedule = loan
+            .cashflow_schedule(market, date!(2025 - 01 - 01))
+            .expect("cashflow schedule should succeed");
+        let mut periods: Vec<(time::Date, time::Date)> = schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.kind.is_interest_like())
+            .map(|cf| {
+                let accrual = cf
+                    .accrual
+                    .expect("interest flow should carry accrual metadata");
+                (accrual.start, accrual.end)
+            })
+            .collect();
+        periods.sort_unstable();
+        periods
+    }
+
+    /// An off-cycle margin step-up must NOT split the enclosing accrual period:
+    /// the period grid is identical to the no-step-up loan, and the new margin
+    /// first applies to the period starting at the next period boundary.
+    #[test]
+    fn test_floating_stepup_applies_from_next_period_start_without_stub() {
+        let market = market_with_forward();
+        let base = build_floating_loan("TL-STEP-FL-BASE", None);
+        let stepped = build_floating_loan("TL-STEP-FL", Some(stepup_covenants()));
+
+        let base_periods = accrual_periods(&base, &market);
+        let stepped_periods = accrual_periods(&stepped, &market);
+
+        // No mid-period stub: identical period count and identical boundaries.
+        assert_eq!(
+            stepped_periods, base_periods,
+            "off-cycle margin step-up must not split accrual periods \
+             (expected {base_periods:?}, got {stepped_periods:?})"
+        );
+        assert!(
+            stepped_periods
+                .iter()
+                .all(|(start, end)| *start != STEP_DATE && *end != STEP_DATE),
+            "no accrual boundary may fall on the off-cycle step date {STEP_DATE}"
+        );
+
+        // The new margin first applies to the period starting at the next
+        // period boundary (2025-07-01): earlier coupons match the no-step-up
+        // loan, later coupons exceed it by the 100 bp step.
+        let coupon_amounts = |loan: &TermLoan| -> Vec<(time::Date, f64)> {
+            let schedule = loan
+                .cashflow_schedule(&market, date!(2025 - 01 - 01))
+                .unwrap();
+            let mut flows: Vec<(time::Date, f64)> = schedule
+                .get_flows()
+                .iter()
+                .filter(|cf| cf.kind.is_interest_like())
+                .map(|cf| {
+                    let accrual = cf.accrual.expect("interest flow should carry accrual");
+                    (accrual.start, cf.amount.amount())
+                })
+                .collect();
+            flows.sort_by(|a, b| a.0.cmp(&b.0));
+            flows
+        };
+        let base_coupons = coupon_amounts(&base);
+        let stepped_coupons = coupon_amounts(&stepped);
+        assert_eq!(base_coupons.len(), stepped_coupons.len());
+        for ((start, base_amt), (_, stepped_amt)) in base_coupons.iter().zip(stepped_coupons.iter())
+        {
+            if *start < NEXT_PERIOD_START {
+                assert!(
+                    (stepped_amt - base_amt).abs() < 1e-6,
+                    "coupon for period starting {start} must be unchanged before the \
+                     step takes effect (base {base_amt}, stepped {stepped_amt})"
+                );
+            } else {
+                assert!(
+                    *stepped_amt > *base_amt + 1.0,
+                    "coupon for period starting {start} must reflect the +100 bp step \
+                     (base {base_amt}, stepped {stepped_amt})"
+                );
+            }
+        }
+    }
+
+    /// Fixed and floating loans with the same off-cycle step-up schedule must
+    /// produce the same accrual-period boundaries (both apply the new margin
+    /// from the start of the next interest period).
+    #[test]
+    fn test_fixed_and_floating_stepup_share_period_boundaries() {
+        let market = market_with_forward();
+        let floating = build_floating_loan("TL-STEP-FL-EQ", Some(stepup_covenants()));
+        let fixed = build_fixed_loan("TL-STEP-FX-EQ", Some(stepup_covenants()));
+
+        let floating_periods = accrual_periods(&floating, &market);
+        let fixed_periods = accrual_periods(&fixed, &market);
+        assert_eq!(
+            floating_periods, fixed_periods,
+            "fixed and floating margin step-ups must use the same whole-period \
+             boundaries"
+        );
+
+        // The fixed branch applies the new rate from the next period start too.
+        let schedule = fixed
+            .cashflow_schedule(&market, date!(2025 - 01 - 01))
+            .unwrap();
+        for cf in schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.kind.is_interest_like())
+        {
+            let accrual = cf.accrual.expect("interest flow should carry accrual");
+            let rate = cf.rate.expect("fixed coupon should carry its rate");
+            let expected = if accrual.start < NEXT_PERIOD_START {
+                0.065
+            } else {
+                0.075
+            };
+            assert!(
+                (rate - expected).abs() < 1e-12,
+                "fixed coupon rate for period starting {} should be {expected}, got {rate}",
+                accrual.start
+            );
+        }
+    }
+}

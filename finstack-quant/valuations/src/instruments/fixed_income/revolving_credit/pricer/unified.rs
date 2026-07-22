@@ -33,6 +33,51 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 
 use super::path_generator::generate_three_factor_paths;
 
+/// Default utilization–credit correlation for the auto-synthesized `McConfig`.
+///
+/// When a stochastic facility carries a hazard curve but no explicit
+/// `mc_config`, the pricer synthesizes one with this moderate positive
+/// correlation between the utilization and credit-spread factors. This is the
+/// default adverse-selection ("run on the bank") assumption: as a borrower's
+/// credit deteriorates, drawn exposure rises, so exposure-at-default exceeds
+/// the unconditional expected drawn balance. Simulating utilization
+/// independently of the credit state (the previous default) understates EAD
+/// and overstates lender PV for risky borrowers.
+///
+/// The empirical EAD/LEQ literature consistently finds materially higher
+/// drawdown as borrowers approach default:
+///
+/// - Asarnow, E., & Marker, J. (1995). "Historical Performance of the U.S.
+///   Corporate Loan Market: 1988–1993." *Journal of Commercial Lending*,
+///   77(7), 13–32 — loan-equivalent usage of revolving commitments rises
+///   sharply with deteriorating ratings.
+/// - Jiménez, G., Lopez, J. A., & Saurina, J. (2009). "Empirical Analysis of
+///   Corporate Credit Lines." *Review of Financial Studies*, 22(12),
+///   5069–5098 — defaulting firms draw down their credit lines materially
+///   more than non-defaulting firms in the years leading up to default.
+///
+/// Override by supplying an explicit `McConfig` (any `util_credit_corr` or a
+/// full `correlation_matrix`); pass `util_credit_corr: Some(0.0)` to disable
+/// adverse selection entirely.
+const DEFAULT_UTIL_CREDIT_CORR: f64 = 0.3;
+
+/// Default fractional implied volatility for the auto-synthesized
+/// market-anchored credit-spread process.
+///
+/// Utilization–credit dependence enters the model **only** through the factor
+/// correlation of the Brownian shocks (see `monte_carlo_process`), so
+/// [`DEFAULT_UTIL_CREDIT_CORR`] has a pricing effect only when the credit
+/// factor genuinely diffuses. The previously synthesized `implied_vol = 1e-10`
+/// froze the credit factor, which would leave a default correlation silently
+/// inert. 30% is at the low end of typical single-name credit-spread implied
+/// volatilities and keeps the mean-anchored CIR comfortably inside the Feller
+/// region (2κθ > σ²) for the synthesized `kappa = 0.1`.
+///
+/// Override by supplying an explicit `McConfig` with a custom
+/// `credit_spread_process` (e.g. `implied_vol` near zero for deterministic
+/// credit).
+const DEFAULT_CREDIT_SPREAD_IMPLIED_VOL: f64 = 0.3;
+
 /// Result for a single path valuation.
 ///
 /// Contains the present value, optional 3-factor path data, and the detailed cashflow schedule.
@@ -443,25 +488,50 @@ impl RevolvingCreditPricer {
         } else {
             // Synthesize minimal McConfig
             // If facility has hazard curve, use market-anchored process; otherwise constant zero
-            let credit_process = if let Some(ref hazard_id) = facility.credit_curve_id {
-                CreditSpreadProcessSpec::MarketAnchored {
-                    hazard_curve_id: hazard_id.clone(),
-                    kappa: 0.1,
-                    implied_vol: 1e-10, // Minimal volatility for deterministic behavior
-                    tenor_years: None,
-                }
-            } else {
-                CreditSpreadProcessSpec::Constant(0.0)
-            };
+            //
+            // NOTE: when the facility carries a hazard curve, the synthesized
+            // config defaults to a moderate positive utilization–credit
+            // correlation (`DEFAULT_UTIL_CREDIT_CORR`) and a genuinely
+            // stochastic credit spread (`DEFAULT_CREDIT_SPREAD_IMPLIED_VOL`),
+            // so the default stochastic valuation embeds adverse selection:
+            // spread up ⇒ utilization up ⇒ higher exposure-at-default. Without
+            // a hazard curve there is no credit factor, so no correlation is
+            // applied. Supply an explicit `McConfig` to override either
+            // default (e.g. `util_credit_corr: Some(0.0)` to disable adverse
+            // selection).
+            let (credit_process, util_credit_corr) =
+                if let Some(ref hazard_id) = facility.credit_curve_id {
+                    (
+                        CreditSpreadProcessSpec::MarketAnchored {
+                            hazard_curve_id: hazard_id.clone(),
+                            kappa: 0.1,
+                            implied_vol: DEFAULT_CREDIT_SPREAD_IMPLIED_VOL,
+                            tenor_years: None,
+                        },
+                        Some(DEFAULT_UTIL_CREDIT_CORR),
+                    )
+                } else {
+                    // No credit factor → a utilization–credit correlation
+                    // would be inert; leave it unset.
+                    (CreditSpreadProcessSpec::Constant(0.0), None)
+                };
 
             mc_config_to_use = McConfig {
                 correlation_matrix: None,
                 recovery_rate: facility.recovery_rate,
                 credit_spread_process: credit_process,
                 interest_rate_process: None,
-                util_credit_corr: None,
+                util_credit_corr,
             };
             mc_config_to_use.validate()?;
+            tracing::debug!(
+                facility_id = facility.id.as_str(),
+                util_credit_corr = ?mc_config_to_use.util_credit_corr,
+                "auto-synthesized revolver McConfig: default utilization/credit \
+                 correlation embeds adverse selection when a hazard curve is \
+                 present; supply an explicit McConfig (e.g. util_credit_corr: \
+                 Some(0.0)) to override"
+            );
             &mc_config_to_use
         };
 
@@ -1528,5 +1598,115 @@ mod tests {
                 "path {i} PV diverges between runs: {v1} vs {v2}"
             );
         }
+    }
+
+    /// The auto-synthesized default `McConfig` must embed adverse selection.
+    ///
+    /// For a risky borrower (hazard curve present) with no explicit
+    /// `mc_config`, the synthesized config defaults to
+    /// `util_credit_corr = DEFAULT_UTIL_CREDIT_CORR > 0`: paths where the
+    /// credit spread widens also draw more, so exposure-at-default is higher
+    /// than under independence and the lender PV must be LOWER than an
+    /// otherwise-identical explicit config with `util_credit_corr = 0.0`
+    /// (same seed, same synthesized credit process).
+    #[test]
+    fn default_config_embeds_adverse_selection_vs_explicit_zero_corr() {
+        use finstack_quant_core::market_data::term_structures::HazardCurve;
+
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let end = Date::from_calendar_date(2027, Month::January, 1).expect("date");
+
+        let make_facility = |id: &str, mc_config: Option<McConfig>| {
+            RevolvingCredit::builder()
+                .id(id.into())
+                .commitment_amount(Money::new(10_000_000.0, Currency::USD))
+                .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+                .commitment_date(start)
+                .maturity(end)
+                .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
+                .day_count(DayCount::Act360)
+                .frequency(Tenor::quarterly())
+                .fees(RevolvingCreditFees::default())
+                .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
+                    StochasticUtilizationSpec {
+                        utilization_process: UtilizationProcess::MeanReverting {
+                            target_rate: 0.6,
+                            speed: 0.5,
+                            volatility: 0.25,
+                        },
+                        num_paths: 4000,
+                        seed: Some(42),
+                        antithetic: true,
+                        use_sobol_qmc: false,
+                        mc_config,
+                    },
+                )))
+                .discount_curve_id("USD-OIS".into())
+                .credit_curve_id("BORROWER-HZ".into())
+                .recovery_rate(0.4)
+                .build()
+                .expect("facility")
+        };
+
+        // Explicit config replicating the auto-synthesized default exactly,
+        // except adverse selection is disabled (util_credit_corr = 0.0).
+        let zero_corr_config = McConfig {
+            correlation_matrix: None,
+            recovery_rate: 0.4,
+            credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
+                hazard_curve_id: "BORROWER-HZ".into(),
+                kappa: 0.1,
+                implied_vol: DEFAULT_CREDIT_SPREAD_IMPLIED_VOL,
+                tenor_years: None,
+            },
+            interest_rate_process: None,
+            util_credit_corr: Some(0.0),
+        };
+
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(start)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, (-0.03f64).exp()), (5.0, (-0.15f64).exp())])
+            .build()
+            .expect("curve");
+        // Risky borrower: flat 5% hazard.
+        let hz = HazardCurve::builder("BORROWER-HZ")
+            .base_date(start)
+            .recovery_rate(0.4)
+            .day_count(DayCount::Act365F)
+            .knots([(1.0, 0.05), (5.0, 0.05)])
+            .build()
+            .expect("hazard");
+        let market = MarketContext::new().insert(disc).insert(hz);
+
+        let pv_default = RevolvingCreditPricer::price_with_paths(
+            &make_facility("RC-ADVSEL-DEFAULT", None),
+            &market,
+            start,
+        )
+        .expect("default-config pricing")
+        .mc_result
+        .estimate
+        .mean
+        .amount();
+        let pv_zero_corr = RevolvingCreditPricer::price_with_paths(
+            &make_facility("RC-ADVSEL-ZERO", Some(zero_corr_config)),
+            &market,
+            start,
+        )
+        .expect("zero-corr pricing")
+        .mc_result
+        .estimate
+        .mean
+        .amount();
+
+        // Adverse selection increases expected drawn exposure at default, so
+        // the lender's PV must be strictly lower under the default config.
+        assert!(
+            pv_default < pv_zero_corr,
+            "default config (util_credit_corr = {DEFAULT_UTIL_CREDIT_CORR}) must \
+             embed adverse selection and price BELOW the zero-correlation config: \
+             default = {pv_default}, zero-corr = {pv_zero_corr}"
+        );
     }
 }

@@ -117,6 +117,13 @@ pub struct ConvertibleBond {
     pub discount_curve_id: CurveId,
     /// Credit curve identifier for risky discounting (bond floor).
     /// If not provided, falls back to discount_curve_id (implies no credit spread).
+    ///
+    /// **Convention**: this curve must represent ZERO-RECOVERY (pure hazard)
+    /// risky discounting, i.e. `risky_df = rf_df * survival_probability`. The
+    /// pricer converts it to recovery-adjusted discounting via the blend
+    /// `risky * (1 - R) + rf * R` using [`Self::recovery_rate`]. Supplying a
+    /// market recovery-adjusted spread curve here double-counts `(1 - R)` and
+    /// overstates the credit discount.
     #[builder(optional)]
     pub credit_curve_id: Option<CurveId>,
     /// Conversion terms for equity conversion.
@@ -132,6 +139,14 @@ pub struct ConvertibleBond {
     /// When set, the issuer can only exercise call provisions if the underlying
     /// stock price satisfies the trigger condition (e.g., above 130% of conversion
     /// price for 20 of 30 trading days).
+    ///
+    /// **Modeling scope**: a single trigger gates the ENTIRE callable life —
+    /// every window in [`Self::call_put`] is subject to it. A soft-call period
+    /// followed by an unconditional hard-call period is not representable
+    /// (omit the trigger to model an unconditional call). In the tree the
+    /// trigger is evaluated on the instantaneous node spot with a
+    /// Broadie-Glasserman-Kou-style barrier adjustment approximating the
+    /// k-of-n-days observation window; the realized path is not tracked.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub soft_call_trigger: Option<SoftCallTrigger>,
@@ -227,6 +242,10 @@ pub enum ConversionPolicy {
     /// Holder may convert at any time (subject to window, if any).
     Voluntary,
     /// Bond will mandatorily convert on the specified date.
+    ///
+    /// **Modeling scope**: the tree pricer models conversion only at the
+    /// single step mapped from this date; early voluntary conversion before
+    /// the mandatory date is not modeled.
     MandatoryOn(#[schemars(with = "String")] Date),
     /// Holder may convert within a window.
     Window {
@@ -251,6 +270,10 @@ pub enum ConversionPolicy {
     /// PERCS (Preference Equity Redemption Cumulative Stock) cap the upside.
     /// DECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.
     /// ACES (Automatically Convertible Equity Securities) are similar to DECS.
+    ///
+    /// **Modeling scope**: the tree pricer models conversion only at the
+    /// single step mapped from `conversion_date`; early voluntary conversion
+    /// before that date (offered by some mandatory structures) is not modeled.
     MandatoryVariable {
         /// Date of mandatory conversion.
         #[schemars(with = "String")]
@@ -310,7 +333,49 @@ pub enum AntiDilutionPolicy {
     WeightedAverage,
 }
 
-/// How dividends affect conversion terms.
+/// How dividends affect conversion terms (dividend protection).
+///
+/// Dividend protection compensates the holder for dividends paid on the
+/// underlying, which otherwise leak value from the conversion option (the
+/// stock drifts at `r - q` under the risk-neutral measure). The variants
+/// carry no threshold parameter, so protection is **full**: the entire
+/// continuous dividend yield `q` is protected.
+///
+/// # Pricing model (continuous-yield accretion)
+///
+/// Under the continuous dividend yield `q` used by the tree pricer, each
+/// protected dividend payment bumps the conversion ratio by the dividend
+/// fraction; the continuous limit is exponential accretion from the
+/// valuation date:
+///
+/// ```text
+/// AdjustRatio:  ratio(t)  = ratio_0 * exp(q * t)
+/// AdjustPrice:  K_conv(t) = K_0 * exp(-q * t)
+/// ```
+///
+/// Since `ratio = notional / K_conv`, the price decay is mathematically the
+/// same ratio accretion — the pricer implements both variants through the
+/// single ratio-accretion mechanism. Accretion composes multiplicatively on
+/// top of any anti-dilution adjustments from
+/// [`ConvertibleBond::effective_conversion_ratio`].
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_valuations::instruments::fixed_income::convertible::{
+///     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+/// };
+///
+/// let conversion = ConversionSpec {
+///     ratio: Some(25.0),
+///     price: None,
+///     policy: ConversionPolicy::Voluntary,
+///     anti_dilution: AntiDilutionPolicy::None,
+///     dividend_adjustment: DividendAdjustment::AdjustRatio,
+///     dilution_events: Vec::new(),
+/// };
+/// assert!(conversion.dividend_adjustment.is_protected());
+/// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub enum DividendAdjustment {
     /// No dividend adjustment.
@@ -319,6 +384,16 @@ pub enum DividendAdjustment {
     AdjustPrice,
     /// Adjust conversion ratio upward to compensate for dividends.
     AdjustRatio,
+}
+
+impl DividendAdjustment {
+    /// Whether this adjustment provides dividend protection.
+    ///
+    /// `AdjustPrice` and `AdjustRatio` are economically equivalent under the
+    /// continuous-yield model (see the enum docs) and both return `true`.
+    pub fn is_protected(&self) -> bool {
+        !matches!(self, DividendAdjustment::None)
+    }
 }
 
 /// A dilutive event that triggers anti-dilution adjustment.
@@ -692,7 +767,12 @@ impl ConvertibleBond {
                     lower_conversion_price: 40.0,
                 },
                 anti_dilution: AntiDilutionPolicy::WeightedAverage,
-                dividend_adjustment: DividendAdjustment::AdjustRatio,
+                // Mandatory convertibles (PERCS/DECS) typically compensate the
+                // holder through the enhanced coupon rather than dividend
+                // protection, so `None` is the economically representative
+                // choice here. See the `DividendAdjustment` docs for a
+                // protected (AdjustRatio) example.
+                dividend_adjustment: DividendAdjustment::None,
                 dilution_events: Vec::new(),
             })
             .underlying_equity_id_opt(Some("INDU".to_string()))
@@ -1092,6 +1172,50 @@ mod tests {
             .expect_err("NaN soft-call trigger must fail")
             .to_string()
             .contains("finite"));
+    }
+
+    /// Dividend protection is modeled by the pricer (continuous-yield ratio
+    /// accretion), so every `dividend_adjustment` variant must pass validation.
+    #[test]
+    fn validation_accepts_all_dividend_adjustment_variants() {
+        let mut bond = ConvertibleBond::example().expect("example");
+
+        for adjustment in [
+            DividendAdjustment::None,
+            DividendAdjustment::AdjustPrice,
+            DividendAdjustment::AdjustRatio,
+        ] {
+            bond.conversion.dividend_adjustment = adjustment;
+            bond.validate_for_pricing().unwrap_or_else(|err| {
+                panic!(
+                    "{:?} must pass pricing validation: {err}",
+                    bond.conversion.dividend_adjustment
+                )
+            });
+        }
+
+        // The shipped mandatory example must also pass pricing validation.
+        let mandatory = ConvertibleBond::example_mandatory().expect("mandatory example");
+        mandatory
+            .validate_for_pricing()
+            .expect("example_mandatory must pass pricing validation");
+    }
+
+    /// `AdjustPrice`/`AdjustRatio` must survive a serde round-trip with the
+    /// stable variant names used by the wire schema.
+    #[test]
+    fn dividend_adjustment_serde_round_trip() {
+        for (adjustment, expected_json) in [
+            (DividendAdjustment::None, "\"None\""),
+            (DividendAdjustment::AdjustPrice, "\"AdjustPrice\""),
+            (DividendAdjustment::AdjustRatio, "\"AdjustRatio\""),
+        ] {
+            let json = serde_json::to_string(&adjustment).expect("serialize");
+            assert_eq!(json, expected_json);
+            let parsed: DividendAdjustment = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(parsed.is_protected(), adjustment.is_protected());
+            assert_eq!(format!("{parsed:?}"), format!("{adjustment:?}"));
+        }
     }
 
     #[test]

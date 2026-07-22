@@ -202,6 +202,28 @@ class ValuationResult:
         """
         ...
 
+    def price_decimal(self) -> str:
+        """
+        Return the exact Decimal price as a string, without a float round-trip.
+
+        Unlike the ``price`` property (a lossy ``float``), this preserves the
+        internal Decimal representation exactly. Pass the result to
+        ``decimal.Decimal`` for lossless arithmetic in Python.
+
+        Returns
+        -------
+        str
+            Exact decimal string of the valuation amount, e.g. ``"1000000.00"``.
+
+        Examples
+        --------
+        >>> vr = ValuationResult.from_json("{}")  # doctest: +SKIP
+        >>> from decimal import Decimal
+        >>> Decimal(vr.price_decimal())  # doctest: +SKIP
+        Decimal('1000000.00')
+        """
+        ...
+
     @property
     def currency(self) -> str:
         """

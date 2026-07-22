@@ -144,8 +144,10 @@ pub(crate) fn generate_cashflows(
         }
     }
 
-    // Coupon dates for amortization conversion
-    let coupon_dates: Vec<Date> = {
+    // Coupon dates for amortization conversion, plus the unadjusted
+    // accrual-period start grid used to snap floating margin step-ups to
+    // whole-period boundaries.
+    let (coupon_dates, accrual_starts): (Vec<Date>, Vec<Date>) = {
         use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
         let schedule = loan_schedule_params(loan);
@@ -156,7 +158,8 @@ pub(crate) fn generate_cashflows(
             None,
         ))?;
         let adjust_dates = loan.calendar_id.is_some();
-        std::iter::once(loan.issue_date)
+        let accrual_starts: Vec<Date> = periods.iter().map(|period| period.accrual_start).collect();
+        let coupon_dates: Vec<Date> = std::iter::once(loan.issue_date)
             .chain(periods.into_iter().map(|period| {
                 if adjust_dates {
                     period.payment_date
@@ -164,7 +167,8 @@ pub(crate) fn generate_cashflows(
                     period.accrual_end
                 }
             }))
-            .collect()
+            .collect();
+        (coupon_dates, accrual_starts)
     };
 
     // Amortization → principal events
@@ -351,16 +355,36 @@ pub(crate) fn generate_cashflows(
             // Covenant step-ups and pricing overrides are deltas added at their
             // effective dates.  We push a breakpoint BEFORE applying the delta so
             // that the preceding window has the pre-step-up margin.
-            let mut step_ups = BTreeMap::<Date, Decimal>::new();
+            let mut raw_step_ups = BTreeMap::<Date, Decimal>::new();
             if let Some(cov) = &loan.covenants {
                 for step in &cov.margin_stepups {
-                    *step_ups.entry(step.date).or_default() += Decimal::from(step.delta_bp);
+                    *raw_step_ups.entry(step.date).or_default() += Decimal::from(step.delta_bp);
                 }
             }
             if let Some(ov) = &loan.instrument_pricing_overrides.term_loan {
                 for (dt, bp) in &ov.margin_add_bp_by_date {
-                    *step_ups.entry(*dt).or_default() += Decimal::from(*bp);
+                    *raw_step_ups.entry(*dt).or_default() += Decimal::from(*bp);
                 }
+            }
+
+            // LSTA convention: a margin change takes effect from the start of
+            // the NEXT interest period on or after its effective date, never
+            // mid-period. Snap each step-up date to the accrual-period grid
+            // (the first accrual start >= the step date) before building
+            // windows; passing raw off-cycle dates to
+            // `float_margin_stepup_decimal` would split the enclosing period
+            // into mid-period stubs, diverging from the fixed-rate branch
+            // whose compiler applies `rate_for(period.accrual_start)`
+            // whole-period semantics. A step dated after the final period
+            // start snaps to maturity and therefore never applies.
+            let mut step_ups = BTreeMap::<Date, Decimal>::new();
+            for (date, delta) in raw_step_ups {
+                let effective = accrual_starts
+                    .iter()
+                    .copied()
+                    .find(|start| *start >= date)
+                    .unwrap_or(loan.maturity);
+                *step_ups.entry(effective).or_default() += delta;
             }
 
             let mut steps: Vec<(Date, Decimal)> = Vec::new();

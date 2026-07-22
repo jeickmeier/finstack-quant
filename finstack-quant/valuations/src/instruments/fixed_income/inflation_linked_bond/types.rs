@@ -121,8 +121,20 @@ impl IndexationMethod {
     /// For UK Gilts, this returns `false` (step interpolation) which applies to legacy bonds.
     /// Modern UK Index-Linked Gilts (post-Sep 2005) use daily linear interpolation;
     /// use [`uses_daily_interpolation_modern`](Self::uses_daily_interpolation_modern) for those.
+    ///
+    /// # JGBi Note
+    ///
+    /// Japanese JGBi (issued from March 2004 onward) use a daily-interpolated
+    /// reference CPI with a 3-month lag, the same convention as US TIPS
+    /// (Japan Ministry of Finance, "Inflation-Indexed Bonds" issuance terms).
     pub fn uses_daily_interpolation(&self) -> bool {
-        matches!(self, IndexationMethod::Canadian | IndexationMethod::TIPS)
+        matches!(
+            self,
+            IndexationMethod::Canadian
+                | IndexationMethod::TIPS
+                | IndexationMethod::French
+                | IndexationMethod::Japanese
+        )
     }
 
     /// Whether modern issuances of this method use daily interpolation.
@@ -136,6 +148,7 @@ impl IndexationMethod {
                 | IndexationMethod::TIPS
                 | IndexationMethod::UK
                 | IndexationMethod::French
+                | IndexationMethod::Japanese
         )
     }
 }
@@ -296,7 +309,11 @@ pub struct InflationLinkedBond {
     pub stub: StubKind,
     /// Holiday calendar identifier
     pub calendar_id: Option<CalendarId>,
-    /// Discount curve identifier (real or nominal depending on method)
+    /// Discount curve identifier. This **must** be a NOMINAL curve (e.g.
+    /// "USD-OIS"): the cashflow schedule contains inflation-projected nominal
+    /// amounts (real amount × projected index ratio), so discounting on a real
+    /// curve would double-count inflation. The real curve is never used for PV;
+    /// it enters only through real-yield style metrics computed from real flows.
     pub discount_curve_id: CurveId,
     /// Inflation index identifier
     pub inflation_index_id: CurveId,
@@ -414,6 +431,8 @@ impl InflationLinkedBond {
     /// - **Indexation Lag**: 3 months
     /// - **Interpolation**: Linear (daily)
     /// - **Deflation Protection**: Maturity only (principal floor at par)
+    /// - **Discounting**: Nominal curve ("USD-OIS"); cashflows are
+    ///   inflation-projected nominal amounts
     pub fn example() -> Self {
         use time::macros::date;
         Self {
@@ -432,7 +451,7 @@ impl InflationLinkedBond {
             bdc: BusinessDayConvention::Following,
             stub: StubKind::None,
             calendar_id: None,
-            discount_curve_id: CurveId::new("USD-TIPS"),
+            discount_curve_id: CurveId::new("USD-OIS"),
             inflation_index_id: CurveId::new("US-CPI"),
             quoted_clean: None,
             instrument_pricing_overrides: Default::default(),
@@ -523,7 +542,7 @@ impl InflationLinkedBond {
     ///     "UKTI-2020",
     ///     &params,
     ///     date!(1999-07-26),
-    ///     "GBP-REAL",
+    ///     "GBP-NOMINAL",
     ///     "UK-RPI",
     /// );
     /// ```
@@ -612,7 +631,7 @@ impl InflationLinkedBond {
     /// let gilt = InflationLinkedBond::new_uk_linker_modern(
     ///     "UKTI-2029",
     ///     &params,
-    ///     "GBP-REAL",
+    ///     "GBP-NOMINAL",
     ///     "UK-RPI",
     /// );
     /// ```
@@ -661,15 +680,20 @@ impl InflationLinkedBond {
     /// - **Day Count**: ACT/365F (per MOF Japan standards)
     /// - **Frequency**: Semi-annual
     /// - **Indexation Lag**: 3 months
-    /// - **Interpolation**: Step (monthly, no daily interpolation)
+    /// - **Interpolation**: Linear (daily-interpolated reference CPI)
     /// - **Deflation Protection**: Maturity only (principal floor at par)
     /// - **Index**: Japan CPI (ex-fresh food)
+    ///
+    /// JGBi issued from March 2004 onward compute a daily-interpolated
+    /// reference CPI with a 3-month lag, the same convention as US TIPS
+    /// (Japan Ministry of Finance, "Inflation-Indexed Bonds" issuance terms).
     ///
     /// # Arguments
     ///
     /// * `id` - Unique instrument identifier
     /// * `bond_params` - Bond parameters (notional, coupon, dates, base_index)
-    /// * `discount_curve_id` - Real rate discount curve identifier
+    /// * `discount_curve_id` - Nominal discount curve identifier (the schedule
+    ///   contains inflation-projected nominal cashflows)
     /// * `inflation_index_id` - Japan CPI index identifier
     ///
     /// # Example
@@ -694,7 +718,7 @@ impl InflationLinkedBond {
     ///     base_index: 105.0,
     /// };
     ///
-    /// let jgbi = InflationLinkedBond::new_jgbi("JGBi-10Y", &params, "JPY-REAL", "JP-CPI");
+    /// let jgbi = InflationLinkedBond::new_jgbi("JGBi-10Y", &params, "JPY-NOMINAL", "JP-CPI");
     /// ```
     pub fn new_jgbi(
         id: impl Into<InstrumentId>,
@@ -744,7 +768,7 @@ impl InflationLinkedBond {
     /// | UK Gilt (legacy) | 8 months | Step (monthly) |
     /// | UK Gilt (modern) | 3 months | Linear (daily) |
     /// | French OAT€i | 3 months | Linear (daily) |
-    /// | Japanese JGBi | 3 months | Step (monthly) |
+    /// | Japanese JGBi | 3 months | Linear (daily) |
     ///
     /// # Lag Ownership
     ///
@@ -802,9 +826,10 @@ impl InflationLinkedBond {
         }
 
         let expected_interp = match self.indexation_method {
-            IndexationMethod::TIPS | IndexationMethod::Canadian | IndexationMethod::French => {
-                InflationInterpolation::Linear
-            }
+            IndexationMethod::TIPS
+            | IndexationMethod::Canadian
+            | IndexationMethod::French
+            | IndexationMethod::Japanese => InflationInterpolation::Linear,
             IndexationMethod::UK => {
                 if is_modern_uk {
                     InflationInterpolation::Linear
@@ -812,7 +837,6 @@ impl InflationLinkedBond {
                     InflationInterpolation::Step
                 }
             }
-            IndexationMethod::Japanese => InflationInterpolation::Step,
         };
         if inflation_index.interpolation() != expected_interp {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -863,11 +887,16 @@ impl InflationLinkedBond {
 
     /// Whether the indexation method uses daily-interpolated reference CPI
     /// (the official months-lag RefCPI formula) rather than a step lookup.
+    ///
+    /// Japanese JGBi (issued from March 2004 onward) use the same
+    /// daily-interpolated 3-month-lag reference CPI as US TIPS.
     fn daily_interpolated_indexation(&self) -> bool {
         match self.indexation_method {
-            IndexationMethod::TIPS | IndexationMethod::Canadian | IndexationMethod::French => true,
+            IndexationMethod::TIPS
+            | IndexationMethod::Canadian
+            | IndexationMethod::French
+            | IndexationMethod::Japanese => true,
             IndexationMethod::UK => matches!(self.lag, InflationLag::Months(m) if m <= 3),
-            IndexationMethod::Japanese => false,
         }
     }
 
@@ -1533,7 +1562,7 @@ mod tests {
             bdc: BusinessDayConvention::Following,
             stub: StubKind::None,
             calendar_id: None,
-            discount_curve_id: CurveId::new("USD-REAL"),
+            discount_curve_id: CurveId::new("USD-OIS"),
             inflation_index_id: CurveId::new("US-CPI"),
             quoted_clean: Some(100.0),
             instrument_pricing_overrides: Default::default(),
@@ -1543,7 +1572,7 @@ mod tests {
         };
         let market = MarketContext::new()
             .insert(
-                DiscountCurve::builder("USD-REAL")
+                DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (10.0, 1.0)])
                     .build()
@@ -1599,7 +1628,7 @@ mod tests {
     }
 
     fn market_with_deflation(as_of: Date) -> MarketContext {
-        let discount = DiscountCurve::builder("USD-TIPS")
+        let discount = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (3.0, 1.0)])
             .build()
@@ -1630,7 +1659,7 @@ mod tests {
             bdc: BusinessDayConvention::Following,
             stub: StubKind::None,
             calendar_id: None,
-            discount_curve_id: CurveId::new("USD-TIPS"),
+            discount_curve_id: CurveId::new("USD-OIS"),
             inflation_index_id: CurveId::new("US-CPI"),
             quoted_clean: None,
             instrument_pricing_overrides: Default::default(),

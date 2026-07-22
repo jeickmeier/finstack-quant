@@ -440,6 +440,43 @@ pub struct StructuredCredit {
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub waterfall_rules: Option<WaterfallRules>,
+
+    /// Custom payment waterfall used verbatim for pricing.
+    ///
+    /// `None` (the default) synthesizes the canonical sequential template from
+    /// the tranche structure ([`Waterfall::standard_sequential`]) plus any
+    /// [`Self::fees`]. When set, this waterfall is authoritative:
+    /// [`Self::create_waterfall`] returns it (with deal-level
+    /// [`Self::coverage_triggers`] appended) and no template is synthesized.
+    /// [`Self::waterfall_rules`] overlays (AFC, step-down, shifting interest,
+    /// controlled accumulation) still apply — they rewrite tiers generically by
+    /// `payment_type`, so they compose with custom structures.
+    ///
+    /// The waterfall also **defines each tranche's interest claim** (not just
+    /// cash allocation): an uncapped `TrancheInterest` recipient owes the full
+    /// coupon accrual, a `CappedTrancheInterest` recipient owes the capped
+    /// coupon (the capped-off portion is never owed and never defers), and a
+    /// debt tranche with **no** interest recipient owes nothing (a
+    /// principal-only class). Equity is exempt: its interest/principal split
+    /// is a reporting convention driven by the tranche's metadata coupon.
+    ///
+    /// Constraints, enforced by [`Self::with_waterfall`] and re-checked at
+    /// pricing time so JSON-supplied deals get identical errors:
+    /// - every tranche referenced by a tier recipient or coverage trigger must
+    ///   exist in `tranches`, and tranche-keyed recipients must not target an
+    ///   equity tranche (the engine records equity flows under
+    ///   [`RecipientType::Equity`], paid via `ResidualCash`);
+    /// - at most one interest-type recipient may name a given tranche (the
+    ///   claim definition must be unambiguous);
+    /// - `fees` must be `None` — senior fees are expressed as *leading*
+    ///   [`PaymentType::Fee`] tiers of the custom waterfall, which then feed
+    ///   the IC numerator and excess-spread/reserve sizing exactly like
+    ///   template fees (fee tiers ranked below note interest are junior fees
+    ///   and are deliberately not netted as senior claims);
+    /// - the waterfall's `base_currency` must match the pool currency.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waterfall: Option<Waterfall>,
 }
 
 impl StructuredCredit {
@@ -700,24 +737,210 @@ impl StructuredCredit {
     }
 
     /// Create waterfall from instrument configuration.
+    ///
+    /// Returns the deal's custom [`Self::waterfall`] when one is attached,
+    /// otherwise synthesizes the canonical sequential template. In both cases
+    /// deal-level [`Self::coverage_triggers`] are appended for the coverage-test
+    /// loop.
     pub fn create_waterfall(&self) -> Waterfall {
         self.create_waterfall_internal()
     }
 
     /// Internal waterfall creation (called by constructors).
     fn create_waterfall_internal(&self) -> Waterfall {
-        // Senior transaction fees, paid ahead of every note.
-        let mut waterfall = Waterfall::standard_sequential(
-            self.pool.base_currency(),
-            &self.tranches,
-            self.fee_recipients(),
-        );
+        let mut waterfall = match self.waterfall.as_ref() {
+            Some(custom) => custom.clone(),
+            // Senior transaction fees, paid ahead of every note.
+            None => Waterfall::standard_sequential(
+                self.pool.base_currency(),
+                &self.tranches,
+                self.fee_recipients(),
+            ),
+        };
 
         // Attach deal OC/IC triggers for the waterfall coverage-test loop.
         for trigger in &self.coverage_triggers {
             waterfall = waterfall.add_coverage_trigger(trigger.clone());
         }
         waterfall
+    }
+
+    /// Attach a fully custom payment waterfall, replacing the template.
+    ///
+    /// The waterfall is used verbatim by pricing (see [`Self::waterfall`] for
+    /// the composition rules with `coverage_triggers` and `waterfall_rules`).
+    /// Validation runs immediately so a malformed structure fails at
+    /// construction rather than silently mispricing.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when the waterfall is structurally invalid
+    /// (duplicate tier/recipient ids, bad weights, non-finite parameters),
+    /// references a tranche not in this deal, pays an equity tranche by id
+    /// instead of [`RecipientType::Equity`], mismatches the pool currency,
+    /// duplicates a coverage trigger, or when deal-level [`Self::fees`] are
+    /// set (encode fees as leading `Fee` tiers of the waterfall instead).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
+    /// # fn example(deal: StructuredCredit) -> finstack_quant_core::Result<()> {
+    /// // Start from the template and customize, or build from scratch.
+    /// let waterfall = deal.create_waterfall();
+    /// let deal = deal.with_waterfall(waterfall)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_waterfall(mut self, waterfall: Waterfall) -> finstack_quant_core::Result<Self> {
+        self.waterfall = Some(waterfall);
+        self.validate_custom_waterfall()?;
+        Ok(self)
+    }
+
+    /// Validate an attached custom waterfall against the deal.
+    ///
+    /// No-op when the deal carries no custom waterfall. Called by
+    /// [`Self::with_waterfall`] for fail-fast construction and again by the
+    /// simulation engine (and `validate_invariants`), so deals arriving via
+    /// JSON — which never pass through `with_waterfall` — get identical
+    /// errors instead of silently mispricing.
+    pub(crate) fn validate_custom_waterfall(&self) -> finstack_quant_core::Result<()> {
+        let Some(waterfall) = self.waterfall.as_ref() else {
+            return Ok(());
+        };
+        let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
+
+        // Structural tier validation (duplicate ids, empty tiers, weights,
+        // non-finite payment parameters) — shared with the executor.
+        let tier_errors =
+            crate::instruments::fixed_income::structured_credit::utils::get_validation_errors(
+                &waterfall.tiers,
+            );
+        if let Some(first) = tier_errors.first() {
+            return Err(invalid(format!(
+                "custom waterfall is structurally invalid ({} error(s); first: {first})",
+                tier_errors.len(),
+            )));
+        }
+        if waterfall.tiers.is_empty() {
+            return Err(invalid(
+                "custom waterfall must define at least one tier".to_string(),
+            ));
+        }
+
+        let pool_ccy = self.pool.base_currency();
+        if waterfall.base_currency != pool_ccy {
+            return Err(invalid(format!(
+                "custom waterfall base_currency {} does not match pool currency {}",
+                waterfall.base_currency, pool_ccy
+            )));
+        }
+
+        if self.fees.is_some() {
+            return Err(invalid(
+                "deal-level `fees` conflict with a custom waterfall; encode senior fees as \
+                 leading Fee tiers of the waterfall instead (leading fee tiers feed the IC \
+                 numerator and excess-spread sizing exactly like template fees)"
+                    .to_string(),
+            ));
+        }
+
+        let tranche = |id: &str| self.tranches.tranches.iter().find(|t| t.id.as_str() == id);
+
+        // Every tranche-keyed recipient must resolve to a real, non-equity
+        // tranche. The engine records equity flows under RecipientType::Equity
+        // (see `tranche_recipient_keys` in the simulation engine), so paying an
+        // equity tranche by id would distribute cash that is never recorded.
+        //
+        // The waterfall also DEFINES each tranche's interest claim (F3): at
+        // most one interest-type recipient may name a tranche, otherwise the
+        // claim is ambiguous (split-coupon tiers are not supported).
+        let mut interest_claim_owner: finstack_quant_core::HashMap<&str, &str> =
+            finstack_quant_core::HashMap::default();
+        for tier in &waterfall.tiers {
+            for recipient in &tier.recipients {
+                let mut referenced: Vec<&str> = Vec::new();
+                if let RecipientType::Tranche(id) = &recipient.recipient_type {
+                    referenced.push(id.as_str());
+                }
+                match &recipient.calculation {
+                    PaymentCalculation::TrancheInterest { tranche_id, .. }
+                    | PaymentCalculation::CappedTrancheInterest { tranche_id, .. } => {
+                        referenced.push(tranche_id.as_str());
+                        if let Some(prev_tier) =
+                            interest_claim_owner.insert(tranche_id.as_str(), tier.id.as_str())
+                        {
+                            return Err(invalid(format!(
+                                "custom waterfall defines tranche '{tranche_id}'s interest \
+                                 claim in both tier '{prev_tier}' and tier '{}'; a tranche's \
+                                 interest claim must come from exactly one recipient",
+                                tier.id
+                            )));
+                        }
+                    }
+                    PaymentCalculation::TranchePrincipal { tranche_id, .. } => {
+                        referenced.push(tranche_id.as_str());
+                    }
+                    _ => {}
+                }
+                for id in referenced {
+                    let Some(t) = tranche(id) else {
+                        return Err(invalid(format!(
+                            "custom waterfall tier '{}' recipient '{}' references unknown \
+                             tranche '{id}'",
+                            tier.id, recipient.id
+                        )));
+                    };
+                    if t.seniority == TrancheSeniority::Equity {
+                        return Err(invalid(format!(
+                            "custom waterfall tier '{}' recipient '{}' pays equity tranche \
+                             '{id}' by id; equity distributions must use RecipientType::Equity \
+                             with ResidualCash (the engine records equity flows under that key)",
+                            tier.id, recipient.id
+                        )));
+                    }
+                }
+            }
+        }
+
+        // Coverage triggers from the waterfall itself plus deal-level triggers
+        // (appended by `create_waterfall`) must resolve, carry sane levels, and
+        // not double-test one tranche — a duplicated trigger would evaluate and
+        // cure the same test twice per period.
+        let mut seen: finstack_quant_core::HashSet<&str> = finstack_quant_core::HashSet::default();
+        for trigger in waterfall
+            .coverage_triggers
+            .iter()
+            .chain(self.coverage_triggers.iter())
+        {
+            if tranche(trigger.tranche_id.as_str()).is_none() {
+                return Err(invalid(format!(
+                    "custom waterfall coverage trigger references unknown tranche '{}'",
+                    trigger.tranche_id
+                )));
+            }
+            if !seen.insert(trigger.tranche_id.as_str()) {
+                return Err(invalid(format!(
+                    "duplicate coverage trigger for tranche '{}' across the custom waterfall \
+                     and deal-level coverage_triggers",
+                    trigger.tranche_id
+                )));
+            }
+            for (label, level) in [("oc", trigger.oc_trigger), ("ic", trigger.ic_trigger)] {
+                if let Some(level) = level {
+                    if !level.is_finite() || level <= 0.0 {
+                        return Err(invalid(format!(
+                            "{label}_trigger for tranche '{}' must be finite and positive, \
+                             got {level}",
+                            trigger.tranche_id
+                        )));
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Calculate prepayment rate (SMM) for a given period.
@@ -899,9 +1122,10 @@ impl StructuredCredit {
         tree_config.recovery_spec =
             StochasticRecoverySpec::constant(self.credit_model.recovery_spec.rate)
                 .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
-        tree_config.correlation = correlation;
         tree_config.pool_coupon = self.pool.weighted_avg_coupon();
         // Explicit deal correlation overrides the copula spec's scalar.
+        // The engine consumes only this scalar override; per-pair
+        // Matrix/Sectored correlation in the copula is a deferred feature.
         tree_config.asset_correlation_override = self
             .credit_model
             .correlation_structure
@@ -1223,6 +1447,7 @@ impl Instrument for StructuredCredit {
                 )));
             }
         }
+        self.validate_custom_waterfall()?;
         for swap in &self.hedge_swaps {
             swap.validate_for_pricing()?;
         }

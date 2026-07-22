@@ -1840,8 +1840,8 @@ mod per_name_copula_tests {
         BranchingSpec, ScenarioTreeConfig,
     };
     use crate::instruments::fixed_income::structured_credit::{
-        AssetPool, CorrelationStructure, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec,
-        Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        AssetPool, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec, Tranche,
+        TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
@@ -1941,7 +1941,6 @@ mod per_name_copula_tests {
     ) -> StochasticPricerConfig {
         copula_config_with_spec(
             StochasticDefaultSpec::gaussian_copula(base_cdr, correlation),
-            correlation,
             num_periods,
             granularity,
             num_paths,
@@ -1962,7 +1961,6 @@ mod per_name_copula_tests {
             BranchingSpec::fixed(2),
         );
         tree_config.default_spec = StochasticDefaultSpec::gaussian_copula(base_cdr, correlation);
-        tree_config.correlation = CorrelationStructure::flat(correlation, 0.0);
         tree_config.initial_balance = 100_000_000.0;
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)
             .with_pricing_mode(PricingMode::MonteCarlo {
@@ -1983,7 +1981,6 @@ mod per_name_copula_tests {
     ) -> StochasticPricerConfig {
         copula_config_with_spec(
             StochasticDefaultSpec::student_t_copula(base_cdr, correlation, degrees_of_freedom),
-            correlation,
             num_periods,
             granularity,
             num_paths,
@@ -1993,7 +1990,6 @@ mod per_name_copula_tests {
     /// Build a pricer config from an explicit copula default spec.
     fn copula_config_with_spec(
         default_spec: StochasticDefaultSpec,
-        correlation: f64,
         num_periods: usize,
         granularity: PoolGranularity,
         num_paths: usize,
@@ -2004,7 +2000,6 @@ mod per_name_copula_tests {
             BranchingSpec::fixed(2),
         );
         tree_config.default_spec = default_spec;
-        tree_config.correlation = CorrelationStructure::flat(correlation, 0.0);
         tree_config.initial_balance = 100_000_000.0;
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)
             .with_pricing_mode(PricingMode::MonteCarlo {

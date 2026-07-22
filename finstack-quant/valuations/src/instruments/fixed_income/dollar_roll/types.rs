@@ -272,6 +272,10 @@ impl DollarRoll {
     }
 
     /// Create the front-month TBA leg.
+    ///
+    /// An explicit `front_settlement_date` override is threaded into the leg
+    /// so pricing (mark-to-market) discounts to the same settlement date the
+    /// carry analytics use.
     pub fn front_leg(&self) -> finstack_quant_core::Result<AgencyTba> {
         AgencyTba::builder()
             .id(InstrumentId::new(format!("{}-FRONT", self.id.as_str())))
@@ -281,6 +285,7 @@ impl DollarRoll {
             .settlement_year(self.front_settlement_year)
             .settlement_month(self.front_settlement_month)
             .settlement_class_opt(Some(self.effective_settlement_class()))
+            .settlement_date_opt(self.front_settlement_date)
             .notional(self.notional)
             .trade_price(self.front_price)
             .discount_curve_id(self.discount_curve_id.clone())
@@ -288,6 +293,10 @@ impl DollarRoll {
     }
 
     /// Create the back-month TBA leg.
+    ///
+    /// An explicit `back_settlement_date` override is threaded into the leg
+    /// so pricing (mark-to-market) discounts to the same settlement date the
+    /// carry analytics use.
     pub fn back_leg(&self) -> finstack_quant_core::Result<AgencyTba> {
         AgencyTba::builder()
             .id(InstrumentId::new(format!("{}-BACK", self.id.as_str())))
@@ -297,6 +306,7 @@ impl DollarRoll {
             .settlement_year(self.back_settlement_year)
             .settlement_month(self.back_settlement_month)
             .settlement_class_opt(Some(self.effective_settlement_class()))
+            .settlement_date_opt(self.back_settlement_date)
             .notional(self.notional)
             .trade_price(self.back_price)
             .discount_curve_id(self.discount_curve_id.clone())
@@ -432,6 +442,59 @@ mod tests {
         assert_eq!(back.agency, roll.agency);
         assert!((front.trade_price - roll.front_price).abs() < 1e-10);
         assert!((back.trade_price - roll.back_price).abs() < 1e-10);
+    }
+
+    /// Finding regression: explicit settlement-date overrides must reach the
+    /// priced TBA legs, not just the carry analytics.
+    ///
+    /// Before the fix, `front_leg`/`back_leg` built `AgencyTba` legs from
+    /// year/month only, so the MTM pricer discounted to SIFMA calendar dates
+    /// while `front_settle_date()`/`back_settle_date()` honored the explicit
+    /// overrides — one trade, two discount horizons.
+    #[test]
+    fn explicit_settlement_overrides_flow_into_priced_legs() {
+        let mut roll = DollarRoll::example().expect("DollarRoll example is valid");
+        // Off-calendar override dates (distinct from SIFMA good-delivery dates).
+        let front_override =
+            Date::from_calendar_date(2026, time::Month::March, 3).expect("valid date");
+        let back_override =
+            Date::from_calendar_date(2026, time::Month::April, 7).expect("valid date");
+        roll.front_settlement_date = Some(front_override);
+        roll.back_settlement_date = Some(back_override);
+
+        let front_leg = roll.front_leg().expect("front leg");
+        let back_leg = roll.back_leg().expect("back leg");
+
+        // The priced legs must discount to the SAME dates the carry
+        // analytics use.
+        assert_eq!(
+            front_leg.get_settlement_date().expect("front leg settle"),
+            roll.front_settle_date().expect("front settle")
+        );
+        assert_eq!(
+            back_leg.get_settlement_date().expect("back leg settle"),
+            roll.back_settle_date().expect("back settle")
+        );
+        assert_eq!(
+            front_leg.get_settlement_date().expect("front leg settle"),
+            front_override
+        );
+        assert_eq!(
+            back_leg.get_settlement_date().expect("back leg settle"),
+            back_override
+        );
+
+        // Sanity: the overrides genuinely differ from the SIFMA dates a
+        // no-override roll would use.
+        let no_override = DollarRoll::example().expect("DollarRoll example is valid");
+        assert_ne!(
+            no_override
+                .front_leg()
+                .expect("front leg")
+                .get_settlement_date()
+                .expect("sifma front"),
+            front_override
+        );
     }
 
     #[test]

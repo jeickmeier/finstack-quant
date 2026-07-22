@@ -231,36 +231,36 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
         instrument_cashflows_json(&instrument, market, "not-a-date", "not-a-model").unwrap_err(),
         structured_credit_tranche_discount_margin(
             &instrument,
+            "missing",
             market,
             "not-a-date",
-            "missing",
             f64::NAN,
         )
         .unwrap_err(),
-        structured_credit_tranche_breakeven_cdr(&instrument, market, "not-a-date", "missing")
+        structured_credit_tranche_breakeven_cdr(&instrument, "missing", market, "not-a-date")
             .unwrap_err(),
         structured_credit_tranche_oas(
             &instrument,
-            market,
-            "not-a-date",
             "missing",
             f64::NAN,
+            market,
+            "not-a-date",
             Some("not-json".to_string()),
         )
         .unwrap_err(),
         structured_credit_tranche_scenario_table(
             &instrument,
+            "missing",
             market,
             "not-a-date",
-            "missing",
             "not-json",
         )
         .unwrap_err(),
         structured_credit_tranche_metrics(
             &instrument,
+            "missing",
             market,
             "not-a-date",
-            "missing",
             Some(f64::NAN),
         )
         .unwrap_err(),
@@ -341,7 +341,7 @@ fn structured_credit_tranche_metrics_through_json() {
     let inst = structured_credit_instrument_json();
     let mkt = market_context_json();
 
-    let breakeven = structured_credit_tranche_breakeven_cdr(&inst, &mkt, "2024-01-01", "SR")
+    let breakeven = structured_credit_tranche_breakeven_cdr(&inst, "SR", &mkt, "2024-01-01")
         .expect("breakeven cdr");
     assert!(breakeven >= 0.0);
 
@@ -349,28 +349,28 @@ fn structured_credit_tranche_metrics_through_json() {
     // fixed-rate, so the binding must surface the validation error rather than
     // silently returning a value (parity with the Python negative test).
     let dm_err =
-        structured_credit_tranche_discount_margin(&inst, &mkt, "2024-01-01", "SR", 1_000.0)
+        structured_credit_tranche_discount_margin(&inst, "SR", &mkt, "2024-01-01", 1_000.0)
             .expect_err("discount margin on a fixed-rate tranche should error");
     assert!(format!("{dm_err:?}").to_lowercase().contains("floating"));
 
-    let oas = structured_credit_tranche_oas(&inst, &mkt, "2024-01-01", "SR", 99.0, None)
+    let oas = structured_credit_tranche_oas(&inst, "SR", 99.0, &mkt, "2024-01-01", None)
         .expect("tranche oas");
     let oas_parsed: serde_json::Value = serde_json::from_str(&oas).unwrap();
     assert!(oas_parsed["model_price"].as_f64().expect("model_price") > 0.0);
 
     let grid = r#"{"cprs":[0.10,0.20],"cdrs":[0.02],"severities":[0.40]}"#;
-    let table = structured_credit_tranche_scenario_table(&inst, &mkt, "2024-01-01", "SR", grid)
+    let table = structured_credit_tranche_scenario_table(&inst, "SR", &mkt, "2024-01-01", grid)
         .expect("scenario table");
     let table_parsed: serde_json::Value = serde_json::from_str(&table).unwrap();
     assert_eq!(table_parsed["cells"].as_array().expect("cells").len(), 2);
 
     // Per-tranche metrics bundle: model-price z-spread ~ 0, widening at a cheaper price.
-    let tm = structured_credit_tranche_metrics(&inst, &mkt, "2024-01-01", "SR", None)
+    let tm = structured_credit_tranche_metrics(&inst, "SR", &mkt, "2024-01-01", None)
         .expect("tranche metrics");
     let tm_parsed: serde_json::Value = serde_json::from_str(&tm).unwrap();
     assert_eq!(tm_parsed["tranche_id"], "SR");
     assert!(tm_parsed["pv"].as_f64().expect("pv") > 0.0);
-    let tm_cheap = structured_credit_tranche_metrics(&inst, &mkt, "2024-01-01", "SR", Some(95.0))
+    let tm_cheap = structured_credit_tranche_metrics(&inst, "SR", &mkt, "2024-01-01", Some(95.0))
         .expect("tranche metrics @95");
     let cheap_parsed: serde_json::Value = serde_json::from_str(&tm_cheap).unwrap();
     assert!(

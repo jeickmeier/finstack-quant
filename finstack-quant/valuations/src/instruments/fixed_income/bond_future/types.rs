@@ -426,13 +426,16 @@ pub struct BondFuture {
     ///
     /// # CTD Selection Methodology
     ///
-    /// The CTD is determined by comparing the **net basis** for each deliverable bond:
+    /// The CTD is determined by comparing the **gross basis** for each deliverable bond:
     ///
     /// ```text
-    /// Net Basis = Clean Price - (Futures Price × Conversion Factor)
+    /// Gross Basis = Clean Price - (Futures Price × Conversion Factor)
     /// ```
     ///
-    /// The bond with the **lowest net basis** (or highest implied repo) is the CTD.
+    /// (The *net* basis additionally subtracts the carry to delivery:
+    /// `Net Basis = Gross Basis - Carry`.)
+    ///
+    /// The bond with the **lowest basis** (or highest implied repo) is the CTD.
     /// In practice, this is usually the bond with:
     /// - Highest duration (in a rising rate environment)
     /// - Lowest duration (in a falling rate environment)
@@ -463,15 +466,19 @@ pub struct BondFuture {
     #[builder(default)]
     pub ctd_bond: Option<crate::instruments::fixed_income::bond::Bond>,
 
-    /// Discount curve identifier for present value calculations
+    /// Financing/discount curve identifier.
+    ///
+    /// Used to carry the CTD bond forward to the delivery date (the cost of
+    /// financing the position) whenever no explicit [`repo_curve_id`](Self::repo_curve_id)
+    /// is set. Must be provisionable as a discount curve in the market context.
     pub discount_curve_id: CurveId,
 
     /// Optional repo/financing curve identifier.
     ///
-    /// When set, this curve is used for implied repo rate calculations and
-    /// carry analysis instead of the general discount curve. This allows
-    /// capturing repo specials, where specific collateral (e.g., on-the-run
-    /// Treasuries) trades at rates different from the general funding curve.
+    /// When set, this curve is used for financing/carry calculations instead
+    /// of `discount_curve_id`. This allows capturing repo specials, where
+    /// specific collateral (e.g., on-the-run Treasuries) trades at rates
+    /// different from the general funding curve.
     ///
     /// If `None`, the `discount_curve_id` is used for financing calculations.
     #[builder(optional)]
@@ -642,6 +649,10 @@ impl BondFuture {
     /// - Plus accrued interest on the CTD bond at settlement
     ///
     /// Formula: `Invoice = (Futures_Price × Conversion_Factor) + Accrued_Interest`
+    ///
+    /// Note: this model helper uses the contract entry price stored in
+    /// `quoted_price` as the futures price; exchange invoicing uses the
+    /// delivery-day settlement price.
     ///
     /// # Arguments
     ///
@@ -1096,6 +1107,10 @@ impl BondFuture {
     /// - Invoice Price = Futures Price × CF + Accrued at Delivery
     /// - Purchase Price = Clean Price + Accrued Today
     /// - Coupon Income = sum of coupon cashflows received between today and delivery
+    ///
+    /// Note: this is the simplified implied repo per Burghardt et al., *The
+    /// Treasury Bond Basis* — interim coupons are credited at face value with
+    /// no reinvestment interest between the coupon date and delivery.
     ///
     /// # Arguments
     ///
@@ -1958,7 +1973,10 @@ impl crate::instruments::common_impl::traits::Instrument for BondFuture {
         let mut deps = MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let Some(repo_curve_id) = &self.repo_curve_id {
-            deps.add_forward_curve(repo_curve_id.clone());
+            // The pricer resolves the financing curve via
+            // `MarketContext::get_discount`, so the repo curve is a
+            // discount-curve dependency (not a forward curve).
+            deps.add_discount_curve(repo_curve_id.clone());
         }
         if let Some(ctd_bond) = &self.ctd_bond {
             deps.merge(
@@ -2240,7 +2258,7 @@ mod instrument_trait_tests {
             conversion_factor: 0.8234,
         };
 
-        let future = BondFuture::builder()
+        let mut future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
             .notional(Money::new(1_000_000.0, Currency::USD))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
@@ -2266,5 +2284,16 @@ mod instrument_trait_tests {
         assert_eq!(curves.credit_curves.len(), 0);
         assert!(!curves.is_empty());
         assert_eq!(curves.len(), 1);
+
+        // A configured repo curve is consumed via `get_discount`, so it must
+        // be declared as a discount-curve dependency.
+        future.repo_curve_id = Some(CurveId::new("USD-SPECIAL-REPO"));
+        let curves = future
+            .market_dependencies()
+            .expect("market_dependencies with repo curve")
+            .curves;
+        assert_eq!(curves.discount_curves.len(), 2);
+        assert_eq!(curves.discount_curves[1].as_str(), "USD-SPECIAL-REPO");
+        assert_eq!(curves.forward_curves.len(), 0);
     }
 }

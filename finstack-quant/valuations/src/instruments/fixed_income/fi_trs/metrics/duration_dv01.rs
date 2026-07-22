@@ -19,12 +19,17 @@ use finstack_quant_core::Result;
 ///
 /// # Sign Convention
 ///
-/// Returns **positive** for `ReceiveTotalReturn` (long bond index → value rises
-/// when yields rise in the carry model) and **negative** for `PayTotalReturn`.
+/// Returns **negative** for `ReceiveTotalReturn` and **positive** for
+/// `PayTotalReturn`. A total-return receiver is economically long the reference
+/// bond index, so its signed rate sensitivity is negative: the position loses
+/// value when yields rise. This matches the ISDA SIMM IR-delta convention (see
+/// the `Marginable::simm_sensitivities` implementation for this instrument) and
+/// the workspace CS01 convention (long credit → negative to spread widening).
 ///
-/// Note: SIMM IR delta uses the *opposite* sign (long bond = short rates → negative
-/// delta when rates rise), because SIMM measures rate sensitivity while this metric
-/// measures yield sensitivity. Both are correct for their respective domains.
+/// Note: the underlying FI-TRS pricer is carry/income-only — it has no price
+/// mark-to-market term, so `dV/dy` of the carry model itself would not produce
+/// this sign. The convention here is chosen for economic consistency with the
+/// rest of the workspace, not derived from the carry model.
 ///
 /// # Errors
 ///
@@ -68,9 +73,10 @@ impl MetricCalculator for DurationDv01Calculator {
         // DV01 = Notional × Duration × 1bp
         let dv01 = trs.notional.amount() * duration * 0.0001;
 
+        // Long the reference bond (receive TR) loses when yields rise → negative.
         Ok(match trs.side {
-            TrsSide::ReceiveTotalReturn => dv01,
-            TrsSide::PayTotalReturn => -dv01,
+            TrsSide::ReceiveTotalReturn => -dv01,
+            TrsSide::PayTotalReturn => dv01,
         })
     }
 }

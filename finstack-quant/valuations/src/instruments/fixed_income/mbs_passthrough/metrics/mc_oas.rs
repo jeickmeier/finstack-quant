@@ -22,7 +22,10 @@
 //! ```text
 //! multiplier = exp(-β × (rate - base_rate))
 //! ```
-//! where β controls the sensitivity (typical: 5.0-10.0).
+//! where β defaults to the module-shared [`super::PREPAY_RATE_SENSITIVITY`]
+//! (`ln(2)/0.01 ≈ 69.3`, i.e. prepayment speed roughly doubles per 100 bp
+//! rate drop) so the MC-OAS engine and the effective duration/convexity
+//! engine price the prepayment option consistently.
 //!
 //! # References
 //!
@@ -33,6 +36,7 @@
 //!   Derivatives*. John Wiley & Sons.
 
 use crate::calibration::hull_white::HullWhiteParams;
+use crate::instruments::fixed_income::mbs_passthrough::pricer::first_unpaid_accrual_start;
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use crate::instruments::rates::exotics_shared::{
     calibrate_hw1f_params, initial_short_rate_from_curve,
@@ -58,8 +62,11 @@ pub(crate) struct McOasConfig {
     pub hw_kappa: f64,
     /// Hull-White short-rate volatility σ (default: 0.01).
     pub hw_sigma: f64,
-    /// Prepayment rate sensitivity to interest rates β (default: 7.0).
-    /// Higher values make prepayment more sensitive to rate changes.
+    /// Prepayment rate sensitivity to interest rates β
+    /// (default: [`super::PREPAY_RATE_SENSITIVITY`] ≈ 69.3, the same
+    /// refi-incentive doubling per 100 bp used by the effective
+    /// duration/convexity engine). Higher values make prepayment more
+    /// sensitive to rate changes.
     pub prepay_rate_sensitivity: f64,
     /// Random seed for reproducibility (default: 42).
     pub seed: u64,
@@ -74,7 +81,7 @@ impl Default for McOasConfig {
             num_steps: None,
             hw_kappa: 0.05,
             hw_sigma: 0.01,
-            prepay_rate_sensitivity: 7.0,
+            prepay_rate_sensitivity: super::PREPAY_RATE_SENSITIVITY,
             seed: 42,
             tolerance: 1e-7,
         }
@@ -167,35 +174,69 @@ fn simulate_rate_paths(
     paths
 }
 
-/// Extra discounting time (years) from each projection step's grid endpoint
-/// to the pool's actual payment date for that accrual period.
+/// Per-step accrual and payment schedule shared by every simulated path.
 ///
-/// Step `m` (0-based) accrues over the calendar month starting at
-/// `first-of-month(max(as_of, issue_date)) + m months` and ends at grid time
-/// `(m+1)/12`. Agency pools pay with a stated delay (e.g. FNMA on the 25th of
-/// the following month), so the cash actually arrives later than the accrual
-/// month end. Ignoring the delay overstates PV; the extra time is discounted
-/// at the step's short rate + OAS.
-fn payment_delay_extras(
+/// Precomputed once per valuation so that the MC engine projects the same
+/// accrual periods as the deterministic pricer
+/// ([`generate_cashflows`](crate::instruments::fixed_income::mbs_passthrough::pricer::generate_cashflows)):
+/// projection starts at [`first_unpaid_accrual_start`] (including a
+/// prior-month accrual whose delayed payment is still outstanding), interest
+/// accrues on the pool's day-count fraction over the actual calendar month,
+/// and prepayment seasoning is measured at each accrual period end.
+struct McStepSchedule {
+    /// Extra discounting time (years) from each step's grid endpoint
+    /// `(m+1)/12` to the pool's actual payment date. May be negative:
+    /// GNMA I pays inside the accrual month, and walked-back in-flight
+    /// periods pay before their grid endpoint. Combined with the cumulative
+    /// grid discount factor this discounts each cashflow to its actual
+    /// payment date.
+    payment_extras: Vec<f64>,
+    /// Pool day-count year fraction of each accrual month.
+    accrual_fractions: Vec<f64>,
+    /// Pool seasoning (months) at each accrual period end, driving the
+    /// PSA/CPR ramp exactly as in the deterministic pricer.
+    seasonings: Vec<u32>,
+}
+
+impl McStepSchedule {
+    fn len(&self) -> usize {
+        self.payment_extras.len()
+    }
+}
+
+/// Build the [`McStepSchedule`] for `num_steps` monthly projection steps.
+fn mc_step_schedule(
     mbs: &AgencyMbsPassthrough,
     as_of: Date,
     num_steps: usize,
-) -> Result<Vec<f64>> {
-    let dt = 1.0 / 12.0;
-    let effective_start = as_of.max(mbs.issue_date);
-    let start_month = Date::from_calendar_date(effective_start.year(), effective_start.month(), 1)
-        .map_err(|e| CoreError::Validation(e.to_string()))?;
+) -> Result<McStepSchedule> {
+    use finstack_quant_core::dates::{DateExt, DayCountContext};
 
-    use finstack_quant_core::dates::DateExt;
-    let mut extras = Vec::with_capacity(num_steps);
+    let dt = 1.0 / 12.0;
+    let start_month = first_unpaid_accrual_start(mbs, as_of)?;
+
+    let mut payment_extras = Vec::with_capacity(num_steps);
+    let mut accrual_fractions = Vec::with_capacity(num_steps);
+    let mut seasonings = Vec::with_capacity(num_steps);
     for m in 0..num_steps {
         let period_start = start_month.add_months(m as i32);
+        let accrual_end = period_start.add_months(1);
         let payment_date = mbs.payment_date_for_accrual_period(period_start)?;
         let t_pay = (payment_date - as_of).whole_days() as f64 / 365.25;
-        let t_grid_end = (m as f64 + 1.0) * dt;
-        extras.push((t_pay - t_grid_end).max(0.0));
+        payment_extras.push(t_pay - (m as f64 + 1.0) * dt);
+        accrual_fractions.push(mbs.day_count.year_fraction(
+            period_start,
+            accrual_end,
+            DayCountContext::default(),
+        )?);
+        let period_end = accrual_end - time::Duration::days(1);
+        seasonings.push(mbs.seasoning_months(period_end));
     }
-    Ok(extras)
+    Ok(McStepSchedule {
+        payment_extras,
+        accrual_fractions,
+        seasonings,
+    })
 }
 
 /// Numerical safety cap on the adjusted SMM.
@@ -233,10 +274,11 @@ fn rate_adjusted_smm(base_smm: f64, current_rate: f64, base_rate: f64, sensitivi
 /// Projects monthly cashflows using rate-dependent prepayment and
 /// discounts each cashflow at the path's short rate + OAS.
 ///
-/// The `as_of` date is used to compute the pool's actual seasoning at the
-/// valuation date.  Each projection step adds `month + 1` on top of that
-/// base so that the PSA/CPR ramp reflects the true pool age rather than
-/// treating every valuation as if the pool were newly issued.
+/// The projection grid, accrual fractions, and seasoning come from the
+/// precomputed [`McStepSchedule`], which mirrors the deterministic pricer:
+/// step 0 is the earliest unpaid accrual period (possibly a prior-month
+/// in-flight receivable), interest accrues on the pool day-count over the
+/// actual calendar month, and the PSA/CPR ramp reflects the true pool age.
 ///
 /// # Errors
 ///
@@ -248,10 +290,8 @@ fn price_on_path(
     base_rate: f64,
     oas: f64,
     prepay_sensitivity: f64,
-    as_of: Date,
-    payment_extras: &[f64],
+    steps: &McStepSchedule,
 ) -> Result<f64> {
-    let monthly_coupon_rate = mbs.pass_through_rate / 12.0;
     let monthly_mortgage_rate = mbs.wac / 12.0;
     let dt = 1.0 / 12.0;
 
@@ -260,13 +300,7 @@ fn price_on_path(
     let mut cumulative_df = 1.0;
 
     let wam = mbs.wam as usize;
-    let num_steps = path.rates.len().saturating_sub(1).min(wam);
-
-    // Seasoning base for the PSA SMM ramp: the pool's actual age at the
-    // valuation date (`as_of`). Loop-invariant, so computed once here; the
-    // per-step offset below makes the PSA ramp/plateau reflect the true pool
-    // age rather than a fresh-issue ramp.
-    let base_seasoning = mbs.seasoning_months(as_of);
+    let num_steps = path.rates.len().saturating_sub(1).min(wam).min(steps.len());
 
     for month in 0..num_steps {
         if balance < 0.01 {
@@ -284,7 +318,7 @@ fn price_on_path(
         let step_df = (-(current_rate + oas) * dt).exp();
         cumulative_df *= step_df;
 
-        let seasoning = base_seasoning + month as u32 + 1;
+        let seasoning = steps.seasonings[month];
         let base_smm = mbs.prepayment_model.smm(seasoning)?;
         if !base_smm.is_finite() || !(0.0..=1.0).contains(&base_smm) {
             return Err(CoreError::Validation(format!(
@@ -319,17 +353,21 @@ fn price_on_path(
         // ending balance negative under high SMM.
         let prepayment = (balance - scheduled_principal).max(0.0) * smm;
 
-        // Interest
-        let interest = balance * monthly_coupon_rate;
+        // Investor interest accrues at the pass-through rate over the pool
+        // day-count fraction of the actual accrual month (identical to the
+        // deterministic pricer; exactly 1/12 for 30/360, month-length
+        // dependent for Act/360 and Act/365F).
+        let interest = balance * mbs.pass_through_rate * steps.accrual_fractions[month];
 
         // Total cashflow
         let total_cf = scheduled_principal + prepayment + interest;
 
         // PV of this month's cashflow, discounted to the actual payment date:
-        // the cumulative grid DF covers up to the accrual month end, and the
-        // agency payment delay adds extra discounting at the current short
-        // rate + OAS (matching the deterministic pricer's payment dating).
-        let extra = payment_extras.get(month).copied().unwrap_or(0.0);
+        // the cumulative grid DF covers up to the step's grid endpoint, and
+        // the (possibly negative) payment extra adjusts to the actual payment
+        // date at the current short rate + OAS (matching the deterministic
+        // pricer's payment dating).
+        let extra = steps.payment_extras[month];
         let delay_df = (-(current_rate + oas) * extra).exp();
         pv += total_cf * cumulative_df * delay_df;
 
@@ -401,8 +439,9 @@ pub(crate) fn calculate_mc_oas(
         config.seed,
     );
 
-    // Per-step payment-delay discounting offsets (actual payment dates).
-    let payment_extras = payment_delay_extras(mbs, as_of, num_steps)?;
+    // Per-step accrual periods, day-count fractions, seasonings and
+    // payment-delay discounting offsets (actual payment dates).
+    let steps = mc_step_schedule(mbs, as_of, num_steps)?;
 
     // Capture pricing errors raised by price_on_path so they propagate
     // through the f64-only Brent objective rather than being silently coerced
@@ -425,8 +464,7 @@ pub(crate) fn calculate_mc_oas(
                     initial_rate,
                     oas,
                     config.prepay_rate_sensitivity,
-                    as_of,
-                    &payment_extras,
+                    &steps,
                 )
             })
             .collect();
@@ -482,8 +520,7 @@ pub(crate) fn calculate_mc_oas(
                 initial_rate,
                 oas,
                 config.prepay_rate_sensitivity,
-                as_of,
-                &payment_extras,
+                &steps,
             )
         })
         .collect::<Result<Vec<f64>>>()?;
@@ -678,8 +715,8 @@ mod tests {
         // And price_on_path itself must run without producing a non-finite PV.
         // Use the MBS issue date so seasoning starts at 0 (fresh pool).
         let as_of = mbs.issue_date;
-        let extras = vec![0.0; wam];
-        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0, as_of, &extras).expect("price");
+        let steps = mc_step_schedule(&mbs, as_of, wam).expect("steps");
+        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0, &steps).expect("price");
         assert!(
             pv.is_finite() && pv > 0.0,
             "path PV must be finite/positive"
@@ -705,7 +742,7 @@ mod tests {
         let hw = HullWhiteParams::new(config.hw_kappa, config.hw_sigma).expect("hw");
         let hw1f = calibrate_hw1f_params(hw, curve.as_ref(), as_of, 30.0).expect("theta fit");
         let paths = simulate_rate_paths(initial_rate, &hw1f, 64, 360, config.seed);
-        let extras = payment_delay_extras(&mbs, as_of, 360).expect("extras");
+        let steps = mc_step_schedule(&mbs, as_of, 360).expect("steps");
         let total: f64 = paths
             .iter()
             .map(|path| {
@@ -715,8 +752,7 @@ mod tests {
                     initial_rate,
                     0.0,
                     config.prepay_rate_sensitivity,
-                    as_of,
-                    &extras,
+                    &steps,
                 )
                 .expect("test fixture is well-formed")
             })
@@ -755,27 +791,19 @@ mod tests {
         let mut gnma1 = create_test_mbs();
         gnma1.agency = AgencyProgram::GnmaI; // pays 15th of accrual month
 
-        let fnma_extras = payment_delay_extras(&fnma, as_of, wam).expect("fnma extras");
-        let gnma1_extras = payment_delay_extras(&gnma1, as_of, wam).expect("gnma extras");
+        let fnma_steps = mc_step_schedule(&fnma, as_of, wam).expect("fnma steps");
+        let gnma1_steps = mc_step_schedule(&gnma1, as_of, wam).expect("gnma steps");
         assert!(
-            fnma_extras[0] > gnma1_extras[0],
+            fnma_steps.payment_extras[0] > gnma1_steps.payment_extras[0],
             "FNMA delay extra {} must exceed GNMA I extra {}",
-            fnma_extras[0],
-            gnma1_extras[0]
+            fnma_steps.payment_extras[0],
+            gnma1_steps.payment_extras[0]
         );
 
-        let pv_fnma = price_on_path(&fnma, &flat_path, base_rate, 0.0, 7.0, as_of, &fnma_extras)
-            .expect("fnma pv");
-        let pv_gnma1 = price_on_path(
-            &gnma1,
-            &flat_path,
-            base_rate,
-            0.0,
-            7.0,
-            as_of,
-            &gnma1_extras,
-        )
-        .expect("gnma pv");
+        let pv_fnma =
+            price_on_path(&fnma, &flat_path, base_rate, 0.0, 7.0, &fnma_steps).expect("fnma pv");
+        let pv_gnma1 =
+            price_on_path(&gnma1, &flat_path, base_rate, 0.0, 7.0, &gnma1_steps).expect("gnma pv");
 
         assert!(
             pv_fnma < pv_gnma1,
@@ -891,8 +919,9 @@ mod tests {
             rates: vec![base_rate; wam + 1],
         };
 
-        let extras = vec![0.0; wam];
-        let fresh_pv = price_on_path(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, as_of, &extras)
+        let fresh_steps = mc_step_schedule(&fresh_mbs, as_of, wam).expect("fresh steps");
+        let seasoned_steps = mc_step_schedule(&seasoned_mbs, as_of, wam).expect("seasoned steps");
+        let fresh_pv = price_on_path(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, &fresh_steps)
             .expect("fresh pv");
         let seasoned_pv = price_on_path(
             &seasoned_mbs,
@@ -900,8 +929,7 @@ mod tests {
             base_rate,
             0.0,
             7.0,
-            as_of,
-            &extras,
+            &seasoned_steps,
         )
         .expect("seasoned pv");
 
@@ -916,6 +944,83 @@ mod tests {
             "seasoned pool (60+ months, PSA plateau) must price differently from fresh pool \
              (PSA ramp); fresh_pv={fresh_pv:.2} seasoned_pv={seasoned_pv:.2} diff={:.2}",
             (fresh_pv - seasoned_pv).abs()
+        );
+    }
+
+    /// Findings 3+4 regression: the MC model must agree with the
+    /// deterministic pricer for an Act/360 seasoned pool valued mid-month.
+    ///
+    /// Two historical divergences are exercised at once:
+    /// - interest accrual: the MC path used a flat `pass_through_rate / 12`
+    ///   while the deterministic pricer day-counts the actual month
+    ///   (materially different under Act/360);
+    /// - projection start: the MC path started at
+    ///   first-of-month(max(as_of, issue)) while the deterministic pricer
+    ///   walks back to include the prior-month accrual whose delayed payment
+    ///   is still outstanding (an in-flight receivable for seasoned pools
+    ///   valued mid-month).
+    ///
+    /// In the zero-vol / zero-OAS / flat-curve limit the MC path price and
+    /// the deterministic PV price the same cashflows, so they must agree up
+    /// to the small discounting day-count basis (ACT/365.25 grid time vs the
+    /// curve's day count).
+    #[test]
+    fn mc_zero_vol_matches_deterministic_pricer_for_act360_seasoned_pool() {
+        use crate::instruments::fixed_income::mbs_passthrough::pricer::price_mbs;
+
+        let as_of = Date::from_calendar_date(2026, Month::January, 15).expect("valid");
+        let flat_rate = 0.04;
+
+        // Seasoned Act/360 pool: issued 5 years before `as_of`, remaining
+        // WAM 300, valued mid-month so the December accrual's payment
+        // (Jan 25) is still in flight.
+        let mbs = AgencyMbsPassthrough::builder()
+            .id(InstrumentId::new("TEST-MBS-CONSISTENCY"))
+            .pool_id("TEST-POOL".into())
+            .agency(AgencyProgram::Fnma)
+            .pool_type(PoolType::Generic)
+            .original_face(Money::new(1_000_000.0, Currency::USD))
+            .current_face(Money::new(850_000.0, Currency::USD))
+            .current_factor(0.85)
+            .wac(0.045)
+            .pass_through_rate(0.04)
+            .servicing_fee_rate(0.0025)
+            .guarantee_fee_rate(0.0025)
+            .wam(300)
+            .issue_date(Date::from_calendar_date(2021, Month::January, 1).expect("valid"))
+            .maturity(Date::from_calendar_date(2051, Month::January, 1).expect("valid"))
+            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act360)
+            .build()
+            .expect("valid mbs");
+
+        // Flat continuously-compounded curve: log-linear DF between two knots
+        // gives a constant forward rate equal to `flat_rate`.
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (40.0, (-flat_rate * 40.0_f64).exp())])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("valid curve");
+        let market = MarketContext::new().insert(disc);
+
+        let det_pv = price_mbs(&mbs, &market, as_of).expect("det pv").amount();
+
+        // Zero-vol limit: a single flat short-rate path at the curve rate.
+        let wam = mbs.wam as usize;
+        let flat_path = RatePath {
+            rates: vec![flat_rate; wam + 1],
+        };
+        let steps = mc_step_schedule(&mbs, as_of, wam).expect("steps");
+        let mc_pv = price_on_path(&mbs, &flat_path, flat_rate, 0.0, 7.0, &steps).expect("mc pv");
+
+        assert!(det_pv > 0.0 && mc_pv > 0.0);
+        let rel_diff = (mc_pv - det_pv).abs() / det_pv;
+        assert!(
+            rel_diff < 0.005,
+            "MC model price {mc_pv:.2} must agree with deterministic PV {det_pv:.2} \
+             at zero vol / zero OAS / flat curve; relative diff {rel_diff:.5}"
         );
     }
 

@@ -517,3 +517,120 @@ fn test_breakeven_inflation_metric_consistency() {
         "breakeven consistency",
     );
 }
+
+/// Breakeven metric against a NON-FLAT nominal discount curve with a
+/// hand-computable expectation.
+///
+/// `discount_curve_id` is a nominal curve by contract, so the metric's Fisher
+/// identity is `(1 + nominal_annual) / (1 + real_annual) - 1` where the
+/// nominal leg is the annually-compounded zero read off that curve at the
+/// bond's maturity. Setup:
+///
+/// - Nominal curve zeros: 1% at 1y, 2% at 5y, 3% at maturity (non-flat), with
+///   a knot exactly at t(maturity) so the 3% zero is exact.
+/// - 10y semi-annual 4% real coupon linker quoted at par with flat CPI, so the
+///   real yield is exactly 4% Street => real_annual = 1.02² - 1 = 4.04%.
+/// - Expected breakeven = 1.03 / 1.0404 - 1 ≈ -0.99962%.
+///
+/// With the pre-fix real-named defaults, a real curve fed the nominal leg and
+/// the metric collapsed toward zero; the 1y-vs-maturity zero gap here also
+/// guards against reading the wrong tenor off the curve.
+#[test]
+fn test_breakeven_inflation_metric_non_flat_nominal_curve() {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{
+        BusinessDayConvention, DayCount, DayCountContext, StubKind, Tenor,
+    };
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::scalars::InflationLag;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
+        DeflationProtection, IndexationMethod, InflationLinkedBond,
+    };
+    use finstack_quant_valuations::instruments::Attributes;
+
+    let as_of = d(2025, 1, 15);
+    let maturity = d(2035, 1, 15);
+
+    let mut bond = InflationLinkedBond::builder()
+        .id(InstrumentId::new("ILB-BEI-NONFLAT"))
+        .notional(Money::new(1_000_000.0, Currency::USD))
+        .real_coupon(rust_decimal::Decimal::try_from(0.04).unwrap())
+        .frequency(Tenor::semi_annual())
+        .day_count(DayCount::Thirty360)
+        .issue_date(as_of)
+        .maturity(maturity)
+        .base_index(100.0)
+        .base_date(as_of)
+        .indexation_method(IndexationMethod::TIPS)
+        .lag(InflationLag::None)
+        .deflation_protection(DeflationProtection::MaturityOnly)
+        .bdc(BusinessDayConvention::Following)
+        .stub(StubKind::None)
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .inflation_index_id(CurveId::new("US-CPI"))
+        .attributes(Attributes::new())
+        .build()
+        .unwrap();
+    bond.quoted_clean = Some(100.0); // par => real yield = 4% Street exactly
+
+    // Non-flat nominal curve: DF knots chosen so the annually-compounded zero
+    // is 1% at 1y, 2% at 5y and exactly 3% at the bond's maturity.
+    let t_mat = DayCount::Act365F
+        .year_fraction(as_of, maturity, DayCountContext::default())
+        .unwrap();
+    let nominal_annual = 0.03_f64;
+    // Day count set explicitly: the builder would otherwise infer ACT/360 from
+    // the "USD-OIS" id and t(maturity) would miss the knot placed at `t_mat`.
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .day_count(DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (1.0, 1.01_f64.powi(-1)),
+            (5.0, 1.02_f64.powi(-5)),
+            (t_mat, (1.0 + nominal_annual).powf(-t_mat)),
+        ])
+        .build()
+        .unwrap();
+    // Flat CPI so the real-yield leg is unaffected by inflation.
+    let inflation = InflationCurve::builder("US-CPI")
+        .base_date(as_of)
+        .base_cpi(100.0)
+        .knots([(0.0, 100.0), (11.0, 100.0)])
+        .build()
+        .unwrap();
+    let ctx = MarketContext::new().insert(discount).insert(inflation);
+
+    let result = bond
+        .price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::BreakevenInflation],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+    let breakeven = result.measures[MetricId::BreakevenInflation.as_str()];
+
+    // Hand computation: real_annual = (1 + 0.04/2)^2 - 1 = 4.04%.
+    let real_annual = 1.02_f64.powi(2) - 1.0;
+    let expected = (1.0 + nominal_annual) / (1.0 + real_annual) - 1.0;
+
+    // 0.1 bp tolerance: the real-yield leg comes from an iterative solver, so
+    // a few 1e-6 of convergence noise is expected; convention errors (wrong
+    // curve, wrong tenor, flat-curve shortcut) are all >= 40 bp away.
+    assert!(
+        (breakeven - expected).abs() < 1e-5,
+        "breakeven mismatch: got {breakeven:.8}, expected {expected:.8}"
+    );
+
+    // Discriminator: reading the 1y zero instead of the maturity zero (or a
+    // flat-curve shortcut) would move the result by ~2% — far outside tolerance.
+    let wrong_short_end = (1.0 + 0.01) / (1.0 + real_annual) - 1.0;
+    assert!(
+        (breakeven - wrong_short_end).abs() > 1e-3,
+        "test is not discriminating against short-end zero"
+    );
+}

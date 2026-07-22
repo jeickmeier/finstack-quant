@@ -10,9 +10,16 @@ Examples
 
 from __future__ import annotations
 
+import datetime
+
+from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.money import Money
+from finstack_quant.core.types import Bps, Rate
 
 __all__ = [
+    "Bond",
+    "TermLoan",
     "bond_from_cashflows_json",
     "instrument_cashflows_json",
     "list_models",
@@ -28,6 +35,289 @@ __all__ = [
     "structured_credit_tranche_scenario_table",
     "validate_instrument_json",
 ]
+
+class Bond:
+    """
+    Typed wrapper for the canonical Rust ``Bond`` instrument.
+
+    Construct via :meth:`Bond.fixed`, :meth:`Bond.floating`, or
+    :meth:`Bond.from_json`; serialize with :meth:`Bond.to_json`. Instances
+    are accepted directly by :func:`price_instrument`,
+    :func:`price_instrument_with_metrics`, and
+    :func:`instrument_cashflows_json`.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from finstack_quant.core.currency import Currency
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.core.types import Rate
+    >>> from finstack_quant.valuations.instruments import Bond
+    >>> bond = Bond.fixed(
+    ...     "BOND-1",
+    ...     Money(1_000_000.0, Currency("USD")),
+    ...     Rate(0.05),
+    ...     datetime.date(2024, 1, 1),
+    ...     datetime.date(2034, 1, 1),
+    ...     "USD-OIS",
+    ... )
+    >>> bond.id
+    'BOND-1'
+    """
+
+    @property
+    def id(self) -> str:
+        """
+        Instrument identifier.
+
+        Returns
+        -------
+        str
+            The unique instrument identifier.
+        """
+        ...
+
+    @staticmethod
+    def fixed(
+        id: str,
+        notional: Money,
+        coupon_rate: Rate,
+        issue: datetime.date,
+        maturity: datetime.date,
+        discount_curve_id: str,
+    ) -> Bond:
+        """
+        Create a standard fixed-rate bond (semi-annual, 30/360, T+2).
+
+        Mirrors Rust ``Bond::fixed``.
+
+        Parameters
+        ----------
+        id : str
+            Unique instrument identifier.
+        notional : Money
+            Principal amount of the bond.
+        coupon_rate : Rate
+            Annual coupon rate.
+        issue : datetime.date
+            Issue date.
+        maturity : datetime.date
+            Maturity date.
+        discount_curve_id : str
+            Discount curve identifier used for pricing.
+
+        Returns
+        -------
+        Bond
+            A validated fixed-rate bond.
+
+        Raises
+        ------
+        ValueError
+            If validation fails (e.g. maturity not after issue).
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import Bond
+        >>> callable(Bond.fixed)
+        True
+        """
+        ...
+
+    @staticmethod
+    def floating(
+        id: str,
+        notional: Money,
+        index_id: str,
+        margin_bp: Bps,
+        issue: datetime.date,
+        maturity: datetime.date,
+        freq: Tenor,
+        dc: DayCount,
+        discount_curve_id: str,
+    ) -> Bond:
+        """
+        Create a floating-rate bond (FRN) linked to a forward index.
+
+        Mirrors Rust ``Bond::floating``.
+
+        Parameters
+        ----------
+        id : str
+            Unique instrument identifier.
+        notional : Money
+            Principal amount of the bond.
+        index_id : str
+            Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
+        margin_bp : Bps
+            Spread over the index in basis points.
+        issue : datetime.date
+            Issue date.
+        maturity : datetime.date
+            Maturity date.
+        freq : Tenor
+            Payment frequency (e.g. ``Tenor.quarterly()``).
+        dc : DayCount
+            Day count convention (e.g. ``DayCount.act360()``).
+        discount_curve_id : str
+            Discount curve identifier used for pricing.
+
+        Returns
+        -------
+        Bond
+            A validated floating-rate note.
+
+        Raises
+        ------
+        ValueError
+            If validation fails.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import Bond
+        >>> callable(Bond.floating)
+        True
+        """
+        ...
+
+    @classmethod
+    def from_json(cls, json: str) -> Bond:
+        """
+        Deserialize a bond from tagged instrument JSON.
+
+        Parameters
+        ----------
+        json : str
+            Tagged instrument JSON with type ``"bond"``
+            (``{"type": "bond", "spec": {...}}``).
+
+        Returns
+        -------
+        Bond
+            The validated bond.
+
+        Raises
+        ------
+        ValueError
+            If the JSON is malformed, has a different instrument type, or
+            fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import Bond
+        >>> callable(Bond.from_json)
+        True
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to tagged instrument JSON.
+
+        Returns
+        -------
+        str
+            ``{"type": "bond", "spec": ...}`` JSON accepted by
+            :func:`price_instrument` and :meth:`Bond.from_json`.
+        """
+        ...
+
+class TermLoan:
+    """
+    Typed wrapper for the canonical Rust ``TermLoan`` instrument.
+
+    Rust has no ``fixed``/``floating`` convenience constructors for term
+    loans; construct via :meth:`TermLoan.from_json` with tagged JSON
+    (``{"type": "term_loan", "spec": ...}``) or start from
+    :meth:`TermLoan.example`. Instances are accepted directly by
+    :func:`price_instrument`, :func:`price_instrument_with_metrics`, and
+    :func:`instrument_cashflows_json`.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import TermLoan
+    >>> loan = TermLoan.example()
+    >>> loan.id
+    'TERM-LOAN-USD-5Y'
+    """
+
+    @property
+    def id(self) -> str:
+        """
+        Instrument identifier.
+
+        Returns
+        -------
+        str
+            The unique instrument identifier.
+        """
+        ...
+
+    @classmethod
+    def from_json(cls, json: str) -> TermLoan:
+        """
+        Deserialize a term loan from tagged instrument JSON.
+
+        Parameters
+        ----------
+        json : str
+            Tagged instrument JSON with type ``"term_loan"``
+            (``{"type": "term_loan", "spec": {...}}``).
+
+        Returns
+        -------
+        TermLoan
+            The validated term loan.
+
+        Raises
+        ------
+        ValueError
+            If the JSON is malformed, has a different instrument type, or
+            fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import TermLoan
+        >>> callable(TermLoan.from_json)
+        True
+        """
+        ...
+
+    @staticmethod
+    def example() -> TermLoan:
+        """
+        Canonical example term loan (mirrors Rust ``TermLoan::example``).
+
+        Returns
+        -------
+        TermLoan
+            A 5-year USD fixed-rate loan (6%, quarterly, Act/360, 2.5%
+            per-period amortization).
+
+        Raises
+        ------
+        ValueError
+            If construction fails (should not occur).
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import TermLoan
+        >>> TermLoan.example().id
+        'TERM-LOAN-USD-5Y'
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to tagged instrument JSON.
+
+        Returns
+        -------
+        str
+            ``{"type": "term_loan", "spec": ...}`` JSON accepted by
+            :func:`price_instrument` and :meth:`TermLoan.from_json`.
+        """
+        ...
 
 def bond_from_cashflows_json(
     instrument_id: str,
@@ -96,7 +386,7 @@ def validate_instrument_json(json: str) -> str:
     ...
 
 def price_instrument(
-    instrument_json: str,
+    instrument_json: str | Bond | TermLoan,
     market: MarketContext | str,
     as_of: str,
     model: str = "default",
@@ -106,9 +396,10 @@ def price_instrument(
 
     Parameters
     ----------
-    instrument_json : str
+    instrument_json : str or Bond or TermLoan
         Tagged instrument JSON accepted by
-        :func:`validate_instrument_json`.
+        :func:`validate_instrument_json`, or a typed :class:`Bond` /
+        :class:`TermLoan` instance.
     market : MarketContext or str
         Typed ``MarketContext`` or serialized market-context JSON.
     as_of : str
@@ -139,7 +430,7 @@ def price_instrument(
     ...
 
 def price_instrument_with_metrics(
-    instrument_json: str,
+    instrument_json: str | Bond | TermLoan,
     market: MarketContext | str,
     as_of: str,
     model: str = "default",
@@ -152,8 +443,9 @@ def price_instrument_with_metrics(
 
     Parameters
     ----------
-    instrument_json : str
-        Tagged instrument JSON.
+    instrument_json : str or Bond or TermLoan
+        Tagged instrument JSON, or a typed :class:`Bond` /
+        :class:`TermLoan` instance.
     market : MarketContext or str
         Typed ``MarketContext`` or serialized market-context JSON.
     as_of : str
@@ -190,7 +482,7 @@ def price_instrument_with_metrics(
     ...
 
 def instrument_cashflows_json(
-    instrument_json: str,
+    instrument_json: str | Bond | TermLoan,
     market: MarketContext | str,
     as_of: str,
     model: str,
@@ -200,8 +492,9 @@ def instrument_cashflows_json(
 
     Parameters
     ----------
-    instrument_json : str
-        Tagged instrument JSON.
+    instrument_json : str or Bond or TermLoan
+        Tagged instrument JSON, or a typed :class:`Bond` /
+        :class:`TermLoan` instance.
     market : MarketContext or str
         Typed ``MarketContext`` or serialized market-context JSON.
     as_of : str
@@ -308,7 +601,7 @@ def list_standard_metrics_grouped() -> dict[str, list[str]]:
 def structured_credit_tranche_discount_margin(
     instrument_json: str,
     tranche_id: str,
-    market: MarketContext,
+    market: MarketContext | str,
     as_of: str,
     target_pv: float,
 ) -> float:
@@ -327,9 +620,10 @@ def structured_credit_tranche_discount_margin(
     tranche_id : str
         Identifier of the floating-rate tranche whose contractual cashflows
         are spread-discounted.
-    market : MarketContext
-        Market context supplying the discount curve and any forward curves or
-        historical fixings required for cashflow projection.
+    market : MarketContext or str
+        Typed ``MarketContext`` or serialized market-context JSON supplying
+        the discount curve and any forward curves or historical fixings
+        required for cashflow projection.
     as_of : str
         ISO 8601 valuation date used for projection and discounting.
     target_pv : float
@@ -361,7 +655,7 @@ def structured_credit_tranche_discount_margin(
 def structured_credit_tranche_breakeven_cdr(
     instrument_json: str,
     tranche_id: str,
-    market: MarketContext,
+    market: MarketContext | str,
     as_of: str,
 ) -> float:
     """Solve the constant default rate at which a tranche first takes a writedown.
@@ -372,8 +666,9 @@ def structured_credit_tranche_breakeven_cdr(
         Tagged JSON for a ``StructuredCredit`` deal.
     tranche_id : str
         Identifier of the tranche within the deal.
-    market : MarketContext
-        Market context supplying curves and fixings.
+    market : MarketContext or str
+        Typed ``MarketContext`` or serialized market-context JSON supplying
+        curves and fixings.
     as_of : str
         ISO 8601 valuation date.
 
@@ -400,7 +695,7 @@ def structured_credit_tranche_oas(
     instrument_json: str,
     tranche_id: str,
     market_price_pct: float,
-    market: MarketContext,
+    market: MarketContext | str,
     as_of: str,
     config_json: str | None = None,
 ) -> str:
@@ -414,8 +709,9 @@ def structured_credit_tranche_oas(
         Identifier of the tranche within the deal.
     market_price_pct : float
         Market price as a percentage of original balance (100.0 = par).
-    market : MarketContext
-        Market context supplying curves and fixings.
+    market : MarketContext or str
+        Typed ``MarketContext`` or serialized market-context JSON supplying
+        curves and fixings.
     as_of : str
         ISO 8601 valuation date.
     config_json : str or None, optional
@@ -443,7 +739,7 @@ def structured_credit_tranche_oas(
 def structured_credit_tranche_metrics(
     instrument_json: str,
     tranche_id: str,
-    market: MarketContext,
+    market: MarketContext | str,
     as_of: str,
     market_price_pct: float | None = None,
 ) -> str:
@@ -455,8 +751,9 @@ def structured_credit_tranche_metrics(
         Tagged JSON for a ``StructuredCredit`` deal.
     tranche_id : str
         Identifier of the tranche within the deal.
-    market : MarketContext
-        Market context supplying curves and fixings.
+    market : MarketContext or str
+        Typed ``MarketContext`` or serialized market-context JSON supplying
+        curves and fixings.
     as_of : str
         ISO 8601 valuation date.
     market_price_pct : float or None, optional
@@ -485,7 +782,7 @@ def structured_credit_tranche_metrics(
 def structured_credit_tranche_scenario_table(
     instrument_json: str,
     tranche_id: str,
-    market: MarketContext,
+    market: MarketContext | str,
     as_of: str,
     grid_json: str,
 ) -> str:
@@ -497,8 +794,9 @@ def structured_credit_tranche_scenario_table(
         Tagged JSON for a ``StructuredCredit`` deal.
     tranche_id : str
         Identifier of the tranche within the deal.
-    market : MarketContext
-        Market context supplying curves and fixings.
+    market : MarketContext or str
+        Typed ``MarketContext`` or serialized market-context JSON supplying
+        curves and fixings.
     as_of : str
         ISO 8601 valuation date.
     grid_json : str

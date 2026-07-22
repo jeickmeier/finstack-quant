@@ -252,6 +252,117 @@ fn test_dm_solver_convergence_across_spread_regimes() {
     }
 }
 
+/// Build a flat, self-consistent FRN market: the discount curve and the
+/// projection curve both sit at `rate` (quarterly compounding, Act/360), so the
+/// solved curve DM of an FRN priced at par must equal its quoted margin.
+fn flat_frn_market(
+    as_of: time::Date,
+    rate: f64,
+) -> finstack_quant_core::market_data::context::MarketContext {
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+    use finstack_quant_core::math::interp::InterpStyle;
+    // DF(t) = (1 + rate/4)^(-4t) on the Act/360 axis. With log-linear
+    // interpolation two knots reproduce the exponential exactly, so the
+    // periodically-compounded zero rate at m=4 equals `rate` at every t.
+    let df_10y = (1.0 + rate / 4.0_f64).powf(-40.0);
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .day_count(DayCount::Act360)
+        .interp(InterpStyle::LogLinear)
+        .knots([(0.0, 1.0), (10.0, df_10y)])
+        .build()
+        .expect("flat discount curve should build");
+    // Base the projection curve a few days before `as_of` so the first
+    // coupon's lagged reset date is still projectable (no fixings needed).
+    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        .base_date(date!(2024 - 12 - 28))
+        .day_count(DayCount::Act360)
+        .knots([(0.0, rate), (10.0, rate)])
+        .build()
+        .expect("flat forward curve should build");
+    MarketContext::new().insert(disc).insert(fwd)
+}
+
+fn flat_market_frn(as_of: time::Date, maturity: time::Date, margin_bp: i32) -> Bond {
+    Bond::floating(
+        "DM-PAR-PIN",
+        Money::new(1_000_000.0, Currency::USD),
+        "USD-SOFR-3M",
+        margin_bp,
+        as_of,
+        maturity,
+        finstack_quant_core::dates::Tenor::quarterly(),
+        finstack_quant_core::dates::DayCount::Act360,
+        "USD-OIS",
+    )
+    .expect("FRN construction should succeed")
+}
+
+fn solve_dm_at_clean_price(as_of: time::Date, margin_bp: i32, clean_px: f64) -> f64 {
+    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
+    let mut bond = flat_market_frn(as_of, date!(2027 - 01 - 01), margin_bp);
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
+    let market = flat_frn_market(as_of, 0.03);
+    let result = bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::DiscountMargin],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("DM metric should converge on a flat consistent market");
+    result.measures["discount_margin"]
+}
+
+/// Pinned external value (Fabozzi / Bloomberg YAS convention): an FRN quoted
+/// at par on a flat curve, with the discount curve equal to the projection
+/// curve, must solve to a DM equal to its quoted margin — not zero and not
+/// its negative. Small residual tolerance covers day-count/period-compounding
+/// effects (Act/360 quarterly periods vs the m=4 zero-rate shift).
+#[test]
+fn test_dm_at_par_equals_quoted_margin_on_flat_consistent_curve() {
+    let as_of = date!(2025 - 01 - 01);
+    let quoted_margin = 0.01; // 100 bp
+    let dm = solve_dm_at_clean_price(as_of, 100, 100.0);
+    assert!(
+        (dm - quoted_margin).abs() < 2e-4,
+        "FRN at par on a flat consistent curve must have DM ~= quoted margin \
+         (expected ~{quoted_margin}, got {dm})"
+    );
+}
+
+/// Sign test: PV must be decreasing in DM. An FRN quoted below par must solve
+/// to a DM strictly above its quoted margin; above par, strictly below.
+#[test]
+fn test_dm_sign_convention_below_and_above_par() {
+    let as_of = date!(2025 - 01 - 01);
+    let quoted_margin = 0.01; // 100 bp
+
+    let dm_discount = solve_dm_at_clean_price(as_of, 100, 98.0);
+    assert!(
+        dm_discount > quoted_margin,
+        "FRN quoted below par must carry DM strictly above its quoted margin \
+         (quoted margin {quoted_margin}, got {dm_discount})"
+    );
+
+    let dm_premium = solve_dm_at_clean_price(as_of, 100, 102.0);
+    assert!(
+        dm_premium < quoted_margin,
+        "FRN quoted above par must carry DM strictly below its quoted margin \
+         (quoted margin {quoted_margin}, got {dm_premium})"
+    );
+
+    // And the two must straddle the at-par DM with economically meaningful width.
+    assert!(
+        dm_discount - dm_premium > 1e-3,
+        "DM spread between 98 and 102 quotes should exceed 10 bp, got {}",
+        dm_discount - dm_premium
+    );
+}
+
 // NOTE: The old test "test_dm_requires_accrued_when_clean_price_present" was removed
 // because DM now computes accrued internally via QuoteDateContext per the fix plan.
 // DM no longer requires Accrued to be pre-populated in the metric context.

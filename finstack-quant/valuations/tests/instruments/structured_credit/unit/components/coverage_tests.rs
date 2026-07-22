@@ -48,6 +48,8 @@ fn context_for_tranche<'a>(
         current_pool_balance: None,
         senior_fees: Money::new(0.0, Currency::USD),
         restricted_cash: Money::new(0.0, Currency::USD),
+        interest_claim_caps: None,
+        floating_rate_shift: 0.0,
     }
 }
 
@@ -640,4 +642,97 @@ fn test_oc_test_infinity_ratio_zero_debt() {
     // Assert: Should pass with infinite ratio
     assert!(result.is_passing);
     assert_eq!(result.current_ratio, f64::INFINITY);
+}
+
+// ============================================================================
+// IC claims from the waterfall spec (F3)
+// ============================================================================
+
+/// Two-tranche stack used by the claim-cap IC tests: SENIOR (100M @ 5%) over
+/// EQUITY, quarterly accrual, so the legacy IC due is 1.25M.
+fn claim_test_tranches() -> TrancheStructure {
+    let equity = Tranche::new(
+        "EQUITY",
+        0.0,
+        10.0,
+        TrancheSeniority::Equity,
+        Money::new(11_111_111.0, Currency::USD),
+        TrancheCoupon::Fixed { rate: 0.12 },
+        maturity_date(),
+    )
+    .unwrap();
+    let senior = Tranche::new(
+        "SENIOR",
+        10.0,
+        100.0,
+        TrancheSeniority::Senior,
+        Money::new(100_000_000.0, Currency::USD),
+        TrancheCoupon::Fixed { rate: 0.05 },
+        maturity_date(),
+    )
+    .unwrap();
+    TrancheStructure::new(vec![equity, senior]).unwrap()
+}
+
+#[test]
+fn ic_measures_coverage_of_the_capped_claim() {
+    let pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
+    let tranches = claim_test_tranches();
+
+    // The waterfall caps SENIOR's claim at 2%: due = 100M * 0.02 * 0.25 = 0.5M.
+    let mut caps: finstack_quant_core::HashMap<&str, Option<f64>> =
+        finstack_quant_core::HashMap::default();
+    caps.insert("SENIOR", Some(0.02));
+
+    let mut context = context_for_tranche(
+        &pool,
+        &tranches,
+        "SENIOR",
+        Money::new(0.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD),
+    );
+    context.interest_claim_caps = Some(&caps);
+
+    let result = CoverageTest::new_ic(1.20)
+        .calculate(&context)
+        .expect("coverage calculation");
+
+    // 1.0M collections / 0.5M capped due = 2.0 (passing). The legacy uncapped
+    // due of 1.25M would read 0.8 and breach — the structure never owes it.
+    assert!(result.is_passing);
+    assert!(
+        (result.current_ratio - 2.0).abs() < 0.01,
+        "IC must cover the capped claim, got {}",
+        result.current_ratio
+    );
+}
+
+#[test]
+fn ic_treats_a_tranche_without_interest_recipient_as_owing_nothing() {
+    let pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
+    let tranches = claim_test_tranches();
+
+    // The waterfall defines no interest claim for SENIOR at all.
+    let caps: finstack_quant_core::HashMap<&str, Option<f64>> =
+        finstack_quant_core::HashMap::default();
+
+    let mut context = context_for_tranche(
+        &pool,
+        &tranches,
+        "SENIOR",
+        Money::new(0.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD),
+    );
+    context.interest_claim_caps = Some(&caps);
+
+    let result = CoverageTest::new_ic(1.20)
+        .calculate(&context)
+        .expect("coverage calculation");
+
+    assert!(result.is_passing);
+    assert_eq!(
+        result.current_ratio,
+        f64::INFINITY,
+        "no claim means nothing to cover"
+    );
 }

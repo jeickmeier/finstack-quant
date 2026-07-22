@@ -106,8 +106,13 @@ impl Default for DiscountMarginSolverConfig {
 /// Discount Margin (DM) for floating-rate bonds.
 ///
 /// Definition: constant additive spread (decimal, e.g., 0.01 = 100bp) over the
-/// reference forward index such that the discounted PV of the bond's projected
-/// cashflows equals the observed dirty market price.
+/// bond's **discount curve** such that the PV of the bond's projected
+/// cashflows — projected at the **contractual quoted margin** — equals the
+/// observed dirty market price (Fabozzi; Bloomberg YAS convention). PV is
+/// strictly decreasing in DM, so an FRN quoted below par solves to a DM above
+/// its quoted margin, and vice versa. On a flat, consistent curve where the
+/// discount curve equals the projection index curve, an FRN priced at par has
+/// DM equal to its quoted margin.
 ///
 /// Notes:
 /// - Intended for **floating-rate notes (FRNs)**. For fixed-rate bonds and
@@ -116,8 +121,12 @@ impl Default for DiscountMarginSolverConfig {
 ///   **Z-spread**, or asset-swap spreads instead.
 /// - Requires quoted clean price or falls back to base PV as target.
 /// - Uses the FRN path: coupons are projected off the forward curve at reset
-///   with margin and gearing from `FloatingCouponSpec`, then discounted with the
-///   discount curve. The DM is added to the projected index rate.
+///   with margin and gearing from `FloatingCouponSpec` (unchanged by the DM),
+///   then discounted with the DM added to the periodically-compounded zero
+///   rate derived from the discount curve (the same mechanics as the
+///   Z-spread; see `price_from_dm`). This is a **curve DM**: when the
+///   discount curve differs from the projection index curve, the solved DM
+///   includes that basis.
 ///
 /// # Dependencies
 ///

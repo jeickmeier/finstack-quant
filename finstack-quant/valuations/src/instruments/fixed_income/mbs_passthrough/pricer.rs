@@ -315,7 +315,12 @@ fn previous_month_start(date: Date) -> Result<Date> {
         .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))
 }
 
-fn first_unpaid_accrual_start(mbs: &AgencyMbsPassthrough, as_of: Date) -> Result<Date> {
+/// First-of-month start of the earliest accrual period whose (delayed)
+/// payment has not yet settled at `as_of`.
+///
+/// Shared with the Monte-Carlo OAS engine so both pricers project from the
+/// same accrual period, including a prior-month in-flight receivable.
+pub(crate) fn first_unpaid_accrual_start(mbs: &AgencyMbsPassthrough, as_of: Date) -> Result<Date> {
     let issue_month = Date::from_calendar_date(mbs.issue_date.year(), mbs.issue_date.month(), 1)
         .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
 

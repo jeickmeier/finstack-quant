@@ -233,7 +233,7 @@
             },
             "discount_curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Discount curve identifier (real or nominal depending on method)"
+              "description": "Discount curve identifier. This **must** be a NOMINAL curve (e.g.\n\"USD-OIS\"): the cashflow schedule contains inflation-projected nominal\namounts (real amount × projected index ratio), so discounting on a real\ncurve would double-count inflation. The real curve is never used for PV;\nit enters only through real-yield style metrics computed from real flows."
             },
             "frequency": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",

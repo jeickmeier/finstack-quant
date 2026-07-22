@@ -22,7 +22,11 @@
 //! - `CF_nom(t) = CF_real × IndexRatio(t)` (Projected Nominal Cashflow)
 //! - `DF_nom(t)` = Nominal Discount Factor from the discount curve
 //!
-//! The `discount_curve_id` should point to a **Nominal** discount curve (e.g., USD-OIS or specialized Nominal curve).
+//! The `discount_curve_id` **must** point to a **Nominal** discount curve (e.g., "USD-OIS").
+//! Because the schedule contains inflation-projected nominal cashflows, discounting on a
+//! real curve would double-count inflation. The real curve is never used for PV; real
+//! rates enter only through real-yield style metrics computed from the real (unindexed)
+//! cashflows.
 //!
 //! ## Real Yield
 //!

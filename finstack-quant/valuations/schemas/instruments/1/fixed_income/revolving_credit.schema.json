@@ -101,7 +101,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Market-anchored credit spread process calibrated to a hazard curve and CDS option vol.\n\nThe mean level is anchored to the time-average spread implied by the input hazard\ncurve (over tenor T chosen as facility maturity by default). The initial spread is set\nto the first-segment spread, and the volatility is scaled from the CDS index option\nimplied volatility.",
+          "description": "Market-anchored credit spread process calibrated to a hazard curve and CDS option vol.\n\nAt the simulation anchor (the later of valuation and commitment date),\nthe initial spread is set from the contemporaneous hazard and the mean\nlevel is anchored to conditional survival over the remaining tenor.\nVolatility is scaled from the CDS index option implied volatility.",
           "properties": {
             "MarketAnchored": {
               "properties": {
@@ -408,7 +408,7 @@
             "HullWhite1F": {
               "properties": {
                 "initial": {
-                  "description": "Initial short rate",
+                  "description": "Initial short rate used only when `sigma == 0`. For a stochastic\nprocess, the pricer derives the initial rate from the facility's\ndiscount curve at the valuation anchor.",
                   "format": "double",
                   "type": "number"
                 },
@@ -423,7 +423,7 @@
                   "type": "number"
                 },
                 "theta": {
-                  "description": "Constant mean reversion level (θ)",
+                  "description": "Constant mean reversion level used only when `sigma == 0`. For a\nstochastic process, the pricer fits a time-dependent θ(t) to the\nfacility's discount curve.",
                   "format": "double",
                   "type": "number"
                 }

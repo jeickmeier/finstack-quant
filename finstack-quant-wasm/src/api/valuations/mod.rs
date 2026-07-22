@@ -10,6 +10,7 @@
 //! - [`credit_derivatives`] — CDS-family example payload factories.
 //! - [`fourier`] — COS-method Fourier pricers (Black-Scholes, VG, Merton).
 //! - [`exotic_rates`] — deterministic TARN / snowball / range-accrual helpers.
+//! - [`fixed_income`] — typed `Bond` / `TermLoan` instrument classes.
 //! - [`sabr`] — SABR parameters, model, smile, and calibrator.
 
 pub mod analytic;
@@ -18,6 +19,7 @@ pub mod correlation;
 pub mod credit;
 pub mod credit_derivatives;
 pub mod exotic_rates;
+pub mod fixed_income;
 pub mod fourier;
 pub mod fx;
 pub mod market_handle;

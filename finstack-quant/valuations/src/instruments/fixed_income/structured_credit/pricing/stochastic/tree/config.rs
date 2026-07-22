@@ -5,10 +5,7 @@
 
 #![allow(dead_code)]
 
-use super::super::{
-    correlation::CorrelationStructure, default::StochasticDefaultSpec,
-    prepayment::StochasticPrepaySpec,
-};
+use super::super::{default::StochasticDefaultSpec, prepayment::StochasticPrepaySpec};
 use crate::correlation::factor_model::LatentFactorSpec;
 use crate::correlation::recovery::RecoverySpec;
 
@@ -143,9 +140,6 @@ pub(crate) struct ScenarioTreeConfig {
     /// Recovery model specification
     pub recovery_spec: RecoverySpec,
 
-    /// Correlation structure
-    pub correlation: CorrelationStructure,
-
     /// Random seed for reproducibility
     pub seed: u64,
 
@@ -181,7 +175,6 @@ impl ScenarioTreeConfig {
             prepay_spec: StochasticPrepaySpec::default(),
             default_spec: StochasticDefaultSpec::default(),
             recovery_spec: RecoverySpec::default(),
-            correlation: CorrelationStructure::default(),
             seed: 42,
             initial_balance: 1_000_000.0,
             initial_seasoning: 0,
@@ -202,7 +195,6 @@ impl ScenarioTreeConfig {
             prepay_spec: StochasticPrepaySpec::rmbs_agency(pool_coupon),
             default_spec: StochasticDefaultSpec::rmbs_standard(),
             recovery_spec: RecoverySpec::market_standard_stochastic(),
-            correlation: CorrelationStructure::rmbs_standard(),
             seed: 42,
             initial_balance: 1_000_000.0,
             initial_seasoning: 0,
@@ -229,7 +221,6 @@ impl ScenarioTreeConfig {
                 // correlation makes recovery fall when the factor falls.
                 factor_correlation: 0.50,
             },
-            correlation: CorrelationStructure::clo_standard(),
             seed: 42,
             initial_balance: 1_000_000.0,
             initial_seasoning: 0,
@@ -278,12 +269,6 @@ impl ScenarioTreeConfig {
     /// Set the default specification.
     pub(crate) fn with_default_spec(mut self, spec: StochasticDefaultSpec) -> Self {
         self.default_spec = spec;
-        self
-    }
-
-    /// Set the correlation structure.
-    pub(crate) fn with_correlation(mut self, corr: CorrelationStructure) -> Self {
-        self.correlation = corr;
         self
     }
 
@@ -378,7 +363,9 @@ mod tests {
         let config = ScenarioTreeConfig::clo_standard(7.0);
 
         assert_eq!(config.num_periods, 84);
-        assert!(config.correlation.is_sectored());
+        assert!(
+            super::super::super::correlation::CorrelationStructure::clo_standard().is_sectored()
+        );
     }
 
     #[test]

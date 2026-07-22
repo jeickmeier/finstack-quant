@@ -928,6 +928,12 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
         rules.validate(tranches)?;
     }
 
+    // A custom waterfall must be structurally valid, reference only real
+    // (non-equity) tranches, and not conflict with deal-level `fees`. Deals
+    // arriving via JSON never pass through `with_waterfall`, so re-validate
+    // here rather than pricing a silently-broken structure.
+    instrument.validate_custom_waterfall()?;
+
     // Validate and extract months per period
     let months_per_period = match instrument.frequency.months() {
         Some(m) => m as f64,
@@ -3030,6 +3036,7 @@ mod tests {
                 reserve_balance: Money::new(0.0, ccy),
                 restricted_cash: Money::new(0.0, Currency::USD),
                 recovery_proceeds: Money::new(0.0, ccy),
+                floating_rate_shift: 0.0,
             },
         )
         .expect("waterfall executes");
@@ -3078,6 +3085,7 @@ mod tests {
                 reserve_balance: Money::new(0.0, ccy),
                 restricted_cash: Money::new(0.0, Currency::USD),
                 recovery_proceeds: Money::new(0.0, ccy),
+                floating_rate_shift: 0.0,
             },
         )
         .expect("waterfall executes");
@@ -3174,6 +3182,7 @@ mod tests {
                     reserve_balance: Money::new(0.0, ccy),
                     restricted_cash: Money::new(0.0, Currency::USD),
                     recovery_proceeds: Money::new(0.0, ccy),
+                    floating_rate_shift: 0.0,
                 },
             )
             .expect("waterfall executes")
@@ -4018,6 +4027,23 @@ fn simulate_period(
     // below) and the interest *recorded* (Step 5), so the two cannot diverge.
     let live_afc_cap = live_afc_cap_rate(instrument, state, context, period_start)?;
 
+    // Per-tranche interest CLAIMS as the waterfall spec defines them (F3): an
+    // uncapped recipient owes the full coupon, a capped recipient owes the
+    // capped coupon (the capped-off portion never defers), and a debt tranche
+    // with no interest recipient owes nothing. Extracted from the base
+    // waterfall with the live AFC cap applied exactly as `resolve_waterfall`
+    // does, so these claims match what the period waterfall allocates. Shared
+    // by the excess-spread/reserve sizing below and the Step-5 recording.
+    let claim_caps =
+        crate::instruments::fixed_income::structured_credit::pricing::waterfall::interest_claim_caps(
+            waterfall,
+            instrument
+                .waterfall_rules
+                .as_ref()
+                .and_then(|rules| rules.afc.as_ref()),
+            live_afc_cap,
+        );
+
     // Early amortization (master-trust style): once cumulative losses reach the
     // configured threshold, the revolving period ends immediately and the deal
     // begins amortizing, regardless of the scheduled revolving-period end.
@@ -4344,6 +4370,7 @@ fn simulate_period(
                 valuation_date: as_of,
                 market: context,
                 reserve_balance: state.reserve_balance,
+                floating_rate_shift: state.floating_rate_shift,
             },
         )?
         .amount()
@@ -4353,23 +4380,19 @@ fn simulate_period(
 
     let mut debt_interest_due = senior_fee_accrual_amount;
     if needs_interest_due {
-        let afc = instrument
-            .waterfall_rules
-            .as_ref()
-            .and_then(|rules| rules.afc.as_ref());
         for tranche in &state.tranches.tranches {
             if tranche.seniority == TrancheSeniority::Equity {
                 continue;
             }
+            // The spec defines the claim: absent = no interest owed (and no
+            // deferred claim the waterfall could ever service).
+            let Some(cap) = claim_caps.get(tranche.id.as_str()) else {
+                continue;
+            };
             let bal = state
                 .tranche_balances
                 .get(tranche.id.as_str())
                 .map_or(0.0, Money::amount);
-            let afc_capped = afc.is_some_and(|spec| {
-                spec.capped_tranches
-                    .iter()
-                    .any(|t| t == tranche.id.as_str())
-            });
             debt_interest_due += tranche_period_interest_due(
                 tranche,
                 bal,
@@ -4379,8 +4402,8 @@ fn simulate_period(
                     valuation: as_of,
                 },
                 context,
-                live_afc_cap,
-                afc_capped,
+                cap.unwrap_or(0.0),
+                cap.is_some(),
                 state.floating_rate_shift,
             )?;
             if !tranche.pik_enabled {
@@ -4655,6 +4678,7 @@ fn simulate_period(
             // N2: funding-account principal is still collateral for the notes.
             restricted_cash: state.principal_funding_account,
             recovery_proceeds: released_recoveries,
+            floating_rate_shift: state.floating_rate_shift,
         };
 
     let waterfall_result =
@@ -4671,18 +4695,6 @@ fn simulate_period(
             state.reserve_balance = state.reserve_balance.checked_add(*amount)?;
         }
     }
-
-    // Available-funds cap: for AFC tranches, cap the recorded coupon at the
-    // collateral weighted-average coupon. Combined with the capped waterfall
-    // allocation (`resolve_waterfall`), this caps both the interest *due*
-    // (recorded below) and the cash routed to the interest recipient, so the
-    // excess spread above the cap flows on through the waterfall rather than
-    // inflating this tranche's interest.
-    let afc_spec = instrument
-        .waterfall_rules
-        .as_ref()
-        .and_then(|rules| rules.afc.as_ref());
-    let afc_cap = live_afc_cap;
 
     // ── Step 5: Record flows and update balances ─────────────────────
     for (idx, tranche) in state.tranches.tranches.iter().enumerate() {
@@ -4701,28 +4713,56 @@ fn simulate_period(
             .copied()
             .unwrap_or(Money::new(0.0, state.base_ccy));
 
-        // Current-period interest due on post-writedown balance, via the shared
-        // helper (consistent AFC cap, day-count and index fixing with the
-        // excess-spread surplus check). Non-PIK deferred interest is a separate
-        // senior interest claim passed into the waterfall context before execution.
-        let afc_capped =
-            afc_spec.is_some_and(|spec| spec.capped_tranches.iter().any(|t| t == tranche_id_str));
-        let current_interest_due = Money::new(
-            tranche_period_interest_due(
-                tranche,
-                current_balance.amount(),
-                TrancheAccrualDates {
-                    start: period_start,
-                    payment: pay_date,
-                    valuation: as_of,
-                },
-                context,
-                afc_cap,
-                afc_capped,
-                state.floating_rate_shift,
-            )?,
-            state.base_ccy,
-        );
+        // Current-period interest due on post-writedown balance, as the
+        // waterfall spec defines the claim (`claim_caps`, F3): uncapped
+        // recipients owe the full coupon, capped recipients owe the capped
+        // coupon (AFC live cap or a custom static cap — the capped-off
+        // portion is never owed, so it never defers), and a debt tranche with
+        // no interest recipient owes nothing. The same map sized the
+        // excess-spread/reserve draw above, so the two cannot diverge.
+        //
+        // Equity keeps the legacy metadata-coupon path: equity is paid via
+        // `RecipientType::Equity`/`ResidualCash` (never a tranche-keyed
+        // interest recipient), and its recorded interest-vs-principal split is
+        // a reporting convention, not a waterfall claim.
+        let current_interest_due = if tranche.seniority == TrancheSeniority::Equity {
+            Money::new(
+                tranche_period_interest_due(
+                    tranche,
+                    current_balance.amount(),
+                    TrancheAccrualDates {
+                        start: period_start,
+                        payment: pay_date,
+                        valuation: as_of,
+                    },
+                    context,
+                    0.0,
+                    false,
+                    state.floating_rate_shift,
+                )?,
+                state.base_ccy,
+            )
+        } else {
+            match claim_caps.get(tranche_id_str) {
+                None => Money::new(0.0, state.base_ccy),
+                Some(cap) => Money::new(
+                    tranche_period_interest_due(
+                        tranche,
+                        current_balance.amount(),
+                        TrancheAccrualDates {
+                            start: period_start,
+                            payment: pay_date,
+                            valuation: as_of,
+                        },
+                        context,
+                        cap.unwrap_or(0.0),
+                        cap.is_some(),
+                        state.floating_rate_shift,
+                    )?,
+                    state.base_ccy,
+                ),
+            }
+        };
         let total_interest_claim = if tranche.pik_enabled {
             current_interest_due
         } else {

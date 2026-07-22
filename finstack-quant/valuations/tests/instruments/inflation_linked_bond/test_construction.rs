@@ -31,7 +31,7 @@ fn test_tips_creation_via_helper() {
     .expect("valid literal coupon");
 
     // Act
-    let tips = InflationLinkedBond::new_tips("US_TIPS_2030", &bond_params, "USD-REAL", "US-CPI-U");
+    let tips = InflationLinkedBond::new_tips("US_TIPS_2030", &bond_params, "USD-OIS", "US-CPI-U");
 
     // Assert
     assert_eq!(tips.id.as_str(), "US_TIPS_2030");
@@ -179,9 +179,11 @@ fn test_indexation_method_interpolation_flags() {
     // Arrange & Act & Assert
     assert!(IndexationMethod::TIPS.uses_daily_interpolation());
     assert!(IndexationMethod::Canadian.uses_daily_interpolation());
+    // Legacy UK gilts (pre-Sep 2005) are the only step-interpolated convention.
     assert!(!IndexationMethod::UK.uses_daily_interpolation());
-    assert!(!IndexationMethod::French.uses_daily_interpolation());
-    assert!(!IndexationMethod::Japanese.uses_daily_interpolation());
+    assert!(IndexationMethod::French.uses_daily_interpolation());
+    // Post-2004 JGBi use daily-interpolated reference CPI (same as TIPS).
+    assert!(IndexationMethod::Japanese.uses_daily_interpolation());
 }
 
 #[test]
@@ -334,7 +336,7 @@ fn test_various_frequencies() {
         )
         .expect("valid literal coupon");
 
-        let bond = InflationLinkedBond::new_tips("ILB-TEST", &params, "USD-REAL", "US-CPI-U");
+        let bond = InflationLinkedBond::new_tips("ILB-TEST", &params, "USD-OIS", "US-CPI-U");
 
         assert_eq!(bond.frequency, freq);
     }
@@ -360,7 +362,7 @@ fn test_various_day_count_conventions() {
         )
         .expect("valid literal coupon");
 
-        let bond = InflationLinkedBond::new_tips("ILB-TEST", &params, "USD-REAL", "US-CPI-U");
+        let bond = InflationLinkedBond::new_tips("ILB-TEST", &params, "USD-OIS", "US-CPI-U");
 
         assert_eq!(bond.day_count, dc);
     }

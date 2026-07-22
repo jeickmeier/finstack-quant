@@ -17,7 +17,32 @@ use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::portfolio::types::{PyPortfolio, PyPortfolioResult, PyPortfolioValuation};
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::types::PyFinancialModelSpec;
+use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
 use crate::errors::{display_to_py as to_py, portfolio_to_py};
+
+// ---------------------------------------------------------------------------
+// Instrument — typed-or-JSON extraction to tagged instrument JSON
+// ---------------------------------------------------------------------------
+
+/// Extract tagged instrument JSON from a typed `Bond` / `TermLoan` object
+/// (fast path) or a pre-serialized JSON string (fallback).
+///
+/// Typed instances serialize through the same tagged union
+/// (`InstrumentJson`) the JSON loader parses, so downstream pricing observes
+/// identical payloads for both input forms.
+pub fn extract_instrument_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
+    if let Ok(bond) = obj.cast::<PyBond>() {
+        return bond.borrow().tagged_json();
+    }
+    if let Ok(loan) = obj.cast::<PyTermLoan>() {
+        return loan.borrow().tagged_json();
+    }
+    obj.extract::<String>().map_err(|_| {
+        pyo3::exceptions::PyTypeError::new_err(
+            "expected tagged instrument JSON (str) or a typed Bond / TermLoan instance",
+        )
+    })
+}
 
 // ---------------------------------------------------------------------------
 // Zero-clone access types (available for callers that only need &T)

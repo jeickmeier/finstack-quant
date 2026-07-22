@@ -261,6 +261,20 @@ fn interpolate_rate(t: f64, times: &[f64], rates: &[f64]) -> f64 {
 ///
 /// When using correlation, the Cholesky decomposition should be applied
 /// in the discretization scheme.
+///
+/// # Adverse selection
+///
+/// The drift and diffusion of the utilization factor depend only on the
+/// utilization state itself (OU mean reversion), never on the credit-spread
+/// state. Utilization/credit dependence enters **only** through the factor
+/// correlation matrix. When `params.correlation` is `None`, utilization is
+/// simulated independently of the credit state and the valuation embeds **no
+/// adverse selection** (no "run on the bank" where drawdown rises as credit
+/// deteriorates). For facilities with a hazard curve and no explicit
+/// `McConfig`, the pricer's auto-synthesized config now defaults to a moderate
+/// positive utilization–credit correlation (see `DEFAULT_UTIL_CREDIT_CORR` in
+/// the unified pricer); set `util_credit_corr: Some(0.0)` or supply a full
+/// `correlation_matrix` in `McConfig` to override.
 #[derive(Debug, Clone)]
 pub struct RevolvingCreditProcess {
     params: RevolvingCreditProcessParams,

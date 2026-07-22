@@ -89,10 +89,16 @@ pub struct AssetSwapParCalculator {
 
 /// Asset swap market spread calculator using market price.
 ///
-/// Market ASW is the spread that equates the asset-swap package to par. Uses the approximation:
+/// Market ASW is the spread that equates the asset-swap package to par. Uses the
+/// par-par formula:
 /// ```text
-/// asw_mkt ≈ coupon - par_rate + (1 - dirty/Notional)/annuity
+/// asw_mkt = [(coupon - par_rate)·Ann_fixed + (1 - dirty/Notional)] / Ann_float
 /// ```
+/// where both the running coupon-vs-par term (weighted by the **fixed-leg**
+/// annuity) and the upfront are amortized over the **floating-leg** annuity
+/// (par-par derivation). In the discount-ratio fallback (no forward curve),
+/// the floating leg is proxied on the fixed-leg schedule with the discount
+/// curve's day count.
 ///
 /// # Dependencies
 ///
@@ -994,7 +1000,24 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                                     .to_string(),
                             ));
                         }
-                        return Ok((coupon - par_rate) + (1.0 - clean_px / 100.0) / ann);
+                        // Upfront is amortized over the floating-leg annuity
+                        // (par-par derivation), proxied on the same schedule
+                        // with the discount curve's day count.
+                        let float_ann = fixed_leg_annuity(
+                            disc.as_ref(),
+                            disc.day_count(),
+                            None,
+                            &fixed_schedule,
+                        )?;
+                        if float_ann.abs() < 1e-12 {
+                            return Err(finstack_quant_core::Error::Validation(
+                                "ASW market calculation is undefined for near-zero floating-leg annuity"
+                                    .to_string(),
+                            ));
+                        }
+                        return Ok(
+                            ((coupon - par_rate) * ann + (1.0 - clean_px / 100.0)) / float_ann
+                        );
                     }
                 }
             }
@@ -1063,8 +1086,18 @@ impl MetricCalculator for AssetSwapMarketCalculator {
         let asw_mkt = if let Some((float_pv, fixed_ann, float_ann)) = forward_components {
             (eq_coupon * fixed_ann + 1.0 - price_pct - float_pv) / float_ann
         } else {
-            // Market ASW = Par ASW + upfront discount amortized over the fixed-leg annuity.
-            (eq_coupon - par_rate) + (1.0 - price_pct) / ann
+            // Exact par-par form:
+            // spread = [(C - par_rate)·Ann_fixed + (1 - p)] / Ann_float.
+            // Without a forward curve the floating leg is proxied on the same
+            // schedule using the discount curve's day count.
+            let float_ann = fixed_leg_annuity(disc.as_ref(), disc.day_count(), None, &sched)?;
+            if float_ann.abs() < 1e-12 {
+                return Err(finstack_quant_core::Error::Validation(
+                    "ASW market calculation is undefined for near-zero floating-leg annuity"
+                        .to_string(),
+                ));
+            }
+            ((eq_coupon - par_rate) * ann + (1.0 - price_pct)) / float_ann
         };
         Ok(asw_mkt)
     }

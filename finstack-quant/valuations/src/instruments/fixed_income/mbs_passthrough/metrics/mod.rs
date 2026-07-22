@@ -13,6 +13,21 @@ pub(crate) mod duration;
 pub(crate) mod mc_oas;
 pub(crate) mod oas;
 
+/// Prepayment rate-sensitivity coefficient β shared by every rate-dependent
+/// prepayment adjustment in this module.
+///
+/// Applied as the refinancing-incentive multiplier `exp(-β·Δr)` on prepayment
+/// speed. β is calibrated so a 100 bp rate move roughly doubles (rates down)
+/// or halves (rates up) the prepayment speed — the standard rule-of-thumb
+/// shape of the empirical refinancing S-curve (Hayre 2001; Fabozzi 2016):
+/// `β = ln(2) / 0.01 ≈ 69.3`.
+///
+/// Both the effective duration/convexity engine ([`duration`]) and the
+/// Monte-Carlo OAS engine ([`mc_oas`], via [`McOasConfig`]'s default
+/// `prepay_rate_sensitivity`) use this constant so the two engines price the
+/// prepayment option consistently; the MC config field remains overridable.
+pub(crate) const PREPAY_RATE_SENSITIVITY: f64 = std::f64::consts::LN_2 / 0.01;
+
 pub(crate) use duration::{effective_convexity, effective_duration};
 pub(crate) use mc_oas::{calculate_mc_oas, McOasConfig};
 #[cfg(test)]

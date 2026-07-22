@@ -35,7 +35,8 @@ impl BondFuturePricer {
     ///
     /// Source: CME Group, "Calculating U.S. Treasury Futures Conversion
     /// Factors" (Interest Rate Resource Center, IR232). For a security with
-    /// annual coupon `coupon` (rounded to the nearest 1/8 of 1%) and a
+    /// stated annual coupon `coupon` (used as-is; U.S. Treasury coupons are
+    /// already on a 1/8 of 1% grid, and no exchange spec rounds the coupon) and a
     /// notional yield `r` (6% for all U.S. Treasury futures, so the
     /// per-period rate is `r/2`):
     ///
@@ -102,15 +103,16 @@ impl BondFuturePricer {
             )));
         }
 
-        // Stated annual coupon of the deliverable, rounded to the nearest
-        // 1/8 of 1% (0.00125) per the CME methodology footnote.
-        let raw_coupon = bond.cashflow_spec.fixed_coupon_rate().ok_or_else(|| {
+        // Stated annual coupon of the deliverable, used as-is. U.S. Treasury
+        // coupons are issued on a 1/8 of 1% grid, but no exchange conversion
+        // factor spec (CME/Eurex/ICE) rounds the coupon, and rounding would
+        // corrupt factors for off-grid coupons (e.g. Bunds or Gilts).
+        let coupon = bond.cashflow_spec.fixed_coupon_rate().ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "bond '{}' has no fixed coupon; the CME conversion factor is only defined for fixed-rate deliverables",
                 bond.id.as_str()
             ))
         })?;
-        let coupon = (raw_coupon / 0.00125).round() * 0.00125;
 
         // CME anchor: the first calendar day of the delivery month.
         let month_start = Date::from_calendar_date(
@@ -201,7 +203,8 @@ impl BondFuturePricer {
     ///
     /// This convenience entry point uses the CTD bond's discount curve as the
     /// financing proxy. Position pricing calls the financing-aware helper and
-    /// uses the future's dedicated repo curve when configured.
+    /// uses the future's dedicated repo curve when configured, falling back to
+    /// the future's own `discount_curve_id` otherwise.
     ///
     /// # Parameters
     ///
@@ -334,6 +337,9 @@ impl BondFuturePricer {
     }
 
     /// Calculate the model price using the financing convention declared by a future.
+    ///
+    /// The financing curve is `future.repo_curve_id` when set, otherwise the
+    /// future's own `discount_curve_id`.
     pub(crate) fn calculate_model_price_for_future(
         future: &super::BondFuture,
         ctd_bond: &Bond,
@@ -342,13 +348,17 @@ impl BondFuturePricer {
         as_of: Date,
     ) -> Result<f64> {
         let delivery_date = future.delivery_start.max(as_of);
+        let financing_curve_id = future
+            .repo_curve_id
+            .as_ref()
+            .unwrap_or(&future.discount_curve_id);
         Self::calculate_model_price_with_financing_curve(
             ctd_bond,
             conversion_factor,
             market,
             as_of,
             delivery_date,
-            future.repo_curve_id.as_ref(),
+            Some(financing_curve_id),
         )
     }
 

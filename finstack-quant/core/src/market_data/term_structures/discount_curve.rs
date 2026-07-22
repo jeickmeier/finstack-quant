@@ -198,11 +198,11 @@ pub struct DiscountCurve {
     /// or not calibrated from instruments at all (hand-built curve).
     ///
     /// Stored as a plain scalar (no dependency on the valuations-crate
-    /// `FloatingLegCompounding` enum). Single-curve OIS pricing consults this
-    /// to decide whether the `1/DF(start,end)` compounded fast path is
-    /// self-consistent with the curve's own calibration. It is stamped on
-    /// *both* the intermediate solver curves and the final curve so that the
-    /// bootstrap-internal swap repricing and downstream pricing agree.
+    /// `FloatingLegCompounding` enum). Calibration **provenance only**: it is
+    /// stamped on both the intermediate solver curves and the final curve as
+    /// an audit trail of the bootstrap convention, and round-trips through
+    /// serialization, but no pricing or re-bump path consults it — pricing
+    /// takes the cut-off from the instrument's own `FloatingLegCompounding`.
     pub(crate) calibration_ois_cutoff_days: Option<i32>,
     /// Opaque FX policy stamp when bootstrap used cross-currency assumptions
     /// (XCCY basis, FX triangulation). Propagated to `ResultsMeta.fx_policy_applied`

@@ -195,6 +195,8 @@ impl StructuredCredit {
             cleanup_call_pct: None,
             // No declarative waterfall rules by default.
             waterfall_rules: None,
+            // Template waterfall by default; custom via `with_waterfall`.
+            waterfall: None,
         }
     }
 

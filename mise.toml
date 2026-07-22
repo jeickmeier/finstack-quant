@@ -387,9 +387,9 @@ run = [
 [tasks.rust-gen-schemas]
 description = "Regenerate typed JSON schemas from Rust types"
 run = [
-  "uv run python scripts/sync_instrument_schema_overrides.py",
   "cargo run -p finstack-quant-cashflows --bin gen_cashflow_schemas",
   "cargo run -p finstack-quant-valuations --bin gen_schemas",
+  "uv run python scripts/sync_instrument_schema_overrides.py",
 ]
 
 [tasks.rust-sync-schemas]

@@ -9,6 +9,7 @@ pub mod correlation;
 mod credit;
 mod exotic_rates;
 mod fourier;
+pub(crate) mod instruments;
 mod pricing;
 mod sabr;
 mod structured_credit;
@@ -53,6 +54,21 @@ impl PyValuationResult {
     #[getter]
     fn get_price(&self) -> f64 {
         self.inner.value.amount()
+    }
+
+    /// Return the exact Decimal price as a string, without a float round-trip.
+    ///
+    /// Unlike the ``price`` property (a lossy ``float``), this preserves the
+    /// internal Decimal representation exactly. Pass the result to
+    /// ``decimal.Decimal`` for lossless arithmetic in Python.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Exact decimal string of the valuation amount, e.g. ``"1000000.00"``.
+    #[pyo3(text_signature = "($self)")]
+    fn price_decimal(&self) -> String {
+        self.inner.value.amount_decimal().to_string()
     }
 
     #[getter]
@@ -241,9 +257,12 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     m.add_function(wrap_pyfunction!(bond_from_cashflows_json, &m)?)?;
     m.getattr("bond_from_cashflows_json")?
         .setattr("__module__", "finstack_quant.valuations.instruments")?;
+    instruments::register(py, &m)?;
     pricing::register(py, &m)?;
     structured_credit::register(&m)?;
     let mut exports = vec![
+        "Bond",
+        "TermLoan",
         "bond_from_cashflows_json",
         "instrument_cashflows_json",
         "list_models",

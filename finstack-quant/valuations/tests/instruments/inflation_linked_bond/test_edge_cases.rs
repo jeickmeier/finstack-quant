@@ -157,12 +157,11 @@ fn test_missing_inflation_data() {
     let as_of = d(2025, 1, 2);
 
     // Context with discount but no inflation
-    let disc =
-        finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-REAL")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (5.0, 0.95)])
-            .build()
-            .unwrap();
+    let disc = finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (5.0, 0.95)])
+        .build()
+        .unwrap();
 
     let ctx = finstack_quant_core::market_data::context::MarketContext::new().insert(disc);
 
@@ -365,12 +364,11 @@ fn test_currency_mismatch_detection() {
     let (mut ctx_gbp, _) = uk_market_context(); // GBP market
 
     // Insert USD discount curve into GBP context
-    let disc =
-        finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-REAL")
-            .base_date(d(2025, 1, 2))
-            .knots([(0.0, 1.0), (5.0, 0.95)])
-            .build()
-            .unwrap();
+    let disc = finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
+        .base_date(d(2025, 1, 2))
+        .knots([(0.0, 1.0), (5.0, 0.95)])
+        .build()
+        .unwrap();
     ctx_gbp = ctx_gbp.insert(disc);
 
     let as_of = d(2025, 1, 2);
@@ -491,7 +489,7 @@ fn test_discount_curve_dependency() {
         .expect("ILB should declare a discount curve");
 
     // Assert
-    assert_eq!(curve_id.as_str(), "USD-REAL");
+    assert_eq!(curve_id.as_str(), "USD-OIS");
 }
 
 #[test]

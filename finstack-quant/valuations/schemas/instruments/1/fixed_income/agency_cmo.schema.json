@@ -253,6 +253,11 @@
           "const": "principal_only",
           "description": "Principal-Only strip",
           "type": "string"
+        },
+        {
+          "const": "accrual",
+          "description": "Accrual (Z) bond - capitalizes interest while senior tranches\nare outstanding; the accrual is redirected as accretion-directed\nprincipal to the current-pay tranches",
+          "type": "string"
         }
       ]
     },

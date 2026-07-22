@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from finstack_quant.finstack_quant import valuations as _valuations
 
+Bond = _valuations.instruments.Bond
+TermLoan = _valuations.instruments.TermLoan
 validate_instrument_json = _valuations.instruments.validate_instrument_json
 bond_from_cashflows_json = _valuations.instruments.bond_from_cashflows_json
 price_instrument = _valuations.instruments.price_instrument
@@ -32,6 +34,8 @@ structured_credit_tranche_metrics = _valuations.instruments.structured_credit_tr
 structured_credit_tranche_scenario_table = _valuations.instruments.structured_credit_tranche_scenario_table
 
 __all__: list[str] = [
+    "Bond",
+    "TermLoan",
     "bond_from_cashflows_json",
     "instrument_cashflows_json",
     "list_models",

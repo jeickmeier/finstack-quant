@@ -6,10 +6,13 @@ use finstack_quant_core::dates::DayCountContext;
 
 /// Breakeven inflation calculator for ILB.
 ///
-/// **Important**: This metric derives a "nominal yield" from the bond's
-/// `discount_curve_id`. If that curve is a **real** rate curve (e.g. "USD-REAL"),
-/// the breakeven number will be meaningless. For a correct breakeven, the discount
-/// curve should be a nominal curve, or the caller should use
+/// Derives the nominal-yield leg of the Fisher identity from the bond's
+/// `discount_curve_id`. That field is a **nominal** curve by contract (see the
+/// `InflationLinkedBond::discount_curve_id` field docs), so the annually
+/// compounded zero rate read off it at the bond's maturity is a genuine nominal
+/// yield and the Fisher computation is correct. If a real curve is wired in
+/// despite the contract, the breakeven collapses toward zero; callers needing a
+/// different nominal-yield source should use
 /// [`InflationLinkedBond::breakeven_inflation`] directly with an explicit nominal yield.
 pub(crate) struct BreakevenInflationCalculator;
 

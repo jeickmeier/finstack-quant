@@ -478,6 +478,8 @@ public = [
 [crates.valuations.instruments]
 python_package = "finstack_quant.valuations.instruments"
 public = [
+    "Bond",
+    "TermLoan",
     "bond_from_cashflows_json",
     "instrument_cashflows_json",
     "list_models",
@@ -1521,6 +1523,8 @@ dry_run = "dryRun"
 
 # Python twins that live below the valuations root after API consolidation.
 [wasm_valuations_subset.python_path_js_map]
+"instruments.Bond" = "Bond"
+"instruments.TermLoan" = "TermLoan"
 "instruments.bond_from_cashflows_json" = "bondFromCashflowsJson"
 "instruments.instrument_cashflows_json" = "instrumentCashflowsJson"
 
@@ -1573,6 +1577,8 @@ fx = [
     "QuantoOption",
 ]
 instruments = [
+    "Bond",
+    "TermLoan",
     "bondFromCashflowsJson",
     "instrumentCashflowsJson",
     "instrumentCashflowsWithMarket",

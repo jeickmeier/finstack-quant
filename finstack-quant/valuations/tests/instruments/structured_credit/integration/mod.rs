@@ -4,6 +4,7 @@
 
 pub mod calendar_tests;
 pub mod cashflow_generation_tests;
+pub mod custom_waterfall_tests;
 pub mod deal_type_tests;
 pub mod pricing_tests;
 pub mod serialization_tests;

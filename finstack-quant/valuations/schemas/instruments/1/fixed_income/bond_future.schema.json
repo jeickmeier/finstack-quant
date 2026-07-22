@@ -1660,7 +1660,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Cheapest-to-Deliver (CTD) bond identifier.\n\nThe CTD bond is the deliverable bond that maximizes the implied repo rate\n(or equivalently, minimizes the basis). Users can:\n\n1. **Specify directly**: Set this to a known CTD bond ID\n2. **Calculate automatically**: Use [`BondFuture::determine_ctd`] with bond clean prices\n\n# CTD Selection Methodology\n\nThe CTD is determined by comparing the **net basis** for each deliverable bond:\n\n```text\nNet Basis = Clean Price - (Futures Price × Conversion Factor)\n```\n\nThe bond with the **lowest net basis** (or highest implied repo) is the CTD.\nIn practice, this is usually the bond with:\n- Highest duration (in a rising rate environment)\n- Lowest duration (in a falling rate environment)\n- Lowest coupon (when yields are above the notional coupon)\n\n# Production Note\n\nFor production systems, use [`BondFuture::determine_ctd`] or integrate with\na real-time CTD analysis service. The CTD can change throughout the day as\nbond prices and repo rates fluctuate.\n\nOptional to support workflow where CTD is selected by pricing logic.\nIf omitted, the engine resolves CTD as:\n1) `ctd_bond.id` when embedded CTD bond is provided\n2) single deliverable bond in basket when basket length is 1"
+              "description": "Cheapest-to-Deliver (CTD) bond identifier.\n\nThe CTD bond is the deliverable bond that maximizes the implied repo rate\n(or equivalently, minimizes the basis). Users can:\n\n1. **Specify directly**: Set this to a known CTD bond ID\n2. **Calculate automatically**: Use [`BondFuture::determine_ctd`] with bond clean prices\n\n# CTD Selection Methodology\n\nThe CTD is determined by comparing the **gross basis** for each deliverable bond:\n\n```text\nGross Basis = Clean Price - (Futures Price × Conversion Factor)\n```\n\n(The *net* basis additionally subtracts the carry to delivery:\n`Net Basis = Gross Basis - Carry`.)\n\nThe bond with the **lowest basis** (or highest implied repo) is the CTD.\nIn practice, this is usually the bond with:\n- Highest duration (in a rising rate environment)\n- Lowest duration (in a falling rate environment)\n- Lowest coupon (when yields are above the notional coupon)\n\n# Production Note\n\nFor production systems, use [`BondFuture::determine_ctd`] or integrate with\na real-time CTD analysis service. The CTD can change throughout the day as\nbond prices and repo rates fluctuate.\n\nOptional to support workflow where CTD is selected by pricing logic.\nIf omitted, the engine resolves CTD as:\n1) `ctd_bond.id` when embedded CTD bond is provided\n2) single deliverable bond in basket when basket length is 1"
             },
             "deliverable_basket": {
               "description": "Basket of deliverable bonds with conversion factors",
@@ -1679,7 +1679,7 @@
             },
             "discount_curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Discount curve identifier for present value calculations"
+              "description": "Financing/discount curve identifier.\n\nUsed to carry the CTD bond forward to the delivery date (the cost of\nfinancing the position) whenever no explicit [`repo_curve_id`](Self::repo_curve_id)\nis set. Must be provisionable as a discount curve in the market context."
             },
             "expiry": {
               "description": "Future expiry date (last trading day)",
@@ -1737,7 +1737,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Optional repo/financing curve identifier.\n\nWhen set, this curve is used for implied repo rate calculations and\ncarry analysis instead of the general discount curve. This allows\ncapturing repo specials, where specific collateral (e.g., on-the-run\nTreasuries) trades at rates different from the general funding curve.\n\nIf `None`, the `discount_curve_id` is used for financing calculations."
+              "description": "Optional repo/financing curve identifier.\n\nWhen set, this curve is used for financing/carry calculations instead\nof `discount_curve_id`. This allows capturing repo specials, where\nspecific collateral (e.g., on-the-run Treasuries) trades at rates\ndifferent from the general funding curve.\n\nIf `None`, the `discount_curve_id` is used for financing calculations."
             }
           },
           "required": [

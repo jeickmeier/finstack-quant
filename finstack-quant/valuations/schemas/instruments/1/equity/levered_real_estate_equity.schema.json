@@ -391,6 +391,14 @@
           ],
           "description": "SIFMA settlement class override.\n\nWhen `None`, inferred from agency + term using\n[`SifmaSettlementClass::from_agency_term`]."
         },
+        "settlement_date": {
+          "description": "Explicit settlement date override.\n\nWhen set, bypasses the SIFMA calendar lookup for\n`settlement_year`/`settlement_month` in\n[`AgencyTba::get_settlement_date`]. Dollar rolls use this to keep leg\npricing consistent with explicit roll settlement dates.",
+          "format": "date",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "settlement_month": {
           "description": "Settlement month (1-12).",
           "format": "uint8",
@@ -433,6 +441,21 @@
         "discount_curve_id"
       ],
       "type": "object"
+    },
+    "AllocationMode": {
+      "description": "Allocation mode within a tier",
+      "oneOf": [
+        {
+          "const": "Sequential",
+          "description": "Pay recipients sequentially in order until tier allocation exhausted",
+          "type": "string"
+        },
+        {
+          "const": "ProRata",
+          "description": "Distribute proportionally by weight or equally if no weights",
+          "type": "string"
+        }
+      ]
     },
     "AmortizationSpec": {
       "description": "Amortization specification for principal over time.\n\nDescribes how principal amortizes or is exchanged during the life of the contract.\nUsed by instruments (e.g., bonds) and cashflow legs for consistent behavior.",
@@ -2787,7 +2810,7 @@
               "type": "null"
             }
           ],
-          "description": "Cheapest-to-Deliver (CTD) bond identifier.\n\nThe CTD bond is the deliverable bond that maximizes the implied repo rate\n(or equivalently, minimizes the basis). Users can:\n\n1. **Specify directly**: Set this to a known CTD bond ID\n2. **Calculate automatically**: Use [`BondFuture::determine_ctd`] with bond clean prices\n\n# CTD Selection Methodology\n\nThe CTD is determined by comparing the **net basis** for each deliverable bond:\n\n```text\nNet Basis = Clean Price - (Futures Price × Conversion Factor)\n```\n\nThe bond with the **lowest net basis** (or highest implied repo) is the CTD.\nIn practice, this is usually the bond with:\n- Highest duration (in a rising rate environment)\n- Lowest duration (in a falling rate environment)\n- Lowest coupon (when yields are above the notional coupon)\n\n# Production Note\n\nFor production systems, use [`BondFuture::determine_ctd`] or integrate with\na real-time CTD analysis service. The CTD can change throughout the day as\nbond prices and repo rates fluctuate.\n\nOptional to support workflow where CTD is selected by pricing logic.\nIf omitted, the engine resolves CTD as:\n1) `ctd_bond.id` when embedded CTD bond is provided\n2) single deliverable bond in basket when basket length is 1"
+          "description": "Cheapest-to-Deliver (CTD) bond identifier.\n\nThe CTD bond is the deliverable bond that maximizes the implied repo rate\n(or equivalently, minimizes the basis). Users can:\n\n1. **Specify directly**: Set this to a known CTD bond ID\n2. **Calculate automatically**: Use [`BondFuture::determine_ctd`] with bond clean prices\n\n# CTD Selection Methodology\n\nThe CTD is determined by comparing the **gross basis** for each deliverable bond:\n\n```text\nGross Basis = Clean Price - (Futures Price × Conversion Factor)\n```\n\n(The *net* basis additionally subtracts the carry to delivery:\n`Net Basis = Gross Basis - Carry`.)\n\nThe bond with the **lowest basis** (or highest implied repo) is the CTD.\nIn practice, this is usually the bond with:\n- Highest duration (in a rising rate environment)\n- Lowest duration (in a falling rate environment)\n- Lowest coupon (when yields are above the notional coupon)\n\n# Production Note\n\nFor production systems, use [`BondFuture::determine_ctd`] or integrate with\na real-time CTD analysis service. The CTD can change throughout the day as\nbond prices and repo rates fluctuate.\n\nOptional to support workflow where CTD is selected by pricing logic.\nIf omitted, the engine resolves CTD as:\n1) `ctd_bond.id` when embedded CTD bond is provided\n2) single deliverable bond in basket when basket length is 1"
         },
         "deliverable_basket": {
           "description": "Basket of deliverable bonds with conversion factors",
@@ -2806,7 +2829,7 @@
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier for present value calculations"
+          "description": "Financing/discount curve identifier.\n\nUsed to carry the CTD bond forward to the delivery date (the cost of\nfinancing the position) whenever no explicit [`repo_curve_id`](Self::repo_curve_id)\nis set. Must be provisionable as a discount curve in the market context."
         },
         "expiry": {
           "description": "Future expiry date (last trading day)",
@@ -2864,7 +2887,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional repo/financing curve identifier.\n\nWhen set, this curve is used for implied repo rate calculations and\ncarry analysis instead of the general discount curve. This allows\ncapturing repo specials, where specific collateral (e.g., on-the-run\nTreasuries) trades at rates different from the general funding curve.\n\nIf `None`, the `discount_curve_id` is used for financing calculations."
+          "description": "Optional repo/financing curve identifier.\n\nWhen set, this curve is used for financing/carry calculations instead\nof `discount_curve_id`. This allows capturing repo specials, where\nspecific collateral (e.g., on-the-run Treasuries) trades at rates\ndifferent from the general funding curve.\n\nIf `None`, the `discount_curve_id` is used for financing calculations."
         }
       },
       "required": [
@@ -4620,6 +4643,11 @@
           "const": "principal_only",
           "description": "Principal-Only strip",
           "type": "string"
+        },
+        {
+          "const": "accrual",
+          "description": "Accrual (Z) bond - capitalizes interest while senior tranches\nare outstanding; the accrual is redirected as accretion-directed\nprincipal to the current-pay tranches",
+          "type": "string"
         }
       ]
     },
@@ -6344,7 +6372,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Bond will mandatorily convert on the specified date.",
+          "description": "Bond will mandatorily convert on the specified date.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from this date; early voluntary conversion before\nthe mandatory date is not modeled.",
           "properties": {
             "MandatoryOn": {
               "type": "string"
@@ -6397,7 +6425,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).\n\nAt `conversion_date`, the delivery ratio depends on the stock price:\n- If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)\n- If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)\n- If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)\n\n# Industry Practice\n\nPERCS (Preference Equity Redemption Cumulative Stock) cap the upside.\nDECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.\nACES (Automatically Convertible Equity Securities) are similar to DECS.",
+          "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).\n\nAt `conversion_date`, the delivery ratio depends on the stock price:\n- If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)\n- If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)\n- If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)\n\n# Industry Practice\n\nPERCS (Preference Equity Redemption Cumulative Stock) cap the upside.\nDECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.\nACES (Automatically Convertible Equity Securities) are similar to DECS.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from `conversion_date`; early voluntary conversion\nbefore that date (offered by some mandatory structures) is not modeled.",
           "properties": {
             "MandatoryVariable": {
               "properties": {
@@ -6511,7 +6539,7 @@
               "type": "null"
             }
           ],
-          "description": "Credit curve identifier for risky discounting (bond floor).\nIf not provided, falls back to discount_curve_id (implies no credit spread)."
+          "description": "Credit curve identifier for risky discounting (bond floor).\nIf not provided, falls back to discount_curve_id (implies no credit spread).\n\n**Convention**: this curve must represent ZERO-RECOVERY (pure hazard)\nrisky discounting, i.e. `risky_df = rf_df * survival_probability`. The\npricer converts it to recovery-adjusted discounting via the blend\n`risky * (1 - R) + rf * R` using [`Self::recovery_rate`]. Supplying a\nmarket recovery-adjusted spread curve here double-counts `(1 - R)` and\noverstates the credit discount."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -6608,7 +6636,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional soft-call trigger condition.\n\nWhen set, the issuer can only exercise call provisions if the underlying\nstock price satisfies the trigger condition (e.g., above 130% of conversion\nprice for 20 of 30 trading days)."
+          "description": "Optional soft-call trigger condition.\n\nWhen set, the issuer can only exercise call provisions if the underlying\nstock price satisfies the trigger condition (e.g., above 130% of conversion\nprice for 20 of 30 trading days).\n\n**Modeling scope**: a single trigger gates the ENTIRE callable life —\nevery window in [`Self::call_put`] is subject to it. A soft-call period\nfollowed by an unconditional hard-call period is not representable\n(omit the trigger to model an unconditional call). In the tree the\ntrigger is evaluated on the instantaneous node spot with a\nBroadie-Glasserman-Kou-style barrier adjustment approximating the\nk-of-n-days observation window; the realized path is not tracked."
         },
         "underlying_equity_id": {
           "description": "Optional underlying equity identifier (ticker or instrument id).",
@@ -6853,6 +6881,32 @@
           "type": "object"
         }
       ]
+    },
+    "CoverageTestRules": {
+      "additionalProperties": false,
+      "description": "Simple OC/IC trigger for diversion",
+      "properties": {
+        "haircuts": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Haircuts applied by collateral rating",
+          "type": "object"
+        },
+        "par_value_threshold": {
+          "description": "Optional par-value threshold ratio (collateral / liabilities)",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "haircuts"
+      ],
+      "type": "object"
     },
     "CoverageTrigger": {
       "additionalProperties": false,
@@ -7360,7 +7414,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Market-anchored credit spread process calibrated to a hazard curve and CDS option vol.\n\nThe mean level is anchored to the time-average spread implied by the input hazard\ncurve (over tenor T chosen as facility maturity by default). The initial spread is set\nto the first-segment spread, and the volatility is scaled from the CDS index option\nimplied volatility.",
+          "description": "Market-anchored credit spread process calibrated to a hazard curve and CDS option vol.\n\nAt the simulation anchor (the later of valuation and commitment date),\nthe initial spread is set from the contemporaneous hazard and the mean\nlevel is anchored to conditional survival over the remaining tenor.\nVolatility is scaled from the CDS index option implied volatility.",
           "properties": {
             "MarketAnchored": {
               "properties": {
@@ -8054,7 +8108,7 @@
       "type": "object"
     },
     "DividendAdjustment": {
-      "description": "How dividends affect conversion terms.",
+      "description": "How dividends affect conversion terms (dividend protection).\n\nDividend protection compensates the holder for dividends paid on the\nunderlying, which otherwise leak value from the conversion option (the\nstock drifts at `r - q` under the risk-neutral measure). The variants\ncarry no threshold parameter, so protection is **full**: the entire\ncontinuous dividend yield `q` is protected.\n\n# Pricing model (continuous-yield accretion)\n\nUnder the continuous dividend yield `q` used by the tree pricer, each\nprotected dividend payment bumps the conversion ratio by the dividend\nfraction; the continuous limit is exponential accretion from the\nvaluation date:\n\n```text\nAdjustRatio:  ratio(t)  = ratio_0 * exp(q * t)\nAdjustPrice:  K_conv(t) = K_0 * exp(-q * t)\n```\n\nSince `ratio = notional / K_conv`, the price decay is mathematically the\nsame ratio accretion — the pricer implements both variants through the\nsingle ratio-accretion mechanism. Accretion composes multiplicatively on\ntop of any anti-dilution adjustments from\n[`ConvertibleBond::effective_conversion_ratio`].\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::convertible::{\n    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,\n};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```",
       "oneOf": [
         {
           "const": "None",
@@ -11596,7 +11650,7 @@
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier (real or nominal depending on method)"
+          "description": "Discount curve identifier. This **must** be a NOMINAL curve (e.g.\n\"USD-OIS\"): the cashflow schedule contains inflation-projected nominal\namounts (real amount × projected index ratio), so discounting on a real\ncurve would double-count inflation. The real curve is never used for PV;\nit enters only through real-yield style metrics computed from real flows."
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
@@ -13217,7 +13271,7 @@
             "HullWhite1F": {
               "properties": {
                 "initial": {
-                  "description": "Initial short rate",
+                  "description": "Initial short rate used only when `sigma == 0`. For a stochastic\nprocess, the pricer derives the initial rate from the facility's\ndiscount curve at the valuation anchor.",
                   "format": "double",
                   "type": "number"
                 },
@@ -13232,7 +13286,7 @@
                   "type": "number"
                 },
                 "theta": {
-                  "description": "Constant mean reversion level (θ)",
+                  "description": "Constant mean reversion level used only when `sigma == 0`. For a\nstochastic process, the pricer fits a time-dependent θ(t) to the\nfacility's discount curve.",
                   "format": "double",
                   "type": "number"
                 }
@@ -13737,6 +13791,26 @@
         "spread_bps"
       ],
       "type": "object"
+    },
+    "ManagementFeeType": {
+      "description": "Type of management fee",
+      "oneOf": [
+        {
+          "const": "Senior",
+          "description": "Senior variant.",
+          "type": "string"
+        },
+        {
+          "const": "Subordinated",
+          "description": "Subordinated variant.",
+          "type": "string"
+        },
+        {
+          "const": "Incentive",
+          "description": "Incentive variant.",
+          "type": "string"
+        }
+      ]
     },
     "MarginCallTiming": {
       "additionalProperties": false,
@@ -14690,6 +14764,268 @@
         {
           "const": "receive",
           "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)",
+          "type": "string"
+        }
+      ]
+    },
+    "PaymentCalculation": {
+      "description": "How to calculate payment amount",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Fixed amount",
+          "properties": {
+            "FixedAmount": {
+              "additionalProperties": false,
+              "properties": {
+                "amount": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+                  "description": "Amount."
+                },
+                "rounding": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/RoundingConvention"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Rounding convention."
+                }
+              },
+              "required": [
+                "amount"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "FixedAmount"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Percentage of collateral balance",
+          "properties": {
+            "PercentageOfCollateral": {
+              "additionalProperties": false,
+              "properties": {
+                "annualized": {
+                  "description": "Annualized.",
+                  "type": "boolean"
+                },
+                "day_count": {
+                  "anyOf": [
+                    {
+                      "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Day count convention for annualization."
+                },
+                "rate": {
+                  "description": "Rate.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "rounding": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/RoundingConvention"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Rounding convention."
+                }
+              },
+              "required": [
+                "rate",
+                "annualized"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "PercentageOfCollateral"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Interest due on tranche",
+          "properties": {
+            "TrancheInterest": {
+              "additionalProperties": false,
+              "properties": {
+                "rounding": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/RoundingConvention"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Rounding convention."
+                },
+                "tranche_id": {
+                  "description": "Tranche id.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tranche_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "TrancheInterest"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Principal payment to tranche",
+          "properties": {
+            "TranchePrincipal": {
+              "additionalProperties": false,
+              "properties": {
+                "rounding": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/RoundingConvention"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Rounding convention."
+                },
+                "target_balance": {
+                  "anyOf": [
+                    {
+                      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Target balance."
+                },
+                "tranche_id": {
+                  "description": "Tranche id.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tranche_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "TranchePrincipal"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "ResidualCash",
+          "description": "All remaining cash",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Reserve account replenishment (up to target balance).\n\nThe current reserve balance is passed dynamically via `WaterfallContext`\nat execution time, not stored here, because the balance changes each period.",
+          "properties": {
+            "ReserveReplenishment": {
+              "additionalProperties": false,
+              "properties": {
+                "target_balance": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+                  "description": "Target reserve balance the account should be replenished to."
+                }
+              },
+              "required": [
+                "target_balance"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "ReserveReplenishment"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Tranche interest with the coupon rate capped (available-funds / net-WAC cap).\n\nIdentical to [`PaymentCalculation::TrancheInterest`] except the effective\nannualized coupon is capped at `cap_rate`, modelling an available-funds\ncap where a tranche cannot be paid more interest than the collateral's\nnet weighted-average coupon supports. The capped shortfall is unpaid\n(no carryforward in this variant).",
+          "properties": {
+            "CappedTrancheInterest": {
+              "additionalProperties": false,
+              "properties": {
+                "cap_rate": {
+                  "description": "Cap on the annualized coupon rate (decimal, e.g. `0.03` = 3%).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "rounding": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/RoundingConvention"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Rounding convention."
+                },
+                "tranche_id": {
+                  "description": "Tranche id.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tranche_id",
+                "cap_rate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CappedTrancheInterest"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PaymentType": {
+      "description": "Payment type classification",
+      "oneOf": [
+        {
+          "const": "Fee",
+          "description": "Fee payment",
+          "type": "string"
+        },
+        {
+          "const": "Interest",
+          "description": "Interest payment",
+          "type": "string"
+        },
+        {
+          "const": "Principal",
+          "description": "Principal payment",
+          "type": "string"
+        },
+        {
+          "const": "Residual",
+          "description": "Residual/equity distribution",
           "type": "string"
         }
       ]
@@ -15914,6 +16250,100 @@
         }
       ]
     },
+    "Recipient": {
+      "additionalProperties": false,
+      "description": "Individual payment recipient within a tier",
+      "properties": {
+        "calculation": {
+          "$ref": "#/$defs/PaymentCalculation",
+          "description": "How to calculate payment amount"
+        },
+        "id": {
+          "description": "Unique identifier",
+          "type": "string"
+        },
+        "recipient_type": {
+          "$ref": "#/$defs/RecipientType",
+          "description": "Recipient type"
+        },
+        "weight": {
+          "description": "Weight for pro-rata distribution (None = equal weight)",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "recipient_type",
+        "calculation"
+      ],
+      "type": "object"
+    },
+    "RecipientType": {
+      "description": "Recipient of waterfall payments",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Service provider (trustee, admin, rating agency, etc.)",
+          "properties": {
+            "ServiceProvider": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "ServiceProvider"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Manager fee (type indicates senior/subordinated/incentive)",
+          "properties": {
+            "ManagerFee": {
+              "$ref": "#/$defs/ManagementFeeType"
+            }
+          },
+          "required": [
+            "ManagerFee"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Tranche payment",
+          "properties": {
+            "Tranche": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Tranche"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "Equity",
+          "description": "Equity/residual distribution",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Reserve account (credit enhancement replenishment)",
+          "properties": {
+            "ReserveAccount": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "ReserveAccount"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "ReinvestmentCriteria": {
       "additionalProperties": false,
       "description": "Criteria for reinvestment during revolving period",
@@ -16554,6 +16984,26 @@
         "facility_fee_bp"
       ],
       "type": "object"
+    },
+    "RoundingConvention": {
+      "description": "Rounding convention for payments",
+      "oneOf": [
+        {
+          "const": "Nearest",
+          "description": "Round to nearest precision",
+          "type": "string"
+        },
+        {
+          "const": "Floor",
+          "description": "Round down (floor)",
+          "type": "string"
+        },
+        {
+          "const": "Ceiling",
+          "description": "Round up (ceiling)",
+          "type": "string"
+        }
+      ]
     },
     "SABRParameters": {
       "description": "SABR model parameters",
@@ -17611,6 +18061,17 @@
         "tranches": {
           "$ref": "#/$defs/TrancheStructure",
           "description": "Tranche structure."
+        },
+        "waterfall": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Waterfall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Custom payment waterfall used verbatim for pricing.\n\n`None` (the default) synthesizes the canonical sequential template from\nthe tranche structure ([`Waterfall::standard_sequential`]) plus any\n[`Self::fees`]. When set, this waterfall is authoritative:\n[`Self::create_waterfall`] returns it (with deal-level\n[`Self::coverage_triggers`] appended) and no template is synthesized.\n[`Self::waterfall_rules`] overlays (AFC, step-down, shifting interest,\ncontrolled accumulation) still apply — they rewrite tiers generically by\n`payment_type`, so they compose with custom structures.\n\nConstraints, enforced by [`Self::with_waterfall`] and re-checked at\npricing time so JSON-supplied deals get identical errors:\n- every tranche referenced by a tier recipient or coverage trigger must\n  exist in `tranches`, and tranche-keyed recipients must not target an\n  equity tranche (the engine records equity flows under\n  [`RecipientType::Equity`], paid via `ResidualCash`);\n- `fees` must be `None` — senior fees are expressed as *leading*\n  [`PaymentType::Fee`] tiers of the custom waterfall, which then feed\n  the IC numerator and excess-spread/reserve sizing exactly like\n  template fees (fee tiers ranked below note interest are junior fees\n  and are deliberately not netted as senior claims);\n- the waterfall's `base_currency` must match the pool currency."
         },
         "waterfall_rules": {
           "anyOf": [
@@ -19425,6 +19886,47 @@
         }
       ]
     },
+    "Waterfall": {
+      "additionalProperties": false,
+      "description": "Main waterfall engine with tier-based distribution",
+      "properties": {
+        "base_currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Base currency"
+        },
+        "coverage_rules": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CoverageTestRules"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional coverage test rules (haircuts, par thresholds)"
+        },
+        "coverage_triggers": {
+          "description": "Coverage triggers for OC/IC diversion",
+          "items": {
+            "$ref": "#/$defs/CoverageTrigger2"
+          },
+          "type": "array"
+        },
+        "tiers": {
+          "description": "Ordered payment tiers",
+          "items": {
+            "$ref": "#/$defs/WaterfallTier"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "tiers",
+        "coverage_triggers",
+        "base_currency"
+      ],
+      "type": "object"
+    },
     "WaterfallRules": {
       "additionalProperties": false,
       "description": "Declarative, additively-applied waterfall rules layered onto a deal's base\nwaterfall.\n\nEach sub-spec is optional; when none are present the resolved waterfall is\nidentical to the base waterfall. Applied by\n[`crate::instruments::fixed_income::structured_credit::resolve_waterfall`].",
@@ -19556,6 +20058,50 @@
           "type": "string"
         }
       ]
+    },
+    "WaterfallTier": {
+      "additionalProperties": false,
+      "description": "Waterfall tier with multiple recipients",
+      "properties": {
+        "allocation_mode": {
+          "$ref": "#/$defs/AllocationMode",
+          "description": "How to allocate within tier"
+        },
+        "divertible": {
+          "description": "Whether this tier can be diverted if coverage tests fail",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "Unique tier identifier",
+          "type": "string"
+        },
+        "payment_type": {
+          "$ref": "#/$defs/PaymentType",
+          "description": "Payment type classification"
+        },
+        "priority": {
+          "description": "Priority order (lower = higher priority)",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recipients": {
+          "description": "Recipients in this tier",
+          "items": {
+            "$ref": "#/$defs/Recipient"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "priority",
+        "recipients",
+        "payment_type",
+        "allocation_mode",
+        "divertible"
+      ],
+      "type": "object"
     },
     "XccySwap": {
       "additionalProperties": false,

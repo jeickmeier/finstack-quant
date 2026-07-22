@@ -13,28 +13,16 @@ use finstack_quant_core::market_data::context::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 
-/// Prepayment rate-sensitivity coefficient β for effective duration/convexity.
-///
-/// MBS prepayment responds to rates: when rates fall the refinancing incentive
-/// rises and prepayment speeds up; when rates rise the lock-in effect slows
-/// prepayment. We apply the refinancing-incentive multiplier `exp(-β·Δy)` to
-/// the pool's prepayment *speed* in the bumped scenarios so the effective
-/// measures capture the negative convexity that a *static* PSA bump cannot.
-///
-/// β is calibrated so a 100 bp rate move roughly doubles (rates down) or
-/// halves (rates up) the prepayment speed — the standard rule-of-thumb shape
-/// of the empirical refinancing S-curve: `β = ln(2) / 0.01 ≈ 69.3`. This is a
-/// *speed-multiplier* sensitivity for a parallel curve bump and is distinct
-/// from the Monte-Carlo OAS model's per-path short-rate SMM sensitivity.
-const PREPAY_RATE_SENSITIVITY: f64 = 69.314_718_055_994_53; // ln(2) / 0.01
+use super::PREPAY_RATE_SENSITIVITY;
 
 /// Scale a prepayment model's speed by a rate-shift multiplier.
 ///
 /// `rate_shift` is the parallel curve shift in decimal (e.g. `+0.0025` for a
-/// +25 bp bump). The prepayment speed is multiplied by `exp(-β·rate_shift)`:
-/// a positive shift (rates up) slows prepayment, a negative shift speeds it
-/// up. For a PSA model the `speed_multiplier` is scaled; for constant/lockout
-/// models the annual `cpr` is scaled.
+/// +25 bp bump). The prepayment speed is multiplied by `exp(-β·rate_shift)`
+/// with the module-shared β ([`PREPAY_RATE_SENSITIVITY`]): a positive shift
+/// (rates up) slows prepayment, a negative shift speeds it up. For a PSA
+/// model the `speed_multiplier` is scaled; for constant/lockout models the
+/// annual `cpr` is scaled.
 fn rate_shift_prepayment(model: &PrepaymentModelSpec, rate_shift: f64) -> PrepaymentModelSpec {
     let multiplier = (-PREPAY_RATE_SENSITIVITY * rate_shift).exp();
     match &model.curve {

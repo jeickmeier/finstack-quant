@@ -1,6 +1,6 @@
 //! Instrument pricing pipeline: JSON instrument + market → ValuationResult.
 
-use crate::bindings::extract::extract_market;
+use crate::bindings::extract::{extract_instrument_json, extract_market};
 use crate::errors::display_to_py;
 use pyo3::prelude::*;
 
@@ -25,8 +25,9 @@ fn validate_pricing_instrument_json(
 ///
 /// Parameters
 /// ----------
-/// instrument_json : str
-///     Tagged instrument JSON (``{"type": "bond", ...}``).
+/// instrument_json : str | Bond | TermLoan
+///     Tagged instrument JSON (``{"type": "bond", ...}``) or a typed
+///     ``Bond`` / ``TermLoan`` instance.
 /// market : MarketContext | str
 ///     A ``MarketContext`` object or a JSON string.
 /// as_of : str
@@ -44,14 +45,14 @@ fn validate_pricing_instrument_json(
 #[pyo3(signature = (instrument_json, market, as_of, model="default"))]
 fn price_instrument(
     py: Python<'_>,
-    instrument_json: &str,
+    instrument_json: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
     as_of: &str,
     model: &str,
 ) -> PyResult<String> {
-    validate_pricing_instrument_json(py, instrument_json, None)?;
+    let instrument_json = extract_instrument_json(instrument_json)?;
+    validate_pricing_instrument_json(py, &instrument_json, None)?;
     let market = extract_market(py, market)?;
-    let instrument_json = instrument_json.to_owned();
     let as_of = as_of.to_owned();
     let model = model.to_owned();
 
@@ -71,8 +72,8 @@ fn price_instrument(
 ///
 /// Parameters
 /// ----------
-/// instrument_json : str
-///     Tagged instrument JSON.
+/// instrument_json : str | Bond | TermLoan
+///     Tagged instrument JSON or a typed ``Bond`` / ``TermLoan`` instance.
 /// market : MarketContext | str
 ///     A ``MarketContext`` object or a JSON string.
 /// as_of : str
@@ -102,7 +103,7 @@ fn price_instrument(
 #[allow(clippy::too_many_arguments)]
 fn price_instrument_with_metrics(
     py: Python<'_>,
-    instrument_json: &str,
+    instrument_json: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
     as_of: &str,
     model: &str,
@@ -110,9 +111,9 @@ fn price_instrument_with_metrics(
     pricing_options: Option<&str>,
     market_history: Option<&str>,
 ) -> PyResult<String> {
-    validate_pricing_instrument_json(py, instrument_json, pricing_options)?;
+    let instrument_json = extract_instrument_json(instrument_json)?;
+    validate_pricing_instrument_json(py, &instrument_json, pricing_options)?;
     let market = extract_market(py, market)?;
-    let instrument_json = instrument_json.to_owned();
     let as_of = as_of.to_owned();
     let model = model.to_owned();
     let pricing_options = pricing_options.map(str::to_owned);
@@ -202,8 +203,8 @@ fn list_models_grouped() -> std::collections::BTreeMap<String, Vec<String>> {
 ///
 /// Parameters
 /// ----------
-/// instrument_json : str
-///     Tagged instrument JSON.
+/// instrument_json : str | Bond | TermLoan
+///     Tagged instrument JSON or a typed ``Bond`` / ``TermLoan`` instance.
 /// market : MarketContext | str
 ///     A ``MarketContext`` object or a JSON string.
 /// as_of : str
@@ -219,14 +220,14 @@ fn list_models_grouped() -> std::collections::BTreeMap<String, Vec<String>> {
 #[pyfunction]
 fn instrument_cashflows_json(
     py: Python<'_>,
-    instrument_json: &str,
+    instrument_json: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
     as_of: &str,
     model: &str,
 ) -> PyResult<String> {
-    validate_pricing_instrument_json(py, instrument_json, None)?;
+    let instrument_json = extract_instrument_json(instrument_json)?;
+    validate_pricing_instrument_json(py, &instrument_json, None)?;
     let market = extract_market(py, market)?;
-    let instrument_json = instrument_json.to_owned();
     let as_of = as_of.to_owned();
     let model = model.to_owned();
 

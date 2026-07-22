@@ -136,7 +136,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Bond will mandatorily convert on the specified date.",
+          "description": "Bond will mandatorily convert on the specified date.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from this date; early voluntary conversion before\nthe mandatory date is not modeled.",
           "properties": {
             "MandatoryOn": {
               "type": "string"
@@ -189,7 +189,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).\n\nAt `conversion_date`, the delivery ratio depends on the stock price:\n- If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)\n- If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)\n- If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)\n\n# Industry Practice\n\nPERCS (Preference Equity Redemption Cumulative Stock) cap the upside.\nDECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.\nACES (Automatically Convertible Equity Securities) are similar to DECS.",
+          "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).\n\nAt `conversion_date`, the delivery ratio depends on the stock price:\n- If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)\n- If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)\n- If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)\n\n# Industry Practice\n\nPERCS (Preference Equity Redemption Cumulative Stock) cap the upside.\nDECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.\nACES (Automatically Convertible Equity Securities) are similar to DECS.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from `conversion_date`; early voluntary conversion\nbefore that date (offered by some mandatory structures) is not modeled.",
           "properties": {
             "MandatoryVariable": {
               "properties": {
@@ -355,7 +355,7 @@
       "type": "object"
     },
     "DividendAdjustment": {
-      "description": "How dividends affect conversion terms.",
+      "description": "How dividends affect conversion terms (dividend protection).\n\nDividend protection compensates the holder for dividends paid on the\nunderlying, which otherwise leak value from the conversion option (the\nstock drifts at `r - q` under the risk-neutral measure). The variants\ncarry no threshold parameter, so protection is **full**: the entire\ncontinuous dividend yield `q` is protected.\n\n# Pricing model (continuous-yield accretion)\n\nUnder the continuous dividend yield `q` used by the tree pricer, each\nprotected dividend payment bumps the conversion ratio by the dividend\nfraction; the continuous limit is exponential accretion from the\nvaluation date:\n\n```text\nAdjustRatio:  ratio(t)  = ratio_0 * exp(q * t)\nAdjustPrice:  K_conv(t) = K_0 * exp(-q * t)\n```\n\nSince `ratio = notional / K_conv`, the price decay is mathematically the\nsame ratio accretion — the pricer implements both variants through the\nsingle ratio-accretion mechanism. Accretion composes multiplicatively on\ntop of any anti-dilution adjustments from\n[`ConvertibleBond::effective_conversion_ratio`].\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::convertible::{\n    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,\n};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```",
       "oneOf": [
         {
           "const": "None",
@@ -982,7 +982,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Credit curve identifier for risky discounting (bond floor).\nIf not provided, falls back to discount_curve_id (implies no credit spread)."
+              "description": "Credit curve identifier for risky discounting (bond floor).\nIf not provided, falls back to discount_curve_id (implies no credit spread).\n\n**Convention**: this curve must represent ZERO-RECOVERY (pure hazard)\nrisky discounting, i.e. `risky_df = rf_df * survival_probability`. The\npricer converts it to recovery-adjusted discounting via the blend\n`risky * (1 - R) + rf * R` using [`Self::recovery_rate`]. Supplying a\nmarket recovery-adjusted spread curve here double-counts `(1 - R)` and\noverstates the credit discount."
             },
             "discount_curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -1079,7 +1079,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Optional soft-call trigger condition.\n\nWhen set, the issuer can only exercise call provisions if the underlying\nstock price satisfies the trigger condition (e.g., above 130% of conversion\nprice for 20 of 30 trading days)."
+              "description": "Optional soft-call trigger condition.\n\nWhen set, the issuer can only exercise call provisions if the underlying\nstock price satisfies the trigger condition (e.g., above 130% of conversion\nprice for 20 of 30 trading days).\n\n**Modeling scope**: a single trigger gates the ENTIRE callable life —\nevery window in [`Self::call_put`] is subject to it. A soft-call period\nfollowed by an unconditional hard-call period is not representable\n(omit the trigger to model an unconditional call). In the tree the\ntrigger is evaluated on the instantaneous node spot with a\nBroadie-Glasserman-Kou-style barrier adjustment approximating the\nk-of-n-days observation window; the realized path is not tracked."
             },
             "underlying_equity_id": {
               "description": "Optional underlying equity identifier (ticker or instrument id).",

@@ -121,8 +121,10 @@ pub enum PaymentCalculation {
     /// Identical to [`PaymentCalculation::TrancheInterest`] except the effective
     /// annualized coupon is capped at `cap_rate`, modelling an available-funds
     /// cap where a tranche cannot be paid more interest than the collateral's
-    /// net weighted-average coupon supports. The capped shortfall is unpaid
-    /// (no carryforward in this variant).
+    /// net weighted-average coupon supports. The cap defines the *claim*, not
+    /// just the allocation: the capped-off coupon is never owed, so it does not
+    /// defer, does not PIK, and does not enter IC coverage or excess-spread
+    /// sizing (no carryforward in this variant).
     CappedTrancheInterest {
         /// Tranche id.
         tranche_id: String,

@@ -11,13 +11,13 @@
 //! in the contract's NPV. The conversion factor scaling is handled automatically through
 //! the pricing formula:
 //!
-//! - Model Price = CTD Clean Price / Conversion Factor
-//! - NPV = (Quoted Price - Model Price) × Contract Size × Number of Contracts
+//! - Model Price = Carry-Adjusted Forward CTD Clean Price / Conversion Factor
+//! - NPV = (Model Price - Quoted Price) × (Notional / 100) × Position Sign
 //!
 //! When the discount curve is bumped:
-//! 1. CTD bond's clean price changes by Δ
+//! 1. CTD bond's forward clean price changes by Δ
 //! 2. Model price changes by Δ / CF (conversion factor scales the sensitivity)
-//! 3. NPV changes by -Δ / CF × Contract Size × Num Contracts
+//! 3. NPV changes by Δ / CF × (Notional / 100) × Position Sign
 //! 4. DV01 = -ΔNPV / (1 basis point)
 //!
 //! This ensures that the contract DV01 correctly reflects the conversion factor scaling.

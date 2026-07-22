@@ -304,38 +304,6 @@ impl CorrelationStructure {
         }
     }
 
-    /// Get the prepayment factor loading.
-    ///
-    /// Derived from prepay-default correlation and asset correlation.
-    /// Factor loading represents how much prepayment responds to systematic factor.
-    pub fn prepay_factor_loading(&self) -> f64 {
-        let asset_corr = self.asset_correlation();
-        let prepay_default_corr = self.prepay_default_correlation();
-
-        // Factor loading from correlation:
-        // ρ = β_prepay * β_default (approximately)
-        // Assuming default factor loading ≈ sqrt(asset_correlation)
-        // prepay_factor_loading = prepay_default_correlation / sqrt(asset_correlation)
-        let default_loading = asset_corr.sqrt();
-        if default_loading > 0.001 {
-            // Prepay loading with opposite sign (prepays typically anti-correlate with defaults)
-            (prepay_default_corr / default_loading).clamp(-1.0, 1.0)
-        } else {
-            // Low default correlation → default to weak prepay factor loading
-            -0.3
-        }
-    }
-
-    /// Get the default factor loading.
-    ///
-    /// Derived from asset correlation using single-factor model assumption.
-    /// Factor loading β such that ρ ≈ β².
-    pub fn default_factor_loading(&self) -> f64 {
-        // For Gaussian copula: correlation ≈ factor_loading²
-        let asset_corr = self.asset_correlation();
-        asset_corr.sqrt()
-    }
-
     /// Bump asset correlation by the given amount.
     ///
     /// For flat structures, bumps the single asset correlation.

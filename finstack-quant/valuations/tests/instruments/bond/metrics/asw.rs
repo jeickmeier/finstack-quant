@@ -265,6 +265,121 @@ fn test_asw_market_tightens_when_price_rises() {
     );
 }
 
+/// The discount-ratio fallback (no forward curve) must amortize the par-par
+/// upfront over the **floating-leg** annuity, not the fixed-leg annuity:
+/// `ASW_mkt = [(C - par_rate)·Ann_fixed + (1 - p)] / Ann_float`, where the
+/// floating leg is proxied on the fixed-leg schedule with the discount
+/// curve's day count.
+///
+/// This test constructs a case where the two annuities genuinely differ
+/// (fixed leg 30/360 vs discount curve Act/360) and asserts the metric
+/// matches the hand-derived formula — and would not match the old
+/// fixed-annuity amortization.
+#[test]
+fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
+    use finstack_quant_core::dates::ScheduleBuilder;
+    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
+        fixed_leg_annuity, par_rate_and_annuity_from_discount,
+    };
+
+    let as_of = date!(2025 - 01 - 01);
+    let clean_px = 97.0;
+    let mut bond = simple_fixed_bond(as_of);
+    // Quote on the valuation date (no settlement lag) so the test schedule
+    // anchors at `as_of` exactly like the calculator's quote date, and
+    // accrued is zero (valuation on the issue date).
+    bond.settlement_convention = None;
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
+
+    // Discount curve on Act/360 so the floating-leg proxy annuity differs
+    // from the 30/360 fixed-leg annuity.
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 1.0), (5.0, 0.9)])
+        .interp(InterpStyle::LogLinear)
+        .build()
+        .expect("discount curve should build");
+    let market = MarketContext::new().insert(disc.clone());
+
+    let registry = standard_registry();
+    let mut ctx = MetricContext::new(
+        Arc::new(bond.clone()),
+        Arc::new(market),
+        as_of,
+        Money::new(100.0, Currency::USD),
+        MetricContext::default_config(),
+    );
+    let asw_mkt = *registry
+        .compute(&[MetricId::ASWMarket], &mut ctx)
+        .expect("ASW market fallback should succeed")
+        .get(&MetricId::ASWMarket)
+        .expect("ASW market result");
+
+    // Hand-derived expectation on the same fixed-leg schedule.
+    let CashflowSpec::Fixed(spec) = &bond.cashflow_spec else {
+        panic!("expected fixed bond")
+    };
+    let mut builder = ScheduleBuilder::new(as_of, bond.maturity)
+        .expect("schedule builder")
+        .frequency(spec.schedule.freq)
+        .stub_rule(spec.schedule.stub);
+    if let Some(cal) =
+        finstack_quant_core::dates::calendar::calendar_by_id(&spec.schedule.calendar_id)
+    {
+        builder = builder.adjust_with(spec.schedule.bdc, cal);
+    }
+    let sched: Vec<time::Date> = builder.build().expect("schedule").into_iter().collect();
+
+    let (par_rate, fixed_ann) = par_rate_and_annuity_from_discount(
+        &disc,
+        spec.schedule.dc,
+        Some(spec.schedule.freq),
+        &sched,
+    )
+    .expect("par rate and fixed annuity");
+    let float_ann =
+        fixed_leg_annuity(&disc, disc.day_count(), None, &sched).expect("float annuity");
+
+    // The two annuities must genuinely differ for this test to bite.
+    assert!(
+        (fixed_ann - float_ann).abs() > 1e-4,
+        "fixed ({fixed_ann}) and floating ({float_ann}) annuities should differ"
+    );
+
+    let coupon = rust_decimal::prelude::ToPrimitive::to_f64(&spec.rate).unwrap_or(0.0);
+    let price_pct = clean_px / 100.0; // zero accrued on the issue date
+
+    // Exact par-par asset-swap formula, derived independently of the
+    // implementation: spread = [(C - par)·Ann_fixed + (1 - p)] / Ann_float.
+    let expected = ((coupon - par_rate) * fixed_ann + (1.0 - price_pct)) / float_ann;
+    assert!(
+        (asw_mkt - expected).abs() < 1e-12,
+        "fallback ASW must match the exact par-par formula: \
+         expected {expected}, got {asw_mkt}"
+    );
+
+    // Guard: the old fixed-annuity upfront amortization gives a materially
+    // different value.
+    let old_formula = (coupon - par_rate) + (1.0 - price_pct) / fixed_ann;
+    assert!(
+        (asw_mkt - old_formula).abs() > 1e-6,
+        "test setup should distinguish floating- from fixed-annuity amortization"
+    );
+
+    // Guard: the intermediate (incomplete) form that amortized only the
+    // upfront over the floating annuity but left the coupon term unweighted
+    // must also be distinguishable — this is the form a prior fix landed on.
+    let unweighted_coupon_formula = (coupon - par_rate) + (1.0 - price_pct) / float_ann;
+    assert!(
+        (asw_mkt - unweighted_coupon_formula).abs() > 1e-9,
+        "test setup should distinguish the fixed-annuity-weighted coupon term \
+         from the unweighted form (requires coupon != par_rate and \
+         fixed_ann != float_ann)"
+    );
+}
+
 #[test]
 fn test_asw_par_metric_rejects_matured_schedule() {
     let issue = date!(2020 - 01 - 01);

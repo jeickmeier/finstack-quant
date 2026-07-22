@@ -523,24 +523,48 @@ fn test_fi_index_trs_duration_dv01_based_on_duration() {
     // Arrange
     let market = create_market_context();
     let as_of = as_of_date();
-    let trs = TestFIIndexTrsBuilder::new()
+    let receive = TestFIIndexTrsBuilder::new()
         .side(TrsSide::ReceiveTotalReturn)
+        .build();
+    let pay = TestFIIndexTrsBuilder::new()
+        .side(TrsSide::PayTotalReturn)
         .build();
 
     // Act
-    let result = trs
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::DurationDv01],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
-        )
+    let options = finstack_quant_valuations::instruments::PricingOptions::default;
+    let receive_dv01 = *receive
+        .price_with_metrics(&market, as_of, &[MetricId::DurationDv01], options())
+        .unwrap()
+        .measures
+        .get("duration_dv01")
+        .unwrap();
+    let pay_dv01 = *pay
+        .price_with_metrics(&market, as_of, &[MetricId::DurationDv01], options())
+        .unwrap()
+        .measures
+        .get("duration_dv01")
         .unwrap();
 
-    // Assert
-    let dv01 = *result.measures.get("duration_dv01").unwrap();
-    assert!(dv01.is_finite(), "FI duration DV01 should be finite");
-    assert!(dv01 > 0.0, "Receive TR should have positive duration DV01");
+    // Assert - receiver is long the bond index → negative rate sensitivity
+    // (SIMM IR-delta convention); payer is short → positive. Equal magnitudes.
+    assert!(
+        receive_dv01.is_finite(),
+        "FI duration DV01 should be finite"
+    );
+    assert!(
+        receive_dv01 < 0.0,
+        "Receive TR (long bond) should have strictly negative duration DV01"
+    );
+    assert!(
+        pay_dv01 > 0.0,
+        "Pay TR (short bond) should have strictly positive duration DV01"
+    );
+    assert_approx_eq(
+        receive_dv01.abs(),
+        pay_dv01.abs(),
+        1e-9,
+        "Receive/Pay DV01 magnitudes should match",
+    );
 }
 
 // ================================================================================================

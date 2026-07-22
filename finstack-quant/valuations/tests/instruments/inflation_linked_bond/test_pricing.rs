@@ -81,7 +81,7 @@ fn test_npv_increases_with_inflation() {
     // Context with low inflation
     let ctx_low = {
         let disc =
-            finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-REAL")
+            finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (5.0, 0.95), (10.0, 0.90)])
                 .build()
@@ -106,7 +106,7 @@ fn test_npv_increases_with_inflation() {
     // Context with high inflation
     let ctx_high = {
         let disc =
-            finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-REAL")
+            finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (5.0, 0.95), (10.0, 0.90)])
                 .build()
@@ -154,7 +154,7 @@ fn test_npv_decreases_with_higher_discount_rate() {
 
     // Low discount rate
     let disc_low =
-        finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-REAL")
+        finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.99), (10.0, 0.98)])
             .build()
@@ -162,7 +162,7 @@ fn test_npv_decreases_with_higher_discount_rate() {
 
     // High discount rate
     let disc_high =
-        finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-REAL")
+        finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80), (10.0, 0.65)])
             .build()
@@ -242,12 +242,11 @@ fn test_npv_with_deflation_protection() {
     let as_of = d(2025, 1, 2);
 
     // Context with deflation
-    let disc =
-        finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-REAL")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (5.0, 0.95)])
-            .build()
-            .unwrap();
+    let disc = finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (5.0, 0.95)])
+        .build()
+        .unwrap();
 
     let observations = vec![(d(2024, 12, 1), 290.0)]; // Deflation vs base of 300
     let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
@@ -389,4 +388,100 @@ fn test_uk_gilt_npv() {
     // Assert
     assert_eq!(pv.currency(), Currency::GBP);
     assert!(pv.amount() > 0.0);
+}
+
+/// Regression test for the real/nominal double-count defect.
+///
+/// `base_value` discounts the inflation-PROJECTED (nominal) cashflow schedule,
+/// so `discount_curve_id` must be a NOMINAL curve. With a NON-FLAT setup — CPI
+/// projected at 2%/yr and nominal discounting at 3%/yr — the PV of a
+/// zero-real-coupon 2y linker must satisfy the hand-computed identity
+///
+/// ```text
+/// PV = notional × IndexRatio(T) × DF_nom(T)
+///    = 1_000_000 × 1.0404 × 1.03⁻² ≈ 980_676.78
+/// ```
+///
+/// The old shipped defaults named REAL curves, so a real curve wired in here
+/// double-counted inflation (~+2% per year of maturity); flat-curve tests
+/// could not see the error because projection and discounting both collapse.
+#[test]
+fn test_pv_matches_projected_index_ratio_times_nominal_df() {
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::scalars::InflationLag;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
+        DeflationProtection, IndexationMethod, InflationLinkedBond,
+    };
+    use finstack_quant_valuations::instruments::Attributes;
+
+    // 2-year window containing no Feb 29 so ACT/365F gives t(maturity) = 730/365 = 2.0
+    // exactly, landing on the curve knots and keeping the expectation hand-computable.
+    let as_of = d(2025, 1, 15);
+    let maturity = d(2027, 1, 15);
+
+    let bond = InflationLinkedBond::builder()
+        .id(InstrumentId::new("ILB-NOMINAL-PV"))
+        .notional(Money::new(1_000_000.0, Currency::USD))
+        .real_coupon(rust_decimal::Decimal::ZERO)
+        .frequency(Tenor::annual())
+        .day_count(DayCount::Act365F)
+        .issue_date(as_of)
+        .maturity(maturity)
+        .base_index(100.0)
+        .base_date(as_of)
+        .indexation_method(IndexationMethod::TIPS)
+        .lag(InflationLag::None)
+        .deflation_protection(DeflationProtection::MaturityOnly)
+        .bdc(BusinessDayConvention::Following)
+        .stub(StubKind::None)
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .inflation_index_id(CurveId::new("US-CPI"))
+        .attributes(Attributes::new())
+        .build()
+        .unwrap();
+
+    let df_2y = 1.03_f64.powi(-2);
+    // Day count set explicitly: the builder would otherwise infer ACT/360 from
+    // the "USD-OIS" id, shifting t(maturity) off the 2.0 knot.
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .day_count(DayCount::Act365F)
+        .knots([(0.0, 1.0), (1.0, 1.03_f64.powi(-1)), (2.0, df_2y)])
+        .build()
+        .unwrap();
+    let inflation = InflationCurve::builder("US-CPI")
+        .base_date(as_of)
+        .base_cpi(100.0)
+        .knots([(0.0, 100.0), (1.0, 102.0), (2.0, 104.04)])
+        .build()
+        .unwrap();
+    let ctx = MarketContext::new().insert(discount).insert(inflation);
+
+    let pv = bond.value(&ctx, as_of).unwrap().amount();
+
+    let index_ratio = 1.0404; // 104.04 / 100 at maturity
+    let expected = 1_000_000.0 * index_ratio * df_2y; // ≈ 980_676.78
+
+    assert_approx_eq(
+        pv,
+        expected,
+        1e-7,
+        "PV must equal notional × IndexRatio(T) × DF_nom(T)",
+    );
+
+    // Discriminators: projection actually happened (PV above the unprojected
+    // discounted notional) and discounting actually happened (PV below the
+    // undiscounted projected principal).
+    assert!(
+        pv > 1_000_000.0 * df_2y + 1_000.0,
+        "projection missing: {pv}"
+    );
+    assert!(
+        pv < 1_000_000.0 * index_ratio - 1_000.0,
+        "discounting missing: {pv}"
+    );
 }

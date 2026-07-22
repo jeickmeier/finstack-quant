@@ -42,6 +42,11 @@ use crate::models::{single_factor_equity_state, EvolutionParams, TreeGreeks};
 ///   - `spot <= lower_price`: `(face / lower_price) * spot` (max shares, loss)
 ///   - `lower < spot <= upper`: `face` (variable ratio delivers par)
 ///   - `spot > upper_price`: `(face / upper_price) * spot` (min shares, capped)
+///
+/// This is the **instantaneous** conversion value at the valuation date:
+/// dividend-protection ratio accretion (`exp(q * t)`, see
+/// [`DividendAdjustment`](super::DividendAdjustment)) is 1.0 at `t = 0` and is
+/// applied per tree step inside the pricer, not here.
 pub(crate) fn compute_conversion_value(bond: &ConvertibleBond, spot: f64) -> Result<f64> {
     match &bond.conversion.policy {
         ConversionPolicy::MandatoryVariable {
@@ -143,6 +148,11 @@ pub(crate) struct ConvertibleBondValuator {
     maturity: Date,
     /// Number of tree steps (for date-to-step mapping in conversion policies).
     num_steps: usize,
+    /// Whether the bond carries dividend protection (`AdjustPrice` or
+    /// `AdjustRatio`). When set, the conversion ratio accretes at the
+    /// dividend yield: `ratio(t) = ratio_0 * exp(q * t)`; see
+    /// [`ConvertibleBondValuator::conversion_value`].
+    dividend_protected: bool,
 }
 
 impl ConvertibleBondValuator {
@@ -361,6 +371,10 @@ impl ConvertibleBondValuator {
                 //   adjusted = risky * (1 - R) + rf * R
                 // At R=0: pure zero-recovery TZ model.
                 // At R=1: cash component discounted at risk-free (no credit effect).
+                //
+                // NOTE: this blend assumes the credit curve encodes ZERO-RECOVERY
+                // (pure hazard) risky discounting; see `ConvertibleBond::credit_curve_id`.
+                // A market recovery-adjusted spread curve would double-count (1 - R).
                 let risky_fwd = raw_risky_fwd * (1.0 - recovery) + rf_fwd * recovery;
                 risky_step_dfs.push(risky_fwd);
             } else {
@@ -405,6 +419,7 @@ impl ConvertibleBondValuator {
             volatility,
             maturity: bond.maturity,
             num_steps: steps,
+            dividend_protected: bond.conversion.dividend_adjustment.is_protected(),
         })
     }
 
@@ -428,6 +443,14 @@ impl ConvertibleBondValuator {
     ///
     /// For `PriceTrigger`, we use a barrier approximation: the node spot price
     /// is compared against the trigger threshold.
+    ///
+    /// ## Modeling scope (mandatory convertibles)
+    ///
+    /// For `MandatoryOn` and `MandatoryVariable`, conversion is modeled ONLY at
+    /// the single tree step mapped from the mandatory conversion date. Early
+    /// voluntary conversion before that date (a feature of some mandatory
+    /// structures) is not modeled; before the mandatory step the holder simply
+    /// carries the continuation value.
     fn conversion_allowed(&self, step: usize, node_spot: f64) -> Result<bool> {
         let ctx = DayCountContext {
             frequency: self.day_count_frequency,
@@ -508,8 +531,21 @@ impl ConvertibleBondValuator {
     ///   - spot <= lower_price: max_ratio * spot = (face/lower_price) * spot (loss)
     ///   - lower_price < spot <= upper_price: face value (variable ratio delivers par)
     ///   - spot > upper_price: min_ratio * spot = (face/upper_price) * spot (capped upside)
-    fn conversion_value(&self, spot: f64) -> f64 {
-        match &self.conversion_policy {
+    ///
+    /// ## Dividend protection (`ratio_accretion`)
+    ///
+    /// `ratio_accretion` is the dividend-protection factor `exp(q * t)` at the
+    /// node's step time `t` (1.0 when the bond is unprotected; see
+    /// [`DividendAdjustment`](super::DividendAdjustment)). The stored
+    /// `conversion_ratio` already includes anti-dilution event adjustments, so
+    /// protection composes multiplicatively on top of those (event-adjusted
+    /// ratio first, then time accretion). For `MandatoryVariable`, the same
+    /// factor is applied uniformly to every delivery-ratio regime — the
+    /// max-ratio, par-delivery, and min-ratio branches all scale by
+    /// `ratio_accretion` while the regime boundaries stay at their contractual
+    /// spot levels.
+    fn conversion_value(&self, spot: f64, ratio_accretion: f64) -> f64 {
+        let base = match &self.conversion_policy {
             ConversionPolicy::MandatoryVariable {
                 upper_conversion_price,
                 lower_conversion_price,
@@ -524,7 +560,8 @@ impl ConvertibleBondValuator {
                 }
             }
             _ => spot * self.conversion_ratio,
-        }
+        };
+        base * ratio_accretion
     }
 
     /// Get call price at a given step (if callable)
@@ -557,6 +594,17 @@ impl ConvertibleBondValuator {
     /// required fraction `k/n`, reflecting that higher required fractions make
     /// the trigger harder to satisfy. The `0.5826` constant is rounded to the
     /// exact BGK beta. This is intentionally conservative (slightly over-adjusts).
+    ///
+    /// ## Modeling scope
+    ///
+    /// A single `soft_call_trigger` gates the ENTIRE callable life of the bond:
+    /// every step of every call window is subject to the trigger. Real deals
+    /// often have a soft-call period followed by an unconditional hard-call
+    /// period; that structure is not representable — an unconditional hard call
+    /// can only be modeled by omitting `soft_call_trigger` altogether. The
+    /// trigger is evaluated on the instantaneous node spot (with the BGK-style
+    /// barrier adjustment below), not on the realized path over the
+    /// observation window.
     ///
     /// ## Reference
     ///
@@ -597,8 +645,17 @@ impl ConvertibleBondValuator {
 /// flat-rate discounting. The equity component is discounted at the risk-free
 /// forward rate and the cash component at the recovery-adjusted risky forward
 /// rate, both extracted step-by-step from the respective discount curves.
+/// The tree's risk-neutral branch probabilities are recomputed per step from
+/// the same risk-free forwards, so drift and discounting stay consistent on
+/// non-flat curves.
 ///
 /// ## Credit model
+///
+/// **Credit curve convention**: the supplied `credit_curve_id` curve must
+/// represent ZERO-RECOVERY (pure hazard) risky discounting, i.e.
+/// `risky_df = rf_df * survival_probability`. The recovery blend below is what
+/// converts it to recovery-adjusted discounting. Supplying a market
+/// recovery-adjusted spread curve here would double-count `(1 - R)`.
 ///
 /// The risky step discount factors are adjusted for recovery:
 ///
@@ -649,18 +706,36 @@ impl<'a> TsiveriotisZhangEngine<'a> {
 
         let dt = self.time_to_maturity / self.steps as f64;
 
+        // Dividend protection (continuous-yield model): the protected rate is
+        // the full dividend yield (the DividendAdjustment variants carry no
+        // threshold, so nothing is carved out) and the conversion ratio
+        // accretes as `ratio(t) = ratio_0 * exp(q_prot * t)` from the
+        // valuation date. The stock keeps its unprotected drift `r - q`;
+        // protection enters only through the conversion payoff, so with full
+        // protection the discounted conversion claim
+        // `E[e^{-∫r} * ratio_0 * e^{qT} * S_T] = ratio_0 * S_0` is restored to
+        // a martingale independent of `q`.
+        let protected_dividend_rate = if self.valuator.dividend_protected {
+            dividend_yield.max(0.0)
+        } else {
+            0.0
+        };
+        let ratio_accretion_at = |step: usize| (protected_dividend_rate * step as f64 * dt).exp();
+
         // Evolution parameters for the recombining tree.
         //
-        // KNOWN LIMITATION (drift-discount mismatch):
-        // The tree evolution uses a single short rate (instantaneous forward at t=0)
-        // for the CRR/trinomial up/down factors and probabilities to preserve the
-        // recombining tree structure. Backward induction uses per-step forward
-        // discount factors from the full term structure. Using the short rate
-        // (rather than the average zero rate to maturity) reduces the drift
-        // mismatch but does not eliminate it for non-flat curves.
+        // Drift-discount consistency: the up/down (and middle) factors depend
+        // only on volatility and dt, so they are constant across steps and the
+        // lattice recombines. The branch probabilities, however, are recomputed
+        // per step from the SAME per-step risk-free forward rate used for
+        // discounting in backward induction (`rf_step_dfs`):
         //
-        // A fully consistent implementation would require per-step evolution
-        // parameters, which breaks standard CRR recombination.
+        //   r_i = -ln(df_rf[i]) / dt,   p_i = (e^{(r_i - q)dt} - d) / (u - d)
+        //
+        // so the stock's tree forward matches the discount curve step by step
+        // (martingale property) even on non-flat curves. The base parameters
+        // below (built from the t=0 short rate) only supply the constant
+        // factors; their probabilities are replaced by the per-step set.
         let params = match tree_type {
             ConvertibleTreeType::Binomial(_) => {
                 EvolutionParams::equity_crr(volatility, risk_free_rate, dividend_yield, dt)?
@@ -669,6 +744,20 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 EvolutionParams::equity_trinomial(volatility, risk_free_rate, dividend_yield, dt)?
             }
         };
+
+        // Per-step probabilities driven by the per-step forward rates implied
+        // by the risk-free step discount factors (u/d/middle unchanged).
+        let mut step_params = Vec::with_capacity(self.steps);
+        for &df in &self.valuator.rf_step_dfs {
+            if df <= 0.0 {
+                return Err(Error::Validation(format!(
+                    "convertible tree requires positive per-step risk-free discount \
+                     factors, got {df}"
+                )));
+            }
+            let step_rate = -df.ln() / dt;
+            step_params.push(params.with_drift(step_rate - dividend_yield, dt)?);
+        }
 
         // State tracking: (Total Value, Cash Component)
         let mut values: Vec<(f64, f64)> = Vec::with_capacity(2 * self.steps + 1);
@@ -708,10 +797,13 @@ impl<'a> TsiveriotisZhangEngine<'a> {
         };
 
         let mandatory = self.valuator.conversion_is_mandatory();
+        let terminal_accretion = ratio_accretion_at(self.steps);
 
         for i in 0..num_nodes {
             let node_spot = get_spot(self.steps, i);
-            let conversion_val = self.valuator.conversion_value(node_spot);
+            let conversion_val = self
+                .valuator
+                .conversion_value(node_spot, terminal_accretion);
 
             let coupon = self
                 .valuator
@@ -750,9 +842,12 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 ConvertibleTreeType::Trinomial(_) => 2 * step + 1,
             };
 
-            // Per-step discount factors from full term structure
+            // Per-step discount factors from full term structure, and the
+            // per-step branch probabilities derived from the same forwards.
             let df_rf = self.valuator.rf_step_dfs[step];
             let df_risky = self.valuator.risky_step_dfs[step];
+            let sp = &step_params[step];
+            let step_accretion = ratio_accretion_at(step);
 
             next_values.clear();
 
@@ -763,8 +858,8 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                         let (v_down, c_down) = values[i];
 
                         (
-                            params.prob_up * v_up + params.prob_down * v_down,
-                            params.prob_up * c_up + params.prob_down * c_down,
+                            sp.prob_up * v_up + sp.prob_down * v_down,
+                            sp.prob_up * c_up + sp.prob_down * c_down,
                         )
                     }
                     ConvertibleTreeType::Trinomial(_) => {
@@ -772,10 +867,10 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                         let (v_mid, c_mid) = values[i + 1];
                         let (v_down, c_down) = values[i];
 
-                        let pm = params.prob_middle.unwrap_or(0.0);
+                        let pm = sp.prob_middle.unwrap_or(0.0);
                         (
-                            params.prob_up * v_up + pm * v_mid + params.prob_down * v_down,
-                            params.prob_up * c_up + pm * c_mid + params.prob_down * c_down,
+                            sp.prob_up * v_up + pm * v_mid + sp.prob_down * v_down,
+                            sp.prob_up * c_up + pm * c_mid + sp.prob_down * c_down,
                         )
                     }
                 };
@@ -793,8 +888,9 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 // Node decision logic
                 let node_spot = get_spot(step, i);
 
-                // 1. Conversion (uses variable delivery for MandatoryVariable)
-                let conversion_val = self.valuator.conversion_value(node_spot);
+                // 1. Conversion (uses variable delivery for MandatoryVariable,
+                //    dividend-protection accretion at this step's time)
+                let conversion_val = self.valuator.conversion_value(node_spot, step_accretion);
                 let can_convert = self.valuator.conversion_allowed(step, node_spot)?;
 
                 let mut final_total = continuation_total;
@@ -936,10 +1032,10 @@ fn extract_equity_state(
         finstack_quant_core::dates::DayCountContext::default(),
     )?;
 
-    // Use the short-rate (instantaneous forward at t=0) for tree drift rather
-    // than the average zero rate to maturity. This better approximates the
-    // local risk-neutral drift at each step when combined with the per-step
-    // discount factors used in backward induction.
+    // Short rate (instantaneous forward at t=0). The tree's per-step drift is
+    // derived from the per-step forward discount factors inside the engine;
+    // this rate only seeds the base evolution parameters (u/d factors and
+    // their construction-time validity checks).
     //
     // Approximated as -ln(DF(epsilon))/epsilon with epsilon = 1/252 (~1 day).
     // Falls back to zero rate to maturity when TTM is very short.
@@ -1664,6 +1760,161 @@ mod tests {
         assert!(
             !valuator.coupon_map.contains_key(&0),
             "coupon dated exactly on as_of must not be added at tree step 0"
+        );
+    }
+
+    /// H1 pin test (drift-discount consistency on a non-flat curve).
+    ///
+    /// A deep-in-the-money zero-coupon convertible (conversion value 50x the
+    /// bond floor), zero dividend yield, no calls/puts/credit, convertible
+    /// only at maturity, priced on a markedly upward-sloping curve (2% at 1y
+    /// rising to 4% at 5y) must price at `conversion_ratio * S0`: the
+    /// discounted risk-neutral expectation of `ratio * S_T` is a martingale,
+    /// so any deviation is a drift-discount mismatch. Conversion is windowed
+    /// to maturity so early exercise cannot mask the mismatch.
+    ///
+    /// Before the per-step drift fix the tree used the single t=0 short rate
+    /// (~2%) for the drift while discounting at the full curve (~4% average),
+    /// undervaluing this bond by ~9.8% (measured: 45,100.59 vs 50,000).
+    #[test]
+    fn deep_itm_convertible_matches_parity_on_non_flat_curve() {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let mut bond = create_test_bond();
+        bond.fixed_coupon = None; // zero-coupon: isolates the equity claim
+        bond.conversion.policy = ConversionPolicy::Window {
+            start: bond.maturity,
+            end: bond.maturity,
+        };
+
+        // Upward-sloping zero curve: 2% at 1y -> 4% at 5y.
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(issue)
+            .knots([
+                (0.0, 1.0),
+                (1.0, (-0.02_f64).exp()),
+                (5.0, (-0.04_f64 * 5.0).exp()),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .build()
+            .expect("curve");
+
+        // Spot 5000 with ratio 10 => conversion value 50,000 >> 1,000 face,
+        // so the redemption floor contributes only a ~1e-12 tail probability.
+        let market = MarketContext::new()
+            .insert(curve)
+            .insert_price("AAPL", MarketScalar::Unitless(5000.0))
+            .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+            .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.0));
+
+        let expected = 10.0 * 5000.0;
+        for tree in [
+            ConvertibleTreeType::Binomial(200),
+            ConvertibleTreeType::Trinomial(200),
+        ] {
+            let price = price_convertible_bond(&bond, &market, tree, issue)
+                .expect("should price")
+                .amount();
+            let rel_err = (price - expected).abs() / expected;
+            assert!(
+                rel_err < 1e-7,
+                "deep-ITM convertible must equal parity {expected} on a non-flat curve \
+                 (martingale property); got {price} with {tree:?} (rel err {rel_err:.3e})"
+            );
+        }
+    }
+
+    /// Dividend-protection pin test (martingale identity).
+    ///
+    /// Same construction as `deep_itm_convertible_matches_parity_on_non_flat_curve`
+    /// (deep-ITM zero-coupon convertible, conversion windowed to maturity, no
+    /// calls/puts/credit, upward-sloping curve), but with a nonzero dividend
+    /// yield. With FULL protection the conversion ratio accretes at the
+    /// dividend yield, so the discounted conversion claim is
+    /// `E[e^{-∫r} · ratio₀·e^{qT} · S_T] = ratio₀ · S₀` exactly (the stock
+    /// drifts at `r − q`): the model price must equal `ratio₀ · S₀`
+    /// INDEPENDENT of `q`, for both `AdjustRatio` and `AdjustPrice` (they are
+    /// the same mechanism). Without protection, `q = 6%` must drag the price
+    /// materially below parity by `e^{-qT}` (≈ 26% over ~5y).
+    #[test]
+    fn dividend_protection_restores_parity_independent_of_yield() {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let mut bond = create_test_bond();
+        bond.fixed_coupon = None; // zero-coupon: isolates the equity claim
+        bond.conversion.policy = ConversionPolicy::Window {
+            start: bond.maturity,
+            end: bond.maturity,
+        };
+
+        // Upward-sloping zero curve: 2% at 1y -> 4% at 5y (non-flat is fine;
+        // the identity only needs drift-discount consistency).
+        let market_with_yield = |q: f64| {
+            let curve = DiscountCurve::builder("USD-OIS")
+                .base_date(issue)
+                .knots([
+                    (0.0, 1.0),
+                    (1.0, (-0.02_f64).exp()),
+                    (5.0, (-0.04_f64 * 5.0).exp()),
+                ])
+                .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+                .build()
+                .expect("curve");
+            MarketContext::new()
+                .insert(curve)
+                .insert_price("AAPL", MarketScalar::Unitless(5000.0))
+                .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+                .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(q))
+        };
+
+        let expected = 10.0 * 5000.0;
+
+        // Full protection: price pins to parity regardless of dividend yield.
+        for adjustment in [
+            DividendAdjustment::AdjustRatio,
+            DividendAdjustment::AdjustPrice,
+        ] {
+            for q in [0.0, 0.06] {
+                bond.conversion.dividend_adjustment = adjustment.clone();
+                let market = market_with_yield(q);
+                for tree in [
+                    ConvertibleTreeType::Binomial(200),
+                    ConvertibleTreeType::Trinomial(200),
+                ] {
+                    let price = price_convertible_bond(&bond, &market, tree, issue)
+                        .expect("should price")
+                        .amount();
+                    let rel_err = (price - expected).abs() / expected;
+                    assert!(
+                        rel_err < 1e-7,
+                        "fully protected deep-ITM convertible must equal parity {expected} \
+                         independent of q={q} ({adjustment:?}, {tree:?}); got {price} \
+                         (rel err {rel_err:.3e})"
+                    );
+                }
+            }
+        }
+
+        // No protection: q = 6% leaks value from the conversion option; the
+        // price must fall to ~parity * e^{-qT} (materially below parity).
+        bond.conversion.dividend_adjustment = DividendAdjustment::None;
+        let market = market_with_yield(0.06);
+        let unprotected =
+            price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(200), issue)
+                .expect("should price")
+                .amount();
+        let ttm = DayCount::Act365F
+            .year_fraction(issue, bond.maturity, Default::default())
+            .expect("year fraction");
+        let dragged = expected * (-0.06 * ttm).exp();
+        assert!(
+            unprotected < 0.8 * expected,
+            "unprotected convertible with q=6% must sit materially below parity \
+             {expected}; got {unprotected}"
+        );
+        let rel_err = (unprotected - dragged).abs() / dragged;
+        assert!(
+            rel_err < 1e-3,
+            "unprotected price should match the dividend-dragged parity {dragged}; \
+             got {unprotected} (rel err {rel_err:.3e})"
         );
     }
 
