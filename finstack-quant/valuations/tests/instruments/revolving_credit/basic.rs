@@ -686,7 +686,6 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
         .discount_curve_id("USD-OIS".into())
         .credit_curve_id(finstack_quant_core::types::CurveId::from("BORROWER-A"))
-        .credit_curve_id(finstack_quant_core::types::CurveId::from("BORROWER-A"))
         .recovery_rate(0.40)
         .build()
         .unwrap();
@@ -698,7 +697,10 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
         credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
             hazard_curve_id: "BORROWER-A".into(),
             kappa: 0.3,
-            implied_vol: 0.50,
+            // Near-zero spread volatility is required for a deterministic
+            // convergence test. A 50% implied volatility introduces genuine
+            // CIR convexity even when utilization volatility is near zero.
+            implied_vol: 1e-10,
             tenor_years: None,
         },
         interest_rate_process: None, // Use fixed rate (no stochastic dynamics)

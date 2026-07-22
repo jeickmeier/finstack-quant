@@ -597,10 +597,10 @@ pub enum CreditSpreadProcessSpec {
 
     /// Market-anchored credit spread process calibrated to a hazard curve and CDS option vol.
     ///
-    /// The mean level is anchored to the time-average spread implied by the input hazard
-    /// curve (over tenor T chosen as facility maturity by default). The initial spread is set
-    /// to the first-segment spread, and the volatility is scaled from the CDS index option
-    /// implied volatility.
+    /// At the simulation anchor (the later of valuation and commitment date),
+    /// the initial spread is set from the contemporaneous hazard and the mean
+    /// level is anchored to conditional survival over the remaining tenor.
+    /// Volatility is scaled from the CDS index option implied volatility.
     MarketAnchored {
         /// Hazard curve identifier in `MarketContext` used to anchor spreads.
         hazard_curve_id: CurveId,
@@ -625,9 +625,13 @@ pub enum InterestRateProcessSpec {
         kappa: f64,
         /// Volatility (σ)
         sigma: f64,
-        /// Initial short rate
+        /// Initial short rate used only when `sigma == 0`. For a stochastic
+        /// process, the pricer derives the initial rate from the facility's
+        /// discount curve at the valuation anchor.
         initial: f64,
-        /// Constant mean reversion level (θ)
+        /// Constant mean reversion level used only when `sigma == 0`. For a
+        /// stochastic process, the pricer fits a time-dependent θ(t) to the
+        /// facility's discount curve.
         theta: f64,
     },
 }
@@ -768,9 +772,37 @@ impl RevolvingCredit {
             "RevolvingCredit facility_fee_bp",
         )?;
 
-        // Validate base rate if fixed
-        if let BaseRateSpec::Fixed { rate } = &self.base_rate_spec {
-            validation::validate_f64_finite(*rate, "RevolvingCredit fixed base rate")?;
+        // Validate the complete coupon specification through the same canonical
+        // conversion used by the cashflow engine. This keeps the public
+        // validation/JSON boundary aligned with pricing for gearing, decimal
+        // conversion, and index/all-in floor-cap ordering.
+        match &self.base_rate_spec {
+            BaseRateSpec::Fixed { rate } => {
+                validation::validate_f64_finite(*rate, "RevolvingCredit fixed base rate")?;
+            }
+            BaseRateSpec::Floating(spec) => {
+                validation::require_with(spec.gearing > Decimal::ZERO, || {
+                    format!(
+                        "RevolvingCredit floating gearing must be positive, got {}",
+                        spec.gearing
+                    )
+                })?;
+                if let (Some(floor), Some(cap)) = (spec.index_floor_bp, spec.index_cap_bp) {
+                    validation::require_with(floor <= cap, || {
+                        format!(
+                            "RevolvingCredit index_floor_bp ({floor}) must not exceed index_cap_bp ({cap})"
+                        )
+                    })?;
+                }
+                if let (Some(floor), Some(cap)) = (spec.all_in_floor_bp, spec.all_in_cap_bp) {
+                    validation::require_with(floor <= cap, || {
+                        format!(
+                            "RevolvingCredit all_in_floor_bp ({floor}) must not exceed all_in_cap_bp ({cap})"
+                        )
+                    })?;
+                }
+                let _ = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
+            }
         }
 
         match &self.draw_repay_spec {
@@ -963,36 +995,13 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
             }
         }
 
-        // Route to appropriate pricer based on spec type
-        if self.is_deterministic() {
-            crate::instruments::fixed_income::revolving_credit::pricer::unified::RevolvingCreditPricer::price_deterministic(
-                self, curves, as_of,
-            )
-        } else {
-            // For the value() fast path, route stochastic specs to deterministic pricing.
-            // MC remains available via explicit pricer APIs/bindings (e.g., mc_paths_with_capture).
-            let mut fallback = self.clone();
-            // If the stochastic spec carried a market-anchored hazard reference in its MC config,
-            // propagate that to the deterministic fallback so survival weighting is preserved.
-
-            if let super::types::DrawRepaySpec::Stochastic(spec) = &self.draw_repay_spec {
-                if let Some(mc_cfg) = &spec.mc_config {
-                    if let super::types::CreditSpreadProcessSpec::MarketAnchored {
-                        hazard_curve_id,
-                        ..
-                    } = &mc_cfg.credit_spread_process
-                    {
-                        fallback.credit_curve_id = Some(hazard_curve_id.clone());
-                        fallback.recovery_rate = mc_cfg.recovery_rate;
-                    }
-                }
-            }
-            // Ensure deterministic schedule for pricing.
-            fallback.draw_repay_spec = super::types::DrawRepaySpec::Deterministic(Vec::new());
-            crate::instruments::fixed_income::revolving_credit::pricer::unified::RevolvingCreditPricer::price_deterministic(
-                &fallback, curves, as_of,
-            )
-        }
+        // Use the same automatic deterministic/Monte Carlo dispatch as the
+        // registry and host-language JSON entry points. A stochastic facility
+        // must have one canonical value regardless of which public lifecycle
+        // invokes it.
+        crate::instruments::fixed_income::revolving_credit::pricer::unified::RevolvingCreditPricer::price(
+            self, curves, as_of,
+        )
     }
 
     fn effective_start_date(&self) -> Option<Date> {
@@ -1123,5 +1132,22 @@ mod dependency_tests {
             .expect_err("mismatched recovery assumptions must fail")
             .to_string()
             .contains("must equal"));
+    }
+
+    #[test]
+    fn validation_rejects_invalid_floating_rate_economics() {
+        let mut facility = RevolvingCredit::example().expect("example");
+        let BaseRateSpec::Floating(spec) = &mut facility.base_rate_spec else {
+            unreachable!("example must be floating");
+        };
+        spec.gearing = rust_decimal::Decimal::ZERO;
+
+        let err = facility
+            .validate()
+            .expect_err("non-positive floating gearing must fail validation");
+        assert!(
+            err.to_string().contains("gearing"),
+            "unexpected validation error: {err}"
+        );
     }
 }

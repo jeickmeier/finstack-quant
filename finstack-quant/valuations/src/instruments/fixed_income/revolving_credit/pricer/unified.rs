@@ -360,14 +360,7 @@ impl RevolvingCreditPricer {
         as_of: Date,
     ) -> Result<Money> {
         match &facility.draw_repay_spec {
-            DrawRepaySpec::Deterministic(_) => {
-                // Single deterministic path
-                let fixings = resolve_fixings(facility, market);
-                let engine = CashflowEngine::new(facility, Some(market), as_of, fixings)?;
-                let schedule = engine.generate_deterministic()?;
-                let result = Self::price_single_path(facility, market, as_of, &schedule)?;
-                Ok(result.pv)
-            }
+            DrawRepaySpec::Deterministic(_) => Self::price_deterministic(facility, market, as_of),
             DrawRepaySpec::Stochastic(_) => {
                 let enhanced = Self::price_monte_carlo(facility, market, as_of)?;
                 Ok(enhanced.mc_result.estimate.mean)
@@ -476,7 +469,7 @@ impl RevolvingCreditPricer {
         // short-rate process drives only reset dates that have not fixed yet.
         let fixings = resolve_fixings(facility, market);
         let engine = CashflowEngine::new(facility, Some(market), as_of, fixings)?;
-        let payment_dates = super::super::utils::build_payment_dates(facility, false)?;
+        let accrual_boundary_dates = super::super::utils::build_accrual_boundary_dates(facility)?;
 
         // Generate 3-factor paths (simulation starts at as_of for seasoned facilities)
         let paths = generate_three_factor_paths(
@@ -484,7 +477,7 @@ impl RevolvingCreditPricer {
             mc_config,
             facility,
             market,
-            &payment_dates,
+            &accrual_boundary_dates,
             as_of,
         )?;
 

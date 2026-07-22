@@ -1046,6 +1046,32 @@ mod tests {
     }
 
     #[test]
+    fn revolving_credit_custom_metrics_use_as_of_drawn_balance() {
+        use crate::instruments::fixed_income::revolving_credit::BaseRateSpec;
+
+        let mut facility = RevolvingCredit::example().expect("revolving credit");
+        facility.base_rate_spec = BaseRateSpec::Fixed { rate: 0.05 };
+        let json =
+            serde_json::to_string(&InstrumentJson::RevolvingCredit(facility)).expect("serialize");
+        let result = price_instrument_json_with_metrics_and_history(
+            &json,
+            &market_context(),
+            "2024-07-01",
+            "discounting",
+            &[
+                "utilization_rate".to_string(),
+                "available_capacity".to_string(),
+            ],
+            None,
+            None,
+        )
+        .expect("registered revolving-credit metrics must cross the JSON boundary");
+
+        assert_eq!(result.metric_str("utilization_rate"), Some(0.30));
+        assert_eq!(result.metric_str("available_capacity"), Some(35_000_000.0));
+    }
+
+    #[test]
     fn price_instrument_json_with_metrics_and_history_rejects_unknown_metric_names() {
         let err = price_instrument_json_with_metrics_and_history(
             &bond_instrument_json(),

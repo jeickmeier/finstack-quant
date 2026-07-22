@@ -75,12 +75,9 @@ pub struct InstrumentCashflowEnvelope {
     /// Sum of `flows[i].pv`. Matches `base_value` for supported products.
     pub total_pv: f64,
     /// `true` when `total_pv` agrees with the instrument's canonical
-    /// `base_value` (`Instrument::value`) within rounding tolerance.
-    ///
-    /// This is verified per call, not assumed: it is `false` when the per-flow
-    /// PV sum does not reconcile with `base_value` (for example, when the
-    /// requested `model` differs from the instrument's default pricing model)
-    /// or when `base_value` itself cannot be computed.
+    /// `base_value` (`Instrument::value`) within rounding tolerance. The
+    /// exporter returns an error instead of emitting a non-reconciling
+    /// envelope, so every successful response carries `true`.
     pub reconciles_with_base_value: bool,
 }
 
@@ -438,13 +435,19 @@ fn build_envelope(
     // Compare against the same selected registry result that supplied the
     // effective date. Per-flow and model PVs use different compensated sums,
     // so allow a small numerical tolerance while still catching real drift.
-    let reconciles_with_base_value = if canonical_result.value.currency() == currency {
-        let base = canonical_result.value.amount();
-        let tol = (base.abs() * 1e-6).max(1e-6);
-        (total_pv - base).abs() <= tol
-    } else {
-        false
-    };
+    if canonical_result.value.currency() != currency {
+        return Err(Error::Validation(format!(
+            "instrument_cashflows: exported currency {currency} does not match canonical price currency {} for instrument '{instrument_id}'",
+            canonical_result.value.currency()
+        )));
+    }
+    let base = canonical_result.value.amount();
+    let tol = (base.abs() * 1e-6).max(1e-6);
+    if (total_pv - base).abs() > tol {
+        return Err(Error::Validation(format!(
+            "instrument_cashflows: per-flow PV {total_pv} does not reconcile with canonical {model_key} price {base} for instrument '{instrument_id}' (tolerance {tol}); this instrument/model requires a model-specific cashflow decomposition"
+        )));
+    }
 
     Ok(InstrumentCashflowEnvelope {
         instrument_id,
@@ -456,7 +459,7 @@ fn build_envelope(
         recovery_rate,
         flows: rows,
         total_pv,
-        reconciles_with_base_value,
+        reconciles_with_base_value: true,
     })
 }
 
@@ -486,11 +489,15 @@ where
 mod tests {
     use super::*;
     use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::fixed_income::revolving_credit::{
+        BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    };
     use crate::instruments::fixed_income::structured_credit::StructuredCredit;
     use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
     use crate::instruments::{Instrument, ScenarioPricingOverrides};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
     use std::sync::Arc;
@@ -502,6 +509,54 @@ mod tests {
             instrument: InstrumentJson::Bond(bond.clone()),
         };
         serde_json::to_string(&envelope).expect("serialize bond envelope")
+    }
+
+    #[test]
+    fn revolving_credit_credit_risk_export_fails_instead_of_returning_false_reconciliation() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+        let facility = RevolvingCredit::builder()
+            .id("RC-CASHFLOW-CREDIT".into())
+            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
+            .drawn_amount(Money::new(1_000_000.0, Currency::USD))
+            .commitment_date(as_of)
+            .maturity(maturity)
+            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .day_count(DayCount::Act365F)
+            .frequency(Tenor::annual())
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
+            .discount_curve_id("USD-OIS".into())
+            .credit_curve_id("USD-HZ".into())
+            .recovery_rate(0.4)
+            .build()
+            .expect("facility");
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .build()
+                    .expect("discount curve"),
+            )
+            .insert(
+                HazardCurve::builder("USD-HZ")
+                    .base_date(as_of)
+                    .recovery_rate(0.4)
+                    .knots([(1.0, 0.20), (5.0, 0.20)])
+                    .build()
+                    .expect("hazard curve"),
+            );
+        let json =
+            serde_json::to_string(&InstrumentJson::RevolvingCredit(facility)).expect("serialize");
+
+        let err = instrument_cashflows_json(&json, &market, "2025-01-01", "discounting")
+            .expect_err("generic rows cannot represent the recovery leg");
+        assert!(
+            err.to_string()
+                .contains("model-specific cashflow decomposition"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

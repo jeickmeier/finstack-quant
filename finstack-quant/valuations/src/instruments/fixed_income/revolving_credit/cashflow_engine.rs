@@ -24,7 +24,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
 use crate::cashflow::builder::{
-    emit_revolving_credit_fees, CashFlowSchedule, RevolvingFeeEmissionConfig,
+    emit_revolving_credit_fees, periods::SchedulePeriod, CashFlowSchedule,
+    RevolvingFeeEmissionConfig,
 };
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
@@ -33,7 +34,8 @@ use super::types::{BaseRateSpec, DrawRepaySpec, RevolvingCredit};
 /// Path data from 3-factor Monte Carlo simulation.
 ///
 /// Contains the full trajectory of utilization, interest rates, and credit spreads
-/// at each payment date, enabling cashflow generation and survival probability computation.
+/// at each contractual accrual boundary, enabling cashflow generation and
+/// survival probability computation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct ThreeFactorPathData {
     /// Utilization trajectory at each payment date [0, 1]
@@ -44,7 +46,10 @@ pub struct ThreeFactorPathData {
     pub credit_spread_path: Vec<f64>,
     /// Time points corresponding to each value (years from commitment)
     pub time_points: Vec<f64>,
-    /// Payment dates aligned with trajectories
+    /// Contractual accrual-boundary dates aligned with trajectories.
+    ///
+    /// The compatibility name is retained because this payload predates the
+    /// separation of accrual and adjusted payment dates.
     #[schemars(with = "Vec<String>")]
     pub payment_dates: Vec<Date>,
     /// Whether `short_rate_path` was simulated by a stochastic rate process
@@ -119,8 +124,8 @@ pub struct CashflowEngine<'a> {
     facility: &'a RevolvingCredit,
     /// Optional market context for curve-based rate projections
     market: Option<&'a MarketContext>,
-    /// Payment schedule dates
-    payment_dates: Vec<Date>,
+    /// Canonical periods retaining contractual accrual and adjusted payment dates.
+    payment_periods: Vec<SchedulePeriod>,
     /// Reset dates for floating rate fixings (if applicable)
     reset_dates: Option<Vec<Date>>,
     /// Day count convention for accrual calculations
@@ -164,14 +169,14 @@ impl<'a> CashflowEngine<'a> {
         as_of: Date,
         fixing_series: Option<&'a ScalarTimeSeries>,
     ) -> Result<Self> {
-        let payment_dates = super::utils::build_payment_dates(facility, false)?;
+        let payment_periods = super::utils::build_payment_periods(facility)?;
         let reset_dates = super::utils::build_reset_dates(facility)?;
         let day_count = facility.day_count;
 
         Ok(Self {
             facility,
             market,
-            payment_dates,
+            payment_periods,
             reset_dates,
             day_count,
             as_of,
@@ -275,9 +280,7 @@ impl<'a> CashflowEngine<'a> {
         }
 
         // Generate interest and fee cashflows with intra-period event slicing
-        flows.reserve(
-            (self.payment_dates.len().saturating_sub(1)) * 4 + draw_repay_events.len() + 2,
-        );
+        flows.reserve(self.payment_periods.len() * 4 + draw_repay_events.len() + 2);
 
         // Resolve forward curve once if floating rate (required for rate projection)
         let fwd_curve = match &self.facility.base_rate_spec {
@@ -294,10 +297,10 @@ impl<'a> CashflowEngine<'a> {
             BaseRateSpec::Fixed { .. } => None,
         };
 
-        for i in 0..(self.payment_dates.len() - 1) {
-            let period_start = self.payment_dates[i];
-            let period_end = self.payment_dates[i + 1];
-            let payment_date = period_end;
+        for (i, period) in self.payment_periods.iter().enumerate() {
+            let period_start = period.accrual_start;
+            let period_end = period.accrual_end;
+            let payment_date = period.payment_date;
 
             // Apply as_of filtering for non-principal cashflows
             if payment_date <= self.as_of {
@@ -599,11 +602,16 @@ impl<'a> CashflowEngine<'a> {
             }
         }
 
-        if self.facility.maturity > self.as_of
+        let terminal_payment_date = self
+            .payment_periods
+            .last()
+            .map(|period| period.payment_date)
+            .ok_or(finstack_quant_core::InputError::TooFewPoints)?;
+        if terminal_payment_date > self.as_of
             && !rc.is_effectively_zero(final_balance_for_terminal.amount(), ZeroKind::Money(ccy))
         {
             flows.push(CashFlow::new(
-                self.facility.maturity,
+                terminal_payment_date,
                 None,
                 final_balance_for_terminal,
                 CFKind::Notional,
@@ -627,6 +635,13 @@ impl<'a> CashflowEngine<'a> {
     /// This generates cashflows period by period based on the utilization, rate,
     /// and spread paths from Monte Carlo simulation.
     fn build_path_schedule(&self, path: &ThreeFactorPathData) -> Result<CashFlowSchedule> {
+        if path.payment_dates.len() != self.payment_periods.len() + 1 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RevolvingCredit path boundary count ({}) must equal period count + 1 ({})",
+                path.payment_dates.len(),
+                self.payment_periods.len() + 1
+            )));
+        }
         let mut flows = Vec::new();
         let rc = RoundingContext::default();
         let ccy = self.facility.commitment_amount.currency();
@@ -652,11 +667,13 @@ impl<'a> CashflowEngine<'a> {
             self.facility.utilization_rate()
         };
 
-        // Process each payment period using path data
-        for i in 0..(path.payment_dates.len() - 1) {
-            let period_start = path.payment_dates[i];
-            let period_end = path.payment_dates[i + 1];
-            let payment_date = period_end;
+        // Process each contractual accrual period using path data observed on
+        // its unadjusted boundaries. Payment adjustment changes settlement,
+        // never the accrual interval.
+        for (i, period) in self.payment_periods.iter().enumerate() {
+            let period_start = period.accrual_start;
+            let period_end = period.accrual_end;
+            let payment_date = period.payment_date;
 
             // Get path values at this step (step function - use period start)
             let utilization_start = path.utilization_path[i].clamp(0.0, 1.0);
@@ -788,11 +805,16 @@ impl<'a> CashflowEngine<'a> {
             .clamp(0.0, 1.0);
         let final_balance = self.facility.commitment_amount * final_utilization;
 
-        if self.facility.maturity > self.as_of
+        let terminal_payment_date = self
+            .payment_periods
+            .last()
+            .map(|period| period.payment_date)
+            .ok_or(finstack_quant_core::InputError::TooFewPoints)?;
+        if terminal_payment_date > self.as_of
             && !rc.is_effectively_zero(final_balance.amount(), ZeroKind::Money(ccy))
         {
             flows.push(CashFlow::new(
-                self.facility.maturity,
+                terminal_payment_date,
                 None,
                 final_balance,
                 CFKind::Notional,
@@ -850,4 +872,54 @@ pub fn calculate_drawn_balance_at_date(
     }
 
     Ok(balance)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::fixed_income::revolving_credit::{BaseRateSpec, RevolvingCreditFees};
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use time::Month;
+
+    #[test]
+    fn terminal_principal_uses_adjusted_payment_date_without_extra_accrual() {
+        let start = Date::from_calendar_date(2026, Month::January, 3).expect("date");
+        let maturity = Date::from_calendar_date(2027, Month::January, 3).expect("date");
+        let adjusted = Date::from_calendar_date(2027, Month::January, 4).expect("date");
+        let facility = RevolvingCredit::builder()
+            .id("RC-BDC-BOUNDARY".into())
+            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
+            .drawn_amount(Money::new(1_000_000.0, Currency::USD))
+            .commitment_date(start)
+            .maturity(maturity)
+            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .day_count(DayCount::Act365F)
+            .frequency(Tenor::annual())
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
+            .discount_curve_id("USD-OIS".into())
+            .recovery_rate(0.0)
+            .build()
+            .expect("facility");
+
+        let path = CashflowEngine::new(&facility, None, start, None)
+            .expect("engine")
+            .generate_deterministic()
+            .expect("cashflows");
+        let flows = path.schedule.get_flows();
+        let terminal = flows
+            .iter()
+            .find(|flow| flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+            .expect("terminal principal");
+        let interest = flows
+            .iter()
+            .find(|flow| flow.kind == CFKind::Fixed)
+            .expect("interest");
+
+        assert_eq!(terminal.date, adjusted);
+        assert_eq!(interest.date, adjusted);
+        assert!((interest.accrual_factor - 1.0).abs() < 1e-12);
+        assert!((interest.amount.amount() - 50_000.0).abs() < 1e-8);
+    }
 }

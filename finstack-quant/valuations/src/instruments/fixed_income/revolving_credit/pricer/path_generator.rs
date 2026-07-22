@@ -20,10 +20,14 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 use rayon::prelude::*;
 
+use crate::calibration::hull_white::HullWhiteParams;
 use crate::instruments::fixed_income::revolving_credit::pricer::monte_carlo_discretization::RevolvingCreditDiscretization;
 use crate::instruments::fixed_income::revolving_credit::pricer::monte_carlo_process::{
     CreditSpreadParams, InterestRateSpec, RevolvingCreditProcess, RevolvingCreditProcessParams,
     UtilizationParams,
+};
+use crate::instruments::rates::exotics_shared::{
+    calibrate_hw1f_params, initial_short_rate_from_curve,
 };
 use finstack_quant_monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_monte_carlo::rng::philox::PhiloxRng;
@@ -82,6 +86,15 @@ pub fn generate_three_factor_paths(
 
     // Use facility's day count for consistent time calculations
     let day_count = facility.day_count;
+    // All stochastic factors start at the valuation date for seasoned
+    // facilities.  Keep path time on the facility axis, but retain the
+    // simulation anchor so curve-fitted models can use their own t=0.
+    let simulation_anchor = as_of.max(facility.commitment_date);
+    let t_asof = if as_of > facility.commitment_date {
+        day_count.year_fraction(facility.commitment_date, as_of, DayCountContext::default())?
+    } else {
+        0.0
+    };
     // Build utilization parameters
     let (util_params, is_zero_vol) = match &stoch_spec.utilization_process {
         UtilizationProcess::MeanReverting {
@@ -97,42 +110,83 @@ pub fn generate_three_factor_paths(
     };
 
     // Build interest rate specification
-    let (interest_rate_spec, rate_curve_opt): (InterestRateSpec, RateCurveData) =
-        match &facility.base_rate_spec {
-            BaseRateSpec::Fixed { rate } => (InterestRateSpec::Fixed { rate: *rate }, None),
-            BaseRateSpec::Floating(spec) => {
-                match &mc_config.interest_rate_process {
-                    Some(InterestRateProcessSpec::HullWhite1F {
-                        kappa,
-                        sigma,
-                        initial,
-                        theta,
-                    }) => (
-                        InterestRateSpec::Floating {
-                            params: HullWhite1FParams::new(*kappa, *sigma, *theta),
-                            initial: *initial,
-                        },
-                        None,
-                    ),
-                    None => {
-                        // Use deterministic forward curve
-                        let fwd = market.get_forward(spec.index_id.as_str())?;
-                        let times = fwd.knots().to_vec();
-                        let rates = fwd.forwards().to_vec();
+    let disc_curve = market.get_discount(facility.discount_curve_id.as_str())?;
+    let (interest_rate_spec, rate_curve_opt, rate_time_offset): (
+        InterestRateSpec,
+        RateCurveData,
+        f64,
+    ) = match &facility.base_rate_spec {
+        BaseRateSpec::Fixed { rate } => (InterestRateSpec::Fixed { rate: *rate }, None, 0.0),
+        BaseRateSpec::Floating(spec) => {
+            match &mc_config.interest_rate_process {
+                Some(InterestRateProcessSpec::HullWhite1F {
+                    kappa,
+                    sigma,
+                    initial,
+                    theta,
+                }) => {
+                    if *sigma > 0.0 {
+                        let horizon = day_count
+                            .year_fraction(
+                                simulation_anchor,
+                                facility.maturity,
+                                DayCountContext::default(),
+                            )?
+                            .max(1e-6);
+                        let scalar = HullWhiteParams::new(*kappa, *sigma)?;
+                        let params = calibrate_hw1f_params(
+                            scalar,
+                            disc_curve.as_ref(),
+                            simulation_anchor,
+                            horizon,
+                        )?;
+                        let initial =
+                            initial_short_rate_from_curve(disc_curve.as_ref(), simulation_anchor)?;
                         (
-                            InterestRateSpec::DeterministicForward {
-                                times: times.clone(),
-                                rates: rates.clone(),
+                            InterestRateSpec::Floating { params, initial },
+                            None,
+                            -t_asof,
+                        )
+                    } else {
+                        // Preserve the zero-volatility mode used for
+                        // deterministic parity tests. With no diffusion,
+                        // the supplied constant mean level remains exact.
+                        (
+                            InterestRateSpec::Floating {
+                                params: HullWhite1FParams::new(*kappa, *sigma, *theta),
+                                initial: *initial,
                             },
-                            Some((times, rates)),
+                            None,
+                            0.0,
                         )
                     }
                 }
+                None => {
+                    // Use deterministic forward curve
+                    let fwd = market.get_forward(spec.index_id.as_str())?;
+                    let times = fwd.knots().to_vec();
+                    let rates = fwd.forwards().to_vec();
+                    let curve_offset = fwd.day_count().signed_year_fraction(
+                        fwd.base_date(),
+                        facility.commitment_date,
+                        DayCountContext::default(),
+                    )?;
+                    (
+                        InterestRateSpec::DeterministicForward {
+                            times: times.clone(),
+                            rates: rates.clone(),
+                        },
+                        Some((times, rates)),
+                        curve_offset,
+                    )
+                }
             }
-        };
+        }
+    };
 
     // Build credit spread parameters
-    let credit_spread_params = build_credit_spread_params(mc_config, facility, market)?;
+    let credit_spread_params =
+        build_credit_spread_params(mc_config, facility, market, simulation_anchor)?;
 
     // Create 3-factor process with correlation
     let mut process_params =
@@ -148,16 +202,7 @@ pub fn generate_three_factor_paths(
             process_params.with_correlation([[1.0, 0.0, rho], [0.0, 1.0, 0.0], [rho, 0.0, 1.0]]);
     }
 
-    // Compute time offset for market curve alignment
-    let disc_curve = market.get_discount(facility.discount_curve_id.as_str())?;
-    let disc_dc = disc_curve.day_count();
-    let base_date = disc_curve.base_date();
-    let t_start = disc_dc.signed_year_fraction(
-        base_date,
-        facility.commitment_date,
-        DayCountContext::default(),
-    )?;
-    process_params = process_params.with_time_offset(t_start);
+    process_params = process_params.with_time_offset(rate_time_offset);
 
     let process = RevolvingCreditProcess::new(process_params);
 
@@ -177,11 +222,6 @@ pub fn generate_three_factor_paths(
     // re-simulating the elapsed history would overstate dispersion at every
     // future date. Payment dates at or before `as_of` simply record the t₀
     // state.
-    let t_asof = if as_of > facility.commitment_date {
-        day_count.year_fraction(facility.commitment_date, as_of, DayCountContext::default())?
-    } else {
-        0.0
-    };
     // Payment dates at/before as_of record the initial state (at least the
     // first payment date, which is the commitment date itself).
     let num_initial = raw_time_points
@@ -211,7 +251,13 @@ pub fn generate_three_factor_paths(
     let num_paths = stoch_spec.num_paths;
     let num_steps = time_grid.num_steps();
     let num_factors = process.num_factors();
-    let initial_state = process.params().initial_state(facility.utilization_rate());
+    let initial_state = if sim_start == 0.0 {
+        process.params().initial_state(facility.utilization_rate())
+    } else {
+        process
+            .params()
+            .initial_state_at(facility.utilization_rate(), sim_start)
+    };
     let num_payment_dates = payment_dates.len();
 
     let mut paths = Vec::with_capacity(num_paths);
@@ -255,7 +301,7 @@ pub fn generate_three_factor_paths(
             // For deterministic forward, set initial rate from curve on the
             // CURVE's time axis (market-t = time_offset + path-t).
             if let Some((ref times, ref rates)) = rate_curve_opt {
-                state[1] = interpolate_rate(t_start + time_grid.times()[0], times, rates);
+                state[1] = interpolate_rate(rate_time_offset + time_grid.times()[0], times, rates);
             }
 
             // Record the t₀ state for every payment date at/before as_of
@@ -294,7 +340,7 @@ pub fn generate_three_factor_paths(
                 // For deterministic forward, manually update short rate from
                 // the curve on its own axis (market-t = time_offset + path-t).
                 if let Some((ref times, ref rates)) = rate_curve_opt {
-                    state[1] = interpolate_rate(t_start + t_next, times, rates);
+                    state[1] = interpolate_rate(rate_time_offset + t_next, times, rates);
                 }
 
                 // Only record state at payment dates (not intermediate steps)
@@ -371,7 +417,7 @@ pub fn generate_three_factor_paths(
                     let mut credit_spread_path = Vec::with_capacity(num_payment_dates);
 
                     if let Some((ref times, ref rates)) = rate_curve_opt {
-                        state[1] = interpolate_rate(t_start + times_ref[0], times, rates);
+                        state[1] = interpolate_rate(rate_time_offset + times_ref[0], times, rates);
                     }
 
                     // Record the t₀ state for every payment date at/before
@@ -408,7 +454,7 @@ pub fn generate_three_factor_paths(
                         }
 
                         if let Some((ref times, ref rates)) = rate_curve_opt {
-                            state[1] = interpolate_rate(t_start + t_next, times, rates);
+                            state[1] = interpolate_rate(rate_time_offset + t_next, times, rates);
                         }
 
                         if next_payment_idx < payment_indices_ref.len()
@@ -469,6 +515,7 @@ fn build_credit_spread_params(
     mc_config: &McConfig,
     facility: &RevolvingCredit,
     market: &MarketContext,
+    simulation_anchor: Date,
 ) -> Result<CreditSpreadParams> {
     match &mc_config.credit_spread_process {
         CreditSpreadProcessSpec::Cir {
@@ -513,25 +560,37 @@ fn build_credit_spread_params(
             implied_vol,
             tenor_years,
         } => {
-            // Pull hazard curve and compute tenor
+            // Anchor both the initial state and the target average hazard at
+            // the simulation date. Using the curve's first segment here would
+            // reintroduce elapsed credit history for seasoned facilities.
             let hazard = market.get_hazard(hazard_curve_id.as_str())?;
             let dc = hazard.day_count();
             let base_date = hazard.base_date();
-
-            let t_maturity =
-                dc.year_fraction(base_date, facility.maturity, DayCountContext::default())?;
-            let t = tenor_years.unwrap_or_else(|| t_maturity.max(CIR_MIN_SPREAD));
-
-            // Survival and average hazard over [0,T]
-            let sp_t = hazard.sp(t);
-            let avg_lambda = if t > 0.0 { (-sp_t.ln()) / t } else { 0.0 };
-
-            // Initial hazard from first segment
-            let mut first_lambda = None;
-            if let Some((_, lambda)) = hazard.knot_points().next() {
-                first_lambda = Some(lambda.max(0.0));
+            let t_anchor =
+                dc.signed_year_fraction(base_date, simulation_anchor, DayCountContext::default())?;
+            if t_anchor < 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "hazard curve '{}' has base date {} after revolving-credit simulation anchor {}",
+                    hazard_curve_id, base_date, simulation_anchor
+                )));
             }
-            let lambda0 = first_lambda.unwrap_or(avg_lambda).max(0.0);
+            let remaining = dc
+                .year_fraction(
+                    simulation_anchor,
+                    facility.maturity,
+                    DayCountContext::default(),
+                )?
+                .max(CIR_MIN_SPREAD);
+            let t = tenor_years
+                .unwrap_or(remaining)
+                .min(remaining)
+                .max(CIR_MIN_SPREAD);
+
+            // Conditional survival and average hazard over [anchor, anchor+T].
+            let sp_0 = hazard.sp(t_anchor).max(f64::MIN_POSITIVE);
+            let sp_t = hazard.sp(t_anchor + t).max(f64::MIN_POSITIVE);
+            let avg_lambda = (-(sp_t / sp_0).ln() / t).max(0.0);
+            let lambda0 = hazard.hazard_rate(t_anchor).max(0.0);
 
             // Map hazard ↔ spread using s ≈ (1 − R) · λ
             // Use facility recovery rate for consistency with pricing
@@ -684,4 +743,96 @@ fn interpolate_rate(t: f64, times: &[f64], rates: &[f64]) -> f64 {
     let i = idx.saturating_sub(1);
     let alpha = (t - times[i]) / (times[i + 1] - times[i]);
     rates[i] + alpha * (rates[i + 1] - rates[i])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+    use time::macros::date;
+
+    #[test]
+    fn market_anchored_credit_starts_at_simulation_anchor_hazard() {
+        let mut facility = RevolvingCredit::example().expect("facility");
+        facility.recovery_rate = 0.4;
+        let market = MarketContext::new().insert(
+            HazardCurve::builder("RC-HZ")
+                .base_date(date!(2024 - 01 - 01))
+                .knots([(0.5, 0.01), (5.0, 0.05)])
+                .build()
+                .expect("hazard curve"),
+        );
+        let config = McConfig {
+            recovery_rate: 0.4,
+            credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
+                hazard_curve_id: "RC-HZ".into(),
+                kappa: 0.5,
+                implied_vol: 0.2,
+                tenor_years: None,
+            },
+            interest_rate_process: None,
+            correlation_matrix: None,
+            util_credit_corr: None,
+        };
+
+        let params = build_credit_spread_params(&config, &facility, &market, date!(2025 - 01 - 01))
+            .expect("credit parameters");
+
+        assert!((params.initial - 0.03).abs() < 1e-12);
+    }
+
+    #[test]
+    fn stochastic_hull_white_ignores_legacy_constant_seed_and_fits_curve() {
+        let facility = RevolvingCredit::example().expect("facility");
+        let as_of = date!(2024 - 01 - 01);
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(date!(2024 - 01 - 01))
+                .day_count(DayCount::Act365F)
+                .knots([
+                    (0.0, 1.0),
+                    (1.0, (-0.03_f64).exp()),
+                    (5.0, (-0.15_f64).exp()),
+                ])
+                .build()
+                .expect("discount curve"),
+        );
+        let config = McConfig {
+            recovery_rate: facility.recovery_rate,
+            credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
+            interest_rate_process: Some(InterestRateProcessSpec::HullWhite1F {
+                kappa: 0.1,
+                sigma: 0.01,
+                initial: 0.99,
+                theta: 0.99,
+            }),
+            correlation_matrix: None,
+            util_credit_corr: None,
+        };
+        let stochastic = StochasticUtilizationSpec {
+            utilization_process: UtilizationProcess::MeanReverting {
+                target_rate: 0.5,
+                speed: 1.0,
+                volatility: 0.1,
+            },
+            num_paths: 2,
+            seed: Some(7),
+            antithetic: false,
+            use_sobol_qmc: false,
+            mc_config: Some(config.clone()),
+        };
+        let dates =
+            super::super::super::utils::build_accrual_boundary_dates(&facility).expect("dates");
+
+        let paths =
+            generate_three_factor_paths(&stochastic, &config, &facility, &market, &dates, as_of)
+                .expect("paths");
+
+        let initial_rate = paths[0].short_rate_path[0];
+        assert!(
+            (initial_rate - 0.03).abs() < 5e-4,
+            "initial rate: {initial_rate}"
+        );
+        assert!((initial_rate - 0.99).abs() > 0.5);
+    }
 }

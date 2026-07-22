@@ -13,7 +13,25 @@ pub(crate) use available_capacity::AvailableCapacityCalculator;
 pub(crate) use utilization_rate::UtilizationRateCalculator;
 pub(crate) use weighted_average_cost::ApproxWeightedAverageCostCalculator;
 
+use crate::instruments::fixed_income::revolving_credit::types::DrawRepaySpec;
+use crate::instruments::RevolvingCredit;
 use crate::metrics::MetricRegistry;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
+
+fn drawn_balance_as_of(
+    facility: &RevolvingCredit,
+    as_of: Date,
+) -> finstack_quant_core::Result<Money> {
+    match &facility.draw_repay_spec {
+        DrawRepaySpec::Deterministic(_) => {
+            super::cashflow_engine::calculate_drawn_balance_at_date(facility, as_of)
+        }
+        // For a stochastic facility, drawn_amount is the observed state at the
+        // valuation anchor; future utilization is simulated from this value.
+        DrawRepaySpec::Stochastic(_) => Ok(facility.drawn_amount),
+    }
+}
 
 /// Register all revolving credit metrics with the registry.
 ///

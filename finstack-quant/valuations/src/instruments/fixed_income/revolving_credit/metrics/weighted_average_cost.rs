@@ -2,7 +2,8 @@
 
 use crate::instruments::RevolvingCredit;
 use crate::metrics::{MetricCalculator, MetricContext};
-use rust_decimal::prelude::ToPrimitive;
+
+use super::drawn_balance_as_of;
 
 /// Calculator for approximate weighted average cost across all fees and interest.
 ///
@@ -36,21 +37,11 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
             ) => {
                 // Use forward curve to get current rate
                 let fwd = context.curves.get_forward(spec.index_id.as_str())?;
-                let mut index_rate = fwd.rate(0.25); // Use 3M as representative
-
-                // Apply floor/cap to the index rate before adding spread,
-                // consistent with the cashflow engines.
-                if let Some(floor) = spec.index_floor_bp {
-                    let floor_f64 = floor.to_f64().unwrap_or(0.0);
-                    index_rate = index_rate.max(floor_f64 * 1e-4);
-                }
-                if let Some(cap) = spec.index_cap_bp {
-                    let cap_f64 = cap.to_f64().unwrap_or(f64::MAX);
-                    index_rate = index_rate.min(cap_f64 * 1e-4);
-                }
-
-                let spread_bp_f64 = spec.spread_bp.to_f64().unwrap_or_default();
-                index_rate + (spread_bp_f64 * 1e-4)
+                let index_rate = fwd.rate(0.25); // Use 3M as representative
+                let params = finstack_quant_cashflows::builder::FloatingRateParams::try_from(spec)?;
+                finstack_quant_cashflows::builder::rate_helpers::calculate_floating_rate(
+                    index_rate, &params,
+                )
             }
         };
 
@@ -61,7 +52,7 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
         }
 
         // Calculate total annual cost
-        let drawn_amt = facility.drawn_amount.amount();
+        let drawn_amt = drawn_balance_as_of(facility, context.as_of)?.amount();
         let undrawn_amt = commitment_amount - drawn_amt;
 
         // Interest on drawn

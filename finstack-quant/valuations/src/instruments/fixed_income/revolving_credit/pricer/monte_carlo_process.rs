@@ -185,17 +185,43 @@ impl RevolvingCreditProcessParams {
         self
     }
 
-    /// Get initial state vector [utilization, short_rate, credit_spread].
+    /// Get initial state vector [utilization, short_rate, credit_spread] at
+    /// path time zero.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_utilization` - Observed drawn-to-commitment ratio at the
+    ///   simulation anchor, expressed as a decimal in `[0, 1]`.
+    ///
+    /// # Returns
+    ///
+    /// Initial utilization, short rate, and credit spread state.
     pub fn initial_state(&self, initial_utilization: f64) -> [f64; 3] {
+        self.initial_state_at(initial_utilization, 0.0)
+    }
+
+    /// Get initial state vector at a specific path time.
+    ///
+    /// Deterministic forward curves live on their own market-time axis, so a
+    /// seasoned facility must initialize from `time_offset + path_time`
+    /// rather than blindly taking the first curve knot.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_utilization` - Observed drawn-to-commitment ratio at the
+    ///   simulation anchor, expressed as a decimal in `[0, 1]`.
+    /// * `path_time` - Simulation-anchor time on the facility's year-fraction
+    ///   axis, in years from commitment.
+    ///
+    /// # Returns
+    ///
+    /// Initial utilization, curve-aligned short rate, and credit spread state.
+    pub fn initial_state_at(&self, initial_utilization: f64, path_time: f64) -> [f64; 3] {
         let rate = match &self.interest_rate {
             InterestRateSpec::Fixed { rate } => *rate,
             InterestRateSpec::Floating { initial, .. } => *initial,
             InterestRateSpec::DeterministicForward { times, rates } => {
-                if times.is_empty() {
-                    0.0
-                } else {
-                    rates[0]
-                }
+                interpolate_rate(self.time_offset + path_time, times, rates)
             }
         };
 
@@ -205,6 +231,27 @@ impl RevolvingCreditProcessParams {
             self.credit_spread.initial.max(0.0),
         ]
     }
+}
+
+fn interpolate_rate(t: f64, times: &[f64], rates: &[f64]) -> f64 {
+    if times.is_empty() || rates.is_empty() {
+        return 0.0;
+    }
+    if times.len() == 1 || rates.len() == 1 || t <= times[0] {
+        return rates[0];
+    }
+    let n = times.len().min(rates.len());
+    if t >= times[n - 1] {
+        return rates[n - 1];
+    }
+    let idx = times[..n].partition_point(|&time| time <= t);
+    let i = idx.saturating_sub(1);
+    let width = times[i + 1] - times[i];
+    if width <= 0.0 {
+        return rates[i];
+    }
+    let alpha = (t - times[i]) / width;
+    rates[i] + alpha * (rates[i + 1] - rates[i])
 }
 
 /// Multi-factor stochastic process for revolving credit facilities.
@@ -255,7 +302,7 @@ impl StochasticProcess for RevolvingCreditProcess {
         // Short rate: κ_r [θ_r(t) - r_t] for floating, or 0 for fixed
         out[1] = match &self.params.interest_rate {
             InterestRateSpec::Floating { params, .. } => {
-                params.kappa * (params.theta_at_time(t) - x[1])
+                params.kappa * (params.theta_at_time(self.params.time_offset + t) - x[1])
             }
             InterestRateSpec::Fixed { .. } | InterestRateSpec::DeterministicForward { .. } => 0.0,
         };
@@ -460,6 +507,21 @@ mod tests {
         assert_eq!(state[0], 0.5); // utilization
         assert_eq!(state[1], 0.04); // initial floating rate
         assert_eq!(state[2], 0.015); // credit spread
+    }
+
+    #[test]
+    fn deterministic_forward_initial_state_uses_curve_time_offset() {
+        let utilization = UtilizationParams::new(0.5, 0.6, 0.1).expect("utilization");
+        let interest_rate = InterestRateSpec::DeterministicForward {
+            times: vec![0.0, 1.0, 2.0],
+            rates: vec![0.01, 0.03, 0.05],
+        };
+        let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
+        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread)
+            .with_time_offset(0.25);
+
+        let state = params.initial_state_at(0.5, 0.50);
+        assert!((state[1] - 0.025).abs() < 1e-12);
     }
 
     #[test]

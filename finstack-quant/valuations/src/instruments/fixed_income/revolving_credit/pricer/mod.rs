@@ -116,6 +116,7 @@ mod tests {
     #[test]
     fn test_unified_pricer_stochastic() {
         use super::super::types::{CreditSpreadProcessSpec, McConfig};
+        use crate::instruments::Instrument;
 
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
@@ -174,7 +175,24 @@ mod tests {
         let pv_unified =
             RevolvingCreditPricer::price(&facility, &market, start).expect("should succeed");
 
+        let pv_direct = facility
+            .value(&market, start)
+            .expect("direct instrument lifecycle");
+        let registry_value = crate::pricer::shared_standard_registry()
+            .price_with_metrics(
+                &facility,
+                ModelKey::Discounting,
+                &market,
+                start,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect("registry lifecycle")
+            .value;
+
         // Verify we got a valid result
         assert!(pv_unified.currency() == Currency::USD);
+        assert_eq!(pv_direct, pv_unified);
+        assert_eq!(registry_value, pv_unified);
     }
 }

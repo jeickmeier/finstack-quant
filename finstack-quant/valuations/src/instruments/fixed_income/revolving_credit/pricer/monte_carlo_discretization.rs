@@ -152,7 +152,7 @@ impl Discretization<RevolvingCreditProcess> for RevolvingCreditDiscretization {
                 // r_{t+dt} = r_t e^{-κdt} + θ(1 - e^{-κdt}) + σ√[(1-e^{-2κdt})/(2κ)] Z
                 let kappa = params.kappa;
                 let sigma = params.sigma;
-                let theta = params.theta_at_time(t);
+                let theta = params.theta_at_time(process.params().time_offset + t);
 
                 let exp_kappa_dt = (-kappa * dt).exp();
                 let mean = rate_state[0] * exp_kappa_dt + theta * (1.0 - exp_kappa_dt);

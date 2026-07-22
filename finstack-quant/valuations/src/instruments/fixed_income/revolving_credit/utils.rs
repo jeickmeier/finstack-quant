@@ -8,6 +8,41 @@ use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::Result;
 
+/// Build the canonical accrual/payment periods for a revolving credit facility.
+///
+/// Accrual boundaries remain unadjusted while payment dates follow Modified
+/// Following on the configured facility calendar. Keeping the complete period
+/// objects prevents payment-date adjustment from changing contractual accrual.
+pub(super) fn build_payment_periods(
+    facility: &RevolvingCredit,
+) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+    use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+
+    let calendar_id = facility
+        .attributes
+        .get_meta("calendar_id")
+        .or_else(|| facility.attributes.get_meta("calendar"))
+        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+    let periods = build_periods(BuildPeriodsParams {
+        start: facility.commitment_date,
+        end: facility.maturity,
+        frequency: facility.frequency,
+        stub: facility.stub,
+        bdc: BusinessDayConvention::ModifiedFollowing,
+        calendar_id,
+        end_of_month: false,
+        day_count: facility.day_count,
+        payment_lag_days: 0,
+        reset_lag_days: None,
+        adjust_accrual_dates: false,
+    })?;
+
+    if periods.is_empty() {
+        return Err(finstack_quant_core::InputError::TooFewPoints.into());
+    }
+    Ok(periods)
+}
+
 /// Resolve the calendar for a facility from its attributes.
 ///
 /// Looks for `calendar_id` or `calendar` metadata and strictly resolves it,
@@ -56,26 +91,7 @@ pub(super) fn build_payment_dates(
     facility: &RevolvingCredit,
     include_sentinel: bool,
 ) -> Result<Vec<Date>> {
-    use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
-
-    let calendar_id = facility
-        .attributes
-        .get_meta("calendar_id")
-        .or_else(|| facility.attributes.get_meta("calendar"))
-        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
-    let periods = build_periods(BuildPeriodsParams {
-        start: facility.commitment_date,
-        end: facility.maturity,
-        frequency: facility.frequency,
-        stub: facility.stub,
-        bdc: BusinessDayConvention::ModifiedFollowing,
-        calendar_id,
-        end_of_month: false,
-        day_count: facility.day_count,
-        payment_lag_days: 0,
-        reset_lag_days: None,
-        adjust_accrual_dates: false,
-    })?;
+    let periods = build_payment_periods(facility)?;
     let mut payment_dates: Vec<Date> = std::iter::once(facility.commitment_date)
         .chain(periods.into_iter().map(|period| period.payment_date))
         .collect();
@@ -92,6 +108,18 @@ pub(super) fn build_payment_dates(
     }
 
     Ok(payment_dates)
+}
+
+/// Build contractual accrual-boundary dates used for MC state observations.
+///
+/// The first date is the commitment date and each subsequent date is an
+/// unadjusted accrual end. Payment adjustment is applied only when emitting the
+/// corresponding cashflow.
+pub(super) fn build_accrual_boundary_dates(facility: &RevolvingCredit) -> Result<Vec<Date>> {
+    let periods = build_payment_periods(facility)?;
+    Ok(std::iter::once(facility.commitment_date)
+        .chain(periods.into_iter().map(|period| period.accrual_end))
+        .collect())
 }
 
 /// Build reset schedule dates for floating rate facilities.
@@ -136,8 +164,9 @@ pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec
                 adjust_accrual_dates: false,
             })?;
             Ok(Some(
-                std::iter::once(facility.commitment_date)
-                    .chain(periods.into_iter().map(|period| period.payment_date))
+                periods
+                    .into_iter()
+                    .map(|period| period.accrual_start)
                     .collect(),
             ))
         }
@@ -406,6 +435,30 @@ mod tests {
             .last()
             .expect("Dates should not be empty");
         assert_eq!(*sentinel, *last_payment + time::Duration::days(1));
+    }
+
+    #[test]
+    fn payment_adjustment_does_not_move_accrual_boundaries() {
+        let start = Date::from_calendar_date(2026, Month::January, 3).expect("date");
+        let maturity = Date::from_calendar_date(2027, Month::January, 3).expect("date");
+        let facility = create_test_facility(
+            start,
+            maturity,
+            Tenor::annual(),
+            BaseRateSpec::Fixed { rate: 0.05 },
+            None,
+        );
+
+        let periods = build_payment_periods(&facility).expect("periods");
+        let final_period = periods.last().expect("period");
+        assert_eq!(final_period.accrual_end, maturity);
+        assert_eq!(
+            final_period.payment_date,
+            Date::from_calendar_date(2027, Month::January, 4).expect("date")
+        );
+
+        let observation_dates = build_accrual_boundary_dates(&facility).expect("boundaries");
+        assert_eq!(observation_dates.last(), Some(&maturity));
     }
 
     #[test]

@@ -407,6 +407,52 @@ mod tests {
         serde_json::to_string(&InstrumentJson::Bond(bond)).expect("serialize")
     }
 
+    fn revolving_credit_json(invalid_gearing: bool, with_credit: bool) -> String {
+        use finstack_quant_valuations::instruments::fixed_income::revolving_credit::BaseRateSpec;
+        use finstack_quant_valuations::instruments::{InstrumentJson, RevolvingCredit};
+
+        let mut facility = RevolvingCredit::example().expect("facility");
+        if invalid_gearing {
+            let BaseRateSpec::Floating(spec) = &mut facility.base_rate_spec else {
+                unreachable!("example is floating");
+            };
+            spec.gearing = Default::default();
+        } else {
+            facility.base_rate_spec = BaseRateSpec::Fixed { rate: 0.05 };
+        }
+        if with_credit {
+            facility.credit_curve_id = Some("USD-HZ".into());
+            facility.recovery_rate = 0.4;
+        }
+        serde_json::to_string(&InstrumentJson::RevolvingCredit(facility)).expect("serialize")
+    }
+
+    fn revolving_credit_market(with_credit: bool) -> MarketContext {
+        use finstack_quant_core::dates::DayCount;
+        use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+        use time::macros::date;
+
+        let mut market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(date!(2024 - 01 - 01))
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.85)])
+                .build()
+                .expect("discount curve"),
+        );
+        if with_credit {
+            market = market.insert(
+                HazardCurve::builder("USD-HZ")
+                    .base_date(date!(2024 - 01 - 01))
+                    .recovery_rate(0.4)
+                    .knots([(1.0, 0.02), (5.0, 0.02)])
+                    .build()
+                    .expect("hazard curve"),
+            );
+        }
+        market
+    }
+
     pub(crate) fn bermudan_swaption_json() -> String {
         use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
         use finstack_quant_valuations::instruments::InstrumentJson;
@@ -755,6 +801,45 @@ mod tests {
         let canonical = validate_instrument_json(&json).expect("validate");
         let parsed: serde_json::Value = serde_json::from_str(&canonical).expect("json");
         assert_eq!(parsed["type"], "bermudan_swaption");
+    }
+
+    #[test]
+    fn validate_revolving_credit_rejects_invalid_floating_rate_spec() {
+        assert!(validate_instrument_json(&revolving_credit_json(true, false)).is_err());
+    }
+
+    #[test]
+    fn revolving_credit_metrics_and_cashflow_fail_closed_cross_wasm_context() {
+        let instrument = revolving_credit_json(false, false);
+        let market = revolving_credit_market(false);
+        let result = price_instrument_with_metrics_context(
+            &instrument,
+            &market,
+            "2024-07-01",
+            "discounting",
+            vec![
+                "utilization_rate".to_string(),
+                "available_capacity".to_string(),
+            ],
+            None,
+            None,
+        )
+        .expect("metrics");
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("result");
+        assert_eq!(parsed["measures"]["utilization_rate"], 0.30);
+        assert_eq!(parsed["measures"]["available_capacity"], 35_000_000.0);
+
+        let credit_instrument = revolving_credit_json(false, true);
+        let credit_market_json =
+            serde_json::to_string(&revolving_credit_market(true)).expect("market json");
+        let credit_market = JsMarket::new(&credit_market_json).expect("market handle");
+        assert!(instrument_cashflows_with_market(
+            &credit_instrument,
+            &credit_market,
+            "2024-01-01",
+            "discounting",
+        )
+        .is_err());
     }
 
     #[test]
