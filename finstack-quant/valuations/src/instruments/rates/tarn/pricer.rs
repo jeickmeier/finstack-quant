@@ -905,6 +905,67 @@ mod tests {
         assert!((expected - tarn.notional.amount() * first_coupon_df).abs() < 1e-8);
     }
 
+    /// Knockout-ACTIVE regression: a target hit mid-life must cap the breaching
+    /// coupon at exactly the remaining target and redeem par at that coupon
+    /// date, not at maturity. The other deterministic tests never exercise
+    /// this branch (`target = 1.0` never knocks out; `target = 0.0` redeems
+    /// immediately with no coupon), so a broken knockout — cap ignored,
+    /// redemption left at maturity — would slip through them.
+    ///
+    /// On this sloped curve the σ → 0 cumulative inverse-floater coupon runs
+    /// ≈ 0.019 / 0.032 / 0.043 across the three periods, so `target = 0.025`
+    /// breaches at period 2: the second coupon is capped to
+    /// `0.025 − coupon₁ < coupon₂ (uncapped)` and par redeems at 2026-01-01.
+    /// The MC price is pinned to the independent in-advance ground truth
+    /// (`expected_deterministic_pv`), whose knockout logic is transparent; the
+    /// second assertion proves the branch actually moved the price relative to
+    /// the never-knocked-out contract.
+    #[test]
+    fn mid_life_knockout_caps_coupon_and_redeems_early() {
+        let as_of = date(2025, Month::January, 1);
+        let market = market(as_of, 0.02, 0.03);
+        let knockout_tarn = test_tarn(0.025);
+        let bullet_tarn = test_tarn(1.0);
+
+        let truth_knockout = expected_deterministic_pv(&knockout_tarn, &market, as_of);
+        let truth_bullet = expected_deterministic_pv(&bullet_tarn, &market, as_of);
+        let mc_knockout = deterministic_pricer(32)
+            .price_estimate(&knockout_tarn, &market, as_of)
+            .expect("knockout price")
+            .mean
+            .amount();
+        let mc_bullet = deterministic_pricer(32)
+            .price_estimate(&bullet_tarn, &market, as_of)
+            .expect("bullet price")
+            .mean
+            .amount();
+
+        // Same θ(t)-bootstrap tolerance as the in-advance fixing test.
+        assert!(
+            (mc_knockout - truth_knockout).abs() < 2_000.0,
+            "knockout-active MC PV must match the independent ground truth: \
+             mc={mc_knockout}, expected={truth_knockout}"
+        );
+        // The knockout branch must be economically live in the independent
+        // model: capping the breaching coupon and pulling par forward a period
+        // nets coupon loss against earlier redemption, ≈ $3k here.
+        let truth_shift = truth_knockout - truth_bullet;
+        assert!(
+            truth_shift.abs() > 1_000.0,
+            "fixture must make the knockout economically visible: truth shift {truth_shift}"
+        );
+        // The MC must reproduce that knockout-induced shift. Both contracts
+        // share the same paths and curve, so the θ-bootstrap bias cancels in
+        // the difference and the agreement is much tighter than the level pin.
+        let mc_shift = mc_knockout - mc_bullet;
+        assert!(
+            (mc_shift - truth_shift).abs() < 500.0,
+            "MC knockout-vs-bullet PV shift must match the independent model: \
+             mc shift={mc_shift}, truth shift={truth_shift}; a zero MC shift \
+             means the target-redemption branch never fired"
+        );
+    }
+
     #[test]
     fn higher_path_count_reduces_standard_error() {
         let as_of = date(2025, Month::January, 1);

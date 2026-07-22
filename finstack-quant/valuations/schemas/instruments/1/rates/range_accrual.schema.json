@@ -5,7 +5,7 @@
       "oneOf": [
         {
           "const": "absolute",
-          "description": "Bounds are absolute price levels (e.g., 4500.0 for SPX).\nThis is the market standard for rate-linked range accruals.",
+          "description": "Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate\nband for a rate-linked note priced via\n[`CallableRangeAccrual`](crate::instruments::rates::callable_range_accrual)).",
           "type": "string"
         },
         {

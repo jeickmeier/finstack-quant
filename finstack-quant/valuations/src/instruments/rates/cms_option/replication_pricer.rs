@@ -145,6 +145,174 @@ fn tenor_to_m(freq: Tenor) -> f64 {
     }
 }
 
+// ========================= SHARED OPTIONLET ENGINE =========================
+
+/// Market/contract inputs for one replicated CMS optionlet, independent of
+/// the instrument type. Shared by the [`CmsOption`] replication pricer and the
+/// CMS swap `StaticReplication` pricer so the two cannot drift apart.
+pub(crate) struct CmsOptionletInputs<'a> {
+    /// Forward swap rate `F` for the fixing (must be positive).
+    pub forward_rate: f64,
+    /// Time to fixing in years (ACT/365F vol axis). `<= 0` collapses to
+    /// discounted intrinsic.
+    pub time_to_fixing: f64,
+    /// Discount factor from valuation date to the payment date.
+    pub df_pay: f64,
+    /// Swaption volatility surface (lognormal), queried per strike.
+    pub vol_surface: &'a finstack_quant_core::market_data::surfaces::VolSurface,
+    /// CMS reference-swap tenor in years.
+    pub cms_tenor: f64,
+    /// Fixed-leg payments per year of the reference swap (par-annuity `m`).
+    pub payments_per_year: f64,
+}
+
+/// Discounted value of a single CMS caplet/floorlet per unit notional and
+/// unit accrual, by exact static replication (Andersen-Piterbarg §16.2).
+///
+/// Returns `DF(T_pay) · E^{T_pay}[(S_T − K)⁺]` for a call (floorlet symmetric)
+/// — the boundary-plus-integral formula documented at module level. At
+/// `time_to_fixing <= 0` the value collapses to discounted intrinsic on the
+/// forward. The strike is clamped to [`K_FLOOR`]; a lognormal `S` cannot
+/// reach non-positive strikes, so sub-floor strikes carry no floorlet value
+/// and full forward-minus-strike caplet value, both preserved by the clamp
+/// to within the 1bp floor.
+pub(crate) fn replicated_cms_optionlet(
+    inputs: &CmsOptionletInputs<'_>,
+    strike: f64,
+    option_type: OptionType,
+) -> f64 {
+    let forward_rate = inputs.forward_rate;
+    let ttf = inputs.time_to_fixing;
+    let df_pay = inputs.df_pay;
+    let cms_tenor = inputs.cms_tenor;
+    let m = inputs.payments_per_year;
+    let strike = strike.max(K_FLOOR);
+
+    if ttf <= 0.0 {
+        // Expired fixing: discounted intrinsic on the forward.
+        return match option_type {
+            OptionType::Call => df_pay * (forward_rate - strike).max(0.0),
+            OptionType::Put => df_pay * (strike - forward_rate).max(0.0),
+        };
+    }
+
+    // ATM lognormal standard deviation for integration bounds
+    let atm_vol = inputs.vol_surface.value_clamped(ttf, forward_rate);
+    let std_dev = atm_vol * forward_rate * ttf.sqrt();
+
+    // Vol at the caplet/floorlet strike (for the boundary term)
+    let vol_at_strike = inputs.vol_surface.value_clamped(ttf, strike);
+
+    // Annuity consistency (item 12).
+    //
+    // The CMS caplet value is `V = A₀·E^A[(S−K)⁺·g(S)]`, replicated
+    // by integration by parts as
+    //   V = g(K)·C_sw(K) + ∫ g'(k)·C_sw(k) dk
+    // where `C_sw(k)` is the annuity-measure swaption price and
+    // `g(s) = DF_pay/A(s)` is the Radon-Nikodym weight `dQ^{T_pay}/dQ^A`.
+    //
+    // `g` is *modelled* via the closed-form par annuity, `g(s) =
+    // DF_pay/A_par(s)` — this model must be calibrated to the
+    // market at the forward, i.e. `A_par(F) ≡ A₀`. The replicating
+    // swaption price must use the *same* annuity model that `g`
+    // divides by:
+    //
+    //   C_sw(k) = A_par(k) · Black76(F, k, σ(k), T)
+    //
+    // so that `g(k)·C_sw(k) = DF_pay · Black76(F, k, σ(k), T)`,
+    // with the annuity cancelling cleanly. `A₀` (the market annuity) is
+    // therefore correctly *not* used here: it is subsumed into the
+    // `A_par(F) = A₀` calibration. The market curve still enters through
+    // the forward swap rate `F` and the payment discount factor `DF_pay`.
+    let g_times_c = |k: f64, v: f64, is_call: bool| -> f64 {
+        let black = if is_call {
+            black76_call(forward_rate, k, v, ttf)
+        } else {
+            black76_put(forward_rate, k, v, ttf)
+        };
+        // g(k) · C_sw(k) = (DF_pay / A_par(k)) · (A_par(k) · Black) = DF_pay · Black
+        df_pay * black
+    };
+
+    // Shared integrand: [2·g'(k) + (k−K)·g''(k)] · O_sw(k), with g-derivatives
+    // via non-uniform central / 3-point second differences (k_lo clamped at
+    // K_FLOOR; reverts to standard stencils when both spacings equal
+    // G_PRIME_H).
+    let corrected_integrand = |k: f64, is_call: bool| -> f64 {
+        let v = inputs.vol_surface.value_clamped(ttf, k);
+        let o_sw = par_annuity(k.max(K_FLOOR), cms_tenor, m)
+            * if is_call {
+                black76_call(forward_rate, k, v, ttf)
+            } else {
+                black76_put(forward_rate, k, v, ttf)
+            };
+        // Nodes for finite differences.
+        let k_lo = (k - G_PRIME_H).max(K_FLOOR);
+        let k_hi = k + G_PRIME_H;
+        let g_lo = df_pay / par_annuity(k_lo, cms_tenor, m);
+        let g_hi = df_pay / par_annuity(k_hi, cms_tenor, m);
+        let g_ctr = df_pay / par_annuity(k.max(K_FLOOR), cms_tenor, m);
+        let h_lo = k - k_lo;
+        let h_hi = k_hi - k; // always G_PRIME_H
+                             // g'(k): non-uniform central difference.
+        let g_prime = (g_hi - g_lo) / (h_lo + h_hi);
+        // g''(k): non-uniform 3-point second difference.
+        // Guard against zero denominator when k_lo is clamped to k.
+        let denom = h_lo * h_hi * (h_lo + h_hi);
+        let g_pp = if denom > 0.0 {
+            2.0 * (h_lo * g_hi - (h_lo + h_hi) * g_ctr + h_hi * g_lo) / denom
+        } else {
+            0.0
+        };
+        (2.0 * g_prime + (k - strike) * g_pp) * o_sw
+    };
+
+    match option_type {
+        OptionType::Call => {
+            // Caplet formula (exact static replication, Andersen-Piterbarg §16.2):
+            //   V = g(K) · C_sw(K) + ∫_K^{K_max} [2·g'(k) + (k-K)·g''(k)] · C_sw(k) dk
+            //
+            // Upper bound K_max = K + 6σ ensures ≤ 1e-9 truncation error.
+            let k_max = (strike + N_STD_CUTOFF * std_dev).max(strike * 1.05);
+
+            // Boundary term: g(K) · C_sw(K) = DF_pay · Black76_call(K).
+            let boundary = g_times_c(strike, vol_at_strike, true);
+
+            let integral =
+                gauss_legendre_integrate(|k: f64| corrected_integrand(k, true), strike, k_max, {
+                    QUAD_ORDER
+                })
+                .unwrap_or(0.0);
+
+            boundary + integral
+        }
+
+        OptionType::Put => {
+            // Floorlet formula (Andersen-Piterbarg §16.2, IBP derivation):
+            //   V = g(K) · P_sw(K) − ∫_{K_min}^K [2·g'(k) + (k-K)·g''(k)] · P_sw(k) dk
+            //
+            // Note the MINUS sign.  g(k) = DF_pay / A_par(k) is strictly
+            // INCREASING in k (because A_par(k) is strictly decreasing), so
+            // g'(k) > 0 and the integral is positive.  The minus sign ensures
+            // V_floor < g(K)·P_sw(K), consistent with CMS convexity raising
+            // the payment-measure forward above the swap forward and thereby
+            // reducing the in-the-money probability for a floorlet.
+            let k_min = (strike - N_STD_CUTOFF * std_dev).max(K_FLOOR);
+
+            // Boundary term: g(K) · P_sw(K) = DF_pay · Black76_put(K).
+            let boundary = g_times_c(strike, vol_at_strike, false);
+
+            let integral =
+                gauss_legendre_integrate(|k: f64| corrected_integrand(k, false), k_min, strike, {
+                    QUAD_ORDER
+                })
+                .unwrap_or(0.0);
+
+            boundary - integral
+        }
+    }
+}
+
 // ========================= PRICER STRUCT =========================
 
 /// CMS option static replication pricer.
@@ -242,169 +410,19 @@ impl CmsReplicationPricer {
             // DF to payment date from discount curve (relative to as_of)
             let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
 
-            // ATM vol for integration-range sizing
-            let atm_vol = vol_surface.value_clamped(ttf.max(0.0), forward_rate);
-
-            // --- Static Replication ---
-            let period_pv = if ttf <= 0.0 {
-                // Expired fixing: use intrinsic value discounted to today
-                match inst.option_type {
-                    OptionType::Call => df_pay * (forward_rate - strike).max(0.0),
-                    OptionType::Put => df_pay * (strike - forward_rate).max(0.0),
-                }
-            } else {
-                let cms_tenor = inst.cms_tenor;
-
-                // ATM lognormal standard deviation for integration bounds
-                let std_dev = atm_vol * forward_rate * ttf.sqrt();
-
-                // Vol at the caplet/floorlet strike (for the boundary term)
-                let vol_at_strike = vol_surface.value_clamped(ttf, strike);
-
-                // Annuity consistency (item 12).
-                //
-                // The CMS caplet value is `V = A₀·E^A[(S−K)⁺·g(S)]`, replicated
-                // by integration by parts as
-                //   V = g(K)·C_sw(K) + ∫ g'(k)·C_sw(k) dk
-                // where `C_sw(k)` is the annuity-measure swaption price and
-                // `g(s) = DF_pay/A(s)` is the Radon-Nikodym weight `dQ^{T_pay}/dQ^A`.
-                //
-                // `g` is *modelled* via the closed-form par annuity, `g(s) =
-                // DF_pay/A_par(s)` — this model must be calibrated to the
-                // market at the forward, i.e. `A_par(F) ≡ A₀`. The replicating
-                // swaption price must use the *same* annuity model that `g`
-                // divides by:
-                //
-                //   C_sw(k) = A_par(k) · Black76(F, k, σ(k), T)
-                //
-                // so that `g(k)·C_sw(k) = DF_pay · Black76(F, k, σ(k), T)`,
-                // with the annuity cancelling cleanly. The previous code paired
-                // `g(k) = DF_pay/A_par(k)` with the *market*-annuity swaption
-                // `C_sw(k) = A₀·Black76(k)`, leaving a spurious residual
-                // `A₀/A_par(k)` — equal to 1 only at `k = F` (where
-                // `A_par(F) = A₀`) and mispricing every `K ≠ F`.
-                //
-                // `A₀` (the market annuity) is therefore correctly *not* used
-                // here: it is subsumed into the `A_par(F) = A₀` calibration.
-                // The market curve still enters through the forward swap
-                // rate `F` and the payment discount factor `DF_pay`.
-                let g_times_c = |k: f64, v: f64, is_call: bool| -> f64 {
-                    let black = if is_call {
-                        black76_call(forward_rate, k, v, ttf)
-                    } else {
-                        black76_put(forward_rate, k, v, ttf)
-                    };
-                    // g(k) · C_sw(k) = (DF_pay / A_par(k)) · (A_par(k) · Black) = DF_pay · Black
-                    df_pay * black
-                };
-
-                match inst.option_type {
-                    OptionType::Call => {
-                        // Caplet formula (exact static replication, Andersen-Piterbarg §16.2):
-                        //   V = g(K) · C_sw(K) + ∫_K^{K_max} [2·g'(k) + (k-K)·g''(k)] · C_sw(k) dk
-                        //
-                        // Upper bound K_max = K + 6σ ensures ≤ 1e-9 truncation error.
-                        let k_max = (strike + N_STD_CUTOFF * std_dev).max(strike * 1.05);
-
-                        // Boundary term: g(K) · C_sw(K) = DF_pay · Black76_call(K).
-                        let boundary = g_times_c(strike, vol_at_strike, true);
-
-                        // Integral term: ∫_K^{K_max} [2·g'(k) + (k-K)·g''(k)] · C_sw(k) dk.
-                        //
-                        // g'(k) via non-uniform central differences (k_lo clamped at K_FLOOR).
-                        // g''(k) via non-uniform 3-point second difference reusing the same
-                        // k_lo/k_hi nodes; reverts to standard (g_hi−2g_ctr+g_lo)/h² when
-                        // both spacings equal G_PRIME_H.
-                        let integral = gauss_legendre_integrate(
-                            |k: f64| {
-                                let v = vol_surface.value_clamped(ttf, k);
-                                let c_sw = par_annuity(k.max(K_FLOOR), cms_tenor, m)
-                                    * black76_call(forward_rate, k, v, ttf);
-                                // Nodes for finite differences.
-                                let k_lo = (k - G_PRIME_H).max(K_FLOOR);
-                                let k_hi = k + G_PRIME_H;
-                                let g_lo = df_pay / par_annuity(k_lo, cms_tenor, m);
-                                let g_hi = df_pay / par_annuity(k_hi, cms_tenor, m);
-                                let g_ctr = df_pay / par_annuity(k.max(K_FLOOR), cms_tenor, m);
-                                let h_lo = k - k_lo;
-                                let h_hi = k_hi - k; // always G_PRIME_H
-                                                     // g'(k): non-uniform central difference.
-                                let g_prime = (g_hi - g_lo) / (h_lo + h_hi);
-                                // g''(k): non-uniform 3-point second difference.
-                                // Guard against zero denominator when k_lo is clamped to k.
-                                let denom = h_lo * h_hi * (h_lo + h_hi);
-                                let g_pp = if denom > 0.0 {
-                                    2.0 * (h_lo * g_hi - (h_lo + h_hi) * g_ctr + h_hi * g_lo)
-                                        / denom
-                                } else {
-                                    0.0
-                                };
-                                (2.0 * g_prime + (k - strike) * g_pp) * c_sw
-                            },
-                            strike,
-                            k_max,
-                            QUAD_ORDER,
-                        )
-                        .unwrap_or(0.0);
-
-                        boundary + integral
-                    }
-
-                    OptionType::Put => {
-                        // Floorlet formula (Andersen-Piterbarg §16.2, IBP derivation):
-                        //   V = g(K) · P_sw(K) − ∫_{K_min}^K [2·g'(k) + (k-K)·g''(k)] · P_sw(k) dk
-                        //
-                        // Note the MINUS sign.  g(k) = DF_pay / A_par(k) is strictly
-                        // INCREASING in k (because A_par(k) is strictly decreasing), so
-                        // g'(k) > 0 and the integral is positive.  The minus sign ensures
-                        // V_floor < g(K)·P_sw(K), consistent with CMS convexity raising
-                        // the payment-measure forward above the swap forward and thereby
-                        // reducing the in-the-money probability for a floorlet.
-                        // For k < K, (k-K) < 0, so the g'' term subtracts from the
-                        // effective integrand, reducing the magnitude of the subtracted
-                        // integral and raising V_floor slightly relative to the g'-only formula.
-                        let k_min = (strike - N_STD_CUTOFF * std_dev).max(K_FLOOR);
-
-                        // Boundary term: g(K) · P_sw(K) = DF_pay · Black76_put(K).
-                        let boundary = g_times_c(strike, vol_at_strike, false);
-
-                        // Integral term: ∫_{K_min}^K [2·g'(k) + (k-K)·g''(k)] · P_sw(k) dk.
-                        let integral = gauss_legendre_integrate(
-                            |k: f64| {
-                                let v = vol_surface.value_clamped(ttf, k);
-                                let p_sw = par_annuity(k.max(K_FLOOR), cms_tenor, m)
-                                    * black76_put(forward_rate, k, v, ttf);
-                                // Nodes for finite differences.
-                                let k_lo = (k - G_PRIME_H).max(K_FLOOR);
-                                let k_hi = k + G_PRIME_H;
-                                let g_lo = df_pay / par_annuity(k_lo, cms_tenor, m);
-                                let g_hi = df_pay / par_annuity(k_hi, cms_tenor, m);
-                                let g_ctr = df_pay / par_annuity(k.max(K_FLOOR), cms_tenor, m);
-                                let h_lo = k - k_lo;
-                                let h_hi = k_hi - k;
-                                // g'(k): non-uniform central difference.
-                                let g_prime = (g_hi - g_lo) / (h_lo + h_hi);
-                                // g''(k): non-uniform 3-point second difference.
-                                // Guard against zero denominator when k_lo is clamped to k.
-                                let denom = h_lo * h_hi * (h_lo + h_hi);
-                                let g_pp = if denom > 0.0 {
-                                    2.0 * (h_lo * g_hi - (h_lo + h_hi) * g_ctr + h_hi * g_lo)
-                                        / denom
-                                } else {
-                                    0.0
-                                };
-                                (2.0 * g_prime + (k - strike) * g_pp) * p_sw
-                            },
-                            k_min,
-                            strike,
-                            QUAD_ORDER,
-                        )
-                        .unwrap_or(0.0);
-
-                        boundary - integral
-                    }
-                }
-            };
+            // --- Static Replication (shared engine) ---
+            let period_pv = replicated_cms_optionlet(
+                &CmsOptionletInputs {
+                    forward_rate,
+                    time_to_fixing: ttf,
+                    df_pay,
+                    vol_surface: vol_surface.as_ref(),
+                    cms_tenor: inst.cms_tenor,
+                    payments_per_year: m,
+                },
+                strike,
+                inst.option_type,
+            );
 
             total_pv += period_pv * accrual_fraction;
         }

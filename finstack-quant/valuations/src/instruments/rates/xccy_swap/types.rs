@@ -10,10 +10,7 @@
 //! - This is a deterministic-curve pricer (no fixings). Reset lag is therefore not modeled
 //!   separately; the forward rate is taken directly from the forward curve for the accrual period.
 
-use crate::cashflow::builder::{
-    schedule::merge_cashflow_schedules, CashFlowSchedule, CouponType, FloatingCouponSpec,
-    FloatingRateFallback, FloatingRateSpec, Notional,
-};
+use crate::cashflow::builder::{schedule::merge_cashflow_schedules, CashFlowSchedule, Notional};
 use crate::cashflow::primitives::CFKind;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
@@ -554,67 +551,129 @@ impl XccySwap {
         Ok(())
     }
 
+    /// Build one leg's accrual periods. Single source for both the pricing
+    /// path (`pv_leg_in_reporting_ccy`) and the reporting path
+    /// (`leg_coupon_schedule`), so period boundaries, payment dates, and
+    /// reset dates can never drift between priced and reported cashflows.
+    fn leg_build_periods(
+        &self,
+        leg: &XccySwapLeg,
+        calendar_id: &str,
+    ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+        crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: leg.start,
+                end: leg.end,
+                frequency: leg.frequency,
+                stub: leg.stub,
+                bdc: leg.bdc,
+                calendar_id,
+                end_of_month: false,
+                day_count: leg.day_count,
+                payment_lag_days: leg.payment_lag_days,
+                reset_lag_days: leg.reset_lag_days,
+                adjust_accrual_dates: false,
+            },
+        )
+    }
+
+    /// The single floating-rate projection shared by pricing and reporting:
+    /// a recorded fixing when the period's fixing date has passed (the reset
+    /// lag selects that date), otherwise the window-consistent simple forward
+    /// over the accrual period (which, on a deterministic curve, is
+    /// independent of the observation lag).
+    fn projected_leg_period_rate(
+        leg: &XccySwapLeg,
+        fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
+        fixings: Option<&finstack_quant_core::market_data::scalars::ScalarTimeSeries>,
+        period: &crate::cashflow::builder::periods::SchedulePeriod,
+        as_of: Date,
+    ) -> Result<f64> {
+        use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
+
+        let fixing_date = period.reset_date.unwrap_or(period.accrual_start);
+        let forward_rate = if fixing_date < as_of {
+            finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                fixings,
+                leg.forward_curve_id.as_str(),
+                fixing_date,
+                as_of,
+            )?
+        } else {
+            rate_between_on_dates(fwd, period.accrual_start, period.accrual_end)?
+        };
+        if !forward_rate.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Non-finite forward rate for period {} to {}",
+                period.accrual_start, period.accrual_end
+            )));
+        }
+        Ok(forward_rate)
+    }
+
+    /// Coupon schedule for one leg, projected through the SAME rate path the
+    /// pricer discounts (`projected_leg_period_rate`): window-consistent
+    /// forwards for future fixings, recorded fixings for past ones. Keeping a
+    /// single projection prevents the reported cashflows from silently
+    /// drifting away from what `base_value` actually prices.
+    ///
+    /// The only intentional difference from the pricing path is calendar
+    /// resolution: reporting is strict (an unresolvable `calendar_id` is an
+    /// error unless `allow_calendar_fallback` is set), while pricing falls
+    /// back to weekends-only.
     fn leg_coupon_schedule(
         &self,
         leg: &XccySwapLeg,
         market: &MarketContext,
+        as_of: Date,
     ) -> Result<CashFlowSchedule> {
-        let mut builder = CashFlowSchedule::builder();
-        let _ = builder
-            .principal(leg.notional, leg.start, leg.end)
-            .floating_cf(FloatingCouponSpec {
-                rate_spec: FloatingRateSpec {
-                    index_id: leg.forward_curve_id.clone(),
-                    spread_bp: leg.spread_bp,
-                    gearing: Decimal::ONE,
-                    gearing_includes_spread: true,
-                    index_floor_bp: None,
-                    all_in_cap_bp: None,
-                    all_in_floor_bp: None,
-                    index_cap_bp: None,
-                    overnight_index_constraints: Default::default(),
-                    reset_freq: leg.frequency,
-                    index_tenor: None,
-                    reset_lag_days: leg.reset_lag_days.unwrap_or_default(),
-                    fixing_calendar_id: None,
-                    overnight_compounding: None,
-                    overnight_basis: None,
-                    fallback: FloatingRateFallback::Error,
-                },
-                coupon_type: CouponType::Cash,
-                schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                    freq: leg.frequency,
-                    dc: leg.day_count,
-                    bdc: leg.bdc,
-                    calendar_id: match leg.calendar_id.as_deref() {
-                        Some(id)
-                            if crate::cashflow::builder::calendar::resolve_calendar_strict(id)
-                                .is_ok() =>
-                        {
-                            id.to_string()
-                        }
-                        _ if leg.allow_calendar_fallback => {
-                            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()
-                        }
-                        _ => {
-                            return Err(finstack_quant_core::Error::Validation(format!(
-                                "XccySwap '{}' leg {} requires a resolvable calendar_id",
-                                self.id, leg.currency
-                            )))
-                        }
-                    },
-                    stub: leg.stub,
-                    end_of_month: false,
-                    payment_lag_days: leg.payment_lag_days,
-                    adjust_accrual_dates: false,
-                },
-            });
-        let mut schedule = builder.build(Some(market))?;
-        schedule.retain_flows(|cf| cf.kind == crate::cashflow::primitives::CFKind::FloatReset);
-        schedule.update_flows(|cf| {
-            cf.amount *= leg.side.coupon_sign();
-        });
-        Ok(schedule)
+        let calendar_id = match leg.calendar_id.as_deref() {
+            Some(id) if crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok() => {
+                id
+            }
+            _ if leg.allow_calendar_fallback => {
+                crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID
+            }
+            _ => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "XccySwap '{}' leg {} requires a resolvable calendar_id",
+                    self.id, leg.currency
+                )))
+            }
+        };
+        let periods = self.leg_build_periods(leg, calendar_id)?;
+        let fwd = market.get_forward(&leg.forward_curve_id)?;
+        let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
+            leg.forward_curve_id.as_str(),
+        );
+        let fixings = market.get_series(&fixing_series_id).ok();
+        let spread = decimal_to_f64(leg.spread_bp, "XccySwap leg spread_bp")? / 10_000.0;
+
+        let mut flows = Vec::with_capacity(periods.len());
+        for period in &periods {
+            let rate = Self::projected_leg_period_rate(leg, fwd.as_ref(), fixings, period, as_of)?
+                + spread;
+            let amount = leg.side.coupon_sign()
+                * leg.notional.amount()
+                * rate
+                * period.accrual_year_fraction;
+            flows.push(crate::cashflow::primitives::CashFlow::new(
+                period.payment_date,
+                period.reset_date,
+                Money::new(amount, leg.currency),
+                crate::cashflow::primitives::CFKind::FloatReset,
+                period.accrual_year_fraction,
+                Some(rate),
+            ));
+        }
+        Ok(crate::cashflow::traits::schedule_from_classified_flows(
+            flows,
+            leg.day_count,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(leg.notional),
+                ..Default::default()
+            },
+        ))
     }
 
     fn leg_principal_schedule(&self, leg: &XccySwapLeg, anchor: Date) -> Result<CashFlowSchedule> {
@@ -671,31 +730,18 @@ impl XccySwap {
         context: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
-
         self.validate_leg(leg)?;
 
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: leg.start,
-                end: leg.end,
-                frequency: leg.frequency,
-                stub: leg.stub,
-                bdc: leg.bdc,
-                calendar_id: if leg.calendar_id.as_deref().is_some_and(|id| {
-                    crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok()
-                }) {
-                    leg.calendar_id.as_deref().unwrap_or_default()
-                } else {
-                    crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID
-                },
-                end_of_month: false,
-                day_count: leg.day_count,
-                payment_lag_days: leg.payment_lag_days,
-                reset_lag_days: leg.reset_lag_days,
-                adjust_accrual_dates: false,
-            },
-        )?;
+        // Pricing keeps the historical weekends-only fallback for an
+        // unresolvable calendar; reporting (`leg_coupon_schedule`) is strict.
+        let calendar_id = if leg.calendar_id.as_deref().is_some_and(|id| {
+            crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok()
+        }) {
+            leg.calendar_id.as_deref().unwrap_or_default()
+        } else {
+            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID
+        };
+        let periods = self.leg_build_periods(leg, calendar_id)?;
 
         if periods.is_empty() {
             return Err(finstack_quant_core::Error::Validation(
@@ -780,23 +826,8 @@ impl XccySwap {
                 continue;
             }
 
-            let fixing_date = period.reset_date.unwrap_or(period.accrual_start);
-            let forward_rate = if fixing_date < as_of {
-                finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-                    fixings,
-                    leg.forward_curve_id.as_str(),
-                    fixing_date,
-                    as_of,
-                )?
-            } else {
-                rate_between_on_dates(fwd.as_ref(), period.accrual_start, period.accrual_end)?
-            };
-            if !forward_rate.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Non-finite forward rate for period {} to {}",
-                    period.accrual_start, period.accrual_end
-                )));
-            }
+            let forward_rate =
+                Self::projected_leg_period_rate(leg, fwd.as_ref(), fixings, &period, as_of)?;
             // Warn about extremely negative forward rates which may indicate curve issues.
             // Even in negative rate environments (JPY/CHF/EUR), rates below -5% are unusual.
             if forward_rate < EXTREME_NEGATIVE_RATE_THRESHOLD {
@@ -949,8 +980,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
                 .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected));
         }
 
-        let leg1_schedule = self.leg_coupon_schedule(&self.leg1, market)?;
-        let leg2_schedule = self.leg_coupon_schedule(&self.leg2, market)?;
+        let leg1_schedule = self.leg_coupon_schedule(&self.leg1, market, as_of)?;
+        let leg2_schedule = self.leg_coupon_schedule(&self.leg2, market, as_of)?;
         let leg1_principal = self.leg_principal_schedule(&self.leg1, anchor)?;
         let leg2_principal = self.leg_principal_schedule(&self.leg2, anchor)?;
 

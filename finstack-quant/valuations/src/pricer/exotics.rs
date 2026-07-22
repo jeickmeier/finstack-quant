@@ -88,11 +88,19 @@ pub(crate) fn register_exotic_pricers(registry: &mut PricerRegistry) {
         crate::instruments::rates::cms_option::replication_pricer::CmsReplicationPricer::new(),
     );
 
-    // CMS Swap
+    // CMS Swap (first-order Hagan convexity — default)
     registry.register(
         InstrumentType::CmsSwap,
         ModelKey::Black76,
         crate::instruments::rates::cms_swap::pricer::CmsSwapPricer::new(),
+    );
+
+    // CMS Swap - Static Replication (Andersen-Piterbarg; exact smile-aware
+    // convexity, preferred for CMS tenors > 10Y or high-vol regimes)
+    registry.register(
+        InstrumentType::CmsSwap,
+        ModelKey::StaticReplication,
+        crate::instruments::rates::cms_swap::pricer::CmsSwapReplicationPricer::new(),
     );
 
     // CMS Spread Option - Gaussian copula with SABR marginals

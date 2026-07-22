@@ -2965,7 +2965,7 @@
       "oneOf": [
         {
           "const": "absolute",
-          "description": "Bounds are absolute price levels (e.g., 4500.0 for SPX).\nThis is the market standard for rate-linked range accruals.",
+          "description": "Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate\nband for a rate-linked note priced via\n[`CallableRangeAccrual`](crate::instruments::rates::callable_range_accrual)).",
           "type": "string"
         },
         {
@@ -13400,6 +13400,12 @@
           "format": "date",
           "type": "string"
         },
+        "face_value": {
+          "default": 1000000.0,
+          "description": "Face value of one underlying futures contract (e.g., $1,000,000 for\nSOFR futures). The position size is `notional / face_value` contracts,\nconsistent with [`InterestRateFuture`](crate::instruments::rates::ir_future).",
+          "format": "double",
+          "type": "number"
+        },
         "futures_price": {
           "description": "Underlying futures price (e.g., 95.50 for a 4.50% implied rate)",
           "format": "double",
@@ -13457,8 +13463,13 @@
           "format": "double",
           "type": "number"
         },
+        "vol_model": {
+          "$ref": "#/$defs/VolatilityModel2",
+          "default": "black",
+          "description": "Volatility model the quote refers to. CME SOFR/STIR options are quoted\nin normal (basis-point) vols — use [`VolatilityModel::Normal`] for\nthose. Defaults to Black (lognormal) for backward compatibility."
+        },
         "volatility": {
-          "description": "Lognormal (Black) volatility, annualized",
+          "description": "Annualized volatility. Units follow `vol_model`: a decimal lognormal\nvol of the futures price for [`VolatilityModel::Black`] (e.g. `0.006`),\nor a normal vol in **price points** for [`VolatilityModel::Normal`]\n(e.g. `0.60` ≈ 60 bp of annualized rate vol).",
           "format": "double",
           "type": "number"
         }
@@ -14965,7 +14976,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Tranche interest with the coupon rate capped (available-funds / net-WAC cap).\n\nIdentical to [`PaymentCalculation::TrancheInterest`] except the effective\nannualized coupon is capped at `cap_rate`, modelling an available-funds\ncap where a tranche cannot be paid more interest than the collateral's\nnet weighted-average coupon supports. The capped shortfall is unpaid\n(no carryforward in this variant).",
+          "description": "Tranche interest with the coupon rate capped (available-funds / net-WAC cap).\n\nIdentical to [`PaymentCalculation::TrancheInterest`] except the effective\nannualized coupon is capped at `cap_rate`, modelling an available-funds\ncap where a tranche cannot be paid more interest than the collateral's\nnet weighted-average coupon supports. The cap defines the *claim*, not\njust the allocation: the capped-off coupon is never owed, so it does not\ndefer, does not PIK, and does not enter IC coverage or excess-spread\nsizing (no carryforward in this variant).",
           "properties": {
             "CappedTrancheInterest": {
               "additionalProperties": false,
@@ -15660,7 +15671,7 @@
     },
     "RangeAccrual": {
       "additionalProperties": false,
-      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.",
+      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::rates::callable_range_accrual)\n(with an empty call schedule for a non-callable note), which models the\nreference rate under HW1F and reconstructs the term rate per observation.",
       "properties": {
         "accrual_start_date": {
           "description": "Contractual accrual-period start date.\n\nWhen omitted, the legacy representation infers the start by stepping\none first-observation interval backward. Single-observation contracts\nmust provide this field explicitly.",
@@ -18071,7 +18082,7 @@
               "type": "null"
             }
           ],
-          "description": "Custom payment waterfall used verbatim for pricing.\n\n`None` (the default) synthesizes the canonical sequential template from\nthe tranche structure ([`Waterfall::standard_sequential`]) plus any\n[`Self::fees`]. When set, this waterfall is authoritative:\n[`Self::create_waterfall`] returns it (with deal-level\n[`Self::coverage_triggers`] appended) and no template is synthesized.\n[`Self::waterfall_rules`] overlays (AFC, step-down, shifting interest,\ncontrolled accumulation) still apply — they rewrite tiers generically by\n`payment_type`, so they compose with custom structures.\n\nConstraints, enforced by [`Self::with_waterfall`] and re-checked at\npricing time so JSON-supplied deals get identical errors:\n- every tranche referenced by a tier recipient or coverage trigger must\n  exist in `tranches`, and tranche-keyed recipients must not target an\n  equity tranche (the engine records equity flows under\n  [`RecipientType::Equity`], paid via `ResidualCash`);\n- `fees` must be `None` — senior fees are expressed as *leading*\n  [`PaymentType::Fee`] tiers of the custom waterfall, which then feed\n  the IC numerator and excess-spread/reserve sizing exactly like\n  template fees (fee tiers ranked below note interest are junior fees\n  and are deliberately not netted as senior claims);\n- the waterfall's `base_currency` must match the pool currency."
+          "description": "Custom payment waterfall used verbatim for pricing.\n\n`None` (the default) synthesizes the canonical sequential template from\nthe tranche structure ([`Waterfall::standard_sequential`]) plus any\n[`Self::fees`]. When set, this waterfall is authoritative:\n[`Self::create_waterfall`] returns it (with deal-level\n[`Self::coverage_triggers`] appended) and no template is synthesized.\n[`Self::waterfall_rules`] overlays (AFC, step-down, shifting interest,\ncontrolled accumulation) still apply — they rewrite tiers generically by\n`payment_type`, so they compose with custom structures.\n\nThe waterfall also **defines each tranche's interest claim** (not just\ncash allocation): an uncapped `TrancheInterest` recipient owes the full\ncoupon accrual, a `CappedTrancheInterest` recipient owes the capped\ncoupon (the capped-off portion is never owed and never defers), and a\ndebt tranche with **no** interest recipient owes nothing (a\nprincipal-only class). Equity is exempt: its interest/principal split\nis a reporting convention driven by the tranche's metadata coupon.\n\nConstraints, enforced by [`Self::with_waterfall`] and re-checked at\npricing time so JSON-supplied deals get identical errors:\n- every tranche referenced by a tier recipient or coverage trigger must\n  exist in `tranches`, and tranche-keyed recipients must not target an\n  equity tranche (the engine records equity flows under\n  [`RecipientType::Equity`], paid via `ResidualCash`);\n- at most one interest-type recipient may name a given tranche (the\n  claim definition must be unambiguous);\n- `fees` must be `None` — senior fees are expressed as *leading*\n  [`PaymentType::Fee`] tiers of the custom waterfall, which then feed\n  the IC numerator and excess-spread/reserve sizing exactly like\n  template fees (fee tiers ranked below note interest are junior fees\n  and are deliberately not netted as senior claims);\n- the waterfall's `base_currency` must match the pool currency."
         },
         "waterfall_rules": {
           "anyOf": [

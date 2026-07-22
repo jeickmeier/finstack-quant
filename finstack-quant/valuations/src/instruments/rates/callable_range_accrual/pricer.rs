@@ -5,7 +5,7 @@ use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::callable_range_accrual::CallableRangeAccrual;
 use crate::instruments::rates::exotics_shared::{
-    calibrate_hw1f_params, initial_short_rate_from_curve, resolve_hw1f_params, standard_basis,
+    basis_for_degree, calibrate_hw1f_params, initial_short_rate_from_curve, resolve_hw1f_params,
     ExerciseBoundaryPayoff, Hw1fCalibrationFlavor, Hw1fCapletSurfacePoint, Hw1fResolveRequest,
     Hw1fSurfaceCalibration, Hw1fTermForward, PeriodForwardCoeffs, RateExoticHw1fLsmcPricer,
     RateExoticHw1fMcPricer, RateExoticMcConfig,
@@ -82,6 +82,9 @@ struct CallableRangeAccrualPayoff {
     /// Pathwise bank-account numeraire observed at the final payment event;
     /// 0.0 until recorded.
     bank_at_final_payment: f64,
+    /// LSMC regression basis degree from `RateExoticMcConfig::basis_degree`
+    /// (2 → `standard_basis`, 3+ → `extended_basis`).
+    basis_degree: usize,
 }
 
 impl CallableRangeAccrualPayoff {
@@ -98,6 +101,7 @@ impl CallableRangeAccrualPayoff {
         past_in_range: usize,
         total_past_observations: usize,
         future_observations: usize,
+        basis_degree: usize,
     ) -> Self {
         Self {
             lower_bound,
@@ -115,6 +119,7 @@ impl CallableRangeAccrualPayoff {
             observations_seen: 0,
             next_event: 0,
             bank_at_final_payment: 0.0,
+            basis_degree,
         }
     }
 
@@ -206,7 +211,7 @@ impl ExerciseBoundaryPayoff for CallableRangeAccrualPayoff {
     }
 
     fn continuation_basis(&self, _exercise_idx: usize, t_years: f64, short_rate: f64) -> Vec<f64> {
-        standard_basis(t_years, short_rate)
+        basis_for_degree(self.basis_degree, t_years, short_rate)
     }
 }
 
@@ -341,6 +346,7 @@ impl CallableRangeAccrualPricer {
         // from the spot fixing would offset the simulated short rate from the
         // curve and break the M6 repricing property.
         let r0 = initial_short_rate_from_curve(discount_curve.as_ref(), as_of)?;
+        let config = self.effective_config(inst);
         let payoff = CallableRangeAccrualPayoff::new(
             lower_bound,
             upper_bound,
@@ -353,9 +359,8 @@ impl CallableRangeAccrualPricer {
             inst.range_accrual.past_fixings_in_range.unwrap_or(0),
             inst.range_accrual.total_past_observations.unwrap_or(0),
             schedule.future_observations,
+            config.basis_degree,
         );
-
-        let config = self.effective_config(inst);
         // Bootstrap a time-dependent θ(t) from the discount curve so the
         // simulated short rate reprices the initial curve (HW1F, not Vasicek).
         let horizon = schedule.event_times.last().copied().unwrap_or(0.0);
@@ -757,6 +762,55 @@ mod tests {
             min_steps_between_events: 1,
             ..Default::default()
         })
+    }
+
+    /// `mc_basis_degree` must be a live config surface: degree 3+ switches the
+    /// LSMC continuation regression from the degree-2 `standard_basis` to the
+    /// degree-3 `extended_basis`, which changes the fitted exercise rule and
+    /// therefore the price. Guards against the recurring silently-inert-config
+    /// defect class (config parsed and clamped but never read by the pricer).
+    #[test]
+    fn basis_degree_config_changes_lsmc_price() {
+        let as_of = date(2025, Month::January, 1);
+        let curves = market(as_of, 0.02, 0.03);
+        // One mid-life call date, no lockout, rich coupon so the issuer call
+        // is genuinely in play and the regression drives exercise decisions.
+        let inst = test_callable(vec![date(2025, Month::July, 1)], 0, 0.06);
+
+        let pricer_for_degree = |degree: usize| {
+            CallableRangeAccrualPricer::with_hw_params(
+                HullWhiteParams::new(0.05, 0.01).expect("hw params"),
+            )
+            .with_config(RateExoticMcConfig {
+                num_paths: 256,
+                antithetic: false,
+                min_steps_between_events: 1,
+                basis_degree: degree,
+                ..Default::default()
+            })
+        };
+
+        let pv_deg2 = pricer_for_degree(2)
+            .price_estimate(&inst, &curves, as_of)
+            .expect("degree 2")
+            .mean
+            .amount();
+        let pv_deg3 = pricer_for_degree(3)
+            .price_estimate(&inst, &curves, as_of)
+            .expect("degree 3")
+            .mean
+            .amount();
+
+        assert!(
+            (pv_deg2 - pv_deg3).abs() > 1e-9,
+            "mc_basis_degree must change the LSMC regression basis and price; \
+             got identical PV {pv_deg2} for degrees 2 and 3 (inert config)"
+        );
+        let rel = (pv_deg2 - pv_deg3).abs() / pv_deg2.abs().max(1.0);
+        assert!(
+            rel < 0.05,
+            "basis change is a regression refinement, not a repricing: deg2={pv_deg2}, deg3={pv_deg3}"
+        );
     }
 
     #[test]

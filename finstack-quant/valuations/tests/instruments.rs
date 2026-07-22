@@ -69,6 +69,8 @@ mod cms_option;
 /// Interest rate future tests - Exchange-traded IR futures
 #[path = "instruments/ir_future/mod.rs"]
 mod ir_future;
+#[path = "instruments/ir_future_option/mod.rs"]
+mod ir_future_option;
 
 /// Inflation swap tests - Zero-coupon and year-on-year inflation swaps
 #[path = "instruments/inflation_swap/mod.rs"]

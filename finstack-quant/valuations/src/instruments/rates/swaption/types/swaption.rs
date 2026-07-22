@@ -1210,7 +1210,25 @@ impl Swaption {
     {
         let time_to_expiry = self.time_to_expiry(as_of)?;
         if time_to_expiry <= 0.0 {
-            return Ok(Money::new(0.0, self.notional.currency()));
+            // Past expiry an unexercised European swaption is worthless. At
+            // the exact expiry instant it is worth its (model-free) intrinsic
+            // on the annuity — matching the registry pricer's at-expiry
+            // handling so generic model paths stay consistent with it.
+            if as_of > self.expiry {
+                return Ok(Money::new(0.0, self.notional.currency()));
+            }
+            let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
+            let forward_rate = self.forward_swap_rate(curves, as_of)?;
+            let annuity = self.annuity(disc.as_ref(), as_of, forward_rate)?;
+            let strike = self.strike_f64()?;
+            let intrinsic = match self.option_type {
+                OptionType::Call => (forward_rate - strike).max(0.0),
+                OptionType::Put => (strike - forward_rate).max(0.0),
+            };
+            return Ok(Money::new(
+                intrinsic * annuity * self.notional.amount(),
+                self.notional.currency(),
+            ));
         }
 
         let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
@@ -1237,7 +1255,9 @@ impl Swaption {
 
         let time_to_expiry = self.time_to_expiry(as_of)?;
         if time_to_expiry <= 0.0 {
-            return Ok(Money::new(0.0, self.notional.currency()));
+            // Delegate to the shared base path: 0 past expiry, model-free
+            // intrinsic at the expiry instant (the closure is never invoked).
+            return self.price_model_base(curves, volatility, as_of, |_, _, _, _, _| 0.0);
         }
 
         let strike = self.strike_f64()?;

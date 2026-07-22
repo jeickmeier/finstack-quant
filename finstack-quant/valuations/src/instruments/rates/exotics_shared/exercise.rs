@@ -95,6 +95,23 @@ pub fn extended_basis(t_years: f64, short_rate: f64) -> Vec<f64> {
     vec![1.0, r, r * r, r * r * r, t_years * r, t_years * r * r]
 }
 
+/// Select the LSMC regression basis for a configured polynomial degree
+/// ([`RateExoticMcConfig::basis_degree`], clamped to `[1, 4]` at parse time).
+///
+/// Degrees 1–2 map to the degree-2 [`standard_basis`]; degrees 3+ map to the
+/// degree-3 [`extended_basis`]. This is the single consumption point that
+/// keeps `mc_basis_degree` a live configuration surface for payoffs built on
+/// the shared HW1F LSMC harness.
+///
+/// [`RateExoticMcConfig::basis_degree`]: crate::instruments::rates::exotics_shared::mc_config::RateExoticMcConfig::basis_degree
+pub fn basis_for_degree(degree: usize, t_years: f64, short_rate: f64) -> Vec<f64> {
+    if degree >= 3 {
+        extended_basis(t_years, short_rate)
+    } else {
+        standard_basis(t_years, short_rate)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

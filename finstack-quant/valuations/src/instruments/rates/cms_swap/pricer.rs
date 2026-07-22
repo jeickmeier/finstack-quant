@@ -200,6 +200,184 @@ impl Pricer for CmsSwapPricer {
     }
 }
 
+/// CMS swap pricer using exact static replication (Andersen-Piterbarg §16.2).
+///
+/// Prices each CMS coupon's payment-measure expectation from the same
+/// replication engine the [`CmsOption`] `StaticReplication` model uses, via
+/// the model-free cap-floor parity at the forward:
+///
+/// ```text
+/// E^{T_pay}[S] = F + (Caplet(F) − Floorlet(F)) / DF(T_pay)
+/// ```
+///
+/// where `Caplet`/`Floorlet` are exact replicated CMS optionlets. Embedded
+/// caps and floors on the coupon are priced with the same replicated
+/// optionlets (smile-consistent), instead of the Hagan path's Black-76 on the
+/// adjusted forward:
+///
+/// ```text
+/// E[min(max(S + spread, floor), cap)]
+///   = E[S] + spread − Caplet(cap − spread)/DF + Floorlet(floor − spread)/DF
+/// ```
+///
+/// Seasoned (fixed-but-unpaid) coupons are valued off recorded fixings,
+/// identically to the Hagan pricer. Registered under
+/// `ModelKey::StaticReplication`; the first-order Hagan pricer remains the
+/// `Black76` default. Prefer this model for CMS tenors > 10Y or high-vol
+/// regimes, where first-order Hagan understates the coupon by 5–10 bp (see
+/// the module-level "Accuracy Limitation" note in
+/// [`cms_swap`](crate::instruments::rates::cms_swap)).
+///
+/// # Errors
+///
+/// Like the [`CmsOption`] replication pricer, a non-positive forward swap
+/// rate is a hard error (the lognormal replication integrand is undefined);
+/// use the Hagan/Bachelier path for negative-rate regimes.
+///
+/// [`CmsOption`]: crate::instruments::rates::cms_option::CmsOption
+pub struct CmsSwapReplicationPricer;
+
+impl CmsSwapReplicationPricer {
+    /// Create a new CMS swap static-replication pricer.
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Core pricing: replicated CMS leg minus/plus funding leg by side.
+    pub(crate) fn price_internal(
+        &self,
+        inst: &CmsSwap,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<Money> {
+        inst.validate()?;
+        let pv_cms = self.pv_cms_leg_replication(inst, market, as_of)?;
+        let pv_funding = CmsSwapPricer::new().pv_funding_leg(inst, market, as_of)?;
+
+        let npv = match inst.side {
+            crate::instruments::common_impl::parameters::legs::PayReceive::Pay => {
+                pv_funding - pv_cms
+            }
+            crate::instruments::common_impl::parameters::legs::PayReceive::Receive => {
+                pv_cms - pv_funding
+            }
+        };
+
+        Ok(Money::new(npv, inst.notional.currency()))
+    }
+
+    /// PV of the CMS leg with each coupon's expected rate from static
+    /// replication (cap-floor parity at the forward; embedded cap/floor via
+    /// replicated optionlets at their contractual strikes).
+    fn pv_cms_leg_replication(
+        &self,
+        inst: &CmsSwap,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<f64> {
+        use crate::instruments::rates::cms_option::replication_pricer::{
+            replicated_cms_optionlet, CmsOptionletInputs,
+        };
+        use crate::instruments::OptionType;
+
+        let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
+        let vol_surface = market.get_surface(inst.vol_surface_id.as_str())?;
+        // Fixed-leg payments per year of the reference swap, matching the
+        // Hagan path's frequency argument.
+        let payments_per_year = 1.0 / inst.resolved_swap_fixed_freq().to_years_simple();
+
+        let mut total_pv = 0.0;
+        for (i, &fixing_date) in inst.cms_fixing_dates.iter().enumerate() {
+            let payment_date = inst.cms_payment_dates[i];
+            let accrual_fraction = inst.cms_accrual_fractions[i];
+
+            if payment_date <= as_of {
+                continue;
+            }
+            let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+
+            // Seasoned coupon: known rate off the recorded fixing — identical
+            // to the Hagan pricer's seasoned branch (convexity scale is
+            // irrelevant on a known rate).
+            if fixing_date < as_of {
+                let coupon_rate = cms_coupon_rate(inst, market, as_of, fixing_date, 0.0)?;
+                total_pv += coupon_rate * accrual_fraction * df_pay * inst.notional.amount();
+                continue;
+            }
+
+            let (forward_rate, time_to_fixing) =
+                cms_forward_and_ttf(inst, market, as_of, fixing_date)?;
+            if forward_rate <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Forward swap rate {forward_rate:.6} is non-positive for fixing date \
+                     {fixing_date}; static replication requires positive forwards — use the \
+                     Black76 (Hagan/Bachelier) model for negative-rate regimes"
+                )));
+            }
+
+            let inputs = CmsOptionletInputs {
+                forward_rate,
+                time_to_fixing,
+                df_pay,
+                vol_surface: vol_surface.as_ref(),
+                cms_tenor: inst.cms_tenor,
+                payments_per_year,
+            };
+            let caplet = |k: f64| replicated_cms_optionlet(&inputs, k, OptionType::Call);
+            let floorlet = |k: f64| replicated_cms_optionlet(&inputs, k, OptionType::Put);
+
+            // Payment-measure expected CMS rate via parity at K = F.
+            let expected_cms =
+                forward_rate + (caplet(forward_rate) - floorlet(forward_rate)) / df_pay;
+
+            // Coupon rate with spread and smile-consistent embedded cap/floor.
+            let mut coupon_rate = expected_cms + inst.cms_spread;
+            if let Some(cap) = inst.cms_cap {
+                coupon_rate -= caplet(cap - inst.cms_spread) / df_pay;
+            }
+            if let Some(floor) = inst.cms_floor {
+                coupon_rate += floorlet(floor - inst.cms_spread) / df_pay;
+            }
+
+            total_pv += coupon_rate * accrual_fraction * df_pay * inst.notional.amount();
+        }
+
+        Ok(total_pv)
+    }
+}
+
+impl Default for CmsSwapReplicationPricer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Pricer for CmsSwapReplicationPricer {
+    fn key(&self) -> PricerKey {
+        PricerKey::new(InstrumentType::CmsSwap, ModelKey::StaticReplication)
+    }
+
+    fn price_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> std::result::Result<ValuationResult, PricingError> {
+        let cms = instrument
+            .as_any()
+            .downcast_ref::<CmsSwap>()
+            .ok_or_else(|| {
+                PricingError::type_mismatch(InstrumentType::CmsSwap, instrument.key())
+            })?;
+
+        let pv = self.price_internal(cms, market, as_of).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
+
+        Ok(ValuationResult::stamped(cms.id(), as_of, pv))
+    }
+}
+
 /// Present value entry point for `Instrument::value`.
 pub(crate) fn compute_pv(inst: &CmsSwap, market: &MarketContext, as_of: Date) -> Result<Money> {
     let pricer = CmsSwapPricer::new();
@@ -242,6 +420,48 @@ pub(super) fn cms_coupon_rate(
         ));
     }
 
+    let (forward_swap_rate, time_to_fixing) =
+        cms_forward_and_ttf(inst, market, as_of, fixing_date)?;
+
+    let adj = if time_to_fixing > 0.0 && forward_swap_rate > 0.0 {
+        // The lognormal Hagan convexity adjustment is undefined at
+        // non-positive forwards. In negative-rate regimes, keep the linear CMS
+        // coupon and let embedded cap/floor optionality use the Bachelier
+        // fallback in `cms_embedded_option_value`.
+        crate::instruments::rates::cms_option::pricer::convexity_adjustment_with_frequency(
+            vol_surface.value_clamped(time_to_fixing.max(0.0), forward_swap_rate),
+            time_to_fixing,
+            inst.cms_tenor,
+            forward_swap_rate,
+            1.0 / inst.resolved_swap_fixed_freq().to_years_simple(),
+        ) * convexity_scale
+    } else {
+        0.0
+    };
+
+    Ok(apply_cms_cap_floor(
+        forward_swap_rate + adj,
+        inst.cms_spread,
+        inst.cms_cap,
+        inst.cms_floor,
+        &vol_surface,
+        time_to_fixing,
+    ))
+}
+
+/// Forward swap rate of the CMS reference swap and calendar time to fixing
+/// (ACT/365F vol axis) for one CMS fixing date.
+///
+/// The single convention-resolution and curve path shared by the Hagan
+/// convexity pricer ([`cms_coupon_rate`]) and the static-replication pricer
+/// ([`CmsSwapReplicationPricer`]), so the two models can never disagree on
+/// the underlying forward.
+pub(super) fn cms_forward_and_ttf(
+    inst: &CmsSwap,
+    market: &MarketContext,
+    as_of: Date,
+    fixing_date: Date,
+) -> Result<(f64, f64)> {
     let swap_start = inst.reference_swap_start(fixing_date)?;
     let swap_tenor_months = (inst.cms_tenor * 12.0).round() as i32;
     let swap_end = swap_start.add_months(swap_tenor_months);
@@ -282,30 +502,7 @@ pub(super) fn cms_coupon_rate(
     let time_to_fixing =
         DayCount::Act365F.year_fraction(as_of, fixing_date, DayCountContext::default())?;
 
-    let adj = if time_to_fixing > 0.0 && forward_swap_rate > 0.0 {
-        // The lognormal Hagan convexity adjustment is undefined at
-        // non-positive forwards. In negative-rate regimes, keep the linear CMS
-        // coupon and let embedded cap/floor optionality use the Bachelier
-        // fallback in `cms_embedded_option_value`.
-        crate::instruments::rates::cms_option::pricer::convexity_adjustment_with_frequency(
-            vol_surface.value_clamped(time_to_fixing.max(0.0), forward_swap_rate),
-            time_to_fixing,
-            inst.cms_tenor,
-            forward_swap_rate,
-            1.0 / inst.resolved_swap_fixed_freq().to_years_simple(),
-        ) * convexity_scale
-    } else {
-        0.0
-    };
-
-    Ok(apply_cms_cap_floor(
-        forward_swap_rate + adj,
-        inst.cms_spread,
-        inst.cms_cap,
-        inst.cms_floor,
-        &vol_surface,
-        time_to_fixing,
-    ))
+    Ok((forward_swap_rate, time_to_fixing))
 }
 
 /// Compute the option-adjusted expected coupon rate for a capped/floored CMS
@@ -840,6 +1037,171 @@ mod tests {
             "floored-vs-unfloored gap ({gap:.2}) must exceed pure intrinsic \
              ({intrinsic_approx:.2}); time value must be present (embedded \
              floorlet, not clamp)"
+        );
+    }
+
+    // ================= Static replication (Andersen-Piterbarg) =================
+
+    /// Receive-CMS swap with a single fixing and a zero-rate fixed funding leg,
+    /// so the swap NPV isolates the CMS leg.
+    fn single_fixing_cms_swap(cms_tenor: f64, fixing: Date, payment: Date) -> CmsSwap {
+        CmsSwap::builder()
+            .id(InstrumentId::new("CMS-REPL"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .cms_tenor(cms_tenor)
+            .cms_fixing_dates(vec![fixing])
+            .cms_payment_dates(vec![payment])
+            .cms_accrual_fractions(vec![0.25])
+            .cms_day_count(DayCount::Act365F)
+            .cms_spread(0.0)
+            .swap_convention_opt(Some(IRSConvention::USDStandard))
+            .funding_leg(FundingLeg::Fixed {
+                rate: 0.0,
+                payment_dates: vec![payment],
+                accrual_fractions: vec![0.25],
+                day_count: DayCount::Act360,
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
+            .build()
+            .expect("CMS swap should build")
+    }
+
+    /// Replication must price the CMS leg ABOVE the linear (no-convexity) leg:
+    /// static replication carries the full convexity of E^{pay}[S] > F
+    /// (Andersen-Piterbarg §16.2).
+    #[test]
+    fn replication_cms_leg_exceeds_linear_forward_leg() {
+        let as_of = date(2025, 1, 1);
+        let swap = single_fixing_cms_swap(20.0, date(2030, 1, 1), date(2030, 4, 1));
+        let market = cms_market_with_vol(as_of, 0.30);
+
+        let linear = CmsSwapPricer::new()
+            .price_internal_with_convexity(&swap, &market, as_of, 0.0)
+            .expect("linear PV")
+            .amount();
+        let repl = CmsSwapReplicationPricer::new()
+            .price_internal(&swap, &market, as_of)
+            .expect("replication PV")
+            .amount();
+
+        assert!(
+            repl > linear + 1.0,
+            "static replication must add positive CMS convexity: repl={repl}, linear={linear}"
+        );
+    }
+
+    /// Short tenor / low vol: the first-order Hagan adjustment is accurate, so
+    /// replication must agree closely (sub-basis-point in rate terms on a
+    /// 0.25-accrual coupon: $25 per bp of rate on $1M × 0.25).
+    #[test]
+    fn replication_close_to_hagan_for_short_tenor_low_vol() {
+        let as_of = date(2025, 1, 1);
+        let swap = single_fixing_cms_swap(2.0, date(2026, 1, 1), date(2026, 4, 1));
+        let market = cms_market_with_vol(as_of, 0.10);
+
+        let hagan = CmsSwapPricer::new()
+            .price_internal_with_convexity(&swap, &market, as_of, 1.0)
+            .expect("hagan PV")
+            .amount();
+        let repl = CmsSwapReplicationPricer::new()
+            .price_internal(&swap, &market, as_of)
+            .expect("replication PV")
+            .amount();
+
+        // 2bp-of-rate tolerance: 2e-4 × 0.25 × 1e6 = $50.
+        assert!(
+            (repl - hagan).abs() < 50.0,
+            "short-tenor/low-vol replication must track Hagan: repl={repl}, hagan={hagan}"
+        );
+    }
+
+    /// Long tenor / high vol: first-order Hagan understates the adjustment
+    /// (documented 5-10bp class error); replication must exceed it by a
+    /// meaningful, bounded amount.
+    #[test]
+    fn replication_exceeds_hagan_for_long_tenor_high_vol() {
+        let as_of = date(2025, 1, 1);
+        let swap = single_fixing_cms_swap(20.0, date(2030, 1, 1), date(2030, 4, 1));
+        let market = cms_market_with_vol(as_of, 0.30);
+
+        let hagan = CmsSwapPricer::new()
+            .price_internal_with_convexity(&swap, &market, as_of, 1.0)
+            .expect("hagan PV")
+            .amount();
+        let repl = CmsSwapReplicationPricer::new()
+            .price_internal(&swap, &market, as_of)
+            .expect("replication PV")
+            .amount();
+
+        // Gap in rate terms: PV / (accrual × notional × df). Use df ≈ 1 bound;
+        // require > 0.5bp and < 100bp (sanity).
+        let gap_rate = (repl - hagan) / (0.25 * 1_000_000.0);
+        assert!(
+            gap_rate > 0.5e-4,
+            "long-tenor/high-vol replication must exceed first-order Hagan by \
+             a material margin: repl={repl}, hagan={hagan}, gap={gap_rate:.6}"
+        );
+        assert!(
+            gap_rate < 100.0e-4,
+            "replication-vs-Hagan gap implausibly large: repl={repl}, hagan={hagan}"
+        );
+    }
+
+    /// Seasoned fixing: both models must value the coupon identically off the
+    /// recorded fixing (no convexity on a known rate).
+    #[test]
+    fn replication_matches_hagan_exactly_for_seasoned_fixing() {
+        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+
+        let as_of = date(2025, 6, 1);
+        // Fixed 2025-01-01, pays 2025-07-01: fixed-but-unpaid at as_of.
+        let swap = single_fixing_cms_swap(10.0, date(2025, 1, 1), date(2025, 7, 1));
+        let fixing_series = ScalarTimeSeries::new(
+            finstack_quant_core::market_data::fixings::cms_fixing_series_id("USD-LIBOR-3M", 10.0),
+            vec![(date(2025, 1, 1), 0.045)],
+            None,
+        )
+        .expect("fixing series");
+        let market = cms_market_with_vol(as_of, 0.30).insert_series(fixing_series);
+
+        let hagan = CmsSwapPricer::new()
+            .price_internal_with_convexity(&swap, &market, as_of, 1.0)
+            .expect("hagan PV")
+            .amount();
+        let repl = CmsSwapReplicationPricer::new()
+            .price_internal(&swap, &market, as_of)
+            .expect("replication PV")
+            .amount();
+
+        assert!(
+            (repl - hagan).abs() < 1e-9,
+            "a seasoned CMS coupon is a known cashflow; models must agree \
+             exactly: repl={repl}, hagan={hagan}"
+        );
+    }
+
+    /// Non-positive forward: replication requires a positive forward swap rate
+    /// (lognormal replication integrand), matching the CmsOption replication
+    /// pricer's behavior — a clean error, not a silent fallback.
+    #[test]
+    fn replication_errors_on_non_positive_forward() {
+        let as_of = date(2025, 1, 1);
+        let swap = single_fixing_cms_swap(10.0, date(2026, 1, 1), date(2026, 4, 1));
+        // Negative-rate market: 0% discounting (constant DFs are valid) with a
+        // -1% projection curve drives the reference par swap rate negative.
+        let market = MarketContext::new()
+            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.0, 1.0))
+            .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, -0.01, 1.0));
+
+        let result = CmsSwapReplicationPricer::new().price_internal(&swap, &market, as_of);
+        assert!(
+            result.is_err(),
+            "replication must reject non-positive forwards like the CmsOption \
+             replication pricer, got {:?}",
+            result.ok()
         );
     }
 }

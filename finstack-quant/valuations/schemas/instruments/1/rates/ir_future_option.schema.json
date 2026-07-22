@@ -14,6 +14,21 @@
           "type": "string"
         }
       ]
+    },
+    "VolatilityModel": {
+      "description": "Volatility model for pricing",
+      "oneOf": [
+        {
+          "const": "black",
+          "description": "Black (Lognormal) model (1976)",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "Bachelier (Normal) model",
+          "type": "string"
+        }
+      ]
     }
   },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/ir_future_option.schema.json",
@@ -87,6 +102,12 @@
               "format": "date",
               "type": "string"
             },
+            "face_value": {
+              "default": 1000000.0,
+              "description": "Face value of one underlying futures contract (e.g., $1,000,000 for\nSOFR futures). The position size is `notional / face_value` contracts,\nconsistent with [`InterestRateFuture`](crate::instruments::rates::ir_future).",
+              "format": "double",
+              "type": "number"
+            },
             "futures_price": {
               "description": "Underlying futures price (e.g., 95.50 for a 4.50% implied rate)",
               "format": "double",
@@ -144,8 +165,13 @@
               "format": "double",
               "type": "number"
             },
+            "vol_model": {
+              "$ref": "#/$defs/VolatilityModel",
+              "default": "black",
+              "description": "Volatility model the quote refers to. CME SOFR/STIR options are quoted\nin normal (basis-point) vols — use [`VolatilityModel::Normal`] for\nthose. Defaults to Black (lognormal) for backward compatibility."
+            },
             "volatility": {
-              "description": "Lognormal (Black) volatility, annualized",
+              "description": "Annualized volatility. Units follow `vol_model`: a decimal lognormal\nvol of the futures price for [`VolatilityModel::Black`] (e.g. `0.006`),\nor a normal vol in **price points** for [`VolatilityModel::Normal`]\n(e.g. `0.60` ≈ 60 bp of annualized rate vol).",
               "format": "double",
               "type": "number"
             }

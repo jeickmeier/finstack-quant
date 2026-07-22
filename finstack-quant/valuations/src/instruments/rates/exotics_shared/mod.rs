@@ -35,7 +35,7 @@ pub(crate) mod fixings;
 
 /// Exercise-boundary protocol and basis helpers for LSMC-priced rate exotics.
 pub mod exercise;
-pub use exercise::{extended_basis, standard_basis, ExerciseBoundaryPayoff};
+pub use exercise::{basis_for_degree, extended_basis, standard_basis, ExerciseBoundaryPayoff};
 
 /// Generic HW1F Monte Carlo orchestrator for path-dependent rate exotics.
 pub mod hw1f_mc;

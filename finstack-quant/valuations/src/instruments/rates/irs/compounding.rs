@@ -222,6 +222,16 @@ impl Default for FloatingLegCompounding {
 /// telescoping fast path. FRN-style legs should use
 /// [`FloatingLegCompounding::CompoundedInArrears`] with an explicit lookback or
 /// the `*_observation_shift` presets.
+///
+/// # Day count is NOT part of these presets
+///
+/// A preset only sets the compounding method; the leg's `day_count` must be
+/// configured to the index's own basis separately (ISDA 2021 Definitions):
+/// ACT/360 for SOFR / EFFR / €STR / SARON, but **ACT/365F for SONIA and
+/// TONA**. Pairing [`Self::sonia`] or [`Self::tona`] with an ACT/360 leg
+/// misstates every accrual by ~365/360 (≈ 1.4% of the coupon). The
+/// currency-level `SwapConvention` templates carry the correct pairing;
+/// hand-built legs must set it explicitly.
 impl FloatingLegCompounding {
     /// USD SOFR OIS convention (plain compounded in arrears, payment delay only).
     pub fn sofr() -> Self {

@@ -23,8 +23,9 @@ use finstack_quant_core::types::{CurveId, IndexId, InstrumentId, PriceId, Rate};
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum BoundsType {
-    /// Bounds are absolute price levels (e.g., 4500.0 for SPX).
-    /// This is the market standard for rate-linked range accruals.
+    /// Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate
+    /// band for a rate-linked note priced via
+    /// [`CallableRangeAccrual`](crate::instruments::rates::callable_range_accrual)).
     #[default]
     Absolute,
     /// Bounds are relative to initial spot (e.g., 0.95 = 95% of initial).
@@ -73,6 +74,17 @@ impl std::str::FromStr for BoundsType {
 ///
 /// For mid-life valuations, use `past_fixings_in_range` to specify how many past
 /// observations were in range. The pricer will add this to expected future fixings.
+///
+/// # Rate-Linked Underlyings: Pricing Routing
+///
+/// The rate-linked fields (`rate_index_id`, `projection_curve_id`,
+/// `reference_tenor`) describe the contract but are **not priceable by the
+/// standalone `RangeAccrual` pricers**, which support equity/FX (GBM)
+/// underlyings only and return a validation error when these fields are set.
+/// Price rate-linked range accrual notes through
+/// [`CallableRangeAccrual`](crate::instruments::rates::callable_range_accrual)
+/// (with an empty call schedule for a non-callable note), which models the
+/// reference rate under HW1F and reconstructs the term rate per observation.
 #[derive(
     Clone,
     Debug,

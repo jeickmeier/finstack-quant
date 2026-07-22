@@ -35,7 +35,7 @@
       "oneOf": [
         {
           "const": "absolute",
-          "description": "Bounds are absolute price levels (e.g., 4500.0 for SPX).\nThis is the market standard for rate-linked range accruals.",
+          "description": "Bounds are absolute levels (e.g., 4500.0 for SPX, or an absolute rate\nband for a rate-linked note priced via\n[`CallableRangeAccrual`](crate::instruments::rates::callable_range_accrual)).",
           "type": "string"
         },
         {
@@ -73,7 +73,7 @@
     },
     "RangeAccrual": {
       "additionalProperties": false,
-      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.",
+      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::rates::callable_range_accrual)\n(with an empty call schedule for a non-callable note), which models the\nreference rate under HW1F and reconstructs the term rate per observation.",
       "properties": {
         "accrual_start_date": {
           "description": "Contractual accrual-period start date.\n\nWhen omitted, the legacy representation infers the start by stepping\none first-observation interval backward. Single-observation contracts\nmust provide this field explicitly.",
