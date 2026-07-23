@@ -13,13 +13,16 @@
 //! close to Gaussian, and matching the exact conditional mean and variance
 //! gives a small, bounded error.
 //!
-//! The Gaussian approximation places a small probability mass on `L < 0`;
-//! this leakage is bounded by `Φ(−μ/σ)` and contributes a negative bias to
-//! `E[min(L,K)]` that benchmarking against the exact convolution PMF showed to
-//! be `< 1e-3` of tranchelet EL even in the worst (low-PD) case. A genuine
-//! higher-order saddle-point alternative was evaluated and found 2–6× less
-//! accurate at realistic pool sizes, so it is not implemented here (deferred —
-//! see the audit FLAG).
+//! The Gaussian approximation places a small probability mass on `L < 0` and
+//! mis-shapes the conditional loss law where the cap sits near its peak. A
+//! 2026-07 measured bias study (junior [3,7] tranche PV vs the
+//! exact-convolution PMF on dispersed-hazard pools) found 1.55% at 24 names,
+//! 1.22% at 40, 0.20% at 64 and 0.03% at 125; pools at or below
+//! `credit::SMALL_POOL_THRESHOLD` (64) are therefore always routed to exact
+//! convolution and this approximation only prices larger pools where its
+//! error is ≤ ~0.2% of PV. A genuine higher-order saddle-point alternative
+//! was evaluated and found 2–6× less accurate at realistic pool sizes, so it
+//! is not implemented here.
 //!
 //! All branches are panic-free: degenerate inputs (zero/non-finite variance)
 //! fall back to the deterministic loss.

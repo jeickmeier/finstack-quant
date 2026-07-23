@@ -32,21 +32,24 @@
 //! ### Protection Leg PV
 //! `PV_prot = Σ DF(t_i) * N_tr * [EL_fraction(t_i) - EL_fraction(t_{i-1})]`
 //!
-//! ## Adaptive Integration Thresholds
+//! ## Integration Near Correlation Boundaries
 //!
-//! The pricer uses adaptive Gauss-Hermite quadrature when correlation falls outside
-//! the range [0.05, 0.95]. This is because:
-//! - Near ρ=0: The conditional default probability becomes very sensitive to the
-//!   market factor, requiring higher-order integration for accuracy.
-//! - Near ρ=1: The integrand approaches a step function, requiring more quadrature
-//!   points to capture the sharp transition.
+//! When correlation falls outside [0.05, 0.95] the pricer routes through
+//! `GaussHermiteQuadrature::integrate_adaptive`, which performs at most one
+//! order-promotion step and is a **no-op at the default quadrature order of
+//! 20** (the maximum tabulated order). Boundary-correlation accuracy at the
+//! default configuration therefore rests on the correlation clamp into
+//! (0.01, 0.99) plus the order-20 rule itself — not on adaptive refinement.
+//! Configuring a lower `quadrature_order` (5/7/10/15) enables the single
+//! promotion step near the boundaries.
 //!
 //! ## Portfolio Support
 //!
 //! * Supports both homogeneous and heterogeneous portfolios: per-issuer credit
 //!   curves, recovery rates, and weights via `CreditIndexData::issuer_credit_curves`
 //! * Automatically detects uniform portfolios and uses the faster binomial path
-//! * Falls back to heterogeneous convolution or SPA for diversified portfolios
+//! * Falls back to heterogeneous exact convolution (pools ≤ 64 names) or the
+//!   moment-matched normal approximation for large diversified portfolios
 //!
 //! ## Limitations
 //!

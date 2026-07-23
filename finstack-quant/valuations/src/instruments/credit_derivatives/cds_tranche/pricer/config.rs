@@ -93,7 +93,8 @@ pub(super) const LGD_FLOOR: f64 = 1e-6;
 /// Minimum grid step to avoid degenerate convolution buckets
 pub(super) const GRID_STEP_MIN: f64 = 1e-6;
 
-/// Hard cap on convolution PMF points before falling back to SPA
+/// Hard cap on convolution PMF points before falling back to the
+/// moment-matched normal approximation
 pub(super) const MAX_GRID_POINTS: usize = 200_000;
 
 /// Maximum iterations for par spread solver
@@ -239,7 +240,7 @@ impl Default for CDSTranchePricerConfig {
             corr_boundary_width: DEFAULT_CORR_BOUNDARY_WIDTH,
 
             // Heterogeneous portfolio
-            hetero_method: HeteroMethod::Spa,
+            hetero_method: HeteroMethod::NormalApprox,
             grid_step: DEFAULT_GRID_STEP,
         }
     }
@@ -352,14 +353,17 @@ impl CDSTranchePricerConfig {
 /// Heterogeneous expected loss evaluation method
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeteroMethod {
-    /// Moment-matched normal approximation for heterogeneous pool loss.
+    /// Moment-matched normal (CLT) approximation for heterogeneous pool loss.
     ///
-    /// The legacy variant name is retained for API compatibility, but this is
-    /// not the CGF-based saddle-point implementation. It matches the
-    /// conditional loss mean and variance and can place bounded probability
-    /// mass below zero; see `saddlepoint.rs` for the true SPA helper retained
-    /// for validation work.
-    Spa,
+    /// Matches the conditional loss mean and variance with a Gaussian; can
+    /// place bounded probability mass below zero. Renamed from the misleading
+    /// `Spa` (2026-07 credit-derivatives audit M5): this is **not** a
+    /// CGF-based saddle-point method. Pools at or below
+    /// `credit::SMALL_POOL_THRESHOLD` constituents are always routed to
+    /// exact convolution regardless of this setting; the measured bias of
+    /// this approximation above that threshold is ≤ ~0.2% of tranche PV
+    /// (see the threshold's doc table).
+    NormalApprox,
     /// Exact convolution method (slower but more accurate)
     ExactConvolution,
 }

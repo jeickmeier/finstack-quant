@@ -242,6 +242,10 @@ impl CDSIndexPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<IndexParSpreadResult> {
+        // Enforce the same top-level trade invariants as the npv/leg-PV/CS01
+        // aggregation paths; without this the SingleCurve branch builds the
+        // synthetic CDS directly and silently prices e.g. index_factor > 1.
+        index.validate()?;
         let pricer = CDSPricer::with_config(self.cds_config.clone());
         let method = if self.cds_config.par_spread_uses_full_premium {
             ParSpreadMethod::FullPremiumAoD

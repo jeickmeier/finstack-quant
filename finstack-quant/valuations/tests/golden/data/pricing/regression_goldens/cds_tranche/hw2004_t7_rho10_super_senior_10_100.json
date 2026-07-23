@@ -1,0 +1,179 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "hw2004_t7_rho10_super_senior_10_100",
+    "domain": "credit.cds_tranche",
+    "description": "Hull-White (2004) Table 7 benchmark: [10,100]% tranche on a 100-name homogeneous pool at flat Gaussian correlation 0.1.",
+    "valuation_date": "2006-08-31",
+    "source": "textbook",
+    "source_detail": "Hull, J. and White, A. (2004), 'Valuation of a CDO and an nth to Default CDS Without Monte Carlo Simulation', Journal of Derivatives 12(2), Table 7. Fixture: 100-name homogeneous pool, flat hazard 1%/yr (Act/Act ISDA), recovery 40%, flat 5% continuously-compounded risk-free rate (Act/360), 5Y quarterly premium (2006-09-01 to 2011-09-01, Act/360, Following), Gaussian copula at flat correlation. Expected outputs are the published breakeven running spreads in bp (whole-bp table resolution); cross-referenced against QuantLib test-suite/cdo.cpp hwData7, which validates QuantLib's own CDO engines against the same table at 1-10bp absolute / 4-7% relative tolerance.",
+    "captured_by": "claude",
+    "captured_on": "2026-07-22",
+    "last_reviewed_by": "claude",
+    "last_reviewed_on": "2026-07-22",
+    "review_interval_months": 12,
+    "regen_command": "manual transcription of the published Table 7 values; see source_detail",
+    "screenshots": []
+  },
+  "kind": "pricing",
+  "model": "hazard_rate",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
+      "schema": "finstack_quant.calibration",
+      "plan": {
+        "id": "hw2004_t7_rho10_super_senior_10_100_market",
+        "description": "Static Hull-White Table 7 market snapshot: flat 5% cc Act/360 discounting (log-linear DF knots reproduce exp(-0.05t) exactly), flat 1% Act/Act-ISDA hazard, flat base-correlation curve. No calibration steps; curves are carried in prior_market.",
+        "quote_sets": {},
+        "steps": [],
+        "settings": {
+          "fx": {
+            "pivot_currency": "USD",
+            "enable_triangulation": true,
+            "cache_capacity": 256
+          }
+        }
+      },
+      "market_data": [
+        {
+          "kind": "credit_index",
+          "id": "HW.POOL",
+          "num_constituents": 100,
+          "recovery_rate": 0.4,
+          "index_credit_curve_id": "HW-HAZ",
+          "base_correlation_curve_id": "HW-BC",
+          "issuer_credit_curve_ids": null,
+          "issuer_recovery_rates": null,
+          "issuer_weights": null
+        }
+      ],
+      "prior_market": [
+        {
+          "kind": "discount_curve",
+          "id": "HW-DISC",
+          "base": "2006-08-31",
+          "day_count": "Act360",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              10.0,
+              0.6065306597126334
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        },
+        {
+          "kind": "hazard_curve",
+          "id": "HW-HAZ",
+          "base": "2006-08-31",
+          "knot_points": [
+            [
+              10.0,
+              0.01
+            ]
+          ],
+          "recovery_rate": 0.4,
+          "issuer": null,
+          "seniority": null,
+          "currency": null,
+          "day_count": "ActAct",
+          "par_points": [
+            [
+              1.0,
+              60.0
+            ],
+            [
+              3.0,
+              60.0
+            ],
+            [
+              5.0,
+              60.0
+            ],
+            [
+              10.0,
+              60.0
+            ]
+          ],
+          "par_interp": "Linear"
+        },
+        {
+          "kind": "base_correlation_curve",
+          "id": "HW-BC",
+          "detachment_points": [
+            3.0,
+            100.0
+          ],
+          "correlations": [
+            0.1,
+            0.1
+          ]
+        }
+      ]
+    }
+  },
+  "instrument": {
+    "type": "cds_tranche",
+    "spec": {
+      "id": "HW-T7-RHO10-10-100",
+      "index_name": "HW100",
+      "series": 1,
+      "attach_pct": 10.0,
+      "detach_pct": 100.0,
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "maturity": "2011-09-01",
+      "running_coupon_bp": 100.0,
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "day_count": "Act360",
+      "bdc": "following",
+      "calendar_id": "weekends_only",
+      "discount_curve_id": "HW-DISC",
+      "credit_index_id": "HW.POOL",
+      "side": "buy_protection",
+      "effective_date": "2006-09-01",
+      "accumulated_loss": 0.0,
+      "standard_imm_dates": false,
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
+      }
+    }
+  },
+  "expected": {
+    "par_spread": 1.0,
+    "dv01": 111.050230972731,
+    "cs01": 282.337201682269
+  },
+  "tolerances": {
+    "par_spread": {
+      "abs": 0.6,
+      "tolerance_reason": "HW publishes whole-bp spreads (+/-0.5bp table rounding). Band covers that rounding plus the documented convention residual between finstack's tranche engine (EL at payment dates, (1-f)*dEL accrual-on-default, exact conditional binomial at n=100) and HW's mid-period premium-accrual recursion. Measured residual on 2026-07-22: ours 0.70bp vs published 1bp. QuantLib's own engines carry 1-10bp abs / 4-7% rel bands against this table."
+    },
+    "dv01": {
+      "abs": 1e-06,
+      "rel": 5e-09,
+      "tolerance_reason": "Internal deterministic regression pin, NOT a Hull-White value (the paper publishes only fair spreads). Computed by finstack's own dv01 calculator on this analytic fixture on 2026-07-22 and pinned at ~10x FP-residual tightness so refactor drift is caught; the external benchmark assertion for this fixture is par_spread."
+    },
+    "cs01": {
+      "abs": 1e-06,
+      "rel": 5e-09,
+      "tolerance_reason": "Internal deterministic regression pin, NOT a Hull-White value (the paper publishes only fair spreads). Computed by finstack's own cs01 calculator on this analytic fixture on 2026-07-22 and pinned at ~10x FP-residual tightness so refactor drift is caught; the external benchmark assertion for this fixture is par_spread."
+    }
+  }
+}

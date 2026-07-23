@@ -555,3 +555,59 @@ fn test_jtd_uses_explicit_constituent_count_over_name_inference() {
          default-125={with_default_125}"
     );
 }
+
+#[test]
+fn test_jtd_per_name_independent_of_index_factor() {
+    // Regression (2026-07 credit-derivatives audit F1): per-name JTD on a
+    // seasoned (factored) index must be independent of `index_factor`.
+    //
+    // Markit index mechanics: a trade of `Notional` (original-notional
+    // quotation) on a series with factor f has current notional f·Notional
+    // spread over f·N_orig surviving names, so each surviving name carries
+    // its original per-name notional Notional/N_orig and
+    //
+    //     JTD_per_name = LGD × Notional / N_orig     (no factor term).
+    //
+    // The old SingleCurve branch multiplied by `index_factor` while dividing
+    // by the ORIGINAL pool size, understating JTD by exactly `f` (e.g. -8%
+    // at f = 0.92) and disagreeing with the Constituents branch.
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+
+    let jtd_at_factor = |factor: f64| -> f64 {
+        let idx = standard_single_curve_index("CDX-JTD-FACTOR", start, end, 10_000_000.0)
+            .with_index_factor(factor);
+        let ctx = standard_market_context(as_of);
+        *idx.price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::JumpToDefault],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("jump_to_default")
+        .unwrap()
+    };
+
+    // Analytical value: LGD × Notional / N_orig = 0.60 × $10MM / 125 = $48,000.
+    let expected = 10_000_000.0 * (1.0 - STANDARD_RECOVERY_SENIOR) / 125.0;
+
+    let jtd_seasoned = jtd_at_factor(0.92);
+    assert_relative_eq(
+        jtd_seasoned,
+        expected,
+        1e-10,
+        "seasoned-index (factor 0.92) per-name JTD",
+    );
+
+    // Factor must not change the per-name number at all.
+    let jtd_fresh = jtd_at_factor(1.0);
+    assert_relative_eq(
+        jtd_seasoned,
+        jtd_fresh,
+        1e-12,
+        "per-name JTD must be independent of index_factor",
+    );
+}

@@ -105,8 +105,8 @@ fn test_default_config_hetero_method() {
 
     // Assert
     assert!(
-        matches!(config.hetero_method, HeteroMethod::Spa),
-        "Default heterogeneous method should be SPA"
+        matches!(config.hetero_method, HeteroMethod::NormalApprox),
+        "Default heterogeneous method should be the moment-matched normal approximation"
     );
 }
 
@@ -115,8 +115,8 @@ fn test_default_config_hetero_method() {
 #[test]
 fn test_hetero_method_equality() {
     // Arrange
-    let spa1 = HeteroMethod::Spa;
-    let spa2 = HeteroMethod::Spa;
+    let spa1 = HeteroMethod::NormalApprox;
+    let spa2 = HeteroMethod::NormalApprox;
     let exact = HeteroMethod::ExactConvolution;
 
     // Assert

@@ -13,6 +13,143 @@
 use super::helpers::*;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
 
+// ==================== Economic-Invariant Helpers ====================
+
+/// Market context whose base-correlation curve is flat at `level`, so every
+/// strike prices at the same copula correlation. Flat curves are trivially
+/// arbitrage-free, which isolates the correlation-monotonicity invariants
+/// from base-correlation-skew effects.
+fn flat_correlation_market(level: f64) -> finstack_quant_core::market_data::context::MarketContext {
+    let corr_curve =
+        finstack_quant_core::market_data::term_structures::BaseCorrelationCurve::builder(
+            "FLAT_CORR",
+        )
+        .knots(vec![(3.0, level), (10.0, level), (30.0, level)])
+        .build()
+        .unwrap();
+    let index = finstack_quant_core::market_data::term_structures::CreditIndexData::builder()
+        .num_constituents(125)
+        .recovery_rate(0.40)
+        .index_credit_curve(std::sync::Arc::new(standard_hazard_curve()))
+        .base_correlation_curve(std::sync::Arc::new(corr_curve))
+        .build()
+        .unwrap();
+    standard_market_context().insert_credit_index("CDX.NA.IG.42", index)
+}
+
+/// Undiscounted maturity EL (currency) of a tranche at a flat correlation.
+fn el_at_flat_corr(attach: f64, detach: f64, coupon_bp: f64, level: f64) -> f64 {
+    let pricer = CDSTranchePricer::new();
+    let market = flat_correlation_market(level);
+    let tranche = custom_tranche(
+        attach,
+        detach,
+        coupon_bp,
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::TrancheSide::SellProtection,
+    );
+    pricer.calculate_expected_loss(&tranche, &market).unwrap()
+}
+
+// ==================== Economic Invariants (2026-07 audit) ====================
+//
+// The extreme-correlation tests below previously asserted only
+// `is_ok()`/`is_finite()`. These invariants pin the copula economics:
+// equity EL decreasing in correlation, senior EL increasing, and the
+// 0-100% tranche reproducing the (correlation-invariant) pool EL.
+
+/// One-factor copula: equity-tranche expected loss `E[min(L, K)]` is
+/// decreasing in the flat correlation (O'Kane 2008 Ch. 18; Vasicek).
+/// Includes the extreme levels that the smoke tests exercise.
+#[test]
+fn test_equity_el_monotone_decreasing_in_correlation() {
+    let levels = [0.001, 0.05, 0.30, 0.60, 0.95, 0.999];
+    let els: Vec<f64> = levels
+        .iter()
+        .map(|&rho| el_at_flat_corr(0.0, 3.0, 500.0, rho))
+        .collect();
+
+    for (i, window) in els.windows(2).enumerate() {
+        // Allow a small relative epsilon: near the clamped correlation
+        // boundaries the integrand is step-like and 20-node quadrature can
+        // break exact monotonicity by O(1e-6) relative.
+        let eps = 1e-6 * window[0].abs().max(1.0);
+        assert!(
+            window[1] <= window[0] + eps,
+            "equity EL must be non-increasing in correlation: \
+             EL(rho={}) = {:.4} < EL(rho={}) = {:.4} violated",
+            levels[i + 1],
+            window[1],
+            levels[i],
+            window[0],
+        );
+    }
+    // The move across the full correlation range must be economically
+    // material, not a flat line of numerical noise.
+    assert!(
+        els.first().unwrap() > &(els.last().unwrap() * 1.05),
+        "equity EL should drop materially from rho~0 to rho~1: {els:?}"
+    );
+}
+
+/// One-factor copula: senior-tranche expected loss is increasing in the
+/// flat correlation (loss mass migrates up the capital structure).
+#[test]
+fn test_senior_el_monotone_increasing_in_correlation() {
+    let levels = [0.001, 0.05, 0.30, 0.60, 0.95, 0.999];
+    let els: Vec<f64> = levels
+        .iter()
+        .map(|&rho| el_at_flat_corr(15.0, 30.0, 100.0, rho))
+        .collect();
+
+    for (i, window) in els.windows(2).enumerate() {
+        // Same relative epsilon rationale as the equity test: quadrature on
+        // the near-step integrand at clamped extreme correlations.
+        let eps = 1e-6 * window[0].abs().max(1.0);
+        assert!(
+            window[1] >= window[0] - eps,
+            "senior EL must be non-decreasing in correlation: \
+             EL(rho={}) = {:.4} > EL(rho={}) = {:.4} violated",
+            levels[i + 1],
+            window[1],
+            levels[i],
+            window[0],
+        );
+    }
+    assert!(
+        els.last().unwrap() > &(els.first().unwrap() * 1.05),
+        "senior EL should grow materially from rho~0 to rho~1: {els:?}"
+    );
+}
+
+/// Marginal preservation: the 0-100% tranche is the whole pool, so its EL
+/// must equal the analytic pool EL `Notional × PD(T) × LGD` and be
+/// invariant to the copula correlation. This is the invariant that anchors
+/// every tranchelet decomposition to the bootstrapped index curve.
+#[test]
+fn test_full_capital_structure_el_reproduces_pool_el() {
+    let curve = standard_hazard_curve();
+    let t_maturity = curve
+        .day_count()
+        .year_fraction(
+            base_date(),
+            maturity_5y(),
+            finstack_quant_core::dates::DayCountContext::default(),
+        )
+        .unwrap();
+    let pool_pd = 1.0 - curve.sp(t_maturity);
+    let analytic_pool_el = 10_000_000.0 * pool_pd * (1.0 - 0.40);
+
+    for rho in [0.10, 0.50, 0.90] {
+        let el = el_at_flat_corr(0.0, 100.0, 100.0, rho);
+        assert_relative_eq(
+            el,
+            analytic_pool_el,
+            5e-3,
+            &format!("0-100% tranche EL vs analytic pool EL at rho={rho}"),
+        );
+    }
+}
+
 // ==================== Extreme Correlation Tests ====================
 
 #[test]

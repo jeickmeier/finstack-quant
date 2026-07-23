@@ -235,15 +235,14 @@ impl CDSTranchePricer {
             // Derivatives*, §9 (large-pool normal approximation). It is
             // NOT a saddle-point approximation.
             //
-            // Bias note: the Gaussian places a small probability mass on
-            // L < 0. For these pools σ ≪ μ is *not* generally true, but
-            // the |L<0| leakage is nonetheless bounded by Φ(−μ/σ) and was
-            // verified empirically (against the exact-convolution PMF) to
-            // contribute < 1e-3 of tranchelet EL across realistic CDX /
-            // bespoke pools — materially smaller than the error a
-            // second-order saddle-point expansion introduces at these
-            // pool sizes. See the `saddlepoint` module for a genuine
-            // CGF-based SPA kept available for validation work.
+            // Bias note (2026-07 audit measurement, junior [3,7] tranche PV
+            // vs exact convolution on dispersed-hazard pools): 1.55% at 24
+            // names, 1.22% at 40, 0.20% at 64, 0.03% at 125. The bias is
+            // largest at junior strikes (the equity cap sits at the peak of
+            // the conditional loss distribution) and shrinks with pool size
+            // per the CLT. Pools ≤ SMALL_POOL_THRESHOLD (64) are therefore
+            // always routed to exact convolution above, so this branch only
+            // prices pools where the measured bias is ≤ ~0.2% of PV.
             let integrand = |factors: &[f64]| -> f64 {
                 let z = factors.first().copied().unwrap_or(0.0);
                 let sqrt_rho = correlation.sqrt();
@@ -274,7 +273,7 @@ impl CDSTranchePricer {
                 )?
             } else {
                 match self.params.hetero_method {
-                    HeteroMethod::Spa => {
+                    HeteroMethod::NormalApprox => {
                         warn!(
                             n_constituents = n_const,
                             threshold = credit::SMALL_POOL_THRESHOLD,
@@ -339,7 +338,7 @@ impl CDSTranchePricer {
             )?
         } else {
             match self.params.hetero_method {
-                HeteroMethod::Spa => copula_ref.integrate_fn(&integrand),
+                HeteroMethod::NormalApprox => copula_ref.integrate_fn(&integrand),
                 HeteroMethod::ExactConvolution => self.hetero_exact_convolution_full(
                     cap_pct,
                     correlation,
@@ -390,7 +389,8 @@ impl CDSTranchePricer {
         };
 
         if max_points > MAX_GRID_POINTS {
-            // Performance guard: fall back to SPA approximation with heterogeneous vectors
+            // Performance guard: fall back to the moment-matched normal
+            // approximation with heterogeneous vectors
             return self.hetero_spa_full(
                 thresholds,
                 correlation,

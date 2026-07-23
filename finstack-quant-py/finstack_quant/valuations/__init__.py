@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING as _TYPE_CHECKING, Any as _Any
 from finstack_quant.finstack_quant import valuations as _valuations
 from finstack_quant.valuations import (
     correlation as correlation,
+    credit_derivatives as credit_derivatives,
     instruments as instruments,
     models as models,
 )
@@ -120,6 +121,7 @@ __all__: list[str] = [
     "callable_range_accrual_accrued",
     "cms_spread_option_intrinsic",
     "correlation",
+    "credit_derivatives",
     "dependency_graph_json",
     "dry_run",
     "instrument_cashflows",

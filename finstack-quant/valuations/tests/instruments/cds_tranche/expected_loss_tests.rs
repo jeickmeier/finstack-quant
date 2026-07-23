@@ -4,7 +4,7 @@
 //! - Basic expected loss calculation
 //! - EL curve generation and monotonicity
 //! - Homogeneous pool calculations
-//! - Heterogeneous pool calculations (SPA and exact convolution)
+//! - Heterogeneous pool calculations (normal approximation and exact convolution)
 //! - Tranche subordination effects on EL
 
 #![allow(clippy::field_reassign_with_default)]
@@ -131,7 +131,7 @@ fn test_heterogeneous_spa_expected_loss() {
     // Arrange
     let mut config = CDSTranchePricerConfig::default();
     config.use_issuer_curves = true;
-    config.hetero_method = HeteroMethod::Spa;
+    config.hetero_method = HeteroMethod::NormalApprox;
     let pricer = CDSTranchePricer::with_params(config);
 
     let tranche = mezzanine_tranche();
@@ -142,7 +142,7 @@ fn test_heterogeneous_spa_expected_loss() {
 
     // Assert
     assert!(result.is_ok());
-    assert_finite_non_negative(result.unwrap(), "Heterogeneous SPA EL");
+    assert_finite_non_negative(result.unwrap(), "Heterogeneous normal-approx EL");
 }
 
 #[test]
@@ -196,7 +196,7 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_identical() {
 
     let mut hetero_config = CDSTranchePricerConfig::default();
     hetero_config.use_issuer_curves = true;
-    hetero_config.hetero_method = HeteroMethod::Spa;
+    hetero_config.hetero_method = HeteroMethod::NormalApprox;
     let hetero_pricer = CDSTranchePricer::with_params(hetero_config);
 
     let tranche = custom_tranche(
@@ -219,7 +219,7 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_identical() {
         el_hetero,
         el_homo,
         0.0001,
-        "Hetero SPA should match homogeneous when issuers identical",
+        "Hetero normal-approx should match homogeneous when issuers identical",
     );
 }
 
@@ -230,7 +230,7 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
 
     let mut spa_config = CDSTranchePricerConfig::default();
     spa_config.use_issuer_curves = true;
-    spa_config.hetero_method = HeteroMethod::Spa;
+    spa_config.hetero_method = HeteroMethod::NormalApprox;
     let spa_pricer = CDSTranchePricer::with_params(spa_config);
 
     let mut exact_config = CDSTranchePricerConfig::default();
@@ -249,12 +249,12 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
         .calculate_expected_loss(&tranche, &market)
         .unwrap();
 
-    // Assert: SPA and exact should be close for small pools
+    // Assert: normal approximation and exact should be close for small pools
     assert_relative_eq(
         el_spa,
         el_exact,
         0.05,
-        "SPA and exact convolution should be close for small pools",
+        "Normal approximation and exact convolution should be close for small pools",
     );
 }
 

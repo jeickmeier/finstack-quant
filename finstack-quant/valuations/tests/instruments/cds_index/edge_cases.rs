@@ -364,6 +364,40 @@ fn test_index_factor_greater_than_one() {
 }
 
 #[test]
+fn test_par_spread_rejects_invalid_index_factor() {
+    // Regression (2026-07 credit-derivatives audit Mi1): the SingleCurve
+    // par-spread path must enforce the same top-level trade invariants
+    // (`index.validate()`) as npv/leg-PV/CS01/RPV01. Previously it built the
+    // synthetic CDS directly, so an invalid index_factor > 1 silently priced.
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+
+    let idx = CDSIndex::from_preset(
+        &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
+        "CDX-PAR-BAD-FACTOR",
+        Money::new(TEST_NOTIONAL, Currency::USD),
+        PayReceive::Pay,
+        start,
+        end,
+        TEST_RECOVERY,
+        "USD-OIS",
+        "HZ-INDEX",
+    )
+    .expect("valid test parameters")
+    .with_index_factor(1.5);
+
+    let ctx = standard_market_context(as_of);
+    let err = idx
+        .par_spread(&ctx, as_of)
+        .expect_err("par spread on index_factor > 1 must fail validation");
+    assert!(
+        err.to_string().contains("index_factor"),
+        "error should name index_factor, got: {err}"
+    );
+}
+
+#[test]
 fn test_empty_constituents_list() {
     // Edge Case: Empty constituents list reverts to single-curve
     let start = date!(2025 - 01 - 01);

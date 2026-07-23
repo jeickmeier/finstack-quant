@@ -405,6 +405,7 @@ instruments  = { python = "finstack_quant.valuations.instruments",  status = "ex
 models       = { python = "finstack_quant.valuations.models",       status = "exists", note = "Pricing model wrappers; structural credit lives under finstack_quant.valuations.models.credit" }
 calibration  = { python = "finstack_quant.valuations",              status = "flattened", note = "calibrate, dry_run, validate_calibration_json, dependency_graph_json exported from finstack_quant.valuations root" }
 correlation  = { python = "finstack_quant.valuations.correlation",  status = "exists", note = "Former standalone finstack-correlation crate; nested under valuations" }
+credit_derivatives = { python = "finstack_quant.valuations.credit_derivatives", status = "exists", note = "CDS-family example-payload factories; mirrors WASM valuations.creditDerivatives" }
 
 # Symbol-level pinning for the valuations domain. Names listed here MUST
 # resolve when imported from `finstack_quant.valuations`. Adding a public name to
@@ -473,6 +474,20 @@ public = [
     "nearest_correlation",
     "simulate_portfolio_loss",
     "validate_correlation_matrix",
+]
+
+# Symbol-level pinning for finstack_quant.valuations.credit_derivatives —
+# CDS-family example-payload factories. Python names are the snake_case
+# canonical Rust function names; the WASM facade exposes the same four under
+# `valuations.creditDerivatives` (camelCase), pinned in
+# [wasm_valuations_subset].creditDerivatives.
+[crates.valuations.credit_derivatives]
+python_package = "finstack_quant.valuations.credit_derivatives"
+public = [
+    "cds_index_example_json",
+    "cds_option_example_json",
+    "cds_tranche_example_json",
+    "credit_default_swap_example_json",
 ]
 
 [crates.valuations.instruments]

@@ -246,11 +246,29 @@ pub mod credit {
     /// If the risky annuity (denominator) is below this, par spread is undefined.
     pub const PAR_SPREAD_DENOM_TOLERANCE: f64 = 1e-12;
 
-    /// Small pool threshold for exact convolution vs SPA in tranche pricing.
+    /// Pool-size threshold for exact convolution vs the moment-matched
+    /// normal approximation in heterogeneous CDS-tranche pricing.
     ///
-    /// Portfolios with this many or fewer constituents use exact convolution
-    /// for higher accuracy; larger pools use saddle-point approximation.
-    pub const SMALL_POOL_THRESHOLD: usize = 16;
+    /// Portfolios with this many or fewer constituents use exact convolution;
+    /// larger pools use the moment-matched normal (CLT) approximation of the
+    /// conditional loss distribution.
+    ///
+    /// The threshold is set from a measured bias study (2026-07
+    /// credit-derivatives audit, junior [3,7] tranche on dispersed-hazard
+    /// pools, normal approx vs exact-convolution PV):
+    ///
+    /// | Pool size | Relative PV bias |
+    /// |-----------|------------------|
+    /// | 24        | 1.55%            |
+    /// | 40        | 1.22%            |
+    /// | 64        | 0.20%            |
+    /// | 100       | 0.11%            |
+    /// | 125       | 0.03%            |
+    ///
+    /// At 64 names the exact convolution remains cheap (O(n · loss-buckets)
+    /// per quadrature node) while the CLT error is already inside typical
+    /// quoting precision; below it the approximation error is material.
+    pub const SMALL_POOL_THRESHOLD: usize = 64;
 
     /// Calendar days per year for settlement delay calculations.
     ///

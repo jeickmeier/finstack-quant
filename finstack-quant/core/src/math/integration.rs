@@ -353,28 +353,34 @@ impl GaussHermiteQuadrature {
         acc.total() / std::f64::consts::PI.sqrt()
     }
 
-    /// Adaptive Gauss-Hermite integration with automatic refinement.
+    /// Gauss-Hermite integration with a single tolerance-checked refinement step.
     ///
-    /// This method automatically increases the quadrature order if the function
-    /// exhibits rapid changes or if high correlation values require greater precision.
-    /// Critical for base correlation calibration near boundary conditions.
+    /// This performs at most **one** order-promotion step — it is not an
+    /// iterate-to-convergence scheme, and it cannot refine beyond the
+    /// highest tabulated order (20). In particular, **when the caller's
+    /// quadrature is already order 20 — the CDS-tranche pricer's default —
+    /// this method is identical to [`Self::integrate`] and `tolerance` is
+    /// ignored.** Callers needing genuinely tolerance-controlled accuracy
+    /// at order 20 must add higher-order node tables first.
     ///
     /// # Arguments
     /// * `f` - Function to integrate
-    /// * `tolerance` - Convergence tolerance for adaptive refinement
+    /// * `tolerance` - Accepted difference between the base and next-order
+    ///   estimates for orders 5/7/10; unused for orders 15 (unconditional
+    ///   promotion to 20) and 20 (no-op)
     ///
     /// # Returns
-    /// High-precision integral estimate with automatic accuracy control
+    /// The refined estimate per the table below
     ///
     /// # Refinement Strategy
     ///
-    /// | Starting Order | Refinement Path |
-    /// |---------------|-----------------|
-    /// | 5 | 5 → 7 → 10 → 15 → 20 |
-    /// | 7 | 7 → 10 → 15 → 20 |
-    /// | 10 | 10 → 15 → 20 |
-    /// | 15 | 15 → 20 |
-    /// | 20 | 20 (no refinement) |
+    /// | Starting Order | Behaviour |
+    /// |---------------|-----------|
+    /// | 5 | order-7 vs base within `tolerance` → order-7, else order-10 |
+    /// | 7 | order-10 vs base within `tolerance` → order-10, else order-15 |
+    /// | 10 | order-15 vs base within `tolerance` → order-15, else order-20 |
+    /// | 15 | order-20 unconditionally |
+    /// | 20 | base estimate (identical to `integrate`; `tolerance` unused) |
     // Refinement table: order 20 is listed explicitly (terminal, no refinement)
     // even though it matches the fallback arm.
     #[allow(clippy::match_same_arms)]

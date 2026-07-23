@@ -20,6 +20,22 @@
 //! - For protection **buyer**: JTD is positive (gain on default)
 //! - For protection **seller**: JTD is negative (loss on default)
 //!
+//! ## Convention: gross LGD, no accrued netting
+//!
+//! This metric is the **gross** per-name protection payout
+//! `LGD × Notional / N_orig`. Unlike the single-name CDS
+//! `jump_to_default` (which nets the ISDA accrued-premium payable on
+//! default — see `cds::metrics::jump_to_default`), the index variant does
+//! **not** subtract per-name accrued premium, and there is no MTM-netted
+//! "default exposure" variant for indices. The accrued adjustment is
+//! bounded by `coupon × period_fraction / N_orig` (≈ $200 on a $48K
+//! per-name JTD for a 100 bp quarterly coupon) and is deliberately
+//! omitted to keep the index number a pure notional-at-risk screen.
+//!
+//! The per-name JTD is independent of `index_factor`: a surviving name
+//! keeps its inception notional `Notional / N_orig` no matter how many
+//! other names have defaulted (Markit index mechanics).
+//!
 //! ## Example
 //! - CDX IG (125 names): $10M index with 40% recovery → JTD ≈ $48K per name default
 
@@ -125,14 +141,21 @@ impl MetricCalculator for JumpToDefaultCalculator {
         } else {
             // Simplified calculation using index-level parameters
             // Assume equal-weighted constituents
+            //
+            // `num_constituents` is the ORIGINAL series membership; each
+            // surviving name keeps its inception notional `Notional / N_orig`
+            // regardless of how many names have since defaulted, so the
+            // per-name JTD is independent of `index_factor` (Markit index
+            // mechanics). Equivalent formulation:
+            // `factor·Notional / (factor·N_orig) · LGD`. The Constituents
+            // branch above computes the same quantity via the surviving count.
             let num_constituents =
                 resolve_constituent_count(index.num_constituents, &index.index_name)?;
             let avg_weight = 1.0 / num_constituents;
             let lgd = 1.0 - index.protection.recovery_rate;
 
             // Single name default impact
-            let scale = index.index_factor;
-            let single_name_jtd = avg_weight * index.notional.amount() * scale * lgd;
+            let single_name_jtd = avg_weight * index.notional.amount() * lgd;
 
             // Apply sign based on position
             let signed_jtd = match index.side {

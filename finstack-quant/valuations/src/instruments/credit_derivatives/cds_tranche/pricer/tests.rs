@@ -415,7 +415,7 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_equal() {
     homo.params.use_issuer_curves = false;
     let mut hetero = CDSTranchePricer::new();
     hetero.params.use_issuer_curves = true;
-    hetero.params.hetero_method = HeteroMethod::Spa;
+    hetero.params.hetero_method = HeteroMethod::NormalApprox;
 
     let pv_homo = homo
         .price_tranche(&tranche, &ctx, as_of)
@@ -454,7 +454,7 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
 
     let mut spa = CDSTranchePricer::new();
     spa.params.use_issuer_curves = true;
-    spa.params.hetero_method = HeteroMethod::Spa;
+    spa.params.hetero_method = HeteroMethod::NormalApprox;
     let mut exact = CDSTranchePricer::new();
     exact.params.use_issuer_curves = true;
     exact.params.hetero_method = HeteroMethod::ExactConvolution;
@@ -469,6 +469,99 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
         .expect("Tranche pricing should succeed in test")
         .amount();
     assert!((pv_spa - pv_exact).abs() < 0.02 * pv_exact.abs().max(1.0));
+}
+
+/// Helper for the audit-M2 regression tests below: price one tranche under a
+/// given pricer configuration.
+fn price_hetero_tranche(
+    ctx: &MarketContext,
+    as_of: Date,
+    attach: f64,
+    detach: f64,
+    configure: impl FnOnce(&mut CDSTranchePricer),
+) -> f64 {
+    let tranche_params = CDSTrancheParams::new(
+        "CDX.NA.IG.42",
+        42,
+        attach,
+        detach,
+        Money::new(10_000_000.0, Currency::USD),
+        as_of.add_months(60),
+        0.0,
+    );
+    let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
+    let tranche = CDSTranche::new(
+        "AUDIT_M2_TRANCHE",
+        &tranche_params,
+        &schedule_params,
+        finstack_quant_core::types::CurveId::from("USD-OIS"),
+        finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
+        TrancheSide::SellProtection,
+    )
+    .expect("Valid tranche parameters");
+    let mut pricer = CDSTranchePricer::new();
+    pricer.params.use_issuer_curves = true;
+    configure(&mut pricer);
+    pricer
+        .price_tranche(&tranche, ctx, as_of)
+        .expect("Tranche pricing should succeed in test")
+        .amount()
+}
+
+/// Regression (2026-07 credit-derivatives audit M2): the moment-matched
+/// normal approximation mis-prices bespoke pools below
+/// `SMALL_POOL_THRESHOLD` (64) by >1% of PV at junior strikes (measured:
+/// 1.55% at 24 names on the [3,7] tranche). Such pools must be routed to
+/// exact convolution regardless of the configured `hetero_method`, so the
+/// default configuration must reproduce the exact-convolution PV to
+/// within grid/quadrature noise.
+#[test]
+fn test_hetero_default_routes_small_pools_to_exact_convolution() {
+    let ctx = sample_market_context_with_issuers(24);
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+
+    for (attach, detach) in [(3.0, 7.0), (15.0, 30.0)] {
+        // hetero_method deliberately left at its default.
+        let pv_default = price_hetero_tranche(&ctx, as_of, attach, detach, |_| {});
+        let pv_exact = price_hetero_tranche(&ctx, as_of, attach, detach, |p| {
+            p.params.hetero_method = HeteroMethod::ExactConvolution;
+        });
+
+        // Same method, same grid → agreement to numerical noise. The old
+        // normal-approx path differed by 1.55% ($72k) at [3,7].
+        let tol = 1e-6 * pv_exact.abs().max(1.0);
+        assert!(
+            (pv_default - pv_exact).abs() < tol,
+            "default config must route a 24-name pool to exact convolution \
+             at [{attach},{detach}]: default={pv_default:.2}, exact={pv_exact:.2}"
+        );
+    }
+}
+
+/// Pin the measured accuracy of the normal (CLT) approximation on the pools
+/// it still prices (> `SMALL_POOL_THRESHOLD` names): the audit bias study
+/// found 0.03% at 125 names on the junior [3,7] tranche. Allow 0.2% so the
+/// pin is robust to fixture drift while still catching a regression to the
+/// small-pool bias regime (>1%).
+#[test]
+fn test_hetero_normal_approx_bias_bound_large_pool() {
+    let ctx = sample_market_context_with_issuers(125);
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+
+    let pv_normal = price_hetero_tranche(&ctx, as_of, 3.0, 7.0, |p| {
+        p.params.hetero_method = HeteroMethod::NormalApprox;
+    });
+    let pv_exact = price_hetero_tranche(&ctx, as_of, 3.0, 7.0, |p| {
+        p.params.hetero_method = HeteroMethod::ExactConvolution;
+    });
+
+    let rel = (pv_normal - pv_exact).abs() / pv_exact.abs().max(1.0);
+    assert!(
+        rel < 0.002,
+        "normal-approximation bias on a 125-name pool must stay within the \
+         measured bound: normal={pv_normal:.2}, exact={pv_exact:.2}, rel={:.4}%",
+        rel * 100.0
+    );
 }
 
 /// Item 4: the homogeneity-detection thresholds for PD, LGD and weight must
@@ -568,7 +661,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
 
     let mut pricer = CDSTranchePricer::new();
     pricer.params.use_issuer_curves = true;
-    pricer.params.hetero_method = HeteroMethod::Spa;
+    pricer.params.hetero_method = HeteroMethod::NormalApprox;
 
     // Exactly homogeneous (shift 0): all PD/LGD/weight identical.
     let pv_exact_homo = pricer
