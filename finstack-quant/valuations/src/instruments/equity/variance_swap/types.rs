@@ -436,12 +436,18 @@ impl VarianceSwap {
     ///
     /// Uses the Carr-Madan (1998) replication formula when a volatility surface is available:
     /// ```text
-    /// E[σ²] = (2/T) × e^(rT) × ∫ [V(K)/K²] dK - (1/T) × (F/K₀ - 1)²
+    /// E[σ²] = (2·e^{rT}/T) × ∫ [V(K)/K²] dK − (2/T)·[(F/K₀ − 1) − ln(F/K₀)]
     /// ```
-    /// where V(K) are OTM put/call prices, F is the forward price, and K₀ is the strike at
-    /// or just below the forward. Falls back to ATM vol² or strike variance if no surface.
+    /// where V(K) are OTM put/call prices, F is the forward price, and K₀ is the highest
+    /// strike at or below the forward. The anchor term is the EXACT Demeterfi et al.
+    /// log-contract correction (not its 2nd-order Taylor expansion). For a
+    /// forward-starting swap (`as_of < start_date`) the pre-start leg is removed via the
+    /// total-variance identity. Falls back to ATM vol² (logged at WARN) if replication
+    /// is unavailable; errors if no volatility input exists.
     ///
-    /// Reference: Carr, P. & Madan, D. (1998). "Towards a Theory of Volatility Trading."
+    /// References: Carr, P. & Madan, D. (1998). "Towards a Theory of Volatility Trading";
+    /// Demeterfi, Derman, Kamal & Zou (1999). "More Than You Ever Wanted to Know About
+    /// Volatility Swaps."
     pub fn remaining_forward_variance(&self, context: &MarketContext, _as_of: Date) -> Result<f64> {
         pricer::remaining_forward_variance(self, context, _as_of)
     }

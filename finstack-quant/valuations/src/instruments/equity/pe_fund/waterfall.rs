@@ -944,6 +944,24 @@ impl<'a> EquityWaterfallEngine<'a> {
             });
         }
 
+        // Exhaustive-allocation invariant: a canonical waterfall ends in a
+        // residual-splitting tier (e.g. the carried-interest promote), so a
+        // distribution is always fully allocated. Cash the configured tiers
+        // cannot place must FAIL here — silently discarding it would
+        // understate LP economics (cashflows, IRR, MOIC, DPI, TVPI) with no
+        // diagnostic. Tolerance matches the loop's early-exit epsilon.
+        if remaining_amount > 1e-6 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "waterfall spec cannot fully allocate the {} distribution on {}: {:.6} \
+                 remains unallocated after the last tranche. End the spec with a \
+                 residual-splitting tier (e.g. `promote_tier(hurdle, lp_share, gp_share)`) \
+                 so profits above the configured tiers are not dropped",
+                params.total_amount.amount(),
+                params.allocation_date,
+                remaining_amount
+            )));
+        }
+
         Ok(allocations)
     }
 
@@ -1560,6 +1578,64 @@ mod tests {
         };
 
         assert!(invalid_spec.validate().is_err());
+    }
+
+    /// A waterfall spec that cannot exhaustively allocate a distribution must
+    /// FAIL, not silently drop the residual.
+    ///
+    /// Before the fix, `allocate_distribution` discarded whatever
+    /// `remaining_amount` survived the tranche loop: a plausible
+    /// ROC + preferred spec (no terminal promote tier) on a distribution
+    /// exceeding capital + pref silently vanished the super-preferred profit
+    /// from LP cashflows, PV, IRR, MOIC, DPI and TVPI — with no error.
+    #[test]
+    fn incomplete_spec_with_residual_cash_errors_instead_of_dropping_it() {
+        // ROC + 8% pref only — no residual-splitting tier.
+        let spec = WaterfallSpec::builder()
+            .style(WaterfallStyle::European)
+            .return_of_capital()
+            .preferred_irr(0.08)
+            .build()
+            .expect("spec builds");
+
+        // 1000 in, 1500 out after 4 years: ROC takes 1000, the pref
+        // entitlement is ~1000·(1.08⁴ − 1) ≈ 360 — leaving ~140 unallocated.
+        let events = vec![
+            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
+            FundEvent::distribution(test_date(2024, 1, 1), Money::new(1500.0, test_currency())),
+        ];
+
+        let engine = EquityWaterfallEngine::new(&spec);
+        let err = engine
+            .run(&events)
+            .expect_err("residual cash the spec cannot allocate must error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("allocate") || msg.contains("residual") || msg.contains("remain"),
+            "error must explain the unallocated residual: {msg}"
+        );
+
+        // The same spec WITH a terminal promote tier allocates everything and
+        // must keep working.
+        let complete = WaterfallSpec::builder()
+            .style(WaterfallStyle::European)
+            .return_of_capital()
+            .preferred_irr(0.08)
+            .promote_tier(0.0, 0.8, 0.2)
+            .build()
+            .expect("complete spec builds");
+        let ledger = EquityWaterfallEngine::new(&complete)
+            .run(&events)
+            .expect("exhaustive spec allocates fully");
+        let total: f64 = ledger
+            .rows
+            .iter()
+            .map(|r| r.to_lp.amount() + r.to_gp.amount())
+            .sum();
+        assert!(
+            (total - 1500.0).abs() < 1e-6,
+            "exhaustive spec must allocate the full distribution, got {total}"
+        );
     }
 
     #[test]

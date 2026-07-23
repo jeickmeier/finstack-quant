@@ -293,10 +293,12 @@ impl CliquetOptionMcPricer {
         let disc = PiecewiseExactGbm::new();
         let initial_state = vec![initial_spot];
 
-        // Use the contract expiry rather than indexing reset_dates so this
-        // remains panic-free if reset_dates is somehow empty here.
-        let maturity_date = inst.reset_dates.last().copied().unwrap_or(inst.expiry);
-        let discount_factor = disc_curve.df_between_dates(as_of, maturity_date)?;
+        // The payoff is FIXED on the last reset date but PAID at the contract
+        // expiry (settlement), so the terminal cashflow is discounted from
+        // `expiry` — matching the fully-observed branch above. Validation
+        // guarantees `last_reset <= expiry`, so this never shortens the
+        // discount window.
+        let discount_factor = disc_curve.df_between_dates(as_of, inst.expiry)?;
 
         let result = engine.price(
             &rng,
@@ -425,6 +427,25 @@ mod tests {
             .attributes(Attributes::new())
             .build()
             .expect("cliquet option")
+    }
+
+    /// A negative `global_floor` is a silently-inert knob on this instrument:
+    /// the engine prices the LONG OPTION LEG, whose payoff is floored at zero,
+    /// so a capital-at-risk floor like −20% can never bind. Accepting it would
+    /// let a user believe they modelled a 20%-max-loss note while the engine
+    /// silently prices full downside protection. Validation must fail closed.
+    #[test]
+    fn negative_global_floor_is_rejected_as_inert_config() {
+        let mut option = live_option();
+        option.global_floor = -0.20;
+
+        let err = option
+            .validate()
+            .expect_err("negative global_floor must be rejected, not silently ignored");
+        assert!(
+            err.to_string().contains("global_floor"),
+            "error must name the field: {err}"
+        );
     }
 
     #[test]
@@ -659,6 +680,53 @@ mod tests {
             (pv.amount() - expected).abs() < 1e-9,
             "fully observed cliquet must be deterministic: pv={} expected={expected}",
             pv.amount()
+        );
+    }
+
+    /// A cliquet's return is fixed on the final reset date but the contract
+    /// pays at `expiry` (settlement), so the live MC branch must discount the
+    /// terminal payoff with `DF(as_of, expiry)` — exactly like the
+    /// fully-observed branch of the same pricer. Two otherwise-identical
+    /// cliquets whose expiry differs only by a settlement gap after the last
+    /// reset simulate identical paths (same id-derived seed, same reset
+    /// schedule and horizon), so their PVs must differ by exactly the
+    /// discount-factor ratio between the two settlement dates.
+    ///
+    /// Before the fix the MC branch discounted at `reset_dates.last()`, so the
+    /// two PVs were identical and the settlement gap was silently ignored.
+    #[test]
+    fn live_cliquet_discounts_terminal_payoff_at_expiry_not_last_reset() {
+        let as_of = date(2024, 1, 1);
+        let mkt = market(as_of);
+
+        let pay_at_reset = live_option(); // expiry == last reset (2024-12-31)
+        let mut deferred = live_option();
+        deferred.expiry = date(2025, 6, 30); // six-month settlement gap
+
+        let pv_at_reset = compute_pv(&pay_at_reset, &mkt, as_of).expect("pv at reset");
+        let pv_deferred = compute_pv(&deferred, &mkt, as_of).expect("pv deferred");
+        assert!(
+            pv_at_reset.amount() > 0.0,
+            "capped cliquet PV must be positive"
+        );
+
+        let disc = mkt.get_discount("USD-OIS").expect("curve");
+        let df_reset = disc
+            .df_between_dates(as_of, date(2024, 12, 31))
+            .expect("df to last reset");
+        let df_expiry = disc
+            .df_between_dates(as_of, date(2025, 6, 30))
+            .expect("df to expiry");
+        assert!(df_expiry < df_reset, "test needs a genuine settlement gap");
+
+        let expected = pv_at_reset.amount() / df_reset * df_expiry;
+        assert!(
+            (pv_deferred.amount() - expected).abs() < 1e-6 * expected.max(1.0),
+            "deferred-settlement cliquet must discount at expiry: got {}, \
+             expected {} (pv_at_reset={})",
+            pv_deferred.amount(),
+            expected,
+            pv_at_reset.amount()
         );
     }
 

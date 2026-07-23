@@ -6,7 +6,6 @@
 use crate::impl_instrument_base;
 use crate::{
     cashflow::builder::ScheduleParams,
-    cashflow::traits::CashflowProvider,
     instruments::common_impl::parameters::{
         legs::FinancingLegSpec, trs_common::TrsScheduleSpec, trs_common::TrsSide,
         underlying::EquityUnderlyingParams,
@@ -402,6 +401,14 @@ impl EquityTotalReturnSwap {
 
     /// Calculates the present value of the financing leg.
     ///
+    /// Delegates to [`TrsEngine::pv_financing_leg`](crate::instruments::common_impl::pricing::TrsEngine)
+    /// — the same engine the par-spread and annuity metrics use — so
+    /// `financing.compounding` (term-rate vs SOFR-style overnight-compounded)
+    /// is honored and the reported par spread reprices `base_value` to ~0.
+    /// (The former cashflow-builder path hard-coded a simple term-rate
+    /// projection, silently ignoring `FinancingRateCompounding` and drifting
+    /// from the metrics engine.)
+    ///
     /// # Arguments
     /// * `curves` — Market context containing curves and market data
     /// * `as_of` — Valuation date
@@ -410,42 +417,13 @@ impl EquityTotalReturnSwap {
     /// Present value of the financing leg in the instrument's currency.
     pub fn pv_financing_leg(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
         self.validate()?;
-        let discount = curves.get_discount(self.financing.discount_curve_id.as_str())?;
-        let schedule = self.cashflow_schedule(curves, as_of)?;
-        let financing_flows: Vec<_> = schedule
-            .get_flows()
-            .iter()
-            .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
-            .collect();
-        let period_schedule = self.schedule.period_schedule()?;
-        let payment_ends: Vec<_> = period_schedule
-            .dates
-            .iter()
-            .copied()
-            .skip(1)
-            .filter(|date| *date > as_of)
-            .collect();
-
-        if financing_flows.len() != payment_ends.len() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Equity TRS financing schedule mismatch: {} financing flows vs {} future payment dates",
-                financing_flows.len(),
-                payment_ends.len()
-            )));
-        }
-
-        financing_flows.into_iter().zip(payment_ends).try_fold(
-            Money::new(0.0, self.notional.currency()),
-            |acc, (flow, period_end)| {
-                let payment_date = self.schedule.payment_date_for(period_end)?;
-                let df =
-                    crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-                        discount.as_ref(),
-                        as_of,
-                        payment_date,
-                    )?;
-                acc.checked_add(flow.amount * df)
-            },
+        use crate::instruments::common_impl::pricing::TrsEngine;
+        TrsEngine::pv_financing_leg(
+            &self.financing,
+            &self.schedule,
+            self.notional,
+            curves,
+            as_of,
         )
     }
 

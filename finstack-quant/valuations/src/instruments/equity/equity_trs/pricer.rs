@@ -192,6 +192,17 @@ impl TrsReturnModel for EquityReturnModel<'_> {
         // Combine discrete price and income cashflows with compensated
         // summation before normalizing. This preserves small distributions
         // alongside very large ones and avoids subtracting two huge returns.
+        //
+        // Dividend SETTLEMENT CONVENTION: discrete dividends pass through at
+        // FACE VALUE at the period end (they enter the period-end numerator
+        // undiscounted and the whole period return is discounted from the
+        // payment date). The ex-div forward drop is worth `D·df_d/df_pe` at
+        // period end, so a gross (tax = 0) pass-through is dividend-neutral
+        // only on a flat curve; with rates the receiver bears the funding
+        // carry `D·(df_d/df_pe − 1)` between ex-date and period end. That is
+        // deliberate — the modeled contract pays dividend amounts with the
+        // period-end equity settlement, not at each ex-date. Pinned by
+        // `gross_dividend_period_end_settlement_bears_funding_carry`.
         if uses_discrete_dividends {
             let net_dividends = self
                 .trs
@@ -324,6 +335,85 @@ mod tests {
             .expect("period return");
 
         assert_eq!(period_return, 0.0);
+    }
+
+    /// DF≠1 pin of the dividend settlement convention: dividends pass through
+    /// at FACE at the period end, so under positive rates a gross (tax = 0)
+    /// pass-through under-compensates the ex-div forward drop by exactly the
+    /// funding carry `D·(1 − df_d/df_pe)` (negative). The flat-curve test
+    /// above shows exact neutrality; this one pins the with-rates economics so
+    /// a silent convention change (e.g. switching to ex-date reinvestment)
+    /// fails loudly.
+    #[test]
+    fn gross_dividend_period_end_settlement_bears_funding_carry() {
+        let period_start = date(2025, 1, 1);
+        let div_date = date(2025, 4, 1);
+        let period_end = date(2025, 7, 1);
+
+        let disc = DiscountCurve::builder(CurveId::new("DISC"))
+            .base_date(period_start)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+            .build()
+            .expect("discount curve");
+        let context = MarketContext::new().insert(disc.clone());
+
+        let dividend = 5.0;
+        let mut with_div = EquityTotalReturnSwap::example().expect("example TRS");
+        with_div.financing.discount_curve_id = CurveId::new("DISC");
+        with_div.underlying.div_yield_id = None;
+        with_div.dividend_tax_rate = 0.0;
+        with_div.discrete_dividends = vec![(div_date, dividend)];
+
+        let mut no_div = with_div.clone();
+        no_div.discrete_dividends = vec![(div_date, 0.0)];
+
+        let inputs = super::PeriodReturnInputs {
+            as_of: period_start,
+            period_start,
+            period_end,
+            t_start: 0.0,
+            t_end: 0.5,
+            initial_level: 100.0,
+        };
+        let ret_with = EquityReturnModel {
+            trs: &with_div,
+            spot: 100.0,
+            div_yield: 0.0,
+        }
+        .period_return(&inputs, &context)
+        .expect("period return with dividend");
+        let ret_without = EquityReturnModel {
+            trs: &no_div,
+            spot: 100.0,
+            div_yield: 0.0,
+        }
+        .period_return(&inputs, &context)
+        .expect("period return without dividend");
+
+        let df_d = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+            &disc,
+            period_start,
+            div_date,
+        )
+        .expect("df to ex-date");
+        let df_pe = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+            &disc,
+            period_start,
+            period_end,
+        )
+        .expect("df to period end");
+
+        // Δreturn = [−D·df_d/df_pe + D] / S0 — the funding carry of settling
+        // the dividend at period end instead of its ex-date.
+        let expected_delta = dividend * (1.0 - df_d / df_pe) / 100.0;
+        assert!(expected_delta < 0.0, "positive rates ⇒ carry cost");
+        assert!(
+            ((ret_with - ret_without) - expected_delta).abs() < 1e-12,
+            "period-end dividend settlement must bear exactly the funding \
+             carry: got Δ={}, expected {expected_delta}",
+            ret_with - ret_without
+        );
     }
 
     fn flat_market(as_of: Date, spot: f64) -> MarketContext {

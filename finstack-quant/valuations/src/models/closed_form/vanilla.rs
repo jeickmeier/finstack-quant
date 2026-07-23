@@ -84,21 +84,23 @@ impl fmt::Display for BsGreeks {
 }
 
 impl BsGreeks {
-    /// Validate that Greeks are within expected bounds.
+    /// Validate that Greeks are within their carry-independent bounds.
     ///
-    /// Returns `true` if all Greeks satisfy their theoretical constraints:
-    /// - Delta: must be in [-1, 1] (calls in [0, 1], puts in [-1, 0])
+    /// Returns `true` if all Greeks satisfy the constraints that hold for
+    /// EVERY carry regime:
     /// - Gamma: must be non-negative (≥ 0)
     /// - Vega: must be non-negative (≥ 0)
+    /// - All values finite
     ///
-    /// Theta and rhos have no strict sign constraints (can be positive or negative
-    /// depending on option moneyness and rate environment).
+    /// Delta is deliberately NOT bounded here: the true bound is
+    /// `|Δ| ≤ e^{−qT}`, which exceeds 1 whenever the carry `q` is negative (a
+    /// negative dividend yield, or foreign rate above domestic in the
+    /// Garman-Kohlhagen reuse of this struct). This type does not know `q`
+    /// and `T`, so a ±1 delta check would reject correct values — callers
+    /// that want the carry-aware bound must apply `e^{−qT}` themselves.
+    /// Theta and rhos have no strict sign constraints.
     #[must_use]
     pub fn is_valid(&self) -> bool {
-        // Delta must be in [-1, 1]
-        if !(-1.0..=1.0).contains(&self.delta) {
-            return false;
-        }
         // Gamma must be non-negative
         if self.gamma < 0.0 {
             return false;
@@ -116,18 +118,20 @@ impl BsGreeks {
             && self.rho_q.is_finite()
     }
 
-    /// Clamp Greeks to their valid bounds.
+    /// Clamp Greeks to their carry-independent bounds.
     ///
     /// This corrects for minor numerical precision issues near boundaries:
-    /// - Delta: clamped to [-1, 1]
     /// - Gamma: clamped to [0, ∞)
     /// - Vega: clamped to [0, ∞)
     ///
+    /// Delta is NOT clamped: its true bound `|Δ| ≤ e^{−qT}` depends on the
+    /// carry, which this type does not carry — a ±1 clamp would silently
+    /// corrupt correct negative-carry deltas above 1 (see [`Self::is_valid`]).
     /// Theta and rhos are not clamped as they have no theoretical bounds.
     #[must_use]
     pub fn clamped(self) -> Self {
         Self {
-            delta: self.delta.clamp(-1.0, 1.0),
+            delta: self.delta,
             gamma: self.gamma.max(0.0),
             vega: self.vega.max(0.0),
             theta: self.theta,
@@ -697,9 +701,10 @@ mod tests {
 
     #[test]
     fn test_bs_greeks_clamped() {
-        // Create Greeks with slightly out-of-bounds values (simulating numerical noise)
+        // Gamma/vega noise is floored; delta is untouched (its true bound
+        // depends on the carry, which the struct does not know).
         let greeks = BsGreeks {
-            delta: 1.0000001,  // Slightly above 1.0
+            delta: 1.0000001,  // Legitimate under negative carry; left as-is
             gamma: -0.0000001, // Slightly negative
             vega: -0.0000001,  // Slightly negative
             theta: -0.05,
@@ -708,13 +713,145 @@ mod tests {
         };
 
         let clamped = greeks.clamped();
-        assert_eq!(clamped.delta, 1.0);
+        assert_eq!(clamped.delta, 1.0000001); // Unchanged
         assert_eq!(clamped.gamma, 0.0);
         assert_eq!(clamped.vega, 0.0);
         assert_eq!(clamped.theta, -0.05); // Unchanged
         assert_eq!(clamped.rho_r, 0.5); // Unchanged
         assert_eq!(clamped.rho_q, -0.3); // Unchanged
         assert!(clamped.is_valid());
+    }
+
+    /// Independent finite-difference cross-check of every analytic Greek
+    /// against `bs_price`. The price formula and the Greek formulas are
+    /// separate derivations, so central differences of the price are a
+    /// non-circular oracle — a sign flip or scaling error (×100, missing √T)
+    /// in any Greek fails here even though put-call parity would not notice.
+    #[test]
+    fn analytic_greeks_match_finite_differences_of_price() {
+        let (s, k, r, q, sigma, t) = (100.0, 105.0, 0.03, 0.02, 0.25, 0.75);
+        for option_type in [OptionType::Call, OptionType::Put] {
+            let p = |s: f64, r: f64, q: f64, sigma: f64, t: f64| {
+                bs_price(s, k, r, q, sigma, t, option_type)
+            };
+            let g = bs_greeks(s, k, r, q, sigma, t, option_type, 365.0);
+
+            // Delta: ∂V/∂S
+            let hs = 1e-4 * s;
+            let fd_delta = (p(s + hs, r, q, sigma, t) - p(s - hs, r, q, sigma, t)) / (2.0 * hs);
+            assert!(
+                (g.delta - fd_delta).abs() < 1e-7,
+                "{option_type:?} delta {} vs FD {fd_delta}",
+                g.delta
+            );
+
+            // Gamma: ∂²V/∂S² (0.1%-of-spot bump: truncation ~1e-8, roundoff ~1e-13)
+            let hg = 1e-3 * s;
+            let fd_gamma = (p(s + hg, r, q, sigma, t) - 2.0 * p(s, r, q, sigma, t)
+                + p(s - hg, r, q, sigma, t))
+                / (hg * hg);
+            assert!(
+                (g.gamma - fd_gamma).abs() < 1e-6,
+                "{option_type:?} gamma {} vs FD {fd_gamma}",
+                g.gamma
+            );
+
+            // Vega: ∂V/∂σ, reported per 1% vol.
+            let hv = 1e-5;
+            let fd_vega =
+                (p(s, r, q, sigma + hv, t) - p(s, r, q, sigma - hv, t)) / (2.0 * hv) * 0.01;
+            assert!(
+                (g.vega - fd_vega).abs() < 1e-7,
+                "{option_type:?} vega {} vs FD {fd_vega}",
+                g.vega
+            );
+
+            // Theta: ∂V/∂calendar-time = −∂V/∂T; reported per day (365 basis).
+            let ht = 1e-6;
+            let fd_theta_annual =
+                -(p(s, r, q, sigma, t + ht) - p(s, r, q, sigma, t - ht)) / (2.0 * ht);
+            assert!(
+                (g.theta - fd_theta_annual / 365.0).abs() < 1e-9,
+                "{option_type:?} theta {} vs FD {}",
+                g.theta,
+                fd_theta_annual / 365.0
+            );
+
+            // Rho_r and rho_q, reported per 1% rate move.
+            let hr = 1e-6;
+            let fd_rho_r =
+                (p(s, r + hr, q, sigma, t) - p(s, r - hr, q, sigma, t)) / (2.0 * hr) * 0.01;
+            assert!(
+                (g.rho_r - fd_rho_r).abs() < 1e-8,
+                "{option_type:?} rho_r {} vs FD {fd_rho_r}",
+                g.rho_r
+            );
+            let fd_rho_q =
+                (p(s, r, q + hr, sigma, t) - p(s, r, q - hr, sigma, t)) / (2.0 * hr) * 0.01;
+            assert!(
+                (g.rho_q - fd_rho_q).abs() < 1e-8,
+                "{option_type:?} rho_q {} vs FD {fd_rho_q}",
+                g.rho_q
+            );
+        }
+    }
+
+    /// Literal textbook anchor: Hull, *Options, Futures, and Other
+    /// Derivatives* (10th ed., Ch. 19 worked examples) — S=49, K=50, r=5%,
+    /// σ=20%, T=0.3846, q=0. Hull reports (rounded): Δ=0.522, Γ=0.066,
+    /// vega=12.1 (per 100% vol), Θ=−4.31/yr, ρ=8.91 (per 100% rate).
+    /// Tolerances cover Hull's rounding only — a scaling or sign error is far
+    /// outside them.
+    #[test]
+    fn hull_chapter19_worked_example_anchor() {
+        let g = bs_greeks(49.0, 50.0, 0.05, 0.0, 0.20, 0.3846, OptionType::Call, 365.0);
+
+        assert!((g.delta - 0.522).abs() < 0.001, "delta {}", g.delta);
+        assert!((g.gamma - 0.066).abs() < 0.001, "gamma {}", g.gamma);
+        // vega is per 1% here; Hull's 12.1 is per 100%.
+        assert!((g.vega * 100.0 - 12.1).abs() < 0.05, "vega {}", g.vega);
+        // theta is per day (365 basis); Hull's −4.31 is per year.
+        assert!(
+            (g.theta * 365.0 - (-4.31)).abs() < 0.01,
+            "theta/yr {}",
+            g.theta * 365.0
+        );
+        // rho_r is per 1%; Hull's 8.91 is per 100%.
+        assert!((g.rho_r * 100.0 - 8.91).abs() < 0.05, "rho {}", g.rho_r);
+    }
+
+    /// Under NEGATIVE carry (q < 0 — negative dividend yield, or the foreign
+    /// rate above domestic in the Garman-Kohlhagen reuse of this struct), the
+    /// call delta `e^{−qT}·N(d1)` legitimately exceeds 1. `clamped()` must not
+    /// corrupt such a delta to 1.0, and `is_valid()` must not reject it.
+    #[test]
+    fn negative_carry_delta_above_one_is_neither_clamped_nor_invalid() {
+        // Deep ITM call, q = −5%, T = 2y: delta = e^{0.1}·N(d1) ≈ 1.105·~1.
+        let greeks = bs_greeks(
+            200.0,
+            100.0,
+            0.03,
+            -0.05,
+            0.20,
+            2.0,
+            OptionType::Call,
+            365.0,
+        );
+        assert!(
+            greeks.delta > 1.0,
+            "test premise: negative-carry deep-ITM call delta must exceed 1, got {}",
+            greeks.delta
+        );
+
+        assert!(
+            greeks.is_valid(),
+            "a correct negative-carry delta > 1 must not be flagged invalid"
+        );
+        let clamped = greeks.clamped();
+        assert_eq!(
+            clamped.delta, greeks.delta,
+            "clamped() must not corrupt a legitimate delta > 1 down to 1.0"
+        );
     }
 
     #[test]

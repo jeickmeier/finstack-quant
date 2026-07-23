@@ -15,6 +15,62 @@ use finstack_quant_valuations::metrics::MetricId;
 // Par Spread Tests
 // ================================================================================================
 
+/// The reported par spread must REPRICE the swap to NPV ≈ 0 — the defining
+/// property of a par spread. This requires `base_value` and the par-spread
+/// metric to price the financing leg with the SAME engine.
+///
+/// Before the fix, equity-TRS `base_value` priced financing through the
+/// cashflow-builder path with `overnight_compounding` hard-coded to `None`,
+/// while the par-spread/annuity metrics used `TrsEngine` (which honors
+/// `FinancingRateCompounding`). For a SOFR-style `OvernightCompounded` leg the
+/// two engines disagreed by the daily-compounding convexity, so plugging the
+/// par spread back into the contract did NOT zero the NPV.
+fn assert_par_spread_reprices_to_zero(
+    compounding: finstack_quant_valuations::instruments::FinancingRateCompounding,
+) {
+    let market = create_market_context();
+    let as_of = as_of_date();
+    let mut trs = TestEquityTrsBuilder::new().spread_bp(0.0).build();
+    trs.financing = trs.financing.clone().with_compounding(compounding);
+
+    let result = trs
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ParSpread],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+    let par_spread_bp = *result.measures.get("par_spread").unwrap();
+    assert!(par_spread_bp.is_finite());
+
+    let mut repriced = trs;
+    repriced.financing.spread_bp =
+        rust_decimal::Decimal::try_from(par_spread_bp).expect("par spread fits Decimal");
+
+    let npv = repriced.value(&market, as_of).unwrap();
+    assert!(
+        npv.amount().abs() < 1.0,
+        "spread = par spread must reprice a {compounding:?} equity TRS to ~0 NPV \
+         (10M notional): got {} (par_spread={par_spread_bp}bp)",
+        npv.amount()
+    );
+}
+
+#[test]
+fn par_spread_reprices_term_rate_equity_trs_to_zero() {
+    assert_par_spread_reprices_to_zero(
+        finstack_quant_valuations::instruments::FinancingRateCompounding::TermRate,
+    );
+}
+
+#[test]
+fn par_spread_reprices_overnight_compounded_equity_trs_to_zero() {
+    assert_par_spread_reprices_to_zero(
+        finstack_quant_valuations::instruments::FinancingRateCompounding::OvernightCompounded,
+    );
+}
+
 #[test]
 fn test_equity_trs_par_spread_is_finite() {
     // Arrange

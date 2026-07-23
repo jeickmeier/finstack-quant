@@ -349,6 +349,72 @@ mod tests {
         assert_eq!(via_pricer, via_instrument);
     }
 
+    /// GOLDEN: hand-computed Black-76 value from normal-CDF table literals.
+    ///
+    /// ATM call, F = K = 20 (flat VIX curve), σ (vol-of-vol) = 0.8 flat,
+    /// t = 91/365 (Act/365F, 2025-01-01 → 2025-04-02):
+    ///
+    /// ```text
+    /// σ√t   = 0.8·√(91/365)      = 0.39945168
+    /// d1    = ½σ√t               = 0.19972584,  d2 = −d1
+    /// N(d1) = 0.57915250  (from N(0.20) = 0.57925971, φ(0.20) = 0.39104269)
+    /// undiscounted = F·[N(d1) − N(d2)] = 20·0.15830500 = 3.16610000
+    /// ```
+    ///
+    /// The normal-CDF literals are Abramowitz & Stegun table values — an
+    /// external anchor independent of this crate's `norm_cdf`/`d1_black76`.
+    /// The discount factor and contract scaling are read from the instrument
+    /// and curve (their wiring is what the final equality exercises).
+    #[test]
+    fn black76_atm_call_matches_hand_computed_golden() {
+        let base_date = date!(2025 - 01 - 01);
+        let expiry = date!(2025 - 04 - 02); // exactly 91 days
+
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+            .build()
+            .expect("disc");
+        let vix = VolatilityIndexCurve::builder("VIX")
+            .base_date(base_date)
+            .spot_level(20.0)
+            .knots([(0.0, 20.0), (1.0, 20.0)]) // flat forward = 20 exactly
+            .build()
+            .expect("curve");
+        let volvol = VolSurface::builder("VIX-VOLVOL")
+            .expiries(&[0.1, 0.5, 1.0])
+            .strikes(&[15.0, 20.0, 25.0])
+            .row(&[0.8, 0.8, 0.8])
+            .row(&[0.8, 0.8, 0.8])
+            .row(&[0.8, 0.8, 0.8])
+            .build()
+            .expect("surface");
+        let market = MarketContext::new()
+            .insert(disc)
+            .insert(vix)
+            .insert_surface(volvol);
+
+        let mut option = sample_option();
+        option.expiry = expiry;
+
+        let pv = compute_pv_raw(&option, &market, base_date).expect("pv");
+
+        const UNDISCOUNTED_GOLDEN: f64 = 3.166_100_0; // hand-computed above
+        let df = market
+            .get_discount("USD-OIS")
+            .expect("curve")
+            .df_between_dates(base_date, option.effective_settlement_date())
+            .expect("df");
+        let expected =
+            UNDISCOUNTED_GOLDEN * df * option.contract_specs.multiplier * option.num_contracts();
+
+        assert!(
+            (pv - expected).abs() / expected < 5e-5,
+            "Black-76 ATM VIX call must match the table-derived golden: \
+             got {pv}, expected {expected}"
+        );
+    }
+
     /// W-38: a volatility-index option and a volatility-index future on the
     /// same vol-index curve and the same date must reference an identical
     /// forward. The Black-76 option pricer is an approximation (the index is

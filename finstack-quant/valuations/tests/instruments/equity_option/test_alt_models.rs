@@ -87,6 +87,47 @@ fn pde_cn1d_matches_black_scholes() {
     );
 }
 
+/// Bump-and-revalue gamma through the European CN1D PDE must track analytic
+/// Black-Scholes gamma for a SHORT-DATED ATM call.
+///
+/// A central second difference of PVs is exactly what the equity-option
+/// metrics layer computes when it bumps the spot scalar and re-prices, and it
+/// samples the PDE solution right at the payoff kink where discretization
+/// error concentrates. This guards the end-to-end gamma quality of the
+/// production PDE configuration (Rannacher-damped CN per Rannacher 1984;
+/// Giles & Carter 2006) against grid/scheme regressions.
+#[test]
+fn pde_cn1d_bump_gamma_matches_analytic_for_short_dated_atm() {
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2024 - 01 - 19); // ~2.6 weeks
+    let (spot, strike, vol, rate) = (100.0, 100.0, 0.20, 0.03);
+
+    let pde_pv = |s: f64| {
+        let market = build_standard_market(as_of, s, vol, rate, 0.0);
+        price_call(&market, ModelKey::PdeCrankNicolson1D, as_of, expiry, strike)
+    };
+
+    // Central second difference with a 1%-of-spot bump (the metrics-layer
+    // convention for spot bumps).
+    let h = 0.01 * spot;
+    let gamma_fd = (pde_pv(spot + h) - 2.0 * pde_pv(spot) + pde_pv(spot - h)) / (h * h);
+
+    // Analytic Black-Scholes gamma, scaled by the contract size (100) used by
+    // `create_call`, on the same Act/365F clock as the pricer.
+    let t: f64 = 18.0 / 365.0;
+    let sqrt_t = t.sqrt();
+    let d1 = ((spot / strike).ln() + (rate + 0.5 * vol * vol) * t) / (vol * sqrt_t);
+    let pdf_d1 = (-0.5 * d1 * d1).exp() / (2.0 * std::f64::consts::PI).sqrt();
+    let gamma_bs = pdf_d1 / (spot * vol * sqrt_t) * 100.0;
+
+    let rel = (gamma_fd - gamma_bs).abs() / gamma_bs;
+    assert!(
+        rel < 2e-2,
+        "CN1D bump gamma ({gamma_fd}) must track analytic BS gamma ({gamma_bs}) \
+         within 2% for a short-dated ATM call; rel err {rel}"
+    );
+}
+
 /// The PDE solver carries no RNG: pricing the same option twice is bit-identical.
 #[test]
 fn pde_cn1d_is_deterministic() {
@@ -315,6 +356,41 @@ fn with_rough_heston_scalars(
         .insert_price("ROUGH_HESTON_SIGMA_V", MarketScalar::Unitless(sigma_v))
         .insert_price("ROUGH_HESTON_RHO", MarketScalar::Unitless(rho))
         .insert_price("ROUGH_HESTON_V0", MarketScalar::Unitless(v0))
+}
+
+/// PRICER-LAYER collapse test: with vol-of-vol `σ_v → 0` and `v0 = θ = σ²`,
+/// rough-Heston variance is deterministic and flat, so the Fourier price must
+/// converge to closed-form Black-Scholes — through the full registry path
+/// (scalar sourcing, spot/strike/discount/notional wiring), not just the core
+/// math layer where this limit is already tested. A transposition among the
+/// `ROUGH_HESTON_{KAPPA,THETA,SIGMA_V,RHO}` scalars in the pricer wiring
+/// (κ=1.8 vs θ=0.04 vs σ_v≈0 vs ρ=−0.6 are all distinct) breaks the collapse
+/// and fails this test. (A `v0`↔`θ` swap is invisible here since both equal
+/// σ² by construction of the limit; the Hurst exponent is inert at σ_v = 0.)
+#[test]
+fn rough_heston_fourier_collapses_to_black_scholes() {
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2025 - 01 - 01);
+    let (spot, strike, vol, rate) = (100.0, 100.0, 0.20, 0.03);
+    let var = vol * vol;
+
+    let market = with_rough_heston_scalars(
+        build_standard_market(as_of, spot, vol, rate, 0.0),
+        0.3,  // hurst (rough; inert in the σ_v→0 limit)
+        1.8,  // kappa
+        var,  // theta
+        1e-4, // sigma_v -> 0
+        -0.6, // rho (inert in the limit, but distinct for wiring detection)
+        var,  // v0
+    );
+    let pv = price_call(&market, ModelKey::RoughHestonFourier, as_of, expiry, strike);
+    let bs = bs_call_reference(spot, strike, rate, vol);
+
+    let rel = (pv - bs).abs() / bs;
+    assert!(
+        rel < 2e-2,
+        "σ_v→0 rough-Heston Fourier ({pv}) must match Black-Scholes ({bs}); rel err {rel}"
+    );
 }
 
 /// A rough-Heston Fourier ATM call is positive and in a sane range.

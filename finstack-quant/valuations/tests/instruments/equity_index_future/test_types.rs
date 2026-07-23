@@ -179,7 +179,7 @@ fn test_delta_calculation() {
     )
     .unwrap();
     // Delta = 50 × 10 × 1 = 500
-    assert_eq!(long.delta(), 500.0);
+    assert_eq!(long.delta().expect("delta with entry price"), 500.0);
 
     // Short 5 NQ contracts at 15000: notional = 5 × 20 × 15000 = 1,500,000
     let short = EquityIndexFuture::nasdaq100_emini(
@@ -193,7 +193,7 @@ fn test_delta_calculation() {
     )
     .unwrap();
     // Delta = 20 × 5 × (-1) = -100
-    assert_eq!(short.delta(), -100.0);
+    assert_eq!(short.delta().expect("delta with entry price"), -100.0);
 }
 
 #[test]

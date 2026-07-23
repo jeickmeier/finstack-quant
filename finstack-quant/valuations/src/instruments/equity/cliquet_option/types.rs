@@ -227,6 +227,20 @@ impl CliquetOption {
                 self.global_floor, self.global_cap
             )));
         }
+        // This instrument prices the LONG OPTION LEG: the payoff is
+        // `max(0, clamp(Σ returns))·notional`, so a negative global floor can
+        // never bind — accepting one would silently price full downside
+        // protection while the user believes they modelled a capital-at-risk
+        // note. Fail closed instead of carrying an inert knob.
+        if self.global_floor < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CliquetOption global_floor ({}) must be >= 0: the engine prices the long \
+                 option leg (payoff floored at zero), so a negative global floor is \
+                 economically inert. Model capital-at-risk notes as a separate short-put \
+                 position instead",
+                self.global_floor
+            )));
+        }
         if !self.notional.amount().is_finite() {
             return Err(finstack_quant_core::Error::Validation(
                 "CliquetOption notional amount must be finite".into(),

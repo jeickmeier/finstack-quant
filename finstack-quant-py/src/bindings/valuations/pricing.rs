@@ -1,7 +1,7 @@
 //! Instrument pricing pipeline: JSON instrument + market → ValuationResult.
 
 use crate::bindings::extract::{extract_instrument_json, extract_market};
-use crate::errors::display_to_py;
+use crate::errors::{core_to_py, display_to_py};
 use pyo3::prelude::*;
 
 fn validate_pricing_instrument_json(
@@ -17,7 +17,7 @@ fn validate_pricing_instrument_json(
             pricing_options.as_deref(),
         )
         .map(drop)
-        .map_err(display_to_py)
+        .map_err(core_to_py)
     })
 }
 
@@ -63,7 +63,7 @@ fn price_instrument(
             &as_of,
             &model,
         )
-        .map_err(display_to_py)?;
+        .map_err(core_to_py)?;
         serde_json::to_string(&result).map_err(display_to_py)
     })
 }
@@ -130,7 +130,7 @@ fn price_instrument_with_metrics(
                 pricing_options.as_deref(),
                 market_history.as_deref(),
             )
-            .map_err(display_to_py)?;
+            .map_err(core_to_py)?;
         serde_json::to_string(&result).map_err(display_to_py)
     })
 }
@@ -238,7 +238,7 @@ fn instrument_cashflows_json(
             &as_of,
             &model,
         )
-        .map_err(display_to_py)
+        .map_err(core_to_py)
     })
 }
 

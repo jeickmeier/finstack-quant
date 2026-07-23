@@ -141,9 +141,13 @@ impl EquityOptionHestonPdePricer {
 
         let grid = Grid2D::new(gx, gv);
 
+        // MCS with Rannacher start-up: two fully-implicit ADI steps damp the
+        // payoff-kink error before the second-order MCS scheme takes over
+        // (In 't Hout & Foulon 2010) — the configuration the tight-tolerance
+        // bridge2d reference tests use.
         let solver = Solver2D::builder()
             .grid(grid)
-            .craig_sneyd(self.time_steps)
+            .craig_sneyd_rannacher(2, self.time_steps)
             .build()
             .map_err(|e| {
                 PricingError::model_failure_with_context(

@@ -11,8 +11,11 @@ use finstack_quant_core::{
     Result,
 };
 
-/// Degraded fallback estimate of forward variance from a vol surface when full
-/// Carr–Madan replication is unavailable (W-39).
+/// Degraded ATM-variance fallback when full Carr–Madan replication is
+/// unavailable (W-39). Returns plain `ATM vol²` — it performs NO smile or
+/// wing convexity adjustment, so with any skew it biases fair variance LOW
+/// (true `K_var > σ²_ATM`, the same reason VIX exceeds ATM vol); the caller
+/// logs a WARN whenever it is used.
 ///
 /// # This is a DEGRADED fallback
 ///
@@ -26,7 +29,7 @@ use finstack_quant_core::{
 /// approximate the Carr-Madan integral from an under-specified strike grid:
 /// doing so without strike spacing makes the result depend on how densely the
 /// same smile happens to be sampled.
-fn smile_convexity_adjusted_variance(
+fn atm_variance_fallback(
     surface: &finstack_quant_core::market_data::surfaces::VolSurface,
     time_to_expiry: f64,
     forward: f64,
@@ -451,7 +454,69 @@ pub(crate) fn seasoned_realized_variance(
     }
 }
 
-/// Forward (remaining) variance from `as_of` to `maturity`.
+/// Minimum year-fraction below which the forward-start subtraction is skipped
+/// (the pre-start gap or the accrual window is economically degenerate).
+const FORWARD_START_MIN_T: f64 = 1e-6;
+
+/// Forward (remaining) variance for the swap's accrual window.
+///
+/// For a live or seasoned swap (`as_of >= start_date`) this is the expected
+/// variance over `[as_of, final_observation_date]`. For a FORWARD-STARTING
+/// swap (`as_of < start_date`) variance accrues only from `start_date`, so the
+/// spot-started replication over `[as_of, T]` must have the pre-start leg
+/// removed via the total-variance identity (Demeterfi et al. 1999, forward
+/// variance):
+///
+/// ```text
+/// K²[start,T] = (t1·K²[as_of,T] − t0·K²[as_of,start]) / (t1 − t0)
+/// ```
+///
+/// The two coincide only for a flat vol term structure. A non-monotone
+/// (calendar-arbitrageable) surface can produce a negative forward variance;
+/// it is floored at zero with a warning, matching the piecewise-GBM
+/// forward-vol bootstrap convention.
+pub(crate) fn remaining_forward_variance(
+    inst: &VarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+) -> Result<f64> {
+    let final_observation_date = inst.final_observation_date()?;
+    let var_to_end = spot_variance_to_date(inst, context, as_of, final_observation_date)?;
+
+    if as_of >= inst.start_date {
+        return Ok(var_to_end);
+    }
+
+    let t0 = inst
+        .day_count
+        .year_fraction(as_of, inst.start_date, Default::default())?;
+    let t1 = inst
+        .day_count
+        .year_fraction(as_of, final_observation_date, Default::default())?;
+    if t0 <= FORWARD_START_MIN_T || (t1 - t0) <= FORWARD_START_MIN_T {
+        return Ok(var_to_end);
+    }
+
+    let var_to_start = spot_variance_to_date(inst, context, as_of, inst.start_date)?;
+    let fwd = (var_to_end * t1 - var_to_start * t0) / (t1 - t0);
+    if fwd < 0.0 {
+        tracing::warn!(
+            instrument_id = %inst.id,
+            var_to_start,
+            var_to_end,
+            t0,
+            t1,
+            forward_variance = fwd,
+            "VarianceSwap forward-start: total variance is non-monotone over \
+             [start, maturity] (calendar-spread arbitrage in inputs); flooring \
+             forward variance to zero"
+        );
+        return Ok(0.0);
+    }
+    Ok(fwd)
+}
+
+/// Spot-started expected variance over `[as_of, target_date]`.
 ///
 /// # Fallback cascade
 ///
@@ -462,22 +527,22 @@ pub(crate) fn seasoned_realized_variance(
 ///
 /// 1. **Carr–Madan replication** from a vol surface (preferred). Uses the
 ///    full smile via OTM put/call strip.
-/// 2. **ATM variance + local-smile convexity** (`smile_convexity_adjusted_variance`).
+/// 2. **ATM variance** (`atm_variance_fallback`) — NO smile convexity;
 ///    Used when Carr-Madan can't replicate (e.g. sparse strikes); logged at WARN.
 /// 3. **Scalar implied vol** under key `{ticker}_IMPL_VOL`. Crude — squared
 ///    to a flat variance; logged at WARN.
 ///
 /// If none of these market inputs exists, pricing fails. Substituting the
 /// contract strike variance would manufacture a plausible zero mark.
-pub(crate) fn remaining_forward_variance(
+fn spot_variance_to_date(
     inst: &VarianceSwap,
     context: &MarketContext,
     as_of: Date,
+    target_date: Date,
 ) -> Result<f64> {
-    let final_observation_date = inst.final_observation_date()?;
     let t = inst
         .day_count
-        .year_fraction(as_of, final_observation_date, Default::default())?;
+        .year_fraction(as_of, target_date, Default::default())?;
 
     for sid in inst.volatility_candidate_ids() {
         if let Ok(surface) = context.get_surface(&sid) {
@@ -487,13 +552,13 @@ pub(crate) fn remaining_forward_variance(
                 finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
                 finstack_quant_core::market_data::scalars::MarketScalar::Price(p) => p.amount(),
             };
-            // Date-based zero rate over [as_of, maturity]: avoids the
+            // Date-based zero rate over [as_of, target_date]: avoids the
             // axis bias of `disc.zero(t)` when curve base != as_of.
             let df_mat =
                 crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
                     disc.as_ref(),
                     as_of,
-                    final_observation_date,
+                    target_date,
                 )?;
             let r = crate::instruments::common_impl::helpers::zero_rate_from_df(
                 df_mat,
@@ -528,9 +593,7 @@ pub(crate) fn remaining_forward_variance(
                     return Ok(variance);
                 }
             }
-            if let Some(fallback_variance) =
-                smile_convexity_adjusted_variance(&surface, t.max(1e-8), fwd)
-            {
+            if let Some(fallback_variance) = atm_variance_fallback(&surface, t.max(1e-8), fwd) {
                 let vol_atm = surface.value_clamped(t.max(1e-8), fwd);
                 tracing::warn!(
                     instrument_id = %inst.id,
@@ -606,6 +669,165 @@ mod tests {
         MarketContext::new()
             .insert(curve)
             .insert_price("SPX_IMPL_VOL", MarketScalar::Unitless(0.20))
+    }
+
+    /// End-to-end wiring check of the EQUITY Carr-Madan path: a flat-in-strike,
+    /// flat-in-time surface must replicate `K_var ≈ σ²` through
+    /// `remaining_forward_variance`, with NONZERO rate and dividend yield so
+    /// the equity-specific inputs (`fwd = spot/df·e^{−qt}`, `r = −ln df/t`,
+    /// `bs_price(spot, k, r, q, …)`) are all exercised. A q-sign error, a
+    /// spot/forward swap, or an inverted DF shifts the result far outside the
+    /// tolerance. (The FX pricer shares the replication engine but not this
+    /// wiring, so the FX test cannot catch equity-side regressions.)
+    #[test]
+    fn spot_started_flat_surface_replicates_sigma_squared_with_dividends() {
+        use crate::instruments::common_impl::traits::Attributes;
+        use crate::instruments::equity::variance_swap::types::PayReceive;
+        use finstack_quant_core::dates::{DayCount, Tenor};
+        use finstack_quant_core::money::Money;
+        use finstack_quant_core::types::{CurveId, InstrumentId};
+
+        let as_of = date!(2025 - 01 - 02);
+        let maturity = date!(2026 - 01 - 02);
+
+        let swap = VarianceSwap::builder()
+            .id(InstrumentId::new("VARSPX-FLAT"))
+            .underlying_ticker("SPX".to_string())
+            .notional(Money::new(
+                1_000_000.0,
+                finstack_quant_core::currency::Currency::USD,
+            ))
+            .strike_variance(0.04)
+            .start_date(as_of)
+            .maturity(maturity)
+            .observation_freq(Tenor::daily())
+            .observation_calendar_id("USNY".to_string())
+            .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
+            .side(PayReceive::Receive)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .attributes(Attributes::new())
+            .build()
+            .expect("spot-started swap");
+
+        let vol = 0.20_f64;
+        let strikes: Vec<f64> = (4..=60).map(|i| 5.0 * i as f64).collect(); // 20..300
+        let mut builder = VolSurface::builder("SPX")
+            .expiries(&[0.25, 0.5, 1.0, 2.0])
+            .strikes(&strikes);
+        for _ in 0..4 {
+            builder = builder.row(&vec![vol; strikes.len()]);
+        }
+        let surface = builder.build().expect("surface");
+
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, (-0.03_f64 * 2.0).exp())])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new()
+            .insert(curve)
+            .insert_surface(surface)
+            .insert_price("SPX", MarketScalar::Unitless(100.0))
+            .insert_price("SPX-DIVYIELD", MarketScalar::Unitless(0.015));
+
+        let fair_var = remaining_forward_variance(&swap, &market, as_of).expect("fair variance");
+        assert!(
+            (fair_var - vol * vol).abs() < 5e-4,
+            "flat-surface equity replication must give K_var ≈ σ² = {}: got {fair_var}",
+            vol * vol
+        );
+    }
+
+    /// A FORWARD-STARTING variance swap (`as_of < start_date`) accrues
+    /// variance only over `[start_date, final_observation_date]`. The fair
+    /// strike must therefore be the forward variance
+    /// `(t1·K²[as_of,T] − t0·K²[as_of,start]) / (t1 − t0)` — not the
+    /// spot-started `K²[as_of,T]`, which silently includes the pre-start
+    /// window's volatility. The two coincide only for a flat vol term
+    /// structure, which is why a term-structured surface is essential here.
+    #[test]
+    fn forward_starting_swap_excludes_pre_start_variance() {
+        use crate::instruments::common_impl::traits::Attributes;
+        use crate::instruments::equity::variance_swap::types::PayReceive;
+        use finstack_quant_core::dates::{DayCount, Tenor};
+        use finstack_quant_core::money::Money;
+        use finstack_quant_core::types::{CurveId, InstrumentId};
+
+        let as_of = date!(2024 - 07 - 01);
+        let start = date!(2025 - 01 - 02); // ~6 months forward (business day)
+        let maturity = date!(2025 - 07 - 01); // 1y from as_of (business day)
+
+        let swap = VarianceSwap::builder()
+            .id(InstrumentId::new("VARSPX-FWDSTART"))
+            .underlying_ticker("SPX".to_string())
+            .notional(Money::new(
+                1_000_000.0,
+                finstack_quant_core::currency::Currency::USD,
+            ))
+            .strike_variance(0.04)
+            .start_date(start)
+            .maturity(maturity)
+            .observation_freq(Tenor::daily())
+            .observation_calendar_id("USNY".to_string())
+            .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
+            .side(PayReceive::Receive)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .attributes(Attributes::new())
+            .build()
+            .expect("forward-starting swap");
+
+        // Term-structured, flat-in-strike surface: 30% vol to ~6m, 25% at 1y.
+        // Total variance stays monotone (0.09·0.51 < 0.0625·1.0): no calendar
+        // arbitrage, but a strongly downward-sloping forward vol.
+        let strikes: Vec<f64> = (4..=60).map(|i| 5.0 * i as f64).collect(); // 20..300
+        let vol_rows = [0.30_f64, 0.30, 0.25];
+        let mut builder = VolSurface::builder("SPX")
+            .expiries(&[0.25, 0.51, 1.0])
+            .strikes(&strikes);
+        for v in vol_rows {
+            builder = builder.row(&vec![v; strikes.len()]);
+        }
+        let surface = builder.build().expect("surface");
+
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, (-0.03_f64 * 2.0).exp())])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new()
+            .insert(curve)
+            .insert_surface(surface)
+            .insert_price("SPX", MarketScalar::Unitless(100.0))
+            .insert_price("SPX-DIVYIELD", MarketScalar::Unitless(0.0));
+
+        let fwd = remaining_forward_variance(&swap, &market, as_of).expect("forward variance");
+
+        // Independent expectation from the total-variance identity: both
+        // sub-expiries sit in flat-in-t regions of the surface, so
+        // K²[as_of,start] ≈ 0.30² and K²[as_of,T] ≈ 0.25² up to replication
+        // discretization error.
+        let t0 = DayCount::Act365F
+            .year_fraction(as_of, start, Default::default())
+            .expect("t0");
+        let t1 = DayCount::Act365F
+            .year_fraction(as_of, maturity, Default::default())
+            .expect("t1");
+        let expected = (0.25_f64.powi(2) * t1 - 0.30_f64.powi(2) * t0) / (t1 - t0);
+
+        assert!(
+            (fwd - expected).abs() < 2e-3,
+            "forward-starting fair variance must exclude the pre-start window: \
+             got {fwd}, expected ~{expected} (spot-started K²[as_of,T] would be ~0.0625)"
+        );
+        // And it must NOT be the spot-started variance.
+        assert!(
+            (fwd - 0.0625).abs() > 0.02,
+            "forward variance ({fwd}) must differ from the spot-started total 0.0625"
+        );
     }
 
     #[test]
@@ -906,16 +1128,18 @@ mod tests {
             .build()
             .expect("surface");
 
-        let fallback =
-            smile_convexity_adjusted_variance(&surface, 1.0, 100.0).expect("fallback variance");
+        let fallback = atm_variance_fallback(&surface, 1.0, 100.0).expect("fallback variance");
 
         assert!((fallback - 0.04).abs() < 1e-12);
     }
 
     /// A volatility grid is not an option-price strip. Deep-wing volatility
-    /// points must not be integrated as though they were variance-swap quotes.
+    /// points must not be integrated as though they were variance-swap quotes,
+    /// so the fallback deliberately IGNORES the elevated wings and returns
+    /// plain ATM variance (biased low vs true fair variance — hence the WARN
+    /// on this path).
     #[test]
-    fn smile_convexity_fallback_captures_deep_wing_convexity() {
+    fn atm_fallback_ignores_deep_wing_convexity_by_design() {
         // Strikes bracketing the forward (90, 100, 110) are FLAT at 20% vol;
         // only the DEEP wings (60, 150) are elevated. A 2-strike proxy around
         // the 100 forward would see only the flat 20% and miss the wings.
@@ -927,8 +1151,7 @@ mod tests {
             .expect("surface");
 
         let atm_variance = 0.20_f64 * 0.20; // 0.04
-        let fallback =
-            smile_convexity_adjusted_variance(&surface, 1.0, 100.0).expect("fallback variance");
+        let fallback = atm_variance_fallback(&surface, 1.0, 100.0).expect("fallback variance");
 
         assert!((fallback - atm_variance).abs() < 1e-12);
     }

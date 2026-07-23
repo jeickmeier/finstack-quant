@@ -9,7 +9,7 @@
 ## Methodology & References
 
 - Realized variance computed from underlying returns per selected `RealizedVarMethod`; annualization follows chosen day-count/frequency.
-- Deterministic discounting of terminal payoff; no volatility surface dependency inside the instrument.
+- Deterministic discounting of the terminal payoff. Forward variance is sourced from a volatility surface via Carr-Madan replication (with ATM and scalar-vol fallbacks), so the instrument declares a volatility dependency.
 - Aligns with standard equity variance swap payoff conventions.
 
 ## Usage Example
@@ -29,6 +29,11 @@ let pv = swap.value(&market_context, as_of_date)?;
 
 ## Metrics
 
-- PV, implied variance/vol (solve strike for zero PV), and realized variance diagnostics from input series.
-- Delta/vega proxies via bumping underlying price path or strike; DV01 on discount curve via generic calculator.
-- Exposure reports in variance and volatility terms for hedging alignment.
+Registered metrics (see `metrics/mod.rs`): `Vega`, `VarianceVega`, `ExpectedVariance`,
+`RealizedVariance`, `VarianceNotional`, `VarianceStrikeVol`, `VarianceTimeToMaturity`,
+`Dv01`, `BucketedDv01`.
+
+- `ExpectedVariance` shares `seasoned_expected_variance` with the PV path, so the
+  reported expectation always equals the variance implied by the mark (W-32/W-33).
+- `Vega` and `VarianceVega` are analytic sensitivities of the PV (chain-rule
+  consistent: `vega = variance_vega · 2σ_fwd · 0.01`).

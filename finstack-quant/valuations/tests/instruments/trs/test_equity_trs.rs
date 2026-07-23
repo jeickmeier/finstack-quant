@@ -240,6 +240,21 @@ fn test_equity_trs_cashflow_provider_emits_financing_flows() {
     );
 }
 
+/// The exported cashflow schedule must stay CLOSE to the financing-leg PV.
+///
+/// Since the engine unification, `pv_financing_leg` prices through
+/// `TrsEngine` (the same engine as the par-spread/annuity metrics, honoring
+/// `FinancingRateCompounding`), while the exported schedule keeps the
+/// cashflow-builder convention (term-index fixing at the reset date). The two
+/// projection conventions — index fixing at reset vs discrete forward over
+/// the accrual period — differ by curve-shape detail only (~$40 on a $260k
+/// leg here), never by structure. The tolerance below (1bp of notional)
+/// admits that convention gap while still failing loudly on a structural
+/// break (a dropped period or wrong discounting is worth thousands).
+///
+/// The exact PV-consistency guard is `par_spread_reprices_*_equity_trs_to_zero`
+/// in `test_trs_metrics.rs`: the reported par spread must reprice the swap's
+/// `base_value` to ~0, which pins PV and metrics to one engine.
 #[test]
 fn test_equity_trs_financing_leg_matches_provider_schedule() {
     let market = create_market_context();
@@ -281,11 +296,14 @@ fn test_equity_trs_financing_leg_matches_provider_schedule() {
         expected_pv += flow.amount.amount() * df;
     }
 
+    // 1bp of the 10M notional: wide enough for the documented projection-
+    // convention gap, far too tight for a structural break.
     assert_approx_eq(
         financing_pv.amount(),
         expected_pv,
-        1.0e-6,
-        "Financing PV should reconcile to provider schedule",
+        1_000.0,
+        "Financing PV should reconcile to provider schedule up to the \
+         projection-convention gap",
     );
 }
 

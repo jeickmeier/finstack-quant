@@ -55,22 +55,10 @@ pub(crate) fn compute_pv_raw(
 /// order can be represented in the data model. Once you ask the pricer for
 /// PV, however, the entry price is mandatory: PV is mark-to-market minus
 /// entry, so a missing entry would silently default to zero and book the
-/// full quoted price as P&L.
+/// full quoted price as P&L. Delegates to the shared requirement on the
+/// instrument (also used by `EquityIndexFuture::delta`).
 fn require_entry_price(future: &EquityIndexFuture) -> finstack_quant_core::Result<f64> {
-    let entry = future.entry_price.ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "EquityIndexFuture '{}' has no entry_price; PV requires it. \
-             Set `entry_price` to the trade fill, or remove the position from valuation.",
-            future.id.as_str()
-        ))
-    })?;
-    if !entry.is_finite() || entry <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "EquityIndexFuture '{}' entry_price must be finite and positive, got {entry}",
-            future.id
-        )));
-    }
-    Ok(entry)
+    future.require_entry_price()
 }
 
 fn entry_contracts(future: &EquityIndexFuture, entry_price: f64) -> f64 {

@@ -8,3 +8,4 @@
 mod helpers;
 mod test_day_count_basis;
 mod test_seasoned;
+mod test_settlement_gap;

@@ -270,14 +270,18 @@ impl Payoff for AutocallablePayoff {
             }
         }
 
-        // Store final spot at maturity
-        // Assume maturity is the last observation date (or can be set separately)
+        // Terminal FIXING: the redemption payoff is fixed on the FINAL
+        // OBSERVATION date; a later `expiry` (settlement) only defers payment,
+        // it does not re-fix the underlying. The simulation grid includes the
+        // observation dates as required times, so the first step at/past the
+        // last observation date samples the spot on that date. `final_spot` is
+        // frozen there (`reset()` clears it to the 0.0 sentinel; the `spot > 0`
+        // filter above guarantees any set value is positive) — later steps out
+        // to a post-observation `expiry` must NOT overwrite it with drifted
+        // spot.
         if let Some(&last_date) = self.observation_dates.last() {
-            // Update final spot if we're at or past the last observation date
-            // Check if we're at the observation date (within epsilon for floating point)
-            let is_at_maturity = (state.time - last_date).abs() < 1e-10 || state.time >= last_date;
-            if is_at_maturity {
-                // Always update final_spot if we're at maturity.
+            const EPS: f64 = 1e-6;
+            if self.final_spot <= 0.0 && state.time >= last_date - EPS {
                 self.final_spot = spot;
             }
         } else {

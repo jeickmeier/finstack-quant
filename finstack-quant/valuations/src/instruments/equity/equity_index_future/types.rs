@@ -407,26 +407,51 @@ impl EquityIndexFuture {
         }
     }
 
-    /// Calculate delta exposure (index point sensitivity).
+    /// Entry (fill) price, required for the contract count behind PV and delta.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `entry_price` is unset (an unfilled
+    /// order has no defined exposure) or non-positive/non-finite.
+    pub(crate) fn require_entry_price(&self) -> finstack_quant_core::Result<f64> {
+        let entry = self.entry_price.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "EquityIndexFuture '{}' has no entry_price; the contract count \
+                 (and hence PV/delta) requires it. Set `entry_price` to the \
+                 trade fill, or remove the position from valuation.",
+                self.id.as_str()
+            ))
+        })?;
+        if !entry.is_finite() || entry <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "EquityIndexFuture '{}' entry_price must be finite and positive, got {entry}",
+                self.id
+            )));
+        }
+        Ok(entry)
+    }
+
+    /// Calculate delta exposure (futures point sensitivity).
     ///
     /// # Formula
     /// ```text
     /// delta = contracts × multiplier × position_sign
     /// ```
     ///
-    /// This represents the USD P&L change for a 1-point move in the index.
-    pub fn delta(&self) -> f64 {
-        let contracts = self.entry_contracts();
-        self.contract_specs.multiplier * contracts * self.position_sign()
-    }
-
-    /// Number of contracts implied by notional at entry price.
+    /// This represents the currency P&L change for a 1-point move in the
+    /// FUTURES price (`∂PV/∂F`); the spot delta is this times the carry
+    /// factor `e^{(r−q)T}`. The contract count is fixed at trade inception
+    /// (`notional / (entry_price × multiplier)`).
     ///
-    /// The contract count is fixed at trade inception and does not change
-    /// when the market price moves.
-    fn entry_contracts(&self) -> f64 {
-        let px = self.entry_price.unwrap_or(1.0).max(1e-12);
-        self.num_contracts(px)
+    /// # Errors
+    ///
+    /// Returns a validation error when `entry_price` is unset or invalid —
+    /// mirroring the PV path. The former `entry_price.unwrap_or(1.0)`
+    /// fallback fabricated a contract count of `notional / multiplier`
+    /// (~entry-price× the real exposure) for unfilled orders.
+    pub fn delta(&self) -> finstack_quant_core::Result<f64> {
+        let contracts = self.num_contracts(self.require_entry_price()?);
+        Ok(self.contract_specs.multiplier * contracts * self.position_sign())
     }
 
     /// Calculate the raw present value as f64.
@@ -599,12 +624,33 @@ mod tests {
     fn test_delta_calculation() {
         let future = EquityIndexFuture::example().expect("EquityIndexFuture example is valid");
         // Long 10 ES contracts: delta = 50 × 10 × 1 = 500
-        assert_eq!(future.delta(), 500.0);
+        assert_eq!(future.delta().expect("delta with entry price"), 500.0);
 
         let mut short_future = future;
         short_future.position = Position::Short;
         // Short 10 ES contracts: delta = 50 × 10 × (-1) = -500
-        assert_eq!(short_future.delta(), -500.0);
+        assert_eq!(
+            short_future.delta().expect("delta with entry price"),
+            -500.0
+        );
+    }
+
+    /// A future with no entry price has no defined contract count: the old
+    /// `entry_price.unwrap_or(1.0)` fallback returned `notional/multiplier`
+    /// contracts (~entry-price× the real exposure, ×4500 for ES) and silently
+    /// polluted book-level risk aggregation. Delta must fail like PV does.
+    #[test]
+    fn delta_requires_entry_price_like_pv_does() {
+        let mut future = EquityIndexFuture::example().expect("example");
+        future.entry_price = None;
+
+        let err = future
+            .delta()
+            .expect_err("delta without entry price must error, not fabricate exposure");
+        assert!(
+            err.to_string().contains("entry_price"),
+            "error must name the missing field: {err}"
+        );
     }
 
     #[test]

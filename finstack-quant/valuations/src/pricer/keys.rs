@@ -543,8 +543,9 @@ pub enum ModelKey {
     /// 1D Crank-Nicolson finite difference PDE solver.
     ///
     /// Used for: European/American equity options, barrier options,
-    /// FX options. Supports Rannacher smoothing and penalty method
-    /// for early exercise.
+    /// FX options. Names the scheme family: production pricers run
+    /// Rannacher-damped CN (implicit start-up steps, Rannacher 1984),
+    /// with a penalty method for early exercise.
     PdeCrankNicolson1D = 50,
     /// 2D ADI (Craig-Sneyd) finite difference PDE solver.
     ///

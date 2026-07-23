@@ -18,10 +18,22 @@
 //!
 //! # Market Construction
 //!
-//! Volatility index curves are typically bootstrapped from:
+//! Volatility index curves should be bootstrapped from:
 //! - **VIX Futures**: Monthly and weekly futures on the volatility index
-//! - **VIX Options**: OTC and exchange-traded options on the index
+//!   (preferred — the curve IS the futures strip)
 //! - **Spot level**: Current index value (typically around 12-30 for VIX)
+//!
+//! ## Convexity warning — do NOT feed variance-derived vols
+//!
+//! Downstream pricers (e.g. `VolatilityIndexFuture` in `valuations`) treat
+//! `F(t)` as the fair FUTURES level, i.e. `E[VIX_t]`, with **no convexity
+//! adjustment**. That is exact only when the knots are quoted futures/forward
+//! *levels*. Feeding vols derived from variance-swap strikes or option
+//! replication instead supplies `√(E[VIX_t²])`, which by Jensen's inequality
+//! **overstates** every future by the vol-of-vol convexity
+//! (`√(E[X²]) = E[X]·e^{ω²t/2}` under a lognormal approximation — roughly
+//! +8–28% for typical VIX vol-of-vol). If only variance-derived data is
+//! available, apply the concavity adjustment before building the curve.
 //!
 //! # Term Structure Characteristics
 //!

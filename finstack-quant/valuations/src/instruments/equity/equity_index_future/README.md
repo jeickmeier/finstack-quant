@@ -100,7 +100,7 @@ let es_future2 = EquityIndexFuture::sp500_emini(
 use finstack_quant_valuations::instruments::equity::equity_index_future::EquityIndexFuture;
 
 let future = EquityIndexFuture::example().unwrap();
-let delta = future.delta();
+let delta = future.delta()?; // errors if entry_price is unset
 // For 10 long ES contracts: delta = 50 × 10 × 1 = 500
 // This means $500 P&L per 1-point index move
 ```
@@ -152,7 +152,7 @@ The following metrics are available:
 | Metric | Description |
 |--------|-------------|
 | `present_value` | Net present value of the position |
-| `delta` | Index point sensitivity: `multiplier × quantity × position_sign` |
+| `delta` | Futures point sensitivity: `multiplier × contracts × position_sign`; requires `entry_price` |
 | `dv01` | Interest rate sensitivity (via discount curve) |
 | `bucketed_dv01` | Key-rate DV01 by tenor bucket |
 | `theta` | Time decay (1-day change in PV) |

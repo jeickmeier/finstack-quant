@@ -10,6 +10,8 @@ pub(crate) struct DeltaCalculator;
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let future: &EquityIndexFuture = context.instrument_as()?;
-        Ok(future.delta())
+        // Futures-price delta (∂PV/∂F), NOT spot delta: consumers converting
+        // to spot/equity delta must multiply by the carry factor e^{(r−q)T}.
+        future.delta()
     }
 }

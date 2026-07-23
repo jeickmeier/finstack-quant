@@ -128,9 +128,17 @@ impl EquityOptionPdePricer {
                     .american(payoff_values)
                     .build()
             }
+            // European: Rannacher start-up (4 fully-implicit steps, then CN)
+            // damps the high-frequency error component injected by the payoff
+            // kink at the strike (Rannacher 1984; Giles & Carter 2006), which
+            // plain CN propagates undamped. Measured at the production
+            // defaults (200 sinh points, 100 steps) the effect on PV and
+            // bump-and-revalue gamma is small, but the damped scheme is the
+            // configuration the American path and the tight-tolerance
+            // reference tests already use, at negligible cost.
             _ => Solver1D::builder()
                 .grid(grid)
-                .crank_nicolson(self.time_steps)
+                .rannacher(4, self.time_steps)
                 .build(),
         }
         .map_err(|e| {

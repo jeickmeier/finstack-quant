@@ -851,6 +851,12 @@ mod tests {
         assert_eq!(option.day_count, DayCount::Act365F);
     }
 
+    /// API-WIRING check only: `value()`/`greeks()`/`delta()`… delegate to
+    /// `pricer::compute_pv`/`compute_greeks`, so both sides of these
+    /// assertions run the same code — this cannot detect a formula error.
+    /// Formula correctness is anchored non-circularly in
+    /// `models::closed_form::vanilla` (`analytic_greeks_match_finite_differences_of_price`,
+    /// `hull_chapter19_worked_example_anchor`).
     #[test]
     fn npv_and_greeks_match_pricer_outputs() {
         let as_of = date(2025, 1, 3);

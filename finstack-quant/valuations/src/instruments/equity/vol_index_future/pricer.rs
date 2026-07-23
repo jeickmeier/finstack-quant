@@ -119,4 +119,50 @@ mod tests {
 
         assert_eq!(via_pricer, via_instrument);
     }
+
+    /// Convention golden: on a FLAT vol-index curve the fair future equals the
+    /// quoted forward level EXACTLY (the curve IS the futures strip — no
+    /// convexity term is added or removed; see the module docs on
+    /// `VolatilityIndexCurve` for why variance-derived inputs are forbidden),
+    /// and the MTM is undiscounted variation margin
+    /// `(F − quoted) × multiplier × contracts × sign` in exact dollars.
+    /// Also pins the CBOE VIX contract multiplier ($1000/point) from the spec
+    /// registry.
+    #[test]
+    fn flat_curve_future_equals_forward_level_with_exact_variation_margin() {
+        let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .knots([(0.0, 1.0), (1.0, 0.97)])
+            .build()
+            .expect("disc");
+        let vix = VolatilityIndexCurve::builder("VIX")
+            .base_date(base_date)
+            .spot_level(21.5)
+            .knots([(0.0, 21.5), (1.0, 21.5)]) // flat futures strip at 21.5
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(disc).insert(vix);
+
+        let mut future = sample_future(); // long, quoted 20.0, notional 20,000
+        future.quoted_price = 20.0;
+
+        let specs = crate::instruments::equity::vol_index_future::VolIndexContractSpecs::vix();
+        assert_eq!(
+            specs.multiplier, 1000.0,
+            "CBOE VIX futures multiplier must be $1000 per point"
+        );
+
+        // Fair forward = curve level exactly (no convexity adjustment).
+        let fair = forward_vol(&future, &market).expect("forward");
+        assert_eq!(fair, 21.5);
+
+        // Long MTM: (21.5 − 20.0) × $1000 × contracts, undiscounted.
+        let pv = compute_pv_raw(&future, &market, base_date).expect("pv");
+        let expected = 1.5 * 1000.0 * future.num_contracts();
+        assert!(
+            (pv - expected).abs() < 1e-9,
+            "variation-margin MTM must be exact: got {pv}, expected {expected}"
+        );
+    }
 }

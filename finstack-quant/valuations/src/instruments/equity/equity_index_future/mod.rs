@@ -82,9 +82,9 @@
 //! use finstack_quant_valuations::instruments::equity::equity_index_future::EquityIndexFuture;
 //!
 //! let future = EquityIndexFuture::example().unwrap();
-//! let delta = future.delta();
+//! let delta = future.delta().unwrap(); // errors if entry_price is unset
 //! // For 10 long ES contracts: delta = 50 × 10 × 1 = 500
-//! // This means $500 P&L per 1-point index move
+//! // This means $500 P&L per 1-point move in the futures price
 //! assert_eq!(delta, 500.0);
 //! ```
 //!
