@@ -630,7 +630,7 @@ mod tests {
     #[test]
     fn test_r_equals_q_continuity() {
         // Prices should be continuous as r approaches q.
-        // RATE_EQ_DIV_TOL is 1e-4, so a delta of 0.02 places us well
+        // RATE_EQ_DIV_TOL is 1e-7, so a delta of 0.02 places us far
         // outside the tolerance band (general formula vs limiting form).
         let spot = 100.0;
         let s_min = 95.0;

@@ -246,6 +246,18 @@ impl MertonModel {
 
     /// Default probability over the given horizon.
     ///
+    /// # Measure
+    ///
+    /// This is the **risk-neutral (Q-measure)** default probability: the
+    /// drift is the risk-free `r − q − σ²/2`, not the firm's real-world
+    /// asset drift. It is the right quantity for pricing and credit-spread
+    /// work ([`Self::implied_spread`], [`Self::to_hazard_curve`]), but it
+    /// materially **overstates** the physical/real-world PD (EDF) whenever
+    /// the market price of asset risk is positive — often by several times
+    /// for a healthy firm. Do not feed it into expected-loss, capital, or
+    /// rating analytics that require a physical PD; those need the
+    /// real-world drift substituted for `r`.
+    ///
     /// - **Terminal barrier**: PD = N(-DD) (Merton 1974).
     /// - **First-passage barrier**: Black-Cox (1976) closed-form with
     ///   exponentially growing barrier `B(t) = B * exp(g * t)`. The distance
@@ -401,6 +413,11 @@ impl MertonModel {
     /// Returns [`InputError::Invalid`] if the implied equity value or `N(d1)`
     /// is below the well-posed floor (the firm is economically in default).
     pub fn try_implied_equity(&self, horizon: f64) -> Result<(f64, f64)> {
+        if !(horizon.is_finite() && horizon > 0.0) {
+            return Err(Error::Validation(format!(
+                "try_implied_equity: horizon must be > 0, got {horizon}"
+            )));
+        }
         let v = self.asset_value;
         let sigma = self.asset_vol;
         let b = self.debt_barrier;
@@ -718,6 +735,17 @@ impl MertonModel {
         }
         if equity_vol < 0.0 {
             return Err(InputError::NegativeValue.into());
+        }
+        if !(0.0..=1.0).contains(&mean_recovery) {
+            return Err(Error::Validation(format!(
+                "credit_grades: mean_recovery must be in [0, 1], got {mean_recovery}"
+            )));
+        }
+        if !(barrier_uncertainty.is_finite() && barrier_uncertainty >= 0.0) {
+            return Err(Error::Validation(format!(
+                "credit_grades: barrier_uncertainty (log-barrier vol λ) must be \
+                 finite and >= 0, got {barrier_uncertainty}"
+            )));
         }
 
         // Asset value = equity + debt * mean_recovery
@@ -1889,6 +1917,74 @@ mod tests {
         assert!(
             m_high.default_probability(5.0) > m_low.default_probability(5.0),
             "Higher equity vol should increase CG PD"
+        );
+    }
+
+    /// `try_implied_equity` must reject a non-positive horizon explicitly
+    /// (matching `implied_spread` and `simulate_paths`) rather than letting
+    /// `horizon = 0` silently return intrinsic value with a meaningless
+    /// "equity vol".
+    #[test]
+    fn try_implied_equity_rejects_non_positive_horizon() {
+        let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
+        assert!(m.try_implied_equity(0.0).is_err(), "horizon=0 must error");
+        assert!(
+            m.try_implied_equity(-1.0).is_err(),
+            "negative horizon must error"
+        );
+        assert!(
+            m.try_implied_equity(f64::NAN).is_err(),
+            "NaN horizon must error"
+        );
+    }
+
+    /// The CreditGrades constructor must reject out-of-domain inputs instead
+    /// of silently building a nonsensical model: `mean_recovery > 1` yields a
+    /// barrier above face debt, and a negative `barrier_uncertainty` was
+    /// previously clamped to 0 at compute time, silently discarding it.
+    #[test]
+    fn credit_grades_rejects_out_of_range_recovery_and_negative_lambda() {
+        assert!(
+            MertonModel::credit_grades(25.0, 0.50, 80.0, 0.04, 0.30, 1.5).is_err(),
+            "mean_recovery > 1 must be rejected"
+        );
+        assert!(
+            MertonModel::credit_grades(25.0, 0.50, 80.0, 0.04, 0.30, -0.1).is_err(),
+            "negative mean_recovery must be rejected"
+        );
+        assert!(
+            MertonModel::credit_grades(25.0, 0.50, 80.0, 0.04, -0.30, 0.40).is_err(),
+            "negative barrier_uncertainty must be rejected"
+        );
+    }
+
+    /// Golden pin for the CreditGrades survival formula (Finger et al. 2002).
+    ///
+    /// Every other CreditGrades test asserts only structural properties
+    /// (monotonicity, sensitivity), so a subtle regression — e.g. dropping
+    /// the `exp(λ²)` leverage factor or the `λ²` term in `a_t²` — would pass
+    /// them all. Reference values computed with an independent Python
+    /// implementation of the Technical Document survival function
+    /// `P = Φ(−A/2 + ln d/A) − d·Φ(−A/2 − ln d/A)` with `A² = σ_V²t + λ²`,
+    /// `d = (V₀/B)·e^{λ²}`, and the constructor mapping `V₀ = E + D·R̄`,
+    /// `σ_V = σ_E·E/V₀`, `B = D·R̄`:
+    ///   E=25, σ_E=0.50, D=80, λ=0.30, R̄=0.40
+    ///   → PD(1y) = 0.10002066946020438, PD(5y) = 0.3349985804601995.
+    #[test]
+    fn credit_grades_pd_matches_independent_finger_reference() {
+        let m = MertonModel::credit_grades(25.0, 0.50, 80.0, 0.04, 0.30, 0.40).expect("cg");
+        let pd_1y = m.default_probability(1.0);
+        let pd_5y = m.default_probability(5.0);
+        // Tolerance 1e-9: the reference uses Python's erf-based normal CDF,
+        // which differs from this crate's norm_cdf by O(1e-11) in the tails.
+        // A structural regression (e.g. losing exp(λ²)) moves PD by O(1e-2).
+        assert!(
+            (pd_1y - 0.100_020_669_460_204_38).abs() < 1e-9,
+            "CreditGrades 1y PD {pd_1y:.15} != independent reference 0.100020669460204"
+        );
+        assert!(
+            (pd_5y - 0.334_998_580_460_199_5).abs() < 1e-9,
+            "CreditGrades 5y PD {pd_5y:.15} != independent reference 0.334998580460200"
         );
     }
 

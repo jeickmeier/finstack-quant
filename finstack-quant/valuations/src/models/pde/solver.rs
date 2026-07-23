@@ -786,4 +786,58 @@ mod tests {
             "delta below domain must equal the boundary one-sided slope 3.0, got {d_lo}"
         );
     }
+
+    /// Pure diffusion with a linear profile and matching Neumann fluxes is
+    /// stationary: u(x, t) = 2 + 3x for all t when du/dx = 3 is imposed at
+    /// both edges. On a NON-uniform grid this is only preserved if the
+    /// operator's Neumann elimination and the boundary reconstruction impose
+    /// the same one-sided derivative at the same location — the previous
+    /// central "ghost node" elimination used `2·h_left` where the true node
+    /// span differs on non-uniform spacing, distorting the profile near the
+    /// boundary.
+    struct LinearNeumannDiffusion;
+
+    impl PdeProblem1D for LinearNeumannDiffusion {
+        fn diffusion(&self, _x: f64, _t: f64) -> f64 {
+            1.0
+        }
+        fn convection(&self, _x: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn reaction(&self, _x: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn terminal_condition(&self, x: f64) -> f64 {
+            3.0f64.mul_add(x, 2.0)
+        }
+        fn lower_boundary(&self, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Neumann(3.0)
+        }
+        fn upper_boundary(&self, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Neumann(3.0)
+        }
+    }
+
+    #[test]
+    fn neumann_preserves_linear_profile_on_nonuniform_grid() {
+        // Sinh concentration makes the spacing genuinely non-uniform near 0.4.
+        let grid = Grid1D::sinh_concentrated(0.0, 1.0, 41, 0.4, 0.1).expect("valid grid");
+        let solver = Solver1D::builder()
+            .grid(grid.clone())
+            .crank_nicolson(50)
+            .build()
+            .expect("valid solver");
+
+        let solution = solver
+            .solve(&LinearNeumannDiffusion, 0.5)
+            .expect("stationary Neumann problem must solve");
+
+        for (&x, &v) in grid.points().iter().zip(solution.values.iter()) {
+            let expected = 3.0f64.mul_add(x, 2.0);
+            assert!(
+                (v - expected).abs() < 1e-8,
+                "linear profile not preserved at x={x}: got {v}, want {expected}"
+            );
+        }
+    }
 }

@@ -171,6 +171,14 @@ pub struct OptimalToggle {
 // ---------------------------------------------------------------------------
 
 /// Extract the relevant state value for the toggle decision.
+///
+/// **`DistanceToDefault` fallback:** a missing DD (`None`) is read as `0.0`
+/// — i.e. maximally stressed. For a `Below`-threshold rule this makes the
+/// toggle deterministically choose the stressed leg (PIK). That pessimistic
+/// convention is deliberate (an issuer without a computable DD should not be
+/// treated as healthy), but callers configuring a `DistanceToDefault` rule
+/// should populate `CreditState::distance_to_default` explicitly rather than
+/// rely on it.
 fn extract_state_value(state: &CreditState, variable: &CreditStateVariable) -> f64 {
     match variable {
         CreditStateVariable::HazardRate => state.hazard_rate,

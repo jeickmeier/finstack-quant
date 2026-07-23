@@ -13,7 +13,7 @@
 //! capped at a large finite ceiling so a divergent exponential / power-law
 //! mapping cannot produce a non-finite (`inf`/`NaN`) rate.
 
-use finstack_quant_core::{InputError, Result};
+use finstack_quant_core::{Error, InputError, Result};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -119,6 +119,21 @@ impl EndogenousHazardSpec {
     pub fn tabular(leverage_points: Vec<f64>, hazard_points: Vec<f64>) -> Result<Self> {
         if leverage_points.is_empty() || leverage_points.len() != hazard_points.len() {
             return Err(InputError::DimensionMismatch.into());
+        }
+        if let Some(bad) = hazard_points
+            .iter()
+            .find(|h| !(h.is_finite() && **h >= 0.0))
+        {
+            return Err(Error::Validation(format!(
+                "tabular: hazard points must be finite and >= 0, got {bad}"
+            )));
+        }
+        if leverage_points.windows(2).any(|w| !(w[1] > w[0])) {
+            return Err(Error::Validation(
+                "tabular: leverage points must be strictly increasing — \
+                 interpolation assumes an ascending axis"
+                    .to_string(),
+            ));
         }
         let base_leverage = leverage_points[0];
         let base_hazard_rate = hazard_points[0];
@@ -270,6 +285,29 @@ fn tabular_interpolate(xs: &[f64], ys: &[f64], x: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The tabular constructor must reject invalid tables up front instead
+    /// of silently zero-clamping negative hazards at compute time or
+    /// interpolating over an unsorted leverage axis.
+    #[test]
+    fn tabular_rejects_invalid_hazards_and_unsorted_leverage() {
+        assert!(
+            EndogenousHazardSpec::tabular(vec![1.0, 2.0], vec![0.02, -0.01]).is_err(),
+            "negative hazard point must be rejected"
+        );
+        assert!(
+            EndogenousHazardSpec::tabular(vec![1.0, 2.0], vec![0.02, f64::NAN]).is_err(),
+            "non-finite hazard point must be rejected"
+        );
+        assert!(
+            EndogenousHazardSpec::tabular(vec![2.0, 1.0], vec![0.02, 0.03]).is_err(),
+            "non-increasing leverage points must be rejected"
+        );
+        assert!(
+            EndogenousHazardSpec::tabular(vec![1.0, 2.0], vec![0.02, 0.03]).is_ok(),
+            "a valid ascending table must be accepted"
+        );
+    }
 
     #[test]
     fn power_law_at_base_leverage_returns_base_hazard() {

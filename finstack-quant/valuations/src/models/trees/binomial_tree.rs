@@ -211,10 +211,15 @@ impl BinomialTree {
         t: f64,
         q: f64,
     ) -> Result<(f64, f64, f64)> {
-        if t <= 0.0 || sigma <= 0.0 {
-            return Err(Error::internal(
-                "binomial tree requires positive time_to_maturity and volatility",
-            ));
+        if t <= 0.0 {
+            return Err(Error::internal(format!(
+                "binomial tree requires positive time_to_maturity, got {t}"
+            )));
+        }
+        if sigma <= 0.0 {
+            return Err(Error::internal(format!(
+                "binomial tree requires positive volatility, got {sigma}"
+            )));
         }
 
         let dt = t / self.steps as f64;
@@ -716,6 +721,12 @@ impl BinomialTree {
     ///
     /// This method implements the TreeModel trait, providing a flexible
     /// interface for pricing any instrument that implements TreeValuator.
+    ///
+    /// **Leisen-Reimer note:** this generic path has no spot/strike, so it
+    /// calls `calculate_parameters` with `spot = strike = 0.0`. A tree
+    /// configured as `TreeType::LeisenReimer` therefore silently uses the
+    /// CRR fallback here and loses LR's superior convergence — use the
+    /// dedicated vanilla pricing entry points to get genuine LR behavior.
     #[inline(never)] // Prevent inlining to reduce coverage metadata conflicts
     pub fn price_generic<V: TreeValuator>(
         &self,
@@ -1275,7 +1286,10 @@ mod tests {
         let vol_err = tree
             .calculate_parameters(100.0, 100.0, 0.05, 0.0, 1.0, 0.0)
             .expect_err("zero volatility should fail");
-        assert!(vol_err.to_string().contains("positive time_to_maturity"));
+        assert!(
+            vol_err.to_string().contains("positive volatility"),
+            "a volatility error must name volatility, not maturity: {vol_err}"
+        );
     }
 
     /// W-07: CRR/Tian with σ·√dt underflowing to 0 must return a descriptive

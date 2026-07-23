@@ -207,6 +207,75 @@ mod tests {
         );
     }
 
+    /// Fast, default-running Fourier anchor.
+    ///
+    /// The full-resolution Fourier convergence tests are `#[ignore]`d as
+    /// slow, and the always-running put-call parity test is insensitive to
+    /// the mixed-derivative (correlation) term and the variance dynamics —
+    /// `C − P` satisfies a driftless linear PDE regardless. Without this
+    /// anchor, a wrong-signed `ρσ_v·v·S` cross term would pass the default
+    /// suite. The OTM strike is the discriminating one: at K=120 with
+    /// ρ=−0.7 the smile skew moves the price by far more than the coarse
+    /// tolerance, while at ATM the ρ-sensitivity is smallest.
+    #[test]
+    fn heston_pde_vs_fourier_coarse_anchor() {
+        let spot: f64 = 100.0;
+        let maturity = 1.0;
+        let r = 0.05;
+        let q = 0.02;
+        let kappa = 2.0;
+        let theta_v = 0.04;
+        let sigma_v = 0.3;
+        let rho = -0.7;
+        let v0 = 0.04;
+
+        let x_min = (spot * 0.05).ln();
+        let x_max = (spot * 10.0).ln();
+        let v_min = 0.001;
+        let v_max = 1.5;
+
+        for strike in [100.0, 120.0] {
+            let exact = heston_call_reference(
+                spot, strike, maturity, r, q, kappa, theta_v, sigma_v, rho, v0,
+            );
+
+            let pde = HestonPde {
+                r,
+                q,
+                kappa,
+                theta_v,
+                sigma_v,
+                rho,
+                strike,
+                is_call: true,
+            };
+
+            let gx = Grid1D::sinh_concentrated(x_min, x_max, 141, strike.ln(), 0.1)
+                .expect("valid x-grid");
+            let gy =
+                Grid1D::sinh_concentrated(v_min, v_max, 61, theta_v, 0.15).expect("valid v-grid");
+            let grid = Grid2D::new(gx, gy);
+
+            let solver = Solver2D::builder()
+                .grid(grid)
+                .craig_sneyd_rannacher(4, 150)
+                .build()
+                .expect("valid solver");
+
+            let solution = solver
+                .solve(&pde, maturity)
+                .expect("Heston coarse grid is within the MCS stability regime");
+            let computed = solution.interpolate(spot.ln(), v0);
+
+            let rel_error = (computed - exact).abs() / exact;
+            assert!(
+                rel_error < 0.025,
+                "Heston PDE coarse anchor K={strike}: computed={computed:.6}, \
+                 exact={exact:.6}, rel_err={rel_error:.4e}"
+            );
+        }
+    }
+
     #[test]
     fn heston_pde_put_call_parity() {
         let spot: f64 = 100.0;

@@ -473,16 +473,21 @@ fn apply_lower_boundary(
             correction
         }
         BoundaryCondition::Neumann(g) => {
-            // du/dx at x_min = g
-            // Ghost node: u[-1] ≈ u[1] - 2*h_1*g, where h_1 = x[1] - x[0]
-            // Substitute into the stencil for the first interior point:
-            // lower[0]*u[-1] → lower[0]*(u[1] - 2*h_1*g)
-            // Main diagonal gets: main[0] stays same
-            // Upper gets: upper[0] += lower[0]
-            // RHS correction: -lower[0] * 2 * h_1 * g
+            // du/dx at x_min = g, imposed one-sided at the boundary node:
+            // (u[1] - u[0]) / h_1 = g  →  u[0] = u[1] - h_1*g,
+            // where u[1] is the first interior unknown and h_1 = x[1] - x[0].
+            // Substitute into the first interior row:
+            //   lower[0]*u[0] → lower[0]*(u[1] - h_1*g)
+            //   main[0] += lower[0];  affine correction = -lower[0]*h_1*g.
+            // This is the SAME discretization `boundary_value`/
+            // `fill_boundaries` use to reconstruct u[0] from the solved
+            // interior — using a central ghost form here (as previously)
+            // imposes the derivative at a different location and is wrong on
+            // non-uniform grids (see
+            // `neumann_preserves_linear_profile_on_nonuniform_grid`).
             let h = grid.h_left(1); // grid[1] - grid[0]
-            let correction = -lower[0] * 2.0 * h * g;
-            upper[0] += lower[0];
+            let correction = -lower[0] * h * g;
+            main[0] += lower[0];
             lower[0] = 0.0;
             correction
         }
@@ -521,11 +526,13 @@ fn apply_upper_boundary(
             correction
         }
         BoundaryCondition::Neumann(g) => {
-            // du/dx at x_max = g
-            // Ghost node: u[n+1] ≈ u[n-1] + 2*h_n*g
+            // du/dx at x_max = g, imposed one-sided at the boundary node:
+            // u[n_grid-1] = u_last + h_n*g, h_n = grid[n-1] - grid[n-2].
+            // Mirrors the lower-edge elimination and matches the
+            // reconstruction in `boundary_value`/`fill_boundaries`.
             let h = grid.h_right(grid.n() - 2); // grid[n-1] - grid[n-2]
-            let correction = upper[last] * 2.0 * h * g;
-            lower[last] += upper[last];
+            let correction = upper[last] * h * g;
+            main[last] += upper[last];
             upper[last] = 0.0;
             correction
         }

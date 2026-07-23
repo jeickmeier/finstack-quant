@@ -14,7 +14,7 @@
 //!
 //! All computed recovery rates are clamped to `[0, base_recovery]`.
 
-use finstack_quant_core::{InputError, Result};
+use finstack_quant_core::{Error, InputError, Result};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -148,6 +148,12 @@ impl DynamicRecoverySpec {
         if floor < 0.0 {
             return Err(InputError::NegativeValue.into());
         }
+        if floor > base_recovery {
+            return Err(Error::Validation(format!(
+                "floored_inverse: floor ({floor}) must not exceed base_recovery \
+                 ({base_recovery}) — the outer clamp would silently disable it"
+            )));
+        }
         Ok(Self {
             base_recovery,
             base_notional,
@@ -172,6 +178,12 @@ impl DynamicRecoverySpec {
         Self::validate(base_recovery, base_notional)?;
         if floor < 0.0 {
             return Err(InputError::NegativeValue.into());
+        }
+        if floor > base_recovery {
+            return Err(Error::Validation(format!(
+                "linear_decline: floor ({floor}) must not exceed base_recovery \
+                 ({base_recovery}) — the outer clamp would silently disable it"
+            )));
         }
         Ok(Self {
             base_recovery,
@@ -236,6 +248,23 @@ impl DynamicRecoverySpec {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A `floor` above `base_recovery` is inoperative — the outer
+    /// `clamp(0, base_recovery)` silently overrides it — so the constructors
+    /// must reject it rather than accept a floor that never applies.
+    #[test]
+    fn floor_above_base_recovery_is_rejected() {
+        assert!(
+            DynamicRecoverySpec::floored_inverse(0.40, 100.0, 0.50).is_err(),
+            "floored_inverse must reject floor > base_recovery"
+        );
+        assert!(
+            DynamicRecoverySpec::linear_decline(0.40, 100.0, 1.0, 0.50).is_err(),
+            "linear_decline must reject floor > base_recovery"
+        );
+        // A floor equal to base_recovery is degenerate but consistent.
+        assert!(DynamicRecoverySpec::floored_inverse(0.40, 100.0, 0.40).is_ok());
+    }
 
     #[test]
     fn constant_recovery_unchanged() {

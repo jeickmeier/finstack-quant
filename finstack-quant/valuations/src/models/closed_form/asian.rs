@@ -331,7 +331,7 @@ fn geometric_asian_call_core(
     // For BS parametrization: F_G = S × exp[(r - q_adj) × T], vol_adj² × T = Var[ln(G)]
     // So: r - q_adj = (r-q-σ²/2)(n+1)/(2n) + σ²(n+1)(2n+1)/(12n²)
     //
-    // Both converge to the continuous limit (σ/√3, q+(r-q-σ²/2)/2+σ²/6) for large n.
+    // Both converge to the continuous limit (σ/√3, q_adj = (r+q)/2 + σ²/12) for large n.
     //
     // Reference: Haug (2007) Chapter 3, Kemna & Vorst (1990).
     let vol_adj = if num_fixings == 0 {
@@ -342,8 +342,8 @@ fn geometric_asian_call_core(
     };
 
     let div_yield_adj = if num_fixings == 0 {
-        // Continuous limit: q_adj = q + (r - q - σ²/2) / 2 + σ²/6
-        div_yield + (rate - div_yield - 0.5 * vol * vol) / 2.0 + vol * vol / 6.0
+        // Continuous limit: q_adj = r - (r - q - σ²/2)/2 - σ²/6 = (r+q)/2 + σ²/12
+        rate - (rate - div_yield - 0.5 * vol * vol) / 2.0 - vol * vol / 6.0
     } else {
         // Discrete: q_adj = r - (r-q-σ²/2)(n+1)/(2n) - σ²(n+1)(2n+1)/(12n²)
         let drift_factor = (n + 1.0) / (2.0 * n);
@@ -466,7 +466,8 @@ fn geometric_asian_put_core(
     };
 
     let div_yield_adj = if num_fixings == 0 {
-        div_yield + (rate - div_yield - 0.5 * vol * vol) / 2.0 + vol * vol / 6.0
+        // Continuous limit: q_adj = r - (r - q - σ²/2)/2 - σ²/6 = (r+q)/2 + σ²/12
+        rate - (rate - div_yield - 0.5 * vol * vol) / 2.0 - vol * vol / 6.0
     } else {
         let drift_factor = (n + 1.0) / (2.0 * n);
         let var_half = vol * vol * (n + 1.0) * (2.0 * n + 1.0) / (12.0 * n * n);
@@ -499,8 +500,9 @@ fn geometric_asian_put_core(
 /// The method approximates the arithmetic average distribution as lognormal
 /// by matching the first two moments. For discrete monitoring with n equally-spaced fixings:
 ///
-/// `M1 = E[A] = S * exp((r - q)T) * [1 - exp(-qT)] / (qT)` for `q != 0`
-/// `M2 = E[A^2]` computed via double integral (see implementation)
+/// `M1 = E[A] = (S/n) * Σᵢ exp((r - q)·tᵢ)` over the fixing times `tᵢ = i·T/n`
+/// `M2 = E[A²] = (S²/n²) * Σᵢⱼ exp((r-q)(tᵢ+tⱼ) + σ²·min(tᵢ,tⱼ))` (double sum,
+/// see implementation)
 ///
 /// Then solve for parameters (μ*, σ*) of lognormal matching M1, M2.
 /// For `X ~ LogNormal(mu*, sigma*^2)`:
@@ -1145,7 +1147,7 @@ fn compute_arithmetic_mean_second_moment(
     // Exponent parameters
     let a = 2.0 * rate - 2.0 * div_yield + vol * vol; // coefficient for min(tᵢ, tⱼ)
     let b = rate - div_yield; // coefficient for |tᵢ - tⱼ|
-    let a_minus_b = a - b; // = r - 2q + σ²
+    let a_minus_b = a - b; // = r - q + σ²
 
     let mut diag_acc = NeumaierAccumulator::new();
     let mut upper_acc = NeumaierAccumulator::new();
@@ -1247,6 +1249,36 @@ mod tests {
             "Arithmetic Asian {} should be ≥ geometric Asian {}",
             arith,
             geo
+        );
+    }
+
+    #[test]
+    fn test_geometric_continuous_limit_matches_discrete_and_kemna_vorst() {
+        // The `num_fixings == 0` continuous-monitoring branch must agree with
+        // (a) the discrete branch in its n→∞ limit, and (b) the independently
+        // computed Kemna-Vorst (1990) closed form with
+        // q_adj = (r+q)/2 + σ²/12 and vol_adj = σ/√3.
+        // Reference values computed externally (Python, erf-based normal CDF):
+        //   call = 4.98575982721038, put = 3.869493271713857
+        // for S=K=100, T=1, r=5%, q=2%, σ=20%.
+        let (spot, strike, time, rate, div_yield, vol) = (100.0, 100.0, 1.0, 0.05, 0.02, 0.2);
+
+        let call_cont = geometric_asian_call(spot, strike, time, rate, div_yield, vol, 0);
+        let put_cont = geometric_asian_put(spot, strike, time, rate, div_yield, vol, 0);
+        let call_disc = geometric_asian_call(spot, strike, time, rate, div_yield, vol, 1_000_000);
+
+        assert!(
+            (call_cont - 4.985_759_827_210_38).abs() < 1e-6,
+            "continuous geometric call {call_cont} != Kemna-Vorst reference 4.98576"
+        );
+        assert!(
+            (put_cont - 3.869_493_271_713_857).abs() < 1e-6,
+            "continuous geometric put {put_cont} != Kemna-Vorst reference 3.86949"
+        );
+        // Discrete n=1e6 differs from the continuous limit by O(1/n) ≈ 4e-6.
+        assert!(
+            (call_cont - call_disc).abs() < 1e-4,
+            "continuous branch {call_cont} disagrees with discrete n=1e6 limit {call_disc}"
         );
     }
 

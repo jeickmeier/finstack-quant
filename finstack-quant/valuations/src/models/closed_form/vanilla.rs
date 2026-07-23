@@ -362,6 +362,22 @@ pub fn bs_greeks(
         "theta_days_per_year must be positive, got {theta_days_per_year}"
     );
 
+    // At expiry the option is pure intrinsic: delta is the exercise
+    // indicator and every other sensitivity is zero. Mirrors
+    // `bs_call_greeks`/`bs_put_greeks`; without this, `t = 0` flows into
+    // `d1_d2` and produces `0/0 = NaN` delta at exactly ATM plus a spurious
+    // non-zero theta from the `−rK·N(d2)` discounting term.
+    if t <= 0.0 {
+        let delta = match option_type {
+            OptionType::Call => f64::from(spot > strike),
+            OptionType::Put => -f64::from(spot < strike),
+        };
+        return BsGreeks {
+            delta,
+            ..BsGreeks::default()
+        };
+    }
+
     // Use combined d1_d2 to compute both values in one pass (avoids duplicate ln/sqrt)
     let (d1, d2) = d1_d2(spot, strike, r, sigma, t, q);
 
@@ -818,6 +834,42 @@ mod tests {
         );
         // rho_r is per 1%; Hull's 8.91 is per 100%.
         assert!((g.rho_r * 100.0 - 8.91).abs() < 0.05, "rho {}", g.rho_r);
+    }
+
+    /// At expiry (`t <= 0`) the raw `bs_greeks` must return the degenerate
+    /// intrinsic Greeks used by its siblings `bs_call_greeks`/`bs_put_greeks`
+    /// (delta = exercise indicator, all other sensitivities zero) instead of
+    /// flowing `t = 0` into `d1_d2` — which yields `0/0 = NaN` delta at
+    /// exactly ATM and a spurious non-zero theta from the `−rK·N(d2)` term.
+    #[test]
+    fn bs_greeks_at_expiry_returns_finite_intrinsic_greeks() {
+        for (spot, option_type, want_delta) in [
+            (110.0, OptionType::Call, 1.0),
+            (90.0, OptionType::Call, 0.0),
+            (100.0, OptionType::Call, 0.0), // exactly ATM: N(NaN) hazard
+            (90.0, OptionType::Put, -1.0),
+            (110.0, OptionType::Put, 0.0),
+            (100.0, OptionType::Put, 0.0),
+        ] {
+            let g = bs_greeks(spot, 100.0, 0.05, 0.02, 0.2, 0.0, option_type, 365.0);
+            assert!(
+                (g.delta - want_delta).abs() < 1e-12,
+                "{option_type:?} S={spot}: delta {} != {want_delta}",
+                g.delta
+            );
+            for (name, v) in [
+                ("gamma", g.gamma),
+                ("vega", g.vega),
+                ("theta", g.theta),
+                ("rho_r", g.rho_r),
+                ("rho_q", g.rho_q),
+            ] {
+                assert!(
+                    v == 0.0,
+                    "{option_type:?} S={spot}: {name} should be 0 at expiry, got {v}"
+                );
+            }
+        }
     }
 
     /// Under NEGATIVE carry (q < 0 — negative dividend yield, or the foreign

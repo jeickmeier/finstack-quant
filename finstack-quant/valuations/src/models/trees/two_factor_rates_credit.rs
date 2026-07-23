@@ -461,6 +461,22 @@ impl RatesCreditTree {
         Ok(rates)
     }
 
+    /// Couple the two marginal up-probabilities into joint cell
+    /// probabilities with covariance `ρ·√(var_r·var_h)`.
+    ///
+    /// In the moderate regime (no cell clamps) this preserves both
+    /// marginals and realizes the configured correlation exactly (see
+    /// `joint_probabilities_realize_configured_correlation_when_unclamped`).
+    ///
+    /// **Known limitation:** for skewed marginals (mean-reverted extreme
+    /// nodes push `p` far from ½) a large |ρ| can exceed the Fréchet upper
+    /// bound for two Bernoullis, in which case individual cells clamp at 0
+    /// and the renormalisation both lowers the realized correlation below
+    /// `config.correlation` and perturbs the marginals — silently.
+    /// Probabilities remain valid (non-negative, sum to 1), so pricing is
+    /// never corrupted, but effective correlation degrades at the lattice
+    /// edges. Callers needing high |ρ| with strong mean reversion should
+    /// treat edge-node correlation as approximate.
     #[inline]
     fn joint_probabilities(&self, p_r: f64, p_h: f64) -> (f64, f64, f64, f64) {
         // Correlated Bernoulli coupling
@@ -635,6 +651,45 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
+
+    /// The joint transition probabilities must realize the configured
+    /// correlation exactly in the moderate regime (no clamping active).
+    /// With balanced marginals `p_r = p_h = 0.5` and ±1 coding of the
+    /// up/down moves, E[X] = E[Y] = 0 and Var[X] = Var[Y] = 1, so
+    /// realized ρ = p_uu + p_dd − p_ud − p_du, and no cell can clamp for
+    /// any |ρ| ≤ 1 (each cell is 0.25·(1 ± ρ) ∈ [0, 0.5]).
+    ///
+    /// Note the deliberate limitation this test does NOT cover: at skewed
+    /// marginals a large |ρ| can exceed the Fréchet bound for two
+    /// Bernoullis; the cell clamp + renormalisation then reduces the
+    /// realized correlation (and shifts the marginals) with no diagnostic.
+    /// See the doc comment on `joint_probabilities`.
+    #[test]
+    fn joint_probabilities_realize_configured_correlation_when_unclamped() {
+        for &target_rho in &[-0.9, -0.5, 0.0, 0.5, 0.9] {
+            let tree = RatesCreditTree::new(RatesCreditConfig {
+                correlation: target_rho,
+                ..RatesCreditConfig::default()
+            });
+            let (p_uu, p_ud, p_du, p_dd) = tree.joint_probabilities(0.5, 0.5);
+
+            let sum = p_uu + p_ud + p_du + p_dd;
+            assert!((sum - 1.0).abs() < 1e-14, "probs must sum to 1, got {sum}");
+            // Marginals preserved.
+            assert!(
+                (p_uu + p_ud - 0.5).abs() < 1e-14 && (p_uu + p_du - 0.5).abs() < 1e-14,
+                "marginals distorted at rho={target_rho}: pr={}, ph={}",
+                p_uu + p_ud,
+                p_uu + p_du
+            );
+            // Realized correlation matches the configured value exactly.
+            let realized = p_uu + p_dd - p_ud - p_du;
+            assert!(
+                (realized - target_rho).abs() < 1e-14,
+                "realized correlation {realized} != configured {target_rho}"
+            );
+        }
+    }
 
     struct DummyValuator;
 

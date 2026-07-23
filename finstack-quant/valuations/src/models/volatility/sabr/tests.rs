@@ -1471,3 +1471,103 @@ fn test_chi_series_matches_exact_near_crossover() {
         }
     }
 }
+
+/// At ρ≈−1 the χ(z) limit is ln(1+z), defined only for z > −1. The z ≤ −1
+/// domain must be rejected with a clear error (mirroring the ρ≈+1 / z ≥ 1
+/// guard) instead of letting a −∞/NaN log propagate to the generic
+/// "produced invalid volatility" failure.
+#[test]
+fn chi_rho_minus_one_rejects_z_at_or_below_minus_one() {
+    let model = SABRModel::new(
+        SABRParameters::new(0.2, 0.5, 0.3, -1.0).expect("rho=-1 boundary should be accepted"),
+    );
+    assert!(
+        model.calculate_chi_robust(-1.5).is_err(),
+        "z < -1 at rho=-1 must be a domain error"
+    );
+    assert!(
+        model.calculate_chi_robust(-1.0).is_err(),
+        "z = -1 at rho=-1 must be a domain error"
+    );
+    // Inside the domain the stable form equals ln(1+z) exactly.
+    let chi = model
+        .calculate_chi_robust(0.5)
+        .expect("z > -1 should compute");
+    assert!(
+        (chi - 1.5_f64.ln()).abs() < 1e-12,
+        "rho=-1 chi(0.5) should be ln(1.5), got {chi}"
+    );
+}
+
+/// External golden pin for the fractional-β (β=0.5) lognormal expansion —
+/// the workhorse rates configuration. β=1 and β=0 pins exist elsewhere, but
+/// in both of those the `(1−β)²/24·ln²` / `(1−β)⁴/1920·ln⁴` prefactor
+/// corrections and the α²-leverage time term vanish, so a regression in
+/// those coefficients (or the `(FK)^{(1−β)/2}` geometric-mean prefactor)
+/// would otherwise pass every existing test. Reference values computed with
+/// an independent Python implementation of Hagan et al. (2002) eq. 2.17a
+/// with the Obloj (2008) z-correction:
+///   F=0.03, T=2, α=0.02, β=0.5, ν=0.4, ρ=−0.25.
+#[test]
+fn fractional_beta_smile_matches_independent_hagan_obloj_reference() {
+    let model = SABRModel::new(
+        SABRParameters::new(0.02, 0.5, 0.4, -0.25).expect("SABR parameters should be valid"),
+    );
+    let forward = 0.03;
+    let expiry = 2.0;
+
+    for (strike, expected) in [
+        (0.02, 0.169_247_998_460_346_35),
+        (0.025, 0.138_007_953_434_595_02),
+        (0.035, 0.111_389_034_607_113_54),
+        (0.04, 0.114_609_353_928_979_06),
+    ] {
+        let vol = model
+            .implied_volatility(forward, strike, expiry)
+            .expect("smile vol should compute");
+        assert!(
+            (vol - expected).abs() < 1e-9,
+            "Hagan+Obloj β=0.5 mismatch at K={strike}: got {vol:.12}, want {expected:.12}"
+        );
+    }
+}
+
+#[test]
+fn atm_beta_snap_is_consistent_between_smile_and_atm_paths() {
+    // A raw β inside the snap band below 1 (here 1−5e-5) is snapped to
+    // exactly 1.0 by `implied_volatility` for every off-ATM strike. The
+    // ATM delegation to `atm_volatility` must classify the same raw β
+    // identically, otherwise the ATM point prices with prefactor
+    // α/F^(1−β) while its immediate neighbours price with α — a
+    // discontinuity of ~F^(−(1−β)) (several bp of vol level at F=100).
+    let forward = 100.0;
+    let t = 2.0;
+    let snapped = SABRModel::new(
+        SABRParameters::new(0.2, 1.0 - 5e-5, 0.4, -0.3).expect("SABR parameters should be valid"),
+    );
+    let exact_one = SABRModel::new(
+        SABRParameters::new(0.2, 1.0, 0.4, -0.3).expect("SABR parameters should be valid"),
+    );
+
+    let atm_snapped = snapped
+        .implied_volatility(forward, forward, t)
+        .expect("ATM vol should compute");
+    let atm_exact = exact_one
+        .implied_volatility(forward, forward, t)
+        .expect("ATM vol should compute");
+    assert!(
+        (atm_snapped - atm_exact).abs() < 1e-9,
+        "β in the snap band must ATM-price identically to β=1: got {atm_snapped} vs {atm_exact}"
+    );
+
+    // Smile continuity: the exact-ATM point (atm_volatility path) and an
+    // immediately adjacent strike (general branch, snapped β=1) must agree
+    // to well under a basis point of vol.
+    let near_atm = snapped
+        .implied_volatility(forward, forward * (1.0 + 1e-6), t)
+        .expect("near-ATM vol should compute");
+    assert!(
+        (atm_snapped - near_atm).abs() < 5e-6,
+        "ATM smile discontinuity for snap-band β: ATM {atm_snapped} vs K=F(1+1e-6) {near_atm}"
+    );
+}

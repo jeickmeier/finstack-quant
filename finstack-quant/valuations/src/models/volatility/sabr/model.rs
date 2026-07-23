@@ -248,12 +248,24 @@ impl SABRModel {
     #[inline]
     pub(crate) fn atm_volatility(&self, forward: f64, time_to_expiry: f64) -> Result<f64> {
         let alpha = self.params.alpha;
-        let beta = self.params.beta;
         let nu = self.params.nu;
         let rho = self.params.rho;
-        // Use the same snap tolerance as `implied_volatility` so the same raw
-        // β classifies onto the same (β=0 / general) branch in both paths.
-        let beta_is_zero = beta.abs() < BETA_SNAP_TOL;
+        // Snap β with the same classification as `implied_volatility` so the
+        // same raw β lands on the same branch in both paths. Snapping only
+        // β≈0 (and not β≈1) here would price the exact-ATM point with
+        // prefactor α/F^(1−β) while every neighbouring strike (which goes
+        // through the general formula with snapped β=1) uses α — an ATM
+        // smile discontinuity of ~F^(−(1−β)).
+        let raw_beta = self.params.beta;
+        let beta_is_zero = raw_beta < BETA_SNAP_TOL;
+        let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
+        let beta = if beta_is_zero {
+            0.0
+        } else if beta_is_one {
+            1.0
+        } else {
+            raw_beta
+        };
 
         // Handle degenerate cases
         if alpha.abs() < 1e-14 {
@@ -369,7 +381,19 @@ impl SABRModel {
                 return Ok(-(1.0 - z_val).ln());
             }
             if (1.0 + rho).abs() < 1e-10 {
-                // rho ≈ -1: Use stable form
+                // ρ → −1 limit of χ(z): the discriminant is (1+z)², so for
+                // z > −1 the exact limit is χ(z) = ln(1+z), computed in the
+                // stable form below. Mirror the ρ≈1 guard: at z ≤ −1 the
+                // log argument is non-positive and the Hagan expansion is
+                // undefined (SABR density degenerates), so error out with a
+                // domain message instead of letting −∞/NaN propagate to the
+                // generic "produced invalid volatility" failure.
+                if z_val <= -1.0 {
+                    return Err(Error::Validation(format!(
+                        "SABR chi function: rho≈-1 with z={z_val:.6} ≤ -1 — \
+                         Hagan expansion is undefined in this limit"
+                    )));
+                }
                 return Ok((sqrt_disc + z_val + 1.0).ln() - (2.0_f64).ln());
             }
 
