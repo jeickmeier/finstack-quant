@@ -189,8 +189,12 @@ impl JsSabrSmile {
     pub fn implied_vol(&self, strike: f64) -> Result<f64, JsValue> {
         self.inner
             .generate_smile(&[strike])
-            .map(|v| v[0])
-            .map_err(to_js_err)
+            .map_err(to_js_err)?
+            .first()
+            .copied()
+            .ok_or_else(|| {
+                JsValue::from_str("SABR smile returned no volatility for the requested strike")
+            })
     }
 
     /// Implied volatilities for a strike grid.

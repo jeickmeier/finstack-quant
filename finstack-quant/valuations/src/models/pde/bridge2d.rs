@@ -276,6 +276,66 @@ mod tests {
         }
     }
 
+    /// A strong-mean-reversion Heston configuration (κ=10) drives the cell
+    /// Péclet number in the variance direction well above the old
+    /// `MCS_PECLET_MAX = 4` ceiling near the `v`-floor. The solver must
+    /// handle it via the per-node upwind switch (first-order, monotone in
+    /// convection-dominated cells) rather than rejecting the solve outright
+    /// — and the price must still track the Fourier reference.
+    #[test]
+    fn heston_pde_high_kappa_solves_via_upwinding() {
+        let spot: f64 = 100.0;
+        let strike = 100.0;
+        let maturity = 1.0;
+        let r = 0.05;
+        let q = 0.02;
+        let kappa = 10.0;
+        let theta_v = 0.04;
+        let sigma_v = 0.3;
+        let rho = -0.7;
+        let v0 = 0.04;
+
+        let exact = heston_call_reference(
+            spot, strike, maturity, r, q, kappa, theta_v, sigma_v, rho, v0,
+        );
+
+        let pde = HestonPde {
+            r,
+            q,
+            kappa,
+            theta_v,
+            sigma_v,
+            rho,
+            strike,
+            is_call: true,
+        };
+
+        let x_min = (spot * 0.05).ln();
+        let x_max = (spot * 10.0).ln();
+        let gx =
+            Grid1D::sinh_concentrated(x_min, x_max, 141, strike.ln(), 0.1).expect("valid x-grid");
+        let gy = Grid1D::sinh_concentrated(0.001, 1.5, 61, theta_v, 0.15).expect("valid v-grid");
+        let grid = Grid2D::new(gx, gy);
+
+        let solver = Solver2D::builder()
+            .grid(grid)
+            .craig_sneyd_rannacher(4, 150)
+            .build()
+            .expect("valid solver");
+
+        let solution = solver
+            .solve(&pde, maturity)
+            .expect("high-kappa Heston must solve via upwinding, not PecletViolation");
+        let computed = solution.interpolate(spot.ln(), v0);
+
+        let rel_error = (computed - exact).abs() / exact;
+        assert!(
+            rel_error < 0.025,
+            "high-kappa Heston vs Fourier: computed={computed:.6}, exact={exact:.6}, \
+             rel_err={rel_error:.4e}"
+        );
+    }
+
     #[test]
     fn heston_pde_put_call_parity() {
         let spot: f64 = 100.0;

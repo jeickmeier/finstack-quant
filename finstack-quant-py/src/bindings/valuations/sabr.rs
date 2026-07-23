@@ -237,8 +237,14 @@ impl PySabrSmile {
     fn implied_vol(&self, strike: f64) -> PyResult<f64> {
         self.inner
             .generate_smile(&[strike])
-            .map(|v| v[0])
-            .map_err(display_to_py)
+            .map_err(display_to_py)?
+            .first()
+            .copied()
+            .ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err(
+                    "SABR smile returned no volatility for the requested strike",
+                )
+            })
     }
 
     /// Generate implied volatilities for a vector of strikes.

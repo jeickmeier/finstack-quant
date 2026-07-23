@@ -106,19 +106,64 @@ fn assemble_x_line(
         let x = pts[i];
         let h_m = x_grid.h_left(i);
         let h_p = x_grid.h_right(i);
-        let h_sum = h_m + h_p;
 
         let a = problem.diffusion_xx(x, y, t);
         let b = problem.convection_x(x, y, t);
         // Half-reaction goes into the x-direction operator
         let c_half = 0.5 * problem.reaction(x, y, t);
 
-        lower[k] = 2.0 * a / (h_m * h_sum) - b * h_p / (h_m * h_sum);
-        main[k] = -2.0 * a / (h_m * h_p) + b * (h_p - h_m) / (h_m * h_p) + c_half;
-        upper[k] = 2.0 * a / (h_p * h_sum) + b * h_m / (h_p * h_sum);
+        let (lo, mi, up) = node_stencil(a, b, h_m, h_p);
+        lower[k] = lo;
+        main[k] = mi + c_half;
+        upper[k] = up;
     }
 
     TridiagOperator::from_parts(lower, main, upper, source, bc_lower, bc_upper, x_grid)
+}
+
+/// Diffusion + convection stencil for one interior node on a non-uniform grid.
+///
+/// Discretizes `a·d²u/ds² + b·du/ds`. The convection term uses the
+/// second-order central stencil while the resulting off-diagonals stay
+/// non-negative (the M-matrix / monotonicity condition), and switches to the
+/// first-order upwind stencil in convection-dominated cells — i.e. when
+/// `|b|·h > 2a` on the relevant one-sided spacing (cell Péclet above 1).
+///
+/// The upwind fallback keeps the unidirectional operators monotone for any
+/// convection strength (including the degenerate `a = 0` pure-transport
+/// case), so strongly mean-reverting problems (large Heston `κ`, wide
+/// variance grids) solve with locally first-order accuracy instead of being
+/// rejected outright. Reference: In 't Hout & Foulon (2010) treat the same
+/// regions with one-sided differences at the `v = 0` boundary; upwinding
+/// interior convection-dominated cells is the standard monotone extension
+/// (Duffy, *Finite Difference Methods in Financial Engineering*, Ch. 8).
+#[inline]
+fn node_stencil(a: f64, b: f64, h_m: f64, h_p: f64) -> (f64, f64, f64) {
+    let h_sum = h_m + h_p;
+    let central_is_monotone = if b >= 0.0 {
+        b * h_p <= 2.0 * a
+    } else {
+        -b * h_m <= 2.0 * a
+    };
+
+    let mut lower = 2.0 * a / (h_m * h_sum);
+    let mut main = -2.0 * a / (h_m * h_p);
+    let mut upper = 2.0 * a / (h_p * h_sum);
+
+    if central_is_monotone {
+        lower -= b * h_p / (h_m * h_sum);
+        main += b * (h_p - h_m) / (h_m * h_p);
+        upper += b * h_m / (h_p * h_sum);
+    } else if b >= 0.0 {
+        // Flow toward +s: difference against the upwind (right) neighbour.
+        main -= b / h_p;
+        upper += b / h_p;
+    } else {
+        // Flow toward -s: difference against the upwind (left) neighbour.
+        main += b / h_m;
+        lower -= b / h_m;
+    }
+    (lower, main, upper)
 }
 
 /// Assemble the y-direction tridiagonal operator at a fixed x-level.
@@ -145,15 +190,15 @@ fn assemble_y_line(
         let y = pts[j];
         let h_m = y_grid.h_left(j);
         let h_p = y_grid.h_right(j);
-        let h_sum = h_m + h_p;
 
         let a = problem.diffusion_yy(x, y, t);
         let b = problem.convection_y(x, y, t);
         let c_half = 0.5 * problem.reaction(x, y, t);
 
-        lower[k] = 2.0 * a / (h_m * h_sum) - b * h_p / (h_m * h_sum);
-        main[k] = -2.0 * a / (h_m * h_p) + b * (h_p - h_m) / (h_m * h_p) + c_half;
-        upper[k] = 2.0 * a / (h_p * h_sum) + b * h_m / (h_p * h_sum);
+        let (lo, mi, up) = node_stencil(a, b, h_m, h_p);
+        lower[k] = lo;
+        main[k] = mi + c_half;
+        upper[k] = up;
     }
 
     TridiagOperator::from_parts(lower, main, upper, source, bc_lower, bc_upper, y_grid)

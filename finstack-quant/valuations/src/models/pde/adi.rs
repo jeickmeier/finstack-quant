@@ -179,95 +179,13 @@ impl AdiWorkBuffers {
 /// standard choice for the Heston PDE.
 const MCS_THETA: f64 = 1.0 / 3.0;
 
-/// Cell-Péclet ceiling for the 2D MCS ADI stepper.
-///
-/// The cell Péclet number `Pe = |b| * h / (2 * a)` measures local
-/// convection-vs-diffusion. MCS at `theta = 1/3` is unconditionally stable
-/// for *pure 2D diffusion*, but for the *general convection-diffusion* case
-/// the von Neumann stability bound rises to `theta >= 2/5` (In 't Hout &
-/// Mishra 2010). In the strongly convection-dominated regime — large Heston
-/// `kappa`, very wide variance grids, or coarse spacing — the `theta = 1/3`
-/// scheme leaves its proven-stable envelope and can diverge silently.
-///
-/// `4.0` is chosen empirically. Representative production Heston grids
-/// (ATM 1y, put-call parity, strong-correlation reconciliation cases) peak at
-/// `Pe ≈ 1` — comfortably below this ceiling. A pathological large-`kappa`
-/// configuration (`kappa = 10`) reaches `Pe ≈ 5` and `kappa = 20` reaches
-/// `Pe ≈ 10`; both are flagged. The ceiling therefore sits well above the
-/// convection-dominated onset (`Pe ~ 1`, where a central-difference
-/// off-diagonal first changes sign) yet below the genuinely pathological
-/// regime, so it never false-positives a normal Heston solve while catching
-/// the cases the scheme cannot reliably handle.
-const MCS_PECLET_MAX: f64 = 4.0;
-
-/// Check the 2D grid is not so convection-dominated that the `theta = 1/3`
-/// MCS scheme leaves its reliably-stable regime.
-///
-/// Scans every interior node and computes the cell Péclet number in each
-/// direction, `Pe = |b| * h / (2 * a)`, using the *larger* of the two
-/// neighbour spacings (the conservative cell width — it is the spacing that
-/// governs whether a central-difference off-diagonal flips sign). If the
-/// largest `Pe` exceeds [`MCS_PECLET_MAX`] the step is rejected with
-/// [`StepperError::PecletViolation`] rather than risking silent divergence.
-///
-/// A node whose diffusion `a` is exactly zero while convection is non-zero
-/// is treated as infinitely convection-dominated and flagged.
-fn check_peclet(problem: &dyn PdeProblem2D, grid: &Grid2D, t: f64) -> Result<(), StepperError> {
-    let x_pts = grid.x().points();
-    let y_pts = grid.y().points();
-
-    let mut worst: Option<(&'static str, f64, f64, f64, f64)> = None;
-    let mut consider = |dir: &'static str, b: f64, a: f64, h: f64| {
-        let b = b.abs();
-        if b == 0.0 {
-            return; // no convection here — no Péclet constraint
-        }
-        // Pe = |b| h / (2a); a == 0 with b != 0 is infinite Péclet.
-        let pe = if a > 0.0 {
-            b * h / (2.0 * a)
-        } else {
-            f64::INFINITY
-        };
-        if worst.map(|(_, w, ..)| pe > w).unwrap_or(true) {
-            worst = Some((dir, pe, b, a, h));
-        }
-    };
-
-    // Iterate the interior nodes (grid indices 1..n-1). `x` / `y` come from
-    // the point iterators; the index is used only for the spacing helpers.
-    for (i, &x) in x_pts.iter().enumerate().take(grid.nx() - 1).skip(1) {
-        let hx = grid.x().h_left(i).max(grid.x().h_right(i));
-        for (j, &y) in y_pts.iter().enumerate().take(grid.ny() - 1).skip(1) {
-            let hy = grid.y().h_left(j).max(grid.y().h_right(j));
-            consider(
-                "x",
-                problem.convection_x(x, y, t),
-                problem.diffusion_xx(x, y, t),
-                hx,
-            );
-            consider(
-                "y",
-                problem.convection_y(x, y, t),
-                problem.diffusion_yy(x, y, t),
-                hy,
-            );
-        }
-    }
-
-    if let Some((direction, peclet, convection, diffusion, spacing)) = worst {
-        if peclet > MCS_PECLET_MAX {
-            return Err(StepperError::PecletViolation {
-                direction,
-                peclet,
-                pe_max: MCS_PECLET_MAX,
-                convection,
-                diffusion,
-                spacing,
-            });
-        }
-    }
-    Ok(())
-}
+// NOTE: the former `check_peclet` global rejection (with its
+// `MCS_PECLET_MAX = 4` ceiling) was removed when the unidirectional
+// operators gained a per-node monotone upwind switch
+// (`operator2d::node_stencil`): convection-dominated cells now assemble a
+// first-order upwind convection stencil instead of a sign-flipped central
+// one, so the `theta = 1/3` MCS scheme stays within its stable envelope for
+// any convection strength and no solve needs to be rejected.
 
 /// Modified Craig-Sneyd (MCS) ADI time stepper for 2D problems.
 ///
@@ -407,13 +325,12 @@ impl CraigSneydStepper {
             return Err(StepperError::NonPositiveStep { dt, t_from, t_to });
         }
 
-        // Convection-dominated guard: the `theta = 1/3` MCS scheme is reliably
-        // stable only when the cell Péclet number is bounded. The 1D path
-        // enforces a CFL bound; the 2D path enforces this Péclet bound.
-        // Evaluated at t_from (coefficients are time-homogeneous for the
-        // Heston PDE, the production user of this stepper).
-        check_peclet(problem, grid, t_from)?;
-
+        // Convection-dominated cells are handled inside the unidirectional
+        // operator assembly (`operator2d::node_stencil`): wherever the cell
+        // Péclet exceeds 1 the convection term switches to the monotone
+        // first-order upwind stencil, so no global Péclet rejection is
+        // needed — strongly mean-reverting problems (large Heston `κ`) solve
+        // with locally reduced order instead of erroring out.
         let theta = if step_index < self.implicit_start_steps {
             1.0
         } else {
@@ -963,23 +880,15 @@ mod tests {
         }
     }
 
-    /// [P6-1] The 2D MCS stepper must reject a strongly convection-dominated
-    /// grid with [`StepperError::PecletViolation`] rather than running the
-    /// `theta = 1/3` scheme silently outside its proven-stable regime.
-    ///
-    /// Failure mode being guarded: unlike the 1D path (which enforces a CFL
-    /// bound), the 2D MCS stepper hard-coded `theta = 1/3` with no stability
-    /// guard. MCS at `theta = 1/3` is unconditionally stable for *pure
-    /// diffusion* but only for `theta >= 2/5` in the general
-    /// convection-diffusion case (In 't Hout & Mishra 2010); a
-    /// convection-dominated grid can therefore diverge silently to inf / NaN.
-    ///
-    /// On a 41x41 grid over `[0, pi]^2` (spacing h ≈ pi/40 ≈ 0.0785) with
-    /// diffusion `a = 0.01` and convection `b = 5.0`, the cell Péclet number
-    /// is `Pe = |b|*h/(2a) ≈ 5*0.0785/0.02 ≈ 19.6` — far above the
-    /// `MCS_PECLET_MAX = 4.0` ceiling. The step must error.
+    /// [P6-1, revised] A strongly convection-dominated grid must now SOLVE
+    /// via the per-node upwind switch in the operator assembly — not be
+    /// rejected. On a 41x41 grid over `[0, pi]^2` with diffusion `a = 0.01`
+    /// and convection `b = 5.0`, the cell Péclet is ≈ 19.6; the central
+    /// stencil would flip an off-diagonal sign there, but the monotone
+    /// upwind stencil keeps the step stable, finite, and free of new
+    /// extrema.
     #[test]
-    fn mcs_step_rejects_convection_dominated_grid() {
+    fn mcs_step_handles_convection_dominated_grid_via_upwinding() {
         let pi = std::f64::consts::PI;
         let problem = ConvectionDominated2D {
             diff: 0.01,
@@ -989,32 +898,6 @@ mod tests {
         let gy = Grid1D::uniform(0.0, pi, 41).expect("valid grid");
         let grid = Grid2D::new(gx, gy);
 
-        // The Péclet check itself flags the grid.
-        match check_peclet(&problem, &grid, 0.0) {
-            Err(StepperError::PecletViolation {
-                peclet,
-                pe_max,
-                convection,
-                diffusion,
-                ..
-            }) => {
-                assert!(
-                    (pe_max - MCS_PECLET_MAX).abs() < 1e-12,
-                    "the error must cite the MCS_PECLET_MAX ceiling"
-                );
-                assert!(
-                    peclet > MCS_PECLET_MAX,
-                    "the reported Péclet {peclet:e} must exceed the ceiling {pe_max}"
-                );
-                assert!(
-                    (convection - 5.0).abs() < 1e-12 && (diffusion - 0.01).abs() < 1e-12,
-                    "the error must cite the offending convection / diffusion coefficients"
-                );
-            }
-            other => panic!("expected PecletViolation from check_peclet, got {other:?}"),
-        }
-
-        // A full MCS step must surface the same error.
         let nx = grid.nx();
         let ny = grid.ny();
         let nx_int = grid.nx_interior();
@@ -1032,41 +915,38 @@ mod tests {
                 u_int[ii * ny_int + jj] = u_full[(ii + 1) * ny + (jj + 1)];
             }
         }
+        // Extremum bounds must include the boundary values (zero Dirichlet):
+        // interior values legitimately decay toward the boundaries, so the
+        // valid range is [min(boundary, interior), max(boundary, interior)].
+        let initial_max = u_int
+            .iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max)
+            .max(0.0);
+        let initial_min = u_int.iter().copied().fold(f64::INFINITY, f64::min).min(0.0);
+
         let stepper = CraigSneydStepper::new(100);
-        let result = stepper.step(&problem, &grid, &mut u_full, &mut u_int, 0.25, 0.245, 0);
-        assert!(
-            matches!(result, Err(StepperError::PecletViolation { .. })),
-            "a convection-dominated MCS step must be rejected, got {result:?}"
-        );
-    }
+        // March several steps: instability would amplify step over step.
+        let mut t_from = 0.25;
+        for step in 0..10 {
+            let t_to = t_from - 0.005;
+            stepper
+                .step(&problem, &grid, &mut u_full, &mut u_int, t_from, t_to, step)
+                .expect("convection-dominated step must solve via upwinding");
+            t_from = t_to;
+        }
 
-    /// [P6-1] The Péclet guard must NOT false-positive a benign grid: pure
-    /// 2D diffusion (zero convection — MCS at `theta = 1/3` is
-    /// unconditionally stable here) and a mildly convective grid well within
-    /// the ceiling both pass.
-    #[test]
-    fn mcs_peclet_guard_accepts_diffusion_dominated_grids() {
-        let pi = std::f64::consts::PI;
-        let gx = Grid1D::uniform(0.0, pi, 41).expect("valid grid");
-        let gy = Grid1D::uniform(0.0, pi, 41).expect("valid grid");
-        let grid = Grid2D::new(gx, gy);
-
-        // Pure diffusion: zero convection → no Péclet constraint at all.
-        assert!(
-            check_peclet(&Heat2D, &grid, 0.0).is_ok(),
-            "pure-diffusion grid must pass the Péclet guard"
-        );
-
-        // Mild convection: with a = 1.0, b = 1.0, h ≈ 0.0785 the cell Péclet
-        // is ≈ 0.04 — far inside the ceiling.
-        let mild = ConvectionDominated2D {
-            diff: 1.0,
-            conv: 1.0,
-        };
-        assert!(
-            check_peclet(&mild, &grid, 0.0).is_ok(),
-            "a mildly convective, diffusion-dominated grid must pass the Péclet guard"
-        );
+        // Finite everywhere, and no new extrema beyond a small tolerance —
+        // the signature of a monotone (upwinded) convection discretization.
+        let tol = 1e-9 * initial_max.abs().max(1.0);
+        for &v in &u_int {
+            assert!(v.is_finite(), "upwinded solution must stay finite");
+            assert!(
+                v <= initial_max + tol && v >= initial_min - tol,
+                "monotone scheme must not create new extrema: {v} outside \
+                 [{initial_min}, {initial_max}]"
+            );
+        }
     }
 
     /// [P6-6] The 2D MCS stepper must reject a non-positive time step with

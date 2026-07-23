@@ -439,11 +439,13 @@ mod tests {
         }
     }
 
-    /// [P6-1] `Solver2D::solve` must propagate the MCS Péclet stability
-    /// failure as `PdeSolver2DError::Stepper(StepperError::PecletViolation)`
-    /// rather than returning a silently-divergent solution.
+    /// [P6-1, revised] A convection-dominated 2D solve must now SUCCEED via
+    /// the per-node upwind switch in the operator assembly (the former
+    /// global `PecletViolation` rejection was removed) and stay finite —
+    /// the monotone upwind stencil keeps `theta = 1/3` MCS inside its
+    /// stable envelope for any convection strength.
     #[test]
-    fn solver2d_solve_propagates_peclet_violation() {
+    fn solver2d_solves_convection_dominated_grid_via_upwinding() {
         let pi = std::f64::consts::PI;
         let gx = Grid1D::uniform(0.0, pi, 41).expect("valid grid");
         let gy = Grid1D::uniform(0.0, pi, 41).expect("valid grid");
@@ -453,16 +455,19 @@ mod tests {
             .build()
             .expect("valid solver");
 
-        let result = solver.solve(&ConvectionDominated2D, 0.25);
-        assert!(
-            matches!(
-                result,
-                Err(PdeSolver2DError::Stepper(
-                    StepperError::PecletViolation { .. }
-                ))
-            ),
-            "a convection-dominated 2D solve must surface a PecletViolation, got {result:?}"
-        );
+        let solution = solver
+            .solve(&ConvectionDominated2D, 0.25)
+            .expect("convection-dominated solve must succeed via upwinding");
+        // Terminal condition sin(x)·sin(y) ∈ [0, 1] on this domain with
+        // zero Dirichlet boundaries and zero reaction: the solution must
+        // stay finite and produce no new extrema.
+        for &v in &solution.values {
+            assert!(v.is_finite(), "upwinded 2D solution must stay finite");
+            assert!(
+                (-1e-6..=1.0 + 1e-6).contains(&v),
+                "monotone scheme must not create new extrema, got {v}"
+            );
+        }
     }
 
     /// [P6-6] `Solver2D::solve` must reject a non-positive maturity and a

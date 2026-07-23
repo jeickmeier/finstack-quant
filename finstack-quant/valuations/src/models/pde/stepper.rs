@@ -13,12 +13,13 @@ use super::problem::PdeProblem1D;
 /// Failure modes:
 /// - [`StepperError::CflViolation`] — an explicit / under-damped 1D theta
 ///   scheme stepped past its CFL / von-Neumann stability limit.
-/// - [`StepperError::PecletViolation`] — the 2D Modified Craig-Sneyd ADI
-///   stepper was handed a convection-dominated grid whose cell Péclet number
-///   exceeds the regime in which `theta = 1/3` MCS is reliably stable.
 /// - [`StepperError::NonPositiveStep`] — a non-positive time step `dt`
 ///   (e.g. a non-positive maturity, or `n_steps` so small the step is
 ///   degenerate) was requested.
+///
+/// (The former `PecletViolation` variant was removed: convection-dominated
+/// 2D cells are now handled by the monotone per-node upwind switch in the
+/// operator assembly instead of a global rejection.)
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum StepperError {
@@ -48,38 +49,6 @@ pub enum StepperError {
         dx_min: f64,
         /// Largest absolute diffusion coefficient over the interior grid.
         max_diffusion: f64,
-    },
-    /// The 2D Modified Craig-Sneyd ADI stepper was handed a grid whose largest
-    /// cell Péclet number `Pe = |b| * h / (2 * a)` exceeds the threshold
-    /// inside which the `theta = 1/3` scheme is reliably stable.
-    ///
-    /// MCS at `theta = 1/3` is unconditionally stable for *pure 2D diffusion*,
-    /// but for the *general convection-diffusion* case the von Neumann bound
-    /// rises to `theta >= 2/5` (In 't Hout & Mishra 2010). In the strongly
-    /// convection-dominated regime — large Heston `kappa`, very wide variance
-    /// grids, or coarse spacing where convection swamps diffusion — the
-    /// `theta = 1/3` scheme leaves its proven-stable envelope and can diverge
-    /// silently to inf / NaN. This guard reports it instead.
-    #[error(
-        "Péclet stability violated: 2D MCS ADI (theta=1/3) requires the cell Péclet number \
-         Pe = |b|*h/(2*a) <= {pe_max} for reliable stability, but the {direction}-direction \
-         grid reaches Pe = {peclet:e} (convection |b| = {convection:e}, diffusion a = {diffusion:e}, \
-         spacing h = {spacing:e}); refine the grid in that direction, narrow the domain, or \
-         reduce the convection dominance"
-    )]
-    PecletViolation {
-        /// Direction the violation occurred on (`"x"` or `"y"`).
-        direction: &'static str,
-        /// The largest cell Péclet number found on that direction.
-        peclet: f64,
-        /// Threshold above which the scheme is considered convection-dominated.
-        pe_max: f64,
-        /// Absolute convection coefficient at the offending node.
-        convection: f64,
-        /// Diffusion coefficient at the offending node.
-        diffusion: f64,
-        /// Grid spacing at the offending node.
-        spacing: f64,
     },
     /// A non-positive time step `dt` was requested.
     ///

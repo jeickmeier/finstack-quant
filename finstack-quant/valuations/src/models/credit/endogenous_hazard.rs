@@ -128,7 +128,12 @@ impl EndogenousHazardSpec {
                 "tabular: hazard points must be finite and >= 0, got {bad}"
             )));
         }
-        if leverage_points.windows(2).any(|w| !(w[1] > w[0])) {
+        if let Some(bad) = leverage_points.iter().find(|l| !l.is_finite()) {
+            return Err(Error::Validation(format!(
+                "tabular: leverage points must be finite, got {bad}"
+            )));
+        }
+        if leverage_points.windows(2).any(|w| w[1] <= w[0]) {
             return Err(Error::Validation(
                 "tabular: leverage points must be strictly increasing — \
                  interpolation assumes an ascending axis"

@@ -4458,20 +4458,27 @@ export interface ValuationInstrumentsNamespace {
    * @param instrumentJson - Canonical JSON payload representing the instrument consumed by this API.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Pricing-model identifier; use `"default"` for the instrument-native model when supported.
+   * @param model - Optional pricing-model identifier; omit for the instrument-native model (matches the Python binding's `model="default"`).
    * @returns Returns the requested string representation or JSON payload.
    * @throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.
    */
-  priceInstrument(instrumentJson: string, marketJson: string, asOf: string, model: string): string;
+  priceInstrument(
+    instrumentJson: string,
+    marketJson: string,
+    asOf: string,
+    model?: string | null,
+  ): string;
   /**
    * Price an instrument with explicit metric requests.
    *
-   * Pass `model = "default"` to use the instrument-native default model.
+   * Omit `model` (or pass `"default"`) for the instrument-native default
+   * model, and omit `metrics` for none — matching the Python binding's
+   * `model="default"`, `metrics=[]` defaults.
    * @param instrumentJson - Canonical JSON payload representing the instrument consumed by this API.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Pricing-model identifier; use `"default"` for the instrument-native model when supported.
-   * @param metrics - Array of canonical metric identifiers to calculate with the instrument price.
+   * @param model - Optional pricing-model identifier; omit for the instrument-native model.
+   * @param metrics - Optional array of canonical metric identifiers to calculate with the instrument price.
    * @param pricingOptions - Optional JSON pricing overrides accepted by the canonical instrument validator.
    * @param marketHistory - Optional serialized historical market snapshots required by historical pricing models.
    * @returns Returns the requested string representation or JSON payload.
@@ -4481,8 +4488,8 @@ export interface ValuationInstrumentsNamespace {
     instrumentJson: string,
     marketJson: string,
     asOf: string,
-    model: string,
-    metrics: string[],
+    model?: string | null,
+    metrics?: string[] | null,
     pricingOptions?: string | null,
     marketHistory?: string | null
   ): string;

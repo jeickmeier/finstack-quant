@@ -40,7 +40,7 @@ use pyo3::prelude::*;
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put.
 /// n_terms : int, optional
-///     Number of cosine terms in the expansion (default 128).
+///     Number of cosine terms in the expansion; omit to use the pricer default.
 ///
 /// Returns
 /// -------
@@ -102,7 +102,7 @@ fn bs_cos_price(
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put.
 /// n_terms : int, optional
-///     Number of cosine terms (default 128; heavier tails may need 256+).
+///     Number of cosine terms; omit to use the pricer default (heavier tails may need more).
 ///
 /// Returns
 /// -------
@@ -171,7 +171,7 @@ fn vg_cos_price(
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put.
 /// n_terms : int, optional
-///     Number of cosine terms (default 128).
+///     Number of cosine terms; omit to use the pricer default.
 ///
 /// Returns
 /// -------

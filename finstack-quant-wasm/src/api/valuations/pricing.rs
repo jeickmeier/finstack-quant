@@ -159,31 +159,39 @@ pub fn bond_from_cashflows_json(
 
 /// Price an instrument from its tagged JSON and return a ValuationResult JSON.
 ///
-/// Pass `model = "default"` to use the instrument-native default model.
+/// Omit `model` (or pass `"default"`) to use the instrument-native default
+/// model — matching the Python binding's `model="default"` default.
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-/// @param model - Pricing-model identifier; use `"default"` for the instrument-native model when supported.
+/// @param model - Optional pricing-model identifier; omit for the instrument-native model.
 #[wasm_bindgen(js_name = priceInstrument)]
 pub fn price_instrument(
     instrument_json: &str,
     market_json: &str,
     as_of: &str,
-    model: &str,
+    model: Option<String>,
 ) -> Result<String, JsValue> {
     validate_pricing_instrument_json(instrument_json, None)?;
     let market = parse_market_json(market_json)?;
-    price_instrument_with_context(instrument_json, &market, as_of, model)
+    price_instrument_with_context(
+        instrument_json,
+        &market,
+        as_of,
+        model.as_deref().unwrap_or("default"),
+    )
 }
 
 /// Price an instrument with explicit metric requests.
 ///
-/// Pass `model = "default"` to use the instrument-native default model.
+/// Omit `model` (or pass `"default"`) to use the instrument-native default
+/// model, and omit `metrics` (undefined/null) for none — matching the Python
+/// binding's `model="default"`, `metrics=[]` defaults.
 /// @param instrument_json - Canonical JSON payload representing the instrument consumed by this API.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-/// @param model - Pricing-model identifier; use `"default"` for the instrument-native model when supported.
-/// @param metrics - Array of canonical metric identifiers to calculate with the instrument price.
+/// @param model - Optional pricing-model identifier; omit for the instrument-native model.
+/// @param metrics - Optional array of canonical metric identifiers to calculate with the instrument price.
 /// @param pricing_options - Optional JSON pricing overrides accepted by the canonical instrument validator.
 /// @param market_history - Optional serialized historical market snapshots required by historical pricing models.
 #[wasm_bindgen(js_name = priceInstrumentWithMetrics)]
@@ -191,14 +199,19 @@ pub fn price_instrument_with_metrics(
     instrument_json: &str,
     market_json: &str,
     as_of: &str,
-    model: &str,
+    model: Option<String>,
     metrics: JsValue,
     pricing_options: Option<String>,
     market_history: Option<String>,
 ) -> Result<String, JsValue> {
     validate_pricing_instrument_json(instrument_json, pricing_options.as_deref())?;
     let market = parse_market_json(market_json)?;
-    let metric_strs: Vec<String> = serde_wasm_bindgen::from_value(metrics).map_err(to_js_err)?;
+    let model = model.as_deref().unwrap_or("default");
+    let metric_strs: Vec<String> = if metrics.is_undefined() || metrics.is_null() {
+        Vec::new()
+    } else {
+        serde_wasm_bindgen::from_value(metrics).map_err(to_js_err)?
+    };
     price_instrument_with_metrics_context(
         instrument_json,
         &market,
@@ -846,7 +859,8 @@ mod tests {
     fn price_instrument_bond() {
         let inst = bond_instrument_json();
         let mkt = market_context_json();
-        let result = price_instrument(&inst, &mkt, "2024-01-01", "discounting").expect("price");
+        let result = price_instrument(&inst, &mkt, "2024-01-01", Some("discounting".to_string()))
+            .expect("price");
         let parsed: serde_json::Value = serde_json::from_str(&result).expect("json");
         assert!(parsed.is_object());
     }
@@ -873,8 +887,13 @@ mod tests {
     fn price_instrument_tarn_hull_white_mc() {
         let inst = tarn_json();
         let mkt = tarn_market_context_json();
-        let result = price_instrument(&inst, &mkt, "2025-01-01", "monte_carlo_hull_white_1f")
-            .expect("price");
+        let result = price_instrument(
+            &inst,
+            &mkt,
+            "2025-01-01",
+            Some("monte_carlo_hull_white_1f".to_string()),
+        )
+        .expect("price");
         let parsed: serde_json::Value = serde_json::from_str(&result).expect("json");
         let amount = amount_from_result(&parsed);
         assert!(amount > 0.0);
@@ -892,10 +911,20 @@ mod tests {
         // the whole serialized envelope.
         let inst = tarn_json();
         let mkt = tarn_market_context_json();
-        let first = price_instrument(&inst, &mkt, "2025-01-01", "monte_carlo_hull_white_1f")
-            .expect("first MC price");
-        let second = price_instrument(&inst, &mkt, "2025-01-01", "monte_carlo_hull_white_1f")
-            .expect("second MC price");
+        let first = price_instrument(
+            &inst,
+            &mkt,
+            "2025-01-01",
+            Some("monte_carlo_hull_white_1f".to_string()),
+        )
+        .expect("first MC price");
+        let second = price_instrument(
+            &inst,
+            &mkt,
+            "2025-01-01",
+            Some("monte_carlo_hull_white_1f".to_string()),
+        )
+        .expect("second MC price");
         let first_parsed: serde_json::Value =
             serde_json::from_str(&first).expect("first result json");
         let second_parsed: serde_json::Value =
@@ -914,8 +943,13 @@ mod tests {
     fn price_instrument_snowball_hull_white_mc() {
         let inst = snowball_json();
         let mkt = tarn_market_context_json();
-        let result = price_instrument(&inst, &mkt, "2025-01-01", "monte_carlo_hull_white_1f")
-            .expect("price");
+        let result = price_instrument(
+            &inst,
+            &mkt,
+            "2025-01-01",
+            Some("monte_carlo_hull_white_1f".to_string()),
+        )
+        .expect("price");
         let parsed: serde_json::Value = serde_json::from_str(&result).expect("json");
         assert!(amount_from_result(&parsed) > 0.0);
         assert_eq!(parsed["measures"]["mc_num_paths"], 32.0);
@@ -925,7 +959,8 @@ mod tests {
     fn price_instrument_inverse_floater_discounting() {
         let inst = inverse_floater_json();
         let mkt = tarn_market_context_json();
-        let result = price_instrument(&inst, &mkt, "2025-01-01", "discounting").expect("price");
+        let result = price_instrument(&inst, &mkt, "2025-01-01", Some("discounting".to_string()))
+            .expect("price");
         let parsed: serde_json::Value = serde_json::from_str(&result).expect("json");
         assert!(amount_from_result(&parsed) > 0.0);
     }
@@ -934,8 +969,13 @@ mod tests {
     fn price_instrument_callable_range_accrual_hull_white_mc() {
         let inst = callable_range_accrual_json();
         let mkt = tarn_market_context_json();
-        let result = price_instrument(&inst, &mkt, "2025-01-01", "monte_carlo_hull_white_1f")
-            .expect("price");
+        let result = price_instrument(
+            &inst,
+            &mkt,
+            "2025-01-01",
+            Some("monte_carlo_hull_white_1f".to_string()),
+        )
+        .expect("price");
         let parsed: serde_json::Value = serde_json::from_str(&result).expect("json");
         assert!(amount_from_result(&parsed) > 0.0);
         assert_eq!(parsed["measures"]["mc_num_paths"], 8.0);
@@ -945,8 +985,13 @@ mod tests {
     fn price_instrument_cms_spread_option_static_replication() {
         let inst = cms_spread_option_json();
         let mkt = cms_spread_market_context_json();
-        let result =
-            price_instrument(&inst, &mkt, "2025-01-01", "static_replication").expect("price");
+        let result = price_instrument(
+            &inst,
+            &mkt,
+            "2025-01-01",
+            Some("static_replication".to_string()),
+        )
+        .expect("price");
         let parsed: serde_json::Value = serde_json::from_str(&result).expect("json");
         assert!(amount_from_result(&parsed) > 0.0);
         assert!(
@@ -962,7 +1007,8 @@ mod tests {
         let inst = bond_instrument_json();
         let mkt = market_context_json();
         let result_json =
-            price_instrument(&inst, &mkt, "2024-01-01", "discounting").expect("price");
+            price_instrument(&inst, &mkt, "2024-01-01", Some("discounting".to_string()))
+                .expect("price");
         let canonical = validate_valuation_result_json(&result_json).expect("validate");
         assert!(!canonical.is_empty());
         let parsed: serde_json::Value = serde_json::from_str(&canonical).expect("json");

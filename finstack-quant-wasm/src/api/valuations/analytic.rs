@@ -101,12 +101,9 @@ pub fn bs_greeks(
     is_call: bool,
     theta_days: Option<f64>,
 ) -> Result<JsValue, JsValue> {
+    // theta_days validation (finite, > 0) lives in `bs_greeks_checked` —
+    // the single home for Greeks input validation.
     let theta_days = theta_days.unwrap_or(365.0);
-    if !theta_days.is_finite() || theta_days <= 0.0 {
-        return Err(JsValue::from_str(&format!(
-            "thetaDays must be positive, got {theta_days}"
-        )));
-    }
     let g = bs_greeks_core(
         spot,
         strike,
