@@ -179,8 +179,8 @@ pub fn transform_cross_sectional_with_op(
             CrossSectionalOp::MinmaxScale => minmax_scale(values, indices, &mut output),
             CrossSectionalOp::Clip => clip(values, indices, params, &mut output)?,
             CrossSectionalOp::ClipBySigma => clip_by_sigma(values, indices, params, &mut output)?,
-            CrossSectionalOp::ClipByQuantile => {
-                clip_by_quantile(values, indices, params, &mut output)?
+            CrossSectionalOp::ClipByQuantile | CrossSectionalOp::Winsorize => {
+                winsorize(values, indices, params, &mut output)?
             }
             CrossSectionalOp::NormalScoreTransform => {
                 normal_score_transform(values, indices, &mut output)
@@ -192,7 +192,6 @@ pub fn transform_cross_sectional_with_op(
             CrossSectionalOp::FillMissing => fill_missing(values, indices, params, &mut output)?,
             CrossSectionalOp::IsFinite => is_finite(values, indices, &mut output),
             CrossSectionalOp::NanMask => nan_mask(values, indices, &mut output),
-            CrossSectionalOp::Winsorize => winsorize(values, indices, params, &mut output)?,
         }
     }
     Ok(output)
@@ -413,15 +412,6 @@ fn clip_by_sigma(
         output[idx] = Some(value.clamp(lower, upper));
     }
     Ok(())
-}
-
-fn clip_by_quantile(
-    values: &[Option<f64>],
-    indices: &[usize],
-    params: Option<&Value>,
-    output: &mut [Option<f64>],
-) -> Result<()> {
-    winsorize(values, indices, params, output)
 }
 
 fn normal_score_transform(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {

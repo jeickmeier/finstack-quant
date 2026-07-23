@@ -241,7 +241,7 @@ impl McEngineBuilder {
             antithetic: self.antithetic,
         };
 
-        Ok(McEngine::from_config(config))
+        Ok(McEngine::new(config))
     }
 }
 

@@ -245,7 +245,7 @@ fn compute_contractual_flows(
     IndexMap<String, crate::capital_structure::CashflowBreakdown>,
     Vec<EvalWarning>,
 )> {
-    use crate::capital_structure::integration;
+    use crate::capital_structure::period_flows::calculate_period_flows;
 
     let mut flows = IndexMap::new();
     let mut warnings = Vec::new();
@@ -266,7 +266,7 @@ fn compute_contractual_flows(
             .copied()
             .unwrap_or_else(|| Money::new(0.0, opening_balance.currency()));
         let (breakdown, closing_balance, net_new_funding, period_warnings) =
-            integration::calculate_period_flows(
+            calculate_period_flows(
                 instrument.as_ref(),
                 period,
                 opening_balance,

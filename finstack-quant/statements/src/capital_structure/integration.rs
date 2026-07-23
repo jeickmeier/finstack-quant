@@ -24,10 +24,6 @@ use finstack_quant_core::money::{fx::FxQuery, Money};
 use indexmap::IndexMap;
 use std::sync::Arc;
 
-// Re-export the moved helper so existing call sites that import via this
-// module continue to compile.
-pub use crate::capital_structure::period_flows::calculate_period_flows;
-
 /// Build a runtime instrument from a [`crate::types::DebtInstrumentSpec`].
 ///
 /// Delegates to the canonical valuations instrument registry. The `spec`

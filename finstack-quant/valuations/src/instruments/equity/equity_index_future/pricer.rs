@@ -49,18 +49,6 @@ pub(crate) fn compute_pv_raw(
     price_fair_value(future, market, as_of)
 }
 
-/// Resolve the entry price for an open position, erroring if absent.
-///
-/// `EquityIndexFuture::entry_price` is `Option<f64>` so that an unfilled
-/// order can be represented in the data model. Once you ask the pricer for
-/// PV, however, the entry price is mandatory: PV is mark-to-market minus
-/// entry, so a missing entry would silently default to zero and book the
-/// full quoted price as P&L. Delegates to the shared requirement on the
-/// instrument (also used by `EquityIndexFuture::delta`).
-fn require_entry_price(future: &EquityIndexFuture) -> finstack_quant_core::Result<f64> {
-    future.require_entry_price()
-}
-
 fn entry_contracts(future: &EquityIndexFuture, entry_price: f64) -> f64 {
     future.num_contracts(entry_price)
 }
@@ -69,7 +57,7 @@ pub(crate) fn price_quoted(
     future: &EquityIndexFuture,
     quoted_price: f64,
 ) -> finstack_quant_core::Result<f64> {
-    let entry = require_entry_price(future)?;
+    let entry = future.require_entry_price()?;
     let price_diff = quoted_price - entry;
     let contracts = entry_contracts(future, entry);
     let pv = price_diff * future.contract_specs.multiplier * contracts * future.position_sign();
@@ -82,7 +70,7 @@ pub(crate) fn price_fair_value(
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
     let fair_value = fair_forward(future, market, as_of)?;
-    let entry = require_entry_price(future)?;
+    let entry = future.require_entry_price()?;
     let price_diff = fair_value - entry;
     let contracts = entry_contracts(future, entry);
     let pv = price_diff * future.contract_specs.multiplier * contracts * future.position_sign();

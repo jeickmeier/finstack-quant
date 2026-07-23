@@ -121,11 +121,6 @@ impl McEngine {
         Self { config }
     }
 
-    /// Construct from config (used by builder).
-    pub(super) fn from_config(config: McEngineConfig) -> Self {
-        Self { config }
-    }
-
     /// Borrow the engine configuration.
     pub fn config(&self) -> &McEngineConfig {
         &self.config

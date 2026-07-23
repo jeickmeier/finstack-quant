@@ -1392,7 +1392,7 @@ impl Discounting for DiscountCurve {
 
     #[inline]
     fn df(&self, t: f64) -> f64 {
-        self.interp.interp(t)
+        DiscountCurve::df(self, t)
     }
 
     #[inline]
