@@ -107,3 +107,31 @@
 - During a plan, validate each completed task with the smallest targeted tests and focused lint/type checks that cover its changes. Run full test suites only once, at the very end of the plan, after targeted checks are clean.
 - User reports issues by pasting terminal output (clippy, cargo deny, test failures) rather than describing them
 - When moving files, use `mv` in terminal and update all import references; then lint and format
+
+## Cursor Cloud specific instructions
+
+Toolchains are provisioned by `mise` (see `mise.toml`); the startup update script runs
+`mise install`, `mise run python-sync`, and `npm ci --ignore-scripts` for the WASM package.
+Standard tasks live in `mise.toml` (`mise tasks`) and README "Common Commands"; use those
+rather than duplicating commands. Non-obvious environment caveats:
+
+- **Always drive tools through `mise`.** `mise` and `uv` are symlinked into `/usr/local/bin`,
+  but the mise-managed `rust`/`cargo`, `node`/`npm`, `wasm-pack`, `maturin`, and `nextest` are
+  only on `PATH` inside `mise run <task>` / `mise exec -- <cmd>` (or a login shell that sources
+  `~/.bashrc`). A bare non-login `cargo`/`node`/`npm` may resolve to the base image's tools or
+  fail. Prefer `mise run <task>`; for ad-hoc commands use `mise exec -- <cmd>`.
+- **rustup default is pinned to 1.91.1** (matches `mise.toml`). The base image ships rustc 1.83
+  as its default; without this pin, building `cargo:` tools would fail on `edition2024`. Keep the
+  default at 1.91.1. `CARGO_HOME=/usr/local/cargo` and `RUSTUP_HOME=/usr/local/rustup` are set in
+  the image environment — don't unset them or mise reinstalls Rust under `~/.rustup`.
+- **The update script installs deps but does not build.** The Python extension is Rust-compiled
+  and is **not** hot-reloaded: after changing any Rust source, rebuild before Python tests with
+  `mise run python-build` (the `python-test*` tasks do this automatically). `uv run` re-syncs the
+  venv, so pass `--no-sync` when you only want to run against the already-built editable extension.
+- **WASM `pkg/` and `pkg-node/` are build artifacts** (persisted in the snapshot). `npm ci` normally
+  triggers a `prepare` → `wasm-pack build`; the update script uses `--ignore-scripts` to skip it.
+  Rebuild explicitly with `mise run wasm-build` (web), `mise run wasm-pkg` (web + node), or
+  `mise run wasm-test` (rebuilds both). `wasm-pack` runs `wasm-opt` on a ~26 MB binary, so a clean
+  `mise run wasm-test` can take ~15–20 minutes; the facade tests require the web `pkg/` to exist.
+- **System packages** `pkg-config` and `libssl-dev` are installed (needed to build
+  `cargo-public-api`); they are baked into the snapshot.
