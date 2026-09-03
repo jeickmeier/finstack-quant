@@ -12,6 +12,7 @@ from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 import time
+import warnings
 
 from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError
@@ -62,8 +63,14 @@ def run_notebook(notebook_path: Path, timeout: int, save_outputs: bool = False) 
     _configure_pythonpath()
     start = time.time()
     try:
-        with open(notebook_path, encoding="utf-8") as f:
-            nb = nbformat.read(f, as_version=4)
+        # A verified notebook must already be valid on disk.  In particular,
+        # do not let nbformat silently repair missing cell IDs while reading.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            with open(notebook_path, encoding="utf-8") as f:
+                nb = nbformat.read(f, as_version=4)
+        if any("skip-execution" in cell.get("metadata", {}).get("tags", []) for cell in nb.cells):
+            raise ValueError("skip-execution tags are not allowed in verified notebooks")
 
         with TemporaryDirectory(prefix="finstack-notebook-") as ipc_dir:
             config = Config()
@@ -75,8 +82,55 @@ def run_notebook(notebook_path: Path, timeout: int, save_outputs: bool = False) 
                 kernel_name="python3",
                 resources={"metadata": {"path": str(notebook_path.parent)}},
                 config=config,
+                force_raise_errors=True,
             )
-            client.execute()
+            # Financial acceptance assertions must run even under an optimized caller.
+            kernel_env = os.environ.copy()
+            kernel_env["PYTHONOPTIMIZE"] = "0"
+            ipython_dir = Path(ipc_dir) / "ipython"
+            ipython_dir.mkdir()
+            kernel_env["IPYTHONDIR"] = str(ipython_dir)
+            # Configure warnings around each authored cell, after Jupyter has
+            # booted and before it shuts down. This keeps kernel lifecycle
+            # deprecations separate from warnings caused by lesson code.
+            guard = nbformat.v4.new_code_cell(
+                "import warnings as _finstack_warnings\n"
+                "_finstack_warning_filters = []\n"
+                "def _finstack_warning_start(info):\n"
+                "    global _finstack_warning_filters\n"
+                "    _finstack_warning_filters = list(_finstack_warnings.filters)\n"
+                "    _finstack_warnings.simplefilter('error')\n"
+                "def _finstack_warning_end(result):\n"
+                "    _finstack_warnings.filters[:] = _finstack_warning_filters\n"
+                "get_ipython().events.register('pre_run_cell', _finstack_warning_start)\n"
+                "get_ipython().events.register('post_run_cell', _finstack_warning_end)"
+            )
+            nb.cells.insert(0, guard)
+            try:
+                client.execute(env=kernel_env)
+            finally:
+                del nb.cells[0]
+            # The temporary guard consumed execution count 1. Keep the saved
+            # build copy numbered from the first authored code cell.
+            for cell in nb.cells:
+                if isinstance(cell.get("execution_count"), int):
+                    cell.execution_count -= 1
+                for output in cell.get("outputs", []):
+                    if isinstance(output.get("execution_count"), int):
+                        output.execution_count -= 1
+
+        for cell_number, cell in enumerate(nb.cells, start=1):
+            if cell.cell_type != "code" or not cell.source.strip():
+                continue
+            if cell.execution_count is None or any(output.output_type == "error" for output in cell.outputs):
+                raise ValueError("Notebook contains a skipped or failed code cell")
+            for output in cell.outputs:
+                if output.output_type != "stream" or output.get("name") != "stderr":
+                    continue
+                stderr = str(output.get("text", "")).strip()
+                if stderr:
+                    preview = " ".join(stderr.splitlines())[:500]
+                    raise ValueError(f"Notebook emitted stderr in cell {cell_number}: {preview}")
 
         elapsed = time.time() - start
         cell_count = sum(1 for c in nb.cells if c.cell_type == "code")
@@ -94,7 +148,7 @@ def run_notebook(notebook_path: Path, timeout: int, save_outputs: bool = False) 
         # cell source that always contains the word "error".
         for i in range(len(lines) - 1, -1, -1):
             line = lines[i]
-            if line.startswith("-----") or line.startswith("An error occurred"):
+            if line.startswith(("-----", "An error occurred")):
                 continue
             if "Error" in line or "Exception" in line:
                 start_idx = max(0, i - 2)
@@ -120,6 +174,12 @@ def _fmt(seconds: float) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run finstack example notebooks")
     parser.add_argument(
+        "--notebook-root",
+        type=Path,
+        default=NOTEBOOKS_DIR,
+        help="Notebook tree to execute; package and shared-fixture imports still use the source checkout",
+    )
+    parser.add_argument(
         "--directory",
         help="Only run notebooks in this subdirectory, or a single .ipynb path",
     )
@@ -139,8 +199,12 @@ def main() -> int:
 
     _configure_pythonpath()
 
-    base_dir = NOTEBOOKS_DIR
+    base_dir = args.notebook_root.resolve()
+    if not base_dir.is_dir():
+        parser.error(f"Notebook root is not a directory: {base_dir}")
     notebooks = find_notebooks(base_dir, args.directory)
+    if any(not notebook.resolve().is_relative_to(base_dir) for notebook in notebooks):
+        parser.error("--directory must remain inside --notebook-root")
 
     if not notebooks:
         print("No notebooks found!")

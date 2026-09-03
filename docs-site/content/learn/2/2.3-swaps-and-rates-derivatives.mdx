@@ -1,0 +1,352 @@
+---
+id: '2.3'
+title: Swaps and Rates Derivatives
+description: 'Analyst program lesson 2.3: Swaps and Rates Derivatives'
+desk_question: '"We pay fixed on $250mm of 10y swaps. What is that position really,
+  and what carries it?"'
+references:
+- '#black-1976'
+- '#bachelier-1900'
+- '#sadr-2009-interest-rate-swaps'
+- '#hull-white-1990-pricing-interest-rate-derivatives'
+- '#jamshidian-1989-bond-option'
+- '#brigo-mercurio-2006-interest-rate-models'
+- '#mtm-resetting-cross-currency-swaps'
+- '#hagan-2003-cms-convexity'
+api:
+- finstack_quant.core.dates.DayCount
+- finstack_quant.core.dates.Tenor
+- finstack_quant.core.market_data.ForwardCurve
+- finstack_quant.core.market_data.MarketContext
+- finstack_quant.core.money.Money
+- finstack_quant.valuations.instruments.CapFloor
+- finstack_quant.valuations.instruments.FixedLegSpec
+- finstack_quant.valuations.instruments.FloatLegSpec
+- finstack_quant.valuations.instruments.InterestRateSwap
+- finstack_quant.valuations.instruments.Swaption
+- finstack_quant.valuations.instruments.instrument_cashflows_json
+- finstack_quant.valuations.instruments.price_instrument
+status: published
+---
+
+<DeskContext question={"We pay fixed on $250mm of 10y swaps. What is that position really, and what carries it?"}>
+
+Your bond sleeve loses money when yields rise. A payer swap may offset part of that exposure, but choosing its notional from face amounts ignores coupon timing, maturity and currency. Build the swap cashflows, find its par coupon, then size the hedge from consistent risk units.
+
+You will add the native USD payer IRS to the staged book, reconcile its projected floating leg and fixed annuity, and price a cap, floor and payer swaption. The option parity exercise shows why small schedule and projection differences can break an otherwise exact financial identity.
+
+</DeskContext>
+
+<Standard>
+
+### Two legs, two curve roles
+
+A payer IRS pays fixed and receives floating. Ignoring exchanges of principal, its value is $V=PV_{\mathrm{float}}-K A$, where
+
+$$A=N\sum_i \alpha_i D(0,T_i),\qquad K_{\mathrm{par}}=\frac{PV_{\mathrm{float}}}{A}.$$
+
+Here $A$ includes notional and has units of currency-years. In a per-unit-notional convention the same symbol is often used without $N$; check the convention before dividing. The native `FixedLegSpec` and `FloatLegSpec` expose frequency, day count, calendars, stubs, reset lag and payment lag. Our fixed coupons are negative and floating receipts positive in the exported payer cashflows.
+
+Discounting and projection answer different questions. USD-OIS discounts collateralized payments; USD-SOFR-3M projects the floating index. A reset that has already occurred uses its historical fixing. A future reset uses the forward curve. The telescoping identity $PV_{\mathrm{float}}=N[D(0,T_0)-D(0,T_n)]$ requires matching single-curve assumptions and conventions; in a multi-curve setting, project and discount the actual coupons instead. Replacing the fixed coupon by `par_rate` should produce approximately zero NPV under unchanged market data.
+
+The book's swap starts in April 2025 and pays a fixed 4.5%. Its curve-implied par coupon is higher, making receive-floating/pay-fixed value positive in this fixture. The exact result depends on its leg conventions, not only a displayed three-year rate. [Brigo and Mercurio](/references.html#brigo-mercurio-2006-interest-rate-models) and [Hull](/references.html#hull-options-futures) provide the rates-model context.
+
+### Hedge a risk, not a face amount
+
+If $b$ is the signed bond DV01 and $s$ the signed DV01 of one payer-swap contract, choose $h=-b/s$ contracts. The original swap demonstration neutralizes the USD corporate bond's scalar risk. Exercise A adds the EUR government bond after translating its native EUR DV01 at EURUSD 1.08, then neutralizes the resulting **joint parallel USD/EUR rate shock** with a USD payer swap.
+
+That scalar hedge does not neutralize EUR curve risk separately. It also leaves key-rate shape risk, cross-currency basis, credit spreads, funding, FX and nonlinear exposure. A change in EURUSD changes the USD value of the EUR bond and its translated risk. An implementable hedge may need EUR rates instruments and FX hedges; the exercise's combined scalar is an explicit simplifying scenario.
+
+### Cap and floor decomposition
+
+A caplet on a future reset pays $N\alpha\max(L-K,0)$ at the payment date. A cap is a strip of caplets; a floor is the corresponding strip of floorlets. Under Black-76, the caplet value is
+
+$$N\alpha D(0,T_p)[F\Phi(d_1)-K\Phi(d_2)],\quad d_{1,2}=\frac{\ln(F/K)\pm\tfrac12\sigma^2T_r}{\sigma\sqrt{T_r}},$$
+
+where $T_r$ is time to reset and $T_p$ time to payment. Discounting to the reset date instead of payment changes the price. Lognormal Black volatility is a decimal relative-rate volatility: 0.25 means 25% annually. A normal/Bachelier quote is an **absolute rate** volatility: 50bp means 0.005 in decimal-rate units per square root year. These numbers cannot be swapped into the same model field. Normal models permit negative forwards without an arbitrary log shift; shifted lognormal models require a stated shift and support domain.
+
+For identical dates, notional, index, strike and conventions,
+
+$$\mathrm{Cap}(K)-\mathrm{Floor}(K)=\mathrm{PayerSwap}(K).$$
+
+This follows pathwise from $\max(L-K,0)-\max(K-L,0)=L-K$, so volatility cancels. The exercise uses the actual quarterly ACT/360 boundaries as the forward curve's `projection_grid`. A numeric step of 0.25 years is not three calendar months in every period. The cap's period-forward and the IRS's reset-date projection must refer to the same effective periods before asserting parity. This is a useful diagnostic: a parity difference can reveal inconsistent inputs rather than a failure of Black's formula.
+
+### Swaptions and extensions
+
+A payer swaption grants the right to enter a payer swap; a receiver swaption grants the opposite right. A Black swaption prices an option on the forward par swap rate with the swap annuity as scale. Physical settlement delivers the swap; cash settlement pays a convention-defined amount, which can use a cash annuity rather than the physical annuity. Equal strike and expiry do not make those settlement contracts identical. The example prices a native payer swaption from the shared fixture against a staged rates-volatility surface and checks positive value and vega; it does not claim cash/physical parity.
+
+In a cross-currency swap, each leg projects and discounts in its own currency before a consistent FX conversion. The quoted basis reflects funding and collateral conventions; an FX forward from pure covered interest parity does not by itself reproduce a market basis curve. A constant-maturity swap coupon references a longer swap rate, and an in-arrears coupon resets near payment. Their payoff timing changes the relevant measure and correlation exposure, creating a convexity adjustment. The forward rate alone is not generally their fair expected coupon. These are previews of model-dependent extensions, not assumptions silently embedded in the plain IRS.
+
+</Standard>
+
+<BuildIt>
+
+### Price the staged swap and solve its par coupon
+
+The native result supplies curve-qualified PV01 and DV01. Replacing the fixed rate with the reported par rate reprices to zero, then the USD corporate bond hedge is sized from its signed DV01.
+
+{/* notebook-block notebook="02_pricing/instruments/rates_derivatives.ipynb" cell="swap-proof" role="build" */}
+```python exec id=swap-proof role=build
+import copy, json
+from finstack_quant.valuations.instruments import InterestRateSwap, price_instrument
+from _shared.analyst_book import AS_OF, build_market, instruments
+
+market = build_market('rates')
+swap = instruments('rates')['USD-PAYER-IRS']
+priced = price_instrument(InterestRateSwap.from_json(json.dumps(swap)), market, AS_OF, metrics=['par_rate', 'dv01', 'pv01', 'bucketed_dv01'])
+par = copy.deepcopy(swap)
+par['instrument']['spec']['fixed']['rate'] = str(priced.get_metric('par_rate'))
+par_price = price_instrument(json.dumps(par), market, AS_OF).price
+assert abs(par_price) < 0.01
+bond = price_instrument(json.dumps(instruments('rates')['USD-CORP']), market, AS_OF, metrics=['dv01'])
+hedge_units = -bond.get_metric('dv01') / priced.get_metric('dv01')
+assert abs(bond.get_metric('dv01') + hedge_units * priced.get_metric('dv01')) < 1e-10
+assert any(key.startswith('pv01::USD-SOFR-3M') for key in priced.metric_keys())
+print({'par_rate_decimal': priced.get_metric('par_rate'), 'par_npv': par_price, 'payer_swap_units_for_USD_bond': hedge_units})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.3" block="swap-proof" />
+
+
+### Construct typed fixed and floating legs
+
+This builder example exposes both calendars and conventions. The printed native envelope includes reset dates, signed amounts, discount factors and per-flow PVs; inspect them before using a simplified par formula.
+
+{/* notebook-block notebook="02_pricing/instruments/rates_derivatives.ipynb" cell="swap-legs-annuity" role="build" */}
+```python exec id=swap-legs-annuity role=build
+import json
+from datetime import date
+from finstack_quant.core.dates import Tenor,DayCount
+from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments import FixedLegSpec,FloatLegSpec,InterestRateSwap,price_instrument,instrument_cashflows_json
+from _shared.analyst_book import AS_OF,build_market
+fixed=FixedLegSpec('USD-OIS',.045,Tenor.semi_annual(),DayCount.THIRTY_360,'2025-04-15','2028-04-15',compounding_simple=False,calendar_id='weekends_only')
+floating=FloatLegSpec('USD-OIS','USD-SOFR-3M',0,Tenor.quarterly(),DayCount.ACT_360,'2025-04-15','2028-04-15',calendar_id='weekends_only')
+leg_swap=(InterestRateSwap.builder().id('TYPED-IRS').notional(Money(2_000_000,'USD')).side('pay').fixed(fixed).float(floating).build())
+leg_market=build_market('rates');leg_value=price_instrument(leg_swap,leg_market,AS_OF,metrics=['par_rate'])
+leg_flows=json.loads(instrument_cashflows_json(leg_swap,leg_market,AS_OF,'discounting'))['flows']
+assert leg_value.price>0
+print({'par_rate_decimal':leg_value.get_metric('par_rate'),'cashflows':leg_flows})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.3" block="swap-legs-annuity" />
+
+
+### Price a strip and verify parity
+
+The same matched forward grid is used for caplets, cap, floor and payer swap. The sum of four native caplet prices equals the cap. A separate native swaption is priced using the rates market.
+
+{/* notebook-block notebook="02_pricing/instruments/rates_derivatives.ipynb" cell="rates-option-proof" role="build" */}
+```python exec id=rates-option-proof role=build
+import copy, json
+from datetime import date
+from finstack_quant.core.dates import Tenor, DayCount
+from finstack_quant.core.market_data import MarketContext, ForwardCurve
+from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments import CapFloor, price_instrument
+from _shared.analyst_book import AS_OF, build_market, instruments
+from _shared.instrument_fixtures import swaption, instrument_envelope
+
+market = build_market('rates')
+assert market.get_surface('USD-CAP-VOL').id == 'USD-CAP-VOL'
+assert market.get_surface('USD-SWPNVOL').id == 'USD-SWPNVOL'
+boundaries = [AS_OF, date(2025, 4, 15), date(2025, 7, 15), date(2025, 10, 15), date(2026, 1, 15), date(2026, 4, 15)]
+projection_grid = [DayCount.ACT_360.year_fraction(AS_OF, boundary) for boundary in boundaries]
+matched_forward = ForwardCurve('USD-SOFR-3M', 0.25, AS_OF, [(0.0, 0.05), (projection_grid[-1], 0.05)],
+    day_count='act_360', projection_grid=projection_grid)
+parity_market = MarketContext.from_json(market.to_json()).insert(matched_forward)
+cap = (CapFloor.builder().id('LESSON-CAP').rate_option_type('cap').notional(Money(2_000_000.0, 'USD'))
+    .strike(0.045).start_date(date(2025, 4, 15)).maturity(date(2026, 4, 15))
+    .frequency(Tenor.quarterly()).day_count(DayCount.ACT_360)
+    .business_day_convention('modified_following').calendar_id('weekends_only')
+    .discount_curve_id('USD-OIS').forward_curve_id('USD-SOFR-3M').vol_surface_id('USD-CAP-VOL')
+    .vol_type('lognormal').build())
+cap_result = price_instrument(cap, parity_market, AS_OF, model='black76', metrics=['vega'])
+floor = json.loads(cap.to_json())
+floor['instrument']['spec']['rate_option_type'] = 'floor'
+floor_result = price_instrument(json.dumps(floor), parity_market, AS_OF, model='black76')
+swap = instruments('rates')['USD-PAYER-IRS']
+for leg in ('fixed', 'float'):
+    swap['instrument']['spec'][leg]['end'] = '2026-04-15'
+    swap['instrument']['spec'][leg]['frequency'] = {'count': 3, 'unit': 'months'}
+    swap['instrument']['spec'][leg]['day_count'] = 'act_360'
+    swap['instrument']['spec'][leg]['calendar_id'] = 'weekends_only'
+swap_result = price_instrument(json.dumps(swap), parity_market, AS_OF)
+assert cap_result.price > 0 and cap_result.get_metric('vega') > 0
+assert abs(cap_result.price - floor_result.price - swap_result.price) < 0.01
+caplet_values = []
+start = date(2025, 4, 15)
+for index in range(4):
+    end = Tenor.quarterly().add_to_date(start)
+    caplet = json.loads(cap.to_json())
+    caplet['instrument']['spec'].update({'id': f'LESSON-CAPLET-{index}', 'rate_option_type': 'caplet',
+                                       'start_date': start.isoformat(), 'maturity': end.isoformat()})
+    caplet_values.append(price_instrument(json.dumps(caplet), parity_market, AS_OF, model='black76').price)
+    start = end
+assert abs(sum(caplet_values) - cap_result.price) < 0.01
+_, swaption_spec = swaption(0)
+swaption_result = price_instrument(json.dumps(instrument_envelope(swaption_spec)), market, AS_OF, model='black76', metrics=['vega'])
+assert swaption_result.price > 0 and swaption_result.get_metric('vega') > 0
+print({'cap': cap_result.price, 'floor': floor_result.price, 'payer_swap': swap_result.price, 'payer_swaption': swaption_result.price})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.3" block="rates-option-proof" />
+
+
+
+### Build the payer swaption explicitly
+
+The call option type is the payer right. Physical settlement is selected explicitly; the cash-settlement method remains a required contract field but does not convert this into a cash-settled option. The fixed and floating underlying legs begin after expiry. Absolute short-rate volatility is not used here: the Black surface contains lognormal rate volatility.
+
+{/* notebook-block notebook="02_pricing/instruments/rates_derivatives.ipynb" cell="swaption-typed-builder" role="build" */}
+```python exec id=swaption-typed-builder role=build
+from finstack_quant.core.dates import Tenor,DayCount
+from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments import Swaption,FixedLegSpec,FloatLegSpec,price_instrument
+from _shared.analyst_book import AS_OF,build_market
+fixed=FixedLegSpec('USD-OIS',.045,Tenor.semi_annual(),DayCount.THIRTY_360,'2026-01-15','2029-01-15',compounding_simple=False,calendar_id='weekends_only')
+floating=FloatLegSpec('USD-OIS','USD-SOFR-3M',0.,Tenor.quarterly(),DayCount.ACT_360,'2026-01-15','2029-01-15',calendar_id='weekends_only')
+payer=(Swaption.builder().id('TYPED-PAYER-SWAPTION').option_type('call').notional(Money(2_000_000,'USD'))
+ .expiry('2026-01-13').settlement('physical').cash_settlement_method('collateralized_cash_price')
+ .vol_model('black').vol_surface_id('USD-SWPNVOL').underlying_fixed_leg(fixed).underlying_float_leg(floating).build())
+value=price_instrument(payer,build_market('rates'),AS_OF,model='black76',metrics=['vega'])
+assert value.price>0 and value.get_metric('vega')>0
+print({'settlement':payer.settlement,'strike_decimal':payer.get_strike(),'payer_value_USD':value.price,'native_vega':value.get_metric('vega')})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.3" block="swaption-typed-builder" />
+
+</BuildIt>
+
+<LabCard notebook="02_pricing/instruments/rates_derivatives.ipynb" title="Rates Derivatives" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<Exercise id="exercise-bond-sleeve-hedge" title="A. Hedge both bonds under a stated joint shock" question={"Translate the EUR bond DV01 to USD, combine it with the USD bond and size the payer swap to neutralize the joint parallel shock."}>
+
+The calculation holds EURUSD fixed at 1.08 and shocks both rate curves in parallel. The residual assertion verifies the scalar algebra. It does not eliminate the remaining EUR curve factor, key-rate mismatch or FX risk; write those exposures next to the hedge notional.
+
+{/* notebook-block notebook="02_pricing/instruments/rates_derivatives.ipynb" cell="exercise-bond-sleeve-hedge" role="exercise" */}
+```python exec id=exercise-bond-sleeve-hedge role=exercise
+import json
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF,build_market,instruments
+market=build_market('rates');contracts=instruments('rates')
+bond_risk={id:price_instrument(json.dumps(contracts[id]),market,AS_OF,metrics=['dv01']).get_metric('dv01') for id in ('USD-CORP','EUR-GOVT')}
+base_risk=bond_risk['USD-CORP']+1.08*bond_risk['EUR-GOVT']
+swap_risk=price_instrument(json.dumps(contracts['USD-PAYER-IRS']),market,AS_OF,metrics=['dv01']).get_metric('dv01')
+units=-base_risk/swap_risk
+assert units>0 and abs(base_risk+units*swap_risk)<1e-8
+print({'native_bond_DV01':bond_risk,'USD_parallel_risk':base_risk,'payer_contract_units':units,'payer_notional_USD':units*2_000_000,'residual_USD_per_bp':base_risk+units*swap_risk})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.3" block="exercise-bond-sleeve-hedge" />
+
+</Exercise>
+
+<Exercise id="exercise-cap-floor-parity" title="B. Make the parity inputs identical" question={"Reprice a matched cap, floor and swap, and show that the four caplets sum to the cap."}>
+
+The strike, notional, schedule, payment convention, day count and period projections match. Parity is checked in currency units to a cent. If you replace the explicit calendar projection grid by evenly spaced numeric quarter-years, first inspect the changed forwards before blaming option pricing.
+
+{/* notebook-block notebook="02_pricing/instruments/rates_derivatives.ipynb" cell="exercise-cap-floor-parity" role="exercise" */}
+```python exec id=exercise-cap-floor-parity role=exercise
+import copy, json
+from datetime import date
+from finstack_quant.core.dates import Tenor, DayCount
+from finstack_quant.core.market_data import MarketContext, ForwardCurve
+from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments import CapFloor, price_instrument
+from _shared.analyst_book import AS_OF, build_market, instruments
+from _shared.instrument_fixtures import swaption, instrument_envelope
+
+market = build_market('rates')
+assert market.get_surface('USD-CAP-VOL').id == 'USD-CAP-VOL'
+assert market.get_surface('USD-SWPNVOL').id == 'USD-SWPNVOL'
+boundaries = [AS_OF, date(2025, 4, 15), date(2025, 7, 15), date(2025, 10, 15), date(2026, 1, 15), date(2026, 4, 15)]
+projection_grid = [DayCount.ACT_360.year_fraction(AS_OF, boundary) for boundary in boundaries]
+matched_forward = ForwardCurve('USD-SOFR-3M', 0.25, AS_OF, [(0.0, 0.05), (projection_grid[-1], 0.05)],
+    day_count='act_360', projection_grid=projection_grid)
+parity_market = MarketContext.from_json(market.to_json()).insert(matched_forward)
+cap = (CapFloor.builder().id('LESSON-CAP').rate_option_type('cap').notional(Money(2_000_000.0, 'USD'))
+    .strike(0.045).start_date(date(2025, 4, 15)).maturity(date(2026, 4, 15))
+    .frequency(Tenor.quarterly()).day_count(DayCount.ACT_360)
+    .business_day_convention('modified_following').calendar_id('weekends_only')
+    .discount_curve_id('USD-OIS').forward_curve_id('USD-SOFR-3M').vol_surface_id('USD-CAP-VOL')
+    .vol_type('lognormal').build())
+cap_result = price_instrument(cap, parity_market, AS_OF, model='black76', metrics=['vega'])
+floor = json.loads(cap.to_json())
+floor['instrument']['spec']['rate_option_type'] = 'floor'
+floor_result = price_instrument(json.dumps(floor), parity_market, AS_OF, model='black76')
+swap = instruments('rates')['USD-PAYER-IRS']
+for leg in ('fixed', 'float'):
+    swap['instrument']['spec'][leg]['end'] = '2026-04-15'
+    swap['instrument']['spec'][leg]['frequency'] = {'count': 3, 'unit': 'months'}
+    swap['instrument']['spec'][leg]['day_count'] = 'act_360'
+    swap['instrument']['spec'][leg]['calendar_id'] = 'weekends_only'
+swap_result = price_instrument(json.dumps(swap), parity_market, AS_OF)
+assert cap_result.price > 0 and cap_result.get_metric('vega') > 0
+assert abs(cap_result.price - floor_result.price - swap_result.price) < 0.01
+caplet_values = []
+start = date(2025, 4, 15)
+for index in range(4):
+    end = Tenor.quarterly().add_to_date(start)
+    caplet = json.loads(cap.to_json())
+    caplet['instrument']['spec'].update({'id': f'LESSON-CAPLET-{index}', 'rate_option_type': 'caplet',
+                                       'start_date': start.isoformat(), 'maturity': end.isoformat()})
+    caplet_values.append(price_instrument(json.dumps(caplet), parity_market, AS_OF, model='black76').price)
+    start = end
+assert abs(sum(caplet_values) - cap_result.price) < 0.01
+_, swaption_spec = swaption(0)
+swaption_result = price_instrument(json.dumps(instrument_envelope(swaption_spec)), market, AS_OF, model='black76', metrics=['vega'])
+assert swaption_result.price > 0 and swaption_result.get_metric('vega') > 0
+print({'cap': cap_result.price, 'floor': floor_result.price, 'payer_swap': swap_result.price, 'payer_swaption': swaption_result.price})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.3" block="exercise-cap-floor-parity" />
+
+</Exercise>
+
+<Exercise id="exercise-forward-par-rate" title="C. Recover par from projected cashflows" question={"Export the native payer IRS flows and independently compute floating-leg PV divided by fixed-leg annuity."}>
+
+The fixed-leg PV is negative for a payer. Its absolute PV divided by the positive fixed coupon gives the notional-weighted annuity. Summing the projected positive floating receipts and discounting each payment yields the numerator. The ratio agrees with `par_rate` without invoking a single-curve telescoping shortcut.
+
+{/* notebook-block notebook="02_pricing/instruments/rates_derivatives.ipynb" cell="exercise-forward-par-rate" role="exercise" */}
+```python exec id=exercise-forward-par-rate role=exercise
+import json
+from datetime import date
+from finstack_quant.core.dates import DayCount
+from finstack_quant.valuations.instruments import price_instrument,instrument_cashflows_json
+from _shared.analyst_book import AS_OF,build_market,instruments
+market=build_market('rates');contract=instruments('rates')['USD-PAYER-IRS'];raw=contract['instrument']['spec']
+flows=json.loads(instrument_cashflows_json(json.dumps(contract),market,AS_OF,'discounting'))['flows']
+curve=market.get_discount('USD-OIS');fixed_pv=0.;float_pv=0.
+for flow in flows:
+ t=DayCount.ACT_365F.year_fraction(AS_OF,date.fromisoformat(flow['date']))
+ pv=float(flow['amount'])*curve.df(t)
+ if flow['kind']=='fixed':fixed_pv+=pv
+ elif flow['kind']=='float_reset':float_pv+=pv
+annuity=abs(fixed_pv)/float(raw['fixed']['rate']);derived=abs(float_pv)/annuity
+native=price_instrument(json.dumps(contract),market,AS_OF,metrics=['par_rate']).get_metric('par_rate')
+assert abs(derived-native)<1e-10
+print({'fixed_leg_PV_USD':fixed_pv,'floating_leg_PV_USD':float_pv,'notional_weighted_annuity_USD_years':annuity,'derived_par_rate':derived,'native_par_rate':native})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.3" block="exercise-forward-par-rate" />
+
+</Exercise>
+
+<CheckYourself>
+
+1. **Which leg is positive for a payer?** Floating receipts; fixed payments are negative.
+2. **When can the floating leg telescope to discount factors?** Under aligned single-curve and schedule assumptions, not automatically in a multi-curve market.
+3. **What does cap–floor parity test?** The pathwise payoff identity plus matched projection, discounting and conventions.
+4. **Why is a 0.25-year projection grid not always quarterly?** Calendar quarters have different actual day counts.
+5. **Does a zero combined DV01 remove basis risk?** No. Currency, curve and tenor factors can still move differently.
+6. **Is a 25% Black quote comparable numerically to a 50bp normal quote?** No; one is relative volatility and the other absolute rate volatility.
+
+</CheckYourself>

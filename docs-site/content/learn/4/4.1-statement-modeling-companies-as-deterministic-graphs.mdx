@@ -1,0 +1,187 @@
+---
+id: '4.1'
+title: 'Statement Modeling: Companies as Deterministic Graphs'
+description: 'Analyst program lesson 4.1: Statement Modeling: Companies as Deterministic
+  Graphs'
+desk_question: '"Build me a driver-based model of this company I can audit line by
+  line."'
+references:
+- '#koller-valuation'
+- '#rosenbaum-pearl-2020'
+api: []
+status: published
+---
+
+<DeskContext question={"Build a model of this company that I can audit line by line."}>
+
+The borrower is the same company used in valuation, private credit and the revolver cases. We begin with four actual quarters and four forecast quarters, keep each model vintage explicit, and follow revenue through earnings, debt service and cash. A model that produces a valuation but cannot explain its balance sheet is unfinished.
+
+This lesson has two mandatory sessions: build and trace the operating graph, then validate its accounting identities and challenge its forecasts. The loan held by the analyst book later is a 1% slice of the borrower's facility; this company model describes the entire borrower.
+
+</DeskContext>
+
+<Standard>
+
+Each native statement node has a stable identifier and a formula, values or forecast rule over a period lattice. Dependencies are evaluated in order. Explicit values take precedence over forecasts, and forecasts take precedence over formula fallback. Thus adding a formula does not necessarily change a node with forecast values already supplied. Actuals are information available at the model vintage; later observations must be absent from an earlier vintage.
+
+All monetary nodes in this model are scalar USD units, not millions. Growth rates and margins are decimal fractions. Interest is 7.5% annually on beginning debt, divided by four for the quarterly teaching convention. Beginning debt is not interchangeable with ending debt after amortization. The quarter's debt payment is USD2.5m. Net leverage uses annualized current-quarter EBITDA, not trailing-twelve-month EBITDA; the label matters in covenant interpretation.
+
+The operating model uses $CFO=NI+D\&A-\Delta NWC$, free cash flow is CFO less capex, and the change in cash also subtracts amortization. Positive investment in receivables or inventory consumes cash; more accounts payable releases cash. The debt, cash, working-capital, fixed-asset and equity balances roll from their opening balance through signed changes. In a complete model, assets equal liabilities plus equity and the cash-flow statement explains the change in cash.
+
+Native check reports distinguish failures from warnings. A near-zero or sign-changing cash-flow base can trigger a large percentage-growth warning even when all accounting identities reconcile. Diagnose and disclose the warning; never silently suppress it. A green accounting report proves internal consistency of the supplied assumptions, not that management's forecast is credible.
+
+</Standard>
+
+<BuildIt>
+
+### Session 1: build the borrower and explain the result
+
+The factory contains the visible native model definitions in the companion lab's shared source. Inspect its revenue, cost and operating-expense forecasts before running the evaluation. The output table checks every balance-sheet residual within USD1e-6, verifies first-quarter interest and year-end debt, and confirms that evaluation leaves the model specification unchanged.
+
+{/* notebook-block notebook="04_statement_modeling/statement_modeling.ipynb" cell="borrower-articulation" role="build" */}
+```python exec id=borrower-articulation role=build
+import pandas as pd
+from _shared.borrower_model import PERIODS, borrower_model, borrower_vintage, borrower_data
+from finstack_quant.statements import Evaluator
+model = borrower_model()
+model_before = model.to_json()
+evaluation = Evaluator().evaluate(model)
+rows = []
+for period in PERIODS:
+    rows.append({"period": period, **{key: evaluation.get(key, period) for key in ["revenue", "ebitda", "cash_end", "debt_end", "net_leverage", "dscr", "balance_check"]}})
+    assert abs(evaluation.get("balance_check", period)) < 1e-6, "USD accounting residual"
+assert evaluation.get("cash_interest", "2025Q1") == 1_875_000
+assert evaluation.get("debt_end", "2025Q4") == 90_000_000
+assert model.to_json() == model_before
+old = Evaluator().evaluate(borrower_vintage("2024Q3"))
+assert old.get("revenue", "2024Q4") != evaluation.get("revenue", "2024Q4")
+print(pd.DataFrame(rows).to_string(index=False))
+print("Q4 revenue revision, USD:", evaluation.get("revenue", "2024Q4") - old.get("revenue", "2024Q4"))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.1" block="borrower-articulation" />
+
+The prior vintage excludes the later actual revenue. Its revision is a forecast-versus-actual difference that can be explained, rather than hidden in a reloaded current model. The next controlled node proves precedence with distinct 100/110/121 actual-and-forecast values against a 900-unit formula. The DSCR explanation follows the real borrower node to the same final value as evaluation.
+
+{/* notebook-block notebook="04_statement_modeling/statement_modeling.ipynb" cell="precedence-and-dependency" role="build" */}
+```python exec id=precedence-and-dependency role=build
+import json
+from finstack_quant.statements import ModelBuilder, ForecastSpec, FinancialModelSpec
+from finstack_quant.statements_analytics import DependencyTracer, explain_formula
+b = ModelBuilder("precedence")
+b.periods("2025Q1..Q3", "2025Q1")
+b.value("fallback", [(p,900.0) for p in ["2025Q1","2025Q2","2025Q3"]])
+x=b.mixed("revenue"); x.values([("2025Q1",100.0)]); x.forecast(ForecastSpec.growth(.10)); x.formula("fallback")
+precedence_model=x.build().build()
+precedence_result=Evaluator().evaluate(precedence_model)
+assert precedence_result.get("revenue","2025Q1")==100
+assert abs(precedence_result.get("revenue","2025Q2")-110)<1e-10
+assert abs(precedence_result.get("revenue","2025Q3")-121)<1e-10
+print("Value overrides forecast, which overrides the900-unit formula:",precedence_result.to_json())
+print(DependencyTracer(model).dependency_tree("dscr"))
+explanation=explain_formula(model,evaluation,"dscr","2025Q1")
+assert explanation.final_value==evaluation.get("dscr","2025Q1")
+print("DSCR explained:",explanation.to_json())
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.1" block="precedence-and-dependency" />
+
+### Session 2: validate identities and challenge the model
+
+Use all five balance accounts in the corkscrew extension so its aggregate check has a complete balance sheet. Its opening observation establishes the seed; subsequent periods must roll forward within USD0.01. The native three-statement mapping also enables cash, retained earnings, depreciation and tax consistency checks. The growth warnings in cash changes are displayed alongside the successful accounting checks.
+
+{/* notebook-block notebook="04_statement_modeling/statement_modeling.ipynb" cell="statement-checks-and-failure" role="build" */}
+```python exec id=statement-checks-and-failure role=build
+from _shared.borrower_model import borrower_builder
+from finstack_quant.statements_analytics import (AccountType, CorkscrewAccount, CorkscrewConfig, CorkscrewExtension, ThreeStatementMapping, run_three_statement_checks)
+b=borrower_builder()
+for node,formula in {"cfi":"-capex","cff":"-amortization","debt_change":"-amortization","ppe_change":"capex-depreciation"}.items(): b.compute(node,formula)
+checked_model=b.build(); checked_result=Evaluator().evaluate(checked_model)
+check_mapping=ThreeStatementMapping("cash_end","equity_end","net_income",assets_nodes=["assets"],liabilities_nodes=["debt_end"],equity_nodes=["equity_end"],ppe_node="ppe_end",depreciation_node="depreciation",tax_expense_node="cash_taxes",pretax_income_node="pretax_income",cfo_node="cash_from_operations",cfi_node="cfi",cff_node="cff",total_cf_node="change_cash",capex_node="capex")
+checks=json.loads(run_three_statement_checks(checked_model,check_mapping,checked_result).to_json())
+assert checks["summary"]["failed"]==0
+print("Native accounting checks and disclosed warnings:",checks)
+accounts=[CorkscrewAccount(node,kind,[change]) for node,kind,change in [("cash_end",AccountType.Asset,"change_cash"),("nwc_end",AccountType.Asset,"change_nwc"),("ppe_end",AccountType.Asset,"ppe_change"),("debt_end",AccountType.Liability,"debt_change"),("equity_end",AccountType.Equity,"net_income")]]
+corkscrew=CorkscrewExtension(CorkscrewConfig(accounts,tolerance=.01)).execute(checked_model,checked_result)
+assert corkscrew.status=="success" and not corkscrew.errors and not corkscrew.warnings
+print(corkscrew.to_json())
+# Deliberately invalid separate model: assets receive an unfinanced1m USD.
+bad=json.loads(checked_model.to_json()); bad["nodes"]["assets"]["formula_text"] += " + 1000000"
+bad_model=FinancialModelSpec.from_json(json.dumps(bad))
+bad_checks=json.loads(run_three_statement_checks(bad_model,check_mapping).to_json())
+assert bad_checks["summary"]["failed"]>0
+assert checked_model.to_json()!=bad_model.to_json()
+print("Expected accounting failure:",[x for x in bad_checks["results"] if not x["passed"]])
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.1" block="statement-checks-and-failure" />
+
+The invalid variant adds USD1m to assets without financing. The test requires the native report to fail. A narrative explanation cannot compensate for this failure; remove the unsupported asset or add the actual funding transaction and let all three statements flow through.
+
+</BuildIt>
+
+<LabCard notebook="04_statement_modeling/statement_modeling.ipynb" title="Borrower graph and validation sessions" description="Run the model, precedence proof, dependency explanation, all accounting checks and both forecast exercises." />
+<LabCard notebook="04_statement_modeling/models/three_statement_model.ipynb" title="Detailed three-statement lab" description="Inspect the explicit receivables, inventory, payables, capex, financing and retained-earnings schedules." />
+<Exercise title="Add a working-capital corkscrew" question={"Build AR, inventory and AP balances, derive the change in net working capital, and show the sign of its cash effect."}>
+
+{/* notebook-block notebook="04_statement_modeling/statement_modeling.ipynb" cell="exercise-working-capital" role="exercise" */}
+```python exec id=exercise-working-capital role=exercise
+# Add explicit AR/inventory/AP balances and a reconciled NWC roll-forward.
+wc=ModelBuilder("working-capital-exercise");wc.periods("2025Q1..Q3")
+periods=["2025Q1","2025Q2","2025Q3"]
+for name,values in {"ar":[4e6,4.4e6,4.8e6],"inventory":[3e6,3.1e6,3.3e6],"ap":[2e6,2.2e6,2.4e6]}.items(): wc.value(name,list(zip(periods,values)))
+wc.compute("nwc","ar+inventory-ap")
+wc.compute("nwc_begin","coalesce(lag(nwc,1),4800000)")
+wc.compute("nwc_investment","nwc-nwc_begin")
+wc.compute("cash_effect","-nwc_investment")
+wc_model=wc.build();wc_result=Evaluator().evaluate(wc_model)
+report=CorkscrewExtension(CorkscrewConfig([CorkscrewAccount("nwc",AccountType.Asset,["nwc_investment"],beginning_balance_node="nwc_begin")])).execute(wc_model,wc_result)
+assert all(x["is_valid"] for x in json.loads(report.data_json())["validations"])
+assert wc_result.get("cash_effect","2025Q2")==-300000
+print(wc_result.to_dataframe().to_string())
+print("One-account roll-forward only; aggregate-balance warning is expected because this toy is not a complete balance sheet:",report.warnings)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.1" block="exercise-working-capital" />
+
+Net working capital is AR plus inventory less AP. In the second quarter it rises USD300,000, so cash falls by that amount before other operating flows. The one-account extension verifies only that roll-forward; its aggregate-balance warning is expected because this controlled example does not contain a complete balance sheet. The complete borrower check above does.
+
+</Exercise>
+<Exercise title="Swap the forecast method" question={"Replace the operating-expense growth forecast with a 14% revenue-margin rule. Preserve actuals and trace the change in forecast EBITDA."}>
+
+{/* notebook-block notebook="04_statement_modeling/statement_modeling.ipynb" cell="exercise-forecast-method" role="exercise" */}
+```python exec id=exercise-forecast-method role=exercise
+# Same actual operating expenses; compare a growth forecast with a revenue-margin formula.
+b=borrower_builder()
+actuals=[(p,evaluation.get("opex",p)) for p in PERIODS[:4]]
+x=b.mixed("opex");x.values(actuals);x.formula("revenue * 0.14")
+margin_model=x.build().build();margin_result=Evaluator().evaluate(margin_model)
+for p in PERIODS[:4]: assert margin_result.get("opex",p)==evaluation.get("opex",p)
+assert margin_result.get("opex","2025Q4")!=evaluation.get("opex","2025Q4")
+forecast_rows=[]
+for p in PERIODS[4:]:
+ forecast_rows.append({"period":p,"growth_opex_usd":evaluation.get("opex",p),"margin_opex_usd":margin_result.get("opex",p),"ebitda_change_usd":margin_result.get("ebitda",p)-evaluation.get("ebitda",p)})
+ assert abs((margin_result.get("ebitda",p)-evaluation.get("ebitda",p))+(margin_result.get("opex",p)-evaluation.get("opex",p)))<1e-8
+print(pd.DataFrame(forecast_rows).to_string(index=False))
+print(DependencyTracer(margin_model).dependency_tree("opex"))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.1" block="exercise-forecast-method" />
+
+Removing the growth forecast matters: otherwise precedence would prevent the fallback formula from taking effect. Actual expenses remain unchanged. With revenue and other costs held fixed, each USD 1 increase in operating expense reduces EBITDA by USD 1. The dependency tree shows revenue as the margin forecast's driver, exposing its operating-leverage assumption.
+
+</Exercise>
+
+<CheckYourself>
+
+- Why can a formula edit leave a value unchanged? A supplied value or forecast may take precedence.
+- Does balance-sheet articulation establish commercial realism? No: it establishes consistency, not forecasting accuracy.
+- Why keep beginning debt explicit? Interest and debt-service calculations depend on timing.
+- What makes an earlier forecast vintage valid? It contains only information available at that date and preserves a traceable comparison with later observations.
+
+</CheckYourself>

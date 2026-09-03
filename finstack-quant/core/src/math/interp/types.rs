@@ -131,7 +131,7 @@ pub enum InterpStyle {
     MonotoneConvex,
     /// Cubic Hermite interpolation (monotone-preserving slopes).
     CubicHermite,
-    /// Piecewise quadratic forwards (smooth forward curve, C²).
+    /// Piecewise quadratic forwards (C¹ forwards and C² log discount factors).
     PiecewiseQuadraticForward,
 }
 

@@ -1,0 +1,453 @@
+---
+id: "4.3"
+title: "Private Credit: Covenants, Scoring, and Expected Loss"
+description: "Connect native borrower forecasts to contractual tests, compare credit signals, and reconcile staged physical expected loss with the held loan exposure."
+desk_question: "Will this borrower breach its covenants, and what loss estimate belongs beside the loan price?"
+references: ["#ifrs-9-impairment", "#asc-326-cecl", "#bcbs-2015-ecl-guidance", "#altman-1968", "#ohlson-1980", "#zmijewski-1984", "#merton-1974", "#crosbie-bohn-2003-kmv", "#lando-skodeberg-2002", "#israel-rosenthal-wei-2001", "#schuermann-2004-lgd", "#altman-et-al-2005-recovery", "#moodys-rating-symbols"]
+api: ["finstack_quant.covenants.CovenantEngine", "finstack_quant.covenants.CovenantSpec", "finstack_quant.covenants.evaluate_engine", "finstack_quant.models.credit.scoring.altman_z_score", "finstack_quant.models.credit.pd.MasterScale", "finstack_quant.models.credit.migration.GeneratorMatrix", "finstack_quant.models.credit.lgd.workout_lgd", "finstack_quant.statements_analytics.compute_ecl", "finstack_quant.statements_analytics.compute_ecl_weighted", "finstack_quant.models.credit.MertonModel"]
+status: "published"
+---
+
+<DeskContext question="Will this borrower breach its covenants, and what loss estimate belongs beside the loan price?">
+
+The borrower from [lesson 4.2](/learn/4.2) enters the priced common book here as a USD 1 million holding of a USD 100 million term-loan facility. The facility and the holding are different amounts. A covenant breach, an accounting impairment allowance and a market mark are also different outputs; this lesson makes their inputs and relationships explicit.
+
+Deliver a dated covenant forecast, a score-and-rating workpaper, a migration-derived PD term structure, a recovery calculation and a staged ECL reconciliation. Complete the three required diagnostic exercises before carrying the loan into Track C or the capstone.
+
+</DeskContext>
+
+<Standard>
+
+### Contract definitions come before ratios
+
+A maintenance covenant is tested on an agreed schedule; an incurrence covenant restricts specified actions. A springing test activates only when its contractual condition holds. Cov-lite means fewer maintenance protections, not absence of risk or a guarantee of payment. Cure rights, waivers, baskets, EBITDA add-backs, netting rules and consequences must come from the agreement.
+
+The fixture uses net debt divided by current-quarter EBITDA times four, capped at 4.5×. Its DSCR is EBITDA less cash taxes, capex and working-capital investment, divided by cash interest plus mandatory amortization; the minimum is 1.1×. This is the fixture's definition, not a universal DSCR formula. Trailing EBITDA would give a different leverage result.
+
+For an upper-bound test, headroom in ratio units is limit minus actual. For a lower-bound test it is actual minus limit. The native report divides that difference by the threshold, returning a **fraction of the limit**. A value of −0.05 therefore means a 5% shortfall against the threshold, not a shortfall of 0.05×. The code prints both conventions and reconciles them. Test-frequency metadata is descriptive; the caller supplies the actual test dates.
+
+### Accounting scores, rating scales and structural signals
+
+Altman Z combines working capital, retained earnings, EBIT, equity value and sales ratios. Its original public-manufacturer, private-company Z-prime and non-manufacturer Z-double-prime variants use different specifications. Ohlson uses a logit-style score and Zmijewski a probit-style score. Sample applicability, financial-statement definitions, size units, price-level normalization and estimation vintage affect interpretation. A formula output is not automatically a calibrated probability for this borrower. [Altman](/references.html#altman-1968), [Ohlson](/references.html#ohlson-1980) and [Zmijewski](/references.html#zmijewski-1984) are the original model references.
+
+The private borrower has no observed listed market capitalization or complete current-liability split in the compact fixture. Those extra inputs are explicitly assumed below. A master scale maps supplied PDs or probability-bearing score results into configured grade bands. It does not independently validate the underlying score or assign an agency rating. [Rating-symbol definitions](/references.html#moodys-rating-symbols) are context, not a substitute for an issuer rating process.
+
+PIT PD conditions default risk on a current macro state; TTC PD averages through the cycle under a model convention. The one-factor transformation uses a specified asset correlation and systematic state. A negative state is adverse in this implementation. Its algebraic inverse provides a consistency check, not evidence that the estimated cycle state is correct. Physical underwriting PD and quote-implied risk-neutral default probabilities should remain labelled separately.
+
+### Migration is not linear PD scaling
+
+A rating transition matrix has nonnegative rows summing to one, with default absorbing. Under a time-homogeneous Markov model, $P(t)=\exp(Qt)$, where generator rows sum to zero and off-diagonal intensities are nonnegative. Matrix logarithms do not make every empirical transition matrix embeddable. The native Israel–Rosenthal–Wei extraction includes regularization diagnostics and a reconstruction error; inspect both rather than silently accepting a repaired matrix. [Israel–Rosenthal–Wei](/references.html#israel-rosenthal-wei-2001) and [Lando–Skødeberg](/references.html#lando-skodeberg-2002) provide the methodological context.
+
+Cumulative default probability at five years is an entry of $P(5)$, not five times the one-year probability. Marginal unconditional bucket default probability is the difference between successive cumulative probabilities. Summing conditional annual PDs without survival weighting double-counts names that have already defaulted.
+
+### Recovery and accounting loss use explicit horizons
+
+Workout LGD deducts haircuts, direct and indirect costs, and the effect of recovery delay. Higher recoveries in good conditions can deteriorate alongside PD in stress; treating the two inputs as independent is a substantive assumption. [Schuermann](/references.html#schuermann-2004-lgd) and [Altman and coauthors](/references.html#altman-et-al-2005-recovery) discuss recovery risk.
+
+Under IFRS 9's general approach, Stage 1 measures losses arising from defaults possible in the next twelve months; a significant increase in credit risk moves the allowance to lifetime losses in Stage 2. Stage 3 identifies credit impairment. Twelve-month ECL is not limited to cash shortfalls paid within twelve months. Staging uses forward-looking evidence; past-due backstops do not replace that assessment. [IFRS 9, section 5.5](https://www.ifrs.org/content/dam/ifrs/publications/pdf-standards/english/2022/issued/part-a/ifrs-9-financial-instruments.pdf?bypass=on)
+
+CECL under ASC 326-20 measures lifetime expected credit losses without the IFRS Stage-1-to-Stage-2 horizon switch, using historical experience, current conditions and reasonable supportable forecasts, with reversion where needed. The Python calculation below executes the IFRS staging path; its lifetime result is not labelled a complete CECL implementation. [FASB's credit-loss overview](https://fasb.org/page/PageContent?pageId=%2Fstandards%2FTransition%2Fcredit-losses-transition.html) and [forecast guidance](https://fasb.org/page/PageContent?pageId=%2Fprojects%2Fother-staff-projects%2Ffasb-staff-qatopic-326-no-2developing-an-estimate-of-expect.html)
+
+The native simplified ECL integration is inspectable:
+
+$$
+\mathrm{ECL}=\sum_i [F(t_i)-F(t_{i-1})],\mathrm{LGD}_i,\mathrm{EAD}(\bar t_i),(1+\mathrm{EIR})^{-\bar t_i}.
+$$
+
+Here $F$ is cumulative **physical** PD and $\bar t_i$ is the bucket midpoint. EIR discounting is not WACC or a substituted risk-neutral hazard curve. The exposure's staging PD inputs are lifetime PDs; its measurement schedule has its own cumulative term structure. Keep those horizons aligned.
+
+</Standard>
+
+<BuildIt>
+
+### 1. Introduce the held loan without confusing price and loss
+
+The base book has no term loan; the common book includes `BORROWER-TL`. Price that native holding with applicable risk metrics and assert the holding fraction. The displayed one-year PD×LGD×EAD amounts are undiscounted physical expected-loss approximations, not deductions to apply mechanically to the market PV.
+
+{/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="priced-term-loan" role="build" */}
+```python exec id=priced-term-loan role=build
+import json
+from decimal import Decimal
+from _shared.analyst_book import build_book, build_market, instruments, RISK_METRICS
+from _shared.borrower_model import borrower_data
+from finstack_quant.portfolio import value_portfolio
+data = borrower_data()
+assert "BORROWER-TL" not in instruments("base")
+assert "BORROWER-TL" in instruments("common")
+valuation = value_portfolio(build_book("common"), build_market("common"), strict_risk=True, metrics=list(RISK_METRICS))
+wire = json.loads(valuation.to_json())
+loan = wire["position_values"]["BORROWER-TL"]
+assert loan["risk_metrics_complete"] and not loan.get("risk_error")
+assert Decimal(loan["value_native"]["amount"]) > 0
+ead = data["loan"]["holding_notional"]
+assert ead / data["loan"]["facility_notional"] == data["loan"]["holding_fraction"]
+assert data["credit"]["measure"] == "physical"
+losses = {scenario: ead * data["credit"][scenario]["pd"] * data["credit"][scenario]["lgd"] for scenario in ["base", "downside", "severe"]}
+assert losses["base"] < losses["downside"] < losses["severe"]
+print("Native loan PV:", loan["value_native"])
+print("Held EAD USD:", ead, "Facility USD:", data["loan"]["facility_notional"])
+print("Undiscounted one-year physical expected losses USD:", losses)
+print("Covenant definitions:", data["covenants"])
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.3" block="priced-term-loan" />
+
+The loan's market PV is about USD 1.098 million in this controlled fixture. Its market forwards, contractual cash flows and pricing conventions come from the common valuation environment. The USD 13,750 baseline physical one-year loss uses a separate 2.5% PD and 55% LGD. A price above par does not establish absence of credit risk.
+
+### 2. Forecast the actual covenant definitions
+
+The native statement model preserves actuals and applies the shared underwriting base and downside assumptions. The downside changes revenue, costs and the interest-rate assumption together. A standard LBO package is shown for orientation; the actual engine then tests exactly the fixture's two agreed rules. The JSON bridge must agree with typed evaluation.
+
+{/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="borrower-covenant-forecast" role="build" */}
+```python exec id=borrower-covenant-forecast role=build
+import json
+import math
+import numpy as np
+import pandas as pd
+from _shared.borrower_model import borrower_model, borrower_data, PERIODS
+from finstack_quant.statements import Evaluator, ModelBuilder, ForecastSpec
+from finstack_quant.covenants import Covenant, CovenantType, CovenantSpec, CovenantEngine, evaluate_engine, lbo_standard
+
+credit_data = borrower_data()
+credit_model = borrower_model()
+credit_actuals = Evaluator().evaluate(credit_model)
+# Templates illustrate package breadth; the two enforceable fixture rules below retain their exact definitions.
+print("Standard LBO package labels:",[s.covenant.label for s in lbo_standard(6.0,2.0,1.1,50_000_000)])
+credit_specs = [CovenantSpec(Covenant(CovenantType.max_net_debt_to_ebitda(4.5),"3M","net-leverage"),"net_leverage"),
+                CovenantSpec(Covenant(CovenantType.min_dscr(1.1),"3M","debt-service"),"dscr")]
+credit_engine = CovenantEngine.from_specs(credit_specs)
+credit_engine.validate()
+forecast_dates = ["2025-03-31","2025-06-30","2025-09-30","2025-12-31"]
+credit_scenarios, covenant_rows = {}, []
+for scenario in ("base","downside"):
+    assumptions = credit_data["scenarios"][scenario]
+    builder = ModelBuilder.from_spec(credit_model)
+    for node in ("revenue","cogs","opex"):
+        builder.forecast(node,ForecastSpec.growth(assumptions[f"{node}_growth_per_quarter"]))
+    builder = builder.mixed("interest_rate").values([(q,credit_actuals.get("interest_rate",q)) for q in PERIODS[:4]]).formula(str(assumptions["annual_interest_rate"])).build()
+    values = Evaluator().evaluate(builder.build())
+    credit_scenarios[scenario] = values
+    assert all(values.get("revenue",q)==credit_actuals.get("revenue",q) for q in PERIODS[:4])
+    engine = CovenantEngine.from_specs(credit_specs)
+    for quarter,as_of in zip(PERIODS[4:],forecast_dates):
+        metrics = {"net_leverage":values.get("net_leverage",quarter),"dscr":values.get("dscr",quarter)}
+        reports = engine.evaluate(metrics,as_of)
+        bridged = evaluate_engine(CovenantEngine.from_specs(credit_specs).to_json(),metrics,as_of)
+        for identifier,report in reports.items():
+            unit_headroom = 4.5-metrics["net_leverage"] if identifier=="net-leverage" else metrics["dscr"]-1.1
+            assert abs(report.headroom-unit_headroom/report.threshold) < 1e-12
+            assert report.passed == bridged[identifier].passed == (unit_headroom>=0)
+            covenant_rows.append({"scenario":scenario,"period":quarter,"covenant":identifier,"actual_x":report.actual_value,
+                                  "threshold_x":report.threshold,"headroom_x":unit_headroom,"native_headroom_fraction":report.headroom,"passed":report.passed})
+covenant_table = pd.DataFrame(covenant_rows)
+base_dscr = covenant_table[(covenant_table.scenario=="base")&(covenant_table.covenant=="debt-service")]
+assert not base_dscr.iloc[0].passed
+print(covenant_table.to_string(index=False))
+print("Run-rate EBITDA is current quarter x4; DSCR includes cash taxes, capex and working capital over cash interest plus amortization.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.3" block="borrower-covenant-forecast" />
+
+The baseline passes leverage but **fails DSCR in every forecast quarter**: DSCR improves from roughly 0.942× to 1.041× and remains below 1.1×. The broader downside also breaches leverage in 2025Q4 at approximately 4.774×. Neither finding depends on pretending the base case is clean.
+
+A failed snapshot is a contractual metric result. The model has not determined whether a waiver exists, a cure is available, acceleration occurs or default has been triggered under the agreement. Those are additional evidence and contract questions.
+
+### 3. Compute and qualify the credit signals
+
+Prepare the accounting ratios from the native borrower's latest actual balance sheet and full-year actual income flows. Supplemental inputs include a DCF equity proxy, an assumed current-liability split and an explicitly fixed size normalization. Compare all score families, reconcile the original Z formula by hand, map probability-bearing scores through the master scale and round-trip a stressed PIT/TTC transformation.
+
+{/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="borrower-score-and-pit" role="build" */}
+```python exec id=borrower-score-and-pit role=build
+from finstack_quant.models.credit import scoring, pd as credit_pd
+
+q = "2024Q4"
+assets = credit_actuals.get("assets",q)
+liabilities = credit_actuals.get("debt_end",q)
+book_equity = credit_actuals.get("equity_end",q)
+working_capital = credit_actuals.get("nwc_end",q)
+retained_earnings = book_equity-3_000_000
+annual_ebit = sum(credit_actuals.get("ebit",t) for t in PERIODS[:4])
+annual_sales = sum(credit_actuals.get("revenue",t) for t in PERIODS[:4])
+annual_income = sum(credit_actuals.get("net_income",t) for t in PERIODS[:4])
+ffo_proxy = annual_income+sum(credit_actuals.get("depreciation",t) for t in PERIODS[:4])
+# Supplemental scoring assumptions: private borrower has no observed market capitalization/current-liability split.
+market_equity_proxy = 117_010_672.09  # Base DCF equity from lesson 4.2, not a listed share price.
+current_liabilities_assumed = 10_000_000.0
+current_assets_assumed = current_liabilities_assumed+working_capital
+score_ratios = [working_capital/assets,retained_earnings/assets,annual_ebit/assets,market_equity_proxy/liabilities,annual_sales/assets]
+z_public = scoring.altman_z_score(*score_ratios)
+z_private = scoring.altman_z_prime(*score_ratios[:3],book_equity/liabilities,score_ratios[4])
+z_nonmanufacturing = scoring.altman_z_double_prime(*score_ratios[:3],book_equity/liabilities)
+assert abs(z_public.score-sum(a*b for a,b in zip([1.2,1.4,3.3,0.6,1.0],score_ratios))) < 1e-12
+# Fixed reference size of USD 1m and unit price-level deflator; this is explicitly an uncalibrated teaching normalization.
+size_input = math.log(assets/1_000_000)
+ohlson = scoring.ohlson_o_score(size_input,liabilities/assets,working_capital/assets,current_liabilities_assumed/current_assets_assumed,
+    float(liabilities>assets),annual_income/assets,ffo_proxy/liabilities,0.0,0.05)
+zmijewski = scoring.zmijewski_score(annual_income/assets,liabilities/assets,current_assets_assumed/current_liabilities_assumed)
+master = credit_pd.MasterScale.sp_assumptions()
+assert 0 < ohlson.implied_pd < 1 and 0 < zmijewski.implied_pd < 1
+print("Native accounting scores:",[(x.model,x.score,x.zone,x.implied_pd) for x in [z_public,z_private,z_nonmanufacturing,ohlson,zmijewski]])
+print("Illustrative grade mappings:",master.map_score(ohlson).grade,master.map_score(zmijewski).grade)
+print("Accounting-score probability maps are not the borrower's calibrated underwriting PD; size normalization and sample applicability matter.")
+rho, cycle_state, through_cycle_pd = 0.15,-1.5,0.025
+point_in_time_pd = credit_pd.ttc_to_pit(through_cycle_pd,rho,cycle_state)
+round_trip_pd = credit_pd.pit_to_ttc(point_in_time_pd,rho,cycle_state)
+assert point_in_time_pd > through_cycle_pd and abs(round_trip_pd-through_cycle_pd)<1e-10
+print(f"TTC physical PD={through_cycle_pd:.4%}; stressed PIT={point_in_time_pd:.4%}; round trip={round_trip_pd:.4%}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.3" block="borrower-score-and-pit" />
+
+The high raw Ohlson/Zmijewski probability outputs demonstrate why preprocessing and calibration matter. They are not substituted for the fixture's underwriting PD. The TTC-to-PIT calculation takes 2.5% to about 6.74% under the selected adverse state and returns to 2.5% under inversion. That check validates the transformation mechanics only.
+
+### 4. Build a cumulative PD term structure
+
+The three-state example is deliberately small enough to audit. Extract an annual generator, project it to one and five years, and reconcile the five-year projection against five matrix compositions. The emitted JSON is a native calibration artifact. Its regularization mass is zero for this embeddable example; the reconstruction error is near machine precision.
+
+{/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="rating-generator-term-structure" role="build" */}
+```python exec id=rating-generator-term-structure role=build
+from pathlib import Path
+from finstack_quant.models.credit import migration
+
+rating_scale = migration.RatingScale.custom(["A","B","D"])
+annual_transition = migration.TransitionMatrix(rating_scale,[[0.94,0.05,0.01],[0.01,0.94,0.05],[0,0,1]],1.0)
+credit_generator = migration.GeneratorMatrix.from_transition_matrix_with_tol(annual_transition,1e-8)
+one_year = migration.project(credit_generator,1.0)
+five_year = migration.project(credit_generator,5.0)
+assert np.allclose(one_year.to_matrix(),annual_transition.to_matrix(),atol=1e-8)
+assert np.allclose(five_year.to_matrix(),np.linalg.matrix_power(np.asarray(annual_transition.to_matrix()),5),atol=1e-8)
+assert credit_generator.round_trip_error < 1e-8
+assert np.allclose(np.asarray(credit_generator.to_matrix()).sum(axis=1),0,atol=1e-12)
+pd_term = [(t,migration.project(credit_generator,t).probability("B","D")) for t in [0.5,1,2,3,5]]
+assert all(pd_term[i+1][1]>=pd_term[i][1] for i in range(len(pd_term)-1))
+assert five_year.probability("B","D") != 5*annual_transition.probability("B","D")
+Path("credit-generator.json").write_text(credit_generator.to_json())
+print("Annual generator (per year):",credit_generator.to_matrix())
+print("Extraction regularization L1 / round-trip error:",credit_generator.regularization_l1,credit_generator.round_trip_error)
+print("B cumulative PD term structure:",pd_term)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.3" block="rating-generator-term-structure" />
+
+A name starting in B has 5% one-year cumulative PD and approximately 22.29% five-year cumulative PD. The exercise uses a synthetic transition matrix, not a rating-agency calibration or the borrower-specific PD schedule used for ECL.
+
+### 5. Reconcile workout recovery and stage-specific allowance
+
+The recovery example starts with USD 640,000 of post-haircut liquidation value on USD 1 million EAD. Five percent of EAD covers costs and the remaining recovery arrives after two years at an 8% discount rate. Native recovery and LGD must match the explicit arithmetic. The downturn helper is a labelled stress approximation, not an empirical recovery fit.
+
+{/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="workout-and-downturn-lgd" role="build" */}
+```python exec id=workout-and-downturn-lgd role=build
+from finstack_quant.models.credit import lgd
+
+workout = lgd.workout_lgd(1_000_000,[("receivables",500_000,0.2),("equipment",400_000,0.4)],0.03,0.02,2.0,0.08)
+liquidation = 500_000*(1-0.2)+400_000*(1-0.4)
+manual_recovery = (min(liquidation,1_000_000)-0.05*1_000_000)/(1.08**2)
+assert abs(workout.net_recovery-manual_recovery)<1e-8
+assert abs(workout.lgd-(1-manual_recovery/1_000_000))<1e-12
+stressed_lgd = lgd.downturn_lgd_stressed(workout.lgd,0.15,0.4,0.999)
+assert workout.lgd < stressed_lgd <= 1
+print(f"Liquidation={liquidation:,.2f}; delayed net recovery={workout.net_recovery:,.2f}; workout LGD={workout.lgd:.4%}; stressed approximation={stressed_lgd:.4%}")
+print("The downturn helper is a mean-plus-stress approximation; it is not an empirical recovery calibration or a Frye-Jacobs model.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.3" block="workout-and-downturn-lgd" />
+
+For impairment, use the shared physical PD assumptions, quarterly cumulative-PD knots, fixed 7.5% EIR and a five-year horizon. The observed covenant weakness motivates an explicit watchlist/SICR flag in this teaching policy. A separate performing comparator isolates Stage 1. A 120-days-past-due comparator demonstrates the configured Stage 3 rule. These flags and numerical thresholds are stated policy choices; they are not universal accounting cutoffs or an automatic consequence of every covenant breach.
+
+{/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="staged-borrower-ecl" role="build" */}
+```python exec id=staged-borrower-ecl role=build
+from finstack_quant.statements_analytics import Exposure, StagingConfig, QualitativeFlags, classify_stage, compute_ecl, compute_ecl_weighted
+
+ead43 = credit_data["loan"]["holding_notional"]
+eir43, maturity43, lgd43 = 0.075,5.0,credit_data["credit"]["base"]["lgd"]
+quarterly_times = np.arange(0,5.001,0.25)
+physical_schedules = {name:[(float(t),1-(1-credit_data["credit"][name]["pd"])**float(t)) for t in quarterly_times]
+                      for name in ["base","downside","severe"]}
+base_lifetime_pd = physical_schedules["base"][-1][1]
+staging_policy = StagingConfig(pd_delta_absolute=0.05,pd_delta_relative=float("inf"))
+performing_comparator = Exposure("performing-comparator",ead43,lgd43,eir43,maturity43,base_lifetime_pd,base_lifetime_pd)
+# Explicit analyst policy for this case: the observed covenant weakness warrants a watchlist review/SICR flag.
+watched_borrower = Exposure("BORROWER-TL",ead43,lgd43,eir43,maturity43,base_lifetime_pd,base_lifetime_pd,qualitative_flags=QualitativeFlags(watchlist=True))
+defaulted_comparator = Exposure("defaulted-comparator",ead43,lgd43,eir43,maturity43,1.0,base_lifetime_pd,dpd=120)
+for exposure in [performing_comparator,watched_borrower,defaulted_comparator]:
+    stage = classify_stage(exposure,staging_policy)
+    print(exposure.id,stage.stage.value,stage.triggers)
+assert classify_stage(watched_borrower,staging_policy).stage.value=="stage2"
+base_ecl = compute_ecl(performing_comparator,physical_schedules["base"],stage="stage1",bucket_width_years=0.25)
+lifetime_ecl = compute_ecl(watched_borrower,physical_schedules["base"],stage="stage2",bucket_width_years=0.25)
+manual_stage1 = sum((physical_schedules["base"][i+1][1]-physical_schedules["base"][i][1])*ead43*lgd43/(1+eir43)**((quarterly_times[i]+quarterly_times[i+1])/2) for i in range(4))
+assert abs(base_ecl.ecl-manual_stage1)<1e-8
+assert lifetime_ecl.ecl > base_ecl.ecl
+scenario_weights = {"base":0.60,"downside":0.25,"severe":0.15}
+weighted_native = compute_ecl_weighted(watched_borrower,[(scenario_weights[name],physical_schedules[name]) for name in scenario_weights],stage="stage2",bucket_width_years=0.25)
+manual_weighted = sum(weight*compute_ecl(watched_borrower,physical_schedules[name],stage="stage2",bucket_width_years=0.25).ecl for name,weight in scenario_weights.items())
+assert abs(weighted_native.ecl-manual_weighted)<1e-8
+joint_pd_lgd_ecl = 0.0
+for name,weight in scenario_weights.items():
+    exposure = Exposure(name,ead43,credit_data["credit"][name]["lgd"],eir43,maturity43,physical_schedules[name][-1][1],base_lifetime_pd)
+    joint_pd_lgd_ecl += weight*compute_ecl(exposure,physical_schedules[name],stage="stage2",bucket_width_years=0.25).ecl
+assert joint_pd_lgd_ecl > weighted_native.ecl
+stage3_ecl = compute_ecl(defaulted_comparator,physical_schedules["base"],stage="stage3",stage3_time_to_recovery_years=1.0)
+assert abs(stage3_ecl.ecl-ead43*lgd43/(1+eir43))<1e-8
+print("Stage1 / lifetime / fixed-LGD weighted lifetime / joint PD-LGD weighted lifetime / Stage3 ECL USD:",base_ecl.ecl,lifetime_ecl.ecl,weighted_native.ecl,joint_pd_lgd_ecl,stage3_ecl.ecl)
+print(base_ecl.to_dataframe().to_string(index=False))
+print("Constant EAD, EIR and conditional annual PD are controlled impairment assumptions, not the loan pricer's amortizing market cash flows.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.3" block="staged-borrower-ecl" />
+
+The Stage 1 bucket sum reconciles to about USD 13,266. Constant-EAD lifetime loss is about USD 55,086. The native probability-weighted calculation holds LGD fixed because it takes one exposure; a second explicit weighted sum allows scenario-specific LGD and therefore shows the additional joint PD/LGD stress. The simplified Stage 3 calculation assumes certain default and discounts its specified loss at the recovery horizon.
+
+Now carry the held loan's USD 25,000 quarterly amortization into EAD. The native schedule interpolates linearly, so pin each integration midpoint to the pre-payment balance and disclose the approximation between knots. The final quarter begins with USD 525,000 before the last amortization and balloon redemption. A hand sum reconciles the native result, which must be below the constant-EAD comparator. Invalid decreasing cumulative PD is rejected with `ValueError`.
+
+{/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="amortizing-loan-ecl" role="build" */}
+```python exec id=amortizing-loan-ecl role=build
+# The held slice amortizes USD25,000 at each quarterly payment, with remaining principal redeemed at maturity.
+quarterly_amortization = ead43*credit_data["loan"]["amortization_per_quarter_of_original"]
+midpoint_ead = [(float((quarterly_times[i]+quarterly_times[i+1])/2),ead43-i*quarterly_amortization) for i in range(20)]
+# Exposure interpolates linearly, so pin every integration midpoint to its contractual pre-payment balance.
+ead_knots = [(0.0,ead43),*midpoint_ead,(5.0,0.0)]
+amortizing_exposure = Exposure("BORROWER-TL-amortizing",ead43,lgd43,eir43,maturity43,base_lifetime_pd,base_lifetime_pd,
+    qualitative_flags=QualitativeFlags(watchlist=True),ead_schedule=ead_knots)
+amortizing_loss = compute_ecl(amortizing_exposure,physical_schedules["base"],stage="stage2",bucket_width_years=0.25)
+manual_amortizing_loss = sum((physical_schedules["base"][i+1][1]-physical_schedules["base"][i][1])*balance*lgd43/(1+eir43)**t for i,(t,balance) in enumerate(midpoint_ead))
+assert abs(amortizing_loss.ecl-manual_amortizing_loss)<1e-8
+assert amortizing_loss.ecl<lifetime_ecl.ecl
+assert midpoint_ead[-1][1]==525_000
+try:
+    compute_ecl(amortizing_exposure,[(0.0,0.0),(1.0,0.05),(2.0,0.04)],stage="stage2")
+except ValueError as error:
+    print("Decreasing cumulative-PD schedule rejected:",error)
+else:
+    raise AssertionError("Cumulative PD cannot decrease")
+print(f"Amortizing lifetime ECL={amortizing_loss.ecl:,.2f}; constant-EAD comparator={lifetime_ecl.ecl:,.2f}")
+print("Quarterly midpoint EAD matches the payment grid. Linear interpolation between those knots is not an exact continuous-time jump schedule.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.3" block="amortizing-loan-ecl" />
+
+### 6. Compare an asset-value signal with accounting information
+
+Merton represents equity as a call on firm assets over a specified debt barrier. The chosen asset value and volatility are illustrative market-model inputs, not book assets and an accounting ratio. Recover assets and asset volatility from the native equity value and volatility; check the round trip and the normal-probability relationship to distance to default.
+
+{/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="merton-market-signal" role="build" */}
+```python exec id=merton-market-signal role=build
+from statistics import NormalDist
+from finstack_quant.models.credit import MertonModel
+
+structural = MertonModel(180_000_000,0.25,100_000_000,0.04)
+structural_dd = structural.distance_to_default(1.0)
+structural_pd = structural.default_probability(1.0)
+assert abs(structural_pd-NormalDist().cdf(-structural_dd))<1e-12
+implied_equity,implied_equity_vol = structural.try_implied_equity(1.0)
+recovered = MertonModel.from_equity(implied_equity,implied_equity_vol,100_000_000,0.04,0.0,1.0)
+assert abs(recovered.asset_value/structural.asset_value-1)<1e-7
+assert abs(recovered.asset_vol-structural.asset_vol)<1e-7
+physical_dd = structural.distance_to_default_with_drift(0.08,1.0)
+physical_pd = structural.default_probability_with_drift(0.08,1.0)
+assert physical_dd > structural_dd and physical_pd < structural_pd
+print(f"Risk-neutral DD={structural_dd:.6f}; PD={structural_pd:.6%}; assumed-drift physical DD={physical_dd:.6f}; theoretical physical PD={physical_pd:.6%}")
+print(f"Equity-option duality: E={implied_equity:,.2f}; equity vol={implied_equity_vol:.6%}; recovered assets={recovered.asset_value:,.2f}")
+print("Asset value and volatility are illustrative market-model inputs, not book assets or a calibrated empirical KMV EDF mapping.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.3" block="merton-market-signal" />
+
+The risk-neutral one-year PD is approximately 0.851%. Replacing risk-neutral drift with an assumed 8% physical asset drift gives a different theoretical probability. Neither is an empirically calibrated KMV EDF; that requires an empirical default mapping and a defensible default point. [Merton](/references.html#merton-1974) and [Crosbie–Bohn](/references.html#crosbie-bohn-2003-kmv) provide the structural-model context.
+
+<LabCard notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" title="Borrower covenant, recovery and loss workpaper" description="The full native workflow, three required diagnostics and the held-loan bridge." />
+<LabCard notebook="04_statement_modeling/models/credit_scoring_and_pd.ipynb" title="Score families and physical PD transformations" description="Inspect model variants, input ratios and master-scale interpretation." />
+<LabCard notebook="04_statement_modeling/models/covenant_monitoring.ipynb" title="Covenant engine contracts" description="Typed specifications, dated reports and JSON evaluation parity." />
+<LabCard notebook="07_advanced_quant/correlation/structural_credit_models.ipynb" title="Structural credit models" description="Equity back-out, default barriers, physical drift and model variants." />
+
+</BuildIt>
+
+<Exercise title="1. Measure headroom under the exact 4.2 bear case" question="Recreate lesson 4.2's revenue-only -2% quarterly growth scenario, keep the other baseline assumptions, and identify each covenant breach and its headroom units.">
+
+This is intentionally different from the broader underwriting downside. Costs retain baseline growth and the interest-rate assumption stays at 7.5%. Leverage breaches in 2025Q2 and worsens to approximately 7.711× by Q4. DSCR fails throughout and reaches approximately 0.361×. The code checks each native fractional headroom against the ratio-unit difference divided by the limit.
+
+{/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="bear-covenant-headroom" role="exercise" */}
+```python exec id=bear-covenant-headroom role=exercise
+# Lesson 4.2 changes only revenue growth to -2%; this differs from the broader underwriting downside above.
+bear_model = ModelBuilder.from_spec(credit_model).forecast("revenue",ForecastSpec.growth(-0.02)).build()
+bear_values = Evaluator().evaluate(bear_model)
+headroom_rows = []
+for quarter,as_of in zip(PERIODS[4:],forecast_dates):
+    metrics = {"net_leverage":bear_values.get("net_leverage",quarter),"dscr":bear_values.get("dscr",quarter)}
+    reports = CovenantEngine.from_specs(credit_specs).evaluate(metrics,as_of)
+    for identifier,node,limit,direction in [("net-leverage","net_leverage",4.5,-1),("debt-service","dscr",1.1,1)]:
+        headroom = direction*(metrics[node]-limit)
+        assert abs(reports[identifier].headroom-headroom/limit)<1e-12
+        headroom_rows.append({"period":quarter,"covenant":identifier,"actual_x":metrics[node],"headroom_x":headroom,"passed":reports[identifier].passed})
+assert bear_values.get("dscr","2025Q4")<credit_scenarios["base"].get("dscr","2025Q4")
+assert bear_values.get("net_leverage","2025Q4")>credit_scenarios["base"].get("net_leverage","2025Q4")
+print(pd.DataFrame(headroom_rows).to_string(index=False))
+print("Covenant breach is a contractual test result. Waivers, cure rights, acceleration and impairment judgement require the actual agreement and evidence.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.3" block="bear-covenant-headroom" />
+
+The comparison attributes the different breach timing to different scenario assumptions. A shared label such as “bear” is not a complete scenario specification.
+
+</Exercise>
+
+<Exercise title="2. Isolate the Stage 1 to Stage 2 allowance cliff" question="Keep the same PD curve, EAD, LGD and EIR, then change only the qualitative SICR flag. Reconcile the allowance jump and explain its economic meaning.">
+
+The allowance rises from about USD 13,266 to USD 55,086, a roughly 4.15× ratio. The experiment holds the credit-loss curve fixed, so the jump isolates the measurement-horizon change. It does not mean the borrower's economic value instantly falls by the same amount or that default probability jumps at the accounting boundary.
+
+{/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="stage-two-allowance-cliff" role="exercise" */}
+```python exec id=stage-two-allowance-cliff role=exercise
+# Isolate the stage-horizon effect: same EAD, LGD, discount rate and PD curve, with/without a qualitative SICR flag.
+clean_stage = classify_stage(performing_comparator,staging_policy)
+watch_stage = classify_stage(watched_borrower,staging_policy)
+assert clean_stage.stage.value=="stage1" and watch_stage.stage.value=="stage2"
+clean_allowance = compute_ecl(performing_comparator,physical_schedules["base"],stage=clean_stage.stage,bucket_width_years=0.25).ecl
+watch_allowance = compute_ecl(watched_borrower,physical_schedules["base"],stage=watch_stage.stage,bucket_width_years=0.25).ecl
+assert watch_allowance>clean_allowance
+print(f"Same credit curve: Stage1={clean_allowance:,.2f}; Stage2={watch_allowance:,.2f}; allowance jump={watch_allowance-clean_allowance:,.2f}; ratio={watch_allowance/clean_allowance:.4f}")
+print("Stage1 includes lifetime losses caused by defaults possible in the next 12 months, not only cash shortfalls paid within 12 months.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.3" block="stage-two-allowance-cliff" />
+
+The Stage 1 comparator still captures lifetime cash losses associated with defaults occurring within the next twelve months. Stage 2 extends the default-event window over the remaining life. Do not confuse a loss-payment horizon with a default-event horizon.
+
+</Exercise>
+
+<Exercise title="3. Explain improving Z and worsening distance to default" question="Increase trailing EBIT/assets while holding the other accounting ratios fixed, then double assumed asset volatility. Show the conflicting score and structural signals and explain what each observes.">
+
+The accounting Z-score improves because measured earnings strengthen. Distance to default falls and model PD rises because the forward asset distribution widens around the debt barrier. Accounting data can lag market information, market volatility can be transient, and either model may be misspecified. Investigate the reason for disagreement instead of averaging a Z-score and a distance-to-default number with incompatible meanings.
+
+{/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="distance-versus-accounting-score" role="exercise" */}
+```python exec id=distance-versus-accounting-score role=exercise
+improved_ratios = list(score_ratios)
+improved_ratios[2] *= 1.20  # Better trailing EBIT/assets, with other accounting ratios held fixed.
+improved_z = scoring.altman_z_score(*improved_ratios)
+volatile_market = MertonModel(structural.asset_value,0.50,structural.debt_barrier,structural.risk_free_rate)
+assert improved_z.score>z_public.score
+assert volatile_market.distance_to_default(1.0)<structural_dd
+assert volatile_market.default_probability(1.0)>structural_pd
+print(f"Accounting Z: {z_public.score:.4f} -> {improved_z.score:.4f}; market DD: {structural_dd:.4f} -> {volatile_market.distance_to_default(1.0):.4f}")
+print("The signals disagree because trailing accounting performance improved while assumed forward asset volatility doubled. Neither is a substitute for the other or a calibrated borrower PD.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.3" block="distance-versus-accounting-score" />
+
+</Exercise>
+
+<CheckYourself>
+
+State the exact leverage and DSCR definitions, the baseline breach, the test dates and both headroom units. Label scoring probabilities, physical PD schedules and risk-neutral model probabilities separately. Reconcile cumulative to marginal PD, EAD amortization, recovery timing and EIR discounting. Your completed workpaper includes the priced holding, all six build stages and all three required solutions; learner completion time is unmeasured.
+
+</CheckYourself>

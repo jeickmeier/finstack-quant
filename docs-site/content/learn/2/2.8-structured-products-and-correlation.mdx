@@ -1,0 +1,363 @@
+---
+id: "2.8"
+title: "Structured Products and Correlation"
+description: "Decompose structured coupons and redemption, reconcile a real pool waterfall, and trace correlation through portfolio and tranche losses."
+desk_question: "Which risks did the structure redistribute, and which assumptions generated the quoted tranche value?"
+references: ["#li-2000-gaussian-copula", "#vasicek-2002-loan-portfolio", "#laurent-gregory-2005-factor-copulas", "#andersen-sidenius-basu-2003", "#gibson-2004-synthetic-cdos", "#hull-white-2004-cdo", "#krekel-stumpp-2006-correlation-products", "#overhaus-2007-equity-derivatives", "#richard-roll-1989", "#schwartz-torous-1989"]
+api: ["finstack_quant.valuations.tarn_coupon_profile", "finstack_quant.valuations.snowball_coupon_profile", "finstack_quant.valuations.instruments.structured_credit_tranche_metrics", "finstack_quant.models.correlation.simulate_portfolio_loss", "finstack_quant.core.market_data.BaseCorrelationCurve", "finstack_quant.valuations.instruments.price_instrument"]
+status: "published"
+---
+
+<DeskContext question="Which risks did the structure redistribute, and which assumptions generated the quoted tranche value?">
+
+A high coupon can be compensation for a short option, principal-loss exposure, callability or illiquidity. A senior rating describes a place in a loss allocation, not the absence of risk. Read the payoff first, then the pool, then the model that translates dependence into tranche cash flows.
+
+This lesson joins [path-dependent pricing](/learn/2.7) and [credit pricing](/learn/2.5). You will produce a coupon/redemption reconciliation, a real two-asset waterfall, a loss-distribution and tranche comparison, and a synthetic-tranche correlation quote. Track C deepens these subjects; every exercise here is required.
+
+</DeskContext>
+
+<Standard>
+
+### Structured notes are bundles of contingent cash flows
+
+An autocallable can terminate early when a reference level is reached. Conditional coupons, participation caps and a short downside option change the investor's exposure. The issuer's creditworthiness also matters: a contractual capital floor is an obligation of the issuer, not an external guarantee. The deterministic known-fixing example below isolates redemption and deliberately makes no issuer-credit valuation claim.
+
+A TARN caps cumulative coupon payments at a target, so the last coupon may be truncated. A snowball coupon depends recursively on the previous coupon. An inverse floater decreases with its reference rate, subject to contractual limits. A range-accrual coupon multiplies a coupon rate by the fraction of qualifying observations and the accrual year fraction. Observation inclusivity and target units change cash; they are tested explicitly. [Overhaus](/references.html#overhaus-2007-equity-derivatives) supplies structured-equity context.
+
+### Cash-flow tranching and loss tranching are different descriptions
+
+A cash pool collects interest, scheduled principal, prepayments and recoveries. Fees and interest priorities precede principal distributions according to the deal rules. OC tests compare eligible collateral with specified debt; IC tests compare available interest with required interest. A failed test may redirect cash to senior repayment. Neither test is a substitute for modelling actual cash arrivals and recovery timing.
+
+For constant annual rates, monthly mortality equivalents are
+
+$$
+\mathrm{SMM}=1-(1-\mathrm{CPR})^{1/12},\qquad
+\mathrm{MDR}=1-(1-\mathrm{CDR})^{1/12}.
+$$
+
+CPR is prepayment, CDR is default; default severity determines lost principal, while recovery lag determines when the surviving recovery arrives. Constant curves are controlled scenarios. Mortgage seasoning, refinancing incentives and borrower heterogeneity require richer assumptions, as illustrated by [Richard–Roll](/references.html#richard-roll-1989) and [Schwartz–Torous](/references.html#schwartz-torous-1989).
+
+A loss-only tranche with attachment $a$ and detachment $d$, expressed as fractions of pool notional $N$, absorbs
+
+$$
+L_{a,d}=N\min\{\max(L/N-a,0),d-a\}.
+$$
+
+The equity loss tranche attaches first at zero. Do not transfer those coordinates into the cash-stack builder without reading its contract: the native structured-credit fixture's senior `attachment_point`/`detachment_point` describe capital-stack ordering. Its AAA 0–80% coordinates are not an equity first-loss 0–80% tranche. The displayed copula experiment uses explicit loss attachment/detachment fractions in a separate object.
+
+### Correlation changes joint outcomes while marginal default risk stays fixed
+
+In the one-factor Gaussian model, name $i$ defaults when
+
+$$
+\sqrt\rho\,Z+\sqrt{1-\rho}\,\epsilon_i<\Phi^{-1}(p_i).
+$$
+
+Here $\rho$ is latent asset correlation, not observed default-indicator correlation. The API takes factor loadings, so equal-name loading is $\sqrt\rho$. Passing $\rho$ as the loading would produce the wrong dependence. With fixed marginal PD and LGD, expected total pool loss remains $\sum_i N_i p_i\mathrm{LGD}_i$; correlation changes its distribution and allocation across nonlinear tranches. [Li](/references.html#li-2000-gaussian-copula), [Vasicek](/references.html#vasicek-2002-loan-portfolio) and [Laurent–Gregory](/references.html#laurent-gregory-2005-factor-copulas) develop this modelling family.
+
+Conditioning on the common factor makes defaults independent, with conditional PD
+
+$$
+p_i(z)=\Phi\left(\frac{\Phi^{-1}(p_i)-\sqrt\rho z}{\sqrt{1-\rho}}\right).
+$$
+
+For a homogeneous infinitely granular pool, conditional loss converges to LGD times this conditional PD: the Vasicek loan-loss limit. Finite pools retain idiosyncratic granularity. Factor-copula semi-analytics integrate conditional loss distributions over the common factor; conditional recursion/convolution or quadrature replaces part of the brute-force sampling. The native experiment below uses finite-pool Monte Carlo, so its sampling error must still be reported.
+
+Base correlation quotes cumulative zero-to-detachment tranches. A tranche's expected loss can be represented as the difference of two such cumulative pieces. Different detachment correlations fit different quotes; the resulting surface is not automatically one coherent joint default model. Check loss monotonicity across detachments and time, interpolation behaviour and quote fit. A bootstrap proceeds through quoted maturities and detachments, solving a correlation to reproduce each spread/upfront quote while keeping the marginal credit and discount inputs consistent. Check each residual after interpolation and test the implied cumulative expected-loss surface. This lesson reprices supplied base-correlation curves; it does not label that sweep a completed bootstrap. Calibration identifies parameters within the chosen convention, not the true dependence law. [Gibson](/references.html#gibson-2004-synthetic-cdos), [Hull–White](/references.html#hull-white-2004-cdo) and [Krekel–Stumpp](/references.html#krekel-stumpp-2006-correlation-products) provide the tranche-pricing context.
+
+</Standard>
+
+<BuildIt>
+
+### 1. Read redemption and coupon arithmetic in cash units
+
+The autocallable experiment supplies observed fixings, zero discount rates and zero coupons, and sets the call threshold out of reach. This removes unrelated cash flows while testing capital floors, participation caps and the investor's short knock-in put. A breach followed by complete spot recovery returns principal in this contract: touching a barrier does not mean principal is automatically lost.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="structured-note-redemption" role="build" */}
+```python exec id=structured-note-redemption role=build
+import datetime as dt
+import json
+from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments import price_instrument
+
+note_market = MarketContext().insert(DiscountCurve.flat("USD-OIS", dt.date(2026, 1, 1), 0.0))
+note_market.insert_price("SPX-SPOT", Money(100.0, "USD"))
+note_spec = {
+    "id": "NOTE-PAYOFF-PROOF", "underlying_ticker": "SPX",
+    "observation_dates": ["2025-12-30", "2025-12-31"],
+    "payment_dates": ["2026-01-02", "2026-01-02"], "expiry": "2026-01-02",
+    "autocall_barriers": [3.0, 3.0], "coupon_barriers": [0.0, 0.0],
+    "coupons": [0.0, 0.0], "memory_coupons": False,
+    "final_barrier": 0.7, "participation_rate": 1.0, "cap_level": 1.5,
+    "notional": {"amount": "1000", "currency": "USD"}, "day_count": "act_365f",
+    "discount_curve_id": "USD-OIS", "spot_id": "SPX-SPOT", "vol_surface_id": "SPX-VOL",
+    "path_model": "atm_term_gbm", "div_yield_id": None, "initial_level": 100.0,
+    "attributes": {},
+}
+print("terminal | capital floor/cap | 50% upside | knock-in principal")
+for terminal in (50.0, 70.0, 90.0, 100.0, 125.0, 160.0):
+    note_spec["past_fixings"] = [["2025-12-30", 100.0], ["2025-12-31", terminal]]
+    ratio = terminal / 100.0
+    contracts = [
+        ({"capital_protection": {"floor": 1.0}}, max(1.0, min(ratio, 1.5))),
+        ({"participation": {"rate": 0.5}}, 1.0 + 0.5 * max(min(ratio, 1.5) - 1.0, 0.0)),
+        ({"knock_in_put": {"strike": 100.0}}, ratio if ratio <= 0.7 else 1.0),
+    ]
+    values = []
+    for payoff, expected in contracts:
+        note_spec["final_payoff_type"] = payoff
+        envelope = {"schema": "finstack_quant.instrument/1",
+                    "instrument": {"type": "autocallable", "spec": note_spec}}
+        value = price_instrument(json.dumps(envelope), note_market, "2026-01-01").price
+        assert abs(value - 1000 * expected) < 1e-10
+        values.append(value)
+    print(f"{terminal:8.0f} | {values[0]:17.2f} | {values[1]:10.2f} | {values[2]:18.2f}")
+note_spec["past_fixings"] = [["2025-12-30", 50.0], ["2025-12-31", 100.0]]
+envelope["instrument"]["spec"] = note_spec
+recovered = price_instrument(json.dumps(envelope), note_market, "2026-01-01").price
+assert recovered == 1000.0
+print(f"Prior knock-in with full recovery: {recovered:.2f}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.8" block="structured-note-redemption" />
+
+The four coupon helpers are arithmetic tools, not complete callable-note valuation engines. In the TARN example, 1.5% then 1.0% reaches a 2.5% cumulative target. The range-accrual check counts two of four observations, including boundary points, then applies the 8% annual coupon and one-quarter accrual fraction.
+
+{/* notebook-block notebook="02_pricing/instruments/exotic_rates.ipynb" cell="structured-rate-coupon-arithmetic" role="build" */}
+```python exec id=structured-rate-coupon-arithmetic role=build
+from finstack_quant.valuations import (
+    tarn_coupon_profile, snowball_coupon_profile,
+    inverse_floater_coupon_profile, callable_range_accrual_accrued,
+)
+
+coupon_tarn = tarn_coupon_profile(0.05, 0.0, [0.02, 0.03, 0.04], 0.025, 0.5)
+# First payment is (5%-2%)*0.5=1.5%; only 1% remains of the 2.5% target.
+assert abs(coupon_tarn["coupons_paid"][0] - 0.015) < 1e-12
+assert abs(coupon_tarn["coupons_paid"][1] - 0.010) < 1e-12
+assert abs(sum(coupon_tarn["coupons_paid"]) - 0.025) < 1e-12
+assert coupon_tarn["redemption_index"] == 1 and coupon_tarn["redeemed_early"]
+coupon_snowball = snowball_coupon_profile(0.03, 0.04, [0.02, 0.03, 0.05], 0, 0.10)
+assert all(abs(actual - expected) < 1e-12 for actual, expected in
+           zip(coupon_snowball, [0.05, 0.06, 0.05], strict=True))
+coupon_inverse = inverse_floater_coupon_profile(0.08, [0.02, 0.03, 0.05], 0, 0.10, 1.5)
+assert all(abs(actual - expected) < 1e-12 for actual, expected in
+           zip(coupon_inverse, [0.05, 0.035, 0.005], strict=True))
+coupon_range = callable_range_accrual_accrued(0.01, 0.03, [0.005, 0.02, 0.03, 0.04], 0.08, 0.25)
+assert abs(coupon_range - 0.08 * 0.25 * 2 / 4) < 1e-12
+print("TARN payments and target:", coupon_tarn)
+print("Snowball coupons:", coupon_snowball)
+print("Inverse floater coupons:", coupon_inverse)
+print(f"Uncalled range-accrual coupon: {coupon_range:.2%} of notional")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.8" block="structured-rate-coupon-arithmetic" />
+
+### 2. Reconcile a real two-asset pool by hand
+
+Use two positive USD 50 million `PoolAsset` balances, not metadata-only representative lines. Over 90 actual days on a 360-day accrual basis, the 8% pool produces USD 102 million including principal. Allocate USD 80.8 million to AAA, USD 15.225 million to BBB, and the residual USD 5.975 million to equity. Discount each receipt with the native USD curve and compare each native tranche PV to the hand allocation within one cent.
+
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="two-asset-waterfall" role="build" */}
+```python exec id=two-asset-waterfall role=build
+import json
+from datetime import date
+import pandas as pd
+from _shared import analyst_tracks as tracks
+from finstack_quant.valuations.instruments import structured_credit_tranche_metrics
+
+lesson28_market = tracks.build_market("credit")
+lesson28_deal = tracks.clo_deal(one_period=True)
+lesson28_spec = lesson28_deal["instrument"]["spec"]
+lesson28_spec["pool"]["assets"] = lesson28_spec["pool"]["assets"][:2]
+for asset in lesson28_spec["pool"]["assets"]:
+    asset["balance"]["amount"] = "50000000"
+assert sum(float(a["balance"]["amount"]) for a in lesson28_spec["pool"]["assets"]) == 100_000_000
+accrual = (date(2025, 4, 15) - tracks.AS_OF).days / 360
+cash_available = 100_000_000 * (1 + 0.08 * accrual)
+receipts = {"AAA": 80_000_000 * (1 + 0.04 * accrual),
+            "BBB": 15_000_000 * (1 + 0.06 * accrual)}
+receipts["EQUITY"] = cash_available - sum(receipts.values())
+flow_df = lesson28_market.get_discount("USD-OIS").df((date(2025, 4, 15) - tracks.AS_OF).days / 365)
+waterfall_rows = []
+for tranche, receipt in receipts.items():
+    native = structured_credit_tranche_metrics(json.dumps(lesson28_deal), tranche, lesson28_market, tracks.AS_OF)
+    assert abs(native.pv - receipt * flow_df) < 0.01
+    waterfall_rows.append({"tranche": tranche, "receipt_usd": receipt, "native_pv_usd": native.pv})
+assert abs(sum(r["native_pv_usd"] for r in waterfall_rows) / flow_df - cash_available) < 0.01
+print(pd.DataFrame(waterfall_rows).to_string(index=False))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.8" block="two-asset-waterfall" />
+
+This intentionally one-payment fixture removes default, prepayment and trigger timing from the reconciliation. Its strength is an exact cash identity. It does not establish a realistic five-year CLO valuation. The required stress exercise returns to the full multi-period deal and reads PV, price, WAL, OAS and writedown together.
+
+### 3. Hold PD and LGD fixed; change only dependence
+
+The pool now has 125 equal names, USD 100 million notional, 5% horizon PD and 60% LGD. Its analytical expected loss is USD 3 million under both asset correlations. Each simulation checks that expectation within four estimated SE. The tranche losses are computed both by the native result and by explicit clipping; their sums reconcile to total portfolio loss within USD 0.000001.
+
+{/* notebook-block notebook="07_advanced_quant/correlation_and_credit_models.ipynb" cell="copula-tranche-losses" role="build" */}
+```python exec id=copula-tranche-losses role=build
+import math
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from finstack_quant.models.correlation import (
+    CopulaSpec, CreditExposure, PortfolioLossConfig, LatentSingleFactor, simulate_portfolio_loss,
+)
+
+latent = LatentSingleFactor(0.15, 0.5)
+assert latent.num_factors == 1  # Descriptor, not an injected simulation engine.
+pool_notional = 100_000_000.0
+tranche_bounds = [("equity", 0.0, 0.03), ("mezz", 0.03, 0.15), ("senior", 0.15, 1.0)]
+correlation_rows, loss_samples = [], {}
+for rho in (0.1, 0.5):
+    exposures = [CreditExposure(f"NAME-{i:03}", pool_notional / 125, 0.05, 0.6, [math.sqrt(rho)])
+                 for i in range(125)]
+    result = simulate_portfolio_loss(exposures, PortfolioLossConfig(16384, 17, 0.99, CopulaSpec.gaussian()))
+    losses = np.asarray(result.losses)
+    loss_samples[rho] = losses / pool_notional
+    standard_error = losses.std(ddof=1) / math.sqrt(len(losses))
+    assert abs(result.expected_loss - pool_notional * 0.05 * 0.6) < 4 * standard_error
+    allocated = 0.0
+    for name, attachment, detachment in tranche_bounds:
+        stats = result.tranche_loss_statistics(attachment, detachment, pool_notional)
+        hand = np.clip(losses / pool_notional - attachment, 0, detachment - attachment) * pool_notional
+        assert abs(hand.mean() - stats.expected_loss_amount) < 1e-6
+        allocated += stats.expected_loss_amount
+        correlation_rows.append({"rho": rho, "tranche": name, "expected_loss_usd": stats.expected_loss_amount,
+                                 "expected_principal_usd": (detachment - attachment) * pool_notional - stats.expected_loss_amount})
+    assert abs(allocated - result.expected_loss) < 1e-6
+correlation_table = pd.DataFrame(correlation_rows)
+print(correlation_table.to_string(index=False))
+fig, ax = plt.subplots(figsize=(8, 3.6))
+for rho, values in loss_samples.items():
+    ax.hist(values * 100, bins=np.arange(0, 62, 2), density=True, histtype="step", linewidth=2, label=f"Asset correlation {rho:.0%}")
+ax.set(xlabel="Pool loss (% of notional)", ylabel="Density per percentage point", title="Same marginal PD and LGD; different joint tails")
+ax.legend(); fig.tight_layout()
+
+loss_stack = correlation_table.pivot(index="rho", columns="tranche", values="expected_loss_usd")[["equity","mezz","senior"]] / 1e6
+fig, ax = plt.subplots(figsize=(8,3.6))
+loss_stack.plot.bar(stacked=True,ax=ax,color=["#a45227","#75b2a4","#154c53"],rot=0)
+ax.set(xlabel="Latent asset correlation",ylabel="Expected loss (USD millions)",title="Tranche losses sum to the same expected pool loss within sampling error")
+ax.legend(title="Loss tranche");fig.tight_layout()
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.8" block="copula-tranche-losses" />
+
+Higher correlation produces more near-clean outcomes and more severe common-loss outcomes. The first-loss tranche benefits from more clean states after its loss is capped; senior claims become exposed to the heavier joint tail. This is an allocation statement under fixed marginals. It does not mean higher correlation creates or destroys expected total loss.
+
+`LatentSingleFactor` is inspected as a descriptor. The native loss simulation takes `CreditExposure` loadings and `PortfolioLossConfig` explicitly; the lesson does not imply that the descriptor is an injected pricing engine.
+
+### 4. Reprice a supported synthetic-tranche quote
+
+The CDX 0–3% protection claim is a synthetic contract, distinct from the cash pool above. Reuse its supported instrument envelope and registry model `hazard_rate`; no unsupported builder is invented. `BaseCorrelationCurve` detachment knots are percentage points such as 3 and 7, while correlation values are decimals such as 0.25.
+
+{/* notebook-block notebook="07_advanced_quant/correlation_and_credit_models.ipynb" cell="base-correlation-quote" role="build" */}
+```python exec id=base-correlation-quote role=build
+import json
+from _shared import analyst_tracks as tracks
+from finstack_quant.core.market_data import BaseCorrelationCurve
+from finstack_quant.valuations.instruments import price_instrument
+
+synthetic = tracks.credit_index_inputs()["CDX-0-3"]
+base_correlation_rows = []
+for rho in (0.15, 0.25, 0.40):
+    tranche_market = tracks.build_market("credit")
+    tranche_market.insert(BaseCorrelationCurve("CDX-BASE-CORR", [(3.0, rho), (7.0, rho), (15.0, rho), (100.0, rho)]))
+    tranche_value = price_instrument(json.dumps(synthetic), tranche_market, tracks.AS_OF, model="hazard_rate")
+    assert math.isfinite(tranche_value.value.amount)
+    base_correlation_rows.append({"base_correlation": rho, "protection_pv_usd": tranche_value.value.amount})
+assert len({row["protection_pv_usd"] for row in base_correlation_rows}) == 3
+print(pd.DataFrame(base_correlation_rows).to_string(index=False))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.8" block="base-correlation-quote" />
+
+The output is protection PV, not a bond price or the value of a funded principal claim. The sweep demonstrates quote sensitivity under fixed other inputs. It is not a base-correlation bootstrap or a market calibration. A full quote-fit exercise must preserve the quoted spread/upfront convention and inspect the resulting loss surface.
+
+<LabCard notebook="02_pricing/instruments/structured_credit.ipynb" title="Cash pools, waterfalls and tranche stress" description="Actual assets, reconciled receipts, tranche metrics and the first-writedown threshold." />
+<LabCard notebook="07_advanced_quant/correlation_and_credit_models.ipynb" title="Dependence and loss allocation" description="Native finite-pool losses, loss-tranche carve-up and base-correlation pricing." />
+
+</BuildIt>
+
+<Exercise title="1. Explain the opposite equity and senior signs" question="Compare expected principal at asset correlations 0.1 and 0.5. Verify the signs and explain why they are conditional rather than universal traded-price rules.">
+
+Subtract expected tranche loss from tranche notional. For this fixed-PD/LGD, loss-only horizon experiment, expected equity principal rises by about USD 0.94 million while senior principal falls by about USD 0.44 million. The mezzanine absorbs the remaining redistribution. Coupons, default timing, discounting, correlation skew and recalibrated marginal curves can alter actual quoted-price sensitivities.
+
+{/* notebook-block notebook="07_advanced_quant/correlation_and_credit_models.ipynb" cell="correlation-equity-senior" role="exercise" */}
+```python exec id=correlation-equity-senior role=exercise
+comparison = correlation_table.pivot(index="tranche", columns="rho", values="expected_principal_usd")
+assert comparison.loc["equity", 0.5] > comparison.loc["equity", 0.1]
+assert comparison.loc["senior", 0.5] < comparison.loc["senior", 0.1]
+print("Expected undiscounted principal change, higher minus lower correlation (USD):")
+print((comparison[0.5] - comparison[0.1]).to_string())
+print("These signs concern fixed-PD/LGD loss-only principal claims. Coupons, timing and calibrated quotes can change traded-price sensitivities.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.8" block="correlation-equity-senior" />
+
+</Exercise>
+
+<Exercise title="2. Locate the mezzanine's first-writedown CDR" question="Read the full deal's BBB metrics and CDR scenario table. Bracket the first-writedown rate, reconcile model-price OAS and explain why discount margin is rejected for this coupon contract.">
+
+The grid fixes zero CPR, 60% severity and a six-month recovery lag. BBB has no writedown at 1% CDR and positive writedown at 2%; the native threshold is approximately 1.7258%. This is the first-principal-writedown threshold under the specified deal and scenarios, not a CDR that makes market price equal par.
+
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="tranche-loss-threshold" role="exercise" */}
+```python exec id=tranche-loss-threshold role=exercise
+from finstack_quant.valuations.instruments import (
+    structured_credit_tranche_breakeven_cdr, structured_credit_tranche_scenario_table,
+    structured_credit_tranche_oas, structured_credit_tranche_discount_margin,
+)
+
+long_deal = tracks.clo_deal()
+long_wire = json.dumps(long_deal)
+mezzanine = structured_credit_tranche_metrics(long_wire, "BBB", lesson28_market, tracks.AS_OF)
+breakeven = structured_credit_tranche_breakeven_cdr(long_wire, "BBB", lesson28_market, tracks.AS_OF)
+grid = {"cprs": [0.0], "cdrs": [0.0, 0.01, 0.02, 0.05], "severities": [0.6], "recovery_lag": 6}
+scenario_table = structured_credit_tranche_scenario_table(long_wire, "BBB", lesson28_market, tracks.AS_OF, grid)
+scenario_rows = json.loads(scenario_table.to_json())["cells"]
+assert scenario_rows[1]["writedown"] == 0 and scenario_rows[2]["writedown"] > 0
+assert 0.01 < breakeven < 0.02
+assert scenario_rows[-1]["price"] < scenario_rows[0]["price"]
+oas = structured_credit_tranche_oas(long_wire, "BBB", mezzanine.price_pct, lesson28_market, tracks.AS_OF)
+assert abs(oas.oas) < 1e-6
+# This BBB contract pays a fixed coupon. A floating-tranche margin is inapplicable.
+try:
+    structured_credit_tranche_discount_margin(long_wire, "BBB", lesson28_market, tracks.AS_OF, mezzanine.pv)
+except ValueError as error:
+    print("Fixed-coupon discount-margin rejection:", error)
+else:
+    raise AssertionError("Discount margin must reject a fixed-coupon tranche")
+print("Native tranche metrics:", mezzanine.to_json())
+print(pd.DataFrame(scenario_rows).to_string(index=False))
+print(f"First-writedown CDR: {breakeven:.4%}; model-price OAS: {oas.oas * 10_000:.6f} bp")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.8" block="tranche-loss-threshold" />
+
+At the native model price, solved OAS is approximately zero, as it should be. OAS is a spread conditional on modelled cash flows and discounting; report it in basis points only after converting its decimal return. WAL describes principal timing and can move differently from PV under defaults and prepayments. Discount margin applies to a floating-rate tranche; this fixed-coupon BBB route raises `ValueError`. For floating contracts, distinguish the discount spread from the contractual coupon margin and use the documented market-price units.
+
+</Exercise>
+
+<Exercise title="3. What does the Gaussian copula leave out?" question="Write a short credit-committee explanation of why a Gaussian correlation fit is insufficient evidence of protection against a crisis such as 2008. Separate assumptions, calibration and structural risks.">
+
+The single-factor construction specifies a static dependence shape, fixed marginal default probabilities and the chosen recovery assumptions. A Gaussian copula has no asymptotic tail dependence at correlations strictly below one; a fitted moderate correlation can underrepresent joint extremes if the actual dependence changes in stress. Common funding, liquidity, underwriting and macroeconomic exposures can be stronger than the historical sample suggests. Default probabilities and recoveries may deteriorate together, violating a fixed-PD/fixed-LGD stress interpretation.
+
+A good fit to tranche quotes only shows that the chosen parameters reproduce those quotes. Base-correlation interpolation may fail loss or time monotonicity, and a surface of separate quoted correlations need not define one joint law. Small historical samples, unstable regimes and model-dependent marks weaken the inference from fit to economic safety.
+
+The deal can also lose value through trigger diversion, delayed recovery, prepayment changes, financing pressure, issuer or counterparty default and illiquidity. Those channels are not repaired by changing one copula parameter. The appropriate response is a transparent marginal/default/recovery stress set, dependence alternatives, explicit cash-flow and trigger analysis, and a record of which risks each model excludes. This is a model-risk explanation, not a claim that one mathematical formula alone caused the financial crisis.
+
+</Exercise>
+
+<CheckYourself>
+
+Identify the option the note investor has sold, distinguish cash-stack coordinates from loss attachments, and explain why the pool's expected loss can stay constant while tranche expected losses move. Quote a tranche result with its notional, units, payoff side, PD/LGD assumptions, model, correlation convention and recovery timing. Submit all four reconciliations and the three completed exercises; learner completion time is unmeasured.
+
+</CheckYourself>

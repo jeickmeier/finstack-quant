@@ -1,0 +1,239 @@
+---
+id: '4.4'
+title: Portfolio Construction and Liquidity
+description: 'Analyst program lesson 4.4: Portfolio Construction and Liquidity'
+desk_question: "\"Given our views and our limits, what should the book look like \u2014\
+  \ and how fast could we get out?\""
+references:
+- '#grinold-kahn-1999-active-portfolio'
+- '#meucci-risk-and-asset-allocation'
+- '#tasche-2008-capital-allocation'
+- '#litterman-1996-hot-spots'
+- '#hallerbach-2003-decomposing-var'
+- '#roll-1984'
+- '#amihud-2002'
+- '#bangia-1999-lvar'
+- '#almgren-chriss-2000'
+- '#kyle-1985'
+- '#aifmd-liquidity-management'
+api: []
+status: published
+---
+
+<DeskContext question={"Given our views and limits, what should we hold, and how quickly could we get out?"}>
+
+The common book is fully priceable, but priceability does not establish a sensible allocation or an executable exit. We optimize a proportional copy of its eight-contract universe, inspect its risk-budget concentration, then examine trading capacity and spread/impact costs. The data are synthetic and every capacity assumption is visible.
+
+Complete three sessions: constraints and allocation, risk budgets, then liquidity and execution. An unavailable loan capacity remains unavailable throughout the exercise.
+
+</DeskContext>
+
+<Standard>
+
+Expected-return estimates and covariances are noisy. An unconstrained optimum can concentrate in the most optimistic estimate, so the constraint set is part of the investment decision. The current native optimizer is a linear-programming engine with explicit objectives and constraints; the example maximizes estimated annual profit subject to a unit budget, bounds and turnover. It is not presented as a quadratic mean-variance optimizer. We use the mean-variance lens separately to discuss estimation fragility and measure covariance risk.
+
+The shared daily panel is modeled P&L divided by fixed risk capital, not actual book returns. Assign USD100,000 of risk capital to one full contract for this controlled allocation exercise. Scale every initial holding to 0.125 units so the eight quantities sum to one; this preserves relative holdings while giving an explicit USD100,000 total risk-capital budget. The sum-to-one native budget applies to contract quantities, not net market value. This avoids dividing derivative returns by a near-zero PV. The real one-unit holdings remain unchanged in the factory.
+
+A 99% one-day Gaussian VaR decomposition uses aligned covariance and currency exposures. Component VaRs must sum to portfolio VaR by Euler homogeneity; hedges can have negative contributions. Native loss values use a negative sign. Equal target risk shares are a stated comparison, not a claim that equal capital produces equal risk.
+
+Trading capacity must use the same units as position quantity. The fixture records full-contract units per day and separately gives notional per unit. OTC capacities are invented assumptions. Cash deposits have contractual treatment; the loan has no available capacity estimate. Neither is silently assigned a zero liquidation horizon. Bangia LVaR adds a stressed half-spread cost to market loss under its model assumptions. Apply its cash-price spread convention only to the two cash bonds here; OTC derivative closeout and unquoted-loan liquidity need additional data and conventions.
+
+Roll uses negative serial covariance as a bid-ask-spread proxy; it may be unestimable when that condition fails. Amihud relates absolute returns to dollar volume. The native Kyle estimate relates price moves to volume under its stated proxy convention; it is not a causal market-impact guarantee. Almgren–Chriss shows the tension between slower trading's lower temporary impact and higher exposure to price risk. All these measures depend on sampling, units and market regime.
+
+</Standard>
+
+<BuildIt>
+
+### Session 1: preserve identity and optimize the declared units
+
+The liquidity and factor panels align to all eight common-book IDs and contain no missing modeled factor observations. Missing capacity remains a separate explicit condition. Verify the 10-day corporate-bond estimate as one unit divided by 0.10 units/day.
+
+{/* notebook-block notebook="05_portfolio/liquidity_risk.ipynb" cell="common-book-liquidity" role="build" */}
+```python exec id=common-book-liquidity role=build
+import numpy as np
+from _shared.analyst_liquidity import liquidity_panel, position_factor_panel
+from _shared.analyst_book import instruments
+liquidity = liquidity_panel()
+panel = position_factor_panel()
+assert set(liquidity.index) == set(instruments("common"))
+assert set(liquidity.index) <= set(panel.columns)
+assert not panel.isna().any().any() and panel.index.is_unique
+liquidity["days_at_full_capacity"] = liquidity.quantity / liquidity.daily_capacity
+assert liquidity.loc["USD-CORP", "days_at_full_capacity"] == 10.0
+assert np.isnan(liquidity.loc["BORROWER-TL", "days_at_full_capacity"])
+assert np.isnan(liquidity.loc["USD-CASH", "days_at_full_capacity"])
+print(liquidity[["currency", "quantity", "daily_capacity", "days_at_full_capacity", "spread_fraction", "source"]].sort_values("days_at_full_capacity").to_string())
+print(panel.attrs)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.4" block="common-book-liquidity" />
+
+The objective coefficient is the synthetic panel's mean annualized by 252 and multiplied by USD 100,000 per full contract. Compare the unconstrained corner with a 35% unit cap and 0.40 total absolute quantity turnover. Bounds, budget, turnover and objective arithmetic are checked independently. No missing metric is replaced by zero.
+
+{/* notebook-block notebook="05_portfolio/liquidity_risk.ipynb" cell="constrained-common-universe" role="build" */}
+```python exec id=constrained-common-universe role=build
+import json
+import pandas as pd
+from _shared.analyst_book import AS_OF,book_spec,build_market
+from finstack_quant.portfolio import (Objective,MetricExpr,PerPositionMetric,PortfolioOptimizationSpec,WeightingScheme,Constraint,PositionFilter,MissingMetricPolicy,optimize_portfolio)
+# A proportional1/8 copy of the common book. Unit quantities sum to1.
+# Each full contract is assigned100k USD fixed risk capital for the proxy panel.
+opt_spec=book_spec("common")
+position_ids=[p["position_id"] for p in opt_spec["positions"]]
+expected_profit={pid:float(panel[pid].mean()*252*100_000) for pid in position_ids}
+for p in opt_spec["positions"]:
+ p["quantity"]=.125
+ p["attributes"]={"expected_profit_usd":expected_profit[p["position_id"]]}
+objective=Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.attribute("expected_profit_usd")))
+def optimize_units(cap,turnover=None):
+ spec=PortfolioOptimizationSpec.new(json.dumps(opt_spec),objective).with_weighting(WeightingScheme.unit_scaling()).with_missing_metric_policy(MissingMetricPolicy.strict()).with_constraint(Constraint.weight_bounds(PositionFilter.all(),0.,cap,label="position_cap"))
+ # Native optimization includes one sum(weights)=1 budget; don't add a duplicate.
+ if turnover is not None:spec=spec.with_constraint(Constraint.max_turnover(turnover,label="turnover"))
+ result=optimize_portfolio(spec,build_market("common"))
+ assert result.is_feasible and abs(sum(result.optimal_weights.values())-1)<1e-8
+ assert all(-1e-10<=w<=cap+1e-8 for w in result.optimal_weights.values())
+ if turnover is not None:assert result.turnover<=turnover+1e-8
+ assert abs(result.objective_value-sum(expected_profit[pid]*w for pid,w in result.optimal_weights.items()))<1e-6
+ return result
+corner=optimize_units(1.)
+constrained=optimize_units(.35,.40)
+assert corner.objective_value>=constrained.objective_value-1e-8
+print(pd.DataFrame({"expected_annual_profit_per_full_contract_USD":expected_profit,"initial_units":{pid:.125 for pid in position_ids},"corner_units":corner.optimal_weights,"constrained_units":constrained.optimal_weights}).to_string())
+print({"corner_objective_usd":corner.objective_value,"constrained_objective_usd":constrained.objective_value,"sum_absolute_quantity_changes":constrained.turnover,"binding":constrained.binding_constraints})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.4" block="constrained-common-universe" />
+
+### Session 2: inspect who spends risk
+
+Use the optimized quantities times their risk-capital scale as currency exposures against the same aligned covariance matrix. The component sum closes within USD1e-8. A position with a small allocation may consume a large risk share because of its volatility and covariance. A binding allocation constraint and a breached risk target describe different limits.
+
+### Session 3: quantify liquidation costs with matching units
+
+The cash-bond LVaR table retains native model loss, spread cost and adjusted loss separately. Other instrument types are explicitly outside this particular spread-cost calculation. The microstructure example uses shares for Kyle and share-volume times USD 50 for Amihud. In the impact example both order size and ADV are in shares; the reference price makes cost scaling explicit.
+
+{/* notebook-block notebook="05_portfolio/liquidity_risk.ipynb" cell="risk-budget-and-liquidity" role="build" */}
+```python exec id=risk-budget-and-liquidity role=build
+from finstack_quant.models.factor.risk import parametric_var_decomposition,evaluate_risk_budget
+from finstack_quant.models.liquidity import lvar_bangia,roll_effective_spread,amihud_illiquidity,almgren_chriss_impact,kyle_lambda
+from finstack_quant.portfolio import value_portfolio
+from finstack_quant.analytics import Performance
+covariance=panel[position_ids].cov().to_numpy()
+# Currency exposure is position quantity times the disclosed100k proxy-risk-capital denominator.
+exposure=[100_000*constrained.optimal_weights[pid] for pid in position_ids]
+decomp=parametric_var_decomposition(position_ids,exposure,covariance,confidence=.99,compute_incremental=True)
+components=[x.component_var for x in decomp.var_contributions]
+assert abs(sum(components)-decomp.portfolio_var)<1e-8
+budget=evaluate_risk_budget(position_ids,components,[1/8]*8,decomp.portfolio_var)
+print(pd.DataFrame([{"position":x.position_id,"component_VaR_USD":x.component_var,"share":x.relative_var} for x in decomp.var_contributions]).to_string(index=False))
+print("Risk-budget report:",budget.to_json())
+# LVaR's price-spread formula is applied to the cash bonds only.
+# OTC derivative closeout spreads and the unquoted loan need additional conventions/data.
+values=json.loads(value_portfolio(json.dumps(book_spec("common")),build_market("common"),metrics=[]).to_json())
+lvar_rows=[]
+for pid in ["USD-CORP","EUR-GOVT"]:
+ pv=float(values["position_values"][pid]["value_base"]["amount"])
+ returns_frame=panel[[pid]]
+ proxy=Performance.from_returns(returns_frame,frequency="daily")
+ var=proxy.parametric_var(.99).iloc[0]*100_000
+ spread=float(liquidity.loc[pid,"spread_fraction"])
+ result=lvar_bangia(var,spread,spread*.25,.99,pv)
+ assert result.lvar<=result.var and result.spread_cost>=0
+ lvar_rows.append({"position":pid,"market_var_USD":result.var,"spread_cost_USD":result.spread_cost,"LVaR_USD":result.lvar,"PV_USD":pv})
+print(pd.DataFrame(lvar_rows).to_string(index=False))
+# Visible synthetic microstructure panel; quantity is shares, dollar volume is shares*price.
+rng=np.random.default_rng(44);micro_r=.0001+.001*(-1.)**np.arange(252)+rng.normal(0,.00025,252)
+share_volume=rng.uniform(80_000,120_000,252);reference_price=50.0
+dollar_volume=share_volume*reference_price
+roll=roll_effective_spread(micro_r.tolist())
+amihud=amihud_illiquidity(micro_r.tolist(),dollar_volume.tolist())
+kyle=kyle_lambda(micro_r.tolist(),share_volume.tolist(),reference_price)
+assert roll is not None and roll>0 and amihud is not None and amihud>0 and kyle is not None
+print({"Roll_relative_spread":roll,"Amihud_return_per_USD":amihud,"Kyle_USD_per_share_of_volume":kyle})
+impact_rows=[]
+for horizon in [1.,5.,10.]:
+ estimate=almgren_chriss_impact(10_000.,100_000.,.02,horizon,.1,.2,reference_price=50.)
+ impact_rows.append({"horizon_days":horizon,"temporary_impact":estimate.temporary_impact,"cost_USD":estimate.total_cost,"cost_bp":estimate.cost_bp,"execution_risk":estimate.execution_risk})
+assert impact_rows[-1]["temporary_impact"]<impact_rows[0]["temporary_impact"]
+assert impact_rows[-1]["execution_risk"]>impact_rows[0]["execution_risk"]
+print(pd.DataFrame(impact_rows).to_string(index=False))
+import matplotlib.pyplot as plt
+pd.DataFrame(impact_rows).set_index("horizon_days")[["cost_USD","execution_risk"]].plot(title="Synthetic execution: cost and one-sigma risk",ylabel="USD")
+plt.tight_layout()
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.4" block="risk-budget-and-liquidity" />
+
+The chart reports trading cost and execution risk in USD under fixed illustrative coefficients. Slower execution reduces the temporary-impact component and raises execution risk in this model. Capacity during stress can deteriorate at the same time as spreads widen; the static estimates are not a promise of realizable liquidation proceeds.
+
+</BuildIt>
+
+<LabCard notebook="05_portfolio/liquidity_risk.ipynb" title="Three-session construction and liquidity lab" description="Run the common-book allocation, risk decomposition, liquidity comparisons and all three required exercises." />
+<LabCard notebook="05_portfolio/portfolio_optimization.ipynb" title="Native optimization contract" description="Complete the separate yield/rating, filtered-metric, turnover and trade-list examples." />
+<LabCard notebook="05_portfolio/portfolio_risk_decomposition.ipynb" title="Risk decomposition and allocation methods" description="Complete parametric/historical risk, budget and capital-allocation examples." />
+<Exercise title="Tighten a constraint" question={"Reduce the maximum position quantity from 0.35 to 0.25 with the same turnover bound. Attribute the loss in objective to the changed holdings."}>
+
+{/* notebook-block notebook="05_portfolio/liquidity_risk.ipynb" cell="exercise-tighten-constraint" role="exercise" */}
+```python exec id=exercise-tighten-constraint role=exercise
+tight=optimize_units(.25,.40)
+loss=constrained.objective_value-tight.objective_value
+assert loss>=-1e-8
+contributions={pid:expected_profit[pid]*(constrained.optimal_weights[pid]-tight.optimal_weights[pid]) for pid in position_ids}
+assert abs(sum(contributions.values())-loss)<1e-6
+print(pd.DataFrame({"old_units":constrained.optimal_weights,"new_units":tight.optimal_weights,"objective_loss_USD":contributions}).to_string())
+print({"total_objective_loss_USD":loss,"new_binding_constraints":tight.binding_constraints})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.4" block="exercise-tighten-constraint" />
+
+The estimated profit sacrificed is the sum of each coefficient times its reduction in quantity. This is an opportunity cost under the synthetic estimates, not a realized loss. A tighter cap can reduce concentration while reducing the optimized objective. Review risk and liquidity changes before deciding whether the tradeoff is worthwhile.
+
+</Exercise>
+<Exercise title="Rank the exit" question={"Rank the actual common-book positions by modeled days to liquidate. Which eligible cash bond has the larger LVaR spread add-on?"}>
+
+{/* notebook-block notebook="05_portfolio/liquidity_risk.ipynb" cell="exercise-liquidation-ranking" role="exercise" */}
+```python exec id=exercise-liquidation-ranking role=exercise
+rank=liquidity.sort_values("days_at_full_capacity",ascending=False,na_position="last")
+assert rank.index[0]=="USD-CORP" and rank.iloc[0].days_at_full_capacity==10
+assert np.isnan(rank.loc["BORROWER-TL","days_at_full_capacity"])
+print(rank[["daily_capacity","days_at_full_capacity","source"]].to_string())
+print("Largest modeled cash-bond spread add-on:",max(lvar_rows,key=lambda row:row["spread_cost_USD"])["position"])
+print("Cash is a separate treatment; the loan's missing capacity is unknown, not zero-day liquidity.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.4" block="exercise-liquidation-ranking" />
+
+The USD corporate bond is the slowest among the available full-capacity estimates. The printed LVaR ranking applies only to the two cash bonds. The private loan cannot be ranked numerically without an invented capacity; identify it separately as requiring an execution assessment. A cash deposit's treatment follows its contractual maturity rather than a stock-ADV formula.
+
+</Exercise>
+<Exercise title="Interpret Kyle lambda" question={"Change the volume unit from shares to lots of 100 shares. What happens to the coefficient and to its economic interpretation?"}>
+
+{/* notebook-block notebook="05_portfolio/liquidity_risk.ipynb" cell="exercise-kyle-interpretation" role="exercise" */}
+```python exec id=exercise-kyle-interpretation role=exercise
+# Re-express volumes in lots of100shares; coefficient must increase100fold.
+lot_lambda=kyle_lambda(micro_r.tolist(),(share_volume/100).tolist(),reference_price)
+assert lot_lambda is not None and abs(lot_lambda-100*kyle)<1e-12
+print({"USD_per_share_volume":kyle,"USD_per_100_share_lot":lot_lambda})
+print("A larger numerical lambda can be a unit change. Compare the same return sampling, volume unit and reference price.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.4" block="exercise-kyle-interpretation" />
+
+The coefficient becomes 100 times larger because one unit of volume now means 100 shares. The underlying price response is unchanged. Compare lambda only after matching reference price, volume unit, sample frequency and estimation convention; do not rank assets by unqualified coefficients.
+
+</Exercise>
+
+<CheckYourself>
+
+- Does a fully priced portfolio have an observable liquidation capacity? No.
+- Do equal capital weights imply equal risk? No; covariance and factor exposure matter.
+- Can component VaR be negative? Yes, for a hedge contribution under the signed convention.
+- What is the first question about an optimizer's weights? Their denominator: quantities, gross market value, notional or a declared risk-capital budget.
+
+</CheckYourself>

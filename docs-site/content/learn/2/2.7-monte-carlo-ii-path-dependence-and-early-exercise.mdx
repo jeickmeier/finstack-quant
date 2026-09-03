@@ -1,0 +1,431 @@
+---
+id: "2.7"
+title: "Monte Carlo II: Path Dependence and Early Exercise"
+description: "Define exact payoff observations, separate approximation from benchmark, and evaluate learned exercise policies on independent paths."
+desk_question: "Which parts of this exotic price come from the contract, the monitoring grid, and the exercise policy?"
+references: ["#glasserman-2004-monte-carlo", "#kemna-vorst-1990", "#turnbull-wakeman-1991", "#conze-viswanathan-1991", "#goldman-sosin-gatto-1979", "#broadie-glasserman-kou-1997", "#reiner-rubinstein-1991", "#hull-white-1994-numerical-procedures", "#broadie-detemple-1996", "#brigo-mercurio-2006-interest-rate-models", "#hull-white-1990-pricing-ird"]
+api: ["finstack_quant.models.asian_option_price", "finstack_quant.models.barrier_call", "finstack_quant.models.quanto_option_price", "finstack_quant.models.monte_carlo.PathDependentPricer", "finstack_quant.models.monte_carlo.LsmcPricer", "finstack_quant.valuations.instruments.Swaption", "finstack_quant.valuations.instruments.price_instrument"]
+status: "published"
+---
+
+<DeskContext question="Which parts of this exotic price come from the contract, the monitoring grid, and the exercise policy?">
+
+A client describes an average-price option, a knock-out or an American put. The name is not a complete contract. Fix observation dates, initial fixings, barrier direction, rebate, exercise dates and settlement convention before comparing prices. Build on [the estimator diagnostics in lesson 2.6](/learn/2.6); an impressive error bar cannot resolve a contract mismatch.
+
+Your deliverable is an exotic-pricing comparison with one contract identity, one monitoring experiment, an independent-policy diagnostic and a supported rates example. Complete all three extensions: lookback, regression overfit and quanto.
+
+</DeskContext>
+
+<Standard>
+
+### Path dependence begins with the observations
+
+For positive observed prices $S_{t_1},\ldots,S_{t_m}$, define the arithmetic average $A=m^{-1}\sum S_{t_i}$ and geometric average $G=(\prod S_{t_i})^{1/m}$. An Asian call pays $(A-K)^+$ or $(G-K)^+$. Specify whether $t_0$ is included. Since $A\geq G$, the arithmetic call dominates the geometric call on each matched path. It need not dominate a terminal vanilla call path by path.
+
+Under GBM, the geometric average has an analytical distribution, giving the [Kemna–Vorst benchmark](/references.html#kemna-vorst-1990). The arithmetic `asian_option_price` route uses [Turnbull–Wakeman](/references.html#turnbull-wakeman-1991), an approximation. Treating that value as an exact arithmetic benchmark confuses approximation error with sampling noise. With one terminal fixing, both averages become the same terminal price, so both reduce exactly to the corresponding vanilla contract.
+
+A geometric Asian can be a control variate for an arithmetic Asian: subtract a fitted multiple of its simulated deviation from its known expectation. This works because the two payoffs are strongly related. The displayed Python workflow does not expose an automatic injectable control-variate engine; the exact geometric value is used to audit captured-path arithmetic.
+
+### A barrier is an observation rule
+
+An up-and-out call survives only if no monitored price reaches its upper barrier. Adding observations can only remove surviving paths when payoff, rebate and path are held fixed. Thus a coarse discrete knock-out is at least as valuable pathwise as a finer nested one. Continuously monitored survival is more restrictive still.
+
+The [Reiner–Rubinstein](/references.html#reiner-rubinstein-1991) `barrier_call` formula here is continuously monitored and has no monitoring-frequency argument. The discrete sweep must therefore use captured paths. Independently generated coarse and fine simulations obscure the pathwise comparison with sampling noise.
+
+The [Broadie–Glasserman–Kou correction](/references.html#broadie-glasserman-kou-1997) approximates discrete monitoring by shifting a continuous barrier outward by a factor involving $\exp(\beta\sigma\sqrt{\Delta t})$, with $\beta$ about 0.5826: an upper barrier moves up and a lower barrier moves down. It is an approximation under its assumptions, especially delicate near a barrier, with irregular monitoring or additional contractual features. We do not substitute it for the explicit observation experiment.
+
+### Exercise value is a policy problem
+
+At an exercise date, compare immediate exercise with conditional expected continuation value. Least-squares Monte Carlo regresses realized discounted future values on basis functions of the current state, typically using relevant in-the-money paths. Backward induction fits an exercise policy on the chosen grid.
+
+Reusing those paths to value their fitted policy creates training optimism. `price_american_put_unbiased` evaluates that learned policy on independent pricing paths. Its name refers to the policy-evaluation sampling step; the policy can remain suboptimal and the grid finite. The true American put value is at least the corresponding European value because waiting to maturity remains feasible. A finite simulated estimate can lie below it because of sampling or policy error. A finite exercise grid is economically Bermudan. [Glasserman, chapter 8](/references.html#glasserman-2004-monte-carlo) provides the regression and policy-estimation framework.
+
+The wrapper exposes prices, errors and path counts, but no exercise-boundary object. The computed spot-price plot compares held-out policy values with European and intrinsic values. A separate, explicitly illustrative policy schematic explains exercise and continuation regions without claiming to export an engine boundary. The executable path-count study changes training and independent pricing samples while keeping the grid fixed. A small interval around a weak learned policy does not certify an accurate American price.
+
+For a Bermudan swaption, the state process is an interest-rate model and exercise delivers an underlying swap. A Hull–White 1F tree and Hull–White Monte Carlo share model assumptions but use different numerical methods. The fixture specifies mean reversion and volatility directly; it is not a calibrated market cube. [Hull–White](/references.html#hull-white-1990-pricing-ird) and [Brigo–Mercurio](/references.html#brigo-mercurio-2006-interest-rate-models) supply the rates context.
+
+</Standard>
+
+<BuildIt>
+
+### 1. Reconcile Asian contracts before comparing methods
+
+The visible setup supports the independent lesson run. The proof then checks the one-fixing identity, matches monthly observation dates excluding time zero, verifies arithmetic-versus-geometric dominance and compares the geometric sample mean with its analytical value within four SE. It prints the arithmetic approximation separately.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="path-payoff-imports" role="build" */}
+```python exec id=path-payoff-imports role=build
+from finstack_quant.models import bs_price
+from finstack_quant.models.monte_carlo import EuropeanPricer, PathDependentPricer, LsmcPricer
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.7" block="path-payoff-imports" />
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="asian-contract-benchmarks" role="build" */}
+```python exec id=asian-contract-benchmarks role=build
+import math
+import numpy as np
+from finstack_quant.models import asian_option_price
+from finstack_quant.models.monte_carlo import simulate_gbm_paths
+
+args = (100.0, 100.0, 0.05, 0.0, 0.20, 1.0)
+vanilla = bs_price(*args, True)
+one_fixing = asian_option_price(*args, 1, "arithmetic", True)
+assert math.isclose(one_fixing, vanilla, abs_tol=1e-12)
+eu_one = EuropeanPricer(4096, 17, False).price_call(*args, num_steps=1)
+asian_one = PathDependentPricer(4096, 17, False, False).price_asian_call(*args, num_steps=1)
+assert math.isclose(asian_one.mean.amount, eu_one.mean.amount, abs_tol=1e-12)
+print(f"One-fixing analytical Asian={one_fixing:.8f}; BS={vanilla:.8f}")
+print(f"One-fixing MC Asian={asian_one.mean.amount:.8f}; European MC={eu_one.mean.amount:.8f}")
+
+paths = np.asarray(simulate_gbm_paths(100, 0.05, 0, 0.20, 1, 12, 8192, seed=17).paths)
+fixings = paths[:, 1:]
+arithmetic_payoffs = math.exp(-0.05) * np.maximum(fixings.mean(axis=1) - 100, 0)
+geometric_payoffs = math.exp(-0.05) * np.maximum(np.exp(np.log(fixings).mean(axis=1)) - 100, 0)
+assert np.all(arithmetic_payoffs + 1e-12 >= geometric_payoffs)
+for convention, payoffs in [("arithmetic", arithmetic_payoffs), ("geometric", geometric_payoffs)]:
+    reference = asian_option_price(*args, 12, convention, True)
+    standard_error = payoffs.std(ddof=1) / math.sqrt(len(payoffs))
+    label = "TW approximation" if convention == "arithmetic" else "exact geometric formula"
+    print(f"{convention}: MC={payoffs.mean():.6f}; SE={standard_error:.6f}; "
+          f"{label}={reference:.6f}; difference={payoffs.mean()-reference:.6f}")
+    if convention == "geometric":
+        assert abs(payoffs.mean() - reference) < 4 * standard_error
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.7" block="asian-contract-benchmarks" />
+
+A discrepancy between arithmetic MC and Turnbull–Wakeman is not automatically a Monte Carlo defect. First reconcile averaging, fixing count, dividend yield and discounting; then separate sampling uncertainty from approximation error.
+
+### 2. Observe the same barrier paths more often
+
+The experiment captures 252-step GBM paths once and selects nested quarterly, monthly and daily observations. An assertion checks payoff monotonicity path by path, then compares the finest discrete estimate with the continuous benchmark allowing a four-SE sampling margin. The exact pathwise inequality is the strongest part of this test; the continuum comparison is statistical.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="nested-barrier-monitoring" role="build" */}
+```python exec id=nested-barrier-monitoring role=build
+from finstack_quant.models import barrier_call
+
+fine_paths = np.asarray(simulate_gbm_paths(100, 0.05, 0, 0.20, 1, 252, 4096, seed=17).paths)
+terminal_payoffs = math.exp(-0.05) * np.maximum(fine_paths[:, -1] - 100, 0)
+continuous = barrier_call(100, 100, 120, 0.05, 0, 0.20, 1, "up", "out")
+previous_payoffs = terminal_payoffs
+print("observations | sampled up-and-out value | SE | gap to continuous")
+for observations in (4, 12, 252):
+    observed_spots = fine_paths[:, ::252 // observations]
+    payoffs = terminal_payoffs * (observed_spots.max(axis=1) < 120)
+    assert np.all(previous_payoffs >= payoffs)
+    standard_error = payoffs.std(ddof=1) / math.sqrt(len(payoffs))
+    print(f"{observations:12d} | {payoffs.mean():.6f} | {standard_error:.6f} | "
+          f"{payoffs.mean()-continuous:.6f}")
+    previous_payoffs = payoffs
+print(f"Continuous-monitoring analytical value: {continuous:.6f}")
+assert payoffs.mean() + 4 * standard_error >= continuous
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.7" block="nested-barrier-monitoring" />
+
+For an up-and-in claim with complementary payoff conventions, the monitoring effect reverses through in–out parity. Rebate timing or a different terminal payoff can invalidate a casual parity comparison, so retain the complete contract.
+
+### 3. Separate fitting from pricing
+
+Compare polynomial degrees on the same training setup and two independent pricing seeds. The assertion deliberately rejects a pricing seed equal to the training seed. Read the pair and physical-path counts from the result rather than assuming `num_paths` means the same thing in every API.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="lsmc-held-out-policy" role="build" */}
+```python exec id=lsmc-held-out-policy role=build
+put_args = (100.0, 100.0, 0.05, 0.0, 0.30, 1.0)
+print("basis degree | in-sample | held-out seed | policy value | SE | gap to BS European")
+european_put = bs_price(*put_args, False)
+for degree in (1, 3, 6):
+    trained = LsmcPricer(2048, 17, False, 20, "polynomial", degree, True)
+    in_sample = trained.price_american_put(*put_args)
+    for pricing_seed in (1017, 2017):
+        held_out = trained.price_american_put_unbiased(*put_args, pricing_seed=pricing_seed)
+        assert math.isfinite(held_out.mean.amount) and math.isfinite(held_out.stderr)
+        assert held_out.num_paths == 2048 and held_out.num_simulated_paths == 4096
+        print(f"{degree:12d} | {in_sample.mean.amount:.6f} | {pricing_seed:13d} | "
+              f"{held_out.mean.amount:.6f} | {held_out.stderr:.6f} | "
+              f"{held_out.mean.amount-european_put:.6f}")
+try:
+    trained.price_american_put_unbiased(*put_args, pricing_seed=17)
+except ValueError as error:
+    assert "pricing_seed" in str(error)
+    print("Training-seed reuse rejected:", error)
+else:
+    raise AssertionError("Held-out pricing must require a distinct seed")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.7" block="lsmc-held-out-policy" />
+
+### Computed policy, European and intrinsic values
+
+Sweep initial spot while holding strike, carry, volatility, expiry, exercise grid, polynomial degree and seed policy fixed. Each LSMC value evaluates a separately fitted policy on independent pricing paths. The error bars reflect that policy’s sampling error; they omit exercise-grid and policy approximation error. European and intrinsic values are separate economic comparisons, not noisy estimates of the same contract.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="lsmc-held-out-price-plot" role="build" */}
+```python exec id=lsmc-held-out-price-plot role=build
+import matplotlib.pyplot as plt
+from IPython import get_ipython
+from IPython.display import Image, display
+
+# Each spot is a separately fitted policy with an independent pricing seed.
+# A narrow interval estimates that policy's value; it is not an optimal-boundary certificate.
+spot_grid=np.linspace(60.,140.,9)
+price_rows=[]
+for spot in spot_grid:
+    pricer=LsmcPricer(4096,17,False,40,"polynomial",3,True)
+    estimate=pricer.price_american_put_unbiased(float(spot),100.,.05,0.,.30,1.,pricing_seed=1017)
+    european=bs_price(float(spot),100.,.05,0.,.30,1.,False)
+    intrinsic=max(100.-float(spot),0.)
+    assert math.isfinite(estimate.mean.amount) and estimate.stderr>0
+    assert estimate.num_paths==4096 and estimate.num_simulated_paths==8192
+    price_rows.append((spot,estimate.mean.amount,estimate.stderr,european,intrinsic))
+price_grid=np.asarray(price_rows)
+fig,ax=plt.subplots(figsize=(9,5.2))
+ax.plot(price_grid[:,0],price_grid[:,3],color="#2563eb",linewidth=2,label="European put — exact Black–Scholes")
+ax.plot(price_grid[:,0],price_grid[:,4],color="#475569",linestyle="--",linewidth=2,label="Immediate exercise: max(100 − spot, 0)")
+ax.errorbar(price_grid[:,0],price_grid[:,1],yerr=1.96*price_grid[:,2],color="#0f766e",
+            fmt="o-",capsize=4,linewidth=1.8,label="Held-out LSMC policy value ± 1.96 SE")
+ax.set(xlabel="Initial spot (USD)",ylabel="Put value per unit (USD)",
+       title="Computed put values across spot — held-out LSMC, European and intrinsic")
+ax.grid(alpha=.2);ax.legend(loc="upper right",fontsize=9)
+fig.text(.5,.005,"K=100, r=5%, q=0%, σ=30%, T=1 year · 40 exercise steps · degree 3 · 4,096 antithetic pairs\nSampling bars exclude policy and exercise-grid error; no engine boundary is extracted.",
+         ha="center",fontsize=9,color="#334155")
+fig.tight_layout(rect=(0,.065,1,1))
+fig.savefig("lsmc-held-out-price-comparison.png",dpi=144,bbox_inches="tight")
+plt.close(fig)
+if get_ipython() is not None:
+    display(Image(filename="lsmc-held-out-price-comparison.png"))
+print("spot | held-out policy value | SE | exact European | intrinsic")
+for row in price_rows:print(" | ".join(f"{value:.6f}" for value in row))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.7" block="lsmc-held-out-price-plot" />
+
+### Illustrative exercise-policy schematic — not engine output
+
+The Python wrapper exposes no boundary or exercise-decision object. The following prescribed curve is deliberately independent of all LSMC results. It illustrates how a put exercise region can lie below a time-dependent threshold and meet the strike at expiry; none of its coordinates estimate the optimal or learned boundary. The title, plot label, formula and caption all state this limitation.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="lsmc-policy-schematic" role="build" */}
+```python exec id=lsmc-policy-schematic role=build
+# This prescribed curve is a drawing aid, never a model output or fitted policy.
+illustrative_time=np.linspace(0.,1.,101)
+illustrative_threshold=68.+32.*illustrative_time**1.8
+assert illustrative_threshold[0]==68. and illustrative_threshold[-1]==100.
+fig,ax=plt.subplots(figsize=(9,5.2))
+ax.fill_between(illustrative_time,40.,illustrative_threshold,color="#ccfbf1",alpha=.9,label="Illustrative exercise region")
+ax.fill_between(illustrative_time,illustrative_threshold,140.,color="#dbeafe",alpha=.7,label="Illustrative continuation region")
+ax.plot(illustrative_time,illustrative_threshold,color="#0f766e",linewidth=2.5,label="Prescribed curve: 68 + 32 t^1.8")
+ax.axhline(100.,color="#475569",linestyle="--",linewidth=1.5,label="Strike 100; terminal put exercise below strike")
+ax.text(.5,132.,"ILLUSTRATION — NOT LSMC OUTPUT",ha="center",va="center",weight="bold",fontsize=12,color="#7c2d12")
+ax.text(.65,62.,"Exercise if spot ≤ drawn curve",ha="center",color="#115e59")
+ax.text(.28,112.,"Continue if spot > drawn curve",ha="center",color="#1e40af")
+ax.set(xlim=(0.,1.),ylim=(40.,140.),xlabel="Elapsed time in years (expiry at 1)",ylabel="Spot (USD)",
+       title="Schematic exercise policy — chosen for illustration, not calibrated or estimated")
+ax.legend(loc="lower left",fontsize=8);ax.grid(alpha=.15)
+fig.text(.5,.01,"The supported Python API returns policy prices and sampling diagnostics, not exercise decisions or a boundary.\nNo point on this prescribed curve was obtained from LsmcPricer; do not use it to exercise a contract.",
+         ha="center",fontsize=9,color="#334155")
+fig.tight_layout(rect=(0,.07,1,1))
+fig.savefig("lsmc-illustrative-policy-schematic.png",dpi=144,bbox_inches="tight")
+plt.close(fig)
+if get_ipython() is not None:
+    display(Image(filename="lsmc-illustrative-policy-schematic.png"))
+print("Schematic only: the time-dependent threshold is prescribed as 68 + 32*t**1.8. It teaches the comparison of exercise and continuation regions and is not an engine boundary export.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.7" block="lsmc-policy-schematic" />
+
+### Required path-count experiment
+
+Increase the number of antithetic pairs from 256 to 1,024 to 4,096 while holding the 40-date grid, degree-three regression and training seed fixed. Price each policy using two independent seeds. Each pair is one independent sampling unit and produces two physical paths. Inspect interval widths and changes in level without demanding monotone estimates or claiming the intervals include policy error.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="lsmc-path-count-study" role="build" */}
+```python exec id=lsmc-path-count-study role=build
+# Change training/pricing sample size while retaining the payoff, grid, degree and seed policy.
+# Different path counts can change both the learned rule and its sampling error.
+path_count_rows=[]
+for pairs in (256,1024,4096):
+    pricer=LsmcPricer(pairs,17,False,40,"polynomial",3,True)
+    for pricing_seed in (1017,2017):
+        estimate=pricer.price_american_put_unbiased(100.,100.,.05,0.,.30,1.,pricing_seed=pricing_seed)
+        assert estimate.num_paths==pairs and estimate.num_simulated_paths==2*pairs
+        assert estimate.stderr>0 and math.isfinite(estimate.mean.amount)
+        path_count_rows.append((pairs,pricing_seed,estimate.mean.amount,estimate.stderr,estimate.num_simulated_paths))
+fig,ax=plt.subplots(figsize=(9,5.2))
+for pricing_seed,color in [(1017,"#0f766e"),(2017,"#c2410c")]:
+    rows=np.asarray([row for row in path_count_rows if row[1]==pricing_seed])
+    ax.errorbar(rows[:,0],rows[:,2],yerr=1.96*rows[:,3],fmt="o-",capsize=4,color=color,
+                label=f"Independent pricing seed {pricing_seed}: ±1.96 SE")
+ax.axhline(bs_price(100.,100.,.05,0.,.30,1.,False),color="#2563eb",linestyle="--",label="Exact European put (different exercise rights)")
+ax.set_xscale("log",base=4);ax.set_xticks([256,1024,4096],labels=["256","1,024","4,096"])
+ax.set(xlabel="Antithetic pairs (physical paths = 2 × pairs)",ylabel="Put value per unit (USD)",
+       title="Executable path-count study — independently priced LSMC policies")
+ax.grid(alpha=.2);ax.legend(fontsize=9)
+fig.text(.5,.01,"Training seed 17 · degree 3 · 40 exercise steps · S=K=100, r=5%, q=0%, σ=30%, T=1 year\nDo not demand monotone prices or a deterministic √N error ratio; policy error is outside these bars.",
+         ha="center",fontsize=9,color="#334155")
+fig.tight_layout(rect=(0,.07,1,1))
+fig.savefig("lsmc-path-count-study.png",dpi=144,bbox_inches="tight")
+plt.close(fig)
+if get_ipython() is not None:
+    display(Image(filename="lsmc-path-count-study.png"))
+print("pairs | pricing seed | held-out value | SE | physical pricing paths")
+for row in path_count_rows:print(f"{row[0]:5d} | {row[1]:12d} | {row[2]:.6f} | {row[3]:.6f} | {row[4]:5d}")
+print("The experiment changes sample size, not exercise rights or the 40-date grid. Separate pricing seeds diagnose sampling variability; larger training samples can also improve or change the fitted policy. No finite-sample monotonicity is asserted.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.7" block="lsmc-path-count-study" />
+
+
+A sensible diagnostic records training price, both held-out prices, SE, basis degree, training count and exercise grid. Increasing basis flexibility can lower approximation bias yet increase estimation error. No single monotone basis-degree ordering is a correctness requirement.
+
+### 4. Carry the idea into rates
+
+The explicit Bermudan specification uses valid business dates, co-terminal underlying legs and a USD 10 million notional. The flat USD curve is 3%; Hull–White mean reversion is 0.05 and volatility 0.01. The tree has 160 steps; Monte Carlo uses 8,192 paths and a recorded seed. Inspect the specification instead of treating an example constructor as a market convention.
+
+{/* notebook-block notebook="02_pricing/instruments/exotic_rates.ipynb" cell="bermudan-hw1f-pricing" role="build" */}
+```python exec id=bermudan-hw1f-pricing role=build
+import datetime as dt
+import json
+import math
+from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.valuations.instruments import Swaption, list_models_grouped, price_instrument
+
+underlying = json.loads(Swaption.example_bermudan().to_json())["instrument"]["spec"]
+for leg_name in ("underlying_fixed_leg", "underlying_float_leg"):
+    underlying[leg_name]["start"] = "2027-01-15"
+    underlying[leg_name]["end"] = "2032-01-15"
+underlying["underlying_fixed_leg"]["rate"] = "0.03"
+bermudan_spec = {
+    "id": "ANALYST-BERMUDAN", "option_type": "call", "settlement": "physical",
+    "notional": {"amount": "10000000", "currency": "USD"},
+    "underlying_fixed_leg": underlying["underlying_fixed_leg"],
+    "underlying_float_leg": underlying["underlying_float_leg"],
+    "bermudan_schedule": {"exercise_dates": ["2028-01-18", "2029-01-16"],
+                          "lockout_end": None, "notice_days": 0},
+    "bermudan_type": "co_terminal", "vol_surface_id": "USD-SWPNVOL", "attributes": {},
+    "instrument_pricing_overrides": {"model_config": {
+        "hw1f_mean_reversion": 0.05, "hw1f_sigma": 0.01, "mc_paths": 8192, "tree_steps": 160}},
+}
+bermudan_json = json.dumps({"schema": "finstack_quant.instrument/1",
+                           "instrument": {"type": "bermudan_swaption", "spec": bermudan_spec}})
+bermudan_market = MarketContext().insert(DiscountCurve.flat("USD-OIS", dt.date(2026, 1, 15), 0.03))
+assert "monte_carlo_hull_white_1f" in list_models_grouped()["bermudan_swaption"]
+mc_bermudan = price_instrument(bermudan_json, bermudan_market, "2026-01-15", "monte_carlo_hull_white_1f")
+tree_bermudan = price_instrument(bermudan_json, bermudan_market, "2026-01-15", "hull_white_1f")
+mc_repeat = price_instrument(bermudan_json, bermudan_market, "2026-01-15", "monte_carlo_hull_white_1f")
+mc_standard_error = mc_bermudan.get_metric("mc_stderr")
+assert mc_bermudan.price == mc_repeat.price
+assert mc_bermudan.get_metric("lsmc_num_paths") == 8192
+assert math.isfinite(mc_standard_error) and mc_standard_error > 0
+assert abs(mc_bermudan.price - tree_bermudan.price) < 4 * mc_standard_error
+print(f"HW1F tree PV={tree_bermudan.price:,.2f}; HW1F LSMC PV={mc_bermudan.price:,.2f}")
+for metric in ("mc_stderr", "lsmc_num_paths", "lsmc_seed", "lsmc_ci95_low", "lsmc_ci95_high"):
+    print(f"{metric}: {mc_bermudan.get_metric(metric):,.6f}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.7" block="bermudan-hw1f-pricing" />
+
+The fixture produces values around USD 205 thousand, with the MC result within four reported SE of the tree result. This is a cross-method diagnostic, not proof that either grid is converged. The registered rates wrapper does not expose the independent `pricing_seed` available on the standalone GBM helper, so its reported LSMC uncertainty is not a held-out policy-error bound.
+
+<LabCard notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" title="Path-dependent payoffs and learned exercise" description="Matched contracts, nested monitoring and independent-policy diagnostics." />
+<LabCard notebook="02_pricing/instruments/exotic_rates.ipynb" title="Bermudan rates and structured coupons" description="Inspect the explicit swaption specification and registered Hull–White models." />
+
+</BuildIt>
+
+<Exercise title="1. A lookback dominates the matched vanilla payoff" question="Price a discretely observed fixed-strike lookback call and its matched terminal vanilla call on exactly the same paths. Prove the inequality before averaging.">
+
+The running maximum includes the terminal observation, so $(\max_j S_{t_j}-K)^+\geq(S_T-K)^+$ on every path. The code proves this identity and independently checks the vanilla leg against Black–Scholes within four SE. It makes no analytical accuracy claim for the discrete lookback price.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="lookback-matched-payoffs" role="exercise" */}
+```python exec id=lookback-matched-payoffs role=exercise
+import math
+import numpy as np
+from finstack_quant.models import bs_price
+from finstack_quant.models.monte_carlo import simulate_gbm_paths
+
+lookback_paths = np.asarray(simulate_gbm_paths(100, 0.05, 0, 0.2, 1, 252, 8192, seed=31).paths)
+vanilla_path_value = math.exp(-0.05) * np.maximum(lookback_paths[:, -1] - 100, 0)
+lookback_path_value = math.exp(-0.05) * np.maximum(lookback_paths.max(axis=1) - 100, 0)
+assert np.all(lookback_path_value >= vanilla_path_value)
+vanilla_exact = bs_price(100, 100, 0.05, 0, 0.2, 1, True)
+lookback_se = lookback_path_value.std(ddof=1) / math.sqrt(len(lookback_paths))
+vanilla_se = vanilla_path_value.std(ddof=1) / math.sqrt(len(lookback_paths))
+assert abs(vanilla_path_value.mean() - vanilla_exact) < 4 * vanilla_se
+print(f"Vanilla exact={vanilla_exact:.6f}; matched MC={vanilla_path_value.mean():.6f}")
+print(f"Discrete fixed-strike lookback={lookback_path_value.mean():.6f}; SE={lookback_se:.6f}")
+print(f"Matched-path incremental payoff={np.mean(lookback_path_value - vanilla_path_value):.6f}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.7" block="lookback-matched-payoffs" />
+
+The continuous fixed-strike lookback helper is excluded from this lesson: the current implementation's $M\geq K$ branch delegates to a floating-strike formula and is discontinuous at the strike boundary in the prerequisite probe. The supported substitute is the fully displayed captured-path payoff. The [Goldman–Sosin–Gatto](/references.html#goldman-sosin-gatto-1979) and [Conze–Viswanathan](/references.html#conze-viswanathan-1991) references explain why fixed- and floating-strike contracts must be distinguished.
+
+</Exercise>
+
+<Exercise title="2. Too many basis terms, too few paths" question="Use a fixed eight-seed panel with 96 training paths and compare degree-one and degree-six polynomials. Measure the difference between training and independently priced policy values.">
+
+Both degrees show training optimism in this deliberately small sample; degree six shows more on the selected panel. The assertion documents this reproducible experiment, not a theorem about every seed. A high training price can reflect fitted noise rather than a superior exercise policy. Increase training observations, validate on independent paths and test grid/basis stability before trusting it.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="lsmc-overfit-panel" role="exercise" */}
+```python exec id=lsmc-overfit-panel role=exercise
+import statistics
+
+optimism = {}
+for degree in (1, 6):
+    observations = []
+    for seed in range(8):
+        fitted = LsmcPricer(96, seed, False, 20, "polynomial", degree, False)
+        training = fitted.price_american_put(100, 100, 0.05, 0, 0.3, 1)
+        testing = fitted.price_american_put_unbiased(100, 100, 0.05, 0, 0.3, 1, pricing_seed=1000+seed)
+        observations.append((training.mean.amount, testing.mean.amount))
+    train_mean = statistics.mean(a for a, b in observations)
+    test_mean = statistics.mean(b for a, b in observations)
+    optimism[degree] = train_mean - test_mean
+    print(f"Degree {degree}: training={train_mean:.6f}, held-out={test_mean:.6f}, gap={optimism[degree]:.6f}")
+assert optimism[6] > optimism[1] > 0
+print("The fixed panel demonstrates training optimism. Its ordering is not a theorem for every sample or basis.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.7" block="lsmc-overfit-panel" />
+
+</Exercise>
+
+<Exercise title="3. What correlation does a quanto need?" question="Sweep equity–FX correlation from -0.5 through zero to +0.5. State the FX quote direction and recover the vanilla limit at zero correlation with equal domestic and foreign rates.">
+
+With FX quoted as domestic currency per unit of foreign currency, foreign-equity volatility $\sigma_S$, FX volatility $\sigma_X$ and correlation $\rho$, the domestic-measure foreign-equity drift is $r_f-q-\rho\sigma_S\sigma_X$. The claim converts at the contractual fixed conversion rate and discounts domestically. Increasing this correlation lowers the call value in the displayed convention. Reversing the FX quote reverses the sign convention; reusing an unlabelled correlation number is unsafe.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="quanto-correlation-proof" role="exercise" */}
+```python exec id=quanto-correlation-proof role=exercise
+from finstack_quant.models import bs_price, quanto_option_price
+
+quanto_values = [quanto_option_price(100, 100, 1, 0.05, 0.03, 0.01, 0.20, 0.10, rho, True)
+                 for rho in (-0.5, 0.0, 0.5)]
+assert quanto_values[0] > quanto_values[1] > quanto_values[2]
+for rho, value in zip((-0.5, 0.0, 0.5), quanto_values, strict=True):
+    adjusted_drift = 0.03 - 0.01 - rho * 0.20 * 0.10
+    print(f"rho={rho:+.1f}; adjusted asset drift={adjusted_drift:.2%}; quanto call={value:.6f}")
+quanto_limit = quanto_option_price(100, 100, 1, 0.05, 0.05, 0.01, 0.20, 0.10, 0, True)
+vanilla_limit = bs_price(100, 100, 0.05, 0.01, 0.20, 1, True)
+assert abs(quanto_limit - vanilla_limit) < 1e-12
+print(f"Zero-correlation, equal-rate reduction: {quanto_limit:.6f} = {vanilla_limit:.6f}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.7" block="quanto-correlation-proof" />
+
+The correlation required is between the foreign equity return and the consistently quoted FX return under the model. A historical estimate may inform an assumption; it does not identify a risk-neutral quanto parameter without additional market and model choices.
+
+</Exercise>
+
+<CheckYourself>
+
+Explain which Asian benchmark is exact, why barrier nesting must share paths, and what the independent-policy interval does not measure. Distinguish a fitted exercise rule from the optimal American value, and state the rates wrapper's diagnostic limitation. Your completed artifact includes the four build comparisons and all three worked extensions; learner time remains unmeasured.
+
+</CheckYourself>

@@ -1,0 +1,240 @@
+---
+id: '1.1'
+title: Money, Currency, and Why Determinism Matters
+description: 'Analyst program lesson 1.1: Money, Currency, and Why Determinism Matters'
+desk_question: '"Why does our NAV differ from the admin''s by 3 cents — and why is
+  that a fire drill?"'
+references:
+- '#usage'
+- '#higham-accuracy-and-stability'
+- '#kahan-1965'
+api:
+- finstack_quant.core.config.FinstackConfig
+- finstack_quant.core.config.RoundingMode
+- finstack_quant.core.currency.Currency
+- finstack_quant.core.market_data.DiscountCurve
+- finstack_quant.core.market_data.FxMatrix
+- finstack_quant.core.market_data.fx_market_pair
+- finstack_quant.core.market_data.fx_pip_size
+- finstack_quant.core.market_data.invert_fx_rate
+- finstack_quant.core.money.Money
+- finstack_quant.core.types.Bps
+- finstack_quant.core.types.Percentage
+- finstack_quant.core.types.Rate
+- finstack_quant.portfolio.Portfolio
+- finstack_quant.portfolio.value_portfolio
+- finstack_quant.valuations.instruments.price_instrument
+status: published
+---
+
+<DeskContext question={"Why does our NAV differ from the admin's by 3 cents \u2014 and why is that a fire drill?"}>
+
+The administrator reports a NAV three cents below yours. Before changing a price, identify the layer that produced the difference: source amount, FX conversion, calculation precision, aggregation order, or final rounding. Three cents can be immaterial to economics while still revealing a repeatability defect that becomes material across thousands of positions.
+
+By the end of this lesson you will produce a currency-safe cash total, an auditable FX cross and a reproducible bond value. You will also construct the four-position foundation book: a USD corporate bond, a EUR government bond and two dated cash deposits. Later lessons obtain fresh snapshots from the same factory.
+
+</DeskContext>
+
+<Standard>
+
+### Amounts and analytical numbers
+
+A monetary amount is a number **and a currency**. `100 USD + 100 EUR` has no defined monetary sum until an FX rate and valuation date are chosen. The native `Money` type rejects that addition with `ValueError`; it does not silently consult a market. A USD amount can be multiplied by an analytical number such as a discount factor, but the factor itself is dimensionless.
+
+Binary floating point represents most decimal fractions approximately. The familiar `0.1 + 0.2` example illustrates representation error; repeated additions also depend on the summation algorithm. Decimal input should therefore enter `Money` from `Decimal('0.1')` or another exact decimal source when the original amount is decimal. Constructing a Decimal from an already rounded binary result cannot recover the original text. Compensated summation reduces accumulation error, but does not change currency rules or make an approximate market model exact. [Higham](/references.html#higham-accuracy-and-stability) and [Kahan](/references.html#kahan-1965) explain this numerical distinction.
+
+Accounting values and pricing calculations have different requirements. Here `Money.amount_decimal` preserves decimal amounts, while the installed native pricing result stamps `numeric_mode = 'f64'`. Do not describe that result as decimal pricing simply because its input notional was a `Money` value. When checking replay, compare prices and measures; a new execution timestamp is expected.
+
+### Quoting and rounding conventions
+
+| Representation | Example | Decimal rate |
+| --- | --- | --- |
+| Rate | `Rate.from_percent(5)` | 0.05 |
+| Basis points | `Bps(250)` | 0.025 |
+| Percentage | `Percentage(5)` | 0.05 |
+
+One basis point is $10^{-4}$ of a rate. A percentage point is 100 basis points. An API expecting a decimal rate will interpret `5` as 500%, not 5%; using a named representation makes that error visible.
+
+ISO currency minor units provide a reporting default, not a license to round every intermediate result. USD and EUR normally display two decimals; JPY displays zero. Banker's rounding resolves an exact midpoint toward the even retained digit: 1.005 becomes 1.00 and 1.015 becomes 1.02 at two decimals. Summing rounded line items can differ from rounding the final unrounded sum. Reconcile the administrator's policy before choosing either convention.
+
+`FinstackConfig` exposes the default currency scales and rounding mode. The pricing entry point used here does not take that object as a pricing override: inspect the result stamp and pass only the documented pricing-options type when an override is needed. Numerical tolerances should express the unit of the comparison—cents for a money reconciliation, decimal rates for a curve residual—and should not conceal a currency mismatch.
+
+### FX direction is part of the unit
+
+Write EURUSD as USD per EUR. With EURUSD = 1.08 and USDJPY = 150,
+
+$$\frac{\mathrm{JPY}}{\mathrm{EUR}}=\frac{\mathrm{USD}}{\mathrm{EUR}}\frac{\mathrm{JPY}}{\mathrm{USD}}=162.$$
+
+A EUR amount becomes USD by multiplication by 1.08. Inverting the rate changes its unit and direction. The market pair helper returns the conventional base/quote order; the pip helper returns the market's quoted increment, 0.01 JPY for EURJPY in this example. A cross can exist mathematically while still being unsuitable operationally if its constituent quotes are stale or from different timestamps. A production conversion policy must address those dates, admissible paths and rounding explicitly.
+
+The foundation market and instruments are deterministic synthetic teaching inputs. Calling their factories twice returns independent objects; adding a later holding must not mutate an earlier lesson's book. This is the first reproducibility boundary. Seeded simulation and supported parallel-mode comparisons are introduced in lesson 2.6; they are separate from the financial replay check here.
+
+</Standard>
+
+<BuildIt>
+
+### The first book and its valuation stamp
+
+The caught exception is part of the demonstration. The holdings table identifies the currency and contractual notional; each portfolio quantity is one complete instrument, not one dollar. Cash holdings are dated deposits whose maturity must later be settled.
+
+{/* notebook-block notebook="01_foundations/core_types_and_money.ipynb" cell="money-proof" role="build" */}
+```python exec id=money-proof role=build
+import json
+from decimal import Decimal
+from finstack_quant.core.money import Money
+from finstack_quant.core.currency import Currency
+from finstack_quant.core.config import FinstackConfig, RoundingMode
+from finstack_quant.core.market_data import FxMatrix, fx_market_pair, fx_pip_size, invert_fx_rate
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF, build_book, build_market, instruments
+
+assert 0.1 + 0.2 != 0.3
+cash = Money(Decimal('0.1'), 'USD') + Money(Decimal('0.2'), 'USD')
+assert cash.amount_decimal == Decimal('0.3')
+try:
+    cash + Money(Decimal('0.3'), 'EUR')
+except ValueError as error:
+    assert 'currency' in str(error).lower()
+else:
+    raise AssertionError('cross-currency addition must fail')
+fx = FxMatrix()
+fx.set_quote(Currency('EUR'), Currency('USD'), 1.08)
+fx.set_quote(Currency('USD'), Currency('JPY'), 150.0)
+cross = fx.rate('EUR', 'JPY', AS_OF)
+assert abs(cross.rate - 162.0) < 1e-12
+assert abs(invert_fx_rate(cross.rate) * cross.rate - 1) < 1e-12
+assert [currency.code for currency in fx_market_pair('USD', 'EUR')] == ['EUR', 'USD']
+assert fx_pip_size('EUR', 'JPY') == 0.01
+config = FinstackConfig(rounding_mode=RoundingMode.BANKERS)
+market = build_market('foundations')
+bond = json.dumps(instruments('foundations')['USD-CORP'])
+first = price_instrument(bond, market, AS_OF)
+second = price_instrument(bond, market, AS_OF)
+assert first.price == second.price
+assert first.meta['rounding']['mode'] == json.loads(config.to_json())['rounding']['mode']
+assert first.meta['numeric_mode'] == 'f64'
+assert config.output_scale('USD') == 2 and config.output_scale('JPY') == 0
+holdings = [{'id': iid, 'type': envelope['instrument']['type'],
+             **envelope['instrument']['spec']['notional']} for iid, envelope in instruments('foundations').items()]
+print(holdings)
+assert len(build_book('foundations')) == 4
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.1" block="money-proof" />
+
+
+### Representations and midpoint rounding
+
+Read the accessors as properties. The assertions compare exact decimal midpoint results and expose the output scale selected for each currency.
+
+{/* notebook-block notebook="01_foundations/core_types_and_money.ipynb" cell="money-units-rounding" role="build" */}
+```python exec id=money-units-rounding role=build
+from decimal import Decimal, ROUND_HALF_EVEN
+from finstack_quant.core.types import Rate, Bps, Percentage
+from finstack_quant.core.config import FinstackConfig
+assert Rate.from_percent(5).as_decimal == 0.05
+assert Bps(250).as_decimal == 0.025
+assert Percentage(5).as_decimal == 0.05
+rounded = [Decimal(x).quantize(Decimal('0.01'), rounding=ROUND_HALF_EVEN) for x in ('1.005','1.015')]
+assert rounded == [Decimal('1.00'), Decimal('1.02')]
+print({'decimal_rate': Rate.from_percent(5).as_decimal, '250bp': Bps(250).as_decimal,
+       'banker_rounding': rounded, 'currency_output_scales': {ccy: FinstackConfig().output_scale(ccy) for ccy in ('USD','EUR','JPY')}})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.1" block="money-units-rounding" />
+
+
+</BuildIt>
+
+<LabCard notebook="01_foundations/core_types_and_money.ipynb" title="Core Types And Money" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<LabCard notebook="01_foundations/registry_defaults_and_overrides.ipynb" title="Registry Defaults And Overrides" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<Exercise id="exercise-fx-triangulation" title="A. Triangulate the cross" question={"Compute EURJPY from EURUSD and USDJPY, then verify its inverse and pip size."}>
+
+The intermediate USD units cancel. The reciprocal is EUR per JPY, so multiplying a EUR amount by that inverse would reverse the intended conversion.
+
+{/* notebook-block notebook="01_foundations/core_types_and_money.ipynb" cell="exercise-fx-triangulation" role="exercise" */}
+```python exec id=exercise-fx-triangulation role=exercise
+from finstack_quant.core.currency import Currency
+from finstack_quant.core.market_data import FxMatrix, fx_pip_size, invert_fx_rate
+from _shared.analyst_book import AS_OF
+crosses=FxMatrix()
+crosses.set_quote(Currency('EUR'),Currency('USD'),1.08)
+crosses.set_quote(Currency('USD'),Currency('JPY'),150.0)
+eur_jpy=crosses.rate('EUR','JPY',AS_OF).rate
+assert abs(eur_jpy-162.0)<1e-12 and fx_pip_size('EUR','JPY')==0.01
+assert abs(invert_fx_rate(eur_jpy)*eur_jpy-1)<1e-12
+print({'JPY_per_EUR':eur_jpy,'JPY_pip':fx_pip_size('EUR','JPY'),'EUR_per_JPY':invert_fx_rate(eur_jpy)})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.1" block="exercise-fx-triangulation" />
+
+</Exercise>
+
+<Exercise id="exercise-money-accumulation" title="B. Accumulate ten thousand cents" question={"Show a binary accumulation residual and produce the exact monetary total."}>
+
+The explicit loop demonstrates naive accumulation; Python versions may use a more accurate algorithm for built-in `sum`. The Money sum starts from USD zero and retains the exact decimal cent inputs. The residual is a representation issue, not a reason to loosen a three-cent reconciliation gate.
+
+{/* notebook-block notebook="01_foundations/core_types_and_money.ipynb" cell="exercise-money-accumulation" role="exercise" */}
+```python exec id=exercise-money-accumulation role=exercise
+from decimal import Decimal
+from finstack_quant.core.money import Money
+binary_total=0.0
+for _ in range(10000):binary_total += 0.01
+decimal_total=sum((Money(Decimal('0.01'),'USD') for _ in range(10000)),Money(0,'USD'))
+assert binary_total != 100.0
+assert decimal_total.amount_decimal == Decimal('100.00')
+print({'binary_total':repr(binary_total),'binary_residual':binary_total-100.0,'money_total':str(decimal_total.amount_decimal)})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.1" block="exercise-money-accumulation" />
+
+</Exercise>
+
+<Exercise id="exercise-gbp-cash-extension" title="C. Add a GBP cash holding" question={"Extend a fresh foundation book with GBP cash, display its holdings and verify USD conversion without changing the original."}>
+
+The exercise assumes GBPUSD = 1.25 and a flat 4% GBP discount curve for the additional dated deposit. These are labelled exercise inputs. We extend a copy, add the required currency market data, and reconcile its native and base-currency value. Adding the position alone would leave an incomplete priceable market.
+
+{/* notebook-block notebook="01_foundations/core_types_and_money.ipynb" cell="exercise-gbp-cash-extension" role="exercise" */}
+```python exec id=exercise-gbp-cash-extension role=exercise
+import copy,json
+from finstack_quant.core.currency import Currency
+from finstack_quant.core.market_data import DiscountCurve,FxMatrix
+from finstack_quant.portfolio import Portfolio,value_portfolio
+from _shared.analyst_book import AS_OF,book_spec,build_market
+original=book_spec('foundations'); original_wire=json.dumps(original,sort_keys=True)
+extended=copy.deepcopy(original)
+gbp=copy.deepcopy(next(p for p in extended['positions'] if p['position_id']=='EUR-CASH'))
+gbp.update(position_id='GBP-CASH',instrument_id='GBP-CASH')
+gbp['instrument_spec']['spec'].update(id='GBP-CASH',notional={'amount':'100000','currency':'GBP'},discount_curve_id='GBP-OIS')
+extended['positions'].append(gbp)
+gbp_market=build_market('foundations').insert(DiscountCurve.flat('GBP-OIS',AS_OF,0.04))
+quotes=FxMatrix();quotes.set_quote(Currency('EUR'),Currency('USD'),1.08);quotes.set_quote(Currency('GBP'),Currency('USD'),1.25)
+gbp_market.insert_fx(quotes)
+valuation=value_portfolio(Portfolio.from_spec(json.dumps(extended)),gbp_market,metrics=[])
+wire=json.loads(valuation.to_json());holding=wire['position_values']['GBP-CASH']
+assert len(extended['positions'])==5 and len(original['positions'])==4
+assert json.dumps(original,sort_keys=True)==original_wire
+assert abs(float(holding['value_base']['amount'])-1.25*float(holding['value_native']['amount']))<0.01
+print([{'id':p['position_id'],'currency':p['instrument_spec']['spec']['notional']['currency']} for p in extended['positions']])
+print({'GBP_value':holding['value_native'],'USD_value':holding['value_base']})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.1" block="exercise-gbp-cash-extension" />
+
+</Exercise>
+
+<CheckYourself>
+
+1. **Does decimal input imply decimal model arithmetic?** No. Inspect the result's numeric-mode stamp; this example prices with f64.
+2. **What turns a currency mismatch into a valid addition?** An explicit dated FX conversion into the same currency, followed by the stated aggregation and rounding policy.
+3. **Why can two rounded totals differ without a bad price?** Rounding individual positions before summing and rounding only the final sum are different operations.
+4. **Which replay fields should match?** Financial values under identical inputs and settings. Execution timestamps can differ.
+
+</CheckYourself>

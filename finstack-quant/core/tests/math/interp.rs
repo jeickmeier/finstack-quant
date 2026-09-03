@@ -196,6 +196,34 @@ interp_basic_tests!(
     Interpolator<PiecewiseQuadraticForwardStrategy>
 );
 
+#[test]
+fn piecewise_quadratic_forward_matches_natural_cubic_and_is_continuous() {
+    // For x = [0, 1, 3], y = -ln(DF) = [0, .02, .12], the natural
+    // spline has second derivatives [0, .03, 0]. Its two segments are
+    // y(x) = .015*x + .005*x^3 and
+    // y(1+s) = .02 + .03*s + .015*s^2 - .0025*s^3.
+    let interp = new_strict!(
+        Interpolator<PiecewiseQuadraticForwardStrategy>,
+        vec![0.0, 1.0, 3.0].into_boxed_slice(),
+        vec![1.0, (-0.02_f64).exp(), (-0.12_f64).exp()].into_boxed_slice(),
+        ExtrapolationPolicy::FlatForward
+    )
+    .expect("valid natural cubic spline");
+
+    for (time, log_df, forward) in [(0.5, 0.008125_f64, 0.01875), (2.0, 0.0625, 0.0525)] {
+        assert!(approx_eq(interp.interp(time), (-log_df).exp(), 1e-14));
+        let actual_forward = -interp.interp_prime(time) / interp.interp(time);
+        assert!(approx_eq(actual_forward, forward, 1e-14));
+    }
+
+    let epsilon = 1e-7;
+    let forward_left = -interp.interp_prime(1.0 - epsilon) / interp.interp(1.0 - epsilon);
+    let forward_right = -interp.interp_prime(1.0 + epsilon) / interp.interp(1.0 + epsilon);
+    assert!(approx_eq(forward_left, 0.03, 1e-8));
+    assert!(approx_eq(forward_right, 0.03, 1e-8));
+    assert!(approx_eq(forward_left, forward_right, 1e-8));
+}
+
 mod monotone_convex_strategy {
     use super::*;
 

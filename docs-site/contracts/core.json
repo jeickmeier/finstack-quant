@@ -1,0 +1,825 @@
+[
+  {
+    "lesson_id": "1.1",
+    "notebook": "01_foundations/core_types_and_money.ipynb",
+    "cell_ids": [
+      "money-proof",
+      "money-units-rounding",
+      "exercise-fx-triangulation",
+      "exercise-money-accumulation",
+      "exercise-gbp-cash-extension"
+    ],
+    "source_cells": [
+      {
+        "notebook": "01_foundations/core_types_and_money.ipynb",
+        "cell_id": "money-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/core_types_and_money.ipynb",
+        "cell_id": "money-units-rounding",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/core_types_and_money.ipynb",
+        "cell_id": "exercise-fx-triangulation",
+        "role": "exercise"
+      },
+      {
+        "notebook": "01_foundations/core_types_and_money.ipynb",
+        "cell_id": "exercise-money-accumulation",
+        "role": "exercise"
+      },
+      {
+        "notebook": "01_foundations/core_types_and_money.ipynb",
+        "cell_id": "exercise-gbp-cash-extension",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.book_spec",
+      "_shared.analyst_book.build_book",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.instruments",
+      "finstack_quant.core.config.FinstackConfig",
+      "finstack_quant.core.config.RoundingMode",
+      "finstack_quant.core.currency.Currency",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.market_data.FxMatrix",
+      "finstack_quant.core.market_data.fx_market_pair",
+      "finstack_quant.core.market_data.fx_pip_size",
+      "finstack_quant.core.market_data.invert_fx_rate",
+      "finstack_quant.core.money.Money",
+      "finstack_quant.core.types.Bps",
+      "finstack_quant.core.types.Percentage",
+      "finstack_quant.core.types.Rate",
+      "finstack_quant.portfolio.Portfolio",
+      "finstack_quant.portfolio.value_portfolio",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "registry: default -> bond discounting"
+    ],
+    "metrics": [],
+    "returned_types": [
+      "finstack_quant.core.money.Money",
+      "finstack_quant.core.config.FinstackConfig",
+      "finstack_quant.valuations.ValuationResult",
+      "finstack_quant.portfolio.Portfolio"
+    ],
+    "expected_exceptions": [
+      {
+        "operation": "Money(USD) + Money(EUR)",
+        "type": "ValueError",
+        "condition": "Currency codes differ; conversion must be explicit."
+      }
+    ],
+    "api_notes": [
+      "Mixed-currency Money addition raises ValueError, not FinstackError.",
+      "Money preserves decimal amounts; this native pricing result records numeric_mode=f64. FinstackConfig is inspected against the result default stamp, not passed as MetricPricingOverrides.",
+      "Replay compares financial values, not execution timestamps."
+    ]
+  },
+  {
+    "lesson_id": "1.2",
+    "notebook": "01_foundations/dates/schedule_building.ipynb",
+    "cell_ids": [
+      "date-proof",
+      "date-reference-periods",
+      "exercise-coupon-day-count",
+      "exercise-long-back-stub",
+      "exercise-cds-roll-dates"
+    ],
+    "source_cells": [
+      {
+        "notebook": "01_foundations/dates/schedule_building.ipynb",
+        "cell_id": "date-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/dates/schedule_building.ipynb",
+        "cell_id": "date-reference-periods",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/dates/schedule_building.ipynb",
+        "cell_id": "exercise-coupon-day-count",
+        "role": "exercise"
+      },
+      {
+        "notebook": "01_foundations/dates/schedule_building.ipynb",
+        "cell_id": "exercise-long-back-stub",
+        "role": "exercise"
+      },
+      {
+        "notebook": "01_foundations/dates/schedule_building.ipynb",
+        "cell_id": "exercise-cds-roll-dates",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.instruments",
+      "finstack_quant.core.dates.BusinessDayConvention",
+      "finstack_quant.core.dates.DayCount",
+      "finstack_quant.core.dates.DayCountContext",
+      "finstack_quant.core.dates.Schedule",
+      "finstack_quant.core.dates.StubKind",
+      "finstack_quant.core.dates.Thirty360Convention",
+      "finstack_quant.core.dates.adjust",
+      "finstack_quant.core.dates.days_30_360",
+      "finstack_quant.core.dates.next_cds_date",
+      "finstack_quant.core.dates.next_imm",
+      "finstack_quant.core.dates.third_friday"
+    ],
+    "models": [],
+    "metrics": [],
+    "returned_types": [
+      "datetime.date",
+      "float",
+      "finstack_quant.core.dates.Schedule"
+    ],
+    "expected_exceptions": [],
+    "api_notes": [
+      "Schedule.builder returns the supported fluent ScheduleBuilder. CDS quarterly twentieth dates differ from futures IMM third Wednesdays."
+    ]
+  },
+  {
+    "lesson_id": "1.3",
+    "notebook": "01_foundations/market_data/discount_curves.ipynb",
+    "cell_ids": [
+      "discount-proof",
+      "overnight-proof",
+      "rate-basis-conversions",
+      "exercise-forward-identity",
+      "exercise-curve-steepening"
+    ],
+    "source_cells": [
+      {
+        "notebook": "01_foundations/market_data/discount_curves.ipynb",
+        "cell_id": "discount-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_data/discount_curves.ipynb",
+        "cell_id": "overnight-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_data/discount_curves.ipynb",
+        "cell_id": "rate-basis-conversions",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_data/discount_curves.ipynb",
+        "cell_id": "exercise-forward-identity",
+        "role": "exercise"
+      },
+      {
+        "notebook": "01_foundations/market_data/discount_curves.ipynb",
+        "cell_id": "exercise-curve-steepening",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.instruments",
+      "finstack_quant.cashflows.builder.CashFlowSchedule",
+      "finstack_quant.cashflows.builder.FloatingCouponSpec",
+      "finstack_quant.cashflows.builder.FloatingRateSpec",
+      "finstack_quant.cashflows.builder.OvernightCompoundingMethod",
+      "finstack_quant.cashflows.builder.ScheduleParams",
+      "finstack_quant.core.dates.DayCount",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.market_data.ForwardCurve",
+      "finstack_quant.core.market_data.MarketContext",
+      "finstack_quant.core.money.Money",
+      "finstack_quant.valuations.instruments.instrument_cashflows_json",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "registry: default -> bond discounting",
+      "cashflow builder: compounded_in_arrears"
+    ],
+    "metrics": [],
+    "returned_types": [
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.cashflows.builder.CashFlowSchedule",
+      "finstack_quant.valuations.ValuationResult",
+      "str (cashflow JSON)"
+    ],
+    "expected_exceptions": [],
+    "api_notes": [
+      "Historical FIXING:USD-SOFR observations are supplied by the foundation market. Weekend day weights are included in the overnight product.",
+      "Cashflow amount times DF is displayed directly; no hidden manual-pricing helper."
+    ]
+  },
+  {
+    "lesson_id": "1.4",
+    "notebook": "01_foundations/market_bootstrap_tour.ipynb",
+    "cell_ids": [
+      "bootstrap-proof",
+      "bootstrap-annuity-step",
+      "projection-curve-quotes",
+      "bootstrap-forward-plots",
+      "exercise-missing-quote",
+      "exercise-zero-interpolation-segment"
+    ],
+    "source_cells": [
+      {
+        "notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "cell_id": "bootstrap-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "cell_id": "bootstrap-annuity-step",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "cell_id": "projection-curve-quotes",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "cell_id": "bootstrap-forward-plots",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "cell_id": "exercise-missing-quote",
+        "role": "exercise"
+      },
+      {
+        "notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "cell_id": "exercise-zero-interpolation-segment",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.calibration_envelope",
+      "_shared.analyst_book.instruments",
+      "finstack_quant.calibration.calibrate",
+      "finstack_quant.core.dates.Tenor",
+      "finstack_quant.core.dates.next_imm",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "calibration plan: discount step, linear/log_linear interpolation"
+    ],
+    "metrics": [],
+    "returned_types": [
+      "finstack_quant.calibration.CalibrationResult",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.market_data.MarketContext"
+    ],
+    "expected_exceptions": [],
+    "api_notes": [
+      "The shared principal strip uses deposit and IRS quotes; the returned report proves repricing residuals.",
+      "Removing a quote can alter a whole interpolated segment; preserved pillars are not assumed."
+    ]
+  },
+  {
+    "lesson_id": "1.5",
+    "notebook": "01_foundations/market_data/hazard_curves.ipynb",
+    "cell_ids": [
+      "recovery-proof",
+      "survival-world-snapshot",
+      "exercise-recovery-experiments",
+      "surface-proof",
+      "exercise-calendar-arbitrage"
+    ],
+    "source_cells": [
+      {
+        "notebook": "01_foundations/market_data/hazard_curves.ipynb",
+        "cell_id": "recovery-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_data/hazard_curves.ipynb",
+        "cell_id": "survival-world-snapshot",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_data/hazard_curves.ipynb",
+        "cell_id": "exercise-recovery-experiments",
+        "role": "exercise"
+      },
+      {
+        "notebook": "01_foundations/market_data/vol_surfaces.ipynb",
+        "cell_id": "surface-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_data/vol_surfaces.ipynb",
+        "cell_id": "exercise-calendar-arbitrage",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.calibration_envelope",
+      "finstack_quant.calibration.calibrate",
+      "finstack_quant.core.market_data.FxDeltaVolSurface",
+      "finstack_quant.core.market_data.HazardCurve",
+      "finstack_quant.core.market_data.MarketContext",
+      "finstack_quant.core.market_data.VolSurface",
+      "finstack_quant.models.volatility.check_surface_grid",
+      "finstack_quant.models.volatility.delta_to_strike",
+      "finstack_quant.models.volatility.get_fx_delta_vol",
+      "finstack_quant.models.volatility.get_surface_vol"
+    ],
+    "models": [
+      "calibration plan: hazard step",
+      "volatility: total_variance interpolation, forward-delta FX smile"
+    ],
+    "metrics": [],
+    "returned_types": [
+      "finstack_quant.core.market_data.HazardCurve",
+      "finstack_quant.core.market_data.VolSurface",
+      "finstack_quant.core.market_data.FxDeltaVolSurface",
+      "finstack_quant.models.volatility.ArbitrageReport",
+      "float"
+    ],
+    "expected_exceptions": [],
+    "api_notes": [
+      "Fixed hazard recovery changes preserve survival; fixed quoted CDS spreads require a newly calibrated hazard curve and preserved replay recipe.",
+      "FX conversion uses forward delta; it does not claim premium-adjusted-delta support."
+    ]
+  },
+  {
+    "lesson_id": "2.1",
+    "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+    "cell_ids": [
+      "bond-price-proof",
+      "amortizer-proof",
+      "bond-builder-and-workouts",
+      "bond-step-up-yield",
+      "exercise-settlement-assumptions",
+      "exercise-step-up-coupon",
+      "exercise-street-true-yield"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "bond-price-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "amortizer-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "bond-builder-and-workouts",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "bond-step-up-yield",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "exercise-settlement-assumptions",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "exercise-step-up-coupon",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "exercise-street-true-yield",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.instruments",
+      "finstack_quant.cashflows.builder.AmortizationSpec",
+      "finstack_quant.cashflows.builder.CashFlowSchedule",
+      "finstack_quant.cashflows.builder.FixedCouponSpec",
+      "finstack_quant.cashflows.builder.ScheduleParams",
+      "finstack_quant.cashflows.builder.StepUpCouponSpec",
+      "finstack_quant.core.dates.DayCount",
+      "finstack_quant.core.dates.add_business_days",
+      "finstack_quant.core.money.Money",
+      "finstack_quant.portfolio.mwr_xirr",
+      "finstack_quant.valuations.instruments.Bond",
+      "finstack_quant.valuations.instruments.bond_from_cashflows_json",
+      "finstack_quant.valuations.instruments.instrument_cashflows_json",
+      "finstack_quant.valuations.instruments.list_models_grouped",
+      "finstack_quant.valuations.instruments.list_standard_metrics",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "registry: default -> bond discounting"
+    ],
+    "metrics": [
+      "clean_price",
+      "dirty_price",
+      "accrued",
+      "ytm",
+      "duration_mod"
+    ],
+    "returned_types": [
+      "finstack_quant.valuations.instruments.Bond",
+      "finstack_quant.cashflows.builder.CashFlowSchedule",
+      "finstack_quant.valuations.ValuationResult",
+      "str (canonical instrument JSON)"
+    ],
+    "expected_exceptions": [],
+    "api_notes": [
+      "Metric names are accrued and duration_mod; clean_price, dirty_price and accrued are currency amounts, while quoted_clean_price is percent of par.",
+      "Fixed-quote settlement shift preserves clean price by construction. Fixed-curve settlement shift does not."
+    ]
+  },
+  {
+    "lesson_id": "2.2",
+    "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+    "cell_ids": [
+      "bond-risk-proof",
+      "duration-convexity-units",
+      "bond-spread-ladder",
+      "exercise-seven-year-buckets",
+      "exercise-zspread-cs01",
+      "exercise-amortizer-duration"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "bond-risk-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "duration-convexity-units",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "bond-spread-ladder",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "exercise-seven-year-buckets",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "exercise-zspread-cs01",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "exercise-amortizer-duration",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.instruments",
+      "_shared.instrument_fixtures.floating_bond",
+      "_shared.instrument_fixtures.instrument_envelope",
+      "finstack_quant.cashflows.builder.AmortizationSpec",
+      "finstack_quant.cashflows.builder.CashFlowSchedule",
+      "finstack_quant.cashflows.builder.FixedCouponSpec",
+      "finstack_quant.cashflows.builder.ScheduleParams",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.market_data.MarketContext",
+      "finstack_quant.core.money.Money",
+      "finstack_quant.valuations.instruments.bond_from_cashflows_json",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "registry: default -> bond discounting"
+    ],
+    "metrics": [
+      "dv01",
+      "bucketed_dv01::USD-OIS::<tenor>",
+      "duration_mod",
+      "convexity",
+      "cs01::USD-CORP",
+      "z_spread",
+      "i_spread",
+      "asw_par"
+    ],
+    "returned_types": [
+      "finstack_quant.valuations.ValuationResult",
+      "finstack_quant.core.market_data.MarketContext"
+    ],
+    "expected_exceptions": [],
+    "api_notes": [
+      "DV01 is the signed currency PV change for +1 bp, negative for the long bond.",
+      "ASW analysis uses an explicit short_front settlement-to-maturity stub on a fresh copy.",
+      "Taylor curvature is measured directly with symmetric curve reprices; the native yield convexity metric has a separate convention.",
+      "g_spread is not used as an unsupported registry alias; the lesson must display the chosen government-benchmark calculation explicitly."
+    ]
+  },
+  {
+    "lesson_id": "2.3",
+    "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+    "cell_ids": [
+      "swap-proof",
+      "rates-option-proof",
+      "swap-legs-annuity",
+      "exercise-bond-sleeve-hedge",
+      "exercise-cap-floor-parity",
+      "exercise-forward-par-rate",
+      "swaption-typed-builder"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "cell_id": "swap-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "cell_id": "rates-option-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "cell_id": "swap-legs-annuity",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "cell_id": "exercise-bond-sleeve-hedge",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "cell_id": "exercise-cap-floor-parity",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "cell_id": "exercise-forward-par-rate",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "cell_id": "swaption-typed-builder",
+        "role": "build"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.instruments",
+      "_shared.instrument_fixtures.instrument_envelope",
+      "_shared.instrument_fixtures.swaption",
+      "finstack_quant.core.dates.DayCount",
+      "finstack_quant.core.dates.Tenor",
+      "finstack_quant.core.market_data.ForwardCurve",
+      "finstack_quant.core.market_data.MarketContext",
+      "finstack_quant.core.money.Money",
+      "finstack_quant.valuations.instruments.CapFloor",
+      "finstack_quant.valuations.instruments.FixedLegSpec",
+      "finstack_quant.valuations.instruments.FloatLegSpec",
+      "finstack_quant.valuations.instruments.InterestRateSwap",
+      "finstack_quant.valuations.instruments.Swaption",
+      "finstack_quant.valuations.instruments.instrument_cashflows_json",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "registry: default -> IRS discounting",
+      "registry: black76 -> cap/floor and European swaption"
+    ],
+    "metrics": [
+      "par_rate",
+      "dv01",
+      "pv01::USD-SOFR-3M",
+      "bucketed_dv01::USD-OIS::<tenor>",
+      "vega"
+    ],
+    "returned_types": [
+      "finstack_quant.valuations.instruments.InterestRateSwap",
+      "finstack_quant.valuations.instruments.CapFloor",
+      "finstack_quant.valuations.ValuationResult"
+    ],
+    "expected_exceptions": [],
+    "api_notes": [
+      "Cap-floor parity aligns the forward projection grid with actual quarterly ACT/360 accrual boundaries; default numeric 0.25-year stepping is not assumed identical.",
+      "The native cap is checked against four native caplet prices.",
+      "Normal-volatility units are an explanatory alternative to the proven lognormal Black-76 path."
+    ]
+  },
+  {
+    "lesson_id": "2.4",
+    "notebook": "02_pricing/instruments/equity_and_options.ipynb",
+    "cell_ids": [
+      "sabr-proof",
+      "sabr-svi-interpretation",
+      "exercise-sabr-beta-identification",
+      "sabr-quote-fit-plot",
+      "option-proof",
+      "greeks-spot-grid",
+      "exercise-financed-delta-hedge",
+      "equity-typed-builder",
+      "exercise-fx-option-gk"
+    ],
+    "source_cells": [
+      {
+        "notebook": "01_foundations/market_data/sabr_volatility.ipynb",
+        "cell_id": "sabr-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_data/sabr_volatility.ipynb",
+        "cell_id": "sabr-svi-interpretation",
+        "role": "build"
+      },
+      {
+        "notebook": "01_foundations/market_data/sabr_volatility.ipynb",
+        "cell_id": "exercise-sabr-beta-identification",
+        "role": "exercise"
+      },
+      {
+        "notebook": "01_foundations/market_data/sabr_volatility.ipynb",
+        "cell_id": "sabr-quote-fit-plot",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/equity_and_options.ipynb",
+        "cell_id": "option-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/equity_and_options.ipynb",
+        "cell_id": "greeks-spot-grid",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/equity_and_options.ipynb",
+        "cell_id": "exercise-financed-delta-hedge",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/equity_and_options.ipynb",
+        "cell_id": "equity-typed-builder",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/fx_instruments.ipynb",
+        "cell_id": "exercise-fx-option-gk",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.instruments",
+      "finstack_quant.core.currency.Currency",
+      "finstack_quant.core.money.Money",
+      "finstack_quant.models.bs_cos_price",
+      "finstack_quant.models.bs_greeks",
+      "finstack_quant.models.bs_implied_vol",
+      "finstack_quant.models.bs_price",
+      "finstack_quant.models.volatility.SabrCalibrator",
+      "finstack_quant.models.volatility.SabrParameters",
+      "finstack_quant.models.volatility.SabrSmile",
+      "finstack_quant.models.volatility.SviParams",
+      "finstack_quant.models.volatility.get_fx_delta_vol",
+      "finstack_quant.models.volatility.get_surface_vol",
+      "finstack_quant.valuations.instruments.EquityOption",
+      "finstack_quant.valuations.instruments.FxOption",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "model functions: bs_price, bs_greeks, bs_cos_price",
+      "registry: default -> equity option black76 (spot/carry Black-Scholes economics)",
+      "SabrCalibrator: fixed beta"
+    ],
+    "metrics": [
+      "delta",
+      "gamma",
+      "vega",
+      "theta"
+    ],
+    "returned_types": [
+      "finstack_quant.valuations.instruments.EquityOption",
+      "finstack_quant.models.volatility.SabrParameters",
+      "finstack_quant.valuations.ValuationResult",
+      "float",
+      "finstack_quant.models.BsGreeks"
+    ],
+    "expected_exceptions": [],
+    "api_notes": [
+      "Standalone Black-Scholes outputs are per underlying unit; the native option notional scales value by 100.",
+      "The hedge ledger includes borrowing interest, continuous-yield dividends and financed rebalancing, with gamma/theta residual comparison.",
+      "SABR quote reproduction is checked within 1e-6 decimal volatility with beta fixed."
+    ]
+  },
+  {
+    "lesson_id": "2.5",
+    "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+    "cell_ids": [
+      "cds-proof",
+      "cds-isda-quote-conversion",
+      "cds-flat-hazard-approximation",
+      "exercise-cds-recovery",
+      "exercise-flat-hazard-spread",
+      "exercise-book-cs01",
+      "cds-typed-calibration"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "cell_id": "cds-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "cell_id": "cds-isda-quote-conversion",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "cell_id": "cds-flat-hazard-approximation",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "cell_id": "exercise-cds-recovery",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "cell_id": "exercise-flat-hazard-spread",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "cell_id": "exercise-book-cs01",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "cell_id": "cds-typed-calibration",
+        "role": "build"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.build_book",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.calibration_envelope",
+      "_shared.analyst_book.instruments",
+      "finstack_quant.calibration.calibrate",
+      "finstack_quant.core.dates.DayCount",
+      "finstack_quant.core.dates.Tenor",
+      "finstack_quant.core.dates.add_business_days",
+      "finstack_quant.core.dates.next_cds_date",
+      "finstack_quant.core.dates.next_imm",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.market_data.HazardCurve",
+      "finstack_quant.core.market_data.MarketContext",
+      "finstack_quant.core.money.Money",
+      "finstack_quant.portfolio.aggregate_metrics",
+      "finstack_quant.portfolio.value_portfolio",
+      "finstack_quant.valuations.instruments.CreditDefaultSwap",
+      "finstack_quant.valuations.instruments.PremiumLegSpec",
+      "finstack_quant.valuations.instruments.ProtectionLegSpec",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "registry: default -> CDS hazard_rate",
+      "calibration plan: hazard replay for quote-space CS01"
+    ],
+    "metrics": [
+      "par_spread",
+      "cs01::ACME-HZD",
+      "bucketed_cs01::ACME-HZD::<tenor>",
+      "protection_leg_pv",
+      "premium_leg_pv",
+      "risky_annuity"
+    ],
+    "returned_types": [
+      "finstack_quant.valuations.instruments.CreditDefaultSwap",
+      "finstack_quant.valuations.ValuationResult",
+      "finstack_quant.core.market_data.MarketContext"
+    ],
+    "expected_exceptions": [],
+    "api_notes": [
+      "par_spread is in basis points.",
+      "Upfront is explicitly valuation-date PV divided by notional; no unsupported upfront metric is requested.",
+      "Protection interval contributions are differences of cumulative native protection-leg PVs; this is not a hidden raw diagnostic.",
+      "Quote-space CS01 needs the retained calibration replay; bond z-spread CS01 uses the instrument ID."
+    ]
+  }
+]

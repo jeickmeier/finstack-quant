@@ -1,0 +1,217 @@
+---
+id: '3.5'
+title: 'Scenarios and Stress: Asking "What If" Precisely'
+description: 'Analyst program lesson 3.5: Scenarios and Stress: Asking "What If" Precisely'
+desk_question: "\"Rates +100, spreads +50, equities \u221215. What does the book do\
+  \ \u2014 and what did we assume to get that number?\""
+references:
+- '#mcneil-frey-embrechts-qrm'
+- '#litterman-scheinkman-1991'
+- '#basel-ii-2006'
+api: []
+status: published
+---
+
+<DeskContext question={"Rates up 100bp, CDS quotes up 50bp, equities down 15%: what happens, and what did we hold fixed?"}>
+
+A stress number is incomplete without the shock definition. Moving zero rates, moving calibration quotes and moving hazard rates produce different experiments. This lesson writes the operations before applying them, preserves the original market, and reprices the actual holdings. It also distinguishes instantaneous shocks from a holding-period return.
+
+The credit-extension exercise is a required forward comparison using the prepared fixture. You can execute it now without taking the credit track; that track later explains the additional contracts in detail.
+
+</DeskContext>
+
+<Standard>
+
+One basis point is 0.0001 in a decimal rate. A parallel continuously compounded zero-rate shift $b$ transforms $DF(t)$ into $DF(t)e^{-bt}$. A quote-space calibration shock instead changes quoted instruments and rebuilds curves; the resulting zero-rate movement need not be exactly parallel. Credit quotes require recalibration, and changing discounting can invalidate replay metadata that was calibrated against the old curve.
+
+Define exactly which factor changes and which remains fixed. The first experiment shifts only the USD discount curve and keeps the hazard curve fixed. PV-only strict portfolio calculation avoids requesting a quote-space credit-risk measure against stale discounting. The composite quote experiment rebuilds OIS and CDS curves together and then shocks the named equity spot. It does not claim to be the same rate experiment.
+
+At small shock sizes, a matched central-difference Taylor approximation is $\Delta V\approx D_{bp}b+\tfrac12 C_{bp^2}b^2$. Its risk factors, curves, positions and bump units must match full repricing. Higher-order effects grow at large shocks; a residual is useful information, not a reason to force the approximation to match.
+
+Scenario composition preserves the specified operations and order. Additive shifts on one unchanged zero curve commute. Calibration, time roll, and other state-dependent operations need not. Previewing a template does not establish that it is suitable for this book or that its named historical episode is an observed market-data replay.
+
+Historical replay values a declared holding set on dated market snapshots. It does not automatically account for subscriptions, trades or all settlement conventions. Use a no-flow/no-payment window here and the full cash ledger in lesson 3.1 for account performance. Horizon returns additionally roll time and include investment carry under the specified convention.
+
+The independent 5 bp repricing checks the local Taylor approximation within USD 0.01 in this fixture. The 100 bp residual is required to exceed USD 1 and the smaller-shock residual. This documents higher-order error for this particular book and shock; it is not a universal monotonic-error rule for every portfolio.
+
+</Standard>
+
+<BuildIt>
+
+### Session 1: define the shock and compare full repricing
+
+Preview the serialized typed operations and validate the scenario. The 100bp shock is compared with composed 40bp and 60bp shifts. The book's own ±1bp valuations supply the first and second differences; no unrelated duration is substituted. Original market serialization must remain unchanged.
+
+{/* notebook-block notebook="06_scenarios/scenarios_and_stress_testing.ipynb" cell="base-book-scenario" role="build" */}
+```python exec id=base-book-scenario role=build
+import json
+import math
+from _shared.analyst_book import AS_OF, build_book, build_market
+from finstack_quant.portfolio import value_portfolio
+from finstack_quant.scenarios import ScenarioSpec, OperationSpec, CurveKind, compose_scenarios, validate_scenario_spec, apply_scenario_to_market
+book, market = build_book("base"), build_market("base")
+unchanged = market.to_json()
+base = value_portfolio(book, market, metrics=[]).total_value
+def rate_scenario(bp):
+    return ScenarioSpec("usd-discount-shock", [OperationSpec.curve_parallel_bp(CurveKind.discount(),"USD-OIS",bp)], f"USD discount +{bp}bp")
+def reprice(bp):
+    applied = apply_scenario_to_market(rate_scenario(bp), market, AS_OF)
+    result = value_portfolio(book, applied.market, strict_risk=True, metrics=[])
+    report = applied.report
+    assert report.operations_applied == 1 and not report.warnings
+    assert not json.loads(result.to_json()).get("degraded_positions",[])
+    return result.total_value
+scenario = rate_scenario(100)
+assert validate_scenario_spec(scenario.to_json()) is None
+print("Previewed operations:",json.loads(scenario.to_json())["operations"])
+composed = compose_scenarios([rate_scenario(40),rate_scenario(60)])
+compound_market = apply_scenario_to_market(composed, market, AS_OF)
+compound_value = value_portfolio(book, compound_market.market, strict_risk=True, metrics=[])
+assert abs(compound_value.total_value-reprice(100))<1e-6, "USD: additive zero shifts commute"
+up, down = reprice(1), reprice(-1)
+signed_dv01 = (up-down)/2
+curvature_per_bp2 = up-2*base+down
+rows=[]
+for bp in [1,5,25,100]:
+    exact = reprice(bp)-base
+    taylor = signed_dv01*bp+0.5*curvature_per_bp2*bp**2
+    rows.append({"bump_bp":bp,"full_pnl_usd":exact,"taylor_pnl_usd":taylor,"residual_usd":exact-taylor})
+assert all(math.isfinite(row["full_pnl_usd"]) for row in rows)
+small=next(row for row in rows if row["bump_bp"]==5)
+large=next(row for row in rows if row["bump_bp"]==100)
+# Independent 5 bp repricing: Taylor approximation within one USD cent in this fixture.
+assert abs(small["residual_usd"])<.01
+# Higher-order error is material at 100 bp for this same fixed-hazard experiment.
+assert abs(large["residual_usd"])>1. and abs(large["residual_usd"])>abs(small["residual_usd"])
+assert market.to_json()==unchanged
+print("Matched scenario P&L:",rows)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.5" block="base-book-scenario" />
+
+The Taylor residual is reported in USD for 1, 25 and 100bp. Do not require a universally monotone error pattern across instruments; inspect the observed approximation error and any option exercise changes.
+
+### Session 2: recalibration, replay and time roll
+
+The composite changes OIS calibration quotes by 100bp and CDS quotes by 50bp, rebuilds their curves together, and reduces `SPX-SPOT` by 15%. This preserves a coherent quote replay recipe. The template is printed before any attempted application. The dated replay uses four weekly synthetic snapshots within a quiet contractual window and must have no skipped dates.
+
+{/* notebook-block notebook="06_scenarios/scenarios_and_stress_testing.ipynb" cell="quote-composite-and-history" role="build" */}
+```python exec id=quote-composite-and-history role=build
+from datetime import date,timedelta
+import pandas as pd
+from _shared.analyst_book import calibration_envelope, instruments, book_spec
+from _shared.analyst_history import history_market
+from finstack_quant.calibration import calibrate
+from finstack_quant.portfolio import Portfolio, replay_portfolio
+from finstack_quant.scenarios import build_from_template, list_builtin_templates, compute_horizon_return
+# Quote-space stress rebuilds discount and hazard curves together. It is not an exact parallel zero shift.
+quoted=calibration_envelope("base")
+quote_changes=[]
+for quote in quoted["market_data"]:
+ if quote["kind"]=="rate_quote":
+  quote["rate"]+=.01;quote_changes.append({"kind":"OIS quote","shock":"+100bp"})
+ elif quote["kind"]=="cds_quote":
+  quote["spread_bp"]+=50;quote_changes.append({"kind":"CDS quote","shock":"+50bp"})
+print("Quote-space operation preview:",quote_changes)
+calibrated=calibrate(quoted).market
+composite_market=build_market("base")
+composite_market.insert(calibrated.get_discount("USD-OIS"));composite_market.insert(calibrated.get_hazard("ACME-HZD"))
+equity_shock=ScenarioSpec("equity-down",[OperationSpec.equity_price_pct(["SPX-SPOT"],-15)])
+applied=apply_scenario_to_market(equity_shock,composite_market,AS_OF)
+assert not applied.report.warnings
+composite_value=value_portfolio(book,applied.market,metrics=[],strict_risk=True)
+assert not json.loads(composite_value.to_json()).get("degraded_positions",[])
+print({"base_usd":base,"quoted_composite_usd":composite_value.total_value,"pnl_usd":composite_value.total_value-base})
+print("Available templates:",list_builtin_templates())
+template=build_from_template("rate_shock_2022")
+assert validate_scenario_spec(template.to_json()) is None
+print("Template preview (not a historical data observation):",template.to_json())
+# Dated synthetic market history; constant holdings and no intervening payments/flows/trades.
+replay_dates=[date(2025,1,16)+timedelta(days=7*k) for k in range(4)]
+snapshots=[(d,history_market(d)) for d in replay_dates]
+replay=replay_portfolio(book,snapshots,config={"mode":"pv_and_pnl","valuation_options":{"metrics":{"mode":"only","metrics":[]}}})
+assert not replay.skipped_dates
+print(replay.to_dataframe().to_string(index=False))
+summary=replay.summary
+assert abs(float(summary["end_value"]["amount"])-float(summary["start_value"]["amount"])-float(summary["total_pnl"]["amount"]))<1e-6
+horizon=ScenarioSpec("one-month-hold",[OperationSpec.time_roll_forward("1M",roll_mode="calendar_days"),OperationSpec.curve_parallel_bp("discount","USD-OIS",25)])
+horizon_result=compute_horizon_return(json.dumps(instruments("base")["USD-CORP"]),history_market(replay_dates[0]),replay_dates[0],horizon,method="waterfall")
+assert math.isfinite(horizon_result.total_return) and horizon_result.horizon_days>0
+assert horizon_result.attribution.residual_within_tolerance()
+print({"horizon_days":horizon_result.horizon_days,"total_return":horizon_result.total_return,"annualized_return":horizon_result.annualized_return,"carry_return":horizon_result.factor_contribution("carry")})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.5" block="quote-composite-and-history" />
+
+The replay table is observed within the teaching fixture, not a claim about market history. The horizon result separately shows a one-calendar-month bond hold plus a 25bp discount-curve shock. Its annualized return is an extrapolation of that short-window result, not a forecast. State both the horizon and the assumption that intervening markets follow the specified scenario.
+
+</BuildIt>
+
+<LabCard notebook="06_scenarios/scenarios_and_stress_testing.ipynb" title="Scenario construction and comparison" description="Execute the exact zero-shift, recalibrated quote composite, template preview and both required stresses." />
+<LabCard notebook="05_portfolio/historical_replay.ipynb" title="Replay modes" description="Run PV-only, P&L and attribution modes and inspect their returned diagnostics." />
+<LabCard notebook="05_portfolio/horizon_total_return.ipynb" title="Horizon-return lab" description="Run carry-only, instantaneous, combined and multifactor cases with explicit time-roll conventions." />
+<Exercise title="Design a twist" question={"Create a 2s10s steepener with the 2Y zero rate down 25bp and 10Y up 25bp. Preview the matching rule, then identify the winning position by full repricing."}>
+
+{/* notebook-block notebook="06_scenarios/scenarios_and_stress_testing.ipynb" cell="exercise-twist" role="exercise" */}
+```python exec id=exercise-twist role=exercise
+from finstack_quant.scenarios import TenorMatchMode
+shape=ScenarioSpec("2s10s-steepener",[OperationSpec.curve_node_bp("discount","USD-OIS",[("2Y",-25.0),("10Y",25.0)],TenorMatchMode.interpolate())])
+print("Preview:",shape.to_json())
+shocked=apply_scenario_to_market(shape,market,AS_OF)
+assert not shocked.report.warnings
+v0=json.loads(value_portfolio(book,market,metrics=[]).to_json())
+v1=json.loads(value_portfolio(book,shocked.market,metrics=[]).to_json())
+rank=[]
+for pid,p in v0["position_values"].items():
+ rank.append({"position":pid,"pnl_usd":float(v1["position_values"][pid]["value_base"]["amount"])-float(p["value_base"]["amount"])})
+rank=pd.DataFrame(rank).sort_values("pnl_usd",ascending=False)
+assert abs(rank.pnl_usd.sum()-(float(v1["total_base_currency"]["amount"])-float(v0["total_base_currency"]["amount"])))<.01
+print(rank.to_string(index=False));print("Largest winner for this exact curve-shape/holding convention:",rank.iloc[0].position)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.5" block="exercise-twist" />
+
+The ranking gives the winner for this fixture and interpolated shape. A payer swap's exposure depends on the distinction between the shocked discount curve and its unchanged forward curve. A label such as “rates steepener” alone is insufficient: include the node amounts, interpolation and curve role.
+
+</Exercise>
+<Exercise title="Same stress, extended book" question={"Apply the identical 100bp discount-curve shock before and after the credit extension. Reprice the BBB holding separately and reconcile native and combined totals."}>
+
+{/* notebook-block notebook="06_scenarios/scenarios_and_stress_testing.ipynb" cell="exercise-credit-extension-stress" role="exercise" */}
+```python exec id=exercise-credit-extension-stress role=exercise
+from _shared import analyst_tracks as tracks
+from finstack_quant.valuations.instruments import structured_credit_tranche_metrics
+# Same100bp zero-rate operation on both books; hazards/other market factors held fixed.
+credit_book=tracks.build_book("credit");credit_market=tracks.build_market("credit")
+credit_shocked=apply_scenario_to_market(rate_scenario(100),credit_market,AS_OF).market
+native0=value_portfolio(credit_book,credit_market,metrics=[]).total_value
+native1=value_portfolio(credit_book,credit_shocked,metrics=[]).total_value
+holding=tracks.clo_bbb_holding()
+bbb0=structured_credit_tranche_metrics(json.dumps(holding["deal"]),holding["tranche_id"],credit_market,AS_OF).pv*holding["quantity"]
+bbb1=structured_credit_tranche_metrics(json.dumps(holding["deal"]),holding["tranche_id"],credit_shocked,AS_OF).pv*holding["quantity"]
+comparison=pd.DataFrame([{"book":"base","native_before_usd":base,"native_after_usd":reprice(100),"BBB_before_usd":0.0,"BBB_after_usd":0.0},{"book":"credit extended","native_before_usd":native0,"native_after_usd":native1,"BBB_before_usd":bbb0,"BBB_after_usd":bbb1}])
+comparison["combined_pnl_usd"]=comparison.native_after_usd-comparison.native_before_usd+comparison.BBB_after_usd-comparison.BBB_before_usd
+assert bbb0>0 and bbb1>0
+assert abs(comparison.iloc[1].combined_pnl_usd-((native1+bbb1)-(native0+bbb0)))<1e-6
+assert "ANALYST-CLO" not in {p["instrument_id"] for p in tracks.book_spec("credit")["positions"]}
+print(comparison.to_string(index=False))
+print("Native12position subtotal plus separatelyrepricedBBB. Same operation; different holdings. No universal P&L sign is assumed.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.5" block="exercise-credit-extension-stress" />
+
+The change in stress P&L reflects added exposures, position sizes and nonlinearities. The BBB sleeve is independently priced in both markets; the whole CLO deal is absent from the native portfolio. Show native and BBB subtotals before the combined P&L. This fixed-hazard scenario is not a claim that CDS market quotes stayed fixed.
+
+</Exercise>
+
+<CheckYourself>
+
+- Are 100bp to a zero curve and 100bp to OIS quotes identical? No: quote recalibration changes the fitted curve according to instrument coverage and interpolation.
+- Can stale calibration replay be used after changing discounting? No. Rebuild consistently before quote-space risk calculations.
+- Does a template name make a scenario historical evidence? No: dated source market observations are required for that claim.
+- Why reprice the BBB sleeve under every stress? A base-date sleeve value would omit its stress contribution and break the combined total.
+
+</CheckYourself>

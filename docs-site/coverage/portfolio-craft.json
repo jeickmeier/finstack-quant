@@ -1,0 +1,455 @@
+[
+  {
+    "lesson_id": "3.1",
+    "scope": "Full original lesson concepts and all original exercise groups with approved supported substitutions.",
+    "concepts": [
+      "Dated native NAV, trades, coupons, maturities, cash ledger and external flows",
+      "Exact flow-neutral TWRR, dated MWRR/XIRR and Modified Dietz",
+      "Geometric growth versus annualized arithmetic volatility/Sharpe; Sortino and Calmar",
+      "Drawdown depth, duration, recovery and benchmark-relative tracking, capture, batting and information ratios"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "03_analytics/performance_analytics.ipynb",
+        "cell_id": "dated-native-performance",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "03_analytics/performance_analytics.ipynb",
+        "cell_id": "performance-measures",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Equal Sharpe with different Sortino/Calmar; explain conditional investor choice",
+        "notebook": "03_analytics/performance_analytics.ipynb",
+        "cell_id": "exercise-same-sharpe",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Large flow before rally; compare TWR, MWR and Dietz",
+        "notebook": "03_analytics/performance_analytics.ipynb",
+        "cell_id": "exercise-flow-before-rally",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:00Z",
+    "authoring_start_precision": "Approximate batch start; overlapping work, not measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:12:41.524291+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "3.3",
+    "scope": "Full original lesson concepts and all original exercise groups with approved supported substitutions.",
+    "concepts": [
+      "Portfolio contract, quantity, entity and currency identity; strict pricing",
+      "Decimal native-currency, FX and reporting-currency reconciliation",
+      "Applicable qualified risk aggregation and full cashflow ladder",
+      "Fresh-object repeated-run consistency; native materialization/cache and generated calculation metadata"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "05_portfolio/portfolio_construction_and_valuation.ipynb",
+        "cell_id": "base-book-reconciliation",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "05_portfolio/portfolio_construction_and_valuation.ipynb",
+        "cell_id": "portfolio-stamps-and-cache",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Diagnose a deliberately reversed FX conversion and reconcile native/base totals",
+        "notebook": "05_portfolio/portfolio_construction_and_valuation.ipynb",
+        "cell_id": "exercise-fx-direction",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Rank the largest signed qualified 10Y bucket with currencies correctly converted",
+        "notebook": "05_portfolio/portfolio_construction_and_valuation.ipynb",
+        "cell_id": "exercise-ten-year-bucket",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:00Z",
+    "authoring_start_precision": "Approximate batch start; overlapping work, not measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:12:41.527681+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "3.4",
+    "scope": "Full original lesson concepts and all original exercise groups with approved supported substitutions.",
+    "concepts": [
+      "Native instrument factor waterfall versus Taylor and factor order",
+      "Cash/FX reconciled bond-sleeve performance over three periods",
+      "Brinson allocation, selection and interaction; Carino geometric linking",
+      "Campisi carry, rates, spreads and residual; corrupted totals and missing-income diagnosis"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "03_analytics/portfolio_returns_and_attribution.ipynb",
+        "cell_id": "three-period-attribution",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "03_analytics/portfolio_returns_and_attribution.ipynb",
+        "cell_id": "native-book-waterfall",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Construct positive allocation and negative selection with full Brinson closure",
+        "notebook": "03_analytics/portfolio_returns_and_attribution.ipynb",
+        "cell_id": "exercise-allocation-selection",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Diagnose Campisi corruption, missing coupon and naive linking error",
+        "notebook": "03_analytics/portfolio_returns_and_attribution.ipynb",
+        "cell_id": "exercise-campisi-diagnosis",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:00Z",
+    "authoring_start_precision": "Approximate batch start; overlapping work, not measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:12:41.532501+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "3.5",
+    "scope": "Full original lesson concepts and all original exercise groups with approved supported substitutions.",
+    "concepts": [
+      "Typed operation preview, validation, composition and immutable market baseline",
+      "Full native revaluation versus matched central-bump Taylor P&L",
+      "Joint quote-space rates/credit recalibration and equity stress; templates",
+      "Dated historical replay and horizon return; curve-shape and credit-extension stress with separate BBB subtotal"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "06_scenarios/scenarios_and_stress_testing.ipynb",
+        "cell_id": "base-book-scenario",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "06_scenarios/scenarios_and_stress_testing.ipynb",
+        "cell_id": "quote-composite-and-history",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Construct a 2s10s twist and rank exact position P&L",
+        "notebook": "06_scenarios/scenarios_and_stress_testing.ipynb",
+        "cell_id": "exercise-twist",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Compare identical stress on base versus native credit extension plus separately repriced BBB",
+        "notebook": "06_scenarios/scenarios_and_stress_testing.ipynb",
+        "cell_id": "exercise-credit-extension-stress",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:00Z",
+    "authoring_start_precision": "Approximate batch start; overlapping work, not measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:12:41.536208+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "3.6",
+    "scope": "Full original lesson concepts and all original exercise groups with approved supported substitutions.",
+    "concepts": [
+      "Auditable instrument, scale, currency, tenor, factor, sign and unit mapping",
+      "Direct SIMM/FRTB target-grid repricing, credit quote recalibration and versioned parameter vintages",
+      "Hand-reconciled SIMM bucket; netting and bilateral schedule comparison",
+      "CSA variation margin, thresholds and minimum transfer amounts",
+      "FRTB capital, SA-CCR and CVA/DVA/FVA/MVA using disclosed exposure and funding assumptions"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "cell_id": "margin-proof-1",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "cell_id": "margin-proof-2",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "cell_id": "margin-proof-3",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "cell_id": "cds-target-grid",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "cell_id": "netting-margin-capital-xva",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Remove a trade and explain nonadditive netting-set IM",
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "cell_id": "exercise-drop-one-im",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Change CSA thresholds/MTA and reconcile transfer/no-transfer results",
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "cell_id": "exercise-vm-threshold-mta",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Explain an economically material MVA with a hand-reconciled funding example",
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "cell_id": "exercise-why-mva",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:00Z",
+    "authoring_start_precision": "Approximate batch start; overlapping work, not measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:12:41.542759+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "4.1",
+    "scope": "Full original lesson concepts and all original exercise groups with approved supported substitutions.",
+    "concepts": [
+      "Articulated borrower P&L, cash, balance sheet, working capital and debt schedules",
+      "Actual/forecast/formula precedence, native dependency traces and explanations",
+      "Three-statement checks, full-account corkscrews and diagnosed warnings",
+      "Intentional accounting failure, cash/NWC signs and fixed-versus-variable operating expenses"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "04_statement_modeling/statement_modeling.ipynb",
+        "cell_id": "borrower-articulation",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/statement_modeling.ipynb",
+        "cell_id": "precedence-and-dependency",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/statement_modeling.ipynb",
+        "cell_id": "statement-checks-and-failure",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Reconcile a working-capital shock to cash with accounting sign conventions",
+        "notebook": "04_statement_modeling/statement_modeling.ipynb",
+        "cell_id": "exercise-working-capital",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Compare variable versus forecast operating expense and explain EBITDA changes",
+        "notebook": "04_statement_modeling/statement_modeling.ipynb",
+        "cell_id": "exercise-forecast-method",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:00Z",
+    "authoring_start_precision": "Approximate batch start; overlapping work, not measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:12:41.545727+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "4.4",
+    "scope": "Full original lesson concepts and all original exercise groups with approved supported substitutions.",
+    "concepts": [
+      "Native linear allocation objective, declared risk-capital denominator, budget, bounds and turnover",
+      "Corner solutions, estimation risk and covariance/mean-variance interpretation",
+      "Euler component/marginal/incremental VaR and target risk budgets",
+      "Aligned position capacity and liquidation ranking; unavailable loan capacity and cash treatment",
+      "Cash-bond liquidity VaR, Roll, Amihud, Kyle and Almgren-Chriss horizon tradeoff"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "cell_id": "common-book-liquidity",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "cell_id": "constrained-common-universe",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "cell_id": "risk-budget-and-liquidity",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Tighten a holding cap and attribute the objective loss",
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "cell_id": "exercise-tighten-constraint",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Rank available liquidation capacity and eligible cash-bond LVaR add-on",
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "cell_id": "exercise-liquidation-ranking",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Interpret Kyle coefficient after changing the volume unit",
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "cell_id": "exercise-kyle-interpretation",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:00Z",
+    "authoring_start_precision": "Approximate batch start; overlapping work, not measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:12:41.548978+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "4.5",
+    "scope": "Full original lesson concepts and all original exercise groups with approved supported substitutions.",
+    "concepts": [
+      "Traceable performance, attribution, current holdings, proxy risk and stress report pack",
+      "Dated self-financing loan acquisition after the three-period historical account ledger",
+      "Exact public primitive reconstruction and independent cumulative-return arithmetic",
+      "Six-KPI PM brief with decision, conditions, units, source windows and monetary reconciliation",
+      "Misleading-report redesign and an additional actionable full-repricing stress"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "cell_id": "native-pm-report",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "cell_id": "report-source-replay",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "cell_id": "report-date-acquisition",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "cell_id": "report-pack-and-primitives",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "cell_id": "one-page-pm-report",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Redesign a deliberately bad report without changing source numbers",
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "cell_id": "exercise-redesign-report",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Add an equity full-repricing stress and explain the position-level loss",
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "cell_id": "exercise-add-stress-row",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:00Z",
+    "authoring_start_precision": "Approximate batch start; overlapping work, not measured active labour.",
+    "authoring_finished_utc": "2026-09-03T05:20:51.473394+00:00",
+    "learner_completion_time": "unmeasured"
+  }
+]

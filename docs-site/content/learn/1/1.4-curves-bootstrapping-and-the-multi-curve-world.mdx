@@ -1,0 +1,287 @@
+---
+id: '1.4'
+title: 'Curves: Bootstrapping and the Multi-Curve World'
+description: 'Analyst program lesson 1.4: Curves: Bootstrapping and the Multi-Curve
+  World'
+desk_question: '"The 10y point moved 4bp this morning. What actually moved, and what
+  did it do to everything we hold?"'
+references:
+- '#hagan-west-monotone-convex'
+- '#ametrano-bianchetti-2013'
+- '#fujii-shimada-takahashi-2010'
+- '#andersen-piterbarg-interest-rate-modeling'
+- '#bloomberg-swpm'
+- '#brent-1973'
+- '#fritsch-carlson-1980'
+api:
+- finstack_quant.calibration.calibrate
+- finstack_quant.core.dates.Tenor
+- finstack_quant.core.dates.next_imm
+- finstack_quant.core.market_data.DiscountCurve
+- finstack_quant.valuations.instruments.price_instrument
+status: published
+---
+
+<DeskContext question={"The 10y point moved 4bp this morning. What actually moved, and what did it do to everything we hold?"}>
+
+A trader says the 10y point moved 4bp. Ask which quote moved, which curve was calibrated, how intermediate maturities were interpolated and which instruments depend on that curve. A change to a calibration input does not merely overwrite one convenient array element; it changes the solution used to value a network of cashflows.
+
+You will reproduce the quote strip, solve one knot by hand, compare forwards between pillars and build a distinct term-rate projection curve. The native calibration report must show that the fitted market reprices its inputs.
+
+</DeskContext>
+
+<Standard>
+
+### Bootstrap as a pricing equation
+
+A deposit quote under simple accrual gives $D(T)=1/(1+r\alpha)$. For an annual-pay, single-curve par swap with unit notional,
+
+$$S\sum_{i=1}^{n}\alpha_iD(t_i)=1-D(t_n).$$
+
+If all earlier DFs are known, isolate the final one:
+
+$$D(t_n)=\frac{1-S\sum_{i<n}\alpha_iD(t_i)}{1+S\alpha_n}.$$
+
+The displayed hand example uses annual payments with $\alpha_i=1$ so this step is fully transparent. It does not claim to reproduce every convention of an OIS instrument. With irregular periods, coupled discount/projection inputs or more complex products, the unknown knot is found by solving a repricing residual. Brent brackets a root and trades speed for robustness; Newton uses a derivative and needs a sensible starting point. A solver termination flag is insufficient without small residuals in the quote's units. [Brent](/references.html#brent-1973) supplies the root-finding foundation.
+
+The canonical strip contains deposits and swaps. A separate forward example uses FRAs; the second experiment replaces the FRA projection strip with three quarterly rate futures while keeping the deposit/swap discount step. Rate futures quote price as 100 minus the annualized futures rate in percent. Under the stated Hull sign convention,
+
+$$F=\frac{100-P_{\mathrm{future}}}{100}-\mathrm{CA}.$$
+
+The exercise assumes a one-basis-point convexity adjustment explicitly. Daily margining makes futures and forward economics differ when rates are stochastic; zero adjustment is an approximation, not a universal convention. For CME SR3, the input expiry is the business day before the **ending** IMM Wednesday of the underlying reference quarter. A named contract month or starting IMM date is not a substitute.
+
+### Interpolation is a model choice
+
+A calibration matches quotes at a finite set of pillars. Valuation also needs DFs between them. Linear interpolation on DFs, linear interpolation on zeros and log-linear interpolation on DFs are different models. Native `linear` in this comparison acts on DF values; it should not be relabelled linear-zero. Log-linear DF interpolation makes the interval forward constant between adjacent knots, so the instantaneous forward can jump at a knot. Linear-zero interpolation makes its own forward shape through $f(t)=z(t)+t z'(t)$.
+
+The [Hagan–West monotone-convex method](/references.html#hagan-west-monotone-convex) controls forward-curve shape rather than merely drawing a smooth-looking line. Shape preservation and monotonic interpolation do not guarantee that every market input is economically consistent. The forward plot shows why checking only zero rates can miss a discontinuity or oscillation. [Fritsch–Carlson](/references.html#fritsch-carlson-1980) gives useful interpolation background.
+
+Dropping the 5y input removes a constraint. The recalibrated curve can still fit the remaining quotes while changing the unquoted region. The changed node and forward table is the evidence; do not promise that every other point remains unchanged when the interpolation or solve is coupled.
+
+### Discounting and projection
+
+Before the multi-curve transition, a simplified swap model often used one curve for both discounting and index forwards. Collateralized OIS discounting and tenor-dependent index projection generally require separate curves. The fixed-leg par equation becomes
+
+$$S=\frac{\sum_iD_d(t_i)\alpha_i F_p(t_{i-1},t_i)}{\sum_jD_d(u_j)\beta_j}.$$
+
+The discount curve $D_d$ prices payment timing; the projection curve supplies contractual index forwards. Changing one role need not change the other. The native calibration plan makes the dependency explicit: solve the discount step first, then the forward step that references it. The [multi-curve literature](/references.html#ametrano-bianchetti-2013), [Fujii–Shimada–Takahashi](/references.html#fujii-shimada-takahashi-2010) and [Andersen–Piterbarg](/references.html#andersen-piterbarg-interest-rate-modeling) describe this separation; [SWPM](/references.html#bloomberg-swpm) provides market-screen context.
+
+Curve risk consequently has several coordinates: which quote, which curve role, which pillar, and which bump unit. Lesson 2.2 formalizes that information in qualified DV01 keys. Today we preserve those identities in the input envelope, calibrated market and comparison tables.
+
+</Standard>
+
+<BuildIt>
+
+### Reprice the same strip under two interpolations
+
+The shared envelope carries actual quote identifiers. Both fits must reproduce their inputs. Forward differences between pillars are legitimate model differences, not evidence of a failed fit.
+
+{/* notebook-block notebook="01_foundations/market_bootstrap_tour.ipynb" cell="bootstrap-proof" role="build" */}
+```python exec id=bootstrap-proof role=build
+import json
+from finstack_quant.calibration import calibrate
+from _shared.analyst_book import calibration_envelope, build_market
+
+calibrations = {}
+for interpolation in ('linear', 'log_linear'):
+    envelope = calibration_envelope('foundations')
+    envelope['plan']['steps'][0]['interpolation'] = interpolation
+    result = calibrate(json.dumps(envelope))
+    assert result.success and result.report.max_residual < 1e-7
+    calibrations[interpolation] = result
+linear = calibrations['linear'].market.get_discount('USD-OIS')
+loglinear = calibrations['log_linear'].market.get_discount('USD-OIS')
+forwards = [(t, linear.forward(t, t + 0.1), loglinear.forward(t, t + 0.1)) for t in (0.6, 1.4, 3.4, 7.4)]
+assert any(abs(first - second) > 1e-8 for _, first, second in forwards)
+reduced = calibration_envelope('foundations')
+removed = 'USD-OIS-SWAP-5Y'
+reduced['market_data'] = [quote for quote in reduced['market_data'] if quote['id'] != removed]
+reduced['plan']['quote_sets']['usd_rate_quotes'].remove(removed)
+reduced_result = calibrate(json.dumps(reduced))
+assert reduced_result.success
+assert abs(reduced_result.market.get_discount('USD-OIS').df(5.0) - loglinear.df(5.0)) > 1e-6
+assert build_market('foundations').get_discount('USD-OIS').df(5.0) == loglinear.df(5.0)
+print('forward comparisons:', forwards)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.4" block="bootstrap-proof" />
+
+
+### Solve one knot visibly
+
+This annual-pay single-curve example isolates the last DF from known earlier payments. Its algebra is the smallest complete bootstrap step.
+
+{/* notebook-block notebook="01_foundations/market_bootstrap_tour.ipynb" cell="bootstrap-annuity-step" role="build" */}
+```python exec id=bootstrap-annuity-step role=build
+from _shared.analyst_book import build_market
+curve=build_market('foundations').get_discount('USD-OIS')
+annual_dfs=[curve.df(t) for t in range(1,6)]
+# Transparent annual-pay, single-curve teaching swap: no claim of OIS coupon conventions.
+par=(1-annual_dfs[-1])/sum(annual_dfs)
+known_annuity=sum(annual_dfs[:-1])
+solved_df=(1-par*known_annuity)/(1+par)
+assert abs(solved_df-annual_dfs[-1])<1e-12
+print({'annual_pay_par_rate':par,'known_1_to_4y_annuity':known_annuity,'solved_5y_DF':solved_df})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.4" block="bootstrap-annuity-step" />
+
+
+### Build separate FRA and futures projection curves
+
+The canonical dated FRA inputs are rolled consistently to the shared valuation date. The second plan calibrates a futures projection strip with an explicit one-basis-point adjustment; its native residual verifies the supported quote path. Both are standalone calibration experiments and leave the earlier book unchanged.
+
+{/* notebook-block notebook="01_foundations/market_bootstrap_tour.ipynb" cell="projection-curve-quotes" role="build" */}
+```python exec id=projection-curve-quotes role=build
+import json
+from pathlib import Path
+import _shared
+from finstack_quant.calibration import calibrate
+from _shared.analyst_book import AS_OF
+repository=Path(_shared.__file__).resolve().parents[4]
+forward_input=json.loads((repository/'finstack-quant/calibration/examples/market_bootstrap/02_usd_3m_forward_curve.json').read_text())
+from datetime import date
+from finstack_quant.core.dates import Tenor
+anchor=date.fromisoformat(forward_input['plan']['steps'][0]['base_date'])
+for quote in forward_input['market_data']:
+    if quote['type']=='fra':
+        for boundary in ('start','end'):
+            original=date.fromisoformat(quote[boundary]['date'])
+            months=12*(original.year-anchor.year)+original.month-anchor.month
+            quote[boundary]['date']=(AS_OF if months==0 else Tenor.parse(f'{months}M').add_to_date(AS_OF)).isoformat()
+for step in forward_input['plan']['steps']:step['base_date']=AS_OF.isoformat()
+forward_fit=calibrate(json.dumps(forward_input))
+assert forward_fit.success and forward_fit.report.max_residual<1e-7
+forward_curve=forward_fit.market.get_forward('USD-SOFR-3M')
+discount_curve=forward_fit.market.get_discount('USD-OIS')
+# Hull convention, explicitly assumed adjustment of one basis point.
+fra_quote=next(q['rate'] for q in forward_input['market_data'] if q['type']=='fra')
+convexity_adjustment=0.0001
+futures_price=100-100*(fra_quote+convexity_adjustment)
+recovered_forward=(100-futures_price)/100-convexity_adjustment
+assert abs(recovered_forward-fra_quote)<1e-12
+print({'discount_zero_1y':discount_curve.zero(1),'projection_rate_1y':forward_curve.rate(1),'futures_price':futures_price,'explicit_convexity_bp':1,'recovered_forward':recovered_forward})
+
+import copy
+from datetime import timedelta
+from finstack_quant.core.dates import next_imm
+futures_input=copy.deepcopy(forward_input)
+fra_rates=[q['rate'] for q in futures_input['market_data'] if q['type']=='fra'][:3]
+futures_input['market_data']=[q for q in futures_input['market_data'] if q['type']!='fra']
+futures_input['plan']['quote_sets']['sofr_3m_quotes']=[]
+for month,forward in zip((6,9,12),fra_rates):
+    quote={'kind':'rate_quote','type':'futures','id':f'SR3-{month}', 'contract':'CME:SR3',
+           'expiry':(next_imm(date(AS_OF.year,month,1))-timedelta(days=1)).isoformat(),
+           'price':100-100*(forward+convexity_adjustment),'convexity_adjustment':convexity_adjustment}
+    futures_input['market_data'].append(quote)
+    futures_input['plan']['quote_sets']['sofr_3m_quotes'].append(quote['id'])
+futures_fit=calibrate(json.dumps(futures_input))
+assert futures_fit.success and futures_fit.report.max_residual<1e-7
+print({'deposit_swap_discount_plus_futures_projection_residual':futures_fit.report.max_residual,
+       'futures_quotes':[q for q in futures_input['market_data'] if q['type']=='futures']})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.4" block="projection-curve-quotes" />
+
+
+### Inspect forwards and a valuation consequence
+
+Compare short-interval forwards across the same maturity grid. Then replace the calibrated curve by a deliberately simple flat hand curve at its one-year zero rate and reprice the same bond. That PV difference is the cost of the simplifying assumption.
+
+{/* notebook-block notebook="01_foundations/market_bootstrap_tour.ipynb" cell="bootstrap-forward-plots" role="build" */}
+```python exec id=bootstrap-forward-plots role=build
+import json,math
+import matplotlib.pyplot as plt
+from finstack_quant.calibration import calibrate
+from finstack_quant.core.market_data import DiscountCurve
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF,calibration_envelope,build_market,instruments
+fig,ax=plt.subplots(figsize=(8,3.6))
+for mode in ('linear','log_linear'):
+    envelope=calibration_envelope('foundations');envelope['plan']['steps'][0]['interpolation']=mode
+    fit=calibrate(json.dumps(envelope));assert fit.success
+    curve=fit.market.get_discount('USD-OIS')
+    grid=[0.3+i*0.05 for i in range(190)]
+    ax.plot(grid,[100*curve.forward(t,t+0.02) for t in grid],label=mode)
+ax.set(xlabel='Years',ylabel='Short-interval forward (%)');ax.legend();fig.tight_layout()
+market=build_market('foundations');bond=json.dumps(instruments('foundations')['USD-CORP'])
+calibrated_pv=price_instrument(bond,market,AS_OF).price
+hand_rate=market.get_discount('USD-OIS').zero(1)
+market.insert(DiscountCurve.flat('USD-OIS',AS_OF,hand_rate))
+hand_pv=price_instrument(bond,market,AS_OF).price
+assert abs(calibrated_pv-hand_pv)>1
+print({'calibrated_PV':calibrated_pv,'flat_hand_curve_PV':hand_pv,'difference':calibrated_pv-hand_pv})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.4" block="bootstrap-forward-plots" />
+
+
+</BuildIt>
+
+<LabCard notebook="01_foundations/market_data/discount_curves.ipynb" title="Discount Curves" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<LabCard notebook="01_foundations/market_bootstrap_tour.ipynb" title="Market Bootstrap Tour" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<Exercise id="exercise-missing-quote" title="A. Remove one calibration constraint" question={"Remove the 5y swap quote, recalibrate and identify where the solution changes."}>
+
+Inspect DF and forward changes together. The remaining quotes still fit, but the missing constraint permits a different 5y region. A curve can be calibrated successfully and still be unsuitable for a position whose risk sits in that unconstrained segment.
+
+{/* notebook-block notebook="01_foundations/market_bootstrap_tour.ipynb" cell="exercise-missing-quote" role="exercise" */}
+```python exec id=exercise-missing-quote role=exercise
+import json
+from finstack_quant.calibration import calibrate
+from _shared.analyst_book import calibration_envelope
+complete=calibration_envelope('foundations');reduced=calibration_envelope('foundations')
+removed='USD-OIS-SWAP-5Y'
+reduced['market_data']=[q for q in reduced['market_data'] if q['id']!=removed]
+reduced['plan']['quote_sets']['usd_rate_quotes'].remove(removed)
+first,second=[calibrate(json.dumps(x)) for x in (complete,reduced)]
+assert first.success and second.success
+curves=[x.market.get_discount('USD-OIS') for x in (first,second)]
+rows=[{'year':t,'DF_change':curves[1].df(t)-curves[0].df(t),'forward_change_bp':10000*(curves[1].forward(t,t+0.1)-curves[0].forward(t,t+0.1))} for t in (1,2,3,5,7,9)]
+assert abs(rows[3]['DF_change'])>1e-6
+print(rows)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.4" block="exercise-missing-quote" />
+
+</Exercise>
+
+<Exercise id="exercise-zero-interpolation-segment" title="B. Explain the 9y forward response" question={"Under linear-zero interpolation between 5y and 10y, explain how a 4bp 10y zero bump changes the 9y forward."}>
+
+The interpolated 9y zero receives 4/5 of the endpoint move. Its instantaneous forward also includes nine times the slope change. The multiplier is (2×9−5)/5 = 2.6, so the 9y forward rises 10.4bp. This is a conceptual linear-zero calculation, distinct from the native linear-DF comparison above.
+
+{/* notebook-block notebook="01_foundations/market_bootstrap_tour.ipynb" cell="exercise-zero-interpolation-segment" role="exercise" */}
+```python exec id=exercise-zero-interpolation-segment role=exercise
+from _shared.analyst_book import build_market
+curve=build_market('foundations').get_discount('USD-OIS')
+z5,z10=curve.zero(5),curve.zero(10)
+# For linear z(t), instantaneous f(t)=z(t)+t*zprime(t).
+t=9.0;weight=(t-5)/5
+z9=z5+weight*(z10-z5);forward9=z9+t*(z10-z5)/5
+bump=0.0004
+bumped_z9=z5+weight*(z10+bump-z5)
+bumped_forward9=bumped_z9+t*(z10+bump-z5)/5
+assert abs((bumped_forward9-forward9)/bump-(2*t-5)/5)<1e-12
+print({'zero_10y_shock_bp':4,'zero_9y_shock_bp':10000*(bumped_z9-z9),'instantaneous_forward_9y_shock_bp':10000*(bumped_forward9-forward9)})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.4" block="exercise-zero-interpolation-segment" />
+
+</Exercise>
+
+<CheckYourself>
+
+1. **What proves a calibration succeeded economically?** Repricing residuals in stated quote units, not only a solver success flag.
+2. **Why can two fitted curves value an unquoted cashflow differently?** They impose different between-pillar interpolation assumptions.
+3. **Why is a futures quote not always an FRA quote?** Daily margining and stochastic rates create a convexity adjustment whose convention and amount must be supplied.
+4. **Which curve projects a SOFR coupon?** Its designated projection curve; the discount curve handles its payment PV.
+5. **Does a 10y quote bump affect only 10y instruments?** No. Interpolation and calibration dependencies transmit it to other maturities.
+
+</CheckYourself>

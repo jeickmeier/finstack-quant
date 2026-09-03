@@ -1,0 +1,448 @@
+---
+id: "2.6"
+title: "Monte Carlo I: Processes, Paths, and Honest Error Bars"
+description: "Price a European claim from simulated paths, audit uncertainty and path counts, and measure variance reduction before moving to stochastic volatility."
+desk_question: "There is no convenient formula for this payoff. How do we price it, and what does the error bar actually cover?"
+references: ["#glasserman-2004-monte-carlo", "#heston-1993", "#andersen-2008-heston-qe", "#lord-koekkoek-vandijk-2010", "#broadie-kaya-2006-exact-heston", "#salmon-2011-philox", "#box-muller-1958", "#joe-kuo-2008-sobol", "#kahan-1965", "#albrecher-2007-little-heston-trap"]
+api: ["finstack_quant.models.bs_price", "finstack_quant.models.bs_greeks", "finstack_quant.models.monte_carlo.EuropeanPricer", "finstack_quant.models.monte_carlo.LsmcPricer", "finstack_quant.models.monte_carlo.simulate_gbm_paths", "finstack_quant.models.monte_carlo.price_heston_call"]
+status: "published"
+---
+
+<DeskContext question="There is no convenient formula for this payoff. How do we price it, and what does the error bar actually cover?">
+
+A desk receives a payoff that depends on simulated market states. Before extending the payoff, establish that the process has the right mean, the vanilla contract agrees with its analytical benchmark within sampling uncertainty, and the reported sample count means what you think it means. Your deliverable is a reproducible price-and-error sheet with path counts, seeds, a variance-reduction comparison and a separate statement of model limitations.
+
+Use the analytical equity-option conventions from [lesson 2.4](/learn/2.4): decimal annual rates, continuous dividend yield, annual volatility and time in years. These are controlled risk-neutral examples, not forecasts of the equity risk premium.
+
+</DeskContext>
+
+<Standard>
+
+### A price is an expectation; its estimator is random
+
+For constant rate $r$, a payoff $H$ at time $T$ has model price $V=e^{-rT}\mathbb E_Q[H]$. With independent discounted payoffs $Y_i$, estimate
+
+$$
+\widehat V_N=\frac1N\sum_{i=1}^N Y_i,\qquad
+\widehat{\mathrm{SE}}=\frac{s_Y}{\sqrt N}.
+$$
+
+An approximate 95% interval is the estimate plus or minus $1.96\widehat{\mathrm{SE}}$. This uses a central-limit approximation. A single interval need not contain the benchmark, and increasing the sample size need not make that seed's realized error smaller. It does not cover the wrong contract, calibration error, time discretization or numerical overflow. [Glasserman](/references.html#glasserman-2004-monte-carlo) develops these distinctions.
+
+Under risk-neutral GBM,
+
+$$
+S_{t+\Delta}=S_t\exp\left[(r-q-\tfrac12\sigma^2)\Delta+\sigma\sqrt{\Delta}Z\right],\quad Z\sim N(0,1).
+$$
+
+This log step samples GBM exactly at the selected times and preserves positivity. Thus the terminal mean should agree statistically with $S_0e^{(r-q)T}$. The drift in the exponent is not the expected proportional price growth: the variance correction reconciles the two. Exact grid-point sampling still leaves monitoring error for a continuously observed payoff.
+
+### Keep four numerical choices separate
+
+| Choice | What it controls | What it cannot establish |
+| --- | --- | --- |
+| Random-number construction | Philox assigns reproducible streams; Box–Muller maps suitable uniforms to normals | Correct economic assumptions |
+| Path/time grid | Which states are generated or observed | A smaller sampling SE does not fix a coarse exercise grid |
+| Estimator and reduction | Plain means, antithetic pair means, common random numbers; compensated summation reduces accumulation error | A better estimator does not repair payoff bias |
+| Number of independent observations | Sampling precision | The number of generated trajectories can differ from this count |
+
+The [Philox reference](/references.html#salmon-2011-philox), [Box–Muller construction](/references.html#box-muller-1958) and [Kahan summation note](/references.html#kahan-1965) explain those implementation choices. The serial/parallel assertion below establishes replay for this installed build, seed and inputs; it is not a promise of identical bits across every release or platform.
+
+Sobol sequences reduce integration discrepancy for suitable problems; their coordinate ordering and dimension matter. Ordinary IID sample-variance intervals do not automatically apply to a deterministic Sobol sequence. Randomized replicates require an appropriate separate error estimate. This Python workflow uses supported fixed-model pricers and captured GBM paths. It does not expose an injectable `McEngine`, `TimeGrid` or arbitrary scheme object. [Joe–Kuo](/references.html#joe-kuo-2008-sobol) is the low-discrepancy reference.
+
+For antithetics, the independent observation is $(Y(Z)+Y(-Z))/2$. Its variance is $[\operatorname{Var}(Y)+\operatorname{Cov}(Y(Z),Y(-Z))]/2$. Negative covariance can help; positive covariance can waste the second trajectory. Compare equal physical-path budgets and compute standard error from pair means.
+
+A finite-difference Greek divides a difference of noisy prices by the bump. Common random numbers increase covariance between the bumped valuations, reducing the variance of that difference. A very small bump can still amplify rounding, and a large bump creates finite-difference bias.
+
+### Stochastic volatility adds a state and a boundary
+
+Heston replaces constant variance with a CIR process:
+
+$$
+dv_t=\kappa(\theta-v_t)dt+\xi\sqrt{v_t}\,dW_t^v,
+\qquad d\langle W^S,W^v\rangle_t=\rho\,dt.
+$$
+
+The Feller condition $2\kappa\theta\geq\xi^2$ is a sufficient positivity boundary condition, not a requirement for the model to exist. A naive Euler step can become negative even when the continuous variance process cannot. Full-truncation Euler modifies the coefficients around zero; Andersen's QE scheme approximates conditional variance moments while respecting nonnegativity. Neither turns a discretized option estimator into an exact Heston price. Compare step refinement or an independent benchmark when pricing precision matters. [Heston](/references.html#heston-1993), [Andersen](/references.html#andersen-2008-heston-qe) and [Lord–Koekkoek–van Dijk](/references.html#lord-koekkoek-vandijk-2010) provide the model and scheme context.
+
+The Little Heston Trap concerns stable evaluation of characteristic-function formulas; Broadie–Kaya concerns exact simulation under its construction. These are useful independent reference methods, not alternative Python engine parameters silently used below.
+
+</Standard>
+
+<BuildIt>
+
+### 1. Establish an analytical anchor and observe convergence
+
+Start with a dividend-paying call and put and reconcile put–call parity to numerical precision. The convergence experiment then deliberately uses a separate at-the-money, zero-dividend call with analytical value about USD 10.450584 per unit. Read every parameter when moving between the two contracts.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb" cell="mc-bs-anchor" role="build" */}
+```python exec id=mc-bs-anchor role=build
+import math
+from finstack_quant.models import bs_price
+from finstack_quant.models.monte_carlo import EuropeanPricer
+
+S, K, r, q, vol, T = 100.0, 100.0, 0.05, 0.02, 0.25, 1.0
+c = bs_price(S, K, r, q, vol, T, True)
+p = bs_price(S, K, r, q, vol, T, False)
+print(f"BS call: {c:.8f}")
+print(f"BS put:  {p:.8f}")
+
+forward = S * math.exp((r - q) * T)
+parity_lhs = c - p
+parity_rhs = math.exp(-r * T) * (forward - K)
+print(f"Put-call parity LHS (C-P): {parity_lhs:.8f}")
+print(f"Put-call parity RHS:       {parity_rhs:.8f}")
+print(f"Parity residual:           {abs(parity_lhs - parity_rhs):.2e}")
+assert abs(parity_lhs - parity_rhs) < 1e-10
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.6" block="mc-bs-anchor" />
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb" cell="mc-convergence" role="build" */}
+```python exec id=mc-convergence role=build
+from finstack_quant.models import bs_price
+from finstack_quant.models.monte_carlo import EuropeanPricer
+
+S, K, r, q, vol, T = 100.0, 100.0, 0.05, 0.0, 0.20, 1.0
+analytical = bs_price(S, K, r, q, vol, T, True)
+print(f"Analytical ATM call: {analytical:.8f}")
+counts = [1_000, 5_000, 10_000, 50_000, 100_000]
+print("paths | mean | standard error | realized absolute error | SE * sqrt(N)")
+for n in counts:
+    est = EuropeanPricer(num_paths=n, seed=123).price_call(S, K, r, q, vol, T, num_steps=1)
+    print(f"{n:6d} | {est.mean.amount:.8f} | {est.stderr:.8f} | "
+          f"{abs(est.mean.amount - analytical):.8f} | {est.stderr * math.sqrt(n):.8f}")
+    assert est.num_paths == est.num_simulated_paths == n
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.6" block="mc-convergence" />
+
+The last column should be roughly stable because it estimates payoff standard deviation. The realized-error column can look unusually good for one seed: the 100,000-path result is much closer than its SE alone would predict. That is luck within the sampling distribution, not evidence that future cases will achieve the same error.
+
+### 2. Inspect paths and test the risk-neutral mean
+
+The captured path includes the initial state, so twelve steps produce thirteen entries. The terminal-mean tolerance below is four empirical standard errors, not an exact identity. The captured-path API rejects `antithetic=True` with `ValueError`; the rejection is tested visibly rather than assuming the flag works everywhere.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/stochastic_processes.ipynb" cell="mc-process-inputs" role="build" */}
+```python exec id=mc-process-inputs role=build
+from finstack_quant.models import bs_price
+from finstack_quant.models.monte_carlo import (
+    EuropeanPricer,
+    heston_satisfies_feller,
+    simulate_gbm_paths,
+)
+
+gbm_params = dict(rate=0.05, div_yield=0.0, vol=0.20)
+heston_params = dict(
+    rate=0.05,
+    div_yield=0.0,
+    v0=0.04,
+    kappa=2.0,
+    theta=0.04,
+    xi=0.3,
+    rho=-0.7,
+)
+feller_ok = heston_satisfies_feller(heston_params["kappa"], heston_params["theta"], heston_params["xi"])
+print(f"GBM params: {gbm_params}")
+print(f"Heston params: {heston_params}")
+print(f"Heston Feller (2*kappa*theta >= xi^2): {feller_ok}")
+
+pr = EuropeanPricer(num_paths=25_000, seed=42)
+mc_call = pr.price_call(100.0, 100.0, 0.05, 0.0, 0.20, 1.0, num_steps=1)
+bs = bs_price(100.0, 100.0, 0.05, 0.0, 0.20, 1.0, True)
+print(f"EuropeanPricer ATM call: {mc_call.mean.amount:.6f} (stderr={mc_call.stderr:.6f})")
+print(f"Black–Scholes call:      {bs:.6f}")
+
+path_summary = simulate_gbm_paths(
+    spot=100.0,
+    expiry=1.0,
+    num_steps=12,
+    num_paths=3,
+    seed=42,
+    **gbm_params,
+)
+print("Captured GBM path shape:", len(path_summary.paths), "x", len(path_summary.times))
+print("Terminal spots:", [round(path[-1], 4) for path in path_summary.paths])
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.6" block="mc-process-inputs" />
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/stochastic_processes.ipynb" cell="gbm-path-capture" role="build" */}
+```python exec id=gbm-path-capture role=build
+import math
+import statistics
+
+try:
+    simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 12, 16, seed=17, antithetic=True)
+except ValueError as error:
+    assert "antithetic" in str(error)
+    print("Antithetic capture rejected:", error)
+else:
+    raise AssertionError("Captured paths must reject an unsupported antithetic request")
+
+captured = simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 12, 4096, seed=17)
+terminal_spots = [path[-1] for path in captured.paths]
+forward = 100 * math.exp(0.05)
+mean_terminal = statistics.mean(terminal_spots)
+terminal_se = statistics.stdev(terminal_spots) / math.sqrt(captured.num_paths)
+assert captured.num_paths == captured.num_simulated_paths == len(captured.paths)
+assert abs(mean_terminal - forward) < 4 * terminal_se
+print(f"Terminal mean={mean_terminal:.6f}; forward={forward:.6f}; SE={terminal_se:.6f}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.6" block="gbm-path-capture" />
+
+### 3. Audit replay and count independent observations
+
+The following tuple compares price, SE, interval endpoints and both path counts. Then a one-step, maturity-only LSMC configuration isolates a European payoff and reconciles the native antithetic estimate to manually formed pairs. There is no intermediate exercise decision in that one-step experiment.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb" cell="mc-parallel-replay" role="build" */}
+```python exec id=mc-parallel-replay role=build
+estimates = [
+    EuropeanPricer(num_paths=4096, seed=17, use_parallel=parallel).price_call(
+        100.0, 100.0, 0.05, 0.0, 0.20, 1.0, num_steps=1
+    )
+    for parallel in (False, True, False)
+]
+signatures = [
+    (e.mean.amount, e.stderr, e.ci_lower.amount, e.ci_upper.amount,
+     e.num_paths, e.num_simulated_paths)
+    for e in estimates
+]
+assert signatures[0] == signatures[1] == signatures[2]
+print("Serial = parallel = seeded replay:", signatures[0])
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.6" block="mc-parallel-replay" />
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo_simulation.ipynb" cell="antithetic-pair-arithmetic" role="build" */}
+```python exec id=antithetic-pair-arithmetic role=build
+from finstack_quant.models.monte_carlo import LsmcPricer
+import statistics
+from finstack_quant.models.monte_carlo import simulate_gbm_paths
+
+pairs = 2048
+seed = 17
+discount = math.exp(-0.05)
+captured = simulate_gbm_paths(100, 0.05, 0.0, 0.20, 1.0, 1, 2 * pairs, seed=seed)
+terminals = [path[-1] for path in captured.paths]
+plain_payoffs = [discount * max(100 - terminal, 0) for terminal in terminals]
+reflection_product = (100 * math.exp(0.05 - 0.5 * 0.20**2)) ** 2
+pair_payoffs = [
+    0.5 * (plain_payoffs[i] + discount * max(100 - reflection_product / terminal, 0))
+    for i, terminal in enumerate(terminals[:pairs])
+]
+print("method | estimators | simulated paths | mean | reported SE | manually calculated SE")
+results = []
+for antithetic, count, payoffs in [(True, pairs, pair_payoffs), (False, 2 * pairs, plain_payoffs)]:
+    estimate = LsmcPricer(count, seed, False, 1, antithetic=antithetic).price_american_put(
+        100, 100, 0.05, 0, 0.20, 1.0
+    )
+    manual_mean = statistics.mean(payoffs)
+    manual_se = statistics.stdev(payoffs) / math.sqrt(count)
+    assert math.isclose(estimate.mean.amount, manual_mean, abs_tol=1e-12)
+    assert math.isclose(estimate.stderr, manual_se, abs_tol=1e-12)
+    assert estimate.num_paths == count and estimate.num_simulated_paths == 2 * pairs
+    print(f"{'antithetic' if antithetic else 'plain':10s} | {count:10d} | "
+          f"{estimate.num_simulated_paths:15d} | {manual_mean:.6f} | "
+          f"{estimate.stderr:.6f} | {manual_se:.6f}")
+    results.append(estimate)
+print(f"Equal-path-budget variance ratio (plain/paired): {(results[1].stderr/results[0].stderr)**2:.4f}")
+assert results[0].stderr < results[1].stderr  # This fixed monotone payoff, not a universal guarantee.
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.6" block="antithetic-pair-arithmetic" />
+
+Record both `num_paths` and `num_simulated_paths`: in this antithetic LSMC case, $N$ means $N$ independent pairs and $2N$ generated trajectories. The matched plain estimate uses $2N$ observations. A lower reported SE at an unmatched computational budget would not establish an efficiency gain.
+
+### 4. Measure a Greek variance reduction, then change the model
+
+The delta and gamma experiment uses the same bump and sample budget for plain and CRN estimates. It asserts the observed SE reduction for this fixture and checks CRN delta against analytical delta within four SE plus a small finite-difference allowance. The gain is measured here; it is not guaranteed for every payoff.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb" cell="mc-crn-greeks" role="build" */}
+```python exec id=mc-crn-greeks role=build
+from finstack_quant.models.monte_carlo import (
+    finite_diff_delta,
+    finite_diff_delta_crn,
+    finite_diff_gamma,
+    finite_diff_gamma_crn,
+)
+
+kw = dict(
+    spot=100.0,
+    strike=100.0,
+    rate=0.05,
+    div_yield=0.0,
+    vol=0.20,
+    expiry=1.0,
+    num_paths=40_000,
+    seed=7,
+    is_call=True,
+)
+d_est = finite_diff_delta(**kw); d, d_se = d_est.mean, d_est.stderr
+dc_est = finite_diff_delta_crn(**kw); dc, dc_se = dc_est.mean, dc_est.stderr
+g_est = finite_diff_gamma(**kw); g, g_se = g_est.mean, g_est.stderr
+gc_est = finite_diff_gamma_crn(**kw); gc, gc_se = gc_est.mean, gc_est.stderr
+print(f"delta      = {d:.5f}  (stderr={d_se:.5f})")
+print(f"delta_crn  = {dc:.5f}  (stderr={dc_se:.5f})  <- CRN cuts the stderr sharply")
+print(f"gamma      = {g:.5f}  (stderr={g_se:.5f})")
+print(f"gamma_crn  = {gc:.5f}  (stderr={gc_se:.5f})")
+from finstack_quant.models import bs_greeks
+exact_delta = bs_greeks(100, 100, 0.05, 0, 0.2, 1, True).delta
+assert dc_se < d_se and gc_se < g_se
+assert abs(dc - exact_delta) < 4 * dc_se + 1e-4
+print(f"CRN delta SE ratio: {dc_se / d_se:.6f}; analytic delta: {exact_delta:.8f}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.6" block="mc-crn-greeks" />
+
+The Heston calculation uses $v_0=\theta=0.04$, $\kappa=2$, $\xi=0.3$ and $\rho=-0.7$. Its positive price and finite sampling error establish an executable QE workflow, not convergence to a closed-form Heston benchmark. Keep the Feller check and the interpretation of its failure next to the model inputs.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/stochastic_processes.ipynb" cell="heston-qe-pricing" role="build" */}
+```python exec id=heston-qe-pricing role=build
+from finstack_quant.models.monte_carlo import price_heston_call, price_heston_put
+
+hc = price_heston_call(
+    spot=100.0,
+    strike=100.0,
+    rate=0.05,
+    div_yield=0.0,
+    kappa=2.0,
+    theta=0.04,
+    vol_of_vol=0.30,
+    rho=-0.70,
+    v0=0.04,
+    expiry=1.0,
+    num_paths=20_000,
+    seed=42,
+)
+hp = price_heston_put(
+    spot=100.0,
+    strike=100.0,
+    rate=0.05,
+    div_yield=0.0,
+    kappa=2.0,
+    theta=0.04,
+    vol_of_vol=0.30,
+    rho=-0.70,
+    v0=0.04,
+    expiry=1.0,
+    num_paths=20_000,
+    seed=42,
+)
+print(f"Heston call: {hc.mean} (stderr={hc.stderr:.4f})")
+print(f"Heston put:  {hp.mean} (stderr={hp.stderr:.4f})")
+assert hc.stderr > 0 and hp.stderr > 0 and hc.mean.amount > 0 and hp.mean.amount > 0
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.6" block="heston-qe-pricing" />
+
+<LabCard notebook="07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb" title="European benchmarks and variance reduction" description="Reproduce the convergence table, paired estimator arithmetic and CRN Greeks." />
+<LabCard notebook="07_advanced_quant/monte_carlo/stochastic_processes.ipynb" title="GBM and Heston processes" description="Inspect captured paths and the variance boundary." />
+<LabCard notebook="07_advanced_quant/monte_carlo/discretization_schemes.ipynb" title="Discretization and honest error scaling" description="Keep sampling uncertainty separate from process and monitoring approximations." />
+
+</BuildIt>
+
+<Exercise title="1. What does quadrupling paths buy?" question="Use 16 independent seeds at N and 4N. Compare average reported SE and root-mean-square error against Black–Scholes. Explain why one seed cannot verify a promise to halve absolute error.">
+
+For the same payoff variance, SE scales as $N^{-1/2}$, so its population ratio is one half. The finite seed panel tests the average SE ratio within a deliberately broad interval. RMSE is an additional empirical diagnostic and remains noisy with only sixteen seeds. We do not assert monotone realized absolute error for each seed.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/discretization_schemes.ipynb" cell="mc-error-scaling" role="exercise" */}
+```python exec id=mc-error-scaling role=exercise
+import math
+import statistics
+
+reference = bs_price(100, 100, 0.05, 0.0, 0.2, 1.0, True)
+scaling = []
+for count in (1024, 4096):
+    runs = [EuropeanPricer(count, seed, False).price_call(
+        100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=1
+    ) for seed in range(16)]
+    average_se = statistics.mean(run.stderr for run in runs)
+    rmse = math.sqrt(statistics.mean((run.mean.amount - reference) ** 2 for run in runs))
+    scaling.append((average_se, rmse))
+    print(f"N={count}: average SE={average_se:.6f}, independent-seed RMSE={rmse:.6f}")
+se_ratio = scaling[1][0] / scaling[0][0]
+print(f"SE(4N)/SE(N)={se_ratio:.4f}; theoretical scale=0.5")
+print(f"Observed RMSE ratio={scaling[1][1] / scaling[0][1]:.4f}")
+# A broad sampling diagnostic on this fixed seed panel, not a pathwise identity.
+assert 0.4 < se_ratio < 0.65
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.6" block="mc-error-scaling" />
+
+A production precision decision should state a target SE or confidence interval and its assumptions, then check bias independently. Increasing paths fourfold addresses only the sampling part of that decision.
+
+</Exercise>
+
+<Exercise title="2. Break Feller without declaring the model invalid" question="Set kappa=1, theta=0.04 and vol-of-vol=0.7. Show one negative naive Euler variance step, run the supported Heston pricer and explain both outcomes.">
+
+Here $2\kappa\theta=0.08$ and $\xi^2=0.49$. The inequality fails. With the displayed step and shock, naive Euler gives negative variance; the native QE calculation still produces a valid nonnegative-state approximation. Neither successful execution nor a positive option price proves small discretization bias near the boundary.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/stochastic_processes.ipynb" cell="heston-feller-boundary" role="exercise" */}
+```python exec id=heston-feller-boundary role=exercise
+from finstack_quant.models.monte_carlo import heston_satisfies_feller, price_heston_call
+
+kappa, theta, xi, initial_variance = 1.0, 0.04, 0.7, 0.04
+assert 2 * kappa * theta < xi * xi
+assert not heston_satisfies_feller(kappa, theta, xi)
+# A single displayed Euler update can cross zero; the CIR process itself does not.
+euler_variance = initial_variance + kappa * (theta-initial_variance) * 0.25 + xi * initial_variance**0.5 * 0.25**0.5 * -2
+assert euler_variance < 0
+outside_feller = price_heston_call(spot=100, strike=100, rate=0.05, div_yield=0,
+    kappa=kappa, theta=theta, vol_of_vol=xi, rho=-0.7, v0=initial_variance,
+    expiry=1, num_paths=8192, seed=17)
+assert outside_feller.mean.amount > 0 and outside_feller.stderr > 0
+print(f"2*kappa*theta={2*kappa*theta:.3f}; xi^2={xi**2:.3f}; Euler update={euler_variance:.3f}")
+print(f"Native Heston QE call={outside_feller.mean.amount:.6f}; SE={outside_feller.stderr:.6f}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.6" block="heston-feller-boundary" />
+
+</Exercise>
+
+<Exercise title="3. An antithetic pair that adds no information" question="Use the symmetric payoff g(Z)=Z squared. Compare plain and antithetic standard errors at an equal 8,192-trajectory budget.">
+
+Because $g(Z)=g(-Z)$, the two payoffs are identical. Pairing 8,192 trajectories yields only 4,096 independent observations, whereas plain sampling yields 8,192. The population SE ratio is $\sqrt2$ in favor of plain sampling. This payoff is a diagnostic of estimator design, not an equity-option contract.
+
+{/* notebook-block notebook="07_advanced_quant/monte_carlo/discretization_schemes.ipynb" cell="antithetic-even-payoff" role="exercise" */}
+```python exec id=antithetic-even-payoff role=exercise
+import numpy as np
+from finstack_quant.models.monte_carlo import simulate_gbm_paths
+
+sample = simulate_gbm_paths(100, 0.05, 0, 0.2, 1, 1, 8192, seed=23)
+terminal = np.asarray(sample.paths)[:, -1]
+z = (np.log(terminal / 100) - (0.05 - 0.5 * 0.2**2)) / 0.2
+# g(z)=z^2 is unchanged under z -> -z. Two reflected trajectories yield only one observation.
+plain_payoffs = z**2
+pair_means = (z[:4096]**2 + (-z[:4096])**2) / 2
+assert np.array_equal(pair_means, z[:4096]**2)
+plain_se = plain_payoffs.std(ddof=1) / np.sqrt(8192)
+paired_se = pair_means.std(ddof=1) / np.sqrt(4096)
+assert paired_se > plain_se
+print(f"Same 8192 raw-path budget: plain SE={plain_se:.5f}, paired SE={paired_se:.5f}")
+print(f"Observed ratio={paired_se/plain_se:.3f}; population prediction=sqrt(2)")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.6" block="antithetic-even-payoff" />
+
+</Exercise>
+
+<CheckYourself>
+
+Before quoting a Monte Carlo number, state the measure and drift, payoff observations, independent sample count, physical path count, seed and SE. Identify which errors the interval excludes. Explain why a repeatable answer can still be wrong, why an even payoff defeats antithetics, and why a violated Feller inequality calls for scheme scrutiny rather than automatic rejection of Heston.
+
+The required submission is the convergence table, matched-budget variance comparison, CRN Greek check and the three completed diagnostics above. Learner completion time has not been measured.
+
+</CheckYourself>

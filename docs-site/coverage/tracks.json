@@ -1,0 +1,1073 @@
+[
+  {
+    "lesson_id": "C1",
+    "scope": "Full original concepts and all original exercise groups, using the approved supported APIs and explicit scoped replacements.",
+    "concepts": [
+      "Contractual cash/PIK split, step-up and original-face amortization; typed/envelope construction and fixed-to-floating windows",
+      "Principal conservation and WAL across bullet, linear, sinking and custom schedules",
+      "Callable versus straight cashflows, quote-conditioned YTM/YTW/OAS and make-whole protection",
+      "Merton fixed-bullet toggle frequency, consistent issuer money units and amortizing-domain rejection"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "complex-bond-pricing",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "pik-cash-ladder",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "complex-bond-yield-oas",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-fixed-float",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-amortization",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-toggle",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-exercise-contract",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "a",
+        "original_requirement": "Reconstruct full 8NC3 bond from JSON and price/YTM/YTW/OAS",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-exercise-make-whole",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "b",
+        "original_requirement": "Replace fixed-price call with make-whole and quantify protection",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-exercise-toggle",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "c",
+        "original_requirement": "Compare issuer PIK-toggle states and enforce supported fixed-bullet model domain",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:02Z",
+    "authoring_start_precision": "Observed shared authoring-batch start; overlapping lessons, not separately measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:40:49.964289+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "C2",
+    "scope": "Full original concepts and all original exercise groups, using the approved supported APIs and explicit scoped replacements.",
+    "concepts": [
+      "Term-loan floors, OID/upfront fees, EIR, yield-to-call/worst and discount margin",
+      "Dated covenant step-ups and PIK events; seasoned floating-PIK limitation",
+      "Delayed funding, undrawn/facility fees and deterministic draw schedules",
+      "Observed utilization versus default-conditional EAD; correlated Bernoulli wrong-way risk and seeded native stochastic revolver",
+      "Loan/revolver credit-curve sensitivity and fee break-even"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "revolver-observed-state",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "conditional-ead-proof",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "stochastic-revolver-proof",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-loan-economics",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-covenant-events",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-ddtl",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-draw-schedule",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-exercise-floor",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "a",
+        "original_requirement": "Price floored versus unfloored loan in negative forwards",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-exercise-fee",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "b",
+        "original_requirement": "Find commitment-fee versus facility-fee break-even utilization",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-exercise-credit-risk",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "c",
+        "original_requirement": "Attach credit curves and compare loan/revolver credit risk",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:02Z",
+    "authoring_start_precision": "Observed shared authoring-batch start; overlapping lessons, not separately measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:40:49.964289+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "C3",
+    "scope": "Full original concepts and all original exercise groups, using the approved supported APIs and explicit scoped replacements.",
+    "concepts": [
+      "Positive PoolAssets, collateral balance identity, floating WAS/rating WARF and principal WAL",
+      "CLO/ABS/CMBS/RMBS presets, payment calendars, explicit standard-equivalent fees and active pool reinvestment",
+      "One-quarter waterfall cash/PV reconciliation and default-driven OC diversion isolated from losses",
+      "ABS step-down, excess-spread reserve, PSA/prepayment01; CMBS lockout, balloon and servicing fees",
+      "BBB quote 96.5, z-spread, first-writedown CDR and CPR/CDR/severity price grid",
+      "Separate actual BBB holding and native-plus-BBB reporting; funded enhancement and RMBS shifting interest"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-1",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-2",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-3",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-pool-models",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-fees-reinvestment",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-4",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-oc-default",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-abs-cmbs",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-quote-breakeven",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-5",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-7",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-6",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-exercise-equity",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "a",
+        "original_requirement": "Equity-tranche IRR under a scenario grid and identify capital failure; exact supported one-payment reference, explicitly distinguished from five-year risk grid",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-exercise-enhancement",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "b",
+        "original_requirement": "Quantify BBB protection from funded subordination versus excess-spread target",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-exercise-rmbs",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "c",
+        "original_requirement": "Quantify RMBS shifting-interest allocation effect on senior WAL",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:02Z",
+    "authoring_start_precision": "Observed shared authoring-batch start; overlapping lessons, not separately measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:40:49.964289+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "C4",
+    "scope": "Full original concepts and all original exercise groups, using the approved supported APIs and explicit scoped replacements.",
+    "concepts": [
+      "Series/version/coupon/factor, calibrated single-curve and constituent pricing, default settlement",
+      "Index option payer/receiver, forward annuity, knockout versus front-end protection and realized index loss",
+      "Credit vol/strike units, model-implied volatility diagnostic and fully qualified quote-space CS01 replay",
+      "Synthetic-tranche base correlation and index quote-direction delta",
+      "CLO/index risk-coordinate basis and joint default/recovery/index stress residual"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-1",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-2",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-3",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-4",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-constituents",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-option-risk",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-5",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-tranche-delta",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-6",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-exercise-hedge",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "a",
+        "original_requirement": "Hedge BBB spread exposure with index and reprice remaining joint-stress basis",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-exercise-stressed-strike",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "b",
+        "original_requirement": "Choose payer strike at stressed spread, compare cost and protection",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-exercise-default",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "c",
+        "original_requirement": "Account for constituent default, factor and front-end settlement without double count",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:02Z",
+    "authoring_start_precision": "Observed shared authoring-batch start; overlapping lessons, not separately measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:40:49.964289+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "C5",
+    "scope": "Full original concepts and all original exercise groups, using the approved supported APIs and explicit scoped replacements.",
+    "concepts": [
+      "Typed convertible contract, conversion value/parity/premium units and three equity regimes",
+      "Zero-recovery risky discount-curve debt floor and independent analytical maturity-only limit",
+      "Supported tree scope, soft-call k-of-n approximation and unexposed refinement/PDE limits",
+      "Position delta shares, conversion01/dividend01 units, static hedge and credit stress",
+      "Realized weighted-average/full-ratchet anti-dilution event accounting"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "convertible-setup",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "convertible-regime-proof",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "convertible-floor-proof",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "convertible-analytical-limit-proof",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "convertible-delta-hedge",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-typed-contract",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-soft-call",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-quoted-premium",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-exercise-hedge",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "a",
+        "original_requirement": "Size delta-neutral convertible equity hedge and nonlinear PnL",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-exercise-credit",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "b",
+        "original_requirement": "Widen credit across debt/ATM/equity regimes",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-exercise-antidilution",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "c",
+        "original_requirement": "Compare realized weighted-average versus full-ratchet anti-dilution",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:02Z",
+    "authoring_start_precision": "Observed shared authoring-batch start; overlapping lessons, not separately measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:40:49.964289+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "V1",
+    "scope": "Full original concepts and all original exercise groups, using the approved supported APIs and explicit scoped replacements.",
+    "concepts": [
+      "Listed future contract count/multiplier/tick, delivery basket CTD and Treasury/OIS basis",
+      "Exchange variation cash, rate-future convexity and IMM/expiry conventions",
+      "Equity/FX futures carry and matched Black76/BSM European equivalence",
+      "American listed option versus unbiased held-out LSMC benchmark",
+      "Native hedge sizing, roll quote/mark/cash distinction, exchange IM qualitative scope versus OTC SIMM/schedule"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-1",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-2",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-3",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-4",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-5",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-6",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-rates-convexity",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-equity-fx-carry",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-black76-carry",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-exercise-hedge",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "a",
+        "original_requirement": "Size bond-future hedge against actual USD OIS 10y exposure and disclose basis",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-exercise-american",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "b",
+        "original_requirement": "Benchmark American listed option with held-out native LSMC under matched drift",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-exercise-roll",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "c",
+        "original_requirement": "Reconcile futures roll quote versus mark and cash",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:02Z",
+    "authoring_start_precision": "Observed shared authoring-batch start; overlapping lessons, not separately measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:40:49.964289+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "V2",
+    "scope": "Full original concepts and all original exercise groups, using the approved supported APIs and explicit scoped replacements.",
+    "concepts": [
+      "Variance notional versus vega notional and variance/volatility convexity",
+      "Discrete log-contract option-strip replication and missing-put-wing bias",
+      "Seasoned realized/implied variance blend and matched variance vega units",
+      "OHLC estimators, overnight gaps and annualization",
+      "VIX index-point futures/options and curve roll; FX variance with domestic/foreign curve roles"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-1",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-2",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-3",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-4",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-overnight-gaps",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-seasoned",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-6",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-vol-convexity",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-5",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-term-structure",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-exercise-notional",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "a",
+        "original_requirement": "Convert variance notional to vega units and explain nonlinear payoff",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-exercise-put-wing",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "b",
+        "original_requirement": "Remove low-strike puts and measure variance-strike bias",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-exercise-fx",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "c",
+        "original_requirement": "Price FX variance with both domestic and foreign discount roles",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:02Z",
+    "authoring_start_precision": "Observed shared authoring-batch start; overlapping lessons, not separately measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:40:49.964289+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "V3",
+    "scope": "Full original concepts and all original exercise groups, using the approved supported APIs and explicit scoped replacements.",
+    "concepts": [
+      "Commodity PriceCurve delivery units, backwardation/contango/seasonality and net convenience yield",
+      "Eight supported native commodity envelopes, listed future-option Black76 identity, per-settlement swaption annuity identity, and matched Asian-versus-vanilla averaging",
+      "Kirk correlation risk, paired Monte Carlo reference and resolved approximation error",
+      "Supported single-commodity Schwartz-Smith defaults, short/long loading and actual commodity scenario repricing",
+      "Seasonal calendar spread and gallon/barrel 3:2:1 refinery hedge sizing"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-1",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-2",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-3",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-4",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-6",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-carry-asian",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-complete-eight-envelopes",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-5",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-factor-stress",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-exercise-calendar",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "a",
+        "original_requirement": "Price calendar spread against curve seasonality",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-exercise-crack",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "b",
+        "original_requirement": "Sketch unit-consistent 3:2:1 crack-spread hedge",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-exercise-kirk",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "c",
+        "original_requirement": "Resolve Kirk approximation error against matching Monte Carlo near effective-denominator/high-correlation limits",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:02Z",
+    "authoring_start_precision": "Observed shared authoring-batch start; overlapping lessons, not separately measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:40:49.964289+00:00",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "capstone",
+    "scope": "Full original concepts and all original exercise groups, using the approved supported APIs and explicit scoped replacements.",
+    "concepts": [
+      "Eight-stage deliverables, correctness/judgment rubric and independent common-book track extensions",
+      "Individual/portfolio pricing and current FX reconciliation, separate actual BBB ownership, and independent BSM valuation of the actual equity call",
+      "Strict supported sensitivity risk with physical-future theta and IR-subcurve limitations explicit",
+      "Full repricing under 504 seeded eight-factor scenarios, native versus independent VaR/ES, 500-resample uncertainty and factor covariance plus nonlinear-residual reconciliation",
+      "Fresh native and BBB composed stress/date repricing with exact subtotal/PnL identities; separate fixed-date replay of a synthetic historical observation pattern",
+      "Actual eligible IRS schedule/SIMM and below-MTA VM; no exchange or all-risk-class margin claim",
+      "Quarterly base/downside borrower covenants and amortizing physical ECL, separate from market PV",
+      "Three weekly actual no-flow periods with FX, variance realized observations and futures VM wealth identity; Carino active-return reconciliation",
+      "Credit stressed waterfall and first-writedown CDR, conditional revolver draw model and convertible regime diagnostics",
+      "Volatility fixed-option-inventory replication PnL with visible residual, actual realized/implied variance attribution and CTD/gross-basis report",
+      "Actual HTML reporting of valuation, sensitivity, tail/factor risk, stress, margin, covenants, ECL and performance; independent eight-stage acceptance exercises"
+    ],
+    "build_workflows": [
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-imports",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-market-setup",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-pricing-reconciliation",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-direct-pricing",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-independent-analytical",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-risk-coverage",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-risk-factor-tail",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-stress-repricing",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-historical-replay",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-track-diagnostics",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-margin-vm-schedule",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-margin-simm-source-reuse",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-borrower-credit-proof",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-quarterly-covenants",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-physical-ecl",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-dated-repricing",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-attribution-linking-proof",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-reporting-proof",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-reference-snapshot",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-imports",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-market-setup",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-pricing-reconciliation",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-direct-pricing",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-independent-analytical",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-risk-coverage",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-risk-factor-tail",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-stress-repricing",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-historical-replay",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-option-strip-pnl",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-ctd-basis",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-margin-vm-schedule",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-margin-simm-source-reuse",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-borrower-credit-proof",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-quarterly-covenants",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-physical-ecl",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-dated-repricing",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-realized-implied-attribution",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-attribution-linking-proof",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-reporting-proof",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-reference-snapshot",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-acceptance",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "a",
+        "original_requirement": "Execute all eight credit-variant correctness gates and interpret rubric limitations",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-acceptance",
+        "role": "exercise",
+        "status": "proven",
+        "original_group": "b",
+        "original_requirement": "Execute all eight volatility-variant correctness gates and interpret rubric limitations",
+        "solution_and_assertions": "Complete visible notebook solution, independent fresh displayed build baseline, executed financial assertions and interpretation in the lesson."
+      }
+    ],
+    "authoring_started_utc": "2026-09-03T03:50:02Z",
+    "authoring_start_precision": "Observed shared authoring-batch start; overlapping lessons, not separately measured active labour.",
+    "authoring_finished_utc": "2026-09-03T04:43:24.554469+00:00",
+    "learner_completion_time": "unmeasured"
+  }
+]

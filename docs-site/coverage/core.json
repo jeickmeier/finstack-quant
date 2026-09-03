@@ -1,0 +1,695 @@
+[
+  {
+    "lesson_id": "1.1",
+    "scope": "Full original per-lesson plan and companion syllabus; no optional cuts.",
+    "concepts": [
+      "Three-cent NAV reconciliation; monetary amounts versus analytical values.",
+      "IEEE-754 versus decimal arithmetic; ISO currency digits and banker rounding.",
+      "Same-currency enforcement; Rate, Bps and Percentage representations.",
+      "FX market pair, pips, inverse, triangulation and conversion policy.",
+      "Rounding and tolerance stamps, deterministic financial replay, independent staged snapshots."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "01_foundations/core_types_and_money.ipynb",
+        "cell_id": "money-proof",
+        "status": "proven",
+        "coverage": "Decimal Money, ValueError mismatch, FX cross/inverse/pip, config/result stamps and four-position foundation book."
+      },
+      {
+        "notebook": "01_foundations/core_types_and_money.ipynb",
+        "cell_id": "money-units-rounding",
+        "status": "proven",
+        "coverage": "Rate/Bps/Percentage conversions, currency decimals, accumulation and rounding examples."
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Triangulate EURJPY from EURUSD and USDJPY and assert pip size.",
+        "planned_notebook": "01_foundations/core_types_and_money.ipynb",
+        "planned_cell_id": "exercise-fx-triangulation",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Compute cross and inverse with native FxMatrix; assert 162 JPY/EUR and 0.01 JPY pip for the pinned quotes."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Demonstrate a float accumulation error and fix it with Money.",
+        "planned_notebook": "01_foundations/core_types_and_money.ipynb",
+        "planned_cell_id": "exercise-money-accumulation",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Accumulate the same decimal cashflow sequence with binary float and Money; assert exact Decimal total and show the float residual."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Extend the book with a GBP cash balance and re-render.",
+        "planned_notebook": "01_foundations/core_types_and_money.ipynb",
+        "planned_cell_id": "exercise-gbp-cash-extension",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Extend a fresh PortfolioSpec with a dated GBP deposit, GBP discount data and GBPUSD quote; assert five holdings, currency conversion and unchanged original snapshot."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "Mismatch raises public ValueError, not FinstackError.",
+      "Money stores decimal amounts; current native pricing records f64. FinstackConfig cannot be passed where MetricPricingOverrides is expected.",
+      "Compare financial outputs; execution timestamps differ. Serial/parallel seeded MC comparison is demonstrated in 2.6."
+    ],
+    "authoring_started_utc": "2026-09-03T03:49:51Z",
+    "authoring_finished_utc": "2026-09-03T04:13:42Z",
+    "learner_completion_time": "unmeasured",
+    "initial_authoring_finished_utc": "2026-09-03T03:58:00Z"
+  },
+  {
+    "lesson_id": "1.2",
+    "scope": "Full original per-lesson plan and companion syllabus; no optional cuts.",
+    "concepts": [
+      "Business days, holidays and Following/Modified Following/Preceding.",
+      "ACT/360, ACT/365F, 30/360 variants, ACT/ACT ISDA and ICMA reference periods.",
+      "Tenors, end-of-month rolls, short/long front/back stubs.",
+      "Futures IMM, CDS quarterly dates, option expiries, settlement conventions."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "01_foundations/dates/schedule_building.ipynb",
+        "cell_id": "date-proof",
+        "status": "proven",
+        "coverage": "Four hand-checked accrual fractions, Modified Following month crossing, short-front/long-back schedules, IMM/CDS/third Friday."
+      },
+      {
+        "notebook": "01_foundations/dates/schedule_building.ipynb",
+        "cell_id": "date-reference-periods",
+        "status": "proven",
+        "coverage": "30/360 variants, ISDA leap-year split, ICMA reference-period context, EOM and calendar comparison."
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Find the ACT/360 versus 30/360 accrual difference on the USD bond coupon.",
+        "planned_notebook": "01_foundations/dates/schedule_building.ipynb",
+        "planned_cell_id": "exercise-coupon-day-count",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Use shared USD bond notional/rate and the same period; compute currency coupon difference and assert the hand-computed amount."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Build a semiannual schedule with a long back stub and explain the last period.",
+        "planned_notebook": "01_foundations/dates/schedule_building.ipynb",
+        "planned_cell_id": "exercise-long-back-stub",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Use Schedule.builder; assert final dates and longer final accrual, explain the effect on coupon amount."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "List 2026 CDS roll dates.",
+        "planned_notebook": "01_foundations/dates/schedule_building.ipynb",
+        "planned_cell_id": "exercise-cds-roll-dates",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Generate the quarterly twentieth dates and assert the full sequence, contrasting futures third Wednesdays."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "Schedule.builder is the supported fluent entry point.",
+      "ICMA needs a reference coupon period; it is not interchangeable with ACT/ACT ISDA."
+    ],
+    "authoring_started_utc": "2026-09-03T03:49:51Z",
+    "authoring_finished_utc": "2026-09-03T04:13:42Z",
+    "learner_completion_time": "unmeasured",
+    "initial_authoring_finished_utc": "2026-09-03T03:58:00Z"
+  },
+  {
+    "lesson_id": "1.3",
+    "scope": "Full original per-lesson plan and companion syllabus; no optional cuts.",
+    "concepts": [
+      "Simple, annual, semiannual and continuous compounding; basis conversions.",
+      "DF, zero, interval forward and instantaneous forward relations.",
+      "Dated cashflow present value and sign/timing conventions.",
+      "SOFR/ESTR/SONIA/TONA overnight compounding and fixing calendars.",
+      "Separate discounting and projection roles."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "01_foundations/market_data/discount_curves.ipynb",
+        "cell_id": "discount-proof",
+        "status": "proven",
+        "coverage": "Four 5% convention PVs on 100m, curve identities and manual native bond cashflow PV reconciliation."
+      },
+      {
+        "notebook": "01_foundations/market_data/discount_curves.ipynb",
+        "cell_id": "overnight-proof",
+        "status": "proven",
+        "coverage": "Historical shared SOFR fixings, native compounded-in-arrears coupon and explicit weekend-weight product."
+      },
+      {
+        "notebook": "01_foundations/market_data/discount_curves.ipynb",
+        "cell_id": "rate-basis-conversions",
+        "status": "proven",
+        "coverage": "Convert numerical rate representations at equal DF and illustrate interval versus instantaneous forward."
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Prove the forward-rate no-arbitrage identity numerically.",
+        "planned_notebook": "01_foundations/market_data/discount_curves.ipynb",
+        "planned_cell_id": "exercise-forward-identity",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Reconstruct DF(t2) from DF(t1) and the interval forward; assert numerical closure."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Reprice a cashflow when the curve steepens.",
+        "planned_notebook": "01_foundations/market_data/discount_curves.ipynb",
+        "planned_cell_id": "exercise-curve-steepening",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Create a fresh curve with an explicitly increasing tenor shock; reprice the same cashflow and explain timing exposure, asserting baseline preservation."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "Foundation market contains actual FIXING:USD-SOFR observations.",
+      "Overnight weekend observations carry their calendar-day weights.",
+      "Manual arithmetic stays visible; no shared helper performs hidden finance."
+    ],
+    "authoring_started_utc": "2026-09-03T03:49:51Z",
+    "authoring_finished_utc": "2026-09-03T04:13:42Z",
+    "learner_completion_time": "unmeasured",
+    "initial_authoring_finished_utc": "2026-09-03T03:58:00Z"
+  },
+  {
+    "lesson_id": "1.4",
+    "scope": "Full original per-lesson plan and companion syllabus; no optional cuts.",
+    "concepts": [
+      "Deposits, futures/FRA and swaps as calibration instruments.",
+      "Sequential bootstrap root finding and one-knot swap annuity algebra.",
+      "Linear DF, linear-zero conceptual comparison, log-linear DF and monotone-convex interpolation.",
+      "Between-pillar forwards and local/global curve risk effects.",
+      "OIS discounting and separate projection curves after the multi-curve transition."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "cell_id": "bootstrap-proof",
+        "status": "proven",
+        "coverage": "Canonical deposit/IRS strip, repricing residual, linear/log_linear forward comparison and dropped-quote effect."
+      },
+      {
+        "notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "cell_id": "bootstrap-annuity-step",
+        "status": "proven",
+        "coverage": "Derive a terminal swap discount factor from known earlier coupons and compare with a native calibrated knot."
+      },
+      {
+        "notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "cell_id": "projection-curve-quotes",
+        "status": "proven",
+        "coverage": "Reuse the canonical FRA/forward calibration envelope for separate projection; explain futures quote and convexity adjustment assumptions."
+      },
+      {
+        "notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "cell_id": "bootstrap-forward-plots",
+        "status": "proven",
+        "coverage": "Plot the interpolation alternatives and compare the same bond against an explicitly labelled simple hand curve."
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Drop one instrument from the strip and identify which curve segment moved.",
+        "planned_notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "planned_cell_id": "exercise-missing-quote",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Remove the 5y quote, recalibrate, display node and forward deltas and assert a changed segment without assuming all other values stay fixed."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Explain why a 10y knot bump moves 9y forwards under linear-zero interpolation.",
+        "planned_notebook": "01_foundations/market_bootstrap_tour.ipynb",
+        "planned_cell_id": "exercise-zero-interpolation-segment",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Show the linearly interpolated zero equation and resulting forward derivative on the shared segment; assert a nonzero 9y response and explain endpoint influence."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "Do not call native linear interpolation linear-zero without inspecting the stored variable.",
+      "Futures treatment remains mandatory: 100-minus-price, underlying accrual and explicit futures/FRA convexity assumption. The shared main strip uses deposit/IRS quotes and the supported separate forward example uses FRAs."
+    ],
+    "authoring_started_utc": "2026-09-03T03:49:51Z",
+    "authoring_finished_utc": "2026-09-03T04:13:42Z",
+    "learner_completion_time": "unmeasured",
+    "initial_authoring_finished_utc": "2026-09-03T03:58:00Z"
+  },
+  {
+    "lesson_id": "1.5",
+    "scope": "Full original per-lesson plan and companion syllabus; no optional cuts.",
+    "concepts": [
+      "Implied volatility, strike/expiry surfaces, smile and skew.",
+      "Total-variance interpolation and calendar arbitrage.",
+      "FX forward/spot/premium-adjusted delta conventions.",
+      "Piecewise hazard, survival integration and annual default probabilities.",
+      "Risk-neutral versus physical default beliefs; base correlation preview.",
+      "MarketContext snapshot with price, inflation, volatility index and cube roles."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "01_foundations/market_data/vol_surfaces.ipynb",
+        "cell_id": "surface-proof",
+        "status": "proven",
+        "coverage": "Total variance interpolation, calendar violation and forward-delta FX wing-to-strike query."
+      },
+      {
+        "notebook": "01_foundations/market_data/hazard_curves.ipynb",
+        "cell_id": "recovery-proof",
+        "status": "proven",
+        "coverage": "Fixed-hazard versus fixed-quote recovery experiments with lossless calibration replay."
+      },
+      {
+        "notebook": "01_foundations/market_data/hazard_curves.ipynb",
+        "cell_id": "survival-world-snapshot",
+        "status": "proven",
+        "coverage": "Annual survival/PD table and a fresh context holding independent curve/surface objects."
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Show a calendar-arbitrage violation when total variance decreases.",
+        "planned_notebook": "01_foundations/market_data/vol_surfaces.ipynb",
+        "planned_cell_id": "exercise-calendar-arbitrage",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Build the decreasing total-variance case at a fixed forward/moneyness assumption; assert diagnostic failure and explain why declining volatility alone is insufficient."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Compute 5y cumulative PD at two recoveries and explain the hazard primitive.",
+        "planned_notebook": "01_foundations/market_data/hazard_curves.ipynb",
+        "planned_cell_id": "exercise-recovery-experiments",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Assert unchanged survival at fixed hazard, then recalibrate unchanged quotes at 40% and 25% recovery and assert lower implied PD at lower recovery; explain severity versus intensity."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "Current delta-to-strike path is forward delta, not a claim of premium-adjusted support.",
+      "A standalone 1.5 hazard experiment does not add CDS positions to earlier book snapshots."
+    ],
+    "authoring_started_utc": "2026-09-03T03:49:51Z",
+    "authoring_finished_utc": "2026-09-03T04:13:42Z",
+    "learner_completion_time": "unmeasured",
+    "initial_authoring_finished_utc": "2026-09-03T03:58:00Z"
+  },
+  {
+    "lesson_id": "2.1",
+    "scope": "Full original per-lesson plan and companion syllabus; no optional cuts.",
+    "concepts": [
+      "Price registry, metrics registry, native call signature and ValuationResult.",
+      "Clean/dirty/accrued prices, percent-of-par input versus currency output.",
+      "Street and true yield, maturity IRR, root finding and ICMA reference periods.",
+      "Settlement, ex-coupon and market quoting conventions.",
+      "Amortizers, step-ups and callable call schedules/yield-to-worst teaser."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "bond-price-proof",
+        "status": "proven",
+        "coverage": "Typed Bond, result/registry access, price-yield round trip, fixed-quote and fixed-curve settlement experiments."
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "amortizer-proof",
+        "status": "proven",
+        "coverage": "Native amortizing cashflow schedule converted to a priceable bond, shorter duration."
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "bond-builder-and-workouts",
+        "status": "proven",
+        "coverage": "Typed builder, explicit ex-coupon/convention case and callable call_put/ytw teaser."
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "bond-step-up-yield",
+        "status": "proven",
+        "coverage": "Supported StepUpCouponSpec schedule and explicit street versus actual-date yield demonstration."
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Settlement-date shift moves accrued but not clean.",
+        "planned_notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "planned_cell_id": "exercise-settlement-assumptions",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Correct the unconditional premise: assert clean invariance at fixed quoted clean price and show non-invariance at fixed discount curve; accrued rises in both examples."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Step-up coupon via StepUpCouponSpec and its YTM effect.",
+        "planned_notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "planned_cell_id": "exercise-step-up-coupon",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Build the native step-up schedule, materialize a bond, hold the comparison price assumption explicitly and show/assert the yield effect."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Explain street versus true yield on one number.",
+        "planned_notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "planned_cell_id": "exercise-street-true-yield",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Use the same price and payment schedule, contrasting periodic street discount times with actual adjusted payment dates; assert each convention reprices its own cashflow equation and explain the difference."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "Correct metrics are accrued and duration_mod.",
+      "CashFlowSchedule.builder and bond_from_cashflows_json are the supported cashflow-to-bond route.",
+      "Callable OAS depth remains C1; the introductory call/ytw example is still required here."
+    ],
+    "authoring_started_utc": "2026-09-03T03:49:51Z",
+    "authoring_finished_utc": "2026-09-03T04:13:42Z",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "2.2",
+    "scope": "Full original per-lesson plan and companion syllabus; no optional cuts.",
+    "concepts": [
+      "Macaulay/modified duration, signed DV01 and yield convexity.",
+      "Bucketed/key-rate curve sensitivities and fully qualified key grammar.",
+      "G, I, Z, ASW, discount margin and OAS comparison, with benchmark and units.",
+      "Embedded-option value and z-spread CS01 convention.",
+      "Taylor P&L approximation, curve versus yield shocks and residual interpretation."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "bond-risk-proof",
+        "status": "proven",
+        "coverage": "Signed DV01 bump check, qualified buckets, z-spread CS01, ASW stub and 25bp Taylor/reprice comparison."
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "bond-spread-ladder",
+        "status": "proven",
+        "coverage": "Explicit government-benchmark G-spread, native I/Z/ASW and interpretation table; FRN discount margin and callable OAS preview."
+      },
+      {
+        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "cell_id": "duration-convexity-units",
+        "status": "proven",
+        "coverage": "Macaulay/modified relationship and native convexity scaling in the yield Taylor equation."
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Which bucket owns risk of a 7y bond on a {2,5,10,30} curve?",
+        "planned_notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "planned_cell_id": "exercise-seven-year-buckets",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Use a shared four-node curve and 7y bond, inspect actual bucket split and assert its reconciliation; explain interpolation-driven neighboring exposure rather than assigning all risk to one bucket."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Compute cs01::<id> via z-spread bump and explain the convention.",
+        "planned_notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "planned_cell_id": "exercise-zspread-cs01",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Compare native cs01::USD-CORP with explicit symmetric z-spread repricing under the same base quote and sign units."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Duration of amortizer versus bullet: why shorter?",
+        "planned_notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "planned_cell_id": "exercise-amortizer-duration",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Price both native instruments with matched input assumptions, assert shorter duration and connect to earlier principal repayments."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "Native DV01 is signed +1bp PV change and is negative for the long bond.",
+      "Native bond convexity is (Psecond/P)/100; multiply by 100 in a decimal-yield Taylor equation.",
+      "ASW example uses a fresh short_front stub copy for its settlement-to-maturity leg.",
+      "No unsupported g_spread registry alias: the government benchmark subtraction is displayed directly.",
+      "Bond no-hazard CS01 is a settlement-anchored forward +1bp periodically compounded z-spread difference, reproduced with quoted_z_spread.",
+      "I-spread, Z-spread, ASW and discount margin are returned as decimal rates; bp display requires multiplication by 10000."
+    ],
+    "authoring_started_utc": "2026-09-03T03:49:51Z",
+    "authoring_finished_utc": "2026-09-03T04:13:42Z",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "2.3",
+    "scope": "Full original per-lesson plan and companion syllabus; no optional cuts.",
+    "concepts": [
+      "Swap fixed/float cashflow signs, discount/project roles and annuity-weighted par.",
+      "Off-par value, bond/swap DV01 hedge and remaining basis/key-rate risk.",
+      "Cap/floor as caplet/floorlet strips and Black-76 vega.",
+      "Payer/receiver swaptions and physical/cash settlement.",
+      "Normal absolute-rate volatility versus lognormal decimal volatility.",
+      "Cross-currency basis and CMS/in-arrears convexity previews."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "cell_id": "swap-proof",
+        "status": "proven",
+        "coverage": "Native payer swap, zero NPV at par, signed USD-bond hedge and qualified forward PV01."
+      },
+      {
+        "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "cell_id": "rates-option-proof",
+        "status": "proven",
+        "coverage": "Native caplet strip, matched cap-floor=swap, Black-76 vega and payer swaption."
+      },
+      {
+        "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "cell_id": "swap-legs-annuity",
+        "status": "proven",
+        "coverage": "Typed leg builder and visible fixed annuity/projected float PV algebra; settlement and normal-vol alternative discussion."
+      },
+      {
+        "notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "cell_id": "swaption-typed-builder",
+        "status": "proven",
+        "coverage": "Build the payer swaption explicitly. The call option type is the payer right. Physical settlement is selected explicitly; the cash-settlement method remains a required contract field but does not convert this into a cash-settled option. The fixed and floating underlying legs begin after expiry. Absolute short-rate volatility is not used here: the Black surface contains lognormal rate volatility."
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Solve notional to DV01-neutralize the book bonds with the swap.",
+        "planned_notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "planned_cell_id": "exercise-bond-sleeve-hedge",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Convert EUR bond currency risk to USD before combining with USD bond DV01; solve payer units and assert parallel net risk zero, then explain remaining curve basis."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Cap-floor parity equals swap check.",
+        "planned_notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "planned_cell_id": "exercise-cap-floor-parity",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Reproduce the proven actual quarterly projection grid, price native cap/floor/matched payer swap and assert parity to a cent."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Forward par rate from curve versus par_rate metric.",
+        "planned_notebook": "02_pricing/instruments/rates_derivatives.ipynb",
+        "planned_cell_id": "exercise-forward-par-rate",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Sum native projected floating coupon PVs and fixed-leg annuity on identical schedules; assert their ratio equals the native par_rate metric."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "Use actual ACT/360 quarterly boundaries in ForwardCurve projection_grid; numeric 0.25-year stepping differs from actual month lengths.",
+      "Cap implied period-forward and IRS reset-date fixing agree under the matched projection grid."
+    ],
+    "authoring_started_utc": "2026-09-03T03:49:51Z",
+    "authoring_finished_utc": "2026-09-03T04:13:42Z",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "2.4",
+    "scope": "Full original per-lesson plan and companion syllabus; no optional cuts.",
+    "concepts": [
+      "Risk-neutral/no-arbitrage intuition and BSM/Black-76 formulas.",
+      "Delta, gamma, vega, theta, rho units and spot-grid behavior.",
+      "Implied volatility inversion, smile/skew and staged surface lookup.",
+      "SABR asymptotics/calibration, fixed beta and rho/nu interpretation.",
+      "SVI parameterization and arbitrage context.",
+      "COS transform agreement; native equity options and Garman-Kohlhagen FX options."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/equity_and_options.ipynb",
+        "cell_id": "option-proof",
+        "status": "proven",
+        "coverage": "Native scaled option versus BSM/COS/IV, financed five-day short-option delta hedge."
+      },
+      {
+        "notebook": "01_foundations/market_data/sabr_volatility.ipynb",
+        "cell_id": "sabr-proof",
+        "status": "proven",
+        "coverage": "Synthetic known-parameter SABR smile fit with fixed beta and quote residual check."
+      },
+      {
+        "notebook": "02_pricing/instruments/equity_and_options.ipynb",
+        "cell_id": "greeks-spot-grid",
+        "status": "proven",
+        "coverage": "Delta/gamma/vega/theta/rho plots and units, surface strike query and native typed builder."
+      },
+      {
+        "notebook": "01_foundations/market_data/sabr_volatility.ipynb",
+        "cell_id": "sabr-svi-interpretation",
+        "status": "proven",
+        "coverage": "Fit/quote plot, rho and nu perturbation, SVI parameterization and limits."
+      },
+      {
+        "notebook": "02_pricing/instruments/equity_and_options.ipynb",
+        "cell_id": "equity-typed-builder",
+        "status": "proven",
+        "coverage": "Construct the native book option. The builder exposes the 100-unit multiplier, spot, dividend, discount and volatility identifiers. It matches the canonical book option and queries the three surface smile points at the actual expiry. Native Greeks include position scaling."
+      },
+      {
+        "notebook": "01_foundations/market_data/sabr_volatility.ipynb",
+        "cell_id": "sabr-quote-fit-plot",
+        "status": "proven",
+        "coverage": "Plot quotes against the fitted smile. The quote points and fitted curve share decimal-volatility units. The residuals printed in volatility basis points make a visually close fit quantitatively reviewable."
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Delta hedge over one fixture week: gamma explains residual.",
+        "planned_notebook": "02_pricing/instruments/equity_and_options.ipynb",
+        "planned_cell_id": "exercise-financed-delta-hedge",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Use the proven full ledger with borrowing interest, dividends and financed rebalance; assert self-financing and compare P&L with gamma plus theta and carry, not gamma alone."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "FxOptionBuilder under Garman-Kohlhagen with delta-quoted vol.",
+        "planned_notebook": "02_pricing/instruments/fx_instruments.ipynb",
+        "planned_cell_id": "exercise-fx-option-gk",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Build the native FX option using shared domestic/foreign curves, FX spot and EURUSD delta surface; compare with supported Garman-Kohlhagen economics and assert agreement with explicit delta convention."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Why is SABR beta fixed by desk convention rather than fit?",
+        "planned_notebook": "01_foundations/market_data/sabr_volatility.ipynb",
+        "planned_cell_id": "exercise-sabr-beta-identification",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Keep beta fixed in each native fit, compare quote reproduction and parameter shifts, assert the chosen beta values and explain identification/hedging stability."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "Equity option default registry key is black76 with BSM spot/carry economics.",
+      "Standalone formulas are per underlying unit; native book option scales by 100.",
+      "SABR fit tolerance is 1e-6 decimal volatility, or 0.01 volatility basis points.",
+      "The native FX option uses a visible delta-smile lookup at the actual forward and a pinned implied-volatility override for the GK reconciliation; two dated DFs determine rates on the option expiry basis."
+    ],
+    "authoring_started_utc": "2026-09-03T03:49:51Z",
+    "authoring_finished_utc": "2026-09-03T04:13:42Z",
+    "learner_completion_time": "unmeasured"
+  },
+  {
+    "lesson_id": "2.5",
+    "scope": "Full original per-lesson plan and companion syllabus; no optional cuts.",
+    "concepts": [
+      "Default time, hazard, survival and recovery.",
+      "CDS premium/protection legs, accrual on default and ISDA step-in/settlement/CDS date conventions.",
+      "Hazard bootstrap, quote residuals and retained replay.",
+      "Standardized coupons and upfront conversion.",
+      "Hazard quote CS01 versus bond z-spread CS01.",
+      "Protection-leg interval decomposition; CDX/iTraxx/index basis and reduced-form/structural previews."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "cell_id": "cds-proof",
+        "status": "proven",
+        "coverage": "Typed CDS, par spread in bp, zero par NPV, replay CS01, upfront PV fraction and interval protection PV decomposition."
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "cell_id": "cds-isda-quote-conversion",
+        "status": "proven",
+        "coverage": "Typed ISDA-NA builder, hazard calibration closure, step-in/settlement timeline and standardized coupon/upfront cash conversion."
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "cell_id": "cds-flat-hazard-approximation",
+        "status": "proven",
+        "coverage": "Flat hazard native par spread versus spread approximately (1-recovery) times hazard."
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "cell_id": "cds-typed-calibration",
+        "status": "proven",
+        "coverage": "Build the regional contract and bootstrap its quotes. The native premium/protection builders expose recovery, calendar and start/end dates. The fresh calibration input displays the complete CDS quote strip and returns a CalibrationResult. A maximum residual-to-tolerance ratio below one passes its numerical gate; the forward-starting contract has different dates from the spot calibration pillars, so its par spread need not equal the five-year input quote."
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Recovery 40 to 25 at fixed spread: what moved and why?",
+        "planned_notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "planned_cell_id": "exercise-cds-recovery",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Recalibrate unchanged CDS quotes with changed recovery, assert lower implied hazard/PD at lower recovery, retain serialization/replay and explain loss severity."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Check spread approximately (1-R) times lambda accuracy.",
+        "planned_notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "planned_cell_id": "exercise-flat-hazard-spread",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Use native CDS under an explicit flat hazard and discount environment, compare basis-point par spread to the approximation and quantify error sources."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Add CDS hedge to the book and compute net CS01.",
+        "planned_notebook": "02_pricing/instruments/credit_derivatives.ipynb",
+        "planned_cell_id": "exercise-book-cs01",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Value the staged book with strict applicable risk, use native aggregate_metrics and display qualified hazard/instrument keys; compare before/after without treating unlike CS01 conventions as an automatic hedge."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "Actual CDS registry model is hazard_rate.",
+      "par_spread returns basis points; no unsupported upfront metric is requested.",
+      "PV upfront fraction and settlement cash differ by the settlement DF.",
+      "Protection interval contributions are differences of cumulative native leg PVs; no fabricated diagnostic or hidden pricing wrapper.",
+      "The CDS is forward-starting on 2025-03-20 from valuation 2025-01-15. The separate illustrative T+3 upfront cash date is not the protection default-settlement delay."
+    ],
+    "authoring_started_utc": "2026-09-03T03:49:51Z",
+    "authoring_finished_utc": "2026-09-03T04:13:42Z",
+    "learner_completion_time": "unmeasured"
+  }
+]

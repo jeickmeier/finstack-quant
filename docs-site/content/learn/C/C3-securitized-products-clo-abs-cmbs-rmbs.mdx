@@ -1,0 +1,408 @@
+---
+id: C3
+title: 'Securitized Products: CLO, ABS, CMBS, RMBS'
+description: 'Analyst program lesson C3: Securitized Products: CLO, ABS, CMBS, RMBS'
+desk_question: '"We''re offered the BBB tranche of a CLO at 96.5. Walk the waterfall:
+  what has to go wrong before we miss a coupon, and what''s our breakeven CDR?"'
+references:
+- '#sifma-mbs-standard-formulas'
+- '#richard-roll-1989'
+- '#schwartz-torous-1989'
+- '#fabozzi-fixed-income-handbook'
+- '#moodys-rating-symbols'
+- '#vasicek-2002-loan-portfolio'
+api:
+- finstack_quant.valuations.instruments.StructuredCredit
+- finstack_quant.valuations.instruments.AssetPool
+- finstack_quant.valuations.instruments.TrancheStructure
+- finstack_quant.cashflows.builder.PrepaymentModelSpec
+- finstack_quant.valuations.instruments.structured_credit_tranche_metrics
+- finstack_quant.valuations.instruments.structured_credit_tranche_breakeven_cdr
+- finstack_quant.valuations.instruments.structured_credit_tranche_scenario_table
+status: published
+---
+
+<DeskContext question="The BBB CLO tranche is offered at 96.5. Which cashflows and collateral losses justify that price?">
+
+Begin with collateral that actually produces cash, then trace its distribution. A tranche rating, coupon or spread cannot explain value without the waterfall, loss allocation, recovery timing and principal rules. The required report includes a manual period reconciliation, native tranche metrics, a default/prepayment grid and an explanation of the quote's downside.
+
+</DeskContext>
+
+<Standard>
+
+### A pool is more than its descriptive averages
+
+The reference contains five positive USD 20 million `PoolAsset` records and USD 100 million of liabilities: AAA 80 million, BBB 15 million and equity 5 million. These priced assets replace the earlier plan's metadata-only representative lines. A `RepLine` can describe a pool, but those descriptions must not be presented as cashflow-producing collateral when the engine consumes `PoolAsset` records.
+
+The initial controlled pool pays fixed 8% interest and repays principal at maturity. Each asset has a maturity, accrual convention, balance, acquisition date and default state. Default and prepayment are competing reductions of performing exposure, while recovery is cash arriving after a lag. Expected loss can be recognized before that recovery cash arrives. Changing recovery rate and changing recovery lag therefore answer different questions.
+
+WAL measures principal timing; it is not duration. WARF is a rating-factor average, not a default probability or a tranche rating. WAS is the weighted spread on performing assets with explicit spreads, not the weighted all-in coupon. We add ratings and floating spread identifiers on a separate copy to demonstrate `clo_warf` and `clo_was` without relabeling the fixed 8% coupon as a 800 bp spread. The common SOFR projection curve is required for that floating copy.
+
+### The waterfall is the central accounting control
+
+For the one-quarter, no-default, no-prepayment, no-fee case, the pool collects USD 100 million principal and USD 2 million interest. AAA receives 80.8 million; BBB receives 15.225 million; equity receives the residual 5.975 million. Every tranche amount is discounted from the same payment date, and their sum equals total available cash. Equity's receipt includes return of its own capital; it is not all profit.
+
+The native waterfall can also route excess interest toward senior principal. Once fees, defaults, coverage tests or reinvestment enter, a coupon-minus-cost shortcut does not reproduce the whole deal. OC compares eligible collateral with the relevant note balance; IC compares available interest with interest obligations. Haircuts and the document's denominator matter. A breached coverage test can redirect cash from juniors to senior repayment, changing timing before principal losses alone explain value.
+
+The first trigger experiment deliberately sets an already-breached 130% threshold to prove the mechanism. A second holds a 124.9% threshold fixed, starts above it, and raises defaults. Comparing enabled and disabled tests at the same CDR separates the additional waterfall effect from the direct effect of losses. The public Python outputs expose resulting PV and WAL; this lesson does not invent an unexposed diversion ledger.
+
+### Deal labels do not install all legal terms
+
+Native CLO, ABS, CMBS and RMBS constructors provide behavioral presets. They still need valid payment calendars and the actual contract's fees and allocation rules. We display their CPR, CDR, recovery and lag defaults, then override terms explicitly. These are teaching assumptions, not underwriting estimates for a named transaction.
+
+CLO management and trustee fees consume cash before residual value. Reinvestment requires both the deal end date and the pool's reinvestment-period configuration; the date alone does not activate recycling. Returning principal to collateral postpones investor repayment and exposes it to subsequent portfolio performance. The example keeps eligibility criteria explicit rather than implying the engine forecasts a manager's security selection.
+
+An ABS step-down switches from sequential toward pro-rata principal only after its date and performance conditions pass. The native trigger is reevaluated each period; it is not necessarily a permanently switched legal state. An excess-spread account must be funded from actual surplus interest and can cover eligible interest shortfalls. A USD 5 million *target* does not mean USD 5 million cash was contributed at closing, and it does not automatically absorb principal writedowns.
+
+PSA is a seasoning curve, with 100% PSA rising toward 6% annual CPR by month 30; monthly mortality is `1-(1-CPR)^(1/12)`. Doubling PSA changes the ramp, not simply today's annual rate. The native `prepayment01` bumps the parameter the model actually reads. For PSA that is a multiplier change corresponding to one basis point of terminal CPR.
+
+CMBS lockout suppresses voluntary prepayment before the specified age. The controlled collateral here has a five-year bullet and a 60-month lockout, so local CPR sensitivity is zero over its life. Balloon refinancing, maturity default, collateral value and delayed recoveries still matter. The example explicitly charges master and special servicing fees on their native bases; a longer recovery lag can worsen liquidity even if nominal recovery is unchanged.
+
+For RMBS, the supported shifting-interest rule gives the senior a scheduled share of **all** principal, with the balance allocated to other debt. It is a first-order non-agency treatment. An agency rule that splits scheduled principal and prepayments separately is more detailed than this input can express.
+
+### A price quote and a first-loss threshold answer different questions
+
+At 96.5, the BBB purchase amount is 96.5% of original tranche balance. The native metrics return model price and a quote-conditioned z-spread separately. `structured_credit_tranche_breakeven_cdr` finds the constant annual default rate at first principal writedown. It is not an economic break-even IRR and is not the CDR that makes the purchase NPV zero. Read the threshold together with the CPR×CDR×severity price and writedown table.
+
+The program holds only the BBB tranche. It remains a separate analytical sleeve because the public native portfolio envelope represents the whole structured-credit deal. Adding that whole deal as though it were BBB would overstate the holding and double count other tranches. The reporting boundary therefore sums native portfolio value and exactly one separately priced BBB holding, with the same discipline under dates and stresses.
+
+</Standard>
+
+<BuildIt>
+
+### Construct positive collateral and trace a complete payment period
+
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-workflow-1" role="build" */}
+```python exec id=c3-workflow-1 role=build
+from pathlib import Path
+import sys
+from copy import deepcopy
+from datetime import date
+import json
+import math
+import numpy as np
+import pandas as pd
+from _shared import analyst_tracks as tracks
+from finstack_quant.valuations.instruments import price_instrument
+AS_OF = tracks.AS_OF
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-workflow-1" />
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-workflow-2" role="build" */}
+```python exec id=c3-workflow-2 role=build
+from finstack_quant.valuations.instruments import structured_credit_tranche_metrics, structured_credit_tranche_scenario_table
+market=tracks.build_market("credit")
+deal=tracks.clo_deal()
+spec=deal["instrument"]["spec"]
+assets=pd.DataFrame(spec["pool"]["assets"])
+assets["balance_usd"]=assets["balance"].map(lambda money:float(money["amount"]))
+assert len(assets)==5 and assets["balance_usd"].gt(0).all()
+assert assets["balance_usd"].sum()==100_000_000
+print(assets[["id","industry","balance_usd","rate","maturity"]])
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-workflow-2" />
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-workflow-3" role="build" */}
+```python exec id=c3-workflow-3 role=build
+short_deal=tracks.clo_deal(one_period=True)
+accrual=(date(2025,4,15)-AS_OF).days/360
+principal=100_000_000.0
+interest=principal*0.08*accrual
+receipts={"AAA":80_000_000*(1+0.04*accrual),"BBB":15_000_000*(1+0.06*accrual)}
+receipts["EQUITY"]=principal+interest-sum(receipts.values())
+df=market.get_discount("USD-OIS").df((date(2025,4,15)-AS_OF).days/365)
+rows=[]
+for tranche,receipt in receipts.items():
+    native=structured_credit_tranche_metrics(json.dumps(short_deal),tranche,market,AS_OF)
+    assert abs(native.pv-receipt*df)<0.01
+    rows.append({"tranche":tranche,"hand_receipt_usd":receipt,"hand_pv_usd":receipt*df,"native_pv_usd":native.pv})
+assert abs(sum(row["native_pv_usd"] for row in rows)/df-(principal+interest))<0.01
+print(pd.DataFrame(rows))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-workflow-3" />
+
+### Distinguish collateral statistics, presets and cash allocation
+
+The floating/rated copy exists only for its explicitly stated collateral-statistics experiment. The original fixed-rate pool remains the baseline for the period reconciliation and the 96.5 desk quote.
+
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-pool-models" role="build" */}
+```python exec id=c3-pool-models role=build
+from finstack_quant.valuations.instruments import StructuredCredit,AssetPool,TrancheStructure,validate_instrument_json
+from finstack_quant.cashflows.builder import PrepaymentModelSpec
+rated=deepcopy(deal)
+for asset,rating,spread in zip(rated["instrument"]["spec"]["pool"]["assets"],
+                              ["BB","BB-","B+","B","B-"],[325.,350.,400.,450.,500.]):
+    asset.update(credit_quality=rating,spread_bp=spread,index_id="USD-SOFR-3M")
+pool_metrics=price_instrument(json.dumps(rated),market,AS_OF,metrics=["clo_warf","clo_was","wal"])
+assert abs(pool_metrics.metrics["clo_was"]-405)<1e-10
+assert pool_metrics.metrics["clo_warf"]>0
+print(pd.Series(pool_metrics.metrics))
+preset_rows=[];presets={}
+for kind in ["clo","abs","cmbs","rmbs"]:
+    p=AssetPool.from_json(json.dumps(spec["pool"]))
+    tr=TrancheStructure.from_json(json.dumps(spec["tranches"]))
+    native_deal=getattr(StructuredCredit,"new_"+kind)("C3-"+kind,p,tr,AS_OF,date(2030,1,15),"USD-OIS")
+    payload=json.loads(native_deal.to_json());s=payload["instrument"]["spec"]
+    s.update(payment_calendar_id="weekends_only",payment_business_day_convention="following")
+    s["pool"]["deal_type"]=kind
+    validate_instrument_json(json.dumps(payload));presets[kind]=payload
+    preset_rows.append({"deal_type":kind,"CPR_parameter":s["prepayment_spec"]["cpr"],
+        "CDR":s["default_spec"]["cdr"],"recovery":s["recovery_spec"]["rate"],
+        "recovery_lag_months":s["recovery_spec"]["recovery_lag"]})
+print(pd.DataFrame(preset_rows))
+print(pd.DataFrame([{"months":age,"PSA100_SMM":PrepaymentModelSpec.psa_100().smm(age),
+    "PSA200_SMM":PrepaymentModelSpec.psa(2).smm(age),
+    "CMBS60_lockout_SMM":PrepaymentModelSpec.cmbs_with_lockout(60,.10).smm(age)} for age in [1,12,30,59,60,72]]))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-pool-models" />
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-fees-reinvestment" role="build" */}
+```python exec id=c3-fees-reinvestment role=build
+fee_deal=deepcopy(deal)
+fee_deal["instrument"]["spec"]["fees"]={"trustee_fee_annual":{"amount":"50000","currency":"USD"},
+    "senior_mgmt_fee_bp":40.,"subordinated_mgmt_fee_bp":20.,"servicing_fee_bp":0.,
+    "master_servicer_fee_bp":None,"special_servicer_fee_bp":None}
+reinvest=deepcopy(fee_deal);reinvest["instrument"]["spec"]["reinvestment_end_date"]="2027-01-15"
+reinvest["instrument"]["spec"]["pool"]["reinvestment_period"]={"end_date":"2027-01-15","is_active":True,
+    "criteria":{"max_price":100.,"min_yield":0.,"maintain_credit_quality":True,"maintain_wal":True,"apply_eligibility_criteria":True}}
+for payload in [fee_deal,reinvest]:
+    payload["instrument"]["spec"]["prepayment_spec"]={"cpr":.15,"curve":None}
+    payload["instrument"]["spec"]["default_assumptions"]["base_cpr_annual"]=.15
+fee_rows=[]
+for name,payload in [("fees_no_reinvestment",fee_deal),("fees_reinvest_2y",reinvest)]:
+    for tranche in ["AAA","BBB","EQUITY"]:
+        out=structured_credit_tranche_metrics(json.dumps(payload),tranche,market,AS_OF)
+        fee_rows.append({"case":name,"tranche":tranche,"PV":out.pv,"WAL":out.wal})
+assert all(math.isfinite(r["PV"]) for r in fee_rows)
+print(pd.DataFrame(fee_rows))
+print("Fees are explicit synthetic inputs matching the library CLO standard: $50k trustee, 40bp senior and 20bp subordinate management. Constructor defaults alone do not populate these fees.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-fees-reinvestment" />
+
+### Force a coverage failure and compare default-driven deterioration
+
+The output reports all three tranche prices for the initial breach and senior/mezzanine PV and WAL for the default experiment. Do not assume every junior value change must be negative: residual timing, turbo principal and coupon savings can interact. Interpret the actual controlled comparison.
+
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-workflow-4" role="build" */}
+```python exec id=c3-workflow-4 role=build
+breach=tracks.clo_deal(oc_trigger=1.30)
+assert 100_000_000/80_000_000 < 1.30
+oc_rows=[]
+for scenario,payload in [("base",deal),("OC_130",breach)]:
+    for tranche in ["AAA","BBB","EQUITY"]:
+        result=structured_credit_tranche_metrics(json.dumps(payload),tranche,market,AS_OF)
+        oc_rows.append({"scenario":scenario,"tranche":tranche,"pv_usd":result.pv,"wal_years":result.wal})
+oc=pd.DataFrame(oc_rows).set_index(["scenario","tranche"])
+assert oc.loc[("OC_130","AAA"),"wal_years"] < oc.loc[("base","AAA"),"wal_years"]
+assert oc.loc[("OC_130","BBB"),"pv_usd"] < oc.loc[("base","BBB"),"pv_usd"]
+print(oc)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-workflow-4" />
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-oc-default" role="build" */}
+```python exec id=c3-oc-default role=build
+loss_oc_rows=[]
+for cdr in [0.,.08]:
+    for trigger in [None,1.249]:
+        payload=tracks.clo_deal(oc_trigger=trigger);s=payload["instrument"]["spec"]
+        s["default_spec"]={"cdr":cdr};s["default_assumptions"]["base_cdr_annual"]=cdr
+        for tranche in ["AAA","BBB"]:
+            out=structured_credit_tranche_metrics(json.dumps(payload),tranche,market,AS_OF)
+            loss_oc_rows.append({"CDR":cdr,"OC_trigger":trigger,"tranche":tranche,"PV":out.pv,"WAL":out.wal})
+assert 100_000_000/80_000_000>1.249
+stress_without=next(r for r in loss_oc_rows if r["CDR"]==.08 and r["OC_trigger"] is None and r["tranche"]=="AAA")
+stress_with=next(r for r in loss_oc_rows if r["CDR"]==.08 and r["OC_trigger"]==1.249 and r["tranche"]=="AAA")
+assert stress_with["WAL"]<stress_without["WAL"]
+print(pd.DataFrame(loss_oc_rows))
+print("The 124.9% trigger passes at closing. Compare enabled/disabled rows at the same stressed CDR to isolate the additional waterfall effect; compare CDR rows to see total deterioration. The public output is tranche PV/WAL, not a period-by-period diversion log.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-oc-default" />
+
+### Configure ABS and CMBS mechanics explicitly
+
+These are separate deal variants. PSA is used to demonstrate a supported seasoning specification; it is not asserted to be the normal prepayment convention for every ABS asset class.
+
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-abs-cmbs" role="build" */}
+```python exec id=c3-abs-cmbs role=build
+abs_deal=deepcopy(presets["abs"]);a=abs_deal["instrument"]["spec"]
+a["prepayment_spec"]=json.loads(PrepaymentModelSpec.psa(1.5).to_json())
+a["waterfall_rules"]={"step_down":{"step_down_date":"2027-01-15","triggers":[{"max_cumulative_loss":.04}]},
+    "excess_spread":{"target_balance":{"amount":"1000000","currency":"USD"}}}
+abs_price=price_instrument(json.dumps(abs_deal),market,AS_OF,metrics=["prepayment01"])
+assert math.isfinite(abs_price.metrics["prepayment01"])
+print({"ABS_PV":abs_price.value.amount,**abs_price.metrics})
+cmbs=deepcopy(presets["cmbs"]);c=cmbs["instrument"]["spec"]
+c["prepayment_spec"]=json.loads(PrepaymentModelSpec.cmbs_with_lockout(60,.10).to_json())
+c["fees"]={"trustee_fee_annual":{"amount":"75000","currency":"USD"},"senior_mgmt_fee_bp":0.,
+    "subordinated_mgmt_fee_bp":0.,"servicing_fee_bp":0.,"master_servicer_fee_bp":25.,"special_servicer_fee_bp":25.}
+cmbs_price=price_instrument(json.dumps(cmbs),market,AS_OF,metrics=["prepayment01"])
+assert abs(cmbs_price.metrics["prepayment01"])<1e-8
+print({"CMBS_PV":cmbs_price.value.amount,**cmbs_price.metrics})
+print("All collateral is bullet at legal maturity and locked out until then. Zero local CPR sensitivity does not remove balloon/refinancing or default/recovery risk; special servicing fees enter on their native default-related base.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-abs-cmbs" />
+
+### Answer the BBB quote and stress the actual holding
+
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-quote-breakeven" role="build" */}
+```python exec id=c3-quote-breakeven role=build
+from finstack_quant.valuations.instruments import structured_credit_tranche_breakeven_cdr
+quoted=structured_credit_tranche_metrics(json.dumps(deal),"BBB",market,AS_OF,market_price_pct=96.5)
+first_loss_cdr=structured_credit_tranche_breakeven_cdr(json.dumps(deal),"BBB",market,AS_OF)
+assert 0<first_loss_cdr<.10
+assert quoted.target_price_pct==96.5
+print(json.loads(quoted.to_json()))
+print({"first_principal_writedown_annual_CDR":first_loss_cdr})
+print("Break-even CDR locates first principal writedown. It is not the default rate at which NPV equals the 96.5 purchase price; the quote-conditioned z-spread is a separate calculation.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-quote-breakeven" />
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-workflow-5" role="build" */}
+```python exec id=c3-workflow-5 role=build
+grid={"cprs":[0.0,0.15],"cdrs":[0.0,0.05],"severities":[0.4,0.6],"recovery_lag":6}
+table=structured_credit_tranche_scenario_table(json.dumps(deal),"BBB",market,AS_OF,grid)
+scenario_rows=json.loads(table.to_json())["cells"]
+assert len(scenario_rows)==8
+print(pd.DataFrame(scenario_rows))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-workflow-5" />
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-workflow-7" role="build" */}
+```python exec id=c3-workflow-7 role=build
+severe=structured_credit_tranche_scenario_table(json.dumps(deal),"BBB",market,AS_OF,
+    {"cprs":[0.0],"cdrs":[0.10],"severities":[0.80],"recovery_lag":6})
+print(pd.DataFrame(json.loads(severe.to_json())["cells"]))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-workflow-7" />
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-workflow-6" role="build" */}
+```python exec id=c3-workflow-6 role=build
+from finstack_quant.portfolio import value_portfolio
+holding=tracks.clo_bbb_holding()
+book=tracks.build_book("credit")
+native=value_portfolio(book,market,metrics=[])
+bbb=structured_credit_tranche_metrics(json.dumps(holding["deal"]),holding["tranche_id"],market,AS_OF)
+report=pd.DataFrame([{ "component":"native credit book", "pv_usd":native.total_value},
+                     {"component":"CLO BBB analytical sleeve", "pv_usd":holding["quantity"]*bbb.pv}])
+assert "CLO-BBB" not in book.position_ids
+report.loc[len(report)]={"component":"combined report total","pv_usd":report["pv_usd"].sum()}
+print(report)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-workflow-6" />
+
+</BuildIt>
+
+<LabCard notebook="02_pricing/instruments/structured_credit.ipynb" title="Collateral, waterfalls and securitized tranche risk" description="Run the reconciled pool, all four deal types, coverage tests, quoted BBB metrics and enhancement exercises." />
+<LabCard notebook="04_statement_modeling/models/clo_tranche_modeling.ipynb" title="CLO statement-model companion" description="Relate collateral economics and tranche financing to the program's statement-model work." />
+
+<Exercise id="c3-equity" title="Find where the equity investment fails" question="Build an equity CPR×CDR return grid and identify capital impairment. Reconcile each return to discounted cash before annualizing it.">
+
+The public tranche table provides price, WAL and writedown, not a dated per-tranche payment ledger. We therefore use the explicitly reconciled **single-quarter deal** for an exact IRR exercise: its one payment equals native equity PV divided by its discount factor. This preserves an exact return calculation instead of mistaking five-year PV or WAL for an IRR. The five-year BBB scenario table above remains the long-horizon risk reference. Report holding-period return beside annualized IRR; a large annualized one-quarter number is not a sustainable equity forecast. Principal can be wiped out while a small interest distribution remains, so “capital dies” need not mean absolutely zero total cash.
+
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-exercise-equity" role="exercise" */}
+```python exec id=c3-exercise-equity role=exercise
+# With one payment date, discounted native equity PV identifies the exact terminal cash.
+# This controlled IRR exercise is explicitly a 90-day deal; the earlier five-year grid remains the risk reference.
+equity_grid=structured_credit_tranche_scenario_table(json.dumps(short_deal),"EQUITY",market,AS_OF,
+    {"cprs":[0.,.15],"cdrs":[0.,.25,.50,.90],"severities":[.80],"recovery_lag":0})
+equity_rows=json.loads(equity_grid.to_json())["cells"]
+for row in equity_rows:
+    pv=row["price"]/100*5_000_000
+    terminal_cash=pv/df
+    row["terminal_cash"]=terminal_cash
+    row["holding_period_return"]=terminal_cash/5_000_000-1
+    row["annualized_IRR"]=(terminal_cash/5_000_000)**(365/90)-1
+    assert abs(terminal_cash*df-pv)<.01
+assert equity_rows[0]["terminal_cash"]>5_000_000
+assert any(row["terminal_cash"]<5_000_000 for row in equity_rows)
+print(pd.DataFrame(equity_rows))
+print("At zero terminal cash the total loss is 100% and IRR is -100%. Annualizing a 90-day residual can magnify a one-off payout; it is not a forecast of a repeatable five-year equity return.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-exercise-equity" />
+
+</Exercise>
+
+<Exercise id="c3-enhancement" title="Compare funded subordination with excess spread" question="Keep BBB face fixed. Compare five million of additional equity, funded by reducing AAA, with a five-million excess-spread-account target in base and 5% CDR cases.">
+
+The capital structures still sum to the same pool balance. Additional funded equity creates an immediate principal-loss cushion. A retained spread account is earned over time and supports its designated obligations. In this controlled principal-loss stress the target can leave BBB unchanged; that zero is an informative result, not missing enhancement. Explain the different funding and loss-absorption timing before comparing headline amounts.
+
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-exercise-enhancement" role="exercise" */}
+```python exec id=c3-exercise-enhancement role=exercise
+subordinated=deepcopy(deal);ss=subordinated["instrument"]["spec"]
+ss["tranches"]["tranches"][0].update(detachment_point=75.,original_balance={"amount":"75000000","currency":"USD"},current_balance={"amount":"75000000","currency":"USD"})
+ss["tranches"]["tranches"][1].update(attachment_point=75.,detachment_point=90.)
+ss["tranches"]["tranches"][2].update(attachment_point=90.,original_balance={"amount":"10000000","currency":"USD"},current_balance={"amount":"10000000","currency":"USD"})
+spread_enhanced=deepcopy(deal)
+spread_enhanced["instrument"]["spec"]["waterfall_rules"]={"excess_spread":{"target_balance":{"amount":"5000000","currency":"USD"}}}
+enhancement_rows=[]
+for name,payload in [("original_5m_equity",deal),("10m_equity_funded",subordinated),("5m_spread_account_target",spread_enhanced)]:
+    for cdr in [0.,.05]:
+        x=deepcopy(payload);z=x["instrument"]["spec"];z["default_spec"]={"cdr":cdr}
+        z["default_assumptions"]["base_cdr_annual"]=cdr
+        out=structured_credit_tranche_metrics(json.dumps(x),"BBB",market,AS_OF)
+        enhancement_rows.append({"enhancement":name,"CDR":cdr,"BBB_PV":out.pv,"BBB_WAL":out.wal})
+assert all(math.isfinite(row["BBB_PV"]) for row in enhancement_rows)
+print(pd.DataFrame(enhancement_rows))
+print("Extra equity is funded at closing; excess spread must first be earned and retained. A target is not an upfront reserve balance. Their timing and protection are different even when both headline amounts are $5m.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-exercise-enhancement" />
+
+</Exercise>
+
+<Exercise id="c3-rmbs" title="Measure shifting interest through senior WAL" question="On a 200% PSA RMBS variant, release senior principal share from 100% to 80% after two years and 65% after three. Compare senior WAL with sequential allocation.">
+
+The lower senior share slows its repayment in this setup. Check both WAL and price, and retain the distinction between the modeled all-principal allocation and more detailed agency rules.
+
+{/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-exercise-rmbs" role="exercise" */}
+```python exec id=c3-exercise-rmbs role=exercise
+rmbs=deepcopy(presets["rmbs"])
+rmbs["instrument"]["spec"]["prepayment_spec"]=json.loads(PrepaymentModelSpec.psa(2).to_json())
+shifted=deepcopy(rmbs)
+shifted["instrument"]["spec"]["waterfall_rules"]={"shifting_interest":{"senior_id":"AAA","schedule":[
+    {"months_from_closing":0,"senior_pct":1.0},{"months_from_closing":24,"senior_pct":.80},
+    {"months_from_closing":36,"senior_pct":.65}]}}
+rmbs_rows=[]
+for name,payload in [("sequential",rmbs),("shifting_interest",shifted)]:
+    out=structured_credit_tranche_metrics(json.dumps(payload),"AAA",market,AS_OF)
+    rmbs_rows.append({"allocation":name,"senior_WAL":out.wal,"senior_PV":out.pv})
+assert rmbs_rows[1]["senior_WAL"]>=rmbs_rows[0]["senior_WAL"]
+print(pd.DataFrame(rmbs_rows))
+print("The native rule allocates all principal by scheduled weights. It is a first-order non-agency treatment, not an agency scheduled-principal/prepayment split.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C3" block="c3-exercise-rmbs" />
+
+</Exercise>
+
+<CheckYourself>
+
+- Can every dollar in the manual period be assigned to collateral receipts or a tranche distribution?
+- Which part of a default is loss recognition and which part is delayed cash recovery?
+- Why is the 96.5 z-spread different from the first-writedown CDR?
+- What extra information is required to compute a true multi-period equity IRR?
+- Why is a five-million reserve target not equivalent to five million of funded equity?
+- Why does the portfolio report carry BBB separately, and what must be repriced under every stress?
+
+</CheckYourself>

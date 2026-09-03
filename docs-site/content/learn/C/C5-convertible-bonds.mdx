@@ -1,0 +1,307 @@
+---
+id: C5
+title: Convertible Bonds
+description: 'Analyst program lesson C5: Convertible Bonds'
+desk_question: '"This convert trades at 112 with parity at 98. What are we paying
+  for, and what''s our real delta?"'
+references:
+- '#tsiveriotis-fernandes-1998'
+- '#ayache-forsyth-vetzal-2003'
+- '#overhaus-2007-equity-derivatives'
+- '#hull-options-futures'
+api:
+- finstack_quant.valuations.instruments.ConvertibleBond
+- finstack_quant.valuations.instruments.ConversionSpec
+- finstack_quant.valuations.instruments.price_instrument
+- finstack_quant.valuations.instruments.Bond
+- finstack_quant.models.bs_price
+status: published
+---
+
+<DeskContext question="A convertible trades at 112 while the stock is 98. What does the premium mean, and how many shares should the desk short?">
+
+A convertible combines issuer debt with the holder's contractual right to receive shares. Its equity exposure changes with spot, credit quality, volatility, coupon and exercise rights. The conversion premium describes a price relationship; delta describes a local hedge. They are different quantities.
+
+Deliver a validated convertible, an independently reconciled bond floor, three spot regimes, an explicit hedge and a credit stress. Identify the model's treatment of issuer calls before interpreting its price.
+
+</DeskContext>
+
+<Standard>
+
+### Keep the contract and its units explicit
+
+This reference has USD 1 million face, a 2% cash coupon, five years to maturity and a conversion ratio of **10,000 shares for the entire position**. At stock price 100 its conversion value is USD 1 million. The native `conversion_value` is money, while `parity` is conversion value divided by face. A ratio of 1.0 is par; it is not one dollar. Quotes expressed as percent of face must be converted to position value before comparison with conversion value.
+
+The conversion specification distinguishes voluntary exercise from mandatory conversion and controls exercise dates, dilution protection and corporate-action adjustments. The reference is voluntary. A future down-round is uncertain and belongs in a scenario; an already effective down-round belongs in today's effective conversion ratio. Applying an event both to the ratio and again as an adjustment double counts protection.
+
+The debt component requires a risky **discount curve**. `CONVERT-RISKY` contains the risk-free rate plus a credit discount spread; it is not a hazard-curve identifier. We set recovery to zero for an unambiguous discounted-debt floor. A nonzero-recovery model requires a consistent spread/hazard interpretation. Omitting the credit curve and discounting debt at the risk-free rate would erase the credit exposure we are trying to study.
+
+### Interpret the three regimes
+
+At low stock prices the option is less valuable and the convertible approaches its straight-bond floor. Near conversion parity, option convexity matters most. At high spot it becomes more equity-like, but it can retain coupon, call and credit effects. The floor is the value of the matched debt payments, not a guarantee against default. It can fall when issuer credit worsens.
+
+The tree values continuation and the available holder/issuer decisions at each node. An issuer call caps continuation subject to conversion and redemption rights; a holder put provides a contractual redemption alternative. The native soft-call feature uses an instantaneous spot barrier with a BGK-style adjustment for the requested k-of-n observation rule. It does **not** track the actual number of historical days above the barrier. One soft-call trigger applies to all call windows; it cannot encode a soft window followed by an unconditional hard-call window in the same specification. The sensitivity table makes this approximation visible rather than treating a k-of-n label as exact path dependence.
+
+### Separate economic uncertainty from numerical resolution
+
+The supported convertible registry selector is `tree`. The public Python contract does not expose convertible tree refinement controls or a convertible PDE pricer. A generic one-dimensional PDE solver is not a substitute: credit/equity discounting and holder/issuer exercise conditions must be encoded together. We instead test the native result against an independently priced floor and a maturity-only, zero-coupon, zero-credit analytical limit. The latter uses discounted principal plus an equity call on the conversion shares. Its tolerance is stated in dollars for this fixed native grid.
+
+A finite tree can produce locally uneven delta estimates. A small bump is not automatically more accurate. Read the quote-to-model difference and a range of spot scenarios before sizing a hedge. `delta` is shares for the whole position. `conversion01` is the value response to a 1% ratio bump. `dividend01` is the value response to a one-basis-point dividend-yield bump. Their numerical values can coincide accidentally while their units remain different.
+
+</Standard>
+
+<BuildIt>
+
+### Establish the debt and equity inputs
+
+The shared credit market contains both discount curves, the stock price and the convertible volatility/dividend inputs. Each market factory returns a fresh object so one spot scenario cannot alter the next.
+
+{/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="convertible-setup" role="build" */}
+```python exec id=convertible-setup role=build
+from pathlib import Path
+import sys
+from copy import deepcopy
+from datetime import date
+import json
+import math
+import numpy as np
+import pandas as pd
+from _shared import analyst_tracks as tracks
+from finstack_quant.valuations.instruments import price_instrument
+AS_OF=tracks.AS_OF
+convert=tracks.credit_extension()["ANALYST-CONVERT"]
+credit_market=tracks.build_market("credit")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C5" block="convertible-setup" />
+{/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="convertible-regime-proof" role="build" */}
+```python exec id=convertible-regime-proof role=build
+regimes=[]
+for spot in [50.,100.,150.]:
+    market=tracks.build_market("credit")
+    market.insert_price("CONVERT",spot,"USD")
+    value=price_instrument(json.dumps(convert),market,AS_OF,model="tree",
+        metrics=["parity","conversion_value","conversion_premium","bond_floor","delta","vega"])
+    assert value.value.amount>=value.metrics["bond_floor"]
+    regimes.append({"spot":spot,"pv_usd":value.value.amount,**value.metrics})
+print(pd.DataFrame(regimes))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C5" block="convertible-regime-proof" />
+
+### Verify two independent reference values
+
+The straight bond uses the same debt cashflows and risky discount curve, with zero settlement lag. Its discounted payment sum matches the reported floor. The analytical limit then removes coupon, credit and early conversion so the equity call can be checked independently. These are different controls: the floor tests debt construction; the limit tests the option component under simplified economics.
+
+{/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="convertible-floor-proof" role="build" */}
+```python exec id=convertible-floor-proof role=build
+from _shared.instrument_fixtures import fixed_bond,instrument_envelope
+from finstack_quant.valuations import instrument_cashflows
+_,floor_bond=fixed_bond(0)
+spec=convert["instrument"]["spec"]
+floor_bond["spec"].update({"id":"CONVERT-FLOOR-BOND","notional":spec["notional"],
+    "issue_date":spec["issue_date"],"maturity":spec["maturity"],"cashflow_spec":{"fixed":spec["fixed_coupon"]},
+    "discount_curve_id":spec["credit_curve_id"],"settlement_days":0})
+floor_payload=json.dumps(instrument_envelope(floor_bond))
+floor_value=price_instrument(floor_payload,credit_market,AS_OF).value.amount
+floor_envelope,floor_flows=instrument_cashflows(floor_payload,credit_market,AS_OF,model="discounting")
+assert abs(floor_value-regimes[1]["bond_floor"])<.01
+assert abs(floor_flows["pv"].sum()-floor_value)<.01
+print(pd.Series({"matched_bond_floor_usd":floor_value,"native_convert_floor_usd":regimes[1]["bond_floor"]}))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C5" block="convertible-floor-proof" />
+{/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="convertible-analytical-limit-proof" role="build" */}
+```python exec id=convertible-analytical-limit-proof role=build
+from finstack_quant.models import bs_price
+reference=tracks.convertible_limit()
+tree=price_instrument(json.dumps(reference),credit_market,AS_OF,model="tree").value.amount
+analytical=1000*math.exp(-.04)+10*bs_price(100.,100.,.04,0.,.25,1.,True)
+assert abs(tree-analytical)<.20
+print(pd.Series({"tree_usd":tree,"analytical_usd":analytical,"residual_usd":tree-analytical,
+           "absolute_tolerance_usd":.20}))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C5" block="convertible-analytical-limit-proof" />
+
+### Read hedge units and reconstruct the typed instrument
+
+The first check compares the model delta with a finite spot move. The typed builder then reconstructs the same contract, and an independent ratio bump verifies `conversion01` in its own convention.
+
+{/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="convertible-delta-hedge" role="build" */}
+```python exec id=convertible-delta-hedge role=build
+base_value=price_instrument(json.dumps(convert),credit_market,AS_OF,model="tree",metrics=["delta"])
+hedge_rows=[]
+for spot in [90.,110.]:
+    scenario=tracks.build_market("credit")
+    scenario.insert_price("CONVERT",spot,"USD")
+    value=price_instrument(json.dumps(convert),scenario,AS_OF,model="tree").value.amount
+    hedge_rows.append({"spot":spot,"convert_pnl_usd":value-base_value.value.amount,
+        "equity_hedge_pnl_usd":-base_value.metrics["delta"]*(spot-100),
+        "hedged_pnl_usd":value-base_value.value.amount-base_value.metrics["delta"]*(spot-100)})
+print(pd.DataFrame(hedge_rows))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C5" block="convertible-delta-hedge" />
+{/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="c5-typed-contract" role="build" */}
+```python exec id=c5-typed-contract role=build
+from finstack_quant.valuations.instruments import ConvertibleBond,ConversionSpec,validate_instrument_json
+from finstack_quant.core.money import Money
+s=convert["instrument"]["spec"]
+rebuilt=(ConvertibleBond.builder().id("C5-REBUILT").notional(Money(1_000_000.,"USD"))
+    .issue_date(AS_OF).maturity(date(2030,1,15)).discount_curve_id("USD-OIS").credit_curve_id("CONVERT-RISKY")
+    .conversion(ConversionSpec(ratio=10_000.)).underlying_equity_id("CONVERT")
+    .fixed_coupon(s["fixed_coupon"]).recovery_rate(0.).build())
+validate_instrument_json(rebuilt.to_json())
+greeks=price_instrument(rebuilt.to_json(),credit_market,AS_OF,model="tree",metrics=["delta","conversion01","dividend01"])
+assert abs(greeks.value.amount-regimes[1]["pv_usd"])<.01
+up=deepcopy(convert);down=deepcopy(convert)
+up["instrument"]["spec"]["conversion"]["ratio"]*=1.01
+down["instrument"]["spec"]["conversion"]["ratio"]*=.99
+manual_conversion01=(price_instrument(json.dumps(up),credit_market,AS_OF,model="tree").value.amount-
+    price_instrument(json.dumps(down),credit_market,AS_OF,model="tree").value.amount)/2
+assert abs(manual_conversion01-greeks.metrics["conversion01"])<.01
+print(pd.Series(greeks.metrics))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C5" block="c5-typed-contract" />
+
+### Investigate issuer calls and the market quote
+
+All call scenarios preserve the bond's other economics. In this grid, some changes in required observation count produce identical prices. That is a resolution/approximation result, not evidence that a true historical observation requirement has no economic value. Raising the price threshold changes issuer exercisability and affects the holder's value.
+
+{/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="c5-soft-call" role="build" */}
+```python exec id=c5-soft-call role=build
+call_rows=[]
+for threshold,required_days in [(120.,20),(130.,10),(130.,20),(130.,30),(150.,20)]:
+    called=deepcopy(convert)
+    called["instrument"]["spec"]["call_put"]={"puts":[],"calls":[
+        {"start_date":"2027-01-15","end_date":"2030-01-15","price_pct_of_par":100.}]}
+    called["instrument"]["spec"]["soft_call_trigger"]={"threshold_pct":threshold,"observation_days":30,
+                                                       "required_days_above":required_days}
+    value=price_instrument(json.dumps(called),credit_market,AS_OF,model="tree").value.amount
+    assert value>=regimes[1]["bond_floor"]
+    call_rows.append({"threshold_pct":threshold,"required_days_of_30":required_days,"pv_usd":value})
+print(pd.DataFrame(call_rows))
+print("The native tree uses an instantaneous-node barrier with a BGK-style heuristic for the k-of-n requirement; it does not count realized path observations. Its one trigger applies to every call window.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C5" block="c5-soft-call" />
+
+The 112 quote is USD 1.12 million, versus USD 980,000 conversion value at stock 98: a 14.29% premium to conversion value. This is an observed-price assumption used for the desk question. The model value and model hedge are printed separately; we do not force the tree to reproduce the quote by silently changing volatility or credit.
+
+{/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="c5-quoted-premium" role="build" */}
+```python exec id=c5-quoted-premium role=build
+quote_market=tracks.build_market("credit");quote_market.insert_price("CONVERT",98.,"USD")
+quote_risk=price_instrument(json.dumps(convert),quote_market,AS_OF,model="tree",metrics=["delta","conversion_value"])
+quoted_bond_value=1_000_000*1.12
+conversion_value=10_000*98.
+assert quote_risk.metrics["conversion_value"]==conversion_value
+print({"quoted_bond_value":quoted_bond_value,"conversion_value":conversion_value,
+       "quoted_conversion_premium_pct":100*(quoted_bond_value/conversion_value-1),
+       "model_value":quote_risk.value.amount,"model_delta_shares":quote_risk.metrics["delta"]})
+print("The quote's premium is not delta. Hedge shares come from the chosen model and are reported separately from the observed clean-price assumption.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C5" block="c5-quoted-premium" />
+
+</BuildIt>
+
+<LabCard notebook="02_pricing/instruments/convertible_bonds.ipynb" title="Convertible debt, equity and issuer exercise" description="Run regime, floor, analytical-limit, soft-call and corporate-action checks." />
+
+<Exercise id="c5-hedge" title="Size a delta-neutral equity short" question="At stock 100, calculate the short-share hedge for the entire convertible position and reprice the combined position at stock 90 and 110.">
+
+The equity short contributes minus delta times the stock move. Reprice the convertible for each move; do not use delta as the final option P&amp;L. The residual includes nonlinearity and finite-grid effects. A static hedge does not remove credit, volatility, dividends, financing or rebalancing costs, and these two finite shocks are not a guaranteed gamma profit.
+
+{/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="c5-exercise-hedge" role="exercise" */}
+```python exec id=c5-exercise-hedge role=exercise
+base=price_instrument(json.dumps(convert),credit_market,AS_OF,model="tree",metrics=["delta"])
+short_shares=base.metrics["delta"]
+results=[]
+for spot in [90.,110.]:
+    m=tracks.build_market("credit");m.insert_price("CONVERT",spot,"USD")
+    new_value=price_instrument(json.dumps(convert),m,AS_OF,model="tree").value.amount
+    equity_pnl=-short_shares*(spot-100.)
+    results.append({"spot":spot,"convert_pnl":new_value-base.value.amount,"equity_pnl":equity_pnl,
+                    "net_pnl":new_value-base.value.amount+equity_pnl})
+assert 0<short_shares<10_000
+assert all(math.isfinite(row["net_pnl"]) for row in results)
+print(pd.DataFrame(results))
+print("The static delta hedge removes the local first-order spot term, not gamma, credit, volatility, financing or rebalance costs.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C5" block="c5-exercise-hedge" />
+
+</Exercise>
+
+<Exercise id="c5-credit" title="Widen credit in every spot regime" question="Raise the risky discount rate from 6.5% to 7.5% at stock 50, 100 and 150. Explain why conversion value is unchanged but the convertible loses value.">
+
+The stock and contractual ratio are fixed within each credit comparison, so immediate conversion value cannot change. The straight-debt floor loses the same amount in each regime; the convertible's loss is smaller when equity optionality dominates. This is a controlled discount-curve credit stress, not a full issuer-default or stock-credit correlation simulation.
+
+{/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="c5-exercise-credit" role="exercise" */}
+```python exec id=c5-exercise-credit role=exercise
+from finstack_quant.core.market_data import DiscountCurve
+credit_rows=[]
+for spot in [50.,100.,150.]:
+    base_market=tracks.build_market("credit");base_market.insert_price("CONVERT",spot,"USD")
+    widened=tracks.build_market("credit");widened.insert_price("CONVERT",spot,"USD")
+    widened.insert(DiscountCurve("CONVERT-RISKY",AS_OF,[(t,math.exp(-.075*t)) for t in [0.,1.,5.,10.]],day_count="act_365f"))
+    before=price_instrument(json.dumps(convert),base_market,AS_OF,model="tree",metrics=["bond_floor","conversion_value"])
+    after=price_instrument(json.dumps(convert),widened,AS_OF,model="tree",metrics=["bond_floor","conversion_value"])
+    assert after.metrics["bond_floor"]<before.metrics["bond_floor"]
+    assert after.metrics["conversion_value"]==before.metrics["conversion_value"]
+    credit_rows.append({"spot":spot,"convert_credit_pnl":after.value.amount-before.value.amount,
+        "floor_credit_pnl":after.metrics["bond_floor"]-before.metrics["bond_floor"],"parity":after.metrics["conversion_value"]})
+print(pd.DataFrame(credit_rows))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C5" block="c5-exercise-credit" />
+
+</Exercise>
+
+<Exercise id="c5-dilution" title="Apply anti-dilution terms once" question="A realized issuance sells 100,000 new shares at 80 against one million old shares and an original conversion price of 100. Compare no protection, weighted-average adjustment and a full ratchet.">
+
+The weighted-average conversion price uses the old shares plus the shares that the new proceeds would have purchased at the original price. A full ratchet resets to the lower issue price. These are explicit simplified contractual policies; actual documents can contain exclusions, thresholds and limits. Validate the effective ratio before interpreting the price change.
+
+{/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="c5-exercise-antidilution" role="exercise" */}
+```python exec id=c5-exercise-antidilution role=exercise
+dilution_event={"date":"2025-01-15","new_issue_price":80.,"new_shares_issued":100_000.,"shares_outstanding_before":1_000_000.}
+adjusted=[]
+for policy in ["none","weighted_average","full_ratchet"]:
+    p=deepcopy(convert);p["instrument"]["spec"]["conversion"].update({"anti_dilution":policy,"dilution_events":[dilution_event]})
+    instrument=ConvertibleBond.from_json(json.dumps(p))
+    adjusted.append({"policy":policy,"effective_ratio":instrument.effective_conversion_ratio,
+        "pv_usd":price_instrument(json.dumps(p),credit_market,AS_OF,model="tree").value.amount})
+wa_price=100.*(1_000_000+100_000*80/100)/(1_000_000+100_000)
+assert abs(adjusted[1]["effective_ratio"]-1_000_000/wa_price)<1e-8
+assert adjusted[0]["effective_ratio"]<adjusted[1]["effective_ratio"]<adjusted[2]["effective_ratio"]
+print(pd.DataFrame(adjusted))
+print("The event is already effective at valuation. Apply the contract's actual corporate-action terms once; a hypothetical future financing belongs in a scenario.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C5" block="c5-exercise-antidilution" />
+
+</Exercise>
+
+<CheckYourself>
+
+- Can you distinguish price percent, parity ratio, conversion value and hedge shares without changing units?
+- Why does the straight-debt floor fall in a credit stress even when the stock is unchanged?
+- Which exercise rights disappear in the analytical limit, and why is the comparison tolerance nonzero?
+- What historical information would an exact k-of-n soft-call model need that this tree does not retain?
+- Which remaining risks explain why delta neutrality is not return neutrality?
+
+</CheckYourself>
+
+The [credit capstone](/learn/capstone) adds this convertible to the independent credit extension. Keep the risky curve and issuer-equity inputs in the market dependency report.

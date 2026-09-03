@@ -1,0 +1,1323 @@
+[
+  {
+    "lesson_id": "C1",
+    "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+    "cell_ids": [
+      "complex-bond-pricing",
+      "pik-cash-ladder",
+      "complex-bond-yield-oas",
+      "c1-fixed-float",
+      "c1-amortization",
+      "c1-toggle",
+      "c1-exercise-contract",
+      "c1-exercise-make-whole",
+      "c1-exercise-toggle"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "complex-bond-pricing",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "pik-cash-ladder",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "complex-bond-yield-oas",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-fixed-float",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-amortization",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-toggle",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-exercise-contract",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-exercise-make-whole",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/complex_cashflows.ipynb",
+        "cell_id": "c1-exercise-toggle",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_tracks",
+      "finstack_quant.cashflows.builder.AmortizationSpec",
+      "finstack_quant.cashflows.builder.CashFlowSchedule",
+      "finstack_quant.cashflows.builder.CouponType",
+      "finstack_quant.cashflows.builder.FixedCouponSpec",
+      "finstack_quant.cashflows.builder.FixedWindow",
+      "finstack_quant.cashflows.builder.FloatingCouponSpec",
+      "finstack_quant.cashflows.builder.FloatingRateSpec",
+      "finstack_quant.cashflows.builder.ScheduleParams",
+      "finstack_quant.cashflows.primitives.CFKind",
+      "finstack_quant.core.money.Money",
+      "finstack_quant.models.credit.MertonModel",
+      "finstack_quant.models.credit.ToggleExerciseModel",
+      "finstack_quant.valuations.instrument_cashflows",
+      "finstack_quant.valuations.instruments.BarrierCrossing",
+      "finstack_quant.valuations.instruments.Bond",
+      "finstack_quant.valuations.instruments.MertonMcConfig",
+      "finstack_quant.valuations.instruments.PikMode",
+      "finstack_quant.valuations.instruments.PikSchedule",
+      "finstack_quant.valuations.instruments.bond_from_cashflows_json",
+      "finstack_quant.valuations.instruments.price_instrument",
+      "finstack_quant.valuations.instruments.validate_instrument_json"
+    ],
+    "models": [
+      "instrument: Bond.price_merton_mc with MertonMcConfig and structural issuer-state toggle",
+      "registry: default bond pricing",
+      "registry: discounting",
+      "registry: discounting (contractual cashflow extraction)"
+    ],
+    "metrics": [
+      "embedded_option_value",
+      "oas",
+      "ytm",
+      "ytw"
+    ],
+    "returned_types": [
+      "dict",
+      "finstack_quant.valuations.ValuationResult",
+      "pandas.DataFrame"
+    ],
+    "expected_exceptions": [
+      {
+        "operation": "Bond.price_merton_mc",
+        "type": "ValueError",
+        "condition": "Amortizing cashflow contract is outside the supported fixed-rate bullet domain."
+      }
+    ],
+    "support_notes": [
+      "The 8NC3 bond fixture combines a cash/PIK coupon split, a coupon step, scheduled principal amortization and contiguous issuer call windows.",
+      "The contractual noncallable twin reconciles extracted cashflows to native PV. The quoted callable copy supplies clean price 100 only for yield/OAS measures; quoted price is not used to establish model PV.",
+      "embedded_option_value is the signed callable-minus-straight value to the holder; issuer optionality therefore has nonpositive sign in the executed example."
+    ]
+  },
+  {
+    "lesson_id": "C2",
+    "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+    "cell_ids": [
+      "revolver-observed-state",
+      "conditional-ead-proof",
+      "stochastic-revolver-proof",
+      "c2-loan-economics",
+      "c2-covenant-events",
+      "c2-ddtl",
+      "c2-draw-schedule",
+      "c2-exercise-floor",
+      "c2-exercise-fee",
+      "c2-exercise-credit-risk"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "revolver-observed-state",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "conditional-ead-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "stochastic-revolver-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-loan-economics",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-covenant-events",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-ddtl",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-draw-schedule",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-exercise-floor",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-exercise-fee",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/loans_and_credit_facilities.ipynb",
+        "cell_id": "c2-exercise-credit-risk",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_tracks",
+      "finstack_quant.core.market_data.ForwardCurve",
+      "finstack_quant.models.correlation.CorrelatedBernoulli",
+      "finstack_quant.valuations.instrument_cashflows",
+      "finstack_quant.valuations.instruments.price_instrument",
+      "finstack_quant.valuations.instruments.validate_instrument_json"
+    ],
+    "models": [
+      "registry: default deterministic revolving-credit pricing",
+      "registry: discounting",
+      "registry: monte_carlo_gbm"
+    ],
+    "metrics": [
+      "all_in_rate",
+      "available_capacity",
+      "cs01",
+      "discount_margin",
+      "oid_eir_amortization",
+      "utilization_rate",
+      "weighted_average_cost",
+      "ytc",
+      "ytw"
+    ],
+    "returned_types": [
+      "finstack_quant.models.correlation.CorrelatedBernoulli",
+      "finstack_quant.valuations.ValuationResult",
+      "pandas.DataFrame"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "The native utilization_rate is the observed drawn/commitment ratio, not conditional utilization at default.",
+      "A fixed-marginal two-state CorrelatedBernoulli example computes conditional utilization and expected loss visibly from joint_p11; no nonexistent native conditional-EAD metric is requested.",
+      "The stochastic revolver uses the supported mean-reverting utilization process, market-anchored credit-spread process and utilization-credit correlation. Fixed seed and configuration reproduce PV exactly; a sampled monotonic PV response is not asserted."
+    ]
+  },
+  {
+    "lesson_id": "C3",
+    "notebook": "02_pricing/instruments/structured_credit.ipynb",
+    "cell_ids": [
+      "c3-workflow-1",
+      "c3-workflow-2",
+      "c3-workflow-3",
+      "c3-pool-models",
+      "c3-fees-reinvestment",
+      "c3-workflow-4",
+      "c3-oc-default",
+      "c3-abs-cmbs",
+      "c3-quote-breakeven",
+      "c3-workflow-5",
+      "c3-workflow-7",
+      "c3-workflow-6",
+      "c3-exercise-equity",
+      "c3-exercise-enhancement",
+      "c3-exercise-rmbs"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-1",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-2",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-3",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-pool-models",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-fees-reinvestment",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-4",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-oc-default",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-abs-cmbs",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-quote-breakeven",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-5",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-7",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-workflow-6",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-exercise-equity",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-exercise-enhancement",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "c3-exercise-rmbs",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_tracks",
+      "finstack_quant.cashflows.builder.PrepaymentModelSpec",
+      "finstack_quant.portfolio.value_portfolio",
+      "finstack_quant.valuations.instruments.AssetPool",
+      "finstack_quant.valuations.instruments.StructuredCredit",
+      "finstack_quant.valuations.instruments.TrancheStructure",
+      "finstack_quant.valuations.instruments.price_instrument",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_breakeven_cdr",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_metrics",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_scenario_table",
+      "finstack_quant.valuations.instruments.validate_instrument_json"
+    ],
+    "models": [
+      "registry: default structured-credit waterfall pricing (tranche APIs)"
+    ],
+    "metrics": [
+      "clo_warf",
+      "clo_was",
+      "finstack_quant.valuations.instruments.TrancheMetrics.cs01",
+      "finstack_quant.valuations.instruments.TrancheMetrics.pv",
+      "finstack_quant.valuations.instruments.TrancheMetrics.wal",
+      "prepayment01",
+      "wal"
+    ],
+    "returned_types": [
+      "finstack_quant.valuations.instruments.ScenarioTable",
+      "finstack_quant.valuations.instruments.TrancheMetrics",
+      "pandas.DataFrame"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Five positive native PoolAssets total USD 100 million; metadata-only representative lines do not generate priced collateral cashflows.",
+      "Attachment/detachment coordinates are percentages: AAA 0\u201380, BBB 80\u201395 and equity 95\u2013100. The one-period no-default/no-prepayment case reconciles all tranche receipts and PVs to collateral cash.",
+      "A separately executed two-asset specialization (USD 50 million per asset) preserves that exact one-period waterfall reconciliation for lesson 2.8.",
+      "The 130% OC trigger fails against initial 125% senior coverage. Native multi-period results demonstrate lower senior WAL and lower BBB PV; no public cashflow-diversion trace is invented.",
+      "CLO-BBB is a separate analytical holding, repriced by tranche_id and added once. The whole-deal envelope is never inserted into the native portfolio as a BBB claim."
+    ]
+  },
+  {
+    "lesson_id": "C4",
+    "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+    "cell_ids": [
+      "c4-workflow-1",
+      "c4-workflow-2",
+      "c4-workflow-3",
+      "c4-workflow-4",
+      "c4-constituents",
+      "c4-option-risk",
+      "c4-workflow-5",
+      "c4-tranche-delta",
+      "c4-workflow-6",
+      "c4-exercise-hedge",
+      "c4-exercise-stressed-strike",
+      "c4-exercise-default"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-1",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-2",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-3",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-4",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-constituents",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-option-risk",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-5",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-tranche-delta",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-workflow-6",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-exercise-hedge",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-exercise-stressed-strike",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/credit_index_and_options.ipynb",
+        "cell_id": "c4-exercise-default",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_tracks",
+      "finstack_quant.calibration.calibrate",
+      "finstack_quant.core.market_data.BaseCorrelationCurve",
+      "finstack_quant.valuations.instruments.price_instrument",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_metrics",
+      "finstack_quant.valuations.instruments.validate_instrument_json"
+    ],
+    "models": [
+      "registry: bloomberg_cdso",
+      "registry: bloomberg_cdso (index option)",
+      "registry: hazard_rate",
+      "registry: hazard_rate (CDS index and synthetic tranche)"
+    ],
+    "metrics": [
+      "bucketed_cs01",
+      "bucketed_cs01::CDX-HAZ::10y",
+      "bucketed_cs01::CDX-HAZ::11m",
+      "bucketed_cs01::CDX-HAZ::3y",
+      "bucketed_cs01::CDX-HAZ::5y",
+      "bucketed_cs01::CDX-HAZ::7y",
+      "cs01",
+      "cs01::CDX-HAZ",
+      "implied_vol",
+      "par_spread",
+      "spread_dv01",
+      "vega"
+    ],
+    "returned_types": [
+      "finstack_quant.calibration.CalibrationResult",
+      "finstack_quant.valuations.ValuationResult",
+      "pandas.DataFrame"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "CDS option underlying_is_index=True, index_factor=1 and a non-knockout payer contract identify the supported index-option path.",
+      "The front-end-protection proof compares otherwise identical non-knockout and knockout payer prices. The calibrated hazard curve retains its quote replay recipe for CS01.",
+      "BaseCorrelationCurve points use percentage detachment coordinates and are replaced in fresh scenario markets before synthetic-tranche repricing."
+    ]
+  },
+  {
+    "lesson_id": "C5",
+    "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+    "cell_ids": [
+      "convertible-setup",
+      "convertible-regime-proof",
+      "convertible-floor-proof",
+      "convertible-analytical-limit-proof",
+      "convertible-delta-hedge",
+      "c5-typed-contract",
+      "c5-soft-call",
+      "c5-quoted-premium",
+      "c5-exercise-hedge",
+      "c5-exercise-credit",
+      "c5-exercise-antidilution"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "convertible-setup",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "convertible-regime-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "convertible-floor-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "convertible-analytical-limit-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "convertible-delta-hedge",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-typed-contract",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-soft-call",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-quoted-premium",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-exercise-hedge",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-exercise-credit",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/convertible_bonds.ipynb",
+        "cell_id": "c5-exercise-antidilution",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_tracks",
+      "_shared.instrument_fixtures.fixed_bond",
+      "_shared.instrument_fixtures.instrument_envelope",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.money.Money",
+      "finstack_quant.models.bs_price",
+      "finstack_quant.valuations.instrument_cashflows",
+      "finstack_quant.valuations.instruments.ConversionSpec",
+      "finstack_quant.valuations.instruments.ConvertibleBond",
+      "finstack_quant.valuations.instruments.price_instrument",
+      "finstack_quant.valuations.instruments.validate_instrument_json"
+    ],
+    "models": [
+      "registry: discounting",
+      "registry: discounting (matched straight-bond floor)",
+      "registry: tree",
+      "registry: tree (convertible)"
+    ],
+    "metrics": [
+      "bond_floor",
+      "conversion01",
+      "conversion_premium",
+      "conversion_value",
+      "delta",
+      "dividend01",
+      "parity",
+      "vega"
+    ],
+    "returned_types": [
+      "dict",
+      "finstack_quant.valuations.ValuationResult",
+      "pandas.DataFrame"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "The conversion ratio is total shares for the instrument: 10,000 shares for USD 1 million face, rather than a per-bond ratio accidentally applied to total notional.",
+      "The native fixed tree is validated against a maturity-only, credit-free conversion limit: discounted principal plus the matching European call. Its USD 0.20 absolute tolerance accounts for the native fixed tree grid.",
+      "The current Python API has no configurable convertible tree-step count and no compatible generic Crank-Nicolson convertible solver. Neither unsupported comparison is claimed.",
+      "A straight bond with identical coupon dates, credit discount curve and zero settlement days exactly matches the convertible bond-floor metric."
+    ]
+  },
+  {
+    "lesson_id": "V1",
+    "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+    "cell_ids": [
+      "v1-workflow-1",
+      "v1-workflow-2",
+      "v1-workflow-3",
+      "v1-workflow-4",
+      "v1-workflow-5",
+      "v1-workflow-6",
+      "v1-rates-convexity",
+      "v1-equity-fx-carry",
+      "v1-black76-carry",
+      "v1-exercise-hedge",
+      "v1-exercise-american",
+      "v1-exercise-roll"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-1",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-2",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-3",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-4",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-5",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-workflow-6",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-rates-convexity",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-equity-fx-carry",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-black76-carry",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-exercise-hedge",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-exercise-american",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/futures_and_listed_options.ipynb",
+        "cell_id": "v1-exercise-roll",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_tracks",
+      "_shared.instrument_fixtures.instrument_envelope",
+      "_shared.instrument_fixtures.ir_future",
+      "finstack_quant.core.dates.imm_option_expiry",
+      "finstack_quant.core.dates.next_imm",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.market_data.VolSurface",
+      "finstack_quant.models.bs_price",
+      "finstack_quant.models.monte_carlo.LsmcPricer",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "instrument: terms.model=black76",
+      "registry: bond_future_clean_price_proxy",
+      "registry: discounting",
+      "registry: discounting (listed option dispatcher)"
+    ],
+    "metrics": [
+      "bucketed_dv01",
+      "conversion_factor",
+      "convexity_adjustment",
+      "dv01",
+      "futures_price",
+      "implied_forward"
+    ],
+    "returned_types": [
+      "finstack_quant.valuations.ValuationResult",
+      "pandas.DataFrame"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "The two-deliverable example uses explicit conversion factors and demonstrates a CTD switch after a Treasury-curve shift. Futures quote points, contract face and dollar tick P&L are reconciled separately.",
+      "American and European listed options use the same native terms and forward inputs; American value is at least European value.",
+      "Daily variation margin is shown as contract multiplier times settlement-price changes. Exchange initial margin remains qualitative: no clearinghouse calculator or external margin fixture is substituted with bilateral SIMM or the BCBS schedule.",
+      "The physical-delivery UST future has no supported standalone cashflow theta. The volatility portfolio request excludes theta and reports that limitation."
+    ]
+  },
+  {
+    "lesson_id": "V2",
+    "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+    "cell_ids": [
+      "v2-workflow-1",
+      "v2-workflow-2",
+      "v2-workflow-3",
+      "v2-workflow-4",
+      "v2-overnight-gaps",
+      "v2-seasoned",
+      "v2-workflow-6",
+      "v2-vol-convexity",
+      "v2-workflow-5",
+      "v2-term-structure",
+      "v2-exercise-notional",
+      "v2-exercise-put-wing",
+      "v2-exercise-fx"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-1",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-2",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-3",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-4",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-overnight-gaps",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-seasoned",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-6",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-vol-convexity",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-workflow-5",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-term-structure",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-exercise-notional",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-exercise-put-wing",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/vix_and_variance.ipynb",
+        "cell_id": "v2-exercise-fx",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_tracks",
+      "_shared.instrument_fixtures.instrument_envelope",
+      "finstack_quant.core.market_data.ScalarTimeSeries",
+      "finstack_quant.core.market_data.VolSurface",
+      "finstack_quant.core.math.stats",
+      "finstack_quant.models.bs_price",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "instrument: terms.model=black76 (VIX listed option)",
+      "registry: discounting",
+      "registry: discounting (variance swap, VIX future and VIX listed option)"
+    ],
+    "metrics": [
+      "variance_expected",
+      "variance_realized",
+      "variance_strike_vol",
+      "variance_vega",
+      "vega"
+    ],
+    "returned_types": [
+      "finstack_quant.valuations.ValuationResult",
+      "float",
+      "pandas.DataFrame"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Expected variance is in decimal squared-volatility units; the variance notional multiplies variance differences. Volatility-index levels and option strikes are in index points.",
+      "The static strip uses the native grid, endpoint weights, OTM call/put selection and forward-anchor correction. It reconciles to native expected variance exactly and separately measures finite-grid error against flat volatility squared.",
+      "Close-to-close and Parkinson, Garman-Klass, Rogers-Satchell and Yang-Zhang variance estimates use the same positive aligned OHLC fixture.",
+      "The supported lookup surface for the SPX variance instrument is SPX_VOL. This is distinct from the common equity-option SPX-VOL surface.",
+      "Dated capstone variance pricing supplies every observed weekday close through the valuation date; missing realized observations are not silently treated as forecast variance."
+    ]
+  },
+  {
+    "lesson_id": "V3",
+    "notebook": "02_pricing/instruments/commodities.ipynb",
+    "cell_ids": [
+      "v3-workflow-1",
+      "v3-workflow-2",
+      "v3-workflow-3",
+      "v3-workflow-4",
+      "v3-workflow-6",
+      "v3-carry-asian",
+      "v3-complete-eight-envelopes",
+      "v3-workflow-5",
+      "v3-factor-stress",
+      "v3-exercise-calendar",
+      "v3-exercise-crack",
+      "v3-exercise-kirk"
+    ],
+    "source_cells": [
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-1",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-2",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-3",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-4",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-6",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-carry-asian",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-complete-eight-envelopes",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-workflow-5",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-factor-stress",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-exercise-calendar",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-exercise-crack",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/commodities.ipynb",
+        "cell_id": "v3-exercise-kirk",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_tracks",
+      "_shared.instrument_fixtures.instrument_envelope",
+      "finstack_quant.core.market_data.PriceCurve",
+      "finstack_quant.core.market_data.VolSurface",
+      "finstack_quant.models.correlation.LatentMultiFactor",
+      "finstack_quant.portfolio.value_portfolio",
+      "finstack_quant.scenarios.CurveKind",
+      "finstack_quant.scenarios.OperationSpec",
+      "finstack_quant.scenarios.ScenarioSpec",
+      "finstack_quant.scenarios.apply_scenario_to_market",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "registry: asian_turnbull_wakeman",
+      "registry: black76",
+      "registry: black76 (commodity vanilla and Kirk spread)",
+      "registry: discounting",
+      "registry: discounting (forward, future and swap)",
+      "registry: monte_carlo_schwartz_smith",
+      "registry: monte_carlo_schwartz_smith (single-underlying vanilla)"
+    ],
+    "metrics": [],
+    "returned_types": [
+      "finstack_quant.models.correlation.LatentMultiFactor",
+      "finstack_quant.valuations.ValuationResult",
+      "pandas.DataFrame"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Separate WTI, Brent and natural-gas forward curves preserve commodity units and the observed synthetic term structures.",
+      "Kirk is benchmarked against paired Monte Carlo spread payoffs using native LatentMultiFactor shocks. Those shocks already contain marginal volatility; the payoff calculation does not multiply by volatility a second time.",
+      "The benchmark tolerance includes paired Monte Carlo sampling error and a separate 1% approximation allowance. Kirk is not asserted to be exact.",
+      "The Schwartz-Smith registry example uses a single-underlying WTI vanilla option with supported instrument_pricing_overrides.model_config.mc_paths. It is not presented as a supported two-commodity spread engine.",
+      "The fixed registry Schwartz-Smith parameterization is an example, not a calibrated commodity model. The short-factor maturity loading is displayed separately from the native option price.",
+      "All eight supported commodity envelopes are priced. The listed future option has an independent Black76 check; the commodity swaption uses quantity per settlement and an explicit sum-of-discount-factors identity.",
+      "Kirk exercises include a near-zero effective denominator where approximation error exceeds Monte Carlo sampling error; no uniform exactness claim is made."
+    ]
+  },
+  {
+    "lesson_id": "capstone",
+    "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+    "cell_ids": [
+      "credit-imports",
+      "credit-market-setup",
+      "credit-pricing-reconciliation",
+      "credit-direct-pricing",
+      "credit-independent-analytical",
+      "credit-risk-coverage",
+      "credit-risk-factor-tail",
+      "credit-stress-repricing",
+      "credit-historical-replay",
+      "credit-track-diagnostics",
+      "credit-margin-vm-schedule",
+      "credit-margin-simm-source-reuse",
+      "credit-borrower-credit-proof",
+      "credit-quarterly-covenants",
+      "credit-physical-ecl",
+      "credit-dated-repricing",
+      "credit-attribution-linking-proof",
+      "credit-reporting-proof",
+      "credit-reference-snapshot",
+      "vol-imports",
+      "vol-market-setup",
+      "vol-pricing-reconciliation",
+      "vol-direct-pricing",
+      "vol-independent-analytical",
+      "vol-risk-coverage",
+      "vol-risk-factor-tail",
+      "vol-stress-repricing",
+      "vol-historical-replay",
+      "vol-option-strip-pnl",
+      "vol-ctd-basis",
+      "vol-margin-vm-schedule",
+      "vol-margin-simm-source-reuse",
+      "vol-borrower-credit-proof",
+      "vol-quarterly-covenants",
+      "vol-physical-ecl",
+      "vol-dated-repricing",
+      "vol-realized-implied-attribution",
+      "vol-attribution-linking-proof",
+      "vol-reporting-proof",
+      "vol-reference-snapshot",
+      "credit-acceptance",
+      "vol-acceptance"
+    ],
+    "source_cells": [
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-imports",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-market-setup",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-pricing-reconciliation",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-direct-pricing",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-independent-analytical",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-risk-coverage",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-risk-factor-tail",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-stress-repricing",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-historical-replay",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-track-diagnostics",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-margin-vm-schedule",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-margin-simm-source-reuse",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-borrower-credit-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-quarterly-covenants",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-physical-ecl",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-dated-repricing",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-attribution-linking-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-reporting-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-reference-snapshot",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-imports",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-market-setup",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-pricing-reconciliation",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-direct-pricing",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-independent-analytical",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-risk-coverage",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-risk-factor-tail",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-stress-repricing",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-historical-replay",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-option-strip-pnl",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-ctd-basis",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-margin-vm-schedule",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-margin-simm-source-reuse",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-borrower-credit-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-quarterly-covenants",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-physical-ecl",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-dated-repricing",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-realized-implied-attribution",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-attribution-linking-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-reporting-proof",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-reference-snapshot",
+        "role": "build"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_credit_portfolio_workflow.ipynb",
+        "cell_id": "credit-acceptance",
+        "role": "exercise"
+      },
+      {
+        "notebook": "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb",
+        "cell_id": "vol-acceptance",
+        "role": "exercise"
+      }
+    ],
+    "notebook_dependencies": [
+      "07_advanced_quant/margin_collateral_and_xva.ipynb"
+    ],
+    "imports": [
+      "_shared.analyst_history.history_events",
+      "_shared.analyst_history.history_market",
+      "_shared.analyst_history.history_quotes",
+      "_shared.analyst_history.performance_history",
+      "_shared.analyst_tracks",
+      "_shared.borrower_model.PERIODS",
+      "_shared.borrower_model.borrower_data",
+      "_shared.borrower_model.borrower_model",
+      "_shared.instrument_fixtures.instrument_envelope",
+      "finstack_quant.analytics.Performance",
+      "finstack_quant.calibration.calibrate",
+      "finstack_quant.core.currency.Currency",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.market_data.FxMatrix",
+      "finstack_quant.core.market_data.MarketContext",
+      "finstack_quant.core.market_data.PriceCurve",
+      "finstack_quant.core.market_data.ScalarTimeSeries",
+      "finstack_quant.core.market_data.VolSurface",
+      "finstack_quant.covenants.Covenant",
+      "finstack_quant.covenants.CovenantEngine",
+      "finstack_quant.covenants.CovenantSpec",
+      "finstack_quant.covenants.CovenantType",
+      "finstack_quant.margin.CsaSpec",
+      "finstack_quant.margin.ScheduleImCalculator",
+      "finstack_quant.margin.VmCalculator",
+      "finstack_quant.models.bs_price",
+      "finstack_quant.models.correlation.CorrelatedBernoulli",
+      "finstack_quant.portfolio.Portfolio",
+      "finstack_quant.portfolio.brinson_fachler",
+      "finstack_quant.portfolio.carino_link",
+      "finstack_quant.portfolio.twrr_linked",
+      "finstack_quant.portfolio.value_portfolio",
+      "finstack_quant.reporting.document.KPI",
+      "finstack_quant.reporting.document.Section",
+      "finstack_quant.reporting.document.TearSheet",
+      "finstack_quant.reporting.theme.INSTITUTIONAL",
+      "finstack_quant.statements.Evaluator",
+      "finstack_quant.statements.ForecastSpec",
+      "finstack_quant.statements.ModelBuilder",
+      "finstack_quant.statements_analytics.Exposure",
+      "finstack_quant.statements_analytics.QualitativeFlags",
+      "finstack_quant.statements_analytics.StagingConfig",
+      "finstack_quant.statements_analytics.classify_stage",
+      "finstack_quant.statements_analytics.compute_ecl",
+      "finstack_quant.valuations.instruments.instrument_cashflows_json",
+      "finstack_quant.valuations.instruments.price_instrument",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_breakeven_cdr",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_metrics",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_scenario_table"
+    ],
+    "models": [
+      "registry: bond_future_clean_price_proxy",
+      "registry: bond_future_clean_price_proxy (volatility history VM reset)",
+      "registry: native per-instrument defaults",
+      "registry: tree"
+    ],
+    "metrics": [
+      "bond_floor",
+      "bucketed_cs01",
+      "bucketed_dv01",
+      "conversion_factor",
+      "conversion_value",
+      "cs01",
+      "delta",
+      "dv01",
+      "finstack_quant.valuations.instruments.TrancheMetrics.cs01",
+      "finstack_quant.valuations.instruments.TrancheMetrics.wal",
+      "futures_price",
+      "gamma",
+      "parity",
+      "pv01",
+      "rho",
+      "theta",
+      "variance_expected",
+      "vega"
+    ],
+    "returned_types": [
+      "finstack_quant.analytics.MultiFactorResult",
+      "finstack_quant.analytics.Performance",
+      "finstack_quant.core.market_data.FxRateResult",
+      "finstack_quant.covenants.CovenantReport",
+      "finstack_quant.margin.ImResult",
+      "finstack_quant.margin.VmResult",
+      "finstack_quant.portfolio.BrinsonPeriodResult",
+      "finstack_quant.portfolio.CarinoLinkedAttribution",
+      "finstack_quant.portfolio.Portfolio",
+      "finstack_quant.portfolio.PortfolioValuation",
+      "finstack_quant.reporting.document.TearSheet",
+      "finstack_quant.statements_analytics.EclResult",
+      "finstack_quant.statements_analytics.StageResult",
+      "finstack_quant.valuations.instruments.TrancheMetrics",
+      "pandas.DataFrame"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Both independent submissions execute eight stages: complete market, position pricing, strict supported risk, full repricing stress, bilateral IRS margin, shared borrower statements/covenants, three-period attribution and a native tear sheet.",
+      "The credit submission holds the common native book plus credit additions and a separate actual CLO-BBB analytical sleeve. The volatility submission holds the common native book plus volatility additions. BBB is independently repriced at every stress and history date and added exactly once.",
+      "The three consecutive weekly periods run 2025-01-15 through 2025-02-05 without external flows or trades. This independent short model-mark history complements Part III\u2019s separate three-quarter proof of external-flow handling.",
+      "Dated FX is applied on every valuation date. The variance swap receives observed closes through that date. UST futures mark-to-VM-cash transfer plus a zero-valued reset contract preserves wealth; physical-future theta remains explicitly unavailable.",
+      "Stress calls are PV-only. Hazard curves used under simultaneous rate/spread shocks are recalibrated with the shocked discount quotes; quote replay metadata is preserved.",
+      "The actual common IRS defines the bilateral netting set for VM and schedule IM. Exact tagged native SIMM cells are loaded from the declared margin notebook dependency in validated order, and the one-factor hand calculation is reconciled. These margins do not describe CCP requirements or cash-security margin.",
+      "Brinson-Fachler period effects and Carino linked effects reconcile to actual dated sleeve and combined wealth changes against the disclosed constant-cash 4% annual simple-return comparator.",
+      "All expected_exceptions arrays are empty where no intentional negative test is part of this principal proof; unsupported API paths are described rather than executed as if supported.",
+      "Actual IRS residual maturity comes from the shared contract end date. Both actual exposures are below the USD500k CSA MTA; zero VM transfer is verified.",
+      "Native IR SIMM tenor aggregation does not model subcurve basis and covers only the explicitly selected IRS.",
+      "Four-quarter base/downside covenant forecast and amortizing physical ECL are evaluated using shared borrower data; ECL is not deducted from market PV.",
+      "Independent per-position native pricing plus current FX and separately priced BBB reconciles with portfolio aggregation.",
+      "An independent BSM formula reconciles the actual common equity call, in addition to per-position versus portfolio pricing.",
+      "Tail risk reprices every actual holding across 504 synthetic one-day eight-factor shocks; native VaR/ES and factor regressions reconcile to independent sample calculations. Bootstrap intervals measure finite-sample uncertainty, not model completeness.",
+      "A synthetic future-dated observation pattern is reapplied at the frozen valuation date as a historical-pattern stress. It is not a contemporaneous backtest or a real crisis replay.",
+      "Credit includes stressed tranche metrics, controlled one-period cash reconciliation, first-writedown CDR, conditional revolver draws and convertible floor/parity/delta diagnostics.",
+      "Volatility includes fixed option-inventory replication PnL with the forward/cash correction and finite-strike residual, actual realized/implied variance attribution, and CTD/gross-basis diagnostics.",
+      "Tear sheets include sensitivity, tail/factor risk, both stress cases, margin, covenants, physical ECL, dated performance and track-specific diagnostics."
+    ]
+  }
+]

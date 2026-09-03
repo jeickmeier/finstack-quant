@@ -1,0 +1,363 @@
+---
+id: '3.6'
+title: 'Margin, Collateral, and Capital: The Cost of Holding Risk'
+description: 'Analyst program lesson 3.6: Margin, Collateral, and Capital: The Cost
+  of Holding Risk'
+desk_question: "\"The trade makes money on paper. What does it cost to *hold* \u2014\
+  \ margin, funding, capital?\""
+references:
+- '#isda-simm'
+- '#isda-2016-vm-csa'
+- '#isda-2018-im-csa'
+- '#bcbs-iosco-uncleared-margin'
+- '#bcbs-279-sa-ccr'
+- '#bcbs-frtb-minimum-capital-requirements'
+- '#gregory-xva-challenge'
+- '#green-xva'
+- '#isda-2002-master-agreement'
+api: []
+status: published
+---
+
+<DeskContext question={"The trade makes money on paper. What does it cost to hold?"}>
+
+Value the payer swap and protection-buying CDS in one explicitly designated teaching bilateral netting set. Reconcile their sensitivity mapping before comparing initial margin methods. Then calculate variation margin, regulatory-capital measures and funding adjustments. These are different quantities with different purposes; adding them indiscriminately to trade notional would be meaningless.
+
+Complete three mandatory sessions: risk mapping, margin and capital, then XVA and decision exercises. This is an auditable calculation with pinned embedded parameters, not a claim of regulatory approval or complete bank-wide capital coverage.
+
+</DeskContext>
+
+<Standard>
+
+Variation margin collateralizes current mark-to-market under CSA terms. Initial margin protects against potential adverse moves during closeout. Schedule and SIMM are bilateral approaches for non-centrally cleared derivatives; neither is exchange clearing margin. Exchange daily settlement is studied in V1. Legal netting eligibility is a supplied teaching assumption, not something inferred from a common counterparty name.
+
+SIMM IR delta uses currency per basis point on its prescribed tenor grid. This implementation pins SIMM 2.6, the embedded 2023 vintage. FRTB GIRR sensitivities use currency per percentage point, so the same derivative is 100 times the per-bp amount. Credit-spread delta is also scaled explicitly before FRTB. A string rename of a generic risk bucket cannot establish these conventions. Reprice directly on the target grids and retain position quantity, full contractual notional, currency, factor, tenor, sign and bump size in every row.
+
+The IR experiment inserts all target knots while retaining original interpolation breakpoints, then applies a triangular nodal zero/forward-rate shock. A zero bump must preserve PV. For CDS spread delta, rebuild the calibrated credit curve from bumped quotes on 1Y/2Y/3Y/5Y/10Y targets. The missing 2Y quote is a disclosed synthetic par quote from the original curve; all original quotes remain calibration anchors. Its small base-price drift is measured separately from sensitivity. Residual credit-sector classification is explicit because this exercise does not infer a detailed issuer sector.
+
+A single SIMM sensitivity below concentration thresholds has IM equal to absolute sensitivity times its risk weight. Multiple factors require correlations and concentration treatment in the native engine. Schedule IM starts with asset-class/notional/maturity rates and applies the netting-set reduction $0.4+0.6NGR$. For this mixed asset-class set, compute gross class charges natively and show the aggregate NGR arithmetic. Drop-one marginal IM changes need not sum to total IM.
+
+SA-CCR estimates exposure at default, $EAD=\alpha(RC+PFE)$. FRTB estimates market-risk capital and has separate delta, vega, curvature, default-risk and residual-risk concepts. The executable book case below covers the two trades' GIRR/credit delta; the regulatory-capital lab supplies the remaining explicit illustrative components. XVA uses exposure, hazard, discounting and funding assumptions: CVA is counterparty loss, DVA own-default benefit, FVA funding, and MVA funding of segregated IM. These illustrative profiles are assumptions, not a simulated exposure forecast.
+
+The visible table preserves OIS and SOFR source factors, but the native SIMM and FRTB GIRR sensitivity containers key interest-rate inputs by currency and tenor. Adding both curves therefore nets them at that key; a separate subcurve-basis treatment is unavailable through these containers. The resulting charge is an illustrative simplified native calculation. It is not a complete subcurve-sensitive regulatory calculation.
+
+Schedule residual maturity and SA-CCR start/end dates are derived from the same priced contracts: the IRS runs from 15 April 2025 to 15 April 2028, and the CDS ends on 20 March 2030. The IM profile uses an assumed linear decay to the longest actual maturity; it does not claim to reprice future margin on each date.
+
+</Standard>
+
+<BuildIt>
+
+### Session 1: directly price the risk mapping
+
+One swap position unit contains USD 2m notional. The discount and forward curve roles remain separate in the mapping. Central differences use ±1bp. Preserve all interpolation knots so adding target-grid nodes cannot itself manufacture a price move; the zero-shock check is USD 1e-6.
+
+{/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="margin-proof-1" role="build" */}
+```python exec id=margin-proof-1 role=build
+import copy
+import json
+import math
+
+import numpy as np
+import pandas as pd
+
+from _shared.analyst_book import AS_OF, build_market, instruments
+from finstack_quant.core.market_data import MarketContext
+from finstack_quant.margin import FrtbSbaEngine, FrtbSensitivities, SimmCalculator, SimmSensitivities
+from finstack_quant.valuations.instruments import price_instrument
+
+market = build_market("rates")
+swap = json.dumps(instruments("rates")["USD-PAYER-IRS"])
+original_market = json.loads(market.to_json())
+quantity = 1.0  # One position unit already contains USD 2m contractual notional.
+grid_simm = dict(zip(["2W", "1M", "3M", "6M", "1Y", "2Y", "3Y", "5Y", "10Y", "15Y", "20Y", "30Y"], [14/365, 1/12, .25, .5, 1, 2, 3, 5, 10, 15, 20, 30]))
+grid_frtb = dict(zip(["0.25Y", "0.5Y", "1Y", "2Y", "3Y", "5Y", "10Y", "15Y", "20Y", "30Y"], [.25, .5, 1, 2, 3, 5, 10, 15, 20, 30]))
+
+
+def target_market(curve_id, grid, selected, bump_decimal):
+    """Apply a disclosed nodal triangular rate shock directly on the target grid."""
+    payload = copy.deepcopy(original_market)
+    target = next(curve for curve in payload["curves"] if curve["id"] == curve_id)
+    # Preserve every original interpolation breakpoint, adding target-grid nodes.
+    times = sorted(set([knot[0] for knot in target["knot_points"]] + list(grid.values())))
+    original = market.get_discount(curve_id) if target["type"] == "discount" else market.get_forward(curve_id)
+    assert target["interp_style"] in {"log_linear", "linear"}, "This proof requires exact knot insertion for the source interpolation."
+    weights = [float(label == selected) for label in grid]
+    knots = []
+    for time in times:
+        weight = float(np.interp(time, list(grid.values()), weights))
+        value = original.df(time) * math.exp(-bump_decimal * time * weight) if target["type"] == "discount" else original.rate(time) + bump_decimal * weight
+        knots.append([time, value])
+    target["knot_points"] = knots
+    # These are curve-space sensitivity markets, not recalibrated quote scenarios.
+    target["rate_calibration"] = None
+    return MarketContext.from_json(json.dumps(payload))
+
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.6" block="margin-proof-1" />
+{/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="margin-proof-2" role="build" */}
+```python exec id=margin-proof-2 role=build
+base_pv = price_instrument(swap, market, AS_OF, model="discounting").value.amount
+rows = []
+for framework, grid in [("SIMM", grid_simm), ("FRTB", grid_frtb)]:
+    for curve_id in ["USD-OIS", "USD-SOFR-3M"]:
+        zero = price_instrument(swap, target_market(curve_id, grid, next(iter(grid)), 0.0), AS_OF, model="discounting").value.amount
+        assert abs(zero - base_pv) < 1e-6, "USD: inserting grid points must preserve the base price."
+        for tenor in grid:
+            up = price_instrument(swap, target_market(curve_id, grid, tenor, .0001), AS_OF, model="discounting").value.amount
+            down = price_instrument(swap, target_market(curve_id, grid, tenor, -.0001), AS_OF, model="discounting").value.amount
+            # Signed derivative: positive means this payer swap gains when this rate rises.
+            per_bp = quantity * (up - down) / 2
+            rows.append(dict(framework=framework, position="USD-PAYER-IRS", quantity=quantity, contractual_notional_usd=2_000_000, currency="USD", factor=curve_id, tenor=tenor, bump_decimal=.0001, derivative_sign="up-minus-down", units="USD/bp" if framework == "SIMM" else "USD/percentage-point", amount=per_bp if framework == "SIMM" else 100 * per_bp))
+mapping = pd.DataFrame(rows)
+assert np.isfinite(mapping.amount).all()
+print(mapping.to_string(index=False))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.6" block="margin-proof-2" />
+
+The hand check uses USD 1,000/bp at 5Y times the embedded 51bp weight, giving USD 51,000. The native engine must match within USD 1e-8. A 7Y IR bucket is deliberately rejected with `ValueError` because it is not in the prescribed grid.
+
+{/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="margin-proof-3" role="build" */}
+```python exec id=margin-proof-3 role=build
+simm = SimmSensitivities("USD")
+for row in mapping[mapping.framework == "SIMM"].itertuples():
+    simm.add_ir_delta(row.currency, row.tenor, row.amount)
+simm_result = SimmCalculator("v2_6").calculate_from_sensitivities(simm, "USD", AS_OF)
+frtb = FrtbSensitivities("USD")
+for row in mapping[mapping.framework == "FRTB"].itertuples():
+    frtb.add_girr_delta(row.tenor, row.amount, row.currency)
+capital = FrtbSbaEngine().calculate(frtb)
+assert simm_result.amount > 0 and capital.total > 0
+
+# Independently reconcile one 5Y IR bucket, below the concentration threshold.
+one_bucket = SimmSensitivities("USD")
+one_bucket.add_ir_delta("USD", "5Y", 1000.0)
+one_result = SimmCalculator("v2_6").calculate_from_sensitivities(one_bucket, "USD", AS_OF)
+manual = abs(1000.0 * 51.0)  # Embedded SIMM v2.6: 5Y weight 51bp, 2023 vintage.
+assert abs(one_result.amount - manual) < 1e-8, "USD: single-bucket SIMM must equal weighted sensitivity."
+try:
+    invalid = SimmSensitivities("USD")
+    invalid.add_ir_delta("USD", "7Y", 1.0)
+    SimmCalculator("v2_6").calculate_from_sensitivities(invalid, "USD", AS_OF)
+except ValueError:
+    print("Invalid 7Y SIMM bucket rejected, as required.")
+else:
+    raise AssertionError("Unknown regulatory bucket was accepted")
+print({"simm_v2_6_2023_usd": simm_result.amount, "frtb_bcbs_d457_usd": capital.total, "single_bucket_manual_usd": manual})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.6" block="margin-proof-3" />
+
+The CDS adds both quote-space credit sensitivity and fixed-hazard discount sensitivity. The 2Y synthetic-quote insertion is accepted only if its repriced USD 1m CDS moves by less than USD 0.10; the actual drift is printed. This is an explicit calibration approximation bound, not the identity tolerance used above. Tenor labels identify standard CDS quote pillars, whose actual semiannual maturity date is shown.
+
+{/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="cds-target-grid" role="build" */}
+```python exec id=cds-target-grid role=build
+from datetime import date
+from _shared.analyst_book import calibration_envelope
+from finstack_quant.calibration import calibrate
+from finstack_quant.core.dates import prev_cds_date, prev_cds_semiannual_roll, next_semiannual_cds_maturity
+credit_market=build_market("base")
+cds=json.dumps(instruments("base")["ACME-CDS"])
+cds_base=price_instrument(cds,credit_market,AS_OF).value.amount
+# The standard2Y credit node is absent from the original quote strip.
+# Add a synthetic par quote from the existing curve, retaining every original quote.
+roll=prev_cds_semiannual_roll(AS_OF)
+two_year=copy.deepcopy(instruments("base")["ACME-CDS"])
+two_year["instrument"]["spec"]["premium"].update({"start":prev_cds_date(AS_OF).isoformat(),"end":next_semiannual_cds_maturity(date(roll.year+2,roll.month,roll.day)).isoformat()})
+synthetic_2y=price_instrument(json.dumps(two_year),credit_market,AS_OF,metrics=["par_spread"]).get_metric("par_spread")
+credit_plan=calibration_envelope("base")
+quote=copy.deepcopy(next(q for q in credit_plan["market_data"] if q["kind"]=="cds_quote"))
+quote.update({"id":"SIMM-CDS-2Y","spread_bp":synthetic_2y});quote["pillar"]["tenor"]["count"]=2
+credit_plan["market_data"].append(quote);credit_plan["plan"]["quote_sets"]["issuer_a_cds_quotes"].append(quote["id"])
+grid_credit=calibrate(credit_plan).market
+grid_pv=price_instrument(cds,grid_credit,AS_OF).value.amount
+# Quote construction/calibration approximation is separate from finite-difference error.
+assert abs(grid_pv-cds_base)<.10, "USD on1m CDS: added quote's base-price drift must remain below10c."
+print({"synthetic_2Y_spread_bp":synthetic_2y,"maturity":two_year["instrument"]["spec"]["premium"]["end"],"grid_base_drift_usd":grid_pv-cds_base})
+credit_rows=[]
+for year in [1,2,3,5,10]:
+ values=[]
+ for bp in [1.,-1.]:
+  shocked=copy.deepcopy(credit_plan)
+  selected=[q for q in shocked["market_data"] if q["kind"]=="cds_quote" and q["pillar"]["tenor"]["count"]==year]
+  assert len(selected)==1
+  selected[0]["spread_bp"]+=bp
+  values.append(price_instrument(cds,calibrate(shocked).market,AS_OF).value.amount)
+ credit_rows.append({"framework":"SIMM","position":"ACME-CDS","quantity":1.,"contractual_notional_usd":1_000_000,"currency":"USD","factor":"ACME-HZD par CDS","tenor":f"{year}Y","bump_decimal":.0001,"derivative_sign":"up-minus-down","units":"USD/bp","amount":(values[0]-values[1])/2})
+# CDS discount risk on both required IR grids; the credit curve is held fixed for IR delta.
+for framework,grid in [("SIMM",grid_simm),("FRTB",grid_frtb)]:
+ for tenor in grid:
+  values=[]
+  for bump in [.0001,-.0001]:
+   bumped=target_market("USD-OIS",grid,tenor,bump)
+   bumped.insert(credit_market.get_hazard("ACME-HZD"))
+   values.append(price_instrument(cds,bumped,AS_OF).value.amount)
+  per_bp=(values[0]-values[1])/2
+  credit_rows.append({"framework":framework,"position":"ACME-CDS","quantity":1.,"contractual_notional_usd":1_000_000,"currency":"USD","factor":"USD-OIS","tenor":tenor,"bump_decimal":.0001,"derivative_sign":"up-minus-down","units":"USD/bp" if framework=="SIMM" else "USD/percentage-point","amount":per_bp if framework=="SIMM" else 100*per_bp})
+full_mapping=pd.concat([mapping,pd.DataFrame(credit_rows)],ignore_index=True)
+assert np.isfinite(full_mapping.amount).all()
+print(full_mapping.to_string(index=False))
+def netting_sensitivities(keep):
+ sens=SimmSensitivities("USD")
+ for row in full_mapping[(full_mapping.framework=="SIMM") & full_mapping.position.isin(keep)].itertuples():
+  if row.factor=="ACME-HZD par CDS":sens.add_credit_qualifying_delta("residual","ACME",row.tenor,row.amount)
+  else:sens.add_ir_delta("USD",row.tenor,row.amount)
+ return sens
+netting_ids=["USD-PAYER-IRS","ACME-CDS"]
+netting_sens=netting_sensitivities(netting_ids)
+netting_im=SimmCalculator("v2_6").calculate_from_sensitivities(netting_sens,"USD",AS_OF)
+assert netting_im.amount>0
+print("Bilateral teaching netting set ACME-DEALER/CSA-ANALYST, residual credit sector; SIMM2.6(2023):",netting_im.amount)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.6" block="cds-target-grid" />
+
+### Session 2: margin and capital on the declared set
+
+The comparison keeps the same two trades, currencies and notionals. NGR uses signed MTMs in the numerator and gross positive replacement cost in the denominator. CSA VM is then tested for a controlled USD 50,000 mark increase. The FRTB result pins the embedded BCBS d457 parameter set and labels its delta-only scope; no omitted vega/curvature is reported as measured zero. The same trade records enter the SA-CCR example.
+
+### Session 3: exposure and funding assumptions
+
+A deterministic linear-to-maturity decay transforms current SIMM into an assumed future IM profile. Funding spreads are in bp. The printed XVA identity must reconcile within USD 1e-8, while the standalone MVA intentionally uses its stated discount/survival assumptions. Different exposure or funding assumptions legitimately change these values.
+
+{/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="netting-margin-capital-xva" role="build" */}
+```python exec id=netting-margin-capital-xva role=build
+import finstack_quant.margin as margin_api
+from finstack_quant.core.market_data import HazardCurve, DiscountCurve
+swap_pv=price_instrument(swap,market,AS_OF,model="discounting").value.amount
+net_mtm=swap_pv+cds_base
+gross_positive=max(swap_pv,0)+max(cds_base,0)
+ngr=max(net_mtm,0)/gross_positive if gross_positive>0 else 0.0
+schedule=margin_api.ScheduleImCalculator.bcbs_standard()
+swap_contract=json.loads(swap)["instrument"]["spec"]
+cds_contract=json.loads(cds)["instrument"]["spec"]
+trade_terms=[{"position":"USD-PAYER-IRS","asset_class":"interest_rate","notional_usd":float(swap_contract["notional"]["amount"]),"start":swap_contract["fixed"]["start"],"end":swap_contract["fixed"]["end"]},{"position":"ACME-CDS","asset_class":"credit","notional_usd":float(cds_contract["notional"]["amount"]),"start":cds_contract["premium"]["start"],"end":cds_contract["premium"]["end"]}]
+schedule_rows=[{**terms,"maturity_years":(date.fromisoformat(terms["end"])-AS_OF).days/365} for terms in trade_terms]
+assert trade_terms[0]["start"]=="2025-04-15" and trade_terms[0]["end"]=="2028-04-15"
+assert trade_terms[1]["end"]=="2030-03-20"
+
+for row in schedule_rows:row["gross_schedule_im_usd"]=schedule.calculate_for_notional(row["notional_usd"],"USD",row["asset_class"],row["maturity_years"],AS_OF).amount
+gross_schedule=sum(r["gross_schedule_im_usd"] for r in schedule_rows)
+# The API's NGR convenience method is single asset class; aggregate this mixed set visibly.
+schedule_net=gross_schedule*(.4+.6*ngr)
+assert 0<=ngr<=1 and .4*gross_schedule<=schedule_net<=gross_schedule
+print(pd.DataFrame(schedule_rows).to_string(index=False))
+print({"net_mtm_usd":net_mtm,"NGR":ngr,"schedule_net_usd":schedule_net,"SIMM_net_usd":netting_im.amount})
+csa=margin_api.CsaSpec.usd_regulatory().with_vm_threshold(0.,0.)
+initial_vm=margin_api.VmCalculator(csa).calculate(net_mtm,0.,"USD",AS_OF)
+next_vm=margin_api.VmCalculator(csa).calculate(net_mtm+50_000.,net_mtm,"USD",AS_OF)
+assert abs(next_vm.delivery_amount-50_000.)<.01
+print("VM initial and controlled+50k mark move:",initial_vm.to_json(),next_vm.to_json())
+# The native IR containers net OIS and SOFR within currency/tenor; no subcurve basis dimension is available.
+# This is a simplified native charge, not a complete regulatory subcurve treatment.
+# Capital is distinct from IM. Explicit two-trade GIRR and credit-spread delta scope.
+capital_sens=FrtbSensitivities("USD")
+for row in full_mapping[full_mapping.framework=="FRTB"].itertuples():capital_sens.add_girr_delta(row.tenor,row.amount,row.currency)
+for row in full_mapping[(full_mapping.framework=="SIMM") & (full_mapping.factor=="ACME-HZD par CDS")].itertuples():capital_sens.add_csr_nonsec_delta("ACME",16,row.tenor,100*row.amount)
+capital_result=FrtbSbaEngine().calculate(capital_sens)
+assert capital_result.total>0
+print("FRTB BCBSd457 embedded parameter vintage; two-trade delta-only charge:",capital_result.total,capital_result.binding_scenario)
+trades=[margin_api.SaCcrTrade(trade_id=terms["position"],asset_class=terms["asset_class"],notional=terms["notional_usd"],start_date=terms["start"],end_date=terms["end"],underlier="USD" if terms["asset_class"]=="interest_rate" else "ACME",hedging_set="USD-IRS" if terms["asset_class"]=="interest_rate" else "ACME",direction=1.,supervisory_delta=1.,mtm=swap_pv if terms["asset_class"]=="interest_rate" else cds_base) for terms in trade_terms]
+
+config=margin_api.SaCcrNettingSetConfig.unmargined(margin_api.NettingSetId.bilateral("ACME-DEALER","CSA-ANALYST"),collateral=0.,as_of=AS_OF)
+ead=margin_api.SaCcrEngine().calculate_ead(config,trades)
+assert abs(ead.ead-ead.alpha*(ead.rc+ead.pfe))<1e-6
+print({"SA_CCR_EAD_USD":ead.ead,"replacement_cost":ead.rc,"PFE":ead.pfe,"alpha":ead.alpha})
+longest_maturity=max(row["maturity_years"] for row in schedule_rows)
+times=[.5,1.,2.,3.,longest_maturity]
+im_profile=margin_api.im_profile_from_simm(SimmCalculator("v2_6"),netting_sens,"USD",margin_api.ImDecayProfile.linear_to_maturity(longest_maturity),times)
+mva=margin_api.compute_mva(im_profile,[(0.,50.)],credit_market.get_discount("USD-OIS"))
+# The linear IM decay ends at the longest actual trade maturity; it is assumed, not future repricing.
+# Explicit assumed exposure profile; not a simulated future portfolio exposure claim.
+exposure=margin_api.ExposureProfile(times,[net_mtm]*5,[max(net_mtm,0)+50_000*(1-t/6) for t in times],[20_000*(1-t/6) for t in times])
+cpty=HazardCurve("DEALER",AS_OF,[(0.,.02),(30.,.02)],recovery_rate=.4)
+own=HazardCurve("SELF",AS_OF,[(0.,.01),(30.,.01)],recovery_rate=.4)
+xva=margin_api.compute_bilateral_xva(exposure,cpty,own,credit_market.get_discount("USD-OIS"),.4,.4,margin_api.FundingConfig(50.,30.,im_profile))
+assert abs(xva.total_xva-(xva.cva-xva.dva+xva.fva+xva.mva))<1e-8
+assert mva.mva>0
+print({"CVA_USD":xva.cva,"DVA_USD":xva.dva,"FVA_USD":xva.fva,"MVA_USD":xva.mva,"total_XVA_USD":xva.total_xva,"standalone_MVA_USD":mva.mva})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.6" block="netting-margin-capital-xva" />
+
+Review the mapping table before the headline IM amount. A factor omitted from the sensitivity set, a double-applied notional or a 100-fold bump-unit error can overwhelm every later aggregation detail. The full regulatory-capital lab also demonstrates correlation scenarios, vega, curvature, residual-risk add-ons and margined versus unmargined SA-CCR, all mandatory supporting work.
+
+</BuildIt>
+
+<LabCard notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" title="Three-session margin and funding lab" description="Run direct target-grid repricing, two-trade margin, capital, XVA and all three solutions." />
+<LabCard notebook="07_advanced_quant/regulatory_capital.ipynb" title="Capital components and parameter conventions" description="Complete delta/vega/curvature, binding correlation, RRAO, SA-CCR and collateral-haircut comparisons." />
+<Exercise title="Which trade drives IM?" question={"Remove each trade in turn from the same sensitivity set and calculate the change in total SIMM."}>
+
+{/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="exercise-drop-one-im" role="exercise" */}
+```python exec id=exercise-drop-one-im role=exercise
+drop_rows=[]
+for removed in netting_ids:
+ keep=[pid for pid in netting_ids if pid!=removed]
+ remaining=SimmCalculator("v2_6").calculate_from_sensitivities(netting_sensitivities(keep),"USD",AS_OF).amount
+ drop_rows.append({"removed":removed,"remaining_im_usd":remaining,"drop_one_change_usd":netting_im.amount-remaining})
+assert all(math.isfinite(r["drop_one_change_usd"]) for r in drop_rows)
+print(pd.DataFrame(drop_rows).sort_values("drop_one_change_usd",ascending=False).to_string(index=False))
+print("Drop-one changes are marginal decisions and need not sum to totalIM; diversification can make a removal increaseIM.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.6" block="exercise-drop-one-im" />
+
+The largest positive drop-one change identifies the largest marginal IM driver for this set and parameter version. A negative value means the removed trade supplied diversification. These are removal decisions, not an additive allocation, so do not force their sum to match total IM.
+
+</Exercise>
+<Exercise title="Threshold versus minimum transfer" question={"For USD 200,000 exposure and USD 100,000 collateral, compare the three stated threshold/MTA cases."}>
+
+{/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="exercise-vm-threshold-mta" role="exercise" */}
+```python exec id=exercise-vm-threshold-mta role=exercise
+vm_rows=[]
+for threshold,mta in [(0.,0.),(50_000.,10_000.),(95_000.,10_000.)]:
+ terms=margin_api.CsaSpec.usd_regulatory().with_vm_threshold(threshold,mta)
+ result=margin_api.VmCalculator(terms).calculate(200_000.,100_000.,"USD",AS_OF)
+ vm_rows.append({"threshold_usd":threshold,"MTA_usd":mta,"delivery_usd":result.delivery_amount,"return_usd":result.return_amount})
+assert abs(vm_rows[0]["delivery_usd"]-100_000.)<.01
+assert abs(vm_rows[1]["delivery_usd"]-50_000.)<.01
+assert vm_rows[2]["delivery_usd"]==0
+print(pd.DataFrame(vm_rows).to_string(index=False))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.6" block="exercise-vm-threshold-mta" />
+
+A threshold changes the amount to be collateralized. MTA determines whether a small remaining movement is transferred; it does not erase the exposure economically. The final case leaves a USD 5,000 potential transfer below the USD 10,000 MTA. State rounding and settlement conventions when comparing with an actual collateral statement.
+
+</Exercise>
+<Exercise title="Why does MVA exist?" question={"Explain the funding cost of USD 1m segregated IM for two years at 50bp with zero discounting and no default. Reconcile the native calculation."}>
+
+{/* notebook-block notebook="07_advanced_quant/margin_collateral_and_xva.ipynb" cell="exercise-why-mva" role="exercise" */}
+```python exec id=exercise-why-mva role=exercise
+flat=DiscountCurve.flat("MVA-FLAT",AS_OF,0.0)
+constant=margin_api.ImProfile([1.,2.],[1_000_000.,1_000_000.])
+funding_cost=margin_api.compute_mva(constant,[(0.,50.)],flat)
+manual=1_000_000*.005*2
+assert abs(funding_cost.mva-manual)<1e-8
+assert margin_api.compute_mva(constant,[(0.,0.)],flat).mva==0
+print({"expected_MVA_USD":manual,"native_MVA_USD":funding_cost.mva})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.6" block="exercise-why-mva" />
+
+The IM principal is collateral, not an immediate expense. Funding it costs USD 5,000 per year under these assumptions, or USD 10,000 over two years. Segregation limits reuse of the posted collateral. A zero funding spread gives zero MVA even when the IM requirement remains positive; larger IM and greater financing cost are different drivers.
+
+</Exercise>
+
+<CheckYourself>
+
+- What converts USD/bp into USD/percentage point? Multiply by 100.
+- Does a renamed tenor prove a valid regulatory mapping? No; the shock and interpolation must match the target definition.
+- Is initial margin capital or expected credit loss? Neither. Its purpose and horizon differ.
+- Why pin a parameter vintage? Reproducibility requires the exact weights and correlations, and this lesson's embedded vintage is not a claim about current regulatory applicability.
+
+</CheckYourself>

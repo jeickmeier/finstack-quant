@@ -1,0 +1,228 @@
+---
+id: '1.3'
+title: Rates, Compounding, and Discounting
+description: 'Analyst program lesson 1.3: Rates, Compounding, and Discounting'
+desk_question: '"Is 5% simple, annual, semi-annual, or continuous — and how much money
+  is the difference on $100mm?"'
+references:
+- '#hull-options-futures'
+- '#arrc-sofr-users-guide'
+- '#ecb-estr-methodology'
+- '#boe-sonia-key-features'
+- '#boj-tona'
+- '#isda-2006-definitions'
+api:
+- finstack_quant.cashflows.builder.CashFlowSchedule
+- finstack_quant.cashflows.builder.FloatingCouponSpec
+- finstack_quant.cashflows.builder.FloatingRateSpec
+- finstack_quant.cashflows.builder.OvernightCompoundingMethod
+- finstack_quant.cashflows.builder.ScheduleParams
+- finstack_quant.core.dates.DayCount
+- finstack_quant.core.market_data.DiscountCurve
+- finstack_quant.core.market_data.ForwardCurve
+- finstack_quant.core.market_data.MarketContext
+- finstack_quant.core.money.Money
+- finstack_quant.valuations.instruments.instrument_cashflows_json
+- finstack_quant.valuations.instruments.price_instrument
+status: published
+---
+
+<DeskContext question={"Is 5% simple, annual, semi-annual, or continuous \u2014 and how much money is the difference on $100mm?"}>
+
+A screen shows 5%, but the treasury desk asks what is actually paid on USD 100m in two years. A simple annualized quote, an annually compounded rate and a continuously compounded rate imply different growth at the same numerical 5%. You must either specify the basis or convert the quote before discounting.
+
+This lesson ends with the first bond PV: actual instrument cashflows multiplied by discount factors and reconciled to the native pricer. It also prices a historical compounded SOFR coupon from its observations.
+
+</DeskContext>
+
+<Standard>
+
+### Rates describe a discount factor
+
+For a payment of one at time $T$, the discount factor $D(T)$ is today's price. With $T$ in the stated year basis,
+
+$$D(T)=\frac{1}{1+r_sT}=(1+r_a)^{-T}=\left(1+\frac{r_m}{m}\right)^{-mT}=e^{-r_cT}.$$
+
+The rates on the right are equivalent only when converted. Holding their numerical value at 5% instead produces different DFs. For two years, simple discounting gives the highest PV in the comparison and continuous compounding the lowest. Conversely, once $D(T)$ is fixed, each representation can be recovered algebraically. These are quoting identities, not competing forecasts of realized investment returns. [Hull](/references.html#hull-options-futures) provides the standard pricing framework.
+
+A continuously compounded zero rate satisfies $z(T)=-\log D(T)/T$. A continuously compounded **interval** forward over $[a,b]$ satisfies
+
+$$f_{a,b}=\frac{\log D(a)-\log D(b)}{b-a},\qquad D(b)=D(a)e^{-f_{a,b}(b-a)}.$$
+
+A simple forward instead uses $(D(a)/D(b)-1)/(b-a)$. The instantaneous forward is $f(t)=-d\log D(t)/dt$, a limit of interval forwards; it is particularly sensitive to interpolation. All these identities must use the curve's time basis. Mixing ACT/360 coupon fractions with ACT/365F curve times without conversion changes the economics.
+
+### Present value and cashflow timing
+
+For deterministic future cashflows in one currency,
+
+$$PV=\sum_{t_i>0}C_iD(t_i).$$
+
+The sign belongs to the holder's perspective. The formula values promised cashflows under the selected discounting treatment; credit loss and embedded options require their own models. Here the USD corporate bond has no hazard curve, so its base price is the discounted contractual stream; its later CS01 uses the spread convention explained in 2.2.
+
+The exported cashflow amount is an undiscounted amount. Multiplying an already discounted `pv` field by a DF again would double discount. Payments already made at the valuation boundary are excluded consistently with the native pricing convention. Keep the valuation date, quote settlement date and payment date separate; clean/dirty settlement reporting is handled in 2.1.
+
+### Overnight compounding
+
+SOFR, €STR, SONIA and TONA are overnight benchmarks with different currencies, calendars and publication rules. A compounded-in-arrears coupon is determined through the accrual period rather than fixed entirely at its start. In its simplest form,
+
+$$R_{\mathrm{period}}=\prod_i(1+r_i d_i/B)-1,\qquad C=N R_{\mathrm{period}}.$$
+
+Here $d_i$ is the number of calendar days for which observation $i$ applies and $B$ is the overnight basis. A Friday fixing commonly spans a weekend, so replacing every weight by one understates interest. Lookbacks, observation shifts, lockouts/cutoffs, payment lags and spread compounding can alter the contractual calculation; the benchmark's currency alone does not specify them.
+
+The native example uses historical synthetic SOFR observations, ACT/360, no reset lag, a weekends-only calendar and compounded-in-arrears treatment. The hand product uses weights 1,1,1,1,3 for a seven-day week. It is checked against the native cashflow builder. See the [ARRC SOFR guide](/references.html#arrc-sofr-users-guide), [€STR methodology](/references.html#ecb-estr-methodology), [SONIA features](/references.html#boe-sonia-key-features), [TONA reference](/references.html#boj-tona) and [ISDA 2021 definitions](/references.html#isda-2021-definitions) for the relevant convention families.
+
+A discount curve prices payment timing. A projection curve supplies future index rates; a fixing series supplies observations already known. These are separate objects even when a simplified single-curve model makes them numerically consistent. Missing a past fixing is not permission to replace it with today's projected forward.
+
+</Standard>
+
+<BuildIt>
+
+### Four quotes and one native PV
+
+The USD 100m comparison holds the numerical quote fixed. The bond calculation uses actual exported future amounts and the curve day count; agreement within one cent is the reconciliation gate.
+
+{/* notebook-block notebook="01_foundations/market_data/discount_curves.ipynb" cell="discount-proof" role="build" */}
+```python exec id=discount-proof role=build
+import json, math
+from datetime import date
+from finstack_quant.core.dates import DayCount
+from finstack_quant.valuations.instruments import price_instrument, instrument_cashflows_json
+from _shared.analyst_book import AS_OF, build_market, instruments
+
+r, years, notional = 0.05, 2.0, 100_000_000.0
+discounts = {'simple': 1 / (1 + r * years), 'annual': (1 + r) ** -years,
+             'semiannual': (1 + r / 2) ** (-2 * years), 'continuous': math.exp(-r * years)}
+assert discounts['simple'] > discounts['annual'] > discounts['semiannual'] > discounts['continuous']
+market = build_market('foundations')
+curve = market.get_discount('USD-OIS')
+assert abs(math.exp(-curve.zero(5.0) * 5.0) - curve.df(5.0)) < 1e-12
+assert abs(curve.df(2.0) * math.exp(-curve.forward(2.0, 5.0) * 3.0) - curve.df(5.0)) < 1e-12
+bond = json.dumps(instruments('foundations')['USD-CORP'])
+flows = json.loads(instrument_cashflows_json(bond, market, AS_OF, 'discounting'))
+manual_pv = sum(flow['amount'] * curve.df(DayCount.ACT_365F.year_fraction(AS_OF, date.fromisoformat(flow['date'])))
+                for flow in flows['flows'] if date.fromisoformat(flow['date']) > AS_OF)
+native_pv = price_instrument(bond, market, AS_OF).price
+assert abs(manual_pv - native_pv) < 0.01
+assert flows['reconciles_with_base_value']
+print({'convention_pvs': {basis: notional * df for basis, df in discounts.items()}, 'manual_bond_pv': manual_pv})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.3" block="discount-proof" />
+
+
+### Convert bases at an unchanged discount factor
+
+This second experiment holds economics fixed. The four derived rate numbers differ while their reconstructed discount factors agree.
+
+{/* notebook-block notebook="01_foundations/market_data/discount_curves.ipynb" cell="rate-basis-conversions" role="build" */}
+```python exec id=rate-basis-conversions role=build
+import math
+from _shared.analyst_book import build_market
+curve=build_market('foundations').get_discount('USD-OIS')
+t=2.0;df=curve.df(t)
+equivalent={'simple':(1/df-1)/t,'annual':df**(-1/t)-1,'semiannual':2*(df**(-1/(2*t))-1),'continuous':-math.log(df)/t}
+reconstructed=[1/(1+equivalent['simple']*t),(1+equivalent['annual'])**(-t),(1+equivalent['semiannual']/2)**(-2*t),math.exp(-equivalent['continuous']*t)]
+assert max(abs(x-df) for x in reconstructed)<1e-12
+print({'DF':df,'equivalent_decimal_rates':equivalent})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.3" block="rate-basis-conversions" />
+
+
+### Build a compounded-in-arrears coupon
+
+The historical fixing series already belongs to the foundation market. The hand product and native coupon use the same observation calendar and day weights.
+
+{/* notebook-block notebook="01_foundations/market_data/discount_curves.ipynb" cell="overnight-proof" role="build" */}
+```python exec id=overnight-proof role=build
+import json, math
+from datetime import date
+from decimal import Decimal
+from finstack_quant.cashflows.builder import CashFlowSchedule, FloatingCouponSpec, FloatingRateSpec, OvernightCompoundingMethod, ScheduleParams
+from finstack_quant.core.dates import DayCount
+from finstack_quant.core.market_data import ForwardCurve, MarketContext
+from finstack_quant.core.money import Money
+
+from _shared.analyst_book import build_market
+overnight_market = build_market('foundations')
+assert overnight_market.get_series('FIXING:USD-SOFR').id == 'FIXING:USD-SOFR'
+floating_rate = FloatingRateSpec(index_id='USD-SOFR', spread_bp=Decimal('0'), reset_frequency='1W',
+    reset_lag_days=0, fixing_calendar_id='weekends_only', overnight_basis=DayCount.ACT_360,
+    overnight_compounding=OvernightCompoundingMethod.COMPOUNDED_IN_ARREARS)
+schedule = (CashFlowSchedule.builder().principal(Money(1_000_000.0, 'USD'), date(2025, 1, 6), date(2025, 1, 13))
+    .floating_cf(FloatingCouponSpec(rate_spec=floating_rate,
+        schedule=ScheduleParams(frequency='1W', day_count=DayCount.ACT_360, calendar_id='weekends_only')))
+    .build(overnight_market))
+overnight_flows = json.loads(schedule.to_json())['flows']
+coupon = next(flow for flow in overnight_flows if flow['kind'] == 'float_reset')
+period_return = math.prod(1 + 0.05 * days / 360 for days in (1, 1, 1, 1, 3)) - 1
+assert abs(float(coupon['amount']['amount']) - 1_000_000 * period_return) < 1e-6
+print({'compounded_period_return': period_return, 'coupon': coupon['amount']})
+assert floating_rate.overnight_compounding == OvernightCompoundingMethod.COMPOUNDED_IN_ARREARS
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.3" block="overnight-proof" />
+
+
+</BuildIt>
+
+<LabCard notebook="01_foundations/math_toolkit.ipynb" title="Math Toolkit" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<LabCard notebook="01_foundations/market_data/discount_curves.ipynb" title="Discount Curves" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<Exercise id="exercise-forward-identity" title="A. Recover the end discount factor" question={"Verify the same forward no-arbitrage identity under continuous and simple forward quoting."}>
+
+The quote basis changes the forward number, but the reconstructed end DF is identical. This check detects a rate-basis or interval-length error without relying on the native bond pricer.
+
+{/* notebook-block notebook="01_foundations/market_data/discount_curves.ipynb" cell="exercise-forward-identity" role="exercise" */}
+```python exec id=exercise-forward-identity role=exercise
+import math
+from _shared.analyst_book import build_market
+curve=build_market('foundations').get_discount('USD-OIS')
+a,b=2.0,5.0
+continuous=curve.forward(a,b)
+simple=(curve.df(a)/curve.df(b)-1)/(b-a)
+assert abs(curve.df(a)*math.exp(-continuous*(b-a))-curve.df(b))<1e-12
+assert abs(curve.df(a)/(1+simple*(b-a))-curve.df(b))<1e-12
+print({'interval_years':b-a,'continuous_forward':continuous,'simple_forward':simple,'DF_end':curve.df(b)})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.3" block="exercise-forward-identity" />
+
+</Exercise>
+
+<Exercise id="exercise-curve-steepening" title="B. Reprice under a steepener" question={"Apply a zero-rate shock rising to 10bp at 10y, then value USD 1m paid at 5y."}>
+
+At the explicit 5y knot the zero shock is 5bp. The new PV is the original multiplied by exp(−0.0005×5); the long future receipt loses value. An explicit knot removes an interpolation ambiguity in this simple exercise, and the original curve stays unchanged.
+
+{/* notebook-block notebook="01_foundations/market_data/discount_curves.ipynb" cell="exercise-curve-steepening" role="exercise" */}
+```python exec id=exercise-curve-steepening role=exercise
+import math
+from finstack_quant.core.market_data import DiscountCurve
+from _shared.analyst_book import AS_OF,build_market
+curve=build_market('foundations').get_discount('USD-OIS');before=curve.df(5)
+steep=DiscountCurve('USD-STEEP',AS_OF,[(t,curve.df(t)*math.exp(-0.001*(t/10)*t)) for t in sorted(set(curve.knots)|{5.0})],interp='log_linear')
+base_pv,shock_pv=1000000*curve.df(5),1000000*steep.df(5)
+assert shock_pv<base_pv and curve.df(5)==before
+assert abs(shock_pv/base_pv-math.exp(-0.0005*5))<1e-12
+print({'cashflow_USD':1000000,'payment_year':5,'zero_shock_bp':5,'base_PV':base_pv,'steepened_PV':shock_pv,'PnL':shock_pv-base_pv})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.3" block="exercise-curve-steepening" />
+
+</Exercise>
+
+<CheckYourself>
+
+1. **Can the same numerical 5% quote imply different PVs?** Yes; its compounding basis and year fraction must be specified.
+2. **What is the curve primitive here?** Discount factors. Zero and forward representations must reconstruct them.
+3. **Why does the Friday fixing receive weight three?** It accrues through the weekend in the specified calendar.
+4. **What supplies a fixing before the valuation date?** The historical observation series, not a projected forward.
+5. **Why distinguish projection and discount curves?** They answer different contractual and valuation questions, even in a single-curve approximation.
+
+</CheckYourself>

@@ -1,0 +1,375 @@
+---
+id: V3
+title: Commodity Futures and Options
+description: 'Analyst program lesson V3: Commodity Futures and Options'
+desk_question: '"Crude is backwardated, gas is in contango, and we''re short the WTI–Brent
+  spread. What is the book''s real exposure?"'
+references:
+- '#schwartz-smith-2000'
+- '#kirk-1995'
+- '#black-1976'
+- '#turnbull-wakeman-1991'
+- '#levy-1992-asian-options'
+- '#curran-1994-asian-options'
+- '#hull-options-futures'
+api:
+- finstack_quant.core.market_data.PriceCurve
+- finstack_quant.core.market_data.VolSurface
+- finstack_quant.valuations.instruments.price_instrument
+- finstack_quant.models.correlation.LatentMultiFactor
+- finstack_quant.scenarios.CurveKind
+- finstack_quant.scenarios.OperationSpec
+- finstack_quant.scenarios.apply_scenario_to_market
+- finstack_quant.portfolio.value_portfolio
+status: published
+---
+
+<DeskContext question="Why is the WTI–Brent spread option worth more when correlation falls?">
+
+The desk owns a call on the difference between two commodity prices. Each leg can be volatile while the difference is stable if both move together. Price the actual forward curves and units first, then separate correlation, averaging and curve-shape assumptions. The spread option is the final holding in the independent volatility extension.
+
+</DeskContext>
+
+<Standard>
+
+### Delivery prices, spot and carrying economics
+
+A commodity forward curve contains delivery prices in absolute units: USD per barrel for WTI/Brent and USD per MMBtu for natural gas. Backwardation means later delivery is cheaper than earlier delivery; contango means the reverse over the specified segment. Natural-gas seasonality can produce both in one curve. A single slope label does not describe every delivery month.
+
+Under a simplified deterministic carry relation, `F(T)=S*exp((r+u-y)*T)`, where storage cost `u` and convenience yield `y` are annualized. The curve identifies **net convenience yield `y-u`**, not each component separately. The displayed inference assumes the time-zero curve knot is the spot reference and uses the matching discount factor. It does not estimate warehouse costs or explain a named physical inventory market.
+
+A forward pays its mark at contractual settlement and is discounted. A margined future is marked through daily settlement, so its quote-to-entry change is not the same discounted cash claim. Contract count times multiplier converts a quote move into money. A commodity swap exchanges a schedule of fixed versus floating amounts; the native `side` convention must be read before interpreting its sign. Realized fixings must be supplied once an averaging period has begun.
+
+### Vanilla, averaging and spread payoffs
+
+The native commodity option envelope is `commodity_option`, priced under `black76` for this European forward-price example. The selector names the model rather than an exchange venue. Lognormal Black requires positive forward/strike inputs in its supported domain; negative commodity prices demand a different model, not a unit conversion.
+
+An arithmetic Asian call depends on the average fixing price. Turnbull–Wakeman approximates the distribution using moments; it is not an exact lognormal distribution for an arithmetic average. Averaging reduces exposure to individual fixing shocks, but comparing unrelated maturities or forward levels confounds that effect. The controlled comparison below uses the same expiry, strike, quantity, volatility and a flat forward curve. Its lower Asian premium isolates averaging within that model.
+
+Kirk approximates a spread call by treating the second forward plus strike as a scaled lognormal leg. Its effective variance depends on both volatilities, correlation and the weight `F2/(F2+K)`. In this setup, lower correlation increases variance of the difference and increases call value. A zero strike is the exchange-option limit and is not automatically a failure case. A small positive `F2+K`, high correlation and asymmetric dynamics can make the approximation fragile. Compare it with Monte Carlo under **the same** two-lognormal terminal model before blaming sampling noise or changing dynamics.
+
+### Distinguish curve dynamics from a calibration
+
+The native `monte_carlo_schwartz_smith` example separates a mean-reverting short factor from a persistent long factor. The short factor's loading decays approximately as `exp(-kappa*T)` while the long factor moves the log-price level across maturities. The supported example parameters are fixed defaults, with kappa 1, short volatility 0.30, long volatility 0.15 and factor correlation 0.30. The 4,096-path override controls computation; it is not a market calibration. The example is a single-commodity option, not a two-commodity Schwartz–Smith spread model.
+
+The factor-shape table applies explicit 5% log shocks to these loadings. The scenario engine then applies a separate ordinary forward-curve shock and reprices the native book. `OperationSpec.curve_parallel_bp` has an exceptional commodity convention: its `bp` argument is a **percentage price move** for `CurveKind.commodity()`. Passing -10 means -10%, not minus ten rate basis points. The node-level assertion proves the intended units before any portfolio P&amp;L is interpreted.
+
+</Standard>
+
+<BuildIt>
+
+### Build the delivery curves and price the eight supported contract types
+
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-workflow-1" role="build" */}
+```python exec id=v3-workflow-1 role=build
+from pathlib import Path
+import sys
+from copy import deepcopy
+from datetime import date
+import json
+import math
+import numpy as np
+import pandas as pd
+from _shared import analyst_tracks as tracks
+from finstack_quant.valuations.instruments import price_instrument
+AS_OF = tracks.AS_OF
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-workflow-1" />
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-workflow-2" role="build" */}
+```python exec id=v3-workflow-2 role=build
+market = tracks.build_market("vol")
+inputs = tracks.commodity_inputs()
+curve_rows = [{"years": t, **{ticker: market.get_price_curve(f"{ticker}-FORWARD").price(t)
+               for ticker in ["WTI", "BRENT", "NG"]}} for t in [0.0, 0.5, 1.0, 2.0]]
+print(pd.DataFrame(curve_rows))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-workflow-2" />
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-workflow-3" role="build" */}
+```python exec id=v3-workflow-3 role=build
+models = {"WTI-BRENT-SPREAD":"black76", "WTI-CALL":"black76", "WTI-ASIAN":"asian_turnbull_wakeman",
+          "WTI-FORWARD-CONTRACT":"discounting", "WTI-FUTURE":"discounting", "NG-SWAP":"discounting"}
+prices = {iid: price_instrument(json.dumps(payload), market, AS_OF, model=models[iid]).value.amount
+          for iid,payload in inputs.items()}
+print(pd.Series(prices, name="pv_usd"))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-workflow-3" />
+
+The forward and future have the same economic quote difference but different settlement treatment. The Asian and vanilla rows in this first table have different expiries; use the matched comparison below to discuss averaging.
+
+### Benchmark the spread price with independent antithetic pairs
+
+The latent-factor model already scales its output by volatility, so the exponent must not multiply volatility a second time. Each positive/negative pair is one independent observation for the reported Monte Carlo standard error. A seeded tolerance combines sampling uncertainty with an explicit approximation allowance; it is not a calibration claim.
+
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-workflow-4" role="build" */}
+```python exec id=v3-workflow-4 role=build
+from finstack_quant.models.correlation import LatentMultiFactor
+T = (date(2025,9,15)-AS_OF).days/365
+sigma = np.array([0.30,0.28])
+forwards = np.array([market.get_price_curve(f"{name}-FORWARD").price(T) for name in ["WTI","BRENT"]])
+rho, strike, quantity = 0.85, -3.0, 10_000.0
+factor_model = LatentMultiFactor(2,sigma.tolist(),[1.0,rho,rho,1.0])
+z = np.random.default_rng(20250115).standard_normal((30_000,2))
+shocks = np.array([factor_model.generate_correlated_factors(row.tolist()) for row in z])
+terminal_up = forwards*np.exp(-0.5*sigma**2*T+math.sqrt(T)*shocks)
+terminal_down = forwards*np.exp(-0.5*sigma**2*T-math.sqrt(T)*shocks)
+paired_payoff = 0.5*(np.maximum(terminal_up[:,0]-terminal_up[:,1]-strike,0)
+                      +np.maximum(terminal_down[:,0]-terminal_down[:,1]-strike,0))
+df = market.get_discount("USD-OIS").df(T)
+paired_pv = quantity*df*paired_payoff
+mc, se = paired_pv.mean(), paired_pv.std(ddof=1)/math.sqrt(len(paired_pv))
+kirk = prices["WTI-BRENT-SPREAD"]
+assert abs(kirk-mc) < 4*se+0.01*abs(kirk)
+print(pd.Series({"Kirk_USD":kirk,"MC_USD":mc,"MC_standard_error_USD":se,"Kirk_minus_MC_USD":kirk-mc}))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-workflow-4" />
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-workflow-6" role="build" */}
+```python exec id=v3-workflow-6 role=build
+correlation_rows = []
+for rho in [0.25,0.60,0.85]:
+    payload=deepcopy(inputs["WTI-BRENT-SPREAD"])
+    payload["instrument"]["spec"]["correlation"]=rho
+    pv=price_instrument(json.dumps(payload),market,AS_OF,model="black76").value.amount
+    correlation_rows.append({"correlation":rho,"spread_call_usd":pv})
+assert correlation_rows[0]["spread_call_usd"] > correlation_rows[-1]["spread_call_usd"]
+print(pd.DataFrame(correlation_rows))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-workflow-6" />
+
+### Isolate carry, averaging and factor shape
+
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-carry-asian" role="build" */}
+```python exec id=v3-carry-asian role=build
+from finstack_quant.core.market_data import PriceCurve,VolSurface
+carry_rows=[]
+for name in ["WTI","NG"]:
+    curve=market.get_price_curve(name+"-FORWARD");spot=curve.price(0.)
+    for t in [.5,1.,2.]:
+        r=-math.log(market.get_discount("USD-OIS").df(t))/t
+        net_yield=r-math.log(curve.price(t)/spot)/t
+        carry_rows.append({"commodity":name,"years":t,"net_convenience_yield_y_minus_storage":net_yield})
+print(pd.DataFrame(carry_rows))
+flat_market=tracks.build_market("vol")
+flat_market.insert(PriceCurve("WTI-FORWARD",AS_OF,[(0.,75.),(2.,75.)]))
+matched_vanilla=deepcopy(inputs["WTI-CALL"])
+matched_vanilla["instrument"]["spec"]["expiry"]=inputs["WTI-ASIAN"]["instrument"]["spec"]["expiry"]
+vanilla=price_instrument(json.dumps(matched_vanilla),flat_market,AS_OF,model="black76").value.amount
+asian=price_instrument(json.dumps(inputs["WTI-ASIAN"]),flat_market,AS_OF,model="asian_turnbull_wakeman").value.amount
+assert 0<asian<vanilla
+print({"matched_expiry_vanilla":vanilla,"arithmetic_average_call":asian,"averaging_premium_gap":vanilla-asian})
+print("Flat matched forwards, strike, notional, volatility and expiry isolate averaging. The native Asian treatment moment-matches the arithmetic average; fixing and settlement times remain explicit.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-carry-asian" />
+
+### Complete the listed-option and swaption contracts
+
+The listed commodity futures option carries an explicit futures quote and an instrument-level Black76 selector inside the registry's `discounting` path. Its premium-paid value is checked against the Black76 formula. The separate commodity swaption exercises into quarterly fixed-versus-floating commodity settlements: its annuity is the sum of payment discount factors, because notional is quantity **per settlement**, with no interest-rate year-fraction multiplier. Both flat-input checks reconcile within USD 1e-8. The sloped case uses discounted period-average commodity forwards.
+
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-complete-eight-envelopes" role="build" */}
+```python exec id=v3-complete-eight-envelopes role=build
+# Complete the eight-envelope inventory with the listed futures option and a
+# forward-starting commodity swaption. Both have independent flat-input checks.
+from statistics import NormalDist
+from _shared.instrument_fixtures import instrument_envelope
+normal=NormalDist()
+listed=deepcopy(tracks.futures_inputs()["SPX-FUTURE-CALL"])
+listed["instrument"]["type"]="commodity_future_option"
+listed["instrument"]["spec"]["id"]="WTI-FUTURE-CALL"
+terms=listed["instrument"]["spec"]["terms"]
+terms.update(contracts=1.,multiplier=1000.,underlying="CL-SEP25",futures_price=72.,strike=75.,volatility=.30)
+listed_value=price_instrument(json.dumps(listed),market,AS_OF,model="discounting").value.amount
+expiry=date.fromisoformat(terms["expiry"]);t=(expiry-AS_OF).days/365
+d1=(math.log(72/75)+.5*.30**2*t)/(.30*math.sqrt(t));d2=d1-.30*math.sqrt(t)
+listed_manual=1000*market.get_discount("USD-OIS").df(t)*(72*normal.cdf(d1)-75*normal.cdf(d2))
+assert abs(listed_value-listed_manual)<1e-8
+
+swaption=instrument_envelope({"type":"commodity_swaption","spec":{
+    "id":"NG-SWAPTION","commodity_type":"Energy","ticker":"NG","unit":"MMBTU","currency":"USD",
+    "option_type":"call","expiry":"2025-06-16","swap_start":"2025-06-16","swap_end":"2025-12-16",
+    "swap_frequency":{"count":3,"unit":"months"},"fixed_price":3.2,"notional":10000.,
+    "forward_curve_id":"NG-FORWARD","discount_curve_id":"USD-OIS","vol_surface_id":"NG-VOL",
+    "calendar_id":"weekends_only","business_day_convention":"modified_following","day_count":"act_365f","attributes":{}}})
+sloped_value=price_instrument(json.dumps(swaption),market,AS_OF,model="black76").value.amount
+flat=tracks.build_market("vol")
+flat.insert(PriceCurve("NG-FORWARD",AS_OF,[(0.,3.2),(2.,3.2)]))
+flat_value=price_instrument(json.dumps(swaption),flat,AS_OF,model="black76").value.amount
+# Two quarterly settlement quantities, not an annual interest-rate annuity: no tau.
+payments=[date(2025,9,16),date(2025,12,16)]
+annuity=sum(flat.get_discount("USD-OIS").df((day-AS_OF).days/365) for day in payments)
+t=(date(2025,6,16)-AS_OF).days/365;sigma=.45
+d1=.5*sigma*math.sqrt(t);d2=-d1
+swaption_manual=10000*annuity*3.2*(normal.cdf(d1)-normal.cdf(d2))
+assert abs(flat_value-swaption_manual)<1e-8
+eight_types={payload["instrument"]["type"] for payload in inputs.values()}|{listed["instrument"]["type"],swaption["instrument"]["type"]}
+assert len(eight_types)==8
+print(pd.DataFrame([{"contract":"listed commodity future option","native_PV":listed_value,"manual_PV":listed_manual},
+    {"contract":"commodity swaption, flat forward","native_PV":flat_value,"manual_PV":swaption_manual}]))
+print({"sloped_curve_swaption_PV":sloped_value,"payment_DF_annuity":annuity,"commodity_envelopes":sorted(eight_types)})
+print("The listed contract uses terms.model='black76' inside outer model='discounting' and an explicit futures quote, premium-paid settlement and 1000 barrels per contract. The commodity swaption's notional is MMBtu per quarterly settlement; its annuity is sum(DF), with no year-fraction multiplier and no second expiry discount. Both payment dates are weekdays. On the sloped curve the native forward swap price uses discounted period-average commodity forwards.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-complete-eight-envelopes" />
+
+
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-workflow-5" role="build" */}
+```python exec id=v3-workflow-5 role=build
+schwartz = deepcopy(inputs["WTI-CALL"])
+schwartz["instrument"]["spec"]["instrument_pricing_overrides"] = {"model_config":{"mc_paths":4096}}
+ss = price_instrument(json.dumps(schwartz),market,AS_OF,model="monte_carlo_schwartz_smith").value.amount
+assert math.isfinite(ss) and ss > 0
+factor_loading = pd.DataFrame({"years":[0.25,1.0,3.0,5.0]})
+factor_loading["short_loading_kappa_1"] = np.exp(-factor_loading["years"])
+factor_loading["long_loading"] = 1.0
+print({"Schwartz_Smith_example_USD":round(ss,2),"Black76_USD":round(prices["WTI-CALL"],2)})
+print(factor_loading)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-workflow-5" />
+
+The two native option prices use different stochastic models. Their difference is therefore not a Monte Carlo error estimate for Black76. The short/long shock table explains what the second model changes across delivery dates.
+
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-factor-stress" role="build" */}
+```python exec id=v3-factor-stress role=build
+from finstack_quant.scenarios import ScenarioSpec,OperationSpec,CurveKind,apply_scenario_to_market
+from finstack_quant.portfolio import value_portfolio
+shape_rows=[]
+for t in [.25,1.,3.,5.]:
+    base_forward=market.get_price_curve("WTI-FORWARD").price(t)
+    shape_rows.append({"years":t,"base":base_forward,"short_log_shock_5pct":base_forward*math.exp(.05*math.exp(-t)),
+                       "long_log_shock_5pct":base_forward*math.exp(.05)})
+assert shape_rows[0]["short_log_shock_5pct"]/shape_rows[0]["base"]>shape_rows[-1]["short_log_shock_5pct"]/shape_rows[-1]["base"]
+print(pd.DataFrame(shape_rows))
+# On commodity curves this API's bp argument is a PERCENT move, not rate basis points.
+shock=ScenarioSpec("energy_down_10pct",[
+    OperationSpec.curve_parallel_bp(CurveKind.commodity(),"WTI-FORWARD",-10.),
+    OperationSpec.curve_parallel_bp(CurveKind.commodity(),"BRENT-FORWARD",-10.)])
+shocked=apply_scenario_to_market(shock,market,AS_OF).market
+assert abs(shocked.get_price_curve("WTI-FORWARD").price(1.)/.9-market.get_price_curve("WTI-FORWARD").price(1.))<1e-10
+vol_book=tracks.build_book("vol")
+base_book=value_portfolio(vol_book,market,metrics=[])
+stress_book=value_portfolio(vol_book,shocked,metrics=[])
+base_spread=price_instrument(json.dumps(inputs["WTI-BRENT-SPREAD"]),market,AS_OF,model="black76").value.amount
+stress_spread=price_instrument(json.dumps(inputs["WTI-BRENT-SPREAD"]),shocked,AS_OF,model="black76").value.amount
+assert abs((stress_book.total_value-base_book.total_value)-(stress_spread-base_spread))<.01
+print({"native_book_PnL":stress_book.total_value-base_book.total_value,"spread_holding_PnL":stress_spread-base_spread})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-factor-stress" />
+
+The full book's P&amp;L equals the separately repriced spread holding's P&amp;L because the named commodity shocks affect only that holding in this book. This is a position-to-total reconciliation, not a claim that an actual energy shock leaves all other markets unchanged.
+
+</BuildIt>
+
+<LabCard notebook="02_pricing/instruments/commodities.ipynb" title="Commodity curves, options and spread model risk" description="Run forward/futures marks, averaging, correlated Monte Carlo, two-factor shape and portfolio commodity stresses." />
+
+<Exercise id="v3-calendar" title="Price a seasonal calendar spread" question="Build a call on July 2025 natural gas minus January 2026 natural gas, expiring before either delivery. Compare the synthetic seasonal curve with a flat 3.2/3.2 curve.">
+
+Two explicit forward identifiers preserve the two delivery contracts even though the option has one expiry. Both legs use the same volatility and 0.90 correlation. The seasonal curve changes the expected spread; it does not by itself determine spread volatility.
+
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-exercise-calendar" role="exercise" */}
+```python exec id=v3-exercise-calendar role=exercise
+calendar=deepcopy(inputs["WTI-BRENT-SPREAD"]);s=calendar["instrument"]["spec"]
+s.update(id="NG-CALENDAR",expiry="2025-06-15",leg1_forward_curve_id="NG-JUL25",leg2_forward_curve_id="NG-JAN26",
+    leg1_vol_surface_id="NG-VOL",leg2_vol_surface_id="NG-VOL",strike=0.,notional=10_000.,correlation=.90)
+front_t=(date(2025,7,15)-AS_OF).days/365;back_t=(date(2026,1,15)-AS_OF).days/365
+ng=market.get_price_curve("NG-FORWARD");front,back=ng.price(front_t),ng.price(back_t)
+calendar_rows=[]
+for name,f1,f2 in [("seasonal_curve",front,back),("flat_curve",3.2,3.2)]:
+    m=tracks.build_market("vol")
+    m.insert(PriceCurve("NG-JUL25",AS_OF,[(0.,f1),(2.,f1)]));m.insert(PriceCurve("NG-JAN26",AS_OF,[(0.,f2),(2.,f2)]))
+    result=price_instrument(json.dumps(calendar),m,AS_OF,model="black76").value.amount
+    calendar_rows.append({"curve":name,"Jul_forward":f1,"Jan_forward":f2,"calendar_call_USD":result})
+assert front>back and calendar_rows[0]["calendar_call_USD"]>calendar_rows[1]["calendar_call_USD"]
+print(pd.DataFrame(calendar_rows))
+print("Separate forward-curve IDs pin the two delivery prices while the option expires before either delivery. Seasonality and spread correlation are separate assumptions.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-exercise-calendar" />
+
+</Exercise>
+
+<Exercise id="v3-crack" title="Size a 3:2:1 crack-spread hedge" question="A refiner consumes 30,000 barrels of crude and produces 20,000 barrels of gasoline plus 10,000 barrels of distillate. Reconcile its margin and futures counts when product quotes are per gallon.">
+
+Use 42 gallons per barrel. Under the stated synthetic contract sizes, the refiner buys crude and sells the two products to lock its conversion margin. The parallel one-dollar-per-barrel check catches a gallon/barrel scaling error. This sketch omits actual process yields, operating costs, grade and delivery-location basis.
+
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-exercise-crack" role="exercise" */}
+```python exec id=v3-exercise-crack role=exercise
+crude_barrels=30_000.;gasoline_barrels=20_000.;distillate_barrels=10_000.
+crude_quote=75.;gasoline_per_gallon=2.40;distillate_per_gallon=2.50
+cash_margin=gasoline_barrels*42*gasoline_per_gallon+distillate_barrels*42*distillate_per_gallon-crude_barrels*crude_quote
+crude_contracts=crude_barrels/1_000
+product_contracts={"gasoline_short":gasoline_barrels*42/42_000,"distillate_short":distillate_barrels*42/42_000}
+assert crude_contracts==30 and product_contracts=={"gasoline_short":20,"distillate_short":10}
+assert crude_barrels==gasoline_barrels+distillate_barrels
+# A $1/bbl increase in all prices leaves the conversion margin unchanged.
+parallel_margin_change=gasoline_barrels+distillate_barrels-crude_barrels
+assert parallel_margin_change==0
+print({"physical_margin_USD":cash_margin,"margin_per_input_barrel":cash_margin/crude_barrels,
+       "crude_long_contracts":crude_contracts,**product_contracts})
+print("A refiner locks its margin by buying crude futures and selling product futures. This is a unit-consistent sizing sketch: actual yields, quality/location basis, operating costs and delivery months remain separate.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-exercise-crack" />
+
+</Exercise>
+
+<Exercise id="v3-kirk" title="Separate approximation error from Monte Carlo error" question="Compare the exchange-option limit, a highly correlated narrow spread, and a case where F2+K is close to zero. Report signed price differences and Monte Carlo standard errors.">
+
+The zero-strike control agrees within sampling uncertainty. The small-denominator case has a discrepancy much larger than its sampling error, even though the percentage error in total option value may look small. Report both dollar materiality and statistical resolution. Increasing path count reduces Monte Carlo SE; it does not repair Kirk's approximation.
+
+{/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-exercise-kirk" role="exercise" */}
+```python exec id=v3-exercise-kirk role=exercise
+# Common terminal-lognormal economics; antithetic pairs are independent sampling units.
+z=np.random.default_rng(4242).standard_normal((100_000,2));error_rows=[]
+for sig1,sig2,rho,K in [(.8,.2,.99,0.),(.8,.8,.99,-5.),(.3,.28,.99,-74.9)]:
+    m=tracks.build_market("vol");F=np.array([70.,75.]);vol=np.array([sig1,sig2])
+    for name,f,v in zip(["WTI","BRENT"],F,vol):
+        m.insert(PriceCurve(name+"-FORWARD",AS_OF,[(0.,float(f)),(2.,float(f))]))
+        m.insert(VolSurface(name+"-VOL",[.25,1.],[1.,100.,200.],[[float(v)]*3]*2))
+    payload=deepcopy(inputs["WTI-BRENT-SPREAD"]);payload["instrument"]["spec"].update(correlation=rho,strike=K)
+    approximate=price_instrument(json.dumps(payload),m,AS_OF,model="black76").value.amount
+    correlated=np.column_stack([z[:,0],rho*z[:,0]+math.sqrt(1-rho*rho)*z[:,1]])
+    up=F*np.exp(-.5*vol**2*T+math.sqrt(T)*correlated*vol)
+    down=F*np.exp(-.5*vol**2*T-math.sqrt(T)*correlated*vol)
+    payoff=(np.maximum(up[:,0]-up[:,1]-K,0)+np.maximum(down[:,0]-down[:,1]-K,0))/2
+    pair_values=10_000*m.get_discount("USD-OIS").df(T)*payoff
+    estimate=pair_values.mean();error=pair_values.std(ddof=1)/math.sqrt(len(pair_values))
+    error_rows.append({"sigma1":sig1,"sigma2":sig2,"rho":rho,"strike":K,"F2_plus_K":75+K,
+        "Kirk":approximate,"MC":estimate,"MC_SE":error,"difference":approximate-estimate})
+assert abs(error_rows[0]["difference"])<4*error_rows[0]["MC_SE"]
+assert abs(error_rows[-1]["difference"])>4*error_rows[-1]["MC_SE"]
+print(pd.DataFrame(error_rows))
+print("Zero strike is the exchange-option limit and need not break Kirk. A near-zero effective denominator F2+K, high correlation and differing leg dynamics require explicit error checks. Sampling SE is not an approximation-error bound.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V3" block="v3-exercise-kirk" />
+
+</Exercise>
+
+<CheckYourself>
+
+- Which units convert each forward, futures and product quote into position P&amp;L?
+- Why can a curve identify net convenience yield but not storage and convenience separately?
+- Which inputs must be matched before interpreting the Asian–vanilla premium gap?
+- Why does higher leg correlation reduce this spread call's price?
+- When is a price difference sampling error, approximation error or a change of model?
+- What does a commodity “-10 bp” operation actually do in this API, and where is it checked?
+
+</CheckYourself>

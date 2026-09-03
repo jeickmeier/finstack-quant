@@ -1,0 +1,227 @@
+---
+id: '1.5'
+title: 'Market Data Beyond Rates: Vols, Hazards, FX Surfaces'
+description: 'Analyst program lesson 1.5: Market Data Beyond Rates: Vols, Hazards,
+  FX Surfaces'
+desk_question: '"What does the market believe — about how much things move, and
+  about who defaults?"'
+references:
+- '#gatheral-volatility-surface'
+- '#clark-fx-options'
+- '#wystup-fx-options'
+- '#o-kane-2008'
+- '#hull-options-futures'
+api:
+- finstack_quant.calibration.calibrate
+- finstack_quant.core.market_data.FxDeltaVolSurface
+- finstack_quant.core.market_data.HazardCurve
+- finstack_quant.core.market_data.MarketContext
+- finstack_quant.core.market_data.VolSurface
+- finstack_quant.models.volatility.check_surface_grid
+- finstack_quant.models.volatility.delta_to_strike
+- finstack_quant.models.volatility.get_fx_delta_vol
+- finstack_quant.models.volatility.get_surface_vol
+status: published
+---
+
+<DeskContext question={"What does the market believe \u2014 about how much things move, and about who defaults?"}>
+
+A discount curve alone is not the day's market. Option valuation needs a volatility surface and underlying data; credit valuation needs survival and recovery assumptions; FX options need two currency curves and a delta-quote convention. A coherent market snapshot holds those objects with stable identifiers so a model retrieves the inputs intended by the analyst.
+
+You will interpolate volatility in total variance, convert an FX wing quote into a strike, inspect default probabilities and separate two recovery experiments that are often conflated.
+
+</DeskContext>
+
+<Standard>
+
+### Implied volatility is a price representation
+
+Implied volatility is the model input that reproduces a quoted option price. It is not automatically an unbiased forecast of realized volatility. A surface indexes that representation by expiry and strike, moneyness or delta. A smile raises both wings relative to the centre; a skew tilts one side. These shapes encode prices for different payoff states and are interpreted further in 2.4. A VolCube adds another dimension—for example expiry, swap tenor and strike for swaptions.
+
+For total-variance interpolation define $w(K,T)=\sigma(K,T)^2T$. Between two expiries, interpolate $w$ and recover $\sigma=\sqrt{w/T}$. Interpolating volatility directly gives a different result. Calendar-arbitrage reasoning compares compatible claims at fixed moneyness/forward assumptions; decreasing volatility by itself is not a violation. A fall in total variance in the supplied fixed-forward example is one. Discrete grid diagnostics identify violations on that grid; they do not prove global absence of arbitrage. [Gatheral](/references.html#gatheral-volatility-surface) develops the surface framework.
+
+### FX delta quotes
+
+FX desks often quote ATM volatility, risk reversal (RR) and butterfly (BF) at a wing delta. Under the symmetric arithmetic convention used here,
+
+$$
+\sigma_{25C}=\sigma_{ATM}+BF+\frac{RR}{2},\qquad
+\sigma_{25P}=\sigma_{ATM}+BF-\frac{RR}{2}.
+$$
+
+Delta itself has conventions. Forward delta, spot delta and premium-adjusted delta can produce different strikes for the same numerical 25%. ATM can also mean forward ATM, spot ATM or a delta-neutral convention. State which definition the transformation uses before comparing it with a dealer sheet. The native conversion in this lesson uses forward delta. It does not demonstrate a premium-adjusted inversion. [Clark](/references.html#clark-fx-options) and [Wystup](/references.html#wystup-fx-options) explain the FX quoting distinctions.
+
+The volatility surface is not the complete FX option model. Pricing later also needs spot, domestic discounting, foreign discounting, payoff currency, expiry and notional convention. EURUSD means USD per EUR, connecting back to lesson 1.1.
+
+### Hazard, survival and recovery
+
+In a reduced-form credit model, the risk-neutral hazard $\lambda(t)$ is an instantaneous conditional default intensity. Survival to $T$ is
+
+$$
+S(T)=\exp\left(-\int_0^T\lambda(u)du\right),\qquad PD(0,T)=1-S(T).
+$$
+
+For piecewise-constant hazard, the integral is a sum of intensity times interval length. The conditional default probability over $[a,b]$, given survival to $a$, is $1-S(b)/S(a)$. It differs from the unconditional increment $S(a)-S(b)$. A flat 2% hazard therefore does not mean exactly 2% cumulative default probability every year; the one-year conditional probability is $1-e^{-0.02}$.
+
+Recovery $R$ determines loss severity in the credit payoff. At **fixed hazard**, changing recovery leaves survival and PD unchanged. At **fixed quoted CDS spreads**, changing recovery changes the calibrated hazard. The approximation $s\approx(1-R)\lambda$ shows the direction: lower recovery means more loss per default, so less default intensity is needed to explain the same premium. The full native calibration verifies that direction with the actual conventions. See [O'Kane](/references.html#o-kane-2008) for reduced-form credit.
+
+These are market-implied, risk-neutral probabilities. Borrower underwriting later uses physical PD estimates and a different loss model. A disagreement between them need not be a software defect; risk premia, liquidity, contractual recovery and modelling assumptions differ.
+
+### A coherent world object
+
+`MarketContext` holds named objects rather than selecting a model for you. A discount curve, forward curve, hazard curve, vol surface, price curve, inflation index/curve, volatility-index curve and base-correlation curve answer different questions. Base correlation is only a preview here: it is a quoted dependence representation for credit tranches, developed in 2.8/C4, not a single-name PD input. Inflation curves describe an index path; price curves describe traded underlying prices; VIX-related curves describe volatility-index quantities. Substituting one merely because its array shape matches another is a semantic error.
+
+The example assembles an independent context with a clearly labelled flat illustrative hazard and staged option data. It does not alter the foundation book or add a CDS position early. The calibrated hazard experiment retains the quote replay needed for quote-space CS01 in 2.5.
+
+</Standard>
+
+<BuildIt>
+
+### Query volatility in the correct coordinates
+
+The total-variance assertion derives the interpolated value explicitly. The FX wing strike is checked by looking its volatility up again under the same forward-delta convention.
+
+{/* notebook-block notebook="01_foundations/market_data/vol_surfaces.ipynb" cell="surface-proof" role="build" */}
+```python exec id=surface-proof role=build
+import math
+from finstack_quant.core.market_data import VolSurface, FxDeltaVolSurface
+from finstack_quant.models.volatility import get_surface_vol, check_surface_grid, delta_to_strike, get_fx_delta_vol
+
+surface = VolSurface('LESSON-VOL', [0.5, 1.0], [90.0, 100.0, 110.0],
+    [[0.20, 0.20, 0.20], [0.25, 0.25, 0.25]], interpolation_mode='total_variance')
+interpolated = get_surface_vol(surface, 0.75, 100.0)
+assert abs(interpolated ** 2 * 0.75 - (0.20 ** 2 * 0.5 + 0.25 ** 2 * 1.0) / 2) < 1e-12
+broken = check_surface_grid([90.0, 100.0, 110.0], [0.5, 1.0],
+    [[0.40] * 3, [0.10] * 3], forward_prices=[100.0, 100.0])
+assert not broken.passed and broken.total_violations > 0
+fx_surface = FxDeltaVolSurface('EURUSD-VOL', [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.003, 0.004])
+call_vol = 0.11 + 0.004 + 0.012 / 2
+strike = delta_to_strike(0.25, 1.08, call_vol, 1.0)
+resolved = get_fx_delta_vol(fx_surface, 1.0, strike, 1.08)
+assert strike > 1.08 and abs(resolved - call_vol) < 1e-8
+print({'interpolated_vol': interpolated, 'fx_25d_call_strike': strike, 'violations': broken.by_type})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.5" block="surface-proof" />
+
+
+### Compare recovery assumptions without changing the question
+
+The first calculation holds hazard fixed. The second holds calibration quotes fixed and changes both the recovery input and resulting hazard curve. Serialization is included so the calibrated market remains reusable.
+
+{/* notebook-block notebook="01_foundations/market_data/hazard_curves.ipynb" cell="recovery-proof" role="build" */}
+```python exec id=recovery-proof role=build
+import json, math
+from finstack_quant.core.market_data import HazardCurve, MarketContext
+from finstack_quant.calibration import calibrate
+from _shared.analyst_book import AS_OF, calibration_envelope
+
+hazard = HazardCurve.flat('FIXED-HAZARD', AS_OF, 0.02, 0.40)
+lower_recovery = hazard.with_recovery_rate(0.25)
+assert hazard.sp(5.0) == lower_recovery.sp(5.0)
+assert abs(hazard.sp(5.0) - math.exp(-0.02 * 5)) < 1e-12
+calibrated = {}
+for recovery in (0.40, 0.25):
+    envelope = calibration_envelope('base')
+    envelope['plan']['steps'][-1]['recovery_rate'] = recovery
+    for quote in envelope['market_data']:
+        if quote['kind'] == 'cds_quote':
+            quote['recovery_rate'] = recovery
+    result = calibrate(json.dumps(envelope))
+    assert result.success and result.report.max_residual < 1e-7
+    calibrated[recovery] = MarketContext.from_json(result.market.to_json())
+assert calibrated[0.25].get_hazard('ACME-HZD').sp(5.0) > calibrated[0.40].get_hazard('ACME-HZD').sp(5.0)
+print({recovery: 1 - market.get_hazard('ACME-HZD').sp(5.0) for recovery, market in calibrated.items()})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.5" block="recovery-proof" />
+
+
+### Inspect annual survival and conditional default
+
+The table separates cumulative PD from conditional annual PD. The context uses independently constructed objects and stable identifiers.
+
+{/* notebook-block notebook="01_foundations/market_data/hazard_curves.ipynb" cell="survival-world-snapshot" role="build" */}
+```python exec id=survival-world-snapshot role=build
+import math
+from finstack_quant.core.market_data import HazardCurve,MarketContext
+from _shared.analyst_book import AS_OF,build_market
+world=MarketContext.from_json(build_market('options').to_json())
+world.insert(HazardCurve.flat('ILLUSTRATIVE-HAZARD',AS_OF,0.02,0.4))
+hazard=world.get_hazard('ILLUSTRATIVE-HAZARD')
+rows=[{'year':year,'survival':hazard.sp(year),'cumulative_PD':1-hazard.sp(year),'conditional_year_PD':1-hazard.sp(year)/hazard.sp(year-1)} for year in range(1,6)]
+assert all(abs(row['survival']-math.exp(-0.02*row['year']))<1e-12 for row in rows)
+assert world.get_surface('SPX-VOL').id=='SPX-VOL'
+print(rows)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.5" block="survival-world-snapshot" />
+
+
+</BuildIt>
+
+<LabCard notebook="01_foundations/market_data/vol_surfaces.ipynb" title="Vol Surfaces" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<LabCard notebook="01_foundations/market_data/hazard_curves.ipynb" title="Hazard Curves" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<Exercise id="exercise-calendar-arbitrage" title="A. Break total-variance monotonicity" question={"Construct the supplied fixed-forward grid with decreasing total variance and explain its diagnostic failure."}>
+
+At six months, 40% volatility gives total variance 0.08; at one year, 10% gives 0.01. The later compatible claim has less total variance, so the grid flags calendar violations. A fall from 40% to 35% would require recomputing total variance before reaching the same conclusion.
+
+{/* notebook-block notebook="01_foundations/market_data/vol_surfaces.ipynb" cell="exercise-calendar-arbitrage" role="exercise" */}
+```python exec id=exercise-calendar-arbitrage role=exercise
+from finstack_quant.models.volatility import check_surface_grid
+short_t,long_t=0.5,1.0
+short_vol,long_vol=0.4,0.1
+report=check_surface_grid([90.,100.,110.],[short_t,long_t],[[short_vol]*3,[long_vol]*3],forward_prices=[100.,100.])
+assert short_vol**2*short_t > long_vol**2*long_t
+assert not report.passed and report.by_type['calendar_spread']>0
+print({'short_total_variance':short_vol**2*short_t,'long_total_variance':long_vol**2*long_t,'violations':report.by_type})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.5" block="exercise-calendar-arbitrage" />
+
+</Exercise>
+
+<Exercise id="exercise-recovery-experiments" title="B. Separate intensity from severity" question={"Compute five-year PD at 40% and 25% recovery under fixed hazard and under fixed CDS quotes."}>
+
+The fixed-hazard PD is unchanged. The quote-calibrated PD falls when recovery falls, because a given default now causes a larger loss. The quote set is held fixed; treating the old hazard as still calibrated after the recovery change would answer a different question.
+
+{/* notebook-block notebook="01_foundations/market_data/hazard_curves.ipynb" cell="exercise-recovery-experiments" role="exercise" */}
+```python exec id=exercise-recovery-experiments role=exercise
+import json
+from finstack_quant.calibration import calibrate
+from finstack_quant.core.market_data import HazardCurve,MarketContext
+from _shared.analyst_book import AS_OF,calibration_envelope
+fixed=HazardCurve.flat('FIXED',AS_OF,0.02,0.4)
+assert fixed.sp(5)==fixed.with_recovery_rate(0.25).sp(5)
+pds={}
+for recovery in (0.4,0.25):
+    envelope=calibration_envelope('base');envelope['plan']['steps'][-1]['recovery_rate']=recovery
+    for quote in envelope['market_data']:
+        if quote['kind']=='cds_quote':quote['recovery_rate']=recovery
+    fit=calibrate(json.dumps(envelope));assert fit.success
+    restored=MarketContext.from_json(fit.market.to_json())
+    pds[recovery]=1-restored.get_hazard('ACME-HZD').sp(5)
+assert pds[0.25]<pds[0.4]
+print({'fixed_hazard_5y_PD':1-fixed.sp(5),'fixed_quote_5y_PD':pds})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="1.5" block="exercise-recovery-experiments" />
+
+</Exercise>
+
+<CheckYourself>
+
+1. **Does lower implied volatility necessarily create calendar arbitrage?** No. Compare total variance with compatible forward and moneyness assumptions.
+2. **What else defines a 25-delta FX strike?** Delta and premium conventions, forward/spot inputs, expiry and wing volatility.
+3. **Does recovery directly determine survival at fixed hazard?** No; it affects severity. Recalibration at fixed quotes can change hazard and survival.
+4. **Is a five-year cumulative PD the same as five times one-year PD?** No. Survival compounds through time.
+5. **Are risk-neutral and physical PD interchangeable?** No. They serve different pricing and underwriting purposes.
+
+</CheckYourself>

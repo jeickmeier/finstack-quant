@@ -1,0 +1,263 @@
+---
+id: '3.1'
+title: 'Performance: Measuring What Happened'
+description: 'Analyst program lesson 3.1: Performance: Measuring What Happened'
+desk_question: '"The fund returned 11%. Was that good?"'
+references:
+- '#sharpe-1966'
+- '#sortino-van-der-meer-1991'
+- '#grinold-kahn-1999-active-portfolio'
+- '#treynor-1965'
+- '#modigliani-1997'
+- '#keating-shadwick-2002'
+- '#young-1991-calmar'
+- '#martin-1987-ulcer-index'
+- '#burke-1994'
+- '#chekhlov-uryasev-zabarankin-2005'
+api: []
+status: published
+---
+
+<DeskContext question={"The fund returned 11%. Was that good?"}>
+
+First ask whose return is being measured. A portfolio manager controls investments; an investor also controls the timing and size of subscriptions. A correct performance report distinguishes those decisions and names the benchmark and observation window. This lesson uses three periods of native book valuations, including trades, external flows and contractual payments. A separate controlled experiment shows what a headline ratio can hide.
+
+Complete both sessions: reconstruct the cash ledger and flow-neutral return, then evaluate risk-adjusted and benchmark-relative measures. Three quarterly observations demonstrate the arithmetic; they cannot establish persistent skill.
+
+</DeskContext>
+
+<Standard>
+
+An internal trade exchanges cash for an asset and does not create wealth. An external subscription increases NAV without creating investment profit. Coupon and principal receipts move from the position into settled cash; omitting either side produces artificial losses or double counting. Convert EUR payments to USD once, at the explicitly dated FX quote. The ledger assumes settled cash earns no further interest and ignores transaction costs; projected derivative cashflows are teaching inputs rather than a historical trade confirmation system.
+
+For each interval between external flows, compute end wealth divided by beginning wealth. Link the factors to obtain $R_{TW}=\prod_j(1+r_j)-1$. Value immediately before and after every flow. Modified Dietz instead estimates $R=(V_1-V_0-\sum C_j)/(V_0+\sum w_j C_j)$, where $w_j$ is the fraction of the period remaining. It is useful when intraperiod marks are unavailable, but it is not generally identical to exact linking. XIRR solves the dated investor cashflow NPV equation and annualizes on actual days over 365; contributions are negative and terminal wealth positive from the investor's perspective.
+
+For equally spaced quarterly returns, sample volatility is $s\sqrt{4}$ and the zero-rate Sharpe ratio is $4\bar r/(s\sqrt{4})$. CAGR compounds geometric growth. Those are different annualization operations. Sortino uses downside deviation; Calmar divides annualized geometric growth by maximum drawdown magnitude. Neither is a universal substitute for reading the return path. Drawdown depth, calendar-day duration and recovery describe different costs of holding an investment.
+
+Tracking error is the annualized standard deviation of active returns, and information ratio divides annualized mean active return by that tracking error. Capture ratios condition on positive or negative benchmark periods and use geometric annualization. Batting average counts periods of outperformance without measuring their size. The benchmark in this fixture is explicitly illustrative. Every return shown below is a decimal fraction; monetary ledgers are USD.
+
+</Standard>
+
+<BuildIt>
+
+### Session 1: reconstruct the account
+
+The source factory supplies dated holdings, market snapshots and events. The calculation prices the holdings, settles due payments, funds purchases and observes NAV around subscriptions. Its assertions separately check trade self-financing, external-flow changes, linked returns and the XIRR residual. Monetary comparisons use a USD 1e-8 reconciliation tolerance for this float-valued analytics ledger; the XIRR check uses the native scale-normalized 1e-8 NPV tolerance.
+
+{/* notebook-block notebook="03_analytics/performance_analytics.ipynb" cell="dated-native-performance" role="build" */}
+```python exec id=dated-native-performance role=build
+import json
+import math
+from datetime import date, timedelta
+import pandas as pd
+from pytest import approx
+from _shared.analyst_history import (
+    HISTORY_DATES, performance_history, history_events, history_market, history_spec, history_quotes,
+)
+from finstack_quant.portfolio import (
+    Portfolio, aggregate_full_cashflows, value_portfolio, twrr_modified_dietz, twrr_linked_json, mwr_xirr,
+)
+history = performance_history()
+events = history_events()
+start_date, end_date = HISTORY_DATES[0], HISTORY_DATES[-1]
+initial_market = history_market(start_date)
+initial_spec = history_spec(start_date)
+initial_book = Portfolio.from_spec(json.dumps(initial_spec))
+initial_nav = value_portfolio(initial_book, initial_market, metrics=[]).total_value
+initial_cashflows = json.loads(aggregate_full_cashflows(initial_book, initial_market).to_json())["events"]
+payment_dates = {
+    date.fromisoformat(event["date"])
+    for event in initial_cashflows
+    if start_date < date.fromisoformat(event["date"]) <= end_date
+}
+timeline = sorted(
+    payment_dates
+    | set(HISTORY_DATES[1:])
+    | {date.fromisoformat(event["date"]) for event in events}
+)
+nav_rows = [{"date": start_date.isoformat(), "native_positions_usd": initial_nav, "settled_cash_usd": 0.0, "total_nav_usd": initial_nav}]
+flow_rows = []
+cash, segment_start, factor = 0.0, initial_nav, 1.0
+period_begin, period_flows, returns, dietz_returns = initial_nav, [], [], []
+investor_flows = [{"date": start_date.isoformat(), "amount": -initial_nav}]
+settled_positions = set()
+for when in timeline:
+    market = history_market(when)
+    if when in payment_dates:
+        held = history_spec(when - timedelta(days=1))
+        held["as_of"] = when.isoformat()
+        payments = json.loads(aggregate_full_cashflows(Portfolio.from_spec(json.dumps(held)), market).to_json())
+        for payment in payments["events"]:
+            if payment["date"] == when.isoformat():
+                amount = float(payment["amount"]["amount"])
+                if payment["amount"]["currency"] == "EUR":
+                    amount *= history_quotes(when)["eur_usd"]
+                cash += amount
+                settled_positions.add(payment["position_id"])
+    spec = history_spec(when)
+    valuation = value_portfolio(Portfolio.from_spec(json.dumps(spec)), market, metrics=[])
+    wire = json.loads(valuation.to_json())
+    for event in (event for event in events if event["date"] == when.isoformat()):
+        if event["type"] == "trade":
+            position = next(
+                position for position in spec["positions"] if position["instrument_id"] == event["instrument_id"]
+            )
+            unit_value = float(wire["position_values"][event["instrument_id"]]["value_base"]["amount"])
+            unit_value /= position["quantity"]
+            trade_cost = event["quantity_change"] * unit_value
+            before_trade = valuation.total_value - trade_cost + cash
+            cash -= trade_cost
+            assert valuation.total_value + cash == approx(before_trade, abs=1e-8)
+        else:
+            before_flow = valuation.total_value + cash
+            factor *= before_flow / segment_start
+            cash += event["amount"]
+            segment_start = valuation.total_value + cash
+            assert segment_start - before_flow == approx(event["amount"], abs=1e-8)
+            flow_rows.append({"date": event["date"], "before_usd": before_flow, "flow_usd": event["amount"], "after_usd": segment_start})
+            period_flows.append(event)
+            investor_flows.append({"date": event["date"], "amount": -event["amount"]})
+    nav = valuation.total_value + cash
+    if when in HISTORY_DATES[1:]:
+        nav_rows.append({"date": when.isoformat(), "native_positions_usd": valuation.total_value, "settled_cash_usd": cash, "total_nav_usd": nav})
+        returns.append(factor * nav / segment_start - 1.0)
+        period = history[len(returns) - 1]
+        start, end = date.fromisoformat(period["start"]), date.fromisoformat(period["end"])
+        dietz_returns.append(
+            twrr_modified_dietz(
+                json.dumps({
+                    "beginning_market_value": period_begin,
+                    "ending_market_value": nav,
+                    "cashflows": [
+                        {
+                            "amount": flow["amount"],
+                            "fraction_of_period_remaining": (end - date.fromisoformat(flow["date"])).days
+                            / (end - start).days,
+                        }
+                        for flow in period_flows
+                    ],
+                })
+            )
+        )
+        period_begin, segment_start, factor, period_flows = nav, nav, 1.0, []
+investor_flows.append({"date": end_date.isoformat(), "amount": nav})
+years = (date.fromisoformat(history[-1]["end"]) - date.fromisoformat(history[0]["start"])).days / 365.0
+linked = json.loads(twrr_linked_json(json.dumps(returns), years))
+assert len(returns) == len(dietz_returns) == 3
+assert linked["cumulative"] == approx(math.prod(1 + value for value in returns) - 1)
+assert all(math.isfinite(value) for value in returns + dietz_returns)
+assert {"USD-CORP", "EUR-GOVT", "USD-CASH", "EUR-CASH", "ACME-CDS", "USD-PAYER-IRS"} <= settled_positions
+assert cash > 0
+assert history_spec(start_date) == initial_spec
+xirr = mwr_xirr(json.dumps(investor_flows))
+assert math.isfinite(xirr)
+anchor = date.fromisoformat(investor_flows[0]["date"])
+npv = sum(
+    flow["amount"] / (1 + xirr) ** ((date.fromisoformat(flow["date"]) - anchor).days / 365.0)
+    for flow in investor_flows
+)
+# Native XIRR normalizes cash amounts before applying its 1e-8 tolerance.
+assert abs(npv) / max(abs(flow["amount"]) for flow in investor_flows) < 1e-8
+print("Dated native valuations and settled USD cash")
+print(pd.DataFrame(nav_rows).to_string(index=False))
+print("Valuations immediately around each external flow")
+print(pd.DataFrame(flow_rows).to_string(index=False))
+print(pd.DataFrame({"period_end": HISTORY_DATES[1:], "linked_subperiod_return": returns, "modified_dietz": dietz_returns}).to_string(index=False))
+print({"linked_return": linked["cumulative"], "annualized_xirr": xirr, "normalized_xirr_npv_residual": npv / max(abs(flow["amount"]) for flow in investor_flows)})
+
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.1" block="dated-native-performance" />
+
+The three quarterly returns come from this ledger. Modified Dietz is displayed beside exact linking so any difference remains visible. A positive cash balance can include repaid deposits and coupons; it is not an unexplained performance residual.
+
+### Session 2: interpret the measurement
+
+The native analytics object receives the derived returns with `frequency="quarterly"`. We independently verify volatility, Sharpe and tracking error to 1e-12 in return units. The first row of the wealth plot is the initial unit investment, so the first return is not lost. An undefined ratio in a zero-downside or zero-variance window must be discussed as undefined rather than presented as evidence of superior performance.
+
+{/* notebook-block notebook="03_analytics/performance_analytics.ipynb" cell="performance-measures" role="build" */}
+```python exec id=performance-measures role=build
+import numpy as np
+from finstack_quant.analytics import Performance
+return_panel = pd.DataFrame({"BOOK": returns, "BENCH": [p["benchmark_return"] for p in history]}, index=pd.to_datetime(HISTORY_DATES[1:]))
+book_performance = Performance.from_returns(return_panel, benchmark_ticker="BENCH", frequency="quarterly")
+metrics_table = pd.DataFrame({name: getattr(book_performance, name)() for name in ["cagr", "volatility", "sharpe", "sortino", "calmar", "max_drawdown", "max_drawdown_duration", "tracking_error", "information_ratio", "up_capture", "down_capture", "batting_average", "omega_ratio"]})
+manual_vol = np.std(returns, ddof=1) * np.sqrt(4)
+manual_sharpe = np.mean(returns) * 4 / manual_vol
+active = return_panel.BOOK - return_panel.BENCH
+assert abs(metrics_table.loc["BOOK", "volatility"] - manual_vol) < 1e-12
+assert abs(metrics_table.loc["BOOK", "sharpe"] - manual_sharpe) < 1e-12
+assert abs(metrics_table.loc["BOOK", "tracking_error"] - active.std(ddof=1)*2) < 1e-12
+print("Illustrative benchmark; only three observed book periods; frequency-based annualization, zero risk-free rate")
+print(metrics_table.to_string())
+print("Book drawdown episodes:", book_performance.drawdown_details(0, n=3))
+import matplotlib.pyplot as plt
+wealth = pd.concat([pd.DataFrame({"BOOK":[1.0],"BENCH":[1.0]}, index=pd.to_datetime([HISTORY_DATES[0]])), (1+return_panel).cumprod()])
+wealth.plot(title="Flow-neutral wealth; illustrative benchmark", ylabel="Value of one USD invested")
+plt.tight_layout()
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.1" block="performance-measures" />
+
+Read the sign and denominator before ranking: maximum drawdown is a negative return, while its magnitude enters Calmar. The printed duration is in calendar days. A benchmark outperformance statistic over three periods is an arithmetic result, not a significance test. Inspect the drawdown episode's start, trough and recovery, and state if the episode has not recovered by the observation endpoint.
+
+</BuildIt>
+
+<LabCard notebook="03_analytics/performance_analytics.ipynb" title="Two mandatory performance sessions" description="Run the account reconstruction, all ratio and drawdown examples, and both required exercises." />
+<Exercise title="Same Sharpe, different experience" question={"Construct two funds with equal Sharpe ratios but different Sortino and Calmar ratios. Rank them for an investor who cares about downside losses, and defend the choice."}>
+
+{/* notebook-block notebook="03_analytics/performance_analytics.ipynb" cell="exercise-same-sharpe" role="exercise" */}
+```python exec id=exercise-same-sharpe role=exercise
+# Controlled 24-month experiment, not the analyst book's realized history.
+z = np.array([-3.0, -1.0, -0.5, 0.0, 0.5, 1.0]*4)
+z = (z-z.mean())/z.std(ddof=1)
+fund_a = 0.006 + 0.025*z
+fund_b = 0.006 - 0.025*z
+funds = Performance.from_returns(pd.DataFrame({"A":fund_a,"B":fund_b},index=pd.date_range("2023-01-31",periods=24,freq="ME")),frequency="monthly")
+comparison = pd.DataFrame({m:getattr(funds,m)() for m in ["sharpe","sortino","calmar","max_drawdown","cagr"]})
+assert abs(comparison.loc["A","sharpe"]-comparison.loc["B","sharpe"]) < 1e-12
+assert not np.isclose(comparison.loc["A","sortino"],comparison.loc["B","sortino"])
+assert not np.isclose(comparison.loc["A","calmar"],comparison.loc["B","calmar"])
+print(comparison.to_string())
+print("Same sample mean and variance do not imply the same downside distribution or compounded drawdown.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.1" block="exercise-same-sharpe" />
+
+The reflected standardized returns preserve the mean and sample variance exactly while changing which tail is negative. Prefer the fund with the stronger downside statistics only after checking its return path and the investor's constraints. Sharpe alone is insufficient; the choice remains conditional on the assumed distribution, horizon and loss tolerance. Reordering either series preserves Sharpe and Sortino but may change drawdown and Calmar.
+
+</Exercise>
+<Exercise title="A contribution before the rally" question={"Quantify exact TWRR, dated MWRR and Modified Dietz when a large contribution precedes the second-half rally. Which is honest for the manager and for the investor?"}>
+
+{/* notebook-block notebook="03_analytics/performance_analytics.ipynb" cell="exercise-flow-before-rally" role="exercise" */}
+```python exec id=exercise-flow-before-rally role=exercise
+# Two half-years: +0%, then +20%. A 900 USD contribution precedes the rally.
+flow_case = [{"date":"2024-01-01","amount":-100.0},{"date":"2024-07-01","amount":-900.0},{"date":"2025-01-01","amount":1200.0}]
+flow_mwrr = mwr_xirr(json.dumps(flow_case))
+flow_twrr = (1+0.0)*(1+0.20)-1
+flow_dietz = twrr_modified_dietz(json.dumps({"beginning_market_value":100.0,"ending_market_value":1200.0,"cashflows":[{"amount":900.0,"fraction_of_period_remaining":184/366}]}))
+assert abs(flow_twrr-.20)<1e-12
+assert flow_mwrr > flow_twrr
+assert flow_dietz > flow_twrr
+print({"one_year_TWRR":flow_twrr,"annualized_XIRR":flow_mwrr,"modified_Dietz":flow_dietz})
+print("The investor put most capital to work for the rally. TWRR removes that sizing decision; MWRR retains it.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.1" block="exercise-flow-before-rally" />
+
+Exact TWRR reports the strategy's linked 20% one-year return. XIRR gives the investor's annualized experience after committing most money for only the second half. Dietz is an approximation using time-weighted capital. The difference is caused by cashflow timing and annualization, not an arithmetic contradiction. Report TWRR for manager comparison and MWRR for the investor's capital experience, with the dates shown.
+
+</Exercise>
+
+<CheckYourself>
+
+- Can a subscription change NAV while leaving investment return unchanged? Yes: subtract the flow or split the observation immediately around it.
+- Is a coupon an external flow? No. It belongs in investment profit and then settled cash.
+- Does a higher information ratio prove skill? No. Benchmark choice, sample length and uncertainty remain essential.
+- What would invalidate this report? Missing payments, wrong FX direction, omitted flow-date valuations, incorrect frequency or an unexplained residual. Repair those inputs before discussing ratios.
+
+</CheckYourself>

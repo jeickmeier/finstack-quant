@@ -1,0 +1,556 @@
+---
+id: "3.2"
+title: "Risk: VaR, Factors, and Credit Calibration"
+description: "Audit tail estimators and horizon scaling, fit aligned return factors, and turn a calibrated credit covariance into explicitly dimensioned risk."
+desk_question: "How much can this book lose, over which horizon, and which exposures explain that estimate?"
+references: ["#jpmorgan1996RiskMetrics", "#artzner1999CoherentRisk", "#cornishFisher1937", "#mcneil-frey-embrechts-qrm", "#fama-french-1993", "#ben-dor-2007-dts", "#ledoitwolf2004", "#joanesGill1998"]
+api: ["finstack_quant.analytics.Performance", "finstack_quant.core.math.linalg.ledoit_wolf_shrinkage", "finstack_quant.features.neutralize_and_zscore", "finstack_quant.models.factor.risk.parametric_var_decomposition", "finstack_quant.models.factor.risk.parametric_es_decomposition"]
+status: "published"
+---
+
+<DeskContext question="How much can this book lose, over which horizon, and which exposures explain that estimate?">
+
+A risk number without a horizon, confidence level, sign and exposure unit is incomplete. This lesson starts from the aligned synthetic return panel used in the analyst fixtures. Those 504 daily proxy observations support reproducible method comparisons; they are not a historical track record of the current priced book. Convert a return-tail estimate into dollars only after specifying the portfolio value and the return-to-P&L approximation.
+
+Build on [performance conventions](/learn/3.1). Deliver a risk sheet with historical, Gaussian and moment-adjusted tails; an audited return regression; a saved credit-factor calibration; and three completed diagnostics on scaling, neutralization and normal ES.
+
+</DeskContext>
+
+<Standard>
+
+### Quantiles, tails and signs
+
+At confidence $c$, return VaR is the lower $(1-c)$ quantile of returns. These APIs report an adverse return as a negative number. A loss-positive presentation usually negates it. Do not silently change the sign while comparing historical returns with dollar-risk decomposition.
+
+The historical quantile here uses R-7 interpolation: sort $n$ observations, set $h=(n-1)(1-c)$, and interpolate between the adjacent order statistics. The current historical `expected_shortfall` estimator averages every observation at or below that threshold. With a continuous sample and few ties this is a useful empirical tail summary. With a large probability mass at the threshold, it can include more than exactly the worst $(1-c)$ probability mass.
+
+The coherent loss-positive Expected Shortfall definition is
+
+$$
+\mathrm{ES}_c(L)=\frac1{1-c}\int_c^1 q_u(L)\,du.
+$$
+
+That definition includes the correct fraction of any threshold mass. It is the ES used in the subadditivity result, not an arbitrary closed-threshold average on a discrete distribution. The distinction matters in the explicit counterexample below. [Artzner and coauthors](/references.html#artzner1999CoherentRisk) and [Quantitative Risk Management](/references.html#mcneil-frey-embrechts-qrm) provide the risk-measure context.
+
+For additive IID Gaussian daily returns with mean $\mu$ and volatility $\sigma$, return VaR over $h$ periods is
+
+$$
+q_{1-c,h}=h\mu-z_c\sigma\sqrt h.
+$$
+
+Changing confidence requires changing $z_c$; changing horizon also changes drift. This approximation assumes stationary independent increments, fixed exposures and an additive return/P&L representation. Serial dependence, jumps, nonlinear options, changing positions and compounding can invalidate square-root-of-time scaling.
+
+Cornish–Fisher adjusts a normal quantile using sample skewness and kurtosis. It can improve a local approximation on one sample, but unstable higher moments and extreme quantiles can produce unreliable or invalid results. Finite output and closeness to one empirical quantile do not establish predictive accuracy. Use the [original expansion](/references.html#cornishFisher1937) and [moment-estimation discussion](/references.html#joanesGill1998) to interpret the correction. The Gaussian comparison here uses sample moments, not a RiskMetrics EWMA forecast.
+
+### A factor fit describes aligned variation
+
+Regress returns on a constant and aligned factor returns:
+
+$$
+r_t=\alpha+\boldsymbol\beta^\top\mathbf f_t+\epsilon_t.
+$$
+
+Check date alignment, missing values, units, rank and residual orthogonality before interpreting beta or $R^2$. The single benchmark beta is covariance divided by benchmark variance; the multivariate coefficients condition on the other factors. The native regression expects factors already expressed as excess returns; its default `return_kind="excess"` leaves the dependent series unchanged. This fixture uses zero risk-free return for the comparison. For total returns, specify that convention and the annual risk-free rate consistently. High $R^2$ is descriptive fit, not causal identification or evidence of alpha. [Fama–French](/references.html#fama-french-1993) motivates factor descriptions without making this synthetic three-factor panel a Fama–French dataset.
+
+Constraints such as nonnegative coefficients or coefficients summing to one change the regression problem. They can encode a holdings interpretation but bias an unrestricted return fit, and unconstrained OLS residual identities need not survive. The supported `Performance.multi_factor_greeks` path here is unrestricted; it has no coefficient-constraint parameter. Do not reinterpret its betas as long-only portfolio weights.
+
+With factor exposure vector $b$, covariance $\Sigma$ and an explicit horizon, systematic variance is $b^\top\Sigma b$. Dollar exposures require covariance in matching factor units. Include residual risk separately; a systematic-only answer is not total book risk. [Ledoit–Wolf shrinkage](/references.html#ledoitwolf2004) stabilizes covariance toward a structured target; positive definiteness does not prove the target is economically adequate.
+
+### Credit calibration has a second set of units
+
+A spread-return factor model is not the same object as the equity-return regression. The native credit fixture takes decimal spread observations and calibrated outputs expose spread-factor units in basis points. Duration-times-spread weighting uses spread duration multiplied by spread in the matching convention. [Ben Dor and coauthors](/references.html#ben-dor-2007-dts) explain the relative-spread-risk intuition.
+
+Calibrated factors depend on hierarchy, issuer tags, minimum bucket support, observation frequency and weighting. A requested bucket may be pruned when it lacks enough names. A saved model records those choices so a later decomposition can use the same factor definitions.
+
+The covariance returned by this calibration is annualized. Its `OneStep` wrapper exposes that stored covariance; `NSteps(12)` literally scales it by twelve. It is not an instruction to annualize monthly covariance a second time. Read the calibration frequency and result convention together.
+
+</Standard>
+
+<BuildIt>
+
+### 1. Reconcile the empirical risk panel and regression
+
+The first block constructs one complete, aligned panel, computes historical VaR/ES and two parametric alternatives, then compares the native multivariate coefficients with an explicit least-squares solution. The follow-up shows the R-7 interpolation and tail inclusion rule by hand, checks residual orthogonality, audits benchmark beta and computes native shrinkage.
+
+{/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="aligned-risk-panel" role="build" */}
+```python exec id=aligned-risk-panel role=build
+import math
+import numpy as np
+from _shared.analyst_history import risk_panel
+from finstack_quant.analytics import Performance
+panel = risk_panel()
+assert panel.index.is_unique and not panel.isna().any().any()
+performance = Performance.from_returns(panel[["portfolio", "benchmark"]], frequency="daily", benchmark_ticker="benchmark")
+confidence = 0.95
+measures = {"historical_var":float(performance.value_at_risk(confidence).iloc[0]), "normal_var":float(performance.parametric_var(confidence).iloc[0]), "cornish_fisher_var":float(performance.cornish_fisher_var(confidence).iloc[0]), "historical_es":float(performance.expected_shortfall(confidence).iloc[0])}
+assert all(math.isfinite(value) for value in measures.values())
+assert abs(measures["historical_es"]) >= abs(measures["historical_var"])
+factors = panel[["market", "rates", "credit"]].to_numpy().T.tolist()
+fit = performance.multi_factor_greeks(0, factors)
+design = np.column_stack([np.ones(len(panel)), panel[["market", "rates", "credit"]]])
+ols = np.linalg.lstsq(design, panel["portfolio"].to_numpy(), rcond=None)[0]
+assert np.allclose(fit.betas, ols[1:], atol=1e-10), "Dimensionless OLS loadings, independent NumPy reference"
+print("Daily return-risk measures:",measures)
+print("Factor loadings [market,rates,credit]:",fit.betas,"R-squared:",fit.r_squared)
+print("Incorrect 95% one-day VaR times sqrt(10) (not 99%):",measures["normal_var"]*math.sqrt(10))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="aligned-risk-panel" />
+
+{/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="manual-tail-and-shrinkage" role="build" */}
+```python exec id=manual-tail-and-shrinkage role=build
+from finstack_quant.core.math import linalg
+
+returns = panel["portfolio"].to_numpy()
+ordered = np.sort(returns)
+h = (len(ordered)-1) * (1-confidence)
+k = int(math.floor(h))
+manual_var = ordered[k] + (h-k) * (ordered[k+1]-ordered[k])
+manual_es = ordered[ordered <= manual_var].mean()
+assert abs(manual_var-measures["historical_var"]) < 1e-12
+assert abs(manual_es-measures["historical_es"]) < 1e-12
+residual = returns - design @ ols
+assert abs(residual.mean()) < 1e-12
+assert np.allclose(design.T @ residual, 0, atol=1e-10)
+manual_r_squared = 1 - float(residual @ residual) / float((returns-returns.mean()) @ (returns-returns.mean()))
+assert abs(manual_r_squared-fit.r_squared) < 1e-10
+factor_observations = panel[["market","rates","credit"]].to_numpy()
+shrunk, intensity = linalg.ledoit_wolf_shrinkage(factor_observations)
+shrunk = np.asarray(shrunk)
+assert 0 <= intensity <= 1 and np.linalg.eigvalsh(shrunk).min() > 0
+print(f"Manual R-7 lower quantile={manual_var:.8f}; closed-tail mean={manual_es:.8f}")
+print(f"Daily residual volatility={residual.std(ddof=1):.8f}; Ledoit-Wolf intensity={intensity:.6f}")
+print("Shrunk daily factor covariance:\n", shrunk)
+
+single_beta = performance.beta()[0].beta
+benchmark_returns = panel["benchmark"].to_numpy()
+manual_beta = np.cov(returns, benchmark_returns, ddof=1)[0,1] / benchmark_returns.var(ddof=1)
+assert abs(single_beta-manual_beta) < 1e-12
+print(f"Benchmark beta={single_beta:.8f}; independent covariance ratio={manual_beta:.8f}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="manual-tail-and-shrinkage" />
+
+For this fixture, 95% daily historical return VaR is approximately −0.602% and the closed-tail mean approximately −0.727%. Report both as return statistics. The shrinkage intensity reaches one for these inputs; that is the returned estimator choice, not a rule to force every covariance to a diagonal matrix.
+
+### 2. Make skewness matter, then expose a discrete tail trap
+
+The controlled skewed sample applies a quadratic transformation to normal draws. The normal, historical and Cornish–Fisher answers differ because they summarize different information. The code requires finite distinct results but does not reward whichever method happens to match one quantile most closely.
+
+{/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="skewed-return-risk" role="build" */}
+```python exec id=skewed-return-risk role=build
+import pandas as pd
+
+rng = np.random.default_rng(73)
+normal_draws = rng.normal(0, 0.01, 504)
+skewed_returns = normal_draws - 0.002 * ((normal_draws/0.01)**2 - 1)
+skewed_performance = Performance.from_returns(pd.DataFrame({"skewed":skewed_returns},index=panel.index),frequency="daily")
+skewed_measures = {
+    "historical":float(skewed_performance.value_at_risk(0.95).iloc[0]),
+    "Gaussian":float(skewed_performance.parametric_var(0.95).iloc[0]),
+    "Cornish-Fisher":float(skewed_performance.cornish_fisher_var(0.95).iloc[0]),
+}
+assert all(math.isfinite(value) for value in skewed_measures.values())
+assert abs(skewed_measures["Cornish-Fisher"]-skewed_measures["Gaussian"]) > 1e-5
+print("Controlled skewed daily returns:",skewed_measures)
+print("A correction changes the model; closeness to one empirical quantile is not a guarantee out of sample.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="skewed-return-risk" />
+
+Now give each of two positions a 10% loss in four of one hundred equiprobable states, with disjoint loss states. Each position's 95% VaR is zero; their combined VaR is a 10% loss. This violates VaR subadditivity. Exact ES averages five worst states and gives 8%, 8% and 10%, which satisfies subadditivity. The API's closed-threshold averages include the many zero-loss ties for the separate positions and therefore differ from exact-mass ES.
+
+{/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="var-nonsubadditivity" role="build" */}
+```python exec id=var-nonsubadditivity role=build
+# One hundred equally likely dollar-loss states; four A defaults and four different B defaults.
+loss_a = np.zeros(100); loss_a[:4] = 0.1
+loss_b = np.zeros(100); loss_b[4:8] = 0.1
+state_returns = pd.DataFrame({"A":-loss_a,"B":-loss_b,"AplusB":-(loss_a+loss_b)},index=pd.bdate_range("2025-01-01",periods=100))
+discrete = Performance.from_returns(state_returns,frequency="daily")
+var_values = discrete.value_at_risk(0.95)
+assert var_values["A"] == var_values["B"] == 0 and var_values["AplusB"] == -0.1
+# Exact 95% ES averages exactly five worst equiprobable states, including partial threshold mass if needed.
+exact_es_a = np.sort(loss_a)[-5:].mean()
+exact_es_b = np.sort(loss_b)[-5:].mean()
+exact_es_sum = np.sort(loss_a+loss_b)[-5:].mean()
+assert exact_es_sum <= exact_es_a+exact_es_b
+print("Loss-positive VaR:",(-var_values).to_dict())
+print("Exact tail-mass ES:",{"A":exact_es_a,"B":exact_es_b,"AplusB":exact_es_sum})
+print("API closed-threshold tail averages:",(-discrete.expected_shortfall(0.95)).to_dict())
+print("Ties change the included probability mass. The API estimate is not the exact-mass ES used in the coherence theorem.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="var-nonsubadditivity" />
+
+This is a unit-sized additive loss example, not a dynamically rebalanced two-asset return portfolio. The fully displayed exact-mass calculation establishes the definition; the native output exposes the estimator's tied-data limitation rather than pretending it proves the coherence theorem.
+
+### 3. Calibrate and persist a credit hierarchy
+
+The panel contains twenty-four monthly observations and six issuers across rating and region tags. Dates are actual month ends and spreads are decimals. Inspect the JSON hierarchy, generic observations, issuer histories and as-of spreads before calibration. Equal weighting is the baseline.
+
+{/* notebook-block notebook="05_portfolio/credit_factor_hierarchy.ipynb" cell="credit-factor-imports" role="build" */}
+```python exec id=credit-factor-imports role=build
+import json
+import math
+import tempfile
+from datetime import date as dt_date
+from pathlib import Path
+
+import numpy as np
+
+import sys
+sys.path.insert(0, "..")
+
+from _shared.instrument_fixtures import fixed_bond
+from finstack_quant.attribution import attribute_pnl_envelope_json
+from finstack_quant.core.dates import Schedule
+from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.models.factor.credit import (
+    CreditCalibrator,
+    CreditFactorModel,
+    FactorCovarianceForecast,
+    VolHorizon,
+    LevelsAtDate,
+    PeriodDecomposition,
+    decompose_levels,
+    decompose_period,
+)
+
+print("Imports OK.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="credit-factor-imports" />
+
+{/* notebook-block notebook="05_portfolio/credit_factor_hierarchy.ipynb" cell="credit-spread-panel" role="build" */}
+```python exec id=credit-spread-panel role=build
+rng = np.random.default_rng(42)  # fixed seed — deterministic
+
+N_MONTHS = 24
+AS_OF = "2024-03-31"
+
+# Calendar-correct month-end observation dates ending at AS_OF.
+# The builder is inclusive of both endpoints, so ask for one extra month and
+# keep the trailing N_MONTHS.
+_schedule = (
+    Schedule.builder(dt_date(2022, 3, 31), dt_date.fromisoformat(AS_OF))
+    .frequency("1M")
+    .end_of_month(True)
+    .build()
+)
+dates = [d.isoformat() for d in _schedule.dates][-N_MONTHS:]
+assert len(dates) == N_MONTHS and dates[-1] == AS_OF
+
+# Generic factor: CDX IG 5Y proxy, mean 100 bp with small trend
+generic_values = [(100.0 + 0.5 * math.sin(i * 0.4)) / 10_000.0 for i in range(N_MONTHS)]
+
+ISSUERS = [
+    ("ISSUER-A", "IG", "EU"),
+    ("ISSUER-B", "IG", "NA"),
+    ("ISSUER-C", "IG", "APAC"),
+    ("ISSUER-D", "HY", "EU"),
+    ("ISSUER-E", "HY", "NA"),
+    ("ISSUER-F", "HY", "APAC"),
+]
+
+spreads: dict[str, list] = {}
+tags: dict[str, dict] = {}
+as_of_spreads: dict[str, float] = {}
+
+for k, (issuer_id, rating, region) in enumerate(ISSUERS):
+    base = (80.0 + k * 30.0) / 10_000.0  # IG: ~80-170 bp, HY: ~170-230 bp
+    beta_pc = 0.6 + 0.05 * k
+    noise = rng.normal(0, 1.5 / 10_000.0, size=N_MONTHS)
+    series = [
+        base + beta_pc * (generic_values[i] - 0.01) + noise[i]
+        for i in range(N_MONTHS)
+    ]
+    spreads[issuer_id] = series
+    tags[issuer_id] = {"rating": rating, "region": region}
+    as_of_spreads[issuer_id] = series[-1]
+
+print(f"Dates: {dates[0]} .. {dates[-1]}  ({len(dates)} months, all month-end)")
+print(f"Issuers: {list(spreads.keys())}")
+print("As-of spreads (decimal; 0.01 = 100 bp):")
+for k, v in as_of_spreads.items():
+    print(f"  {k}: {v:.6f}  ({v * 10_000:.1f} bp)")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="credit-spread-panel" />
+
+{/* notebook-block notebook="05_portfolio/credit_factor_hierarchy.ipynb" cell="credit-factor-config" role="build" */}
+```python exec id=credit-factor-config role=build
+import _shared
+_NOTEBOOK_DATA = json.loads((Path(_shared.__file__).resolve().parent.parent / "05_portfolio/data/credit_factor_hierarchy.json").read_text())
+
+calibration_config = _NOTEBOOK_DATA["calibration_config"]
+
+calibration_inputs = {
+    "history_panel": {"dates": dates, "spreads": spreads},
+    "issuer_tags": {"tags": tags},
+    "generic_factor": {
+        "spec": {"name": "CDX IG 5Y", "series_id": "cdx.ig.5y"},
+        "values": generic_values,
+    },
+    "as_of": AS_OF,
+    "as_of_spreads": as_of_spreads,
+    "idiosyncratic_overrides": {},
+}
+
+print("Config hierarchy levels:", calibration_config["hierarchy"]["levels"])
+print("Input issuers:", list(calibration_inputs["issuer_tags"]["tags"].keys()))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="credit-factor-config" />
+
+{/* notebook-block notebook="05_portfolio/credit_factor_hierarchy.ipynb" cell="credit-factor-calibration" role="build" */}
+```python exec id=credit-factor-calibration role=build
+# Config and inputs are accepted as plain dicts (or JSON strings).
+calibrator = CreditCalibrator(calibration_config)
+model = calibrator.calibrate(calibration_inputs)
+
+print(f"schema : {model.schema}")
+print(f"as_of          : {model.as_of}")
+print(f"n_levels       : {model.n_levels}")
+print(f"n_issuers      : {model.n_issuers}")
+print(f"n_factors      : {model.n_factors}")
+print(f"level_names    : {model.level_names()}")
+print(f"issuer_ids     : {model.issuer_ids()}")
+print(f"factor_ids     : {model.factor_ids()}")
+assert model.n_issuers == 6 and model.n_levels == 2
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="credit-factor-calibration" />
+
+The resulting supported factors reflect the calibration's bucket and sample rules. A hierarchy with multiple declared levels does not imply every Cartesian bucket survives. Read the returned factor IDs; do not build an exposure vector from a guessed ordering.
+
+{/* notebook-block notebook="05_portfolio/credit_factor_hierarchy.ipynb" cell="credit-factor-roundtrip" role="build" */}
+```python exec id=credit-factor-roundtrip role=build
+# Save to a temporary file and reload — verifies the JSON round-trip.
+with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+    artifact_path = Path(f.name)
+    f.write(model.to_json())
+
+artifact_json = artifact_path.read_text()
+model_reloaded = CreditFactorModel.from_json(artifact_json)
+
+assert model_reloaded.schema == model.schema
+assert model_reloaded.n_issuers == model.n_issuers
+assert model_reloaded.n_factors == model.n_factors
+assert model_reloaded.issuer_ids() == model.issuer_ids()
+
+# Clean up
+artifact_path.unlink()
+
+print("Artifact saved and reloaded successfully.")
+print(f"Reloaded: {model_reloaded}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="credit-factor-roundtrip" />
+
+Saving and reloading the native model gives a reusable calibration artifact with schema and metadata. It does not freeze the market itself: a later risk calculation still needs the correct dated observations and exposures.
+
+### 4. Decompose a spread move and convert aligned covariance into risk
+
+In the controlled two-date comparison, the generic level increases from 99.5 to 101.2 basis points while observed issuer spreads are held fixed. The factor decomposition explains the offsetting components in its native basis-point convention. This is an attribution of a modelled spread move, not realized trade P&L.
+
+{/* notebook-block notebook="05_portfolio/credit_factor_hierarchy.ipynb" cell="credit-factor-decomposition" role="build" */}
+```python exec id=credit-factor-decomposition role=build
+# T0: the second-to-last panel date (2024-02-29). Because the panel is built on
+# a calendar-correct month-end schedule, this is a real observation date.
+T0_DATE = dates[-2]
+T0_GENERIC = 99.5 / 10_000.0
+
+# T1: as-of (the last panel date, 2024-03-31)
+T1_DATE = AS_OF
+T1_GENERIC = 101.2 / 10_000.0
+assert T0_DATE == "2024-02-29" and T1_DATE == dates[-1]
+
+# Observed spreads are a plain {issuer: decimal_spread} mapping (same at both dates).
+snap_t0 = decompose_levels(model, as_of_spreads, T0_GENERIC, T0_DATE)
+snap_t1 = decompose_levels(model, as_of_spreads, T1_GENERIC, T1_DATE)
+
+period = decompose_period(snap_t0, snap_t1)
+
+# decompose_levels -> LevelsAtDate snapshots; decompose_period -> PeriodDecomposition
+assert isinstance(snap_t0, LevelsAtDate) and isinstance(period, PeriodDecomposition)
+
+print(f"Period: {period.from_date} → {period.to_date}")
+print(f"Δ generic (bp): {period.d_generic:.4f}")
+
+for lvl in range(period.n_levels):
+    deltas = period.level_deltas(lvl)
+    level_name = model.level_names()[lvl]
+    print(f"Level {lvl} ({level_name}) Δ bucket values:")
+    for bucket, delta in sorted(deltas.items()):
+        print(f"  {bucket}: {delta:+.4f} bp")
+
+d_adder = period.d_adder()
+print("Δ adder per issuer (bp):")
+for issuer, delta in sorted(d_adder.items()):
+    print(f"  {issuer}: {delta:+.4f}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="credit-factor-decomposition" />
+
+The covariance proof aligns exposures by returned factor ID, checks positive semidefiniteness and makes the horizon scaling literal. It then assigns illustrative USD 1,000 exposures per native factor unit to calculate annual dollar volatility and Gaussian VaR. These exposures are a dimensioned arithmetic example, not measured sensitivities of the analyst book. Issuer residual risk remains a separate component.
+
+{/* notebook-block notebook="05_portfolio/credit_factor_hierarchy.ipynb" cell="credit-factor-covariance" role="build" */}
+```python exec id=credit-factor-covariance role=build
+fcf = FactorCovarianceForecast(model)
+
+# One-step annualized covariance
+cov_one = fcf.covariance_at("one_step")
+factor_ids = cov_one.factor_ids
+data = cov_one.to_numpy()
+
+print("Factor IDs:")
+for fid in factor_ids:
+    print(f"  {fid}")
+
+print(f"\nCovariance matrix shape: {data.shape}")
+print("Diagonal variances (annualized):")
+for fid in factor_ids:
+    print(f"  {fid}: {cov_one.variance(fid):.6f}")
+
+# NSteps(12) covariance = 12 × one-step (Sample vol model); a VolHorizon or a
+# descriptor string such as '{"n_steps": 12}' are both accepted.
+cov_12 = fcf.covariance_at(VolHorizon.n_steps(12))
+one_step_variance = cov_one.variance(factor_ids[0])
+ratio = cov_12.variance(factor_ids[0]) / one_step_variance if one_step_variance != 0.0 else float("nan")
+print(f"\nNSteps(12) / OneStep ratio (should be 12.0): {ratio:.4f}")
+
+# Per-issuer idiosyncratic vol
+print("\nPer-issuer idiosyncratic vol (one-step, annualized):")
+for issuer_id in model.issuer_ids():
+    vol = fcf.idiosyncratic_vol(issuer_id, "one_step")
+    print(f"  {issuer_id}: {vol:.6f}")
+assert np.allclose(cov_12.to_numpy(), 12 * data, rtol=1e-12, atol=1e-12)
+assert np.linalg.eigvalsh(data).min() >= -1e-10
+# Explicit illustrative dollar exposures per native factor unit, aligned by ID.
+from finstack_quant.models.factor.risk import parametric_var_decomposition
+exposure = np.full(len(factor_ids), 1000.0)
+dollar_sigma = float(np.sqrt(exposure @ data @ exposure))
+allocated = parametric_var_decomposition(factor_ids, exposure.tolist(), data, 0.95)
+assert dollar_sigma > 0 and allocated.portfolio_var < 0
+print(f"Illustrative annual dollar volatility: {dollar_sigma:,.6f}; 95% Gaussian VaR: {allocated.portfolio_var:,.6f}")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="credit-factor-covariance" />
+
+Finally calibrate the same input panel with DTS weighting. Every issuer receives an explicit five-year spread duration. The displayed duration-times-spread weights use basis points for readability and document what changed from equal weighting.
+
+{/* notebook-block notebook="05_portfolio/credit_factor_hierarchy.ipynb" cell="credit-dts-calibration" role="build" */}
+```python exec id=credit-dts-calibration role=build
+from copy import deepcopy
+
+dts_config = deepcopy(calibration_config)
+dts_config["bucket_weighting"] = "dts"
+dts_inputs = deepcopy(calibration_inputs)
+dts_inputs["spread_durations"] = {issuer: 5.0 for issuer in as_of_spreads}
+dts_model = CreditCalibrator(dts_config).calibrate(dts_inputs)
+assert dts_model.n_issuers == model.n_issuers
+weights_dts = {issuer: 5.0 * spread * 10_000 for issuer, spread in as_of_spreads.items()}
+assert all(weight > 0 for weight in weights_dts.values())
+print("DTS weights (spread-duration years x spread bp):", weights_dts)
+print("Calibrated equal-weight and DTS artifacts:", model.schema, dts_model.schema)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="credit-dts-calibration" />
+
+<LabCard notebook="03_analytics/risk_and_factor_analytics.ipynb" title="Tail risk and aligned return factors" description="Manual quantiles, exact tail mass, moment corrections and regression diagnostics." />
+<LabCard notebook="03_analytics/factor_sensitivity.ipynb" title="Factor sensitivities and risk decomposition" description="Extend the exposure and covariance accounting." />
+<LabCard notebook="05_portfolio/credit_factor_hierarchy.ipynb" title="Credit hierarchy calibration" description="Persist factor definitions and inspect covariance and spread-decomposition units." />
+
+</BuildIt>
+
+<Exercise title="1. Change 95%/one day into 99%/ten days" question="Derive the 99% ten-day Gaussian return quantile from the daily mean and sample volatility. Compare it with the naive 95% VaR times square root of ten and state the assumptions.">
+
+Use $10\mu-z_{0.99}\sigma\sqrt{10}$, not the 95% quantile multiplied by $\sqrt{10}$. Mean scales linearly and volatility with square root only under the stated IID additive-Gaussian assumptions. The native result and explicit formula agree within $10^{-9}$ in return units. The incorrect shortcut keeps the wrong confidence level and handles drift incorrectly.
+
+{/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="gaussian-horizon-scaling" role="exercise" */}
+```python exec id=gaussian-horizon-scaling role=exercise
+from statistics import NormalDist
+
+mu = returns.mean(); sigma = returns.std(ddof=1)
+z99 = NormalDist().inv_cdf(0.99)
+manual_ten_day = 10 * mu - z99 * sigma * math.sqrt(10)
+native_ten_day = float(performance.parametric_var(0.99,horizon_periods=10).iloc[0])
+assert abs(manual_ten_day-native_ten_day) < 1e-9
+naive = measures["normal_var"] * math.sqrt(10)
+assert abs(naive-native_ten_day) > 1e-4
+print(f"99%/10-period Gaussian return VaR={native_ten_day:.6%}")
+print(f"Incorrect 95%/1-period sqrt(10) shortcut={naive:.6%}")
+print("Assumptions: independent, stationary Gaussian increments, unchanged positions, additive-return approximation.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="gaussian-horizon-scaling" />
+
+For options or a portfolio with changing exposures, revalue horizon scenarios when the linear return approximation is inadequate. Statistical sample stability and the chosen confidence level remain separate from that pricing approximation.
+
+</Exercise>
+
+<Exercise title="2. Neutralize an exposure before standardizing a signal" question="Remove the supplied linear exposure from four aligned same-date signals and standardize the residual. Check mean, exposure orthogonality and the API's variance convention.">
+
+The native helper neutralizes the cross-section and uses a population standard deviation for the z-score. The result has zero mean, zero dot product with the supplied exposure and unit population standard deviation. A sample-standard-deviation assertion would use the wrong convention. Neutrality is relative to these supplied exposures and this date; omitted factors and future drift remain possible.
+
+{/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="neutralize-exposure-signal" role="exercise" */}
+```python exec id=neutralize-exposure-signal role=exercise
+from finstack_quant.features import neutralize_and_zscore
+
+raw_signal = [1.0,2.0,2.0,4.0]
+market_exposure = [0.0,1.0,0.0,1.0]
+scores = np.asarray(neutralize_and_zscore(raw_signal,["2025-01-15"]*4,[market_exposure]))
+assert abs(scores.mean()) < 1e-12
+assert abs(scores @ np.asarray(market_exposure)) < 1e-12
+assert abs(scores.std(ddof=0)-1) < 1e-12
+print("Aligned neutralized population-z-scores:",scores)
+print("Neutrality removes this linear exposure in this cross-section; it is not a forecast of alpha.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="neutralize-exposure-signal" />
+
+</Exercise>
+
+<Exercise title="3. Recover a normal ES back-of-envelope" question="For a zero-mean normal return with 1% daily volatility, derive 95% ES and its ratio to 95% VaR, then compare with native parametric ES decomposition.">
+
+With $z_c=\Phi^{-1}(c)$ and standard-normal density $\phi$, return ES is $-\sigma\phi(z_c)/(1-c)$, while return VaR is $-z_c\sigma$. Their magnitude ratio is approximately 1.254 at 95% confidence. That multiplier is not universal: it changes with confidence, distribution and nonzero mean. The assertion uses the continuous normal reference, so there is no tied-threshold-mass ambiguity.
+
+{/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="normal-es-reference" role="exercise" */}
+```python exec id=normal-es-reference role=exercise
+from finstack_quant.models.factor.risk import parametric_es_decomposition
+from statistics import NormalDist
+
+alpha, daily_sigma = 0.95, 0.01
+z = NormalDist().inv_cdf(alpha)
+phi = math.exp(-0.5*z*z)/math.sqrt(2*math.pi)
+expected_normal_es = -daily_sigma * phi/(1-alpha)
+es_reference = parametric_es_decomposition(["unit_exposure"],[1.0],[[daily_sigma**2]],alpha)
+assert abs(es_reference.portfolio_es-expected_normal_es) < 1e-9
+print(f"Zero-mean normal VaR={es_reference.portfolio_var:.6%}; ES={es_reference.portfolio_es:.6%}")
+print(f"ES/VaR magnitude ratio={phi/((1-alpha)*z):.6f}; this ratio depends on confidence and distribution.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.2" block="normal-es-reference" />
+
+</Exercise>
+
+<CheckYourself>
+
+Give every risk number a sign, unit, horizon and confidence. Explain the tied-data ES limitation, distinguish single and conditional beta, and identify what residual risk is omitted from the illustrative factor VaR. Demonstrate that the credit exposure order and covariance units match. Submit the empirical risk sheet, saved calibration and all three diagnostics; learner completion time has not been measured.
+
+</CheckYourself>

@@ -1,0 +1,355 @@
+---
+id: '4.5'
+title: 'Reporting: Communicating to a PM'
+description: 'Analyst program lesson 4.5: Reporting: Communicating to a PM'
+desk_question: '"You have one page and thirty seconds of the PM''s attention. What
+  goes on it?"'
+references:
+- '#grinold-kahn-1999-active-portfolio'
+api: []
+status: published
+---
+
+<DeskContext question={"The PM has five minutes. What should they do, and which evidence supports that decision?"}>
+
+A report is the final stage of an analytical process. It must preserve dates, units, model assumptions and reconciliations while making the decision easy to find. In this lesson the same native results produce a detailed report pack, an exact reconstruction from public presentation primitives and a compact six-KPI PM brief.
+
+Complete two sessions: assemble the traceable evidence pack, then design and challenge the decision brief. The report date is 15 October 2025. The performance history covers the three earlier observation periods. The loan introduced in 4.3 is acquired at the report date using settled cash; that disclosed acquisition prevents a later holding from being silently inserted into historical returns.
+
+</DeskContext>
+
+<Standard>
+
+Start with the decision and its conditions, then show the minimum evidence needed to assess it. NAV explains capital at risk; TWR separates investment performance from external subscriptions; XIRR describes the investor's experience. A qualified rates sensitivity and credit sensitivity describe different exposures. A full repricing stress supplies a currency loss and its fraction of NAV. These six KPIs serve distinct purposes. A dashboard with more precision or more metrics is not automatically more informative.
+
+Traceability requires an unbroken path from fixture to calculation to output. Keep full precision for checks and apply display formatting only at the last step. Money identities use serialized decimal amounts and a stated one-cent tolerance. The exact self-financing identity is native positions plus settled cash before and after purchasing the loan. Repricing stress holds settled cash constant; report-date cash is a ledger balance, not another live deposit position.
+
+The evidence pack contains different windows and methods. Three-period account performance is historical within this synthetic fixture. The January–February attribution is a separately dated methodological example. The risk report uses the synthetic covariance panel and a fixed risk-capital denominator, while the stress report uses actual native revaluation of the current holdings. These outputs must retain their labels. In particular, a model VaR is not a realized return, a Taylor residual is not alpha and an unknown liquidity estimate is not zero.
+
+The reporting package is a pure presentation layer. `TearSheet`, `Section` and `KPI` compose the convenience functions. A primitive reconstruction should preserve numerical results exactly. The performance helper currently supplies a static “Decimal mode” label; replace it with verified arithmetic and observation metadata before rendering. Presentation text does not establish calculation precision. Charts need an explicit origin, units and observation window. Use restrained colour for meaning, remove decoration and explain missing or undefined values rather than hiding them.
+
+</Standard>
+
+<BuildIt>
+
+### Session 1: assemble a traceable report pack
+
+First retain the initial 15 January common-book holdings report as a dated opening snapshot. Its native position subtotal reconciles in decimal USD. It does not claim to be the October account's performance report.
+
+{/* notebook-block notebook="09_reporting/reporting_performance_tearsheet.ipynb" cell="native-pm-report" role="build" */}
+```python exec id=native-pm-report role=build
+import json
+from decimal import Decimal
+import pandas as pd
+from _shared.analyst_book import AS_OF, build_book, build_market, RISK_METRICS
+from _shared.analyst_liquidity import liquidity_panel
+from finstack_quant.portfolio import value_portfolio, aggregate_metrics
+from finstack_quant.reporting.document import TearSheet, Section, KPI
+from finstack_quant.reporting.theme import INSTITUTIONAL
+market = build_market("common")
+valuation = value_portfolio(build_book("common"),market,strict_risk=True,metrics=list(RISK_METRICS))
+wire = json.loads(valuation.to_json())
+total = Decimal(wire["total_base_currency"]["amount"])
+rows=[{"position":iid,"currency":pv["value_native"]["currency"],"native_amount":pv["value_native"]["amount"],"base_usd":pv["value_base"]["amount"]} for iid,pv in wire["position_values"].items()]
+assert abs(sum(Decimal(row["base_usd"]) for row in rows)-total)<=Decimal("0.01")
+frame=pd.DataFrame(rows)
+frame.to_csv("pm-report-positions.csv",index=False)
+risk=aggregate_metrics(valuation,"USD",market,AS_OF)
+assert not risk.skipped_metrics and not risk.degraded_positions
+credit={key:value for key,value in risk.aggregated.items() if key.startswith("cs01::")}
+report=TearSheet(INSTITUTIONAL,"Analyst common book",[
+    Section("Decision and conditions","<p>Hold pending confirmation of the private loan's executable liquidity. Size any hedge from qualified curve and credit sensitivities; positive bump P&amp;L sets the sign.</p>"),
+    Section("Holdings and currency reconciliation",frame.to_html(index=False)),
+    Section("Credit risk by qualified key",pd.DataFrame(list(credit.items()),columns=["key","USD per bp"]).to_html(index=False)),
+    Section("Liquidity evidence",liquidity_panel()[["source","daily_capacity"]].to_html()),
+],kpis=[KPI("Native common-book PV",f"{total:,.2f} USD"),KPI("Positions",str(len(rows)))],generated=AS_OF,subtitle="Teaching fixture; no CLO sleeve in this common book")
+report.save("analyst-pm-report.html")
+assert f"{total:,.2f}" in report.to_html()
+assert "BORROWER-TL" in report.to_html()
+print(frame.to_string(index=False))
+print("Reconciled USD total:",total)
+print("Saved analyst-pm-report.html and pm-report-positions.csv from the same valuation.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.5" block="native-pm-report" />
+
+Reuse the exact source cells from 3.1 and 3.4 in isolated namespaces. Fixture imports and notebook paths remain visible, and the build records these notebook dependencies. This avoids a second implementation of the account ledger or attribution arithmetic. Each replay performs its original assertions.
+
+{/* notebook-block notebook="09_reporting/reporting_performance_tearsheet.ipynb" cell="report-source-replay" role="build" */}
+```python exec id=report-source-replay role=build
+import _shared
+from pathlib import Path
+import json
+# Import fixture identities visibly, and replay the exact authored source cells.
+from _shared.analyst_book import AS_OF,book_spec,expected_metrics,RISK_METRICS
+from _shared.analyst_history import HISTORY_DATES,history_spec,history_market
+notebook_root=Path(_shared.__file__).resolve().parent.parent
+def source_baseline(name,ids):
+ notebook=json.loads((notebook_root/name).read_text())
+ namespace={"__name__":"__main__"}
+ for identifier in ids:
+  cells=[c for c in notebook["cells"] if c.get("metadata",{}).get("analyst_program",{}).get("id")==identifier]
+  assert len(cells)==1,(name,identifier)
+  exec(compile("".join(cells[0]["source"]),name+"#"+identifier,"exec"),namespace)
+ return namespace
+perf_source=source_baseline("03_analytics/performance_analytics.ipynb",["dated-native-performance","performance-measures"])
+attr_source=source_baseline("03_analytics/portfolio_returns_and_attribution.ipynb",["three-period-attribution","native-book-waterfall"])
+assert len(perf_source["returns"])==3
+assert len(attr_source["instrument_rows"])==7
+print("Report sources: three-quarter account history and separately dated January-February native attribution.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.5" block="report-source-replay" />
+
+At 15 October, the original deposits have matured and their proceeds are already in settled cash. Historical option trades remain in the current quantities. Add the term loan at its current native PV and fund it from that cash. Check required risk applicability and the native-currency/USD subtotal before composing the report. The plus-100 bp experiment shifts USD-OIS zeros with hazards fixed; it requests PV only rather than inconsistent quote-space credit sensitivities.
+
+{/* notebook-block notebook="09_reporting/reporting_performance_tearsheet.ipynb" cell="report-date-acquisition" role="build" */}
+```python exec id=report-date-acquisition role=build
+from decimal import Decimal
+from finstack_quant.portfolio import Portfolio,value_portfolio,aggregate_metrics
+from finstack_quant.scenarios import ScenarioSpec,OperationSpec,CurveKind,apply_scenario_to_market
+from finstack_quant.valuations.instruments import price_instrument
+report_date=HISTORY_DATES[-1]
+report_market=history_market(report_date)
+report_spec=history_spec(report_date)
+common_spec=book_spec("common")
+loan_position=next(p for p in common_spec["positions"] if p["position_id"]=="BORROWER-TL")
+report_spec["positions"].append(loan_position)
+# Add the new envelope while retaining historical quantities and retired deposits.
+# The instrument_spec is carried inside loan_position.
+report_valuation=value_portfolio(Portfolio.from_spec(json.dumps(report_spec)),report_market,strict_risk=True,metrics=list(RISK_METRICS))
+report_wire=json.loads(report_valuation.to_json())
+loan_cost=Decimal(report_wire["position_values"]["BORROWER-TL"]["value_base"]["amount"])
+settled_cash=Decimal(str(perf_source["cash"]))-loan_cost
+native_total=Decimal(report_wire["total_base_currency"]["amount"])
+report_nav=native_total+settled_cash
+assert settled_cash>0 and loan_cost>0
+assert abs(report_nav-Decimal(str(perf_source["nav"])))<=Decimal("0.01"),"USD: purchase funded from settled cash leaves NAV unchanged"
+report_rows=[]
+for pid,item in report_wire["position_values"].items():
+ assert item["risk_metrics_complete"] and not item.get("risk_error")
+ required=expected_metrics("common")[pid]
+ assert all(any(k==m or k.startswith(m+"::") for k in item["valuation_result"]["measures"]) for m in required),(pid,required,item["valuation_result"]["measures"])
+ report_rows.append({"position":pid,"currency":item["value_native"]["currency"],"native_amount":item["value_native"]["amount"],"USD":item["value_base"]["amount"]})
+assert abs(sum(Decimal(r["USD"]) for r in report_rows)-native_total)<=Decimal("0.01")
+report_risk=aggregate_metrics(report_valuation,"USD",report_market,report_date)
+assert not report_risk.skipped_metrics and not report_risk.degraded_positions
+report_shock=ScenarioSpec(id="report-usd-zero-plus100",operations=[OperationSpec.curve_parallel_bp(CurveKind.discount(),"USD-OIS",100.)])
+shocked_market=apply_scenario_to_market(report_shock,report_market,report_date).market
+shocked=value_portfolio(Portfolio.from_spec(json.dumps(report_spec)),shocked_market,metrics=[])
+stress_pnl=Decimal(json.loads(shocked.to_json())["total_base_currency"]["amount"])-native_total
+stress_nav=Decimal(json.loads(shocked.to_json())["total_base_currency"]["amount"])+settled_cash
+assert stress_nav-report_nav==stress_pnl
+pd.DataFrame(report_rows).to_csv("current-holdings.csv",index=False)
+print(pd.DataFrame(report_rows).to_string(index=False))
+print({"report_date":str(report_date),"loan_purchase_USD":str(loan_cost),"native_positions_USD":str(native_total),"settled_cash_USD":str(settled_cash),"NAV_USD":str(report_nav),"USD_OIS_plus100bp_PnL_USD":str(stress_pnl)})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.5" block="report-date-acquisition" />
+
+The convenience performance report and its primitive reconstruction have identical HTML. The additional chart independently reconstructs cumulative return from the three derived returns, including the zero-return starting observation. The attribution report retains the Taylor residual; its companion whole-book waterfall reconciles within USD 1e-6. The risk report uses the same aligned synthetic proxy method studied in 3.2 and 4.4, with current quantities and USD 100,000 risk capital per full contract. Euler contributions close within USD 1e-8.
+
+{/* notebook-block notebook="09_reporting/reporting_performance_tearsheet.ipynb" cell="report-pack-and-primitives" role="build" */}
+```python exec id=report-pack-and-primitives role=build
+import numpy as np
+from finstack_quant.reporting import performance_tearsheet,attribution_tearsheet,portfolio_risk_tearsheet,scenario_tearsheet
+from finstack_quant.reporting.document import TearSheet,Section,KPI
+from finstack_quant.reporting.theme import INSTITUTIONAL
+from finstack_quant.reporting.charts import line_chart,waterfall_chart
+from finstack_quant.models.factor.risk import parametric_var_decomposition,parametric_es_decomposition
+from _shared.analyst_liquidity import position_factor_panel
+perf_report=performance_tearsheet(perf_source["book_performance"],sections=["summary","stats","cumulative","drawdown"],title="Account performance: January 15-October 15, 2025",subtitle="Three observed periods; base holdings before the report-date loan purchase",generated=report_date)
+# Replace the convenience function's static numeric-mode label with verified provenance.
+perf_report.meta_lines=["Native analytical returns (f64); display formatting only", "Three quarterly observations; zero risk-free rate"]
+perf_report.save("performance-report.html")
+# The convenience report is composed entirely of the public primitives.
+primitive=TearSheet(INSTITUTIONAL,perf_report.title,
+ [Section(s.title,s.body,s.subtitle) for s in perf_report.sections],
+ eyebrow=perf_report.eyebrow,subtitle=perf_report.subtitle,meta_lines=list(perf_report.meta_lines),
+ kpis=[KPI(k.label,k.value,k.cls) for k in perf_report.kpis],generated=perf_report.generated,
+ footer_left=perf_report.footer_left,footer_right=perf_report.footer_right)
+assert primitive.to_html()==perf_report.to_html()
+primitive.save("performance-primitives.html")
+# Also reconstruct the data behind the cumulative-return chart independently.
+curve=np.r_[0.,np.cumprod(1+np.array(perf_source["returns"]))-1]
+assert abs(curve[-1]-perf_source["linked"]["cumulative"])<1e-12
+Path("performance-primitive-curve.svg").write_text(line_chart(list(HISTORY_DATES),curve.tolist(),theme=INSTITUTIONAL,y_pct=True,zero=True))
+attr_report=attribution_tearsheet(attr_source["taylor"],title="USD corporate bond: January 16-February 16, 2025",subtitle="Native Taylor attribution; residual retained",generated=report_date)
+attr_report.save("instrument-attribution.html")
+wf=attr_source["waterfall_totals"]
+assert abs(sum(wf.values())-attr_source["actual_usd"])<1e-6
+Path("whole-book-attribution.svg").write_text(waterfall_chart(list(wf),list(wf.values()),theme=INSTITUTIONAL))
+# Same 3.2/4.4 synthetic proxy method, applied to the current surviving holdings.
+proxy_panel=position_factor_panel()
+report_ids=[p["position_id"] for p in report_spec["positions"]]
+proxy_exposures=[100_000*p["quantity"] for p in report_spec["positions"]]
+proxy_cov=proxy_panel[report_ids].cov().to_numpy()
+report_var=parametric_var_decomposition(report_ids,proxy_exposures,proxy_cov,confidence=.99)
+report_es=parametric_es_decomposition(report_ids,proxy_exposures,proxy_cov,confidence=.99)
+assert abs(sum(c.component_var for c in report_var.var_contributions)-report_var.portfolio_var)<1e-8
+risk_report=portfolio_risk_tearsheet(report_var.to_json(),es=report_es.to_json(),title="Current holdings: synthetic proxy risk",subtitle="99% one-day Gaussian; USD 100,000 fixed risk capital per full contract; not actual historical book returns",generated=report_date)
+risk_report.save("proxy-risk-report.html")
+scenario_report=scenario_tearsheet(scenarios={"USD-OIS zero +100 bp, fixed hazard":float(stress_pnl)},title="Current book full repricing",subtitle="Immediate curve-space shock; unchanged cash; no quote-space risk request",generated=report_date)
+scenario_report.meta_lines=["Native currency PVs and f64 scenario differences; display formatting only"]
+scenario_report.save("stress-report.html")
+provenance=pd.DataFrame([
+ {"output":"performance","input":"3.1 native marks, trades, payments and external flows","window":"2025-01-15 to 2025-10-15","unit":"decimal return; USD ledger"},
+ {"output":"attribution","input":"3.4 native factor revaluation","window":"2025-01-16 to 2025-02-16","unit":"USD P&L"},
+ {"output":"proxy risk","input":"3.2/4.4 synthetic covariance method; current quantities","window":"504 synthetic daily observations","unit":"USD model loss"},
+ {"output":"current holdings/stress","input":"native pricing at report date; USD-OIS zero +100 bp","window":str(report_date),"unit":"USD PV/P&L"},
+])
+provenance.to_csv("report-provenance.csv",index=False)
+print(provenance.to_string(index=False))
+print("Primitive reconstruction matches the convenience report exactly; the independent return curve closes to 1e-12.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.5" block="report-pack-and-primitives" />
+
+### Session 2: choose the PM's six numbers
+
+Choose account NAV, linked TWR, annualized investor XIRR, sum of qualified USD-OIS bucketed DV01, qualified ACME-HZD CS01 and the full repricing rates-stress P&L. TWR and XIRR answer different questions and carry different annualization labels. The bucket sum and qualified credit key are selected exposures, not a claim to summarize every currency, curve or option Greek. Keep the full risk inventory in the detailed pack. The bucket sum is a local sensitivity summary under the native tenor bump convention; it need not exactly equal a finite parallel-zero shock. Serialized aggregate entries contain a `total` and entity subtotals; use the numerical `total` field.
+
+{/* notebook-block notebook="09_reporting/reporting_performance_tearsheet.ipynb" cell="one-page-pm-report" role="build" */}
+```python exec id=one-page-pm-report role=build
+from finstack_quant.reporting.tables import data_table
+
+qualified_dv01={k:v["total"] for k,v in report_risk.aggregated.items() if k.startswith("bucketed_dv01::USD-OIS::")}
+qualified_cs01={k:v["total"] for k,v in report_risk.aggregated.items() if k.startswith("cs01::")}
+assert qualified_dv01 and "cs01::ACME-HZD" in qualified_cs01
+kpi_values={"NAV USD":float(report_nav),"Linked TWR Jan-Oct":perf_source["linked"]["cumulative"],"Annualized investor XIRR":perf_source["xirr"],"USD-OIS bucketed DV01 sum USD/bp":sum(qualified_dv01.values()),"ACME-HZD CS01 USD/bp":qualified_cs01["cs01::ACME-HZD"],"USD-OIS +100 bp P&L USD":float(stress_pnl)}
+assert len(kpi_values)==6 and all(np.isfinite(v) for v in kpi_values.values())
+kpis=[KPI(k,f"{v:.2%}" if "TWR" in k or "XIRR" in k else f"{v:,.2f}") for k,v in kpi_values.items()]
+reconciliation=pd.DataFrame([{"component":"Native current positions","USD":native_total},{"component":"Settled USD cash after loan acquisition","USD":settled_cash},{"component":"Account NAV","USD":report_nav}])
+stress_row=pd.DataFrame([{"scenario":"USD-OIS zeros +100 bp","PnL_USD":stress_pnl,"NAV_change":stress_pnl/report_nav,"assumptions":"Immediate; fixed credit hazard and other inputs; cash unchanged"}])
+# Preserve Decimal values for reconciliation; round only the HTML display.
+assert reconciliation.iloc[:2]["USD"].sum()==report_nav
+reconciliation_html=data_table(
+ reconciliation.rename(columns={"component":"Component","USD":"Amount (USD)"}).to_dict("records"),
+ columns=["Component","Amount (USD)"],formats={"Amount (USD)":lambda value:f"{value:,.2f}"})
+stress_html=data_table(
+ stress_row.rename(columns={"scenario":"Scenario","PnL_USD":"P&L (USD)","NAV_change":"NAV impact"}).to_dict("records"),
+ columns=["Scenario","P&L (USD)","NAV impact"],
+ formats={"P&L (USD)":lambda value:f"{value:,.2f}","NAV impact":lambda value:f"{value:.2%}"})
+# Local presentation rules travel with this standalone brief and its redesigns.
+# Existing table primitives retain the institutional theme; finance inputs are unchanged.
+pm_brief_css="""<style>
+.fq-ts { max-width:800px; margin:0 auto; padding:24px 30px; box-sizing:border-box; }
+.fq-ts .head { align-items:flex-start; margin-bottom:14px; padding-bottom:12px; gap:18px; }
+.fq-ts .head .title { font-size:24px; }
+.fq-ts .head .meta { max-width:235px; flex-shrink:0; font-size:10px; }
+.fq-ts .kpis { grid-template-columns:repeat(3,minmax(0,1fr)); padding:10px 0; margin-bottom:16px; row-gap:12px; }
+.fq-ts .kpi { min-width:0; padding:0 12px; }
+.fq-ts .kpi:nth-child(3n) { border-right:0; }
+.fq-ts .kpi:nth-child(n+4) { padding-top:12px; border-top:1px solid #e4e1d8; }
+.fq-ts .kpi .lbl { font-size:9px; line-height:1.35; min-height:2.7em; margin-bottom:5px; }
+.fq-ts .kpi .val { font-size:22px; font-variant-numeric:tabular-nums; }
+.fq-ts .secttl { margin-top:18px; padding-bottom:5px; }
+.fq-ts p { margin:6px 0 10px; font-size:12px; line-height:1.45; }
+.fq-ts table.dd th, .fq-ts table.dd td { padding:6px 4px; }
+.fq-ts .foot { margin-top:20px; gap:16px; font-size:9px; }
+@media (max-width:600px) {
+ .fq-ts { padding:20px; } .fq-ts .head { display:block; }
+ .fq-ts .head .meta { text-align:left; margin-top:8px; max-width:none; }
+ .fq-ts .kpi { padding:0 8px; } .fq-ts .kpi .val { font-size:18px; }
+ .fq-ts .kpi .lbl { font-size:8px; }
+}
+@media print {
+ @page { size:letter; margin:0.45in; }
+ body { margin:0 !important; padding:0 !important; background:white !important; }
+ .fq-ts { max-width:none; padding:0; border-radius:0; }
+ .fq-ts .head, .fq-ts .kpis, .fq-ts table { break-inside:avoid; }
+ .fq-ts .secttl { break-after:avoid; }
+}
+</style>"""
+pm_report=TearSheet(INSTITUTIONAL,"PM decision brief",[
+ Section("Decision and conditions",pm_brief_css+"<p>Maintain the current allocation pending review of the private loan's covenant breach and unobservable exit capacity. Use the qualified USD-OIS sensitivity to size a rates hedge; assess credit separately.</p>"),
+ Section("Account reconciliation",reconciliation_html),
+ Section("Stress the PM can act on",stress_html,subtitle=stress_row.assumptions.iloc[0]),
+ Section("What these numbers mean","<p>TWR removes external-flow timing; XIRR measures the investor's dated cash experience. The loan was bought at today's native PV using settled cash, so historical returns precede that acquisition. Risk KPIs cover the named curve and hazard only, not every factor. Three observed return periods cannot establish skill. Synthetic liquidity is not an executable quote.</p>"),
+],kpis=kpis,generated=report_date,subtitle="Common-book account after deposit maturities; synthetic teaching case",meta_lines=["As of "+str(report_date),"Amounts in USD; qualified sensitivities retain their sign"],footer_left="Source pack: holdings, provenance, performance, attribution, proxy risk and stress")
+pm_report.save("one-page-pm-report.html")
+Path("one-page-kpis.json").write_text(json.dumps(kpi_values,indent=2))
+assert f"{report_nav:,.2f}" in pm_report.to_html()
+assert len(pm_report.kpis)==6 and "2025-10-15" in pm_report.to_html()
+assert 'class="dd"' in pm_report.to_html() and 'border="1"' not in pm_report.to_html()
+assert str(native_total) not in reconciliation_html and f"{native_total:,.2f}" in reconciliation_html
+print(pd.DataFrame(list(kpi_values.items()),columns=["KPI","unrounded_value"]).to_string(index=False))
+print("Saved one-page-pm-report.html; every displayed number comes from this execution.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.5" block="one-page-pm-report" />
+
+The decision remains conditional: the private loan's covenant position and unavailable exit capacity need attention. A well-formatted positive return does not resolve those issues. The PM brief contains the decision, six KPIs, the account subtotal bridge, the actionable stress and interpretation. Downloads preserve unrounded values and provenance for review. The brief rounds only display values, uses the public themed table primitive with human column labels, and arranges six KPIs in a compact three-column, two-row strip. Its local print rules target one standard letter page; the Decimal subtotal checks remain unchanged.
+
+</BuildIt>
+
+<LabCard notebook="09_reporting/reporting_performance_tearsheet.ipynb" title="Two-session reporting lab" description="Run every report, reconstruct the primitives, explain the six KPIs and complete both redesign exercises." />
+<LabCard notebook="09_reporting/reporting_portfolio_risk_tearsheet.ipynb" title="Detailed risk report lab" description="Inspect VaR/ES contributions and risk-budget presentation; retain the loss and exposure units." />
+<Exercise title="Remove chart junk and ambiguity" question={"Redesign the deliberately bad report. Preserve every underlying calculation while removing decoration, ambiguous labels and unsupported claims."}>
+
+{/* notebook-block notebook="09_reporting/reporting_performance_tearsheet.ipynb" cell="exercise-redesign-report" role="exercise" */}
+```python exec id=exercise-redesign-report role=exercise
+# Deliberately bad presentation variant, isolated from the good source data.
+bad=TearSheet(INSTITUTIONAL,"Amazing performance!",[Section("Chart",'<div style="height:240px;background:linear-gradient(45deg,red,cyan);font-size:52px">UP!</div>'),Section("Numbers",pd.DataFrame(list(kpi_values.items()),columns=["metric","value"]).to_html(index=False))],kpis=[KPI("Return",str(perf_source["linked"]["cumulative"])),KPI("VaR",str(report_var.portfolio_var))])
+bad.save("deliberately-bad-report.html")
+assert bad.subtitle is None and not bad.meta_lines
+# Reuse checked calculations; change presentation, labels and hierarchy only.
+redesigned=TearSheet(INSTITUTIONAL,"Decision, evidence, conditions",list(pm_report.sections),kpis=list(pm_report.kpis),subtitle=pm_report.subtitle,meta_lines=list(pm_report.meta_lines),generated=report_date)
+redesigned.save("redesigned-report.html")
+assert [k.value for k in redesigned.kpis]==[k.value for k in pm_report.kpis]
+assert all("USD" in k.label or "TWR" in k.label or "XIRR" in k.label for k in redesigned.kpis)
+print("Removed decorative gradient, ambiguous Return/VaR labels and excessive precision; retained source values, dates, units and six decision KPIs.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.5" block="exercise-redesign-report" />
+
+The bad report omits dates, units and context, uses a decorative gradient and celebrates an unexplained direction. The redesign leads with a conditional decision and restores the checked six-KPI set. Displayed values must remain identical. Reject a cosmetic improvement that changes a negative result to a positive number or hides a material residual.
+
+</Exercise>
+<Exercise title="Add the stress the PM needs" question={"Add an immediate 20% SPX spot decline, showing full repricing P&L, NAV impact and fixed-input assumptions. Explain which position drives the result."}>
+
+{/* notebook-block notebook="09_reporting/reporting_performance_tearsheet.ipynb" cell="exercise-add-stress-row" role="exercise" */}
+```python exec id=exercise-add-stress-row role=exercise
+# Add a separately named downside equity scenario, not an unlabeled historical loss.
+equity_shock=ScenarioSpec(id="report-equity-minus20",operations=[OperationSpec.equity_price_pct(["SPX-SPOT"],-20.)])
+equity_market=apply_scenario_to_market(equity_shock,report_market,report_date).market
+equity_value=value_portfolio(Portfolio.from_spec(json.dumps(report_spec)),equity_market,metrics=[])
+equity_pnl=Decimal(json.loads(equity_value.to_json())["total_base_currency"]["amount"])-native_total
+option_before=Decimal(report_wire["position_values"]["SPX-CALL"]["value_base"]["amount"])
+equity_wire=json.loads(equity_value.to_json())
+option_after=Decimal(equity_wire["position_values"]["SPX-CALL"]["value_base"]["amount"])
+assert abs(equity_pnl-(option_after-option_before))<=Decimal("0.01")
+assert equity_pnl<0
+additional=pd.DataFrame([{"scenario":"SPX spot -20%","PnL_USD":str(equity_pnl),"NAV_change":float(equity_pnl/report_nav),"assumptions":"Immediate; volatility, rates, hazards and settled cash held fixed"}])
+additional.to_csv("additional-stress-row.csv",index=False)
+additional_html=data_table(
+ additional.rename(columns={"scenario":"Scenario","PnL_USD":"P&L (USD)","NAV_change":"NAV impact"}).to_dict("records"),
+ columns=["Scenario","P&L (USD)","NAV impact"],
+ formats={"P&L (USD)":lambda value:f"{Decimal(value):,.2f}","NAV impact":lambda value:f"{value:.2%}"})
+expanded=TearSheet(INSTITUTIONAL,"PM brief with equity stress",[*pm_report.sections,Section("Additional actionable stress",additional_html,subtitle=additional.assumptions.iloc[0])],kpis=list(pm_report.kpis),generated=report_date)
+expanded.save("pm-report-with-equity-stress.html")
+print(additional.to_string(index=False))
+print("The long option explains the entire equity-only loss within one cent. A joint crisis stress would also move volatility, rates and credit and must be separately specified.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="4.5" block="exercise-add-stress-row" />
+
+The long SPX call drives the equity-only loss, and its change reconciles to the portfolio loss within one cent. The row names the shock and the inputs held fixed. A real crisis could also change volatility, rates, hazards and liquidity; that is a different, explicitly specified experiment. Do not call this row a historical replay or a forecast probability.
+
+</Exercise>
+
+<CheckYourself>
+
+- Can the same report contain different analysis windows? Yes, if each is explicit and their totals are not substituted for one another.
+- Does buying the loan create an immediate account profit? No. At the same mark, the purchase exchanges cash for an asset.
+- Why retain unrounded downloads? They allow reconstruction without display-rounding residuals.
+- What fails a PM report even when it looks polished? Broken provenance, missing units, inconsistent totals, hidden assumptions or a decision unsupported by its evidence.
+
+</CheckYourself>

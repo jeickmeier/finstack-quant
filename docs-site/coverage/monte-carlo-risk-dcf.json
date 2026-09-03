@@ -1,0 +1,564 @@
+[
+  {
+    "lesson_id": "2.6",
+    "scope": "Full original per-lesson plan and companion syllabus; every original exercise group required.",
+    "concepts": [
+      "Risk-neutral integration, GBM exact grid-point sampling and terminal-forward mean.",
+      "Sampling SE/CLT intervals versus realized error, model error and grid error.",
+      "Euler-Maruyama, full truncation, Heston QE and the Feller boundary.",
+      "Philox replay, Box-Muller normals, Sobol context and Kahan reduction.",
+      "Equal-physical-path antithetic comparisons and independent pair means.",
+      "Finite-difference bias and measured common-random-number delta/gamma variance reduction."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb",
+        "cell_id": "mc-bs-anchor",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb",
+        "cell_id": "mc-convergence",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/stochastic_processes.ipynb",
+        "cell_id": "mc-process-inputs",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/stochastic_processes.ipynb",
+        "cell_id": "gbm-path-capture",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb",
+        "cell_id": "mc-parallel-replay",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo_simulation.ipynb",
+        "cell_id": "antithetic-pair-arithmetic",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb",
+        "cell_id": "mc-crn-greeks",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/stochastic_processes.ipynb",
+        "cell_id": "heston-qe-pricing",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Halve error with four times the paths, correctly interpreted.",
+        "notebook": "07_advanced_quant/monte_carlo/discretization_schemes.ipynb",
+        "cell_id": "mc-error-scaling",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Sixteen-seed panel compares average SE and realized RMSE; asserts broad average-SE ratio without promising monotone error per seed."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Break the Feller condition and explain.",
+        "notebook": "07_advanced_quant/monte_carlo/stochastic_processes.ipynb",
+        "cell_id": "heston-feller-boundary",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Hand Euler negative-variance step plus a finite positive native QE estimate; failure of Feller is not model invalidity."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Explain weak antithetic gains for symmetric payoffs.",
+        "notebook": "07_advanced_quant/monte_carlo/discretization_schemes.ipynb",
+        "cell_id": "antithetic-even-payoff",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Even z-squared payoff gives identical reflected values; equal raw-path budget loses independent observations and worsens measured SE."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "EuropeanPricer, PathDependentPricer and LsmcPricer are fixed-GBM helpers; their models field is empty because no registry model key is supplied.",
+      "European serial and parallel estimates replay identically with the same seed, grid and inputs.",
+      "For one-step LsmcPricer antithetics, num_paths=N counts independent pair means and num_simulated_paths=2N counts generated trajectories. Compare with 2N plain samples at the same raw-path budget.",
+      "The captured GBM helper includes the initial state; it does not expose engine or scheme injection.",
+      "Four times as many independent samples halves the theoretical standard-error scale, not the realized absolute error of every seed.",
+      "The source set also includes stochastic_processes, discretization_schemes and monte_carlo_simulation; the principal notebook identifies the replay proof."
+    ],
+    "authoring_started_utc": "2026-09-03T03:52:22.942811Z",
+    "authoring_finished_utc": "2026-09-03T04:11:19.190683Z",
+    "timing_basis": "UTC artifact timestamps from first post-P1 notebook authoring write through final focused notebook and published-snippet verification; overlapping lesson work, not isolated active effort. Earlier prerequisite research excluded.",
+    "learner_completion_time": "unmeasured",
+    "verification": {
+      "published_snippets": "passed with fresh build baselines per exercise",
+      "mdx_math_compilation": "passed",
+      "full_notebooks": "All twelve passed on private copies: eleven initial passes plus structured-credit setup fix and focused rerun.",
+      "shared_source_note": null
+    }
+  },
+  {
+    "lesson_id": "2.7",
+    "scope": "Full original per-lesson plan and companion syllabus; every original exercise group required.",
+    "concepts": [
+      "Arithmetic versus geometric Asian averages and fixing conventions; exact one-fixing identity.",
+      "Kemna-Vorst geometric control-variate context and Turnbull-Wakeman approximation.",
+      "Nested discrete barrier monitoring, continuous Reiner-Rubinstein benchmark and BGK correction context.",
+      "Longstaff-Schwartz backward regression, exercise-grid error, basis variance and independent policy evaluation.",
+      "Native co-terminal Hull-White tree and Monte Carlo Bermudan swaption pricing.",
+      "Discrete lookback dominance, regression overfit diagnostics and quanto FX-quote/correlation convention.",
+      "Computed spot-versus-held-out-policy/European/intrinsic plots; explicitly prescribed non-engine policy schematic; executable 256/1024/4096-pair study with two independent pricing seeds."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "cell_id": "path-payoff-imports",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "cell_id": "asian-contract-benchmarks",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "cell_id": "nested-barrier-monitoring",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "cell_id": "lsmc-held-out-policy",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/exotic_rates.ipynb",
+        "cell_id": "bermudan-hw1f-pricing",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "cell_id": "lsmc-held-out-price-plot",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "cell_id": "lsmc-policy-schematic",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "cell_id": "lsmc-path-count-study",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Show lookback payoff at least as large as matched vanilla.",
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "cell_id": "lookback-matched-payoffs",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Same captured paths, pathwise maximum-versus-terminal inequality and vanilla Black-Scholes four-SE check."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Demonstrate overfit foresight bias with too few paths and high degree.",
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "cell_id": "lsmc-overfit-panel",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Eight-seed panel compares training and held-out values for degree one and six with 96 training paths."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Price quanto and identify its required correlation.",
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "cell_id": "quanto-correlation-proof",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Native correlation sweep with domestic-per-foreign FX quote; zero-correlation/equal-rates vanilla identity."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "asian_option_price with arithmetic averaging is the Turnbull-Wakeman approximation; geometric averaging uses the exact benchmark. One terminal fixing reduces both to the matched European contract.",
+      "barrier_call prices continuous monitoring and accepts no monitoring-frequency parameter. The discrete sweep uses nested observations on the same captured fine paths.",
+      "price_american_put_unbiased evaluates a fitted exercise policy on independent pricing paths. Its Monte Carlo interval does not include exercise-grid or learned-policy error.",
+      "No exercise-boundary object is exposed by LsmcPricer. A clearly labelled prescribed schematic is independent of engine output; actual spot-price and path-count plots report held-out policy values with sampling bars and explicit policy/grid-error limits.",
+      "Fixed-strike lookback is computed directly on captured GBM paths and dominates the matched terminal vanilla payoff path by path. The continuous fixed-strike helper is deliberately excluded: its M>=K branch calls the floating-strike formula, creating a discontinuity at K=M (17.216802 at K=100 versus 19.167624 at K=100.000001 for S=M=100, r=5%, q=0, sigma=20%, T=1). No analytical accuracy claim is made for the substituted discrete payoff.",
+      "quanto_option_price is validated by a correlation sweep with domestic-currency-per-foreign FX quotation and unit contractual conversion: effective foreign-equity drift r_f-q-rho*sigma_s*sigma_fx; equal domestic/foreign rates with rho=0 reduce to the vanilla formula.",
+      "The mapped exotic_rates notebook prices an explicitly configured co-terminal Bermudan with both registered Hull-White 1F tree and Monte Carlo models. Seed replay, path count, finite standard error and a fixture-specific cross-method tolerance execute. The default LSMC diagnostic is not a held-out policy-error bound; this registered wrapper does not expose the independent pricing_seed argument of the standalone GBM helper."
+    ],
+    "authoring_started_utc": "2026-09-03T03:52:22.942811Z",
+    "authoring_finished_utc": "2026-09-03T04:11:19.190683Z",
+    "timing_basis": "UTC artifact timestamps from first post-P1 notebook authoring write through final focused notebook and published-snippet verification; overlapping lesson work, not isolated active effort. Earlier prerequisite research excluded.",
+    "learner_completion_time": "unmeasured",
+    "verification": {
+      "published_snippets": "passed with fresh build baselines per exercise",
+      "mdx_math_compilation": "passed",
+      "full_notebooks": "All twelve passed on private copies: eleven initial passes plus structured-credit setup fix and focused rerun.",
+      "shared_source_note": null,
+      "required_visuals": {
+        "status": "passed",
+        "figures": 3,
+        "lesson_blocks": 11,
+        "snippet_seconds": 34.64453079178929,
+        "single_notebook_seconds": 23.45,
+        "source_notebook_outputs": "empty",
+        "notes": "Three PNGs visually inspected; private executed notebook contains one image/png output for each new cell. Price comparison uses actual held-out LSMC versus exact European and intrinsic. Policy schematic is prescribed and explicitly not engine output. Required path-count study is executable.",
+        "lab_execution_and_export_seconds": 22.40747895790264,
+        "lab_html": "/lab-assets/07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.html"
+      },
+      "shared_2_8_refresh": {
+        "status": "passed",
+        "blocks": 7,
+        "seconds": 18.899716292042285
+      }
+    },
+    "visual_completion_started_utc": "2026-09-03T05:15:53Z",
+    "visual_completion_finished_utc": "2026-09-03T05:19:32Z",
+    "visual_publication_finished_utc": "2026-09-03T05:21:24Z"
+  },
+  {
+    "lesson_id": "2.8",
+    "scope": "Full original per-lesson plan and companion syllabus; every original exercise group required.",
+    "concepts": [
+      "Structured-note redemption, short knock-in put, coupon targets/recursions/range observation arithmetic.",
+      "Actual positive pool assets; cash waterfall, OC/IC trigger context, prepayment/default/severity/recovery timing.",
+      "Different capital-stack versus loss-attachment coordinates.",
+      "One-factor Gaussian conditional PD, Vasicek granular limit and finite-pool Monte Carlo loss allocation.",
+      "Factor-copula semi-analytic context, base-correlation bootstrap procedure and actual curve repricing.",
+      "PV/price/WAL/OAS, floating-only discount margin and first-writedown CDR.",
+      "Conditional correlation signs and the Gaussian dependence, recovery, calibration and liquidity limitations."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "cell_id": "structured-note-redemption",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/exotic_rates.ipynb",
+        "cell_id": "structured-rate-coupon-arithmetic",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "two-asset-waterfall",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/correlation_and_credit_models.ipynb",
+        "cell_id": "copula-tranche-losses",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "07_advanced_quant/correlation_and_credit_models.ipynb",
+        "cell_id": "base-correlation-quote",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Equity versus senior value response to correlation.",
+        "notebook": "07_advanced_quant/correlation_and_credit_models.ipynb",
+        "cell_id": "correlation-equity-senior",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Fixed-PD/LGD loss-only expected principal has opposite signs; explanation separates that experiment from universal traded-price claims."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Read breakeven CDR from the scenario table.",
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "cell_id": "tranche-loss-threshold",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Grid brackets first writedown between 1% and 2%, native solve near 1.7258%, model-price OAS near zero and fixed-coupon discount-margin rejection."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Explain Gaussian copula assumptions in a crisis.",
+        "notebook": null,
+        "cell_id": null,
+        "role": "prose",
+        "status": "complete",
+        "solution_and_assertions": "Complete disclosure solution addresses tail dependence, changing PD/recovery dependence, calibration non-identification, surface arbitrage, structural cash flows and liquidity."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "The supported JSON instrument type is autocallable, dispatched through its registered GBM model. All observed fixings are supplied, so this proof takes the deterministic known-redemption branch.",
+      "Zero coupons, unreachable autocall barriers and a zero discount rate isolate the final capital-protection, participation and knock-in-put redemption contracts.",
+      "The note holder is short the knock-in put: principal is reduced by the put loss after breach. A breach followed by full spot recovery returns principal.",
+      "This proof is a payoff-contract identity, not an issuer-credit or new-issue valuation model.",
+      "StructuredCredit requires actual positive PoolAssets for pricing; metadata-only rep lines are not a substitute. The separate track fixture tests supply the pool, waterfall and base-correlation evidence.",
+      "The mapped exotic_rates notebook hand-reconciles the TARN target and truncated final coupon, snowball recursion, inverse-floater gearing, and an inclusive range-accrual observation fraction. These are coupon-profile arithmetic helpers, not complete callable-note or issuer-credit valuation models.",
+      "The two-asset cashflow waterfall now directly reconciles all three native tranche PVs to one-period receipts, with real positive PoolAssets.",
+      "Finite-pool Gaussian exposures use sqrt(asset correlation) loadings. Expected pool loss is PD times LGD times notional; exact pathwise loss tranches reconcile to native tranche statistics.",
+      "The native breakeven CDR is the first-writedown threshold, not a par-price target. OAS reprices model price to approximately zero spread; fixed-coupon discount margin is explicitly rejected.",
+      "Cash-stack attachment coordinates differ from the loss-only tranche coordinates used by PortfolioLossResult. Base-correlation knots are detachment percentage points; correlations are decimals."
+    ],
+    "authoring_started_utc": "2026-09-03T03:51:16.365669Z",
+    "authoring_finished_utc": "2026-09-03T04:11:19.190683Z",
+    "timing_basis": "UTC artifact timestamps from first post-P1 notebook authoring write through final focused notebook and published-snippet verification; overlapping lesson work, not isolated active effort. Earlier prerequisite research excluded.",
+    "learner_completion_time": "unmeasured",
+    "verification": {
+      "published_snippets": "passed with fresh build baselines per exercise",
+      "mdx_math_compilation": "passed",
+      "full_notebooks": "All twelve passed on private copies: eleven initial passes plus structured-credit setup fix and focused rerun.",
+      "shared_source_note": "C3 authoring may change the shared structured-credit notebook; final release must refresh 2.8 notebook fingerprints and snippet evidence."
+    }
+  },
+  {
+    "lesson_id": "3.2",
+    "scope": "Full original per-lesson plan and companion syllabus; every original exercise group required.",
+    "concepts": [
+      "R-7 empirical return quantile, sign/horizon units and closed-threshold ES estimator.",
+      "Exact tail-probability ES definition, VaR non-subadditivity and tied-data limitation.",
+      "Gaussian and Cornish-Fisher tails on a controlled skewed sample, moment instability.",
+      "Benchmark beta and aligned unrestricted OLS: intercept, coefficients, R-squared and residual orthogonality.",
+      "Excess-return convention and constrained-regression context.",
+      "Ledoit-Wolf covariance shrinkage and explicitly dimensioned systematic dollar risk.",
+      "Credit hierarchy, calibration persistence, decimal input spreads/basis-point output, DTS weights and annualized covariance."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "cell_id": "aligned-risk-panel",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "cell_id": "manual-tail-and-shrinkage",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "cell_id": "skewed-return-risk",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "cell_id": "var-nonsubadditivity",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "cell_id": "credit-factor-imports",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "cell_id": "credit-spread-panel",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "cell_id": "credit-factor-config",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "cell_id": "credit-factor-calibration",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "cell_id": "credit-factor-roundtrip",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "cell_id": "credit-factor-decomposition",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "cell_id": "credit-factor-covariance",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "cell_id": "credit-dts-calibration",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Convert 95% one-day risk to 99% ten-day risk under explicit assumptions.",
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "cell_id": "gaussian-horizon-scaling",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Native Gaussian horizon quantile matches drift-plus-z99 formula within 1e-9; wrong 95% square-root shortcut differs."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Prepare neutralized standardized exposure signals.",
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "cell_id": "neutralize-exposure-signal",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Native helper outputs zero-mean, exposure-orthogonal scores with population standard deviation one."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Check normal ES back-of-envelope.",
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "cell_id": "normal-es-reference",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Normal density formula matches native parametric ES within 1e-9 and explains confidence-dependent ES/VaR ratio."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "504 aligned synthetic daily proxy returns are not an actual historical mark series for the common priced book.",
+      "Historical VaR uses R-7 interpolation; historical expected_shortfall includes every observation at or below the threshold. The displayed exact-tail-mass ES proof handles ties separately before invoking coherence.",
+      "Multi-factor OLS is unrestricted, uses already-excess factors and zero risk-free return in this fixture; residual orthogonality, R-squared and benchmark beta are checked against NumPy references.",
+      "CreditCalibrator takes decimal spreads; the calibrated spread-decomposition outputs are in basis points. DTS calibration supplies explicit spread durations.",
+      "The stored credit covariance is annualized; OneStep exposes that covariance and NSteps(12) literally multiplies it by twelve. Illustrative USD 1000 per native factor-unit exposures cover systematic risk only.",
+      "neutralize_and_zscore uses population standard deviation; the exercise asserts mean zero, exposure orthogonality and population variance one."
+    ],
+    "authoring_started_utc": "2026-09-03T03:53:34.260498Z",
+    "authoring_finished_utc": "2026-09-03T04:11:19.190683Z",
+    "timing_basis": "UTC artifact timestamps from first post-P1 notebook authoring write through final focused notebook and published-snippet verification; overlapping lesson work, not isolated active effort. Earlier prerequisite research excluded.",
+    "learner_completion_time": "unmeasured",
+    "verification": {
+      "published_snippets": "passed with fresh build baselines per exercise",
+      "mdx_math_compilation": "passed",
+      "full_notebooks": "All twelve passed on private copies: eleven initial passes plus structured-credit setup fix and focused rerun.",
+      "shared_source_note": null
+    }
+  },
+  {
+    "lesson_id": "4.2",
+    "scope": "Full original per-lesson plan and companion syllabus; every original exercise group required.",
+    "concepts": [
+      "Native borrower UFCF, WACC input weights/rates/taxes and enterprise-to-equity bridge.",
+      "Quarterly-to-annual terminal flow, Gordon denominator, terminal dominance and short-forecast limitations.",
+      "Native two-way DCF grid and distinct EV versus operating-UFCF tornado charts.",
+      "Forecast-only scenario drivers and unchanged actuals.",
+      "Native price-implied terminal-growth goal seek with native DCF reprice.",
+      "LBO sources/uses, debt/interest/amortization cash feasibility, value-creation bridge and dated XIRR.",
+      "Equivalent exit multiple, additive signed-component vintage bridge and native joint-path statement Monte Carlo valuation."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "cell_id": "native-dcf",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "cell_id": "dcf-sensitivity",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "cell_id": "borrower-scenario-set",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "cell_id": "implied-terminal-growth",
+        "role": "build",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/models/lbo_analysis.ipynb",
+        "cell_id": "borrower-lbo-financing",
+        "role": "build",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Reconcile exit-multiple and Gordon terminal value.",
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "cell_id": "equivalent-terminal-multiple",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Derive implied 7.9264x multiple from Gordon TV and annualized EBITDA, reprice through native exit-multiple method to one cent."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Bridge two model information vintages.",
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "cell_id": "borrower-vintage-bridge",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Native Q3/Q4 no-future-information model vintages, signed additive UFCF components and near-zero unexplained residual."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Turn revenue-growth Monte Carlo into an EV distribution.",
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "cell_id": "borrower-monte-carlo-dcf",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "1024 retained joint native statement paths individually repriced through native DCF; no stitching marginal percentiles."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "The native shared borrower operating graph supplies UFCF; USD is stamped at the monetary DCF boundary and all original actuals and baseline UFCF values are preserved.",
+      "WACC is 9.76875%; terminal flow is the annual trailing-four-quarter sum. Approximately 93.16% of EV is terminal PV, so this short teaching horizon is assumption-sensitive.",
+      "A native DCF grid and DcfSensitivityResult measure value effects; the separate operating tornado measures one-quarter UFCF and is labelled separately.",
+      "ScenarioSet changes forecast driver levels only; every native scenario UFCF path is repriced through evaluate_dcf, preserving the base result.",
+      "The bounded native goal_seek changes only perpetual terminal growth and is validated by a native DCF reprice against the market-equity target.",
+      "Native LBO sources/uses, debt roll-forward, after-tax cash feasibility and an independent equity-profit bridge are checked. All cash is reserved for operating liquidity, with no interim distributions or excess-cash credit; entry latest-actual EBITDA is explicitly pinned because evaluate_lbo reads the first model period.",
+      "ForecastSpec.log_normal and Evaluator.evaluate_monte_carlo are the supported APIs. Retained joint quarterly UFCF paths are individually repriced by native DCF; marginal percentiles are never stitched into a fake path."
+    ],
+    "authoring_started_utc": "2026-09-03T03:56:49.352721Z",
+    "authoring_finished_utc": "2026-09-03T04:11:19.190683Z",
+    "timing_basis": "UTC artifact timestamps from first post-P1 notebook authoring write through final focused notebook and published-snippet verification; overlapping lesson work, not isolated active effort. Earlier prerequisite research excluded.",
+    "learner_completion_time": "unmeasured",
+    "verification": {
+      "published_snippets": "passed with fresh build baselines per exercise",
+      "mdx_math_compilation": "passed",
+      "full_notebooks": "All twelve passed on private copies: eleven initial passes plus structured-credit setup fix and focused rerun.",
+      "shared_source_note": null
+    }
+  }
+]

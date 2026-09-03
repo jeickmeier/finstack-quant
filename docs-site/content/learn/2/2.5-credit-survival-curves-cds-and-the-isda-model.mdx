@@ -1,0 +1,310 @@
+---
+id: '2.5'
+title: 'Credit: Survival Curves, CDS, and the ISDA Model'
+description: 'Analyst program lesson 2.5: Credit: Survival Curves, CDS, and the ISDA
+  Model'
+desk_question: '"Protection on ACME quotes 145bp. What default probability is the
+  market implying, and what do we get paid if we''re right?"'
+references:
+- '#isda-cds-standard-model'
+- '#isda-2014-credit-derivatives-definitions'
+- '#o-kane-2008'
+- '#hull-white-2000-cds'
+- '#duffie-singleton-1999'
+- '#lando-1998'
+- '#sp-cds-indices-primer'
+- '#bloomberg-cds-model'
+api:
+- finstack_quant.calibration.calibrate
+- finstack_quant.core.dates.DayCount
+- finstack_quant.core.dates.Tenor
+- finstack_quant.core.dates.add_business_days
+- finstack_quant.core.dates.next_cds_date
+- finstack_quant.core.dates.next_imm
+- finstack_quant.core.market_data.DiscountCurve
+- finstack_quant.core.market_data.HazardCurve
+- finstack_quant.core.market_data.MarketContext
+- finstack_quant.core.money.Money
+- finstack_quant.portfolio.aggregate_metrics
+- finstack_quant.portfolio.value_portfolio
+- finstack_quant.valuations.instruments.CreditDefaultSwap
+- finstack_quant.valuations.instruments.PremiumLegSpec
+- finstack_quant.valuations.instruments.ProtectionLegSpec
+- finstack_quant.valuations.instruments.price_instrument
+status: published
+---
+
+<DeskContext question={"Protection on ACME quotes 145bp. What default probability is the market implying, and what do we get paid if we're right?"}>
+
+The desk sees a CDS spread and asks what default probability it implies. The answer depends on recovery, discounting, premium dates and the pricing measure. A 100bp premium is not a 1% annual default probability, and a standardized coupon can coexist with a nonzero upfront payment.
+
+You will add the calibrated ACME protection position to the book, reconcile premium and protection legs, convert a standardized running coupon into an explicit upfront cash amount, and report its quote-space CS01 separately from the bonds' z-spread risks.
+
+</DeskContext>
+
+<Standard>
+
+### Survival and default intensity
+
+Let $\tau$ be default time. The risk-neutral survival function is $Q(t)=\Pr^{\mathbb Q}(\tau>t)$ and the hazard rate is $\lambda(t)=-d\log Q(t)/dt$. With a flat intensity,
+
+$$Q(t)=e^{-\lambda t},\qquad PD(0,t)=1-Q(t),\qquad PD(t,t+\Delta t\mid\tau>t)=1-e^{-\lambda\Delta t}.$$
+
+The cumulative and conditional probabilities answer different questions. Recovery $R$ scales loss given default, $1-R$, but does not alter survival if the hazard curve is explicitly held fixed. By contrast, holding observed CDS quotes fixed and reducing recovery generally reduces the calibrated hazard rate because each default then causes a larger loss. That is a recalibration experiment, not a property of the same unchanged curve.
+
+A market-implied risk-neutral default probability includes risk premia and model assumptions. It is not a physical expected-default frequency for underwriting or accounting ECL. The borrower exercises in 4.3 supply physical PD/LGD separately. [Duffie and Singleton](/references.html#duffie-singleton-1999) provide the reduced-form pricing framework.
+
+### Premium and protection legs
+
+A protection buyer pays running premium while the reference entity survives and receives a loss payment after a qualifying default. Under a simplified continuously paid premium,
+
+$$PV_{\mathrm{prot}}=N(1-R)\int D(0,t)\lambda(t)Q(t)dt,\qquad PV_{\mathrm{prem}}=Ns\int D(0,t)Q(t)dt.$$
+
+Equating the two for flat hazard and recovery gives $s\approx\lambda(1-R)$. Actual contracts have scheduled premium dates, day-count fractions, accrued premium on default, default settlement delay and exact protection start/end dates. These details explain why the native ISDA-style par spread is close to, but not exactly, the continuous approximation.
+
+The native protection-buyer value is protection-leg PV minus premium-leg PV. The `risky_annuity` is the premium valuation scale with its API convention; use the leg reconciliation and a native par-spread repricing check before relying on a hand scale. `par_spread` returns **basis points**, unlike the decimal bond spread metrics in 2.2. The synthetic ACME contract has USD 1m notional and a 100bp coupon; replacing it with the native par spread makes NPV approximately zero.
+
+### ISDA dates and quote conventions
+
+Standard CDS dates roll on the 20th of March, June, September and December; those are distinct from futures IMM Wednesdays. Trade date, step-in date, premium accrual start, protection start and cash settlement are separate dates. Step-in conventions establish when protection becomes effective, while accrued premium handles the coupon period already in progress. Business-day rules may move cash payments without redefining every accrual boundary. A default settlement delay describes payment following default, not automatically the trade's upfront settlement date.
+
+Our fixture is a **forward-starting** synthetic contract: valuation is 15 January 2025 and premium/protection starts on 20 March 2025. Do not interpret it as a spot-start CDS whose step-in date was silently advanced to March. The example explicitly chooses a three-US-business-day upfront cash date for quote conversion; this is a separate illustrative trade assumption, not inferred from the protection leg's default-settlement-delay field. [ISDA CDS standard model](/references.html#isda-cds-standard-model) documents the market-standard convention framework.
+
+Standardization commonly fixes a running coupon and expresses the remaining value through upfront cash. For a protection buyer whose running-contract PV is positive, a fair new trade requires the buyer to pay positive upfront cash. Its valuation-date fraction is $U_{PV}=V/N$, while cash at settlement $T_s$ is
+
+$$U_{\mathrm{cash}}=\frac{V}{D(0,T_s)},\qquad \text{upfront percentage}=100\,U_{\mathrm{cash}}/N.$$
+
+These are different units and dates. There is no native `upfront` metric used here; the conversion is displayed directly from a native price and a dated discount factor. Accrued premium and clean/dirty upfront quoting may require an additional contractual adjustment for a spot trade; this forward-starting example does not manufacture such an accrual.
+
+### Bootstrap quotes and preserve their meaning
+
+Calibration solves survival parameters so the chosen CDS quotes reprice under the specified discount curve and recovery. Repricing residuals are the first numerical check; monotone nonnegative survival and sensible hazards are separate financial checks. A small residual does not identify recovery independently of hazard, nor prove that the curve interpolates sensibly between quoted maturities.
+
+Quote-space CS01 perturbs the calibrated market CDS spreads and rebuilds survival. That requires the market's stored quote/replay recipe, not just a hand-inserted hazard curve with similar numbers. The build serializes and restores the complete market before requesting `cs01::ACME-HZD` and bucketed CS01, proving replay survives that boundary. The flat-hazard approximation deliberately requests only price/par spread: its manually inserted hazard is an explicit model experiment, not a substitute quote-replay calibration.
+
+The reported CDS CS01 is positive for purchased protection: wider market CDS spreads make the existing fixed-premium protection more valuable. A long unhedged corporate bond usually has negative spread sensitivity. But the two bond fixtures use individual z-spread factors, while ACME-CDS uses a calibrated hazard-quote factor. Keep `cs01::USD-CORP`, `cs01::EUR-GOVT` and `cs01::ACME-HZD` separate in the book report. A sum is meaningful only after defining a joint scenario for these factors and translating currency units.
+
+### Where protection value comes from
+
+To expose the protection timeline using supported APIs, reprice the same contract with successively later ends and take differences of cumulative protection-leg PVs. The resulting nonnegative interval contributions sum to the full native protection-leg PV. This is an exact telescoping decomposition of those native results, not a claim that the API exposes its internal integration nodes or default-state diagnostics.
+
+CDX and iTraxx indices pool standardized single-name credit exposures with index coupons, factors and conventions. An index–single-name basis compares the traded index with a consistent replicated basket; liquidity, funding, constituents, roll dates and default treatment can all matter. It is not simply the difference between any two spread screens. Index products, tranches and credit options are developed in C4.
+
+Reduced-form intensity models specify default probabilistically; structural models relate default to asset value and liabilities. They offer different links to observable markets and borrower fundamentals. Neither lets a market CDS curve stand in for a physical PD model without an explicit bridge. The course keeps pricing calibration and fundamental credit scoring as separate analytical tasks.
+
+</Standard>
+
+<BuildIt>
+
+### Reconcile native CDS legs and quote risk
+
+The native CDS is priced with the `hazard_rate` registry path and retained calibration replay. The par premium reprices to zero. Successive native maturity truncations expose the protection-value distribution across quarterly intervals.
+
+{/* notebook-block notebook="02_pricing/instruments/credit_derivatives.ipynb" cell="cds-proof" role="build" */}
+```python exec id=cds-proof role=build
+import copy, json, math
+from datetime import date
+from finstack_quant.valuations.instruments import CreditDefaultSwap, price_instrument
+from finstack_quant.core.market_data import MarketContext
+from _shared.analyst_book import AS_OF, build_market, instruments
+
+market = MarketContext.from_json(build_market('base').to_json())
+cds = instruments('base')['ACME-CDS']
+priced = price_instrument(CreditDefaultSwap.from_json(json.dumps(cds)), market, AS_OF,
+    metrics=['par_spread', 'cs01', 'bucketed_cs01', 'protection_leg_pv', 'premium_leg_pv', 'risky_annuity'])
+par_spread_bp = priced.get_metric('par_spread')
+par = copy.deepcopy(cds)
+par['instrument']['spec']['premium']['spread_bp'] = str(par_spread_bp)
+assert abs(price_instrument(json.dumps(par), market, AS_OF).price) < 0.01
+assert priced.get_metric('cs01::ACME-HZD') > 0
+notional = float(cds['instrument']['spec']['notional']['amount'])
+upfront_pv_fraction = priced.price / notional
+assert abs(priced.price - (priced.get_metric('protection_leg_pv') - priced.get_metric('premium_leg_pv'))) < 1e-6
+boundaries = [date(year, month, 20) for year in range(2025, 2031) for month in (3, 6, 9, 12)
+              if date(2025, 3, 20) < date(year, month, 20) <= date(2030, 3, 20)]
+previous, protection_rows = 0.0, []
+for end in boundaries:
+    truncated = copy.deepcopy(cds)
+    truncated['instrument']['spec']['premium']['end'] = end.isoformat()
+    cumulative = price_instrument(json.dumps(truncated), market, AS_OF, metrics=['protection_leg_pv']).get_metric('protection_leg_pv')
+    protection_rows.append((end.isoformat(), cumulative - previous))
+    previous = cumulative
+assert all(amount >= 0 for _, amount in protection_rows)
+assert abs(sum(amount for _, amount in protection_rows) - priced.get_metric('protection_leg_pv')) < 1e-6
+print({'par_spread_bp': par_spread_bp, 'upfront_pv_fraction': upfront_pv_fraction, 'cs01_per_bp': priced.get_metric('cs01::ACME-HZD')})
+print(protection_rows)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.5" block="cds-proof" />
+
+
+### Convert running value to upfront cash
+
+The explicit three-business-day trade settlement date is separate from protection default settlement. The assertion discounts the cash amount back to the native valuation-date price.
+
+{/* notebook-block notebook="02_pricing/instruments/credit_derivatives.ipynb" cell="cds-isda-quote-conversion" role="build" */}
+```python exec id=cds-isda-quote-conversion role=build
+import json
+from finstack_quant.core.dates import add_business_days,DayCount
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF,build_market,instruments
+market=build_market('base');contract=instruments('base')['ACME-CDS']
+result=price_instrument(json.dumps(contract),market,AS_OF,metrics=['par_spread','risky_annuity'])
+settlement=add_business_days(AS_OF,3,'usny');t=DayCount.ACT_365F.year_fraction(AS_OF,settlement)
+upfront_cash=result.price/market.get_discount('USD-OIS').df(t)
+assert abs(upfront_cash*market.get_discount('USD-OIS').df(t)-result.price)<1e-8
+print({'illustrative_trade_upfront_settlement':settlement,'contract_premium_start':contract['instrument']['spec']['premium']['start'],'standard_coupon_bp':100.,'par_spread_bp':result.get_metric('par_spread'),'buyer_upfront_USD':upfront_cash,'buyer_upfront_percent':100*upfront_cash/1_000_000})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.5" block="cds-isda-quote-conversion" />
+
+
+### Test the flat-hazard approximation
+
+Use flat hazard 2%, recovery 40% and discount rate 4%. The continuous approximation is 120bp; the native quarterly premium and default-payment conventions produce a small observable residual.
+
+{/* notebook-block notebook="02_pricing/instruments/credit_derivatives.ipynb" cell="cds-flat-hazard-approximation" role="build" */}
+```python exec id=cds-flat-hazard-approximation role=build
+import json
+from finstack_quant.core.market_data import HazardCurve,DiscountCurve
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF,build_market,instruments
+market=build_market('base').insert(HazardCurve.flat('ACME-HZD',AS_OF,.02,.4)).insert(DiscountCurve.flat('USD-OIS',AS_OF,.04))
+contract=instruments('base')['ACME-CDS']
+result=price_instrument(json.dumps(contract),market,AS_OF,metrics=['par_spread'])
+continuous_approx_bp=.02*(1-.4)*1e4
+assert abs(result.get_metric('par_spread')-continuous_approx_bp)<5
+print({'continuous_approx_bp':continuous_approx_bp,'native_ISDA_par_bp':result.get_metric('par_spread'),'residual_bp':result.get_metric('par_spread')-continuous_approx_bp})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.5" block="cds-flat-hazard-approximation" />
+
+
+
+### Build the regional contract and bootstrap its quotes
+
+The native premium/protection builders expose recovery, calendar and start/end dates. The fresh calibration input displays the complete CDS quote strip and returns a CalibrationResult. A maximum residual-to-tolerance ratio below one passes its numerical gate; the forward-starting contract has different dates from the spot calibration pillars, so its par spread need not equal the five-year input quote.
+
+{/* notebook-block notebook="02_pricing/instruments/credit_derivatives.ipynb" cell="cds-typed-calibration" role="build" */}
+```python exec id=cds-typed-calibration role=build
+import json
+from finstack_quant.core.dates import Tenor,DayCount,next_cds_date,next_imm
+from finstack_quant.core.money import Money
+from finstack_quant.calibration import calibrate
+from finstack_quant.valuations.instruments import CreditDefaultSwap,PremiumLegSpec,ProtectionLegSpec,price_instrument
+from _shared.analyst_book import AS_OF,calibration_envelope
+premium=PremiumLegSpec('2025-03-20','2030-03-20',Tenor.quarterly(),DayCount.ACT_360,100.,'USD-OIS',calendar_id='usny',business_day_convention='following')
+protection=ProtectionLegSpec('ACME-HZD',.4,3)
+cds=(CreditDefaultSwap.builder().id('TYPED-ACME-CDS').notional(Money(1_000_000,'USD')).side('pay')
+ .convention('isda_na').premium(premium).protection(protection).build())
+inputs=calibration_envelope('base');fit=calibrate(json.dumps(inputs));assert fit.success and fit.max_residual_ratio<1
+value=price_instrument(cds,fit.market,AS_OF,model='hazard_rate',metrics=['par_spread'])
+assert value.get_metric('par_spread')>0
+print({'next_CDS_roll':next_cds_date(AS_OF),'next_futures_IMM':next_imm(AS_OF),'quote_strip':[q for q in inputs['market_data'] if q['kind']=='cds_quote']})
+print({'calibration_success':fit.success,'max_residual_tolerance_ratio':fit.max_residual_ratio,'CDS_price_USD':value.price,'par_spread_bp':value.get_metric('par_spread')})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.5" block="cds-typed-calibration" />
+
+</BuildIt>
+
+<LabCard notebook="01_foundations/market_data/hazard_curves.ipynb" title="Hazard Curves" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<LabCard notebook="02_pricing/instruments/credit_derivatives.ipynb" title="Credit Derivatives" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<Exercise id="exercise-cds-recovery" title="A. State what recovery holds fixed" question={"Compare recovery 40% and 25% under unchanged hazard, then under unchanged CDS market quotes with recalibration."}>
+
+The fixed-hazard cumulative default probability remains exactly unchanged. For fixed quotes, the lower recovery curve implies lower risk-neutral cumulative PD in this fixture. Both calibrations must succeed, and serialized market restoration preserves their information. Do not describe the second result as a mechanical change to the same hazard curve.
+
+{/* notebook-block notebook="02_pricing/instruments/credit_derivatives.ipynb" cell="exercise-cds-recovery" role="exercise" */}
+```python exec id=exercise-cds-recovery role=exercise
+import json
+from finstack_quant.calibration import calibrate
+from finstack_quant.core.market_data import HazardCurve,MarketContext
+from _shared.analyst_book import AS_OF,calibration_envelope
+fixed=HazardCurve.flat('FIXED',AS_OF,0.02,0.4)
+assert fixed.sp(5)==fixed.with_recovery_rate(0.25).sp(5)
+pds={}
+for recovery in (0.4,0.25):
+    envelope=calibration_envelope('base');envelope['plan']['steps'][-1]['recovery_rate']=recovery
+    for quote in envelope['market_data']:
+        if quote['kind']=='cds_quote':quote['recovery_rate']=recovery
+    fit=calibrate(json.dumps(envelope));assert fit.success
+    restored=MarketContext.from_json(fit.market.to_json())
+    pds[recovery]=1-restored.get_hazard('ACME-HZD').sp(5)
+assert pds[0.25]<pds[0.4]
+print({'fixed_hazard_5y_PD':1-fixed.sp(5),'fixed_quote_5y_PD':pds})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.5" block="exercise-cds-recovery" />
+
+</Exercise>
+
+<Exercise id="exercise-flat-hazard-spread" title="B. Quantify the spread approximation" question={"Calculate lambda times one minus recovery and compare it with the native par spread under the same flat inputs."}>
+
+The displayed result is in basis points. The approximation assumes continuous premium timing; quarterly payments, ACT/360 accrual, accrual on default and settlement conventions create a small difference. A tolerance of 5bp tests closeness for this selected fixture, not an identity for all curves or maturities.
+
+{/* notebook-block notebook="02_pricing/instruments/credit_derivatives.ipynb" cell="exercise-flat-hazard-spread" role="exercise" */}
+```python exec id=exercise-flat-hazard-spread role=exercise
+import json
+from finstack_quant.core.market_data import HazardCurve,DiscountCurve
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF,build_market,instruments
+market=build_market('base').insert(HazardCurve.flat('ACME-HZD',AS_OF,.02,.4)).insert(DiscountCurve.flat('USD-OIS',AS_OF,.04))
+contract=instruments('base')['ACME-CDS']
+result=price_instrument(json.dumps(contract),market,AS_OF,metrics=['par_spread'])
+continuous_approx_bp=.02*(1-.4)*1e4
+assert abs(result.get_metric('par_spread')-continuous_approx_bp)<5
+print({'continuous_approx_bp':continuous_approx_bp,'native_ISDA_par_bp':result.get_metric('par_spread'),'residual_bp':result.get_metric('par_spread')-continuous_approx_bp})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.5" block="exercise-flat-hazard-spread" />
+
+</Exercise>
+
+<Exercise id="exercise-book-cs01" title="C. Add CDS quote risk to the book" question={"Value the options-stage and base-stage books with strict risk, aggregate into USD, and identify the extra ACME hazard-quote factor."}>
+
+The base book adds one CDS holding while preserving the prior holdings. The native aggregator receives the valuation currency, complete market and date explicitly. Missing/inapplicable metrics are distinguished from degraded calculations; inspect the qualified factors rather than presenting all spread sensitivities as one automatically hedged exposure.
+
+{/* notebook-block notebook="02_pricing/instruments/credit_derivatives.ipynb" cell="exercise-book-cs01" role="exercise" */}
+```python exec id=exercise-book-cs01 role=exercise
+import json
+from finstack_quant.portfolio import value_portfolio,aggregate_metrics
+from _shared.analyst_book import AS_OF,build_book,build_market
+reports={}
+for stage in ('options','base'):
+ result=value_portfolio(build_book(stage),build_market(stage),metrics=['cs01'],strict_risk=True)
+ wire=json.loads(result.to_json());assert not wire.get('degraded_risk_positions')
+ metrics=aggregate_metrics(result,'USD',build_market(stage),AS_OF)
+ reports[stage]=json.loads(metrics.to_json())
+before=reports['options']['aggregated'];after=reports['base']['aggregated']
+assert 'cs01::ACME-HZD' not in before and after['cs01::ACME-HZD']['total']>0
+net_before=before['cs01']['total'];net_after=after['cs01']['total']
+assert abs(net_after-net_before-after['cs01::ACME-HZD']['total'])<1e-8
+assert abs(after['cs01::EUR-GOVT']['total']-1.08*reports['base']['by_position']['EUR-GOVT']['metrics']['cs01::EUR-GOVT'])<1e-8
+print(reports)
+print({'joint_parallel_spread_scenario_USD_per_bp_before':net_before,'after':net_after})
+assert len(build_book('base').position_ids)==len(build_book('options').position_ids)+1
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.5" block="exercise-book-cs01" />
+
+</Exercise>
+
+<CheckYourself>
+
+1. **Does 100bp CDS imply 1% annual default probability?** No; hazard also depends on recovery, timing, discounting and risk premia.
+2. **What changes when recovery falls with hazard fixed?** Expected loss severity, not the survival probability.
+3. **Why does lower recovery imply lower calibrated hazard at fixed quotes?** A larger loss per default requires fewer implied defaults to reproduce the same protection cost.
+4. **Why must a CS01 market retain quote replay?** Quote-space risk rebuilds survival after changing calibration quotes.
+5. **Does a positive protection-contract PV mean the buyer receives fair upfront cash?** No. A fair new trade requires the buyer to pay that positive value, adjusted to the cash settlement date.
+6. **What does the interval protection decomposition prove?** Native cumulative leg values telescope to the full leg; it does not reveal hidden integration diagnostics.
+
+</CheckYourself>

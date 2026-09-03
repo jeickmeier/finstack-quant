@@ -1,0 +1,265 @@
+---
+id: '2.2'
+title: 'Bonds II: Duration, DV01, and Spread Measures'
+description: 'Analyst program lesson 2.2: Bonds II: Duration, DV01, and Spread Measures'
+desk_question: '"Rates sold off 25bp. Estimate our bond P&L in ten seconds — then
+  explain why the estimate was off."'
+references:
+- '#tuckman-serrat-fixed-income'
+- '#fabozzi-fixed-income-handbook'
+- '#litterman-scheinkman-1991'
+api:
+- finstack_quant.cashflows.builder.AmortizationSpec
+- finstack_quant.cashflows.builder.CashFlowSchedule
+- finstack_quant.cashflows.builder.FixedCouponSpec
+- finstack_quant.cashflows.builder.ScheduleParams
+- finstack_quant.core.market_data.DiscountCurve
+- finstack_quant.core.market_data.MarketContext
+- finstack_quant.core.money.Money
+- finstack_quant.valuations.instruments.bond_from_cashflows_json
+- finstack_quant.valuations.instruments.price_instrument
+status: published
+---
+
+<DeskContext question={"Rates sold off 25bp. Estimate our bond P&L in ten seconds \u2014 then explain why the estimate was off."}>
+
+The PM asks what a 25bp rates selloff will cost, and whether the bond's spread risk is the same thing. A single duration number cannot answer both questions. You need the shock definition, the currency, the curve or spread factor, the bump size and the local approximation error.
+
+You will reconcile native signed DV01 to direct repricing, explain the quadratic improvement from convexity, and read a qualified key-rate report. You will also compare the spread measures that traders use to describe the same bond under different benchmarks.
+
+</DeskContext>
+
+<Standard>
+
+### Duration is a local derivative
+
+Macaulay duration is a PV-weighted average cashflow time under the yield convention. For a regular instrument with $m$ payments per year, modified duration is $D_{\mathrm{mod}}=D_{\mathrm{Mac}}/(1+y/m)$ and approximates the fractional price decline for a small increase in yield. The native metric names are `duration_mac` and `duration_mod`.
+
+With decimal yield shock $\Delta y$,
+
+$$\frac{\Delta P}{P}\approx-D_{\mathrm{mod}}\Delta y+\tfrac12 C_y(\Delta y)^2,\qquad C_y=\frac1P\frac{\partial^2P}{\partial y^2}.$$
+
+The bond's native `convexity` metric is $C_y/100$ on this API. Multiply it by 100 before using the decimal-yield formula above. The output explicitly prints both representations. A scalar that is numerically plausible can still be wrong by a factor of 100 if its units are assumed.
+
+Curve DV01 and yield duration are related but not identical. A yield shock shifts the single rate that reproduces the bond quote; a curve shock shifts market discounting and potentially projection inputs. Here `dv01` is the **signed currency price change for +1bp**, using a central bump where supported. A long fixed-rate bond has negative DV01. Desks sometimes quote its positive loss magnitude; state the sign convention before applying a hedge ratio. Dollar duration per unit decimal yield is about 10,000 times signed DV01, with the appropriate sign.
+
+The direct curve experiment multiplies discount factors by $e^{-\Delta r t}$, so it is a parallel **continuous zero-rate** shift. At +25bp, a first-order estimate is $25\times DV01$. The second difference at ±1bp gives a curvature term in dollars per bp squared. Using that same shock coordinate makes the linear and quadratic comparisons consistent. Convexity improves this fixture's approximation but does not make a large nonlinear shock exact. A residual may contain third-order effects, recalibration changes, option exercise, cashflow changes or inconsistent conventions; it is not automatically model error.
+
+### Buckets identify the factor
+
+A qualified key such as `bucketed_dv01::USD-OIS::5y` carries the measure, curve and tenor. The curve's input pillars and the risk report's key-rate grid are different objects. Native triangular key-rate bumps distribute a local shock across neighboring tenors; the resulting bond exposure can span several buckets. A seven-year bond on a curve with 2, 5, 10 and 30-year pillars is not simply a seven-year point exposure. Coupons occur earlier and interpolation couples cashflows to nearby curve regions.
+
+Check the actual returned keys and retain their curve and currency. Bucket sums can differ slightly from a parallel shock because finite differences, bump shape and interpolation differ. Do not force an exact equality by moving a residual into one bucket. [Tuckman and Serrat](/references.html#tuckman-serrat-fixed-income) develop the risk interpretation; the exercise prints the native keys rather than presupposing them.
+
+### Several spreads, several questions
+
+| Measure | Benchmark and meaning | Main limitation |
+| --- | --- | --- |
+| G-spread | Bond yield minus same-currency government benchmark yield | Yield conventions and benchmark maturity must match |
+| I-spread | Bond yield minus interpolated par swap rate | A single yield comparison does not reprice each cashflow |
+| Z-spread | Constant spread applied to the discounting zero curve to reproduce price | Assumes fixed cashflows; compounding convention matters |
+| Asset-swap spread | Spread on a floating leg after exchanging the bond's fixed economics | Depends on par/market asset-swap structure, annuities and settlement |
+| Discount margin | Spread measure for a floating-rate note relative to projected index cashflows | Depends on resets, index projection and discount assumptions |
+| OAS | Spread after modelling embedded exercise options | Depends on volatility, dynamics and exercise assumptions |
+
+The library returns I-spread, Z-spread and asset-swap spread as **decimal rates**; the display converts them to basis points. There is no native `g_spread` metric here. We visibly subtract an assumed 4% USD government benchmark from the USD bond's yield. Subtracting the EUR government bond's yield would mix currencies and would not be a G-spread. A production benchmark should also match maturity and yield convention.
+
+`asw_par` constructs settlement-to-maturity swap legs, which need a stub when settlement is off cycle. The example uses a fresh `short_front` copy for that calculation. This convention choice belongs in the analysis, rather than a hidden workaround. `discount_margin` is shown on a separate synthetic floating-rate bond, whose projection curve and fixings are supplied by the rates-stage market.
+
+### Spread risk is not one universal bump
+
+For this corporate bond with no hazard curve, `cs01::USD-CORP` is the forward difference $P(z+1\mathrm{bp})-P(z)$, with the spread added to periodically compounded zero rates and prices anchored at settlement. It differs from the continuous curve DV01 experiment. The exercise reproduces it through `quoted_z_spread` and also prints the central difference, exposing the small curvature difference. Bond `z_spread` itself is decimal, not basis points.
+
+A CDS backed by a calibrated hazard curve instead reports quote-space `cs01::ACME-HZD`: the market CDS quotes move and the survival curve is rebuilt. It is a different risk factor, even though both outputs are dollars per basis point. Aggregating two numbers with the same unit does not make them an economic hedge.
+
+For a callable bond, the issuer's option reduces investor value relative to an otherwise identical straight bond. Positive rate volatility generally increases that option's value. A model can report embedded-option value and solve OAS, but neither should be inferred by subtracting two unrelated yield spreads. Callable effective duration must also allow exercise to change under a shock; C1 works through that model-dependent extension.
+
+</Standard>
+
+<BuildIt>
+
+### Reprice a parallel curve shock
+
+This creates independent bumped markets, reconciles a native ±1bp derivative and compares actual +25bp P&L with first- and second-order estimates. It also verifies that the full curve-qualified bucket keys are available.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="bond-risk-proof" role="build" */}
+```python exec id=bond-risk-proof role=build
+import copy, json, math
+from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF, build_market, instruments
+
+market = build_market('foundations')
+curve = market.get_discount('USD-OIS')
+analysis_bond = instruments('foundations')['USD-CORP']
+# ASW constructs a new settlement-to-maturity leg, which has a short front stub.
+analysis_bond['instrument']['spec']['cashflow_spec']['fixed']['stub'] = 'short_front'
+bond = json.dumps(analysis_bond)
+result = price_instrument(bond, market, AS_OF, metrics=['dv01', 'bucketed_dv01', 'duration_mod', 'convexity', 'cs01', 'z_spread', 'i_spread', 'asw_par'])
+values = {}
+for bp in (-1.0, 0.0, 1.0, 25.0):
+    bumped = MarketContext.from_json(market.to_json())
+    bumped.insert(DiscountCurve('USD-OIS', AS_OF,
+        [(t, df * math.exp(-bp * 1e-4 * t)) for t, df in zip(curve.knots, curve.dfs)], interp='log_linear'))
+    values[bp] = price_instrument(bond, bumped, AS_OF).price
+dv01 = (values[1.0] - values[-1.0]) / 2  # native signed change for +1 bp
+assert abs(dv01 - result.get_metric('dv01')) < 0.01
+actual = values[25.0] - values[0.0]
+linear = 25 * dv01
+quadratic = linear + 0.5 * 25 ** 2 * (values[1.0] + values[-1.0] - 2 * values[0.0])
+assert abs(actual - quadratic) < abs(actual - linear)
+assert result.get_metric('cs01::USD-CORP') is not None
+assert any(key.startswith('bucketed_dv01::USD-OIS::') for key in result.metric_keys())
+print({'actual_pnl': actual, 'linear': linear, 'quadratic': quadratic, 'yield_convexity': result.get_metric('convexity')})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.2" block="bond-risk-proof" />
+
+
+### Read duration and convexity units
+
+The Macaulay-to-modified identity checks the semiannual convention. The printed decimal-yield convexity is the value appropriate to the mathematical Taylor formula, not the native scaled field.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="duration-convexity-units" role="build" */}
+```python exec id=duration-convexity-units role=build
+import json
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF,build_market,instruments
+contract=instruments('foundations')['USD-CORP'];market=build_market('foundations')
+risk=price_instrument(json.dumps(contract),market,AS_OF,metrics=['ytm','duration_mac','duration_mod','convexity'])
+y=risk.get_metric('ytm');dmac=risk.get_metric('duration_mac');dmod=risk.get_metric('duration_mod')
+assert abs(dmac-dmod*(1+y/2))<1e-8
+print({'Macaulay_years':dmac,'modified_years':dmod,'native_convexity':risk.get_metric('convexity'),'decimal_yield_convexity':100*risk.get_metric('convexity')})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.2" block="duration-convexity-units" />
+
+
+### Compare the spread ladder
+
+A 99 quote makes the price-based spread comparison nontrivial. The government yield is an explicit illustrative USD input. The floating-rate note uses an independent native fixture with the required SOFR curve and historical fixings.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="bond-spread-ladder" role="build" */}
+```python exec id=bond-spread-ladder role=build
+import copy,json
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF,build_market,instruments
+from _shared.instrument_fixtures import floating_bond,instrument_envelope
+market=build_market('rates')
+corporate=instruments('foundations')['USD-CORP']
+corporate['instrument']['spec']['cashflow_spec']['fixed']['stub']='short_front'
+corporate['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price':99.0}}
+r=price_instrument(json.dumps(corporate),market,AS_OF,metrics=['ytm','i_spread','z_spread','asw_par'])
+# A same-currency synthetic government yield is an explicit benchmark, not a native g_spread metric.
+government_yield=0.04
+g_spread_bp=(r.get_metric('ytm')-government_yield)*1e4
+_,frn=floating_bond(0)
+frn_result=price_instrument(json.dumps(instrument_envelope(frn)),market,AS_OF,metrics=['discount_margin'])
+assert all(r.get_metric(k) is not None for k in ['i_spread','z_spread','asw_par'])
+print({'government_yield_decimal':government_yield,'G_spread_bp':g_spread_bp,'I_spread_bp':1e4*r.get_metric('i_spread'),'Z_spread_bp':1e4*r.get_metric('z_spread'),'ASW_par_bp':1e4*r.get_metric('asw_par'),'FRN_discount_margin_decimal':frn_result.get_metric('discount_margin')})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.2" block="bond-spread-ladder" />
+
+
+</BuildIt>
+
+<LabCard notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" title="Bonds And Fixed Income" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<LabCard notebook="02_pricing/pnl_attribution.ipynb" title="Pnl Attribution" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<Exercise id="exercise-seven-year-buckets" title="A. Read the seven-year bond risk map" question={"Create a seven-year bond on a curve with 2/5/10/30-year pillars. Which native risk buckets receive exposure, and why?"}>
+
+The assertion requires more than one nonzero bucket and a negative parallel DV01. Inspect the actual returned tenor grid: curve pillars do not prescribe the bump grid. Earlier coupons and interpolation explain the distributed exposure; avoid claiming all seven-year principal risk sits in one displayed bucket.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="exercise-seven-year-buckets" role="exercise" */}
+```python exec id=exercise-seven-year-buckets role=exercise
+import json,math
+from finstack_quant.core.market_data import DiscountCurve
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF,build_market,instruments
+market=build_market('foundations').insert(DiscountCurve('USD-OIS',AS_OF,[(0,1)]+[(t,math.exp(-.04*t)) for t in (2,5,10,30)],interp='log_linear'))
+contract=instruments('foundations')['USD-CORP'];contract['instrument']['spec']['maturity']='2032-01-15'
+r=price_instrument(json.dumps(contract),market,AS_OF,metrics=['dv01','bucketed_dv01'])
+buckets={key:r.get_metric(key) for key in r.metric_keys() if key.startswith('bucketed_dv01::USD-OIS::')}
+assert len([v for v in buckets.values() if abs(v)>0.01])>1
+assert r.get_metric('dv01')<0 and sum(buckets.values())<0
+print({'curve_pillars_years':[2,5,10,30],'parallel_DV01_USD_per_bp':r.get_metric('dv01'),'native_key_rate_buckets':buckets})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.2" block="exercise-seven-year-buckets" />
+
+</Exercise>
+
+<Exercise id="exercise-zspread-cs01" title="B. Reproduce z-spread CS01" question={"Reprice the bond at z\u22121bp, z and z+1bp, and reconcile native CS01 to its documented one-sided convention."}>
+
+The quoted spread overrides use decimal rates. The native CS01 matches the +1bp forward difference at settlement; the central difference is printed separately. Do not substitute a continuous discount-curve shift and expect exact equality.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="exercise-zspread-cs01" role="exercise" */}
+```python exec id=exercise-zspread-cs01 role=exercise
+import copy,json
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF,build_market,instruments
+market=build_market('foundations');contract=instruments('foundations')['USD-CORP']
+r=price_instrument(json.dumps(contract),market,AS_OF,metrics=['cs01','z_spread'])
+z=r.get_metric('z_spread')
+values={}
+for bp in (-1,0,1):
+ bumped=copy.deepcopy(contract)
+ bumped['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_z_spread':z+bp*1e-4}}
+ values[bp]=price_instrument(json.dumps(bumped),market,AS_OF,metrics=['dirty_price']).get_metric('dirty_price')
+native=r.get_metric('cs01::USD-CORP');forward=values[1]-values[0];central=(values[1]-values[-1])/2
+assert native<0 and abs(native-forward)<.01
+print({'bond_zspread_CS01_USD_per_bp':native,'native_forward_difference':forward,'symmetric_difference':central,'convexity_difference':forward-central})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.2" block="exercise-zspread-cs01" />
+
+</Exercise>
+
+<Exercise id="exercise-amortizer-duration" title="C. Explain earlier principal repayment" question={"Build a native amortizer with the bullet coupon and maturity, then compare modified durations."}>
+
+The native principal schedule returns cash earlier, reducing later interest-bearing principal. In this fixture its modified duration is shorter than the bullet. This is a cashflow timing explanation, not a blanket claim that every amortizing security has low risk under all prepayment or extension scenarios.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="exercise-amortizer-duration" role="exercise" */}
+```python exec id=exercise-amortizer-duration role=exercise
+import json
+from datetime import date
+from decimal import Decimal
+from finstack_quant.cashflows.builder import CashFlowSchedule, FixedCouponSpec, ScheduleParams, AmortizationSpec
+from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments import bond_from_cashflows_json, price_instrument
+from _shared.analyst_book import AS_OF, build_market, instruments
+
+market = build_market('foundations')
+schedule = (CashFlowSchedule.builder().principal(Money(2_000_000.0, 'USD'), date(2024, 1, 15), date(2030, 1, 15))
+    .amortization(AmortizationSpec.linear_to(Money(0.0, 'USD')))
+    .fixed_cf(FixedCouponSpec(Decimal('0.055'), ScheduleParams.semiannual_30360()))
+    .build())
+amortizer = bond_from_cashflows_json('LESSON-AMORTIZER', schedule.to_json(), 'USD-OIS')
+amortized = price_instrument(amortizer, market, AS_OF, metrics=['duration_mod', 'ytm'])
+bullet = price_instrument(json.dumps(instruments('foundations')['USD-CORP']), market, AS_OF, metrics=['duration_mod'])
+assert amortized.price > 0
+assert amortized.get_metric('duration_mod') < bullet.get_metric('duration_mod')
+print({'amortizer_duration': amortized.get_metric('duration_mod'), 'bullet_duration': bullet.get_metric('duration_mod')})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.2" block="exercise-amortizer-duration" />
+
+</Exercise>
+
+<CheckYourself>
+
+1. **A long bond has DV01 = −930. What does +25bp suggest?** About USD −23,250 at first order, before convexity and other factors.
+2. **Why does the bucket key include a curve ID?** USD discount risk and another curve's projection or credit risk are not interchangeable.
+3. **What is wrong with putting native convexity directly into a decimal-yield Taylor equation?** This metric is scaled by 1/100; undo that scale first.
+4. **Are I-spread and Z-spread the same when the curve slopes?** Generally no: one compares yields, while the other reprices the entire cashflow vector.
+5. **Can bond z-spread CS01 cancel CDS quote CS01 without more assumptions?** Only under a stated joint spread scenario; the factor names must remain visible.
+
+</CheckYourself>

@@ -1,0 +1,112 @@
+[
+  {
+    "lesson_id": "4.3",
+    "scope": "Full original per-lesson plan and companion syllabus, including all three required exercises.",
+    "concepts": [
+      "Maintenance/incurrence/springing covenants, cov-lite, exact borrower definitions and baseline breaches.",
+      "Native forecast evaluation, headroom units and typed/JSON engine parity.",
+      "Altman public/private/nonmanufacturer, Ohlson, Zmijewski and master-scale applicability.",
+      "Physical PIT/TTC calibration conventions and migration-generator PD term structures.",
+      "Workout and downturn LGD, delayed recovery and default/recovery dependence.",
+      "IFRS9 staging and scenario-weighted ECL; distinct CECL lifetime/forecast framework.",
+      "Amortizing held-loan EAD, cumulative-to-marginal PD and midpoint EIR discounting.",
+      "Merton equity/asset inversion, risk-neutral versus physical drift and divergent accounting/market signals."
+    ],
+    "build_workflows": [
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "cell_id": "priced-term-loan",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "cell_id": "borrower-covenant-forecast",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "cell_id": "borrower-score-and-pit",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "cell_id": "rating-generator-term-structure",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "cell_id": "workout-and-downturn-lgd",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "cell_id": "staged-borrower-ecl",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "cell_id": "amortizing-loan-ecl",
+        "status": "proven"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "cell_id": "merton-market-signal",
+        "status": "proven"
+      }
+    ],
+    "exercises": [
+      {
+        "original_group": "a",
+        "original_requirement": "Covenant headroom under the 4.2 bear scenario.",
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "cell_id": "bear-covenant-headroom",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Recreate revenue-only -2% growth, preserve other baseline inputs, native test all quarters, reconcile relative/absolute headroom and compare with base."
+      },
+      {
+        "original_group": "b",
+        "original_requirement": "Stage1-to-Stage2 allowance cliff.",
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "cell_id": "stage-two-allowance-cliff",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Same PD/LGD/EAD/EIR, qualitative flag changes stage; native allowances jump by the lifetime default-event window, not a valuation-price discontinuity."
+      },
+      {
+        "original_group": "c",
+        "original_requirement": "Distance-to-default versus Z-score divergent signals.",
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "cell_id": "distance-versus-accounting-score",
+        "role": "exercise",
+        "status": "proven",
+        "solution_and_assertions": "Improve trailing EBIT/assets while doubling forward asset volatility; native Z rises while DD falls and model PD increases."
+      }
+    ],
+    "financial_and_api_decisions": [
+      "The common book first adds BORROWER-TL here; held notional is USD1m versus USD100m facility. Physical underwriting PD/LGD assumptions are separate from the market PV/risk calculation.",
+      "Exact borrower covenant definitions are reused: current-quarter run-rate EBITDA, 4.5x net-leverage maximum, and 1.1x DSCR minimum after cash taxes/capex/NWC over interest/amortization. Baseline DSCR breaches all four forecast quarters.",
+      "Native covenant headroom is divided by the threshold; displayed ratio-unit headroom is independently reconciled. Typed and JSON engine evaluations agree.",
+      "The 4.2 bear exercise changes only revenue growth; it is explicitly distinguished from the broader shared underwriting downside, which also changes costs and interest.",
+      "Accounting scoring uses native borrower actuals plus explicitly assumed missing financial inputs and an uncalibrated size normalization. Raw score-implied probabilities and master-scale grades are not substituted for calibrated underwriting PD.",
+      "PIT/TTC transformations round-trip. Native generator extraction/project matches the annual transition matrix and its fivefold matrix composition; annual probabilities are not multiplied by five.",
+      "Workout LGD reconciles haircuts, EAD-based costs and delayed recovery. Downturn LGD is the supported stressed approximation, not an empirical recovery fit.",
+      "Native IFRS9 stages are explicitly set and inspected: a watchlist flag is an analyst policy choice in response to covenant weakness; the performing and defaulted cases are controlled comparators.",
+      "The quarterly ECL proof uses cumulative PD differences, midpoint EAD and EIR discounting. Fixed-LGD native scenario weighting is compared with explicit scenario-specific-LGD weighting through native compute_ecl calls.",
+      "Contractual held-loan amortization is supplied through EAD knots pinned to each quarterly integration midpoint; linear interpolation between knots is disclosed as a grid approximation.",
+      "CECL lifetime measurement and forecast/reversion principles are explained; the native IFRS lifetime output is not relabelled as a complete CECL implementation.",
+      "Merton risk-neutral DD/PD and equity-to-assets inversion are checked. An assumed-drift physical calculation is theoretical, not an empirically calibrated KMV EDF mapping."
+    ],
+    "authoring_started_utc": "2026-09-03T04:14:25.929850Z",
+    "authoring_finished_utc": "2026-09-03T04:20:37.193073Z",
+    "timing_basis": "UTC artifact timestamps from first post-P1 notebook authoring write to final focused validation; earlier prerequisite reading excluded.",
+    "learner_completion_time": "unmeasured",
+    "verification": {
+      "published_snippets": "11 blocks passed; every exercise replays the complete build in a fresh interpreter.",
+      "full_notebook": "Original run_all_notebooks.py --notebook-root private-copy --save-outputs: passed (18.43s). Shared imports use the source checkout.",
+      "mdx_math_compilation": "passed",
+      "source_execution_state": "all source cells output-free and execution_count None",
+      "contracts": "all declared imports and returned type names resolved against the installed Python extension"
+    }
+  }
+]

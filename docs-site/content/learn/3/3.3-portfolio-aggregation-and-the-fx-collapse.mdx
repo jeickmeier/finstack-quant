@@ -1,0 +1,190 @@
+---
+id: '3.3'
+title: Portfolio Aggregation and the FX Collapse
+description: 'Analyst program lesson 3.3: Portfolio Aggregation and the FX Collapse'
+desk_question: "\"Roll the whole book up to USD \u2014 and prove nothing was double-converted\
+  \ on the way.\""
+references:
+- '#usage'
+- '#meucci-risk-and-asset-allocation'
+api: []
+status: published
+---
+
+<DeskContext question={"Roll the whole book up to USD and prove nothing was double-converted."}>
+
+The base book now contains both bonds, two cash deposits, the payer swap, equity option and CDS. Every holding must price before a total is meaningful. The term loan joins in lesson 4.3; credit and volatility specialization holdings enter later. This lesson keeps an audit trail from instrument currency to entity subtotal to the USD total, then reconciles risk and projected cashflows independently.
+
+</DeskContext>
+
+<Standard>
+
+A position consists of a contract, quantity, entity and valuation date. The quantity is a count of the complete fixture contract: a one-unit USD corporate bond already contains USD 2 million notional. Multiplying by that notional again would overstate every result. `Portfolio.from_spec` validates the complete serialized positions. `value_portfolio` returns `PortfolioValuation`; aggregate metrics separately, and only then construct a `PortfolioResult` reporting envelope if required.
+
+Keep native currency values intact until the declared reporting conversion. With EURUSD quoted as USD per EUR, $V_{USD}=V_{USD,native}+1.08V_{EUR,native}$. Sum decimal strings from serialized Money; converting through binary floats first discards the exact reporting representation. Pricing algorithms still use the recorded numeric mode, so exact storage does not imply exact analytical pricing. The reconciliation allowance here is one reporting cent for aggregation/rounding, not a percentage-of-NAV materiality threshold.
+
+Risk measures need more identity than their short family names. `dv01::USD-OIS`, `pv01::USD-SOFR-3M` and `cs01::ACME-HZD` describe different factors. Preserve the curve and tenor in each key. A currency conversion changes monetary units but does not turn EUR rate risk into USD rate risk. The signed finite-difference DV01 convention is PV after a positive one-basis-point bump minus PV before it; a long fixed bond usually has negative signed DV01. If a desk reports positive-loss DV01, label the sign reversal explicitly.
+
+Projected cashflows are a separate object from discounted value. Net only matching dates and currencies, retain each position's representation, and distinguish contractual payments from modeled or contingent amounts. A projected option cashflow representation must not be treated as a guaranteed receipt. Strict risk calculation and explicit applicability checks distinguish an inapplicable measure from a missing required result.
+
+Materialization caches retain decoded contracts by content identity. They save repeated decoding, not valuation under a changed market. A fresh market or scenario still requires repricing. We check cache hit counts and unchanged decoded contracts rather than claim a speedup from a single noisy timing.
+
+</Standard>
+
+<BuildIt>
+
+### Price, preserve currencies and reconcile
+
+The factory creates a new seven-position book and a calibrated market. Request the declared risk families with strict calculation, verify applicability per position, then inspect every aggregated key. Both native and USD subtotals are retained. The two independent totals—summing base-currency positions and converting native-currency subtotals—must agree with the reported total within USD 0.01.
+
+{/* notebook-block notebook="05_portfolio/portfolio_construction_and_valuation.ipynb" cell="base-book-reconciliation" role="build" */}
+```python exec id=base-book-reconciliation role=build
+import json
+from decimal import Decimal
+
+from _shared.analyst_book import AS_OF, RISK_METRICS, build_book, build_market, expected_metrics
+from finstack_quant.portfolio import aggregate_full_cashflows, aggregate_metrics, value_portfolio
+
+book, market = build_book("base"), build_market("base")
+valuation = value_portfolio(book, market, strict_risk=True, metrics=list(RISK_METRICS))
+wire = json.loads(valuation.to_json())
+assert not wire.get("degraded_positions", [])
+currency_subtotals = {}
+base_sum = Decimal("0")
+for position_id, position in wire["position_values"].items():
+    assert position["risk_metrics_complete"] and not position.get("risk_error")
+    measures = position["valuation_result"]["measures"]
+    for family in expected_metrics("base")[position_id]:
+        assert any(key == family or key.startswith(family + "::") for key in measures), (position_id, family)
+    native = position["value_native"]
+    amount = Decimal(native["amount"])
+    currency_subtotals[native["currency"]] = currency_subtotals.get(native["currency"], Decimal("0")) + amount
+    base_sum += Decimal(position["value_base"]["amount"])
+total = Decimal(wire["total_base_currency"]["amount"])
+assert abs(base_sum - total) <= Decimal("0.01"), "USD: reconciliation allows one reporting cent."
+fx_total = currency_subtotals["USD"] + currency_subtotals["EUR"] * Decimal("1.08")
+assert abs(fx_total - total) <= Decimal("0.01"), "EURUSD is USD per EUR, not its inverse."
+print("Native currency subtotals:", currency_subtotals)
+print("USD total:", total)
+aggregated = aggregate_metrics(valuation, "USD", market, AS_OF)
+assert not aggregated.skipped_metrics and not aggregated.degraded_positions
+assert "cs01::ACME-HZD" in aggregated.aggregated
+print("Selected qualified aggregate metrics:", {key: value for key, value in sorted(aggregated.aggregated.items()) if key.startswith(("cs01::", "pv01::", "dv01::"))})
+print("Complete qualified key count:", len(aggregated.aggregated))
+ladder = aggregate_full_cashflows(book, market, allow_partial=False)
+flows = json.loads(ladder.to_json())
+assert not flows["issues"]
+print("Cashflow representations:", {key: value["representation"] for key, value in flows["position_summaries"].items()})
+for currency in ["USD", "EUR"]:
+    exact = sum(Decimal(event["amount"]["amount"]) for event in flows["events"] if event["amount"]["currency"] == currency)
+    reported = sum(Decimal(str(amount)) for _, amount in ladder.net_in_currency_by_date(currency))
+    assert abs(exact - reported) <= Decimal("0.01"), "Currency units: ladder summation within one cent."
+    print(currency, "first five ladder dates:", ladder.net_in_currency_by_date(currency)[:5])
+again = json.loads(value_portfolio(build_book("base"), build_market("base"), strict_risk=True, metrics=list(RISK_METRICS)).to_json())
+assert wire["total_base_currency"] == again["total_base_currency"]
+for key in wire["position_values"]:
+    assert wire["position_values"][key]["value_base"] == again["position_values"][key]["value_base"]
+    assert wire["position_values"][key]["valuation_result"]["measures"] == again["position_values"][key]["valuation_result"]["measures"]
+print("Fresh-factory repeated-run monetary and risk equality passed.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.3" block="base-book-reconciliation" />
+
+The repeated fresh-factory run compares serialized monetary values and risk measures, excluding timing metadata. This proves reproducibility of these inputs and operations. Serial/parallel Monte Carlo engine comparisons belong to lesson 2.6; this portfolio API does not expose that switch.
+
+### Inspect result stamps and materialization
+
+The generated envelope records numeric mode and rounding metadata. The visible reporting policy separately states the dated FX conversion used above; do not infer a configurable FX policy stamp that this valuation result does not expose. Constructing an unrelated configuration object would not alter this pricing call.
+
+{/* notebook-block notebook="05_portfolio/portfolio_construction_and_valuation.ipynb" cell="portfolio-stamps-and-cache" role="build" */}
+```python exec id=portfolio-stamps-and-cache role=build
+import pandas as pd
+from _shared.analyst_book import book_spec, instruments
+from finstack_quant.portfolio import Portfolio, PortfolioResult, InstrumentArtifactCache
+# value_portfolio returns PortfolioValuation. Assemble the reporting envelope explicitly.
+envelope = PortfolioResult(valuation, aggregated)
+meta = envelope.meta
+assert meta["numeric_mode"] == "f64"
+assert meta["rounding"]["mode"] == "bankers"
+print("Generated result metadata:", meta)
+print("Explicit reporting conversion policy: dated spot EURUSD = 1.08 USD per EUR; one conversion to USD.")
+print("Native valuation keys:", list(wire))
+spec = book_spec("base")
+artifacts = instruments("base")
+bundle = {"schema":"finstack_quant.portfolio_materialization/1", "portfolio":{key:value for key,value in spec.items() if key!="positions"}, "instruments":[{"artifact_id":key,"envelope":value} for key,value in artifacts.items()], "positions":[{"id":p["position_id"],"entity_id":p["entity_id"],"instrument_id":p["instrument_id"],"artifact_id":p["instrument_id"],"quantity":p["quantity"],"unit":p["unit"]} for p in spec["positions"]]}
+cache = InstrumentArtifactCache(len(artifacts))
+cold_book, cold = Portfolio.from_materialization(json.dumps(bundle), cache)
+count = cache.decode_count
+warm_book, warm = Portfolio.from_materialization(json.dumps(bundle), cache)
+assert len(warm_book)==7 and cold.unique_instruments==7
+assert warm.cache_hits==7 and cache.decode_count==count
+assert warm_book.to_spec_json()==cold_book.to_spec_json()
+print(pd.DataFrame([json.loads(cold.to_json()),json.loads(warm.to_json())],index=["cold","warm"]).drop(columns=["phase_nanos"]).to_string())
+# Print each qualified bucket in its native instrument currency.
+bucket_rows=[]
+for pid,p in wire["position_values"].items():
+ for key,value in p["valuation_result"]["measures"].items():
+  if key.startswith("bucketed_dv01::"):
+   bucket_rows.append({"position":pid,"currency":p["value_native"]["currency"],"key":key,"native_change_per_bp":value})
+print(pd.DataFrame(bucket_rows).to_string(index=False))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.3" block="portfolio-stamps-and-cache" />
+
+A warm decode reuses seven contracts while preserving seven positions. Multiple positions could share one artifact without becoming one holding. The cache and materialization report are operational diagnostics; currency and risk reconciliation remain the financial acceptance tests. Read the printed 10Y keys before aggregating across currencies so a similarly named factor is never merged accidentally.
+
+</BuildIt>
+
+<LabCard notebook="05_portfolio/portfolio_construction_and_valuation.ipynb" title="Aggregation and materialization lab" description="Run all currency, risk, cashflow, fresh-run and cache checks. Keep the native and base tables in the submission." />
+<Exercise title="Find the wrong-direction conversion" question={"A reviewer divides the EUR subtotal by 1.08 before adding USD. Diagnose the error with dimensions and reconcile the corrected total."}>
+
+{/* notebook-block notebook="05_portfolio/portfolio_construction_and_valuation.ipynb" cell="exercise-fx-direction" role="exercise" */}
+```python exec id=exercise-fx-direction role=exercise
+wrong = currency_subtotals["USD"] + currency_subtotals["EUR"] / Decimal("1.08")
+correct = currency_subtotals["USD"] + currency_subtotals["EUR"] * Decimal("1.08")
+assert abs(wrong-total)>Decimal("1000")
+assert abs(correct-total)<=Decimal("0.01")
+print({"wrong_usd":str(wrong),"correct_usd":str(correct),"residual_usd":str(wrong-total)})
+print("EUR times USD/EUR gives USD. Dividing by USD/EUR has the wrong dimensions.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.3" block="exercise-fx-direction" />
+
+The quote is USD/EUR; multiplication cancels EUR. The wrong total leaves a large residual that is visible before any rounding tolerance is considered. Check the currency subtotal, quotation direction and conversion count before investigating the pricer.
+
+</Exercise>
+<Exercise title="Who dominates the 10Y bucket?" question={"Rank the book contributions to the 10Y DV01 bucket in USD. Preserve the original factor IDs and identify the largest absolute contribution."}>
+
+{/* notebook-block notebook="05_portfolio/portfolio_construction_and_valuation.ipynb" cell="exercise-ten-year-bucket" role="exercise" */}
+```python exec id=exercise-ten-year-bucket role=exercise
+# Compare qualified10Y risk in a common reporting currency, retaining the factor IDs.
+ten_year=[]
+for row in bucket_rows:
+ if row["key"].split("::")[-1].lower()=="10y":
+  fx=1.08 if row["currency"]=="EUR" else 1.0
+  ten_year.append({**row,"usd_change_per_bp":row["native_change_per_bp"]*fx})
+assert ten_year, "The required10Y target must be present, not silently substituted."
+ranked = pd.DataFrame(ten_year).sort_values("usd_change_per_bp",key=abs,ascending=False)
+print(ranked.to_string(index=False))
+assert abs(ranked.iloc[0].usd_change_per_bp)==max(abs(row["usd_change_per_bp"]) for row in ten_year)
+print("Largest absolute10Y contribution:",ranked.iloc[0].position,ranked.iloc[0].key)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.3" block="exercise-ten-year-bucket" />
+
+The printed ranking is the answer for the current fixture. A large signed contribution identifies exposure to that specific curve node, not a universal duration ranking. Offsetting curve buckets can reduce net risk while leaving substantial gross exposure. State both the instrument and qualified factor key in a hedge recommendation.
+
+</Exercise>
+
+<CheckYourself>
+
+- Does an aggregate PV prove complete pricing? No: inspect degraded positions, risk completeness and expected applicability first.
+- Can you sum coupon amounts and compare them directly with PV? No: currencies, payment dates, discounting and contingencies differ.
+- Is a warm decoded contract a cached scenario value? No. Reprice after changing market inputs.
+- What is exact in the repeated-run test? The serialized monetary results and calculated risk measures for identical inputs, excluding runtime timing metadata.
+
+</CheckYourself>

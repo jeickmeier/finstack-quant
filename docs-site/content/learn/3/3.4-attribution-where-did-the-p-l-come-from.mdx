@@ -1,0 +1,235 @@
+---
+id: '3.4'
+title: 'Attribution: Where Did the P&L Come From?'
+description: 'Analyst program lesson 3.4: Attribution: Where Did the P&L Come From?'
+desk_question: "\"We beat the benchmark by 80bp. Skill, sector bets, or luck \u2014\
+  \ and can you prove it?\""
+references:
+- '#brinson-fachler-1985'
+- '#carino-1999'
+- '#campisi-2000'
+- '#dynkin-hyman-vankudre-1998'
+- '#jeet-partani-2023'
+- '#grinold-kahn-1999-active-portfolio'
+api: []
+status: published
+---
+
+<DeskContext question={"We beat the benchmark. Was it sector allocation, selection or an unexplained difference?"}>
+
+An attribution report is a reconciliation with a declared economic interpretation. Start with instrument P&L and cash receipts, then ask a different question: why did a positive-capital sleeve outperform its benchmark? This lesson uses the whole base book for a one-month native factor waterfall and a two-bond sleeve for three-period Brinson and Campisi analysis. The flow-neutral account history remains the result of lesson 3.1.
+
+Complete both sessions. Their totals answer different questions and must not be substituted for each other.
+
+</DeskContext>
+
+<Standard>
+
+Instrument P&L is closing value plus investment receipts minus opening value, with trades and external flows handled explicitly. A waterfall changes factors sequentially, allocating cross-effects to the factor moved later. Parallel factor shocks instead leave cross-effects in a residual. Taylor attribution approximates the change with Greeks and observed factor moves; its residual includes higher-order effects and model/convention differences. A small residual proves arithmetic closure, not a unique causal explanation.
+
+For Brinson–Fachler, sector allocation is $(w_p-w_b)(r_b-R_b)$, selection is $w_b(r_p-r_b)$, and interaction is $(w_p-w_b)(r_p-r_b)$. Their sum equals portfolio return less benchmark return. Weights are beginning capital weights; returns and weights must cover identical sectors and dates. Derivatives with near-zero PV are unsuitable for naive value-weighted return attribution, which is why the positive-capital bond sleeve is used here.
+
+Single-period active returns do not simply add across time. Carino uses logarithmic linking factors so linked allocation, selection and interaction reconcile to the difference of compounded portfolio and benchmark returns. Preserve the period observations rather than trying to repair a naive sum after aggregation.
+
+Campisi separates income/carry, Treasury-curve and spread effects, with remaining selection/residual effects defined by the chosen decomposition. We use a disclosed 5Y continuously compounded zero-rate proxy and the starting bond's modified duration; both fixture bonds have zero model z-spread. Thus their spread contribution is zero in this case. The remainder can include FX, roll, convexity and proxy error. It is not automatically security-selection skill. A numerical reconciliation check catches inconsistent totals; it cannot detect every economically wrong but internally consistent input.
+
+</Standard>
+
+<BuildIt>
+
+### Session 1: three-period instrument and benchmark reconciliation
+
+The source table retains opening and closing USD values and dated coupons for each bond. EUR coupons use payment-date FX. The 50/50 benchmark holds the same two sector instruments and rebalances at period boundaries, so selection and interaction are identically zero; active performance comes from different weights. The assertions check instrument P&L within USD1e-8 and return decompositions within 1e-12.
+
+{/* notebook-block notebook="03_analytics/portfolio_returns_and_attribution.ipynb" cell="three-period-attribution" role="build" */}
+```python exec id=three-period-attribution role=build
+import json
+from datetime import date
+import math
+import pandas as pd
+from _shared.analyst_book import AS_OF, book_spec, instruments
+from _shared.analyst_history import HISTORY_DATES, history_market, history_quotes
+from finstack_quant.portfolio import (
+    Portfolio, value_portfolio, aggregate_full_cashflows, brinson_fachler, carino_link,
+    campisi_attribution, campisi_carino_link, campisi_reconciliation_check,
+)
+from finstack_quant.valuations.instruments import price_instrument
+
+# The bond sleeve is fully invested and has positive capital. Its USD returns include FX.
+# The whole book's flow-neutral performance is reconciled separately in lesson 3.1.
+ids = ['USD-CORP', 'EUR-GOVT']
+initial = book_spec('base')
+initial['positions'] = [p for p in initial['positions'] if p['instrument_id'] in ids]
+initial_book = Portfolio.from_spec(json.dumps(initial))
+cashflows = json.loads(aggregate_full_cashflows(initial_book, history_market(AS_OF)).to_json())['events']
+brinson_periods, campisi_periods, rows = [], [], []
+for start, end in zip(HISTORY_DATES[:-1], HISTORY_DATES[1:], strict=True):
+    start_spec, end_spec = dict(initial, as_of=start.isoformat()), dict(initial, as_of=end.isoformat())
+    start_market, end_market = history_market(start), history_market(end)
+    begin = json.loads(value_portfolio(Portfolio.from_spec(json.dumps(start_spec)), start_market, metrics=[]).to_json())
+    finish = json.loads(value_portfolio(Portfolio.from_spec(json.dumps(end_spec)), end_market, metrics=[]).to_json())
+    beginning = {iid: float(begin['position_values'][iid]['value_base']['amount']) for iid in ids}
+    ending = {iid: float(finish['position_values'][iid]['value_base']['amount']) for iid in ids}
+    receipts = dict.fromkeys(ids, 0.0)
+    for event in cashflows:
+        when = date.fromisoformat(event['date'])
+        if start < when <= end and event['position_id'] in ids:
+            fx = history_quotes(when)['eur_usd'] if event['amount']['currency']=='EUR' else 1.0
+            receipts[event['position_id']] += float(event['amount']['amount']) * fx
+    returns_by_id = {iid: (ending[iid]+receipts[iid])/beginning[iid]-1 for iid in ids}
+    total_begin = sum(beginning.values())
+    weights = {iid: beginning[iid]/total_begin for iid in ids}
+    # An explicit 50/50 rebalanced benchmark holds the same two sector instruments.
+    # Selection is consequently zero; active return measures allocation alone.
+    period = [{'sector': iid, 'portfolio_weight': weights[iid], 'benchmark_weight': 0.5,
+               'portfolio_return': returns_by_id[iid], 'benchmark_return': returns_by_id[iid]} for iid in ids]
+    bf = brinson_fachler(json.dumps(period))
+    assert abs(bf.total_allocation+bf.total_selection+bf.total_interaction-bf.total_excess_return) < 1e-12
+    assert abs(bf.total_selection) < 1e-12 and abs(bf.total_interaction) < 1e-12
+    pnl = sum(ending.values()) + sum(receipts.values()) - total_begin
+    assert abs(pnl - total_begin * bf.portfolio_return) < 1e-8, 'USD sleeve instrument P&L identity'
+    brinson_periods.append(period)
+    p_snap, b_snap = [], []
+    for iid in ids:
+        risk = price_instrument(json.dumps(instruments('base')[iid]), start_market, start, metrics=['ytm','duration_mod','z_spread'])
+        curve_id = 'USD-OIS' if iid=='USD-CORP' else 'EUR-OIS'
+        tenor = 5.0
+        z0 = -math.log(start_market.get_discount(curve_id).df(tenor))/tenor
+        z1 = -math.log(end_market.get_discount(curve_id).df(tenor))/tenor
+        # Model-priced no-hazard bonds have zero z-spread; this fixture's spread move is zero.
+        spread = risk.get_metric('z_spread')
+        assert abs(spread) < 1e-8
+        snap = {'sector':iid,'weight':weights[iid], 'total_return':returns_by_id[iid],
+                'yield_annual':risk.get_metric('ytm'), 'modified_duration':risk.get_metric('duration_mod'),
+                'spread_duration':risk.get_metric('duration_mod'), 'spread':spread,
+                'delta_treasury_yield':z1-z0, 'delta_spread':0.0}
+        p_snap.append(snap)
+        b_snap.append(dict(snap, weight=0.5))
+        rows.append({'period_end':end,'position':iid,'opening_usd':beginning[iid],'closing_usd':ending[iid],
+                     'receipts_usd':receipts[iid],'total_return':returns_by_id[iid]})
+    cp = campisi_attribution(json.dumps(p_snap), json.dumps(b_snap), json.dumps({'period_years':(end-start).days/365}))
+    assert campisi_reconciliation_check(cp.to_json(),1e-10).is_reconciled
+    campisi_periods.append(json.loads(cp.to_json()))
+linked = carino_link(json.dumps(brinson_periods))
+active = linked.portfolio_return_compounded-linked.benchmark_return_compounded
+assert abs(linked.linked_allocation+linked.linked_selection+linked.linked_interaction-active)<1e-12
+campisi_linked = campisi_carino_link(json.dumps(campisi_periods))
+print(pd.DataFrame(rows).to_string(index=False))
+print('Carino linked active return:',active)
+print('Campisi linked effects:',{key:value for key,value in json.loads(campisi_linked.to_json()).items() if key.startswith('linked_') and key!='linked_sectors'})
+bad = json.loads(campisi_periods[0] if isinstance(campisi_periods[0],str) else json.dumps(campisi_periods[0]))
+# Deliberately perturb a result total: arithmetic validation must expose the mismatch.
+bad['total_active_carry'] += 0.001
+assert not campisi_reconciliation_check(json.dumps(bad),1e-10).is_reconciled
+coupon_period = next(row for row in rows if row['receipts_usd']>0)
+omitted_income_return = coupon_period['closing_usd']/coupon_period['opening_usd']-1
+assert abs(coupon_period['total_return']-omitted_income_return-coupon_period['receipts_usd']/coupon_period['opening_usd'])<1e-12
+print('Diagnosed failures: altered carry total rejected; omitted coupon error equals coupon/opening value.')
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.4" block="three-period-attribution" />
+
+Read each period before the linked total. A quarterly coupon omitted from the cash ledger reduces measured return by coupon divided by opening value. The deliberately altered carry total must fail the Campisi check at a 1e-10 return-unit tolerance. Also inspect the remaining Campisi effects: closure does not establish that the 5Y curve proxy explains all bond economics.
+
+### Session 2: native factor P&L for the whole book
+
+Use 16 January to 16 February 2025, a month with no trades, external flows or scheduled payments for these holdings. This also avoids the opening coupon-date inclusion convention. Each native instrument waterfall reconciles to directly priced closing minus opening value. For EUR holdings, convert native P&L at closing FX and separately add opening value times the FX change. That algebra reconciles exactly to closing USD value minus opening USD value.
+
+{/* notebook-block notebook="03_analytics/portfolio_returns_and_attribution.ipynb" cell="native-book-waterfall" role="build" */}
+```python exec id=native-book-waterfall role=build
+from finstack_quant.attribution import attribute_pnl, default_waterfall_order
+from finstack_quant.reporting.charts import waterfall_chart
+from finstack_quant.reporting.theme import INSTITUTIONAL
+from pathlib import Path
+# Avoid coupon-date boundary ambiguity: this month has no external flows, trades or payments.
+a0,a1=date(2025,1,16),date(2025,2,16)
+m0,m1=history_market(a0),history_market(a1)
+fields=["carry","rates_curves_pnl","credit_curves_pnl","inflation_curves_pnl","correlations_pnl","fx_pnl","vol_pnl","cross_factor_pnl","model_params_pnl","market_scalars_pnl","residual"]
+waterfall_totals=dict.fromkeys(fields,0.0);waterfall_totals["reporting_fx_translation"]=0.0
+instrument_rows=[]
+for iid,env in instruments("base").items():
+ result=attribute_pnl(json.dumps(env),m0,m1,a0,a1,{"waterfall":default_waterfall_order()})
+ result_wire=json.loads(result.to_json())
+ assert not result_wire["result_invalid"]
+ p0=price_instrument(json.dumps(env),m0,a0).value.amount
+ p1=price_instrument(json.dumps(env),m1,a1).value.amount
+ currency=result_wire["total_pnl"]["currency"]
+ fx0=history_quotes(a0)["eur_usd"] if currency=="EUR" else 1.0
+ fx1=history_quotes(a1)["eur_usd"] if currency=="EUR" else 1.0
+ assert abs(result.total_pnl-(p1-p0))<1e-6, (iid,"unexpected payment or date boundary")
+ assert abs(sum(float(result_wire[k]["amount"]) for k in fields)-result.total_pnl)<1e-6
+ for k in fields: waterfall_totals[k]+=float(result_wire[k]["amount"])*fx1
+ translation=p0*(fx1-fx0);waterfall_totals["reporting_fx_translation"]+=translation
+ instrument_rows.append({"position":iid,"currency":currency,"native_pnl":result.total_pnl,"reporting_fx_usd":translation,"usd_pnl":p1*fx1-p0*fx0})
+actual_usd=sum(row["usd_pnl"] for row in instrument_rows)
+assert abs(sum(waterfall_totals.values())-actual_usd)<1e-6
+print(pd.DataFrame(instrument_rows).to_string(index=False))
+print("USD factor waterfall:",waterfall_totals)
+Path("book-pnl-waterfall.svg").write_text(waterfall_chart(list(waterfall_totals),list(waterfall_totals.values()),theme=INSTITUTIONAL))
+taylor=attribute_pnl(json.dumps(instruments("base")["USD-CORP"]),m0,m1,a0,a1,{"taylor":{"include_gamma":True,"rate_bump_bp":1.0,"credit_bump_bp":1.0,"vol_bump":.01}})
+assert abs(taylor.total_pnl-next(r["native_pnl"] for r in instrument_rows if r["position"]=="USD-CORP"))<1e-6
+print("USD bond Taylor residual, USD:",taylor.residual)
+print("Taylor residual is disclosed approximation error, not added to explained factors as skill.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.4" block="native-book-waterfall" />
+
+The SVG is generated from the reconciled USD factors. The explicitly displayed reporting-FX term is distinct from an instrument's internal FX risk. The Taylor bond comparison reports the same total actual P&L and its approximation residual; it does not conceal the residual inside an alpha category. Reversing a waterfall's factor order can change contributions even when total P&L is unchanged.
+
+</BuildIt>
+
+<LabCard notebook="03_analytics/portfolio_returns_and_attribution.ipynb" title="Two-session attribution lab" description="Submit three-period instrument, Brinson, Carino and Campisi tables plus the monthly native whole-book waterfall." />
+<LabCard notebook="02_pricing/pnl_attribution.ipynb" title="Factor-method comparison" description="Run parallel, sequential waterfall, changed order and Taylor examples; read the quote-replay requirement for metrics-based credit attribution." />
+<Exercise title="Positive allocation, negative selection" question={"Construct a month in which the portfolio overweights the stronger sector but chooses weaker securities inside both sectors. Reconcile all three Brinson effects."}>
+
+{/* notebook-block notebook="03_analytics/portfolio_returns_and_attribution.ipynb" cell="exercise-allocation-selection" role="exercise" */}
+```python exec id=exercise-allocation-selection role=exercise
+case=[{"sector":"Equity","portfolio_weight":.7,"benchmark_weight":.5,"portfolio_return":.07,"benchmark_return":.10},{"sector":"Bonds","portfolio_weight":.3,"benchmark_weight":.5,"portfolio_return":.01,"benchmark_return":.02}]
+r=brinson_fachler(json.dumps(case))
+assert r.total_allocation>0 and r.total_selection<0
+assert abs(r.total_allocation+r.total_selection+r.total_interaction-r.total_excess_return)<1e-12
+assert abs(r.total_allocation-.016)<1e-12
+assert abs(r.total_selection+.02)<1e-12
+print(r.to_json())
+print("Overweight the stronger benchmark sector, yet underperform within both sectors; allocation is positive while selection is negative.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.4" block="exercise-allocation-selection" />
+
+Allocation contributes +1.6 percentage points while selection contributes −2.0 percentage points. Interaction is also negative because the overweight is in the sector with the larger selection shortfall. The allocation decision helped, but it did not rescue total relative performance. Keep percentage points separate from decimal return inputs.
+
+</Exercise>
+<Exercise title="A residual is a question to investigate" question={"Diagnose a nonzero Campisi reconciliation residual, quantify a missing-coupon return error, and compare naive multi-period active sums with Carino."}>
+
+{/* notebook-block notebook="03_analytics/portfolio_returns_and_attribution.ipynb" cell="exercise-campisi-diagnosis" role="exercise" */}
+```python exec id=exercise-campisi-diagnosis role=exercise
+clean=campisi_periods[0]
+corrupt=dict(clean);corrupt["total_active_carry"]+=.001
+assert campisi_reconciliation_check(json.dumps(clean),1e-10).is_reconciled
+assert not campisi_reconciliation_check(json.dumps(corrupt),1e-10).is_reconciled
+income_row=next(row for row in rows if row["receipts_usd"]>0)
+missing_income=income_row["receipts_usd"]/income_row["opening_usd"]
+assert missing_income>0
+naive=sum(brinson_fachler(json.dumps(period)).total_excess_return for period in brinson_periods)
+print({"omitted_coupon_error_return":missing_income,"naive_active_sum":naive,"Carino_linked_active":active,"linking_difference":active-naive})
+assert abs(linked.linked_allocation+linked.linked_selection+linked.linked_interaction-active)<1e-12
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="3.4" block="exercise-campisi-diagnosis" />
+
+The altered carry total is an arithmetic inconsistency. The missing coupon is a source-data error even if downstream formulas are internally consistent. Check timing, FX, coupon receipts, weights, spread definitions and yield units before blaming the model. The linking difference is neither error nor alpha: it is the interaction created by compounding across periods.
+
+</Exercise>
+
+<CheckYourself>
+
+- Why is selection zero in the base bond-sleeve example? Portfolio and benchmark own the same security within each sector.
+- Does changing waterfall order change total P&L? No; it reallocates cross-effects among factors.
+- Why can a reconciled report still be misleading? The benchmark, yield proxy, flow convention or factor interpretation may be inappropriate.
+- Can a residual be labelled skill? Only after examining and ruling out data, convention and approximation explanations; this lesson makes no such claim.
+
+</CheckYourself>

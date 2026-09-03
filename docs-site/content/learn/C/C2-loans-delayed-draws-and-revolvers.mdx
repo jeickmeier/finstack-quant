@@ -1,0 +1,304 @@
+---
+id: C2
+title: Loans, Delayed Draws, and Revolvers
+description: 'Analyst program lesson C2: Loans, Delayed Draws, and Revolvers'
+desk_question: '"The borrower has drawn 40% of a $500mm revolver paying S+325 with
+  a 50bp commitment fee on the rest. What is our exposure worth, and what happens
+  to it as the borrower deteriorates?"'
+references:
+- '#fabozzi-fixed-income-handbook'
+- '#basel-ii-2006'
+- '#glasserman-2004-monte-carlo'
+api:
+- finstack_quant.valuations.instruments.TermLoan
+- finstack_quant.valuations.instruments.price_instrument
+- finstack_quant.models.correlation.CorrelatedBernoulli
+- finstack_quant.core.market_data.ForwardCurve
+status: published
+---
+
+<DeskContext question="What does the lender earn on a 40%-drawn revolver, and how much exposure appears when the borrower deteriorates?">
+
+A funded term loan, an undrawn commitment and a revolver are different claims. The term loan has current principal exposure. The commitment may require a future cash outflow. A revolver combines drawn principal, future utilization, repayments and a fee schedule. Reporting only the coupon on current drawings hides the economics the credit committee needs.
+
+Build each contract, reconcile its funding and repayment timing, and explain the distinction between today's utilization and exposure conditional on default. The common borrower loan remains in both tracks; the additional revolver belongs only to the independent credit extension.
+
+</DeskContext>
+
+<Standard>
+
+### Floors, fees and effective borrowing cost
+
+A floating coupon separates the reference index from the contractual margin. An index floor is applied to the reference rate; an all-in floor applies after margin and gearing. They are not interchangeable. A zero index floor has value when the forward index is negative, even though the margin remains positive. A floor experiment changes that field alone and uses a deliberately low-rate market.
+
+Original issue discount reduces the lender's funded proceeds or increases the borrower's effective financing cost, depending on the cashflow sign convention. A withheld discount on a draw is not an extra coupon. Upfront, usage and commitment fees can also change the effective interest rate. The `all_in_rate` measure summarizes running economics, while the `oid_eir_amortization` request produces an effective rate and dated accounting diagnostics. The exercise prints `oid_eir_rate` explicitly so a running rate is not mistaken for an IRR.
+
+A secondary loan quote applies to funded outstanding principal at settlement, plus accrued cash interest. It does not apply to the full undrawn commitment. The yield example settles after the issue date, when funded principal exists. Its clean quote is a synthetic input. YTC, YTW and discount margin answer quote-conditioned questions; they are separate from the origination effective-rate calculation.
+
+### Legal events become dated economics
+
+A margin step-up increases future contractual interest. A PIK toggle changes whether interest is paid or capitalized. A cash sweep changes principal; a draw stop changes availability. These effects should enter the contractual event list only after the legal trigger and its effective date have been established. A covenant ratio by itself does not tell a pricer whether an amendment, cure or waiver prevents the event.
+
+The cashflow example applies both a margin increase and a temporary PIK election. It compares their generated cash receipts with the original loan and reconciles each exported schedule to model PV using a zero-day settlement anchor. The dated price comparison then isolates the margin step. Price changes across a payment date include the payment leaving the asset; they are not an event-loss measure unless the received cash is added back.
+
+The supported deterministic path refuses to reconstruct seasoned floating PIK from a fresh projection curve. Past capitalized interest has already fixed the principal balance. Once those accruals are in the past, provide an updated seasoned balance and contract state. The lesson therefore prices the PIK decision from the initial date and makes the before/after-date comparison on the margin-only contract. This preserves the economic question without silently restating past debt.
+
+### Delayed draws and revolver fee bases
+
+A DDTL specifies an availability window, commitment limit, dated draws and any commitment step-downs. The lender's value includes future funding outflows as well as repayment and fee inflows. A small net PV is not the same thing as a small contractual commitment. The example has two draws, a fee on undrawn availability, a usage fee, and OID withheld from funded draws.
+
+For a constant commitment `C`, utilization `u`, and undrawn fee `f`, annual commitment fees are `C*(1-u)*f`. A facility fee charged on all commitment has a different base. Usage fees can change at utilization thresholds, making the total cost piecewise. Quote the fee base and the applicable tier before converting the fee to basis points on drawn principal.
+
+### Wrong-way exposure is a conditional quantity
+
+Today's utilization is `drawn/commitment`. Expected utilization is an average over future states. Utilization conditional on default is an average over default states only. Dependence can raise the last quantity while leaving the first two unchanged. That is the clean wrong-way-risk comparison.
+
+The native revolver's `utilization_rate` is the observed ratio. The two-state probability proof uses the supported `CorrelatedBernoulli` kernel to keep both marginals fixed and change the joint high-utilization/default probability. Expected loss then equals loss-given-default times commitment times default probability times conditional utilization. The stochastic native revolver separately demonstrates supported utilization/credit dynamics and exact seed replay. Its PV incorporates fees and survival-weighted payments, so a one-dimensional PV slope is not a substitute for a conditional-EAD output.
+
+</Standard>
+
+<BuildIt>
+
+### Begin with the actual 40%-drawn facility
+
+{/* notebook-block notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" cell="revolver-observed-state" role="build" */}
+```python exec id=revolver-observed-state role=build
+from copy import deepcopy
+from datetime import date
+import json
+import math
+import numpy as np
+import pandas as pd
+from _shared import analyst_tracks as tracks
+from finstack_quant.valuations.instruments import price_instrument
+AS_OF=tracks.AS_OF
+revolver_payload=tracks.credit_extension()["ANALYST-REVOLVER"]
+credit_market=tracks.build_market("credit")
+revolver_value=price_instrument(json.dumps(revolver_payload),credit_market,AS_OF,
+    metrics=["available_capacity","utilization_rate","weighted_average_cost"])
+assert revolver_value.metrics["utilization_rate"]==.4
+assert revolver_value.metrics["available_capacity"]==6_000_000
+print(pd.Series(revolver_value.metrics))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C2" block="revolver-observed-state" />
+
+### Hold marginals fixed to expose wrong-way risk
+
+The high-utilization state has 25% probability and default has 10% probability. Both scenarios preserve unconditional expected utilization. Only their dependence changes. The dollar loss calculation is visible alongside the native joint probability.
+
+{/* notebook-block notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" cell="conditional-ead-proof" role="build" */}
+```python exec id=conditional-ead-proof role=build
+from finstack_quant.models.correlation import CorrelatedBernoulli
+wwr_rows=[]
+for rho in [0.0,.30]:
+    distribution=CorrelatedBernoulli(.25,.10,rho)
+    marginal_utilization=.4+.6*.25
+    utilization_at_default=.4+.6*distribution.joint_p11/.10
+    expected_loss=(1-.4)*10_000_000*.10*utilization_at_default
+    wwr_rows.append({"correlation":rho,"E_U":marginal_utilization,
+                    "E_U_given_default":utilization_at_default,"expected_loss_usd":expected_loss})
+assert wwr_rows[0]["E_U"]==wwr_rows[1]["E_U"]
+assert wwr_rows[1]["E_U_given_default"]>wwr_rows[0]["E_U_given_default"]
+print(pd.DataFrame(wwr_rows))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C2" block="conditional-ead-proof" />
+{/* notebook-block notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" cell="stochastic-revolver-proof" role="build" */}
+```python exec id=stochastic-revolver-proof role=build
+mc_rows=[]
+for rho in [0.0,.30]:
+    payload=tracks.stochastic_revolver(correlation=rho,num_paths=1024)
+    first=price_instrument(json.dumps(payload),credit_market,AS_OF,model="monte_carlo_gbm").value.amount
+    repeated=price_instrument(json.dumps(payload),credit_market,AS_OF,model="monte_carlo_gbm").value.amount
+    assert first==repeated
+    assert payload["instrument"]["spec"]["drawn_amount"]["amount"]=="4000000"
+    mc_rows.append({"correlation":rho,"seeded_native_pv_usd":first})
+print(pd.DataFrame(mc_rows))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C2" block="stochastic-revolver-proof" />
+
+### Build the floored loan and its quote measures
+
+{/* notebook-block notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" cell="c2-loan-economics" role="build" */}
+```python exec id=c2-loan-economics role=build
+from finstack_quant.valuations.instruments import validate_instrument_json
+from finstack_quant.valuations import instrument_cashflows
+loan=tracks.common.instruments("common")["BORROWER-TL"]
+l=loan["instrument"]["spec"]
+l.update({"id":"C2-FLOORED-LOAN","settlement_days":2,"upfront_fee":{"amount":"20000","currency":"USD"},
+          "oid_eir":{"include_fees":True},"call_schedule":{"calls":[
+              {"date":"2025-07-15","price_pct_of_par":101.,"call_type":"soft"},
+              {"date":"2026-01-15","price_pct_of_par":100.,"call_type":"hard"}]}})
+l["rate"]["floating"].update({"spread_bp":"325","index_floor_bp":"100"})
+validate_instrument_json(json.dumps(loan))
+loan_quote=deepcopy(loan)
+loan_quote["instrument"]["spec"]["instrument_pricing_overrides"]={"market_quotes":{"quoted_clean_price":98.5,"implied_volatility":.01}}
+loan_measures=price_instrument(json.dumps(loan_quote),credit_market,AS_OF,
+    metrics=["ytc","ytw","all_in_rate","discount_margin","oid_eir_amortization"])
+assert loan_measures.metrics["ytw"]<=loan_measures.metrics["ytc"]+1e-10
+assert math.isfinite(loan_measures.metrics["oid_eir_rate"])
+print(pd.Series({k:loan_measures.metrics[k] for k in ["ytc","ytw","all_in_rate","discount_margin","oid_eir_rate"]}))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C2" block="c2-loan-economics" />
+
+### Trace covenant economics and price the supported dated comparison
+
+The PIK intervals suppress cash coupons and increase later exposure. The margin-only dated comparison removes the PIK events explicitly; it does not reinterpret the temporary PIK contract as if its outstanding balance had never changed.
+
+{/* notebook-block notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" cell="c2-covenant-events" role="build" */}
+```python exec id=c2-covenant-events role=build
+contract=deepcopy(loan);contract["instrument"]["spec"]["call_schedule"]=None
+contract["instrument"]["spec"]["settlement_days"]=0
+penalty=deepcopy(contract)
+penalty["instrument"]["spec"]["covenants"]={"margin_stepups":[{"date":"2025-07-15","delta_bp":100}],
+    "pik_toggles":[{"date":"2025-07-15","enable_pik":True},{"date":"2026-01-15","enable_pik":False}],
+    "cash_sweeps":[],"draw_stop_dates":[]}
+event_rows=[]
+for name,payload in [("contract",contract),("penalty_and_toggle",penalty)]:
+    env,flows=instrument_cashflows(json.dumps(payload),credit_market,AS_OF,model="discounting")
+    assert env["reconciles_with_base_value"]
+    assert abs(flows.pv.sum()-float(env["total_pv"]))<.01
+    print(name,flows[["date","kind","amount"]].head(10))
+    dated_payload=deepcopy(payload)
+    if name=="penalty_and_toggle":
+        dated_payload["instrument"]["spec"]["covenants"]["pik_toggles"]=[]
+        name="margin_step_only"  # Seasoned floating PIK needs an updated balance, not replay.
+    for day in [date(2025,7,14),date(2025,7,16)]:
+        pv=price_instrument(json.dumps(dated_payload),tracks.build_market("credit",day),day).value.amount
+        event_rows.append({"contract":name,"valuation_date":day,"pv_usd":pv})
+print(pd.DataFrame(event_rows))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C2" block="c2-covenant-events" />
+
+### Add delayed funding, then deterministic revolver events
+
+The commitment-fee difference compares the same DDTL with and without that fee. Future draws cross the revolving facility's usage-fee threshold, while the observed current utilization remains 40%.
+
+{/* notebook-block notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" cell="c2-ddtl" role="build" */}
+```python exec id=c2-ddtl role=build
+ddtl=deepcopy(contract)
+d=ddtl["instrument"]["spec"]
+d.update({"id":"C2-DDTL","upfront_fee":None,"amortization":"none","ddtl":{
+    "commitment_limit":{"amount":"1000000","currency":"USD"},"availability_start":"2025-01-15",
+    "availability_end":"2026-01-15","draws":[
+        {"date":"2025-04-15","amount":{"amount":"400000","currency":"USD"}},
+        {"date":"2025-07-15","amount":{"amount":"600000","currency":"USD"}}],
+    "commitment_step_downs":[],"usage_fee_bp":25,"commitment_fee_bp":50,
+    "fee_base":"undrawn","oid_policy":{"withheld_pct":200}}})
+ddtl_value=price_instrument(json.dumps(ddtl),credit_market,AS_OF,metrics=["all_in_rate","oid_eir_amortization"])
+no_commitment_fee=deepcopy(ddtl);no_commitment_fee["instrument"]["spec"]["ddtl"]["commitment_fee_bp"]=0
+free_value=price_instrument(json.dumps(no_commitment_fee),credit_market,AS_OF).value.amount
+assert ddtl_value.value.amount>free_value
+print({"DDTL_net_pv_usd":ddtl_value.value.amount,"commitment_fee_pv_usd":ddtl_value.value.amount-free_value,
+       "effective_rate":ddtl_value.metrics["oid_eir_rate"]})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C2" block="c2-ddtl" />
+{/* notebook-block notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" cell="c2-draw-schedule" role="build" */}
+```python exec id=c2-draw-schedule role=build
+scheduled=deepcopy(revolver_payload)
+scheduled["instrument"]["spec"]["draw_repay_spec"]={"deterministic":[
+    {"date":"2025-04-15","amount":{"amount":"2000000","currency":"USD"},"is_draw":True},
+    {"date":"2026-04-15","amount":{"amount":"1000000","currency":"USD"},"is_draw":False}]}
+scheduled_value=price_instrument(json.dumps(scheduled),credit_market,AS_OF,
+    metrics=["available_capacity","utilization_rate","weighted_average_cost"])
+assert scheduled_value.metrics["utilization_rate"]==.4  # Observed current state, before future draws.
+assert math.isfinite(scheduled_value.value.amount)
+print({"static_pv":revolver_value.value.amount,"scheduled_draw_repay_pv":scheduled_value.value.amount,
+       **scheduled_value.metrics})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C2" block="c2-draw-schedule" />
+
+</BuildIt>
+
+<LabCard notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" title="Loan, DDTL and revolver economics" description="Build legal events, funding schedules, fee tiers and a controlled wrong-way-exposure example." />
+
+<Exercise id="c2-floor" title="Value a zero index floor" question="Use the same loan under a negative forward-rate curve. Compare a zero-basis-point index floor with no floor. Keep the margin, credit inputs and all other terms fixed.">
+
+The holder receives the benefit of replacing a negative reference rate with zero. The comparison is a contract-price difference, not an option-volatility calibration. Its positive sign is the relevant invariant.
+
+{/* notebook-block notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" cell="c2-exercise-floor" role="exercise" */}
+```python exec id=c2-exercise-floor role=exercise
+from finstack_quant.core.market_data import ForwardCurve
+low=tracks.build_market("credit")
+low.insert(ForwardCurve("USD-SOFR-3M",.25,AS_OF,[(0.,-.005),(1.,-.005),(5.,-.005),(10.,-.005)]))
+floor_case=deepcopy(contract)
+floor_case["instrument"]["spec"]["rate"]["floating"]["index_floor_bp"]="0"
+no_floor=deepcopy(floor_case);no_floor["instrument"]["spec"]["rate"]["floating"]["index_floor_bp"]=None
+floor_pv=price_instrument(json.dumps(floor_case),low,AS_OF).value.amount
+unfloored_pv=price_instrument(json.dumps(no_floor),low,AS_OF).value.amount
+assert floor_pv>unfloored_pv
+print({"zero_floor_usd":floor_pv,"no_floor_usd":unfloored_pv,"floor_value_usd":floor_pv-unfloored_pv})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C2" block="c2-exercise-floor" />
+
+</Exercise>
+
+<Exercise id="c2-fee" title="Solve breakeven utilization" question="Compare an annual 50 bp fee on undrawn commitment with an annual 20 bp fee on total commitment. At what utilization do their dollar costs match?">
+
+Solve `f*(1-u)=g` on the common commitment base. At lower utilization the undrawn-base fee is more expensive; at higher utilization it is cheaper. A usage tier would require solving separately on each applicable interval.
+
+{/* notebook-block notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" cell="c2-exercise-fee" role="exercise" */}
+```python exec id=c2-exercise-fee role=exercise
+# Compare 50 bp on undrawn capacity with an alternative 20 bp fee on total commitment.
+commitment_fee,facility_fee=.005,.002
+breakeven=1-facility_fee/commitment_fee
+assert 0<breakeven<1
+assert abs(commitment_fee*(1-breakeven)-facility_fee)<1e-12
+utilizations=np.array([.2,.4,breakeven,.8])
+print(pd.DataFrame({"utilization":utilizations,"undrawn_fee_usd":10_000_000*commitment_fee*(1-utilizations),
+                    "facility_fee_usd":10_000_000*facility_fee}))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C2" block="c2-exercise-fee" />
+
+</Exercise>
+
+<Exercise id="c2-credit" title="Explain the revolver's credit sensitivity" question="Compare the native CS01 of a funded term loan and the partly drawn line. Why can the undrawn commitment still matter when today's drawn balance is small?">
+
+The outputs are dollars for a one-basis-point credit-quote shock and retain the hazard-curve qualifier. The contracts have different sizes, schedules and fee bases, so raw dollar CS01 is not a normalized credit-quality ranking. The fixed-marginal loss proof explains the contingent exposure that today's utilization statistic cannot show.
+
+{/* notebook-block notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" cell="c2-exercise-credit-risk" role="exercise" */}
+```python exec id=c2-exercise-credit-risk role=exercise
+credit_loan=deepcopy(contract);credit_loan["instrument"]["spec"]["credit_curve_id"]="ACME-HZD"
+credit_line=deepcopy(revolver_payload);credit_line["instrument"]["spec"]["credit_curve_id"]="ACME-HZD"
+loan_cs=price_instrument(json.dumps(credit_loan),credit_market,AS_OF,metrics=["cs01"])
+line_cs=price_instrument(json.dumps(credit_line),credit_market,AS_OF,metrics=["cs01"])
+assert any(k.startswith("cs01::") for k in loan_cs.metrics)
+assert any(k.startswith("cs01::") for k in line_cs.metrics)
+assert wwr_rows[1]["expected_loss_usd"]>wwr_rows[0]["expected_loss_usd"]
+print("Term loan:",loan_cs.metrics,"Revolver:",line_cs.metrics)
+print("An undrawn line has contingent exposure: future borrower draws and default can be dependent. Its current utilization metric cannot measure that conditional exposure.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C2" block="c2-exercise-credit-risk" />
+
+</Exercise>
+
+<CheckYourself>
+
+- Is the floor on the reference index or the all-in coupon?
+- Which denominator turns a commitment fee into a misleadingly high drawn-balance spread?
+- Does crossing a payment date reduce the asset's value, its total-return wealth, or both?
+- Why must historical PIK principal be carried forward as state rather than recalculated from today's forward curve?
+- Which observed, unconditional or default-conditional utilization quantity answers the wrong-way-risk question?
+
+Connect the legal trigger to the shared borrower and covenant analysis in [Private Credit](/learn/4.3). The pricer consumes the resulting economics; it does not decide whether a contractual breach has legally occurred.
+
+</CheckYourself>

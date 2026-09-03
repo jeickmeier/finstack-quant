@@ -1,0 +1,413 @@
+---
+id: '2.4'
+title: 'Options and Volatility: BSM, Greeks, and the Smile'
+description: 'Analyst program lesson 2.4: Options and Volatility: BSM, Greeks, and
+  the Smile'
+desk_question: '"We''re long 1,000 calls. What are we actually long — and what happens
+  to it overnight?"'
+references:
+- '#black-scholes-1973'
+- '#merton-1973'
+- '#black-1976'
+- '#garman-kohlhagen-1983'
+- '#hagan-2002-sabr'
+- '#gatheral-2004-svi'
+- '#gatheral-jacquier-2014-svi'
+- '#gatheral-volatility-surface'
+- '#fang-oosterlee-2008'
+- '#haug-2007-option-pricing-formulas'
+api:
+- finstack_quant.core.currency.Currency
+- finstack_quant.core.money.Money
+- finstack_quant.models.bs_cos_price
+- finstack_quant.models.bs_greeks
+- finstack_quant.models.bs_implied_vol
+- finstack_quant.models.bs_price
+- finstack_quant.models.volatility.SabrCalibrator
+- finstack_quant.models.volatility.SabrParameters
+- finstack_quant.models.volatility.SabrSmile
+- finstack_quant.models.volatility.SviParams
+- finstack_quant.models.volatility.get_fx_delta_vol
+- finstack_quant.models.volatility.get_surface_vol
+- finstack_quant.valuations.instruments.EquityOption
+- finstack_quant.valuations.instruments.FxOption
+- finstack_quant.valuations.instruments.price_instrument
+status: published
+---
+
+<DeskContext question={"We're long 1,000 calls. What are we actually long \u2014 and what happens to it overnight?"}>
+
+The option position gains when spot rises, but a delta hedge does not make its P&L disappear. The remaining result reflects curvature, time decay, realized movement, funding and dividends. A volatility quote is therefore both a pricing input and a way to describe which risks remain after linear spot exposure is hedged.
+
+You will reconcile the native SPX option to a per-unit Black–Scholes calculation, inspect Greek profiles, invert implied volatility, fit smiles, and run a fully financed five-day hedge. You will then price an FX option using two currency discount curves and the same underlying no-arbitrage structure.
+
+</DeskContext>
+
+<Standard>
+
+### No-arbitrage pricing and the Black–Scholes model
+
+Under the model's assumptions, continuous rebalancing of an option and the underlying can remove its local diffusion risk. The risk-neutral drift of an equity paying continuous dividend yield $q$ is $r-q$, and discounting occurs at $r$. This is a pricing construction, not a forecast that the real-world expected stock return equals the risk-free rate. Constant volatility, frictionless continuous trading, no jumps and appropriate funding are assumptions; they are not claims about actual markets.
+
+For a European call,
+
+$$C=S e^{-qT}\Phi(d_1)-K e^{-rT}\Phi(d_2),\qquad d_1=\frac{\ln(S/K)+(r-q+\sigma^2/2)T}{\sigma\sqrt T},\quad d_2=d_1-\sigma\sqrt T.$$
+
+A put follows from put–call parity, $C-P=S e^{-qT}-K e^{-rT}$. Black-76 expresses the same structure using a forward and a discount factor, $C=D[F\Phi(d_1)-K\Phi(d_2)]$. The native equity-option registry key is `black76`, while its spot/carry inputs reproduce BSM economics. That registry name does not mean the spot dividend yield should be omitted.
+
+The standalone functions return value per underlying unit. The book option has 100 units, so native price is 100 times `bs_price`. The core comparison uses SPX 5200, strike 5200, dividend yield 1.5%, and a surface volatility of 20%. The rate comes from the staged discount curve. A units assertion makes the contract multiplier explicit.
+
+### Greeks describe local changes
+
+| Greek | Local meaning | Standalone `bs_greeks` unit |
+| --- | --- | --- |
+| Delta | First derivative with respect to spot | Option units per one spot unit |
+| Gamma | Change in delta per spot unit | Per spot unit squared in the value expansion |
+| Vega | Value response to volatility | Per one percentage point of volatility |
+| Theta | Value response to calendar time passing | Per day, with 365-day default |
+| Rho | Value response to domestic rate | `rho_r` per one percentage point of rate |
+
+For a long vanilla call under ordinary inputs, delta rises from near zero toward discounted share exposure as spot rises, gamma is concentrated near the money, vega is positive, and theta is commonly negative. Carry can change simple sign heuristics, especially for puts or unusual rate/dividend inputs. Inspect the plotted profiles rather than memorizing one sign table as a theorem.
+
+For small changes, $\Delta V\approx\Delta\Delta S+\frac12\Gamma(\Delta S)^2+\Theta\Delta t+\mathrm{Vega}\Delta\sigma+\mathrm{Rho}\Delta r$, provided every increment uses the Greek's units. Here a 1-vol-point change is 0.01 decimal volatility but one unit of the reported vega. The finite-difference rho check explicitly converts from a derivative per unit decimal rate to a per-percentage-point figure.
+
+### Implied volatility and smile coordinates
+
+Implied volatility is the model input that reproduces a given admissible option price. It is not independently observed future variance. Prices outside no-arbitrage bounds may have no implied-volatility root. A tiny price error in a low-vega wing can create a large implied-volatility error, so report both quote and price residuals when diagnosing a fit.
+
+A flat BSM volatility cannot reproduce a market smile. Equity downside puts often have higher implied volatility, reflecting risk-neutral tail pricing, demand and model limitations. Interpolation in total variance $w=\sigma^2T$ across expiry has different implications from interpolation in volatility. Calendar and butterfly arbitrage checks address different restrictions; a smooth picture alone proves neither.
+
+SABR models a stochastic volatility scale with parameters alpha (level), beta (elasticity), nu (volatility of volatility) and rho (correlation). The constructor order used here is **alpha, beta, nu, rho**. Fixing beta makes a sparse smile calibration better identified: several parameter combinations can fit a small quote set while implying different dynamics away from it. Negative rho usually tilts the smile toward higher low-strike volatilities; increasing nu increases curvature. The plots perturb those parameters separately under fixed remaining assumptions. Hagan's asymptotic formula is an approximation, particularly in extreme wings or long horizons; a small calibration residual is not a validation of all extrapolated prices.
+
+Raw SVI parameterizes total variance by log-moneyness $k=\ln(K/F)$:
+
+$$w(k)=a+b\left[\rho(k-m)+\sqrt{(k-m)^2+\sigma_{\mathrm{SVI}}^2}\right].$$
+
+Its sigma is a smile-width parameter, not BSM volatility. The native `SviParams` example checks the formula at one point. Positive total variance there does not prove global butterfly or calendar arbitrage freedom; parameter and cross-expiry constraints still matter. [Gatheral](/references.html#gatheral-volatility-surface) and [Hagan et al.](/references.html#hagan-2002-sabr) develop the model distinctions.
+
+### A financed delta hedge
+
+The exercise sells one call and buys delta shares, financing the stock position with the option premium and cash borrowing. Initial wealth is zero. Each day, cash earns or pays interest, shares receive continuous-yield dividends, the option is revalued with less time remaining, and shares are rebalanced with an equal and opposite cash trade. Rebalancing itself must not change wealth.
+
+For this short-option book, the leading daily residual is financing plus dividends **minus** half gamma times squared spot movement **minus** long-option theta. It is a comparison of realized discrete movement with the option's priced time decay, not a guaranteed trading profit. We hold rates, dividend yield and implied volatility fixed, omit transaction costs, and use a deterministic five-day spot path. Jumps, stochastic volatility, costs and discrete execution would change the result. The code verifies cash neutrality and compares exact P&L with the local approximation at each step.
+
+### Transform pricing and FX carry
+
+The COS method approximates a density through a Fourier-cosine expansion. Under BSM the characteristic function is known, so agreeing with the analytic price is a useful numerical benchmark; finite truncation and term count still matter. The build compares 256 COS terms with the closed form. It does not claim one successful benchmark validates every characteristic-function model.
+
+Garman–Kohlhagen treats foreign currency like an asset paying the foreign rate: for EURUSD quoted USD per EUR, USD is domestic and EUR is foreign. Set $q=r_{\mathrm{EUR}}$, $r=r_{\mathrm{USD}}$ and $F=S D_{\mathrm{EUR}}/D_{\mathrm{USD}}$. The exercise resolves the delta-quoted smile at the actual forward and strike, then supplies that decimal volatility explicitly to the native instrument. This makes the smile coordinate and quote-to-strike conversion visible. Both rates are derived from the dated discount factors over the option's ACT/365F expiry, avoiding an accidental mixture of curve and option time bases. The option notional is EUR and its price is USD.
+
+</Standard>
+
+<BuildIt>
+
+### Reconcile the option, its implied volatility and its hedge
+
+The complete calculation compares native notional-scaled price, analytic price, implied-volatility inversion and COS pricing before constructing the financed daily hedge ledger. Every cash trade remains visible.
+
+{/* notebook-block notebook="02_pricing/instruments/equity_and_options.ipynb" cell="option-proof" role="build" */}
+```python exec id=option-proof role=build
+import json, math
+from finstack_quant.models import bs_price, bs_greeks, bs_implied_vol, bs_cos_price
+from finstack_quant.valuations.instruments import EquityOption, price_instrument
+from _shared.analyst_book import AS_OF, build_market, instruments
+
+market = build_market('options')
+option = EquityOption.from_json(json.dumps(instruments('options')['SPX-CALL']))
+priced = price_instrument(option, market, AS_OF, metrics=['delta', 'gamma', 'vega', 'theta'])
+expiry = (option.expiry - AS_OF).days / 365.0
+r = market.get_discount('USD-OIS').zero(expiry)
+spot, strike, q, vol = 5200.0, 5200.0, 0.015, 0.20
+analytical = bs_price(spot, strike, r, q, vol, expiry, True)
+assert abs(priced.price - 100 * analytical) < 1e-6
+assert abs(bs_implied_vol(spot, strike, r, q, expiry, analytical, True) - vol) < 1e-8
+assert abs(bs_cos_price(spot, strike, r, q, vol, expiry, True, 256) - analytical) < 1e-6
+spots = [5200.0, 5220.0, 5190.0, 5230.0, 5210.0, 5240.0]
+g = bs_greeks(spots[0], strike, r, q, vol, expiry, True)
+delta = g.delta
+cash = analytical - delta * spots[0]
+wealth, rows = 0.0, []
+for day in range(1, len(spots)):
+    dt, previous_spot = 1 / 365.0, spots[day - 1]
+    financing = cash * math.expm1(r * dt)
+    dividends = delta * previous_spot * math.expm1(q * dt)
+    cash += financing + dividends
+    time_left = expiry - day / 365.0
+    value = bs_price(spots[day], strike, r, q, vol, time_left, True)
+    before_rebalance = cash + delta * spots[day] - value
+    ds = spots[day] - previous_spot
+    approximate_pnl = financing + dividends - 0.5 * g.gamma * ds ** 2 - g.theta
+    assert abs((before_rebalance - wealth) - approximate_pnl) < 0.05
+    g = bs_greeks(spots[day], strike, r, q, vol, time_left, True)
+    cash -= (g.delta - delta) * spots[day]
+    delta = g.delta
+    after_rebalance = cash + delta * spots[day] - value
+    assert abs(after_rebalance - before_rebalance) < 1e-9
+    rows.append((day, before_rebalance - wealth, approximate_pnl, cash))
+    wealth = after_rebalance
+print(rows)
+assert math.isfinite(wealth)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.4" block="option-proof" />
+
+
+### Plot the Greek profiles
+
+The finite-difference rate bump independently checks the per-rate-point rho convention. The charts show delta, gamma, vega and daily theta over a spot grid at fixed strike and expiry.
+
+{/* notebook-block notebook="02_pricing/instruments/equity_and_options.ipynb" cell="greeks-spot-grid" role="build" */}
+```python exec id=greeks-spot-grid role=build
+import math
+import matplotlib.pyplot as plt
+from finstack_quant.models import bs_price,bs_greeks
+spots=[4000+100*i for i in range(25)]
+greeks=[bs_greeks(s,5200,.04,.015,.20,1.,True) for s in spots]
+fig,axes=plt.subplots(2,2,figsize=(9,6))
+for ax,name in zip(axes.flat,('delta','gamma','vega','theta')):
+ ax.plot(spots,[getattr(g,name) for g in greeks]);ax.set(xlabel='Spot USD',ylabel=name);ax.grid(alpha=.25)
+fig.tight_layout()
+g=bs_greeks(5200,5200,.04,.015,.20,1.,True)
+rho_fd=(bs_price(5200,5200,.04001,.015,.20,1.,True)-bs_price(5200,5200,.03999,.015,.20,1.,True))/.00002*.01
+assert abs(g.rho_r-rho_fd)<1e-5
+assert all(x.gamma>0 and x.vega>0 for x in greeks)
+print({'ATM_delta':g.delta,'gamma_per_USD':g.gamma,'vega_per_vol_point':g.vega,'theta_per_day':g.theta,'rho_per_rate_point':g.rho_r})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.4" block="greeks-spot-grid" />
+
+
+### Calibrate a five-strike SABR smile
+
+The synthetic quotes come from a known parameter set, making quote reproduction measurable. Beta stays fixed at one; the maximum residual is below 0.01 volatility basis points in this benchmark.
+
+{/* notebook-block notebook="01_foundations/market_data/sabr_volatility.ipynb" cell="sabr-proof" role="build" */}
+```python exec id=sabr-proof role=build
+from finstack_quant.models.volatility import SabrParameters, SabrSmile, SabrCalibrator
+
+forward, expiry = 5200.0, 1.0
+strikes = [4160.0, 4680.0, 5200.0, 5720.0, 6240.0]
+truth = SabrParameters(0.20, 1.0, 0.30, -0.20)
+quotes = SabrSmile(truth, forward, expiry).generate_smile(strikes)
+fitted = SabrCalibrator().calibrate(forward, strikes, quotes, expiry, 1.0)
+repriced = SabrSmile(fitted, forward, expiry).generate_smile(strikes)
+assert max(abs(quote - fit) for quote, fit in zip(quotes, repriced)) < 1e-6  # 0.01 volatility bp
+assert fitted.beta == 1.0
+print({'alpha': fitted.alpha, 'beta': fitted.beta, 'rho': fitted.rho, 'nu': fitted.nu})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.4" block="sabr-proof" />
+
+
+### Read parameter effects and an SVI slice
+
+Separate rho and nu sweeps distinguish skew from curvature. The raw SVI formula is independently evaluated at one log-moneyness, with its total-variance interpretation stated explicitly.
+
+{/* notebook-block notebook="01_foundations/market_data/sabr_volatility.ipynb" cell="sabr-svi-interpretation" role="build" */}
+```python exec id=sabr-svi-interpretation role=build
+import math
+import matplotlib.pyplot as plt
+from finstack_quant.models.volatility import SabrParameters,SabrSmile,SviParams
+strikes=[80+2*i for i in range(21)]
+fig,axes=plt.subplots(1,2,figsize=(10,4))
+for rho in (-.5,0.,.5):
+ smile=SabrSmile(SabrParameters(.2,1.,.4,rho),100.,1.)
+ axes[0].plot(strikes,smile.generate_smile(strikes),label=f'rho={rho}')
+for nu in (.1,.4,.8):
+ smile=SabrSmile(SabrParameters(.2,1.,nu,-.2),100.,1.)
+ axes[1].plot(strikes,smile.generate_smile(strikes),label=f'nu={nu}')
+for ax in axes:ax.set(xlabel='Strike',ylabel='Implied vol decimal');ax.legend();ax.grid(alpha=.25)
+fig.tight_layout()
+svi=SviParams(.04,.1,-.3,0.,.2)
+k=.1;manual=.04+.1*(-.3*k+math.sqrt(k*k+.2**2))
+assert abs(svi.total_variance(k)-manual)<1e-12
+print({'SVI_total_variance_at_k_0.1':manual,'SVI_vol_1y':svi.implied_vol(k,1.)})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.4" block="sabr-svi-interpretation" />
+
+
+
+### Construct the native book option
+
+The builder exposes the 100-unit multiplier, spot, dividend, discount and volatility identifiers. It matches the canonical book option and queries the three surface smile points at the actual expiry. Native Greeks include position scaling.
+
+{/* notebook-block notebook="02_pricing/instruments/equity_and_options.ipynb" cell="equity-typed-builder" role="build" */}
+```python exec id=equity-typed-builder role=build
+import json
+from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments import EquityOption,price_instrument
+from finstack_quant.models.volatility import get_surface_vol
+from _shared.analyst_book import AS_OF,build_market,instruments
+market=build_market('options');raw=instruments('options')['SPX-CALL']['instrument']['spec']
+option=(EquityOption.builder().id('TYPED-SPX-CALL').underlying_ticker('SPX').strike(5200).option_type('call')
+ .expiry(raw['expiry']).notional(Money(100,'USD')).discount_curve_id('USD-OIS').spot_id('SPX-SPOT')
+ .div_yield_id('SPX-DIV').vol_surface_id('SPX-VOL').build())
+r=price_instrument(option,market,AS_OF,metrics=['delta','gamma','vega','theta'])
+original=price_instrument(json.dumps(instruments('options')['SPX-CALL']),market,AS_OF)
+t=(option.expiry-AS_OF).days/365
+smile={strike:get_surface_vol(market.get_surface('SPX-VOL'),t,strike) for strike in (4000,5200,6400)}
+assert abs(r.price-original.price)<1e-8 and smile[4000]>smile[5200]>smile[6400]
+print({'native_price_USD':r.price,'smile_decimal':smile,'position_greeks':{key:r.get_metric(key) for key in ('delta','gamma','vega','theta')}})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.4" block="equity-typed-builder" />
+
+
+### Plot quotes against the fitted smile
+
+The quote points and fitted curve share decimal-volatility units. The residuals printed in volatility basis points make a visually close fit quantitatively reviewable.
+
+{/* notebook-block notebook="01_foundations/market_data/sabr_volatility.ipynb" cell="sabr-quote-fit-plot" role="build" */}
+```python exec id=sabr-quote-fit-plot role=build
+import matplotlib.pyplot as plt
+from finstack_quant.models.volatility import SabrParameters,SabrSmile,SabrCalibrator
+strikes=[4160.,4680.,5200.,5720.,6240.]
+quotes=SabrSmile(SabrParameters(.2,1.,.3,-.2),5200.,1.).generate_smile(strikes)
+fitted=SabrCalibrator().calibrate(5200.,strikes,quotes,1.,1.)
+fit=SabrSmile(fitted,5200.,1.).generate_smile(strikes)
+fig,ax=plt.subplots(figsize=(7,4));ax.scatter(strikes,quotes,label='Synthetic quotes');ax.plot(strikes,fit,label='Fitted SABR')
+ax.set(xlabel='SPX strike',ylabel='Implied volatility decimal');ax.legend();ax.grid(alpha=.25);fig.tight_layout()
+assert max(abs(a-b) for a,b in zip(quotes,fit))<1e-6
+print({'fit_residuals_vol_bp':[(a-b)*1e4 for a,b in zip(quotes,fit)]})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.4" block="sabr-quote-fit-plot" />
+
+</BuildIt>
+
+<LabCard notebook="02_pricing/instruments/equity_and_options.ipynb" title="Equity And Options" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<LabCard notebook="01_foundations/market_data/sabr_volatility.ipynb" title="Sabr Volatility" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<Exercise id="exercise-financed-delta-hedge" title="A. Account for five days of hedging" question={"Recreate the five-day short-call hedge, including borrowing, dividends and rebalancing cash. Compare exact daily P&L with gamma/theta and carry."}>
+
+The baseline is reconstructed for this exercise; it does not inherit cash from another exercise. The signs refer to a short option and long delta shares. Rebalancing has zero instantaneous P&L, while financing and dividends enter before the trade. The local approximation is checked per day, not only after netting a week of errors.
+
+{/* notebook-block notebook="02_pricing/instruments/equity_and_options.ipynb" cell="exercise-financed-delta-hedge" role="exercise" */}
+```python exec id=exercise-financed-delta-hedge role=exercise
+import json, math
+from finstack_quant.models import bs_price, bs_greeks, bs_implied_vol, bs_cos_price
+from finstack_quant.valuations.instruments import EquityOption, price_instrument
+from _shared.analyst_book import AS_OF, build_market, instruments
+
+market = build_market('options')
+option = EquityOption.from_json(json.dumps(instruments('options')['SPX-CALL']))
+priced = price_instrument(option, market, AS_OF, metrics=['delta', 'gamma', 'vega', 'theta'])
+expiry = (option.expiry - AS_OF).days / 365.0
+r = market.get_discount('USD-OIS').zero(expiry)
+spot, strike, q, vol = 5200.0, 5200.0, 0.015, 0.20
+analytical = bs_price(spot, strike, r, q, vol, expiry, True)
+assert abs(priced.price - 100 * analytical) < 1e-6
+assert abs(bs_implied_vol(spot, strike, r, q, expiry, analytical, True) - vol) < 1e-8
+assert abs(bs_cos_price(spot, strike, r, q, vol, expiry, True, 256) - analytical) < 1e-6
+spots = [5200.0, 5220.0, 5190.0, 5230.0, 5210.0, 5240.0]
+g = bs_greeks(spots[0], strike, r, q, vol, expiry, True)
+delta = g.delta
+cash = analytical - delta * spots[0]
+wealth, rows = 0.0, []
+for day in range(1, len(spots)):
+    dt, previous_spot = 1 / 365.0, spots[day - 1]
+    financing = cash * math.expm1(r * dt)
+    dividends = delta * previous_spot * math.expm1(q * dt)
+    cash += financing + dividends
+    time_left = expiry - day / 365.0
+    value = bs_price(spots[day], strike, r, q, vol, time_left, True)
+    before_rebalance = cash + delta * spots[day] - value
+    ds = spots[day] - previous_spot
+    approximate_pnl = financing + dividends - 0.5 * g.gamma * ds ** 2 - g.theta
+    assert abs((before_rebalance - wealth) - approximate_pnl) < 0.05
+    g = bs_greeks(spots[day], strike, r, q, vol, time_left, True)
+    cash -= (g.delta - delta) * spots[day]
+    delta = g.delta
+    after_rebalance = cash + delta * spots[day] - value
+    assert abs(after_rebalance - before_rebalance) < 1e-9
+    rows.append((day, before_rebalance - wealth, approximate_pnl, cash))
+    wealth = after_rebalance
+print(rows)
+assert math.isfinite(wealth)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.4" block="exercise-financed-delta-hedge" />
+
+</Exercise>
+
+<Exercise id="exercise-fx-option-gk" title="B. Price a EURUSD call" question={"Build a native EURUSD call, resolve its smile volatility at the actual forward, and reconcile USD premium to Garman\u2013Kohlhagen."}>
+
+EUR is the base/notional currency and USD is the quote/premium currency. The native price scales the per-EUR option value by EUR 1m. Foreign discounting supplies the continuous carry yield. The explicit implied-volatility override pins the resolved smile point, so a coordinate lookup does not silently change the comparison.
+
+{/* notebook-block notebook="02_pricing/instruments/fx_instruments.ipynb" cell="exercise-fx-option-gk" role="exercise" */}
+```python exec id=exercise-fx-option-gk role=exercise
+import math
+from datetime import date
+from finstack_quant.core.currency import Currency
+from finstack_quant.core.money import Money
+from finstack_quant.models import bs_price
+from finstack_quant.models.volatility import get_fx_delta_vol
+from finstack_quant.valuations.instruments import FxOption,price_instrument
+from _shared.analyst_book import AS_OF,build_market
+market=build_market('options');expiry=date(2025,12,15);t=(expiry-AS_OF).days/365
+rd=-math.log(market.get_discount('USD-OIS').df_between_dates(AS_OF,expiry))/t
+rf=-math.log(market.get_discount('EUR-OIS').df_between_dates(AS_OF,expiry))/t
+spot=1.08;strike=1.12;forward=spot*math.exp((rd-rf)*t)
+vol=get_fx_delta_vol(market.get_fx_delta_vol_surface('EURUSD-VOL'),t,strike,forward)
+option=(FxOption.builder().id('EURUSD-GK').base_currency(Currency('EUR')).quote_currency(Currency('USD'))
+ .strike(strike).option_type('call').delta_convention('forward',Currency('USD'),'generic_interbank')
+ .expiry(expiry).notional(Money(1_000_000,'EUR')).domestic_discount_curve_id('USD-OIS')
+ .foreign_discount_curve_id('EUR-OIS').vol_surface_id('EURUSD-VOL').build())
+import json
+wire=json.loads(option.to_json())
+wire['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'implied_volatility':vol}}
+native=price_instrument(json.dumps(wire),market,AS_OF).price
+manual=1_000_000*bs_price(spot,strike,rd,rf,vol,t,True)
+assert abs(native-manual)<.01
+print({'USD_rate':rd,'EUR_rate':rf,'EURUSD_forward':forward,'smile_vol':vol,'native_USD_price':native,'GK_USD_price':manual})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.4" block="exercise-fx-option-gk" />
+
+</Exercise>
+
+<Exercise id="exercise-sabr-beta-identification" title="C. Fit two fixed betas" question={"Fit the same five synthetic quotes with beta fixed at 0.5 and at 1.0. Compare fit residuals and parameters."}>
+
+Both fits reproduce this small quote set within the stated tolerance, while alpha changes materially because its scale depends on beta and forward level. Similar fit quality does not identify the same dynamics. Fix beta using a deliberate modelling choice or additional information; do not interpret a fitted alpha as directly comparable across elasticities.
+
+{/* notebook-block notebook="01_foundations/market_data/sabr_volatility.ipynb" cell="exercise-sabr-beta-identification" role="exercise" */}
+```python exec id=exercise-sabr-beta-identification role=exercise
+from finstack_quant.models.volatility import SabrParameters,SabrSmile,SabrCalibrator
+forward=100.;strikes=[80.,90.,100.,110.,120.];expiry=1.
+quotes=SabrSmile(SabrParameters(.2,1.,.3,-.2),forward,expiry).generate_smile(strikes)
+fits=[]
+for beta in (.5,1.):
+ fitted=SabrCalibrator().calibrate(forward,strikes,quotes,expiry,beta)
+ values=SabrSmile(fitted,forward,expiry).generate_smile(strikes)
+ error=max(abs(a-b) for a,b in zip(quotes,values))
+ assert fitted.beta==beta and error<.002
+ fits.append({'beta':beta,'alpha':fitted.alpha,'rho':fitted.rho,'nu':fitted.nu,'max_vol_error':error})
+assert abs(fits[0]['alpha']-fits[1]['alpha'])>.1
+print(fits)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.4" block="exercise-sabr-beta-identification" />
+
+</Exercise>
+
+<CheckYourself>
+
+1. **Does risk-neutral drift predict the stock's realized return?** No; it is the drift used in the no-arbitrage pricing measure.
+2. **Why does a delta-hedged short call retain risk?** Gamma, volatility changes, carry, jumps and discrete rebalancing remain.
+3. **A reported vega is 20. What is a one-vol-point move worth locally?** About 20 value units before position scaling, because that vega is already per percentage point.
+4. **Can two different SABR betas fit the same sparse smile?** Yes; fit quality alone does not identify dynamics or extrapolation.
+5. **Why use the foreign rate in an FX option?** Holding foreign currency earns foreign interest, which is the carry yield in domestic-currency valuation.
+6. **Does COS agreement under BSM prove an arbitrary transform model is correct?** No; it verifies this numerical benchmark and its chosen truncation.
+
+</CheckYourself>

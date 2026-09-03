@@ -311,7 +311,7 @@ fn log_segment_slope(
 /// Strategy for piecewise quadratic forward interpolation (smooth forwards).
 ///
 /// Builds a natural cubic spline in log-discount space so that the resulting
-/// instantaneous forward curve is piecewise quadratic and C²-continuous.
+/// instantaneous forward curve is piecewise quadratic and C¹-continuous.
 /// This matches the “smooth forward” construction commonly used by Bloomberg.
 ///
 /// # References
@@ -359,7 +359,7 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
         // Natural cubic spline second derivatives (m)
         let mut alpha = vec![0.0; n];
         for i in 1..n - 1 {
-            alpha[i] = (3.0 / h[i]) * (y[i + 1] - y[i]) - (3.0 / h[i - 1]) * (y[i] - y[i - 1]);
+            alpha[i] = (6.0 / h[i]) * (y[i + 1] - y[i]) - (6.0 / h[i - 1]) * (y[i] - y[i - 1]);
         }
 
         let mut l = vec![0.0; n];

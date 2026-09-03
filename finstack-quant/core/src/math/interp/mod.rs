@@ -10,7 +10,7 @@
 //! - [`LogLinearStrategy`]: Linear in log(DF), piecewise-constant instantaneous forwards
 //! - [`MonotoneConvexStrategy`]: Hagan-West smooth, monotone, no-arbitrage
 //! - [`CubicHermiteStrategy`]: PCHIP shape-preserving cubic
-//! - [`PiecewiseQuadraticForwardStrategy`]: Natural cubic in log DF (C² forwards)
+//! - [`PiecewiseQuadraticForwardStrategy`]: Natural cubic in log DF (C¹ forwards)
 //!
 //! # Arbitrage Considerations
 //!

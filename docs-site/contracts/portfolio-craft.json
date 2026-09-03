@@ -1,0 +1,966 @@
+[
+  {
+    "lesson_id": "3.1",
+    "notebook": "03_analytics/performance_analytics.ipynb",
+    "cell_ids": [
+      "dated-native-performance",
+      "performance-measures",
+      "exercise-same-sharpe",
+      "exercise-flow-before-rally"
+    ],
+    "source_cells": [
+      {
+        "notebook": "03_analytics/performance_analytics.ipynb",
+        "id": "dated-native-performance",
+        "role": "build"
+      },
+      {
+        "notebook": "03_analytics/performance_analytics.ipynb",
+        "id": "performance-measures",
+        "role": "build"
+      },
+      {
+        "notebook": "03_analytics/performance_analytics.ipynb",
+        "id": "exercise-same-sharpe",
+        "role": "exercise"
+      },
+      {
+        "notebook": "03_analytics/performance_analytics.ipynb",
+        "id": "exercise-flow-before-rally",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_history.HISTORY_DATES",
+      "_shared.analyst_history.history_events",
+      "_shared.analyst_history.history_market",
+      "_shared.analyst_history.history_quotes",
+      "_shared.analyst_history.history_spec",
+      "_shared.analyst_history.performance_history",
+      "finstack_quant.analytics.Performance",
+      "finstack_quant.portfolio.Portfolio",
+      "finstack_quant.portfolio.aggregate_full_cashflows",
+      "finstack_quant.portfolio.mwr_xirr",
+      "finstack_quant.portfolio.twrr_linked_json",
+      "finstack_quant.portfolio.twrr_modified_dietz",
+      "finstack_quant.portfolio.value_portfolio"
+    ],
+    "models": [],
+    "metrics": [],
+    "returned_types": [
+      "finstack_quant.portfolio.PortfolioValuation",
+      "builtins.float"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Principal proof uses displayed calculations and explicit assertions. Additional mandatory labs remain mapped in curriculum.toml."
+    ]
+  },
+  {
+    "lesson_id": "3.2",
+    "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+    "cell_ids": [
+      "aligned-risk-panel",
+      "manual-tail-and-shrinkage",
+      "skewed-return-risk",
+      "var-nonsubadditivity",
+      "credit-factor-imports",
+      "credit-spread-panel",
+      "credit-factor-config",
+      "credit-factor-calibration",
+      "credit-factor-roundtrip",
+      "credit-factor-decomposition",
+      "credit-factor-covariance",
+      "credit-dts-calibration",
+      "gaussian-horizon-scaling",
+      "neutralize-exposure-signal",
+      "normal-es-reference"
+    ],
+    "source_cells": [
+      {
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "id": "aligned-risk-panel",
+        "role": "build"
+      },
+      {
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "id": "manual-tail-and-shrinkage",
+        "role": "build"
+      },
+      {
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "id": "skewed-return-risk",
+        "role": "build"
+      },
+      {
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "id": "var-nonsubadditivity",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "id": "credit-factor-imports",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "id": "credit-spread-panel",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "id": "credit-factor-config",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "id": "credit-factor-calibration",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "id": "credit-factor-roundtrip",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "id": "credit-factor-decomposition",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "id": "credit-factor-covariance",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/credit_factor_hierarchy.ipynb",
+        "id": "credit-dts-calibration",
+        "role": "build"
+      },
+      {
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "id": "gaussian-horizon-scaling",
+        "role": "exercise"
+      },
+      {
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "id": "neutralize-exposure-signal",
+        "role": "exercise"
+      },
+      {
+        "notebook": "03_analytics/risk_and_factor_analytics.ipynb",
+        "id": "normal-es-reference",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_history.risk_panel",
+      "_shared.instrument_fixtures.fixed_bond",
+      "finstack_quant.analytics.Performance",
+      "finstack_quant.attribution.attribute_pnl_envelope_json",
+      "finstack_quant.core.dates.Schedule",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.market_data.MarketContext",
+      "finstack_quant.core.math.linalg",
+      "finstack_quant.features.neutralize_and_zscore",
+      "finstack_quant.models.factor.credit.CreditCalibrator",
+      "finstack_quant.models.factor.credit.CreditFactorModel",
+      "finstack_quant.models.factor.credit.FactorCovarianceForecast",
+      "finstack_quant.models.factor.credit.LevelsAtDate",
+      "finstack_quant.models.factor.credit.PeriodDecomposition",
+      "finstack_quant.models.factor.credit.VolHorizon",
+      "finstack_quant.models.factor.credit.decompose_levels",
+      "finstack_quant.models.factor.credit.decompose_period",
+      "finstack_quant.models.factor.risk.parametric_es_decomposition",
+      "finstack_quant.models.factor.risk.parametric_var_decomposition"
+    ],
+    "models": [],
+    "metrics": [],
+    "returned_types": [
+      "finstack_quant.analytics.Performance",
+      "finstack_quant.analytics.MultiFactorResult",
+      "finstack_quant.models.factor.credit.CreditFactorModel",
+      "finstack_quant.models.factor.credit.FactorCovarianceMatrix",
+      "finstack_quant.models.factor.risk.RiskDecomposition"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "504 aligned synthetic daily proxy returns are not an actual historical mark series for the common priced book.",
+      "Historical VaR uses R-7 interpolation; historical expected_shortfall includes every observation at or below the threshold. The displayed exact-tail-mass ES proof handles ties separately before invoking coherence.",
+      "Multi-factor OLS is unrestricted, uses already-excess factors and zero risk-free return in this fixture; residual orthogonality, R-squared and benchmark beta are checked against NumPy references.",
+      "CreditCalibrator takes decimal spreads; the calibrated spread-decomposition outputs are in basis points. DTS calibration supplies explicit spread durations.",
+      "The stored credit covariance is annualized; OneStep exposes that covariance and NSteps(12) literally multiplies it by twelve. Illustrative USD 1000 per native factor-unit exposures cover systematic risk only.",
+      "neutralize_and_zscore uses population standard deviation; the exercise asserts mean zero, exposure orthogonality and population variance one."
+    ]
+  },
+  {
+    "lesson_id": "3.3",
+    "notebook": "05_portfolio/portfolio_construction_and_valuation.ipynb",
+    "cell_ids": [
+      "base-book-reconciliation",
+      "portfolio-stamps-and-cache",
+      "exercise-fx-direction",
+      "exercise-ten-year-bucket"
+    ],
+    "source_cells": [
+      {
+        "notebook": "05_portfolio/portfolio_construction_and_valuation.ipynb",
+        "id": "base-book-reconciliation",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/portfolio_construction_and_valuation.ipynb",
+        "id": "portfolio-stamps-and-cache",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/portfolio_construction_and_valuation.ipynb",
+        "id": "exercise-fx-direction",
+        "role": "exercise"
+      },
+      {
+        "notebook": "05_portfolio/portfolio_construction_and_valuation.ipynb",
+        "id": "exercise-ten-year-bucket",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.RISK_METRICS",
+      "_shared.analyst_book.book_spec",
+      "_shared.analyst_book.build_book",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.expected_metrics",
+      "_shared.analyst_book.instruments",
+      "finstack_quant.portfolio.InstrumentArtifactCache",
+      "finstack_quant.portfolio.Portfolio",
+      "finstack_quant.portfolio.PortfolioResult",
+      "finstack_quant.portfolio.aggregate_full_cashflows",
+      "finstack_quant.portfolio.aggregate_metrics",
+      "finstack_quant.portfolio.value_portfolio"
+    ],
+    "models": [],
+    "metrics": [
+      "dv01::USD-OIS",
+      "cs01::ACME-HZD",
+      "bucketed_dv01::EUR-OIS::<tenor>",
+      "pv01::USD-SOFR-3M"
+    ],
+    "returned_types": [
+      "finstack_quant.portfolio.PortfolioValuation"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Principal proof uses displayed calculations and explicit assertions. Additional mandatory labs remain mapped in curriculum.toml."
+    ]
+  },
+  {
+    "lesson_id": "3.4",
+    "notebook": "03_analytics/portfolio_returns_and_attribution.ipynb",
+    "cell_ids": [
+      "three-period-attribution",
+      "native-book-waterfall",
+      "exercise-allocation-selection",
+      "exercise-campisi-diagnosis"
+    ],
+    "source_cells": [
+      {
+        "notebook": "03_analytics/portfolio_returns_and_attribution.ipynb",
+        "id": "three-period-attribution",
+        "role": "build"
+      },
+      {
+        "notebook": "03_analytics/portfolio_returns_and_attribution.ipynb",
+        "id": "native-book-waterfall",
+        "role": "build"
+      },
+      {
+        "notebook": "03_analytics/portfolio_returns_and_attribution.ipynb",
+        "id": "exercise-allocation-selection",
+        "role": "exercise"
+      },
+      {
+        "notebook": "03_analytics/portfolio_returns_and_attribution.ipynb",
+        "id": "exercise-campisi-diagnosis",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.book_spec",
+      "_shared.analyst_book.instruments",
+      "_shared.analyst_history.HISTORY_DATES",
+      "_shared.analyst_history.history_market",
+      "_shared.analyst_history.history_quotes",
+      "finstack_quant.attribution.attribute_pnl",
+      "finstack_quant.attribution.default_waterfall_order",
+      "finstack_quant.portfolio.Portfolio",
+      "finstack_quant.portfolio.aggregate_full_cashflows",
+      "finstack_quant.portfolio.brinson_fachler",
+      "finstack_quant.portfolio.campisi_attribution",
+      "finstack_quant.portfolio.campisi_carino_link",
+      "finstack_quant.portfolio.campisi_reconciliation_check",
+      "finstack_quant.portfolio.carino_link",
+      "finstack_quant.portfolio.value_portfolio",
+      "finstack_quant.reporting.charts.waterfall_chart",
+      "finstack_quant.reporting.theme.INSTITUTIONAL",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [],
+    "metrics": [
+      "ytm",
+      "duration_mod",
+      "z_spread"
+    ],
+    "returned_types": [
+      "finstack_quant.portfolio.CarinoLinkedAttribution",
+      "finstack_quant.portfolio.FiAttributionResult"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Principal proof uses displayed calculations and explicit assertions. Additional mandatory labs remain mapped in curriculum.toml."
+    ]
+  },
+  {
+    "lesson_id": "3.5",
+    "notebook": "06_scenarios/scenarios_and_stress_testing.ipynb",
+    "cell_ids": [
+      "base-book-scenario",
+      "quote-composite-and-history",
+      "exercise-twist",
+      "exercise-credit-extension-stress"
+    ],
+    "source_cells": [
+      {
+        "notebook": "06_scenarios/scenarios_and_stress_testing.ipynb",
+        "id": "base-book-scenario",
+        "role": "build"
+      },
+      {
+        "notebook": "06_scenarios/scenarios_and_stress_testing.ipynb",
+        "id": "quote-composite-and-history",
+        "role": "build"
+      },
+      {
+        "notebook": "06_scenarios/scenarios_and_stress_testing.ipynb",
+        "id": "exercise-twist",
+        "role": "exercise"
+      },
+      {
+        "notebook": "06_scenarios/scenarios_and_stress_testing.ipynb",
+        "id": "exercise-credit-extension-stress",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.book_spec",
+      "_shared.analyst_book.build_book",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.calibration_envelope",
+      "_shared.analyst_book.instruments",
+      "_shared.analyst_history.history_market",
+      "_shared.analyst_tracks",
+      "finstack_quant.calibration.calibrate",
+      "finstack_quant.portfolio.Portfolio",
+      "finstack_quant.portfolio.replay_portfolio",
+      "finstack_quant.portfolio.value_portfolio",
+      "finstack_quant.scenarios.CurveKind",
+      "finstack_quant.scenarios.OperationSpec",
+      "finstack_quant.scenarios.ScenarioSpec",
+      "finstack_quant.scenarios.TenorMatchMode",
+      "finstack_quant.scenarios.apply_scenario_to_market",
+      "finstack_quant.scenarios.build_from_template",
+      "finstack_quant.scenarios.compose_scenarios",
+      "finstack_quant.scenarios.compute_horizon_return",
+      "finstack_quant.scenarios.list_builtin_templates",
+      "finstack_quant.scenarios.validate_scenario_spec",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_metrics"
+    ],
+    "models": [],
+    "metrics": [],
+    "returned_types": [
+      "finstack_quant.portfolio.PortfolioValuation",
+      "finstack_quant.scenarios.ApplicationReport"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Fixed-hazard curve-space shocks use apply_scenario_to_market then value_portfolio(metrics=[]). Quote-space risk under changed discounting requires recalibration; preserving old hazard replay does not make that risk calculation consistent. validate_scenario_spec returns None on success."
+    ]
+  },
+  {
+    "lesson_id": "3.6",
+    "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+    "cell_ids": [
+      "margin-proof-1",
+      "margin-proof-2",
+      "margin-proof-3",
+      "cds-target-grid",
+      "netting-margin-capital-xva",
+      "exercise-drop-one-im",
+      "exercise-vm-threshold-mta",
+      "exercise-why-mva"
+    ],
+    "source_cells": [
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "id": "margin-proof-1",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "id": "margin-proof-2",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "id": "margin-proof-3",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "id": "cds-target-grid",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "id": "netting-margin-capital-xva",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "id": "exercise-drop-one-im",
+        "role": "exercise"
+      },
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "id": "exercise-vm-threshold-mta",
+        "role": "exercise"
+      },
+      {
+        "notebook": "07_advanced_quant/margin_collateral_and_xva.ipynb",
+        "id": "exercise-why-mva",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.calibration_envelope",
+      "_shared.analyst_book.instruments",
+      "finstack_quant.calibration.calibrate",
+      "finstack_quant.core.dates.next_semiannual_cds_maturity",
+      "finstack_quant.core.dates.prev_cds_date",
+      "finstack_quant.core.dates.prev_cds_semiannual_roll",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.market_data.HazardCurve",
+      "finstack_quant.core.market_data.MarketContext",
+      "finstack_quant.margin.FrtbSbaEngine",
+      "finstack_quant.margin.FrtbSensitivities",
+      "finstack_quant.margin.SimmCalculator",
+      "finstack_quant.margin.SimmSensitivities",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [],
+    "metrics": [
+      "signed USD per bp on SIMM tenors",
+      "signed USD per percentage point on FRTB tenors"
+    ],
+    "returned_types": [
+      "finstack_quant.margin.ImResult",
+      "finstack_quant.margin.FrtbSbaResult"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Principal proof uses displayed calculations and explicit assertions. Additional mandatory labs remain mapped in curriculum.toml."
+    ]
+  },
+  {
+    "lesson_id": "4.1",
+    "notebook": "04_statement_modeling/statement_modeling.ipynb",
+    "cell_ids": [
+      "borrower-articulation",
+      "precedence-and-dependency",
+      "statement-checks-and-failure",
+      "exercise-working-capital",
+      "exercise-forecast-method"
+    ],
+    "source_cells": [
+      {
+        "notebook": "04_statement_modeling/statement_modeling.ipynb",
+        "id": "borrower-articulation",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/statement_modeling.ipynb",
+        "id": "precedence-and-dependency",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/statement_modeling.ipynb",
+        "id": "statement-checks-and-failure",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/statement_modeling.ipynb",
+        "id": "exercise-working-capital",
+        "role": "exercise"
+      },
+      {
+        "notebook": "04_statement_modeling/statement_modeling.ipynb",
+        "id": "exercise-forecast-method",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.borrower_model.PERIODS",
+      "_shared.borrower_model.borrower_builder",
+      "_shared.borrower_model.borrower_data",
+      "_shared.borrower_model.borrower_model",
+      "_shared.borrower_model.borrower_vintage",
+      "finstack_quant.statements.Evaluator",
+      "finstack_quant.statements.FinancialModelSpec",
+      "finstack_quant.statements.ForecastSpec",
+      "finstack_quant.statements.ModelBuilder",
+      "finstack_quant.statements_analytics.AccountType",
+      "finstack_quant.statements_analytics.CorkscrewAccount",
+      "finstack_quant.statements_analytics.CorkscrewConfig",
+      "finstack_quant.statements_analytics.CorkscrewExtension",
+      "finstack_quant.statements_analytics.DependencyTracer",
+      "finstack_quant.statements_analytics.ThreeStatementMapping",
+      "finstack_quant.statements_analytics.explain_formula",
+      "finstack_quant.statements_analytics.run_three_statement_checks"
+    ],
+    "models": [],
+    "metrics": [],
+    "returned_types": [
+      "finstack_quant.statements.FinancialModelSpec"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Principal proof uses displayed calculations and explicit assertions. Additional mandatory labs remain mapped in curriculum.toml."
+    ]
+  },
+  {
+    "lesson_id": "4.2",
+    "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+    "cell_ids": [
+      "native-dcf",
+      "dcf-sensitivity",
+      "borrower-scenario-set",
+      "implied-terminal-growth",
+      "borrower-lbo-financing",
+      "equivalent-terminal-multiple",
+      "borrower-vintage-bridge",
+      "borrower-monte-carlo-dcf"
+    ],
+    "source_cells": [
+      {
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "id": "native-dcf",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "id": "dcf-sensitivity",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "id": "borrower-scenario-set",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "id": "implied-terminal-growth",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/lbo_analysis.ipynb",
+        "id": "borrower-lbo-financing",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "id": "equivalent-terminal-multiple",
+        "role": "exercise"
+      },
+      {
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "id": "borrower-vintage-bridge",
+        "role": "exercise"
+      },
+      {
+        "notebook": "04_statement_modeling/models/dcf_valuation.ipynb",
+        "id": "borrower-monte-carlo-dcf",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.borrower_model.PERIODS",
+      "_shared.borrower_model.borrower_model",
+      "_shared.borrower_model.borrower_vintage",
+      "finstack_quant.core.money.Money",
+      "finstack_quant.portfolio.mwr_xirr",
+      "finstack_quant.reporting.charts.tornado_chart",
+      "finstack_quant.reporting.theme.INSTITUTIONAL",
+      "finstack_quant.statements.Evaluator",
+      "finstack_quant.statements.ForecastSpec",
+      "finstack_quant.statements.ModelBuilder",
+      "finstack_quant.statements.MonteCarloConfig",
+      "finstack_quant.statements_analytics.ScenarioSet",
+      "finstack_quant.statements_analytics.SensitivityConfig",
+      "finstack_quant.statements_analytics.TerminalValueSpec",
+      "finstack_quant.statements_analytics.add_roll_forward_with_opening",
+      "finstack_quant.statements_analytics.dcf_sensitivity",
+      "finstack_quant.statements_analytics.evaluate_dcf",
+      "finstack_quant.statements_analytics.evaluate_lbo",
+      "finstack_quant.statements_analytics.evaluate_scenario_set",
+      "finstack_quant.statements_analytics.generate_tornado_entries",
+      "finstack_quant.statements_analytics.goal_seek",
+      "finstack_quant.statements_analytics.run_sensitivity",
+      "finstack_quant.statements_analytics.variance_bridge",
+      "finstack_quant.statements_analytics.wacc"
+    ],
+    "models": [],
+    "metrics": [],
+    "returned_types": [
+      "finstack_quant.statements_analytics.CorporateValuationResult",
+      "finstack_quant.statements_analytics.DcfSensitivityResult",
+      "finstack_quant.statements_analytics.SensitivityResult",
+      "finstack_quant.statements_analytics.ScenarioResults",
+      "finstack_quant.statements_analytics.GoalSeekResult",
+      "finstack_quant.statements_analytics.LboResult",
+      "finstack_quant.statements_analytics.BridgeChart",
+      "finstack_quant.statements.MonteCarloResults"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "The native shared borrower operating graph supplies UFCF; USD is stamped at the monetary DCF boundary and all original actuals and baseline UFCF values are preserved.",
+      "WACC is 9.76875%; terminal flow is the annual trailing-four-quarter sum. Approximately 93.16% of EV is terminal PV, so this short teaching horizon is assumption-sensitive.",
+      "A native DCF grid and DcfSensitivityResult measure value effects; the separate operating tornado measures one-quarter UFCF and is labelled separately.",
+      "ScenarioSet changes forecast driver levels only; every native scenario UFCF path is repriced through evaluate_dcf, preserving the base result.",
+      "The bounded native goal_seek changes only perpetual terminal growth and is validated by a native DCF reprice against the market-equity target.",
+      "Native LBO sources/uses, debt roll-forward, after-tax cash feasibility and an independent equity-profit bridge are checked. All cash is reserved for operating liquidity, with no interim distributions or excess-cash credit; entry latest-actual EBITDA is explicitly pinned because evaluate_lbo reads the first model period.",
+      "ForecastSpec.log_normal and Evaluator.evaluate_monte_carlo are the supported APIs. Retained joint quarterly UFCF paths are individually repriced by native DCF; marginal percentiles are never stitched into a fake path."
+    ]
+  },
+  {
+    "lesson_id": "4.3",
+    "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+    "cell_ids": [
+      "priced-term-loan",
+      "borrower-covenant-forecast",
+      "borrower-score-and-pit",
+      "rating-generator-term-structure",
+      "workout-and-downturn-lgd",
+      "staged-borrower-ecl",
+      "amortizing-loan-ecl",
+      "merton-market-signal",
+      "bear-covenant-headroom",
+      "stage-two-allowance-cliff",
+      "distance-versus-accounting-score"
+    ],
+    "source_cells": [
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "id": "priced-term-loan",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "id": "borrower-covenant-forecast",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "id": "borrower-score-and-pit",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "id": "rating-generator-term-structure",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "id": "workout-and-downturn-lgd",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "id": "staged-borrower-ecl",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "id": "amortizing-loan-ecl",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "id": "merton-market-signal",
+        "role": "build"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "id": "bear-covenant-headroom",
+        "role": "exercise"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "id": "stage-two-allowance-cliff",
+        "role": "exercise"
+      },
+      {
+        "notebook": "04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb",
+        "id": "distance-versus-accounting-score",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.RISK_METRICS",
+      "_shared.analyst_book.build_book",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.instruments",
+      "_shared.borrower_model.PERIODS",
+      "_shared.borrower_model.borrower_data",
+      "_shared.borrower_model.borrower_model",
+      "finstack_quant.covenants.Covenant",
+      "finstack_quant.covenants.CovenantEngine",
+      "finstack_quant.covenants.CovenantSpec",
+      "finstack_quant.covenants.CovenantType",
+      "finstack_quant.covenants.evaluate_engine",
+      "finstack_quant.covenants.lbo_standard",
+      "finstack_quant.models.credit.MertonModel",
+      "finstack_quant.models.credit.lgd",
+      "finstack_quant.models.credit.migration",
+      "finstack_quant.models.credit.pd",
+      "finstack_quant.models.credit.scoring",
+      "finstack_quant.portfolio.value_portfolio",
+      "finstack_quant.statements.Evaluator",
+      "finstack_quant.statements.ForecastSpec",
+      "finstack_quant.statements.ModelBuilder",
+      "finstack_quant.statements_analytics.Exposure",
+      "finstack_quant.statements_analytics.QualitativeFlags",
+      "finstack_quant.statements_analytics.StagingConfig",
+      "finstack_quant.statements_analytics.classify_stage",
+      "finstack_quant.statements_analytics.compute_ecl",
+      "finstack_quant.statements_analytics.compute_ecl_weighted"
+    ],
+    "models": [],
+    "metrics": [
+      "Native covenant headroom (fraction of threshold)",
+      "PD and LGD (decimal)",
+      "ECL and EAD (USD)",
+      "Distance to default (standard deviations)"
+    ],
+    "returned_types": [
+      "finstack_quant.portfolio.PortfolioValuation",
+      "finstack_quant.covenants.CovenantReport",
+      "finstack_quant.models.credit.scoring.ScoringResult",
+      "finstack_quant.models.credit.pd.MasterScaleResult",
+      "finstack_quant.models.credit.migration.GeneratorMatrix",
+      "finstack_quant.models.credit.migration.TransitionMatrix",
+      "finstack_quant.models.credit.lgd.WorkoutLgdResult",
+      "finstack_quant.statements_analytics.StageResult",
+      "finstack_quant.statements_analytics.WeightedEclResult",
+      "finstack_quant.models.credit.MertonModel"
+    ],
+    "expected_exceptions": [
+      {
+        "operation": "finstack_quant.statements_analytics.compute_ecl",
+        "type": "ValueError",
+        "condition": "The supplied cumulative-PD schedule decreases from 5% at year1 to 4% at year2."
+      }
+    ],
+    "support_notes": [
+      "The common book first adds BORROWER-TL here; held notional is USD1m versus USD100m facility. Physical underwriting PD/LGD assumptions are separate from the market PV/risk calculation.",
+      "Exact borrower covenant definitions are reused: current-quarter run-rate EBITDA, 4.5x net-leverage maximum, and 1.1x DSCR minimum after cash taxes/capex/NWC over interest/amortization. Baseline DSCR breaches all four forecast quarters.",
+      "Native covenant headroom is divided by the threshold; displayed ratio-unit headroom is independently reconciled. Typed and JSON engine evaluations agree.",
+      "The 4.2 bear exercise changes only revenue growth; it is explicitly distinguished from the broader shared underwriting downside, which also changes costs and interest.",
+      "Accounting scoring uses native borrower actuals plus explicitly assumed missing financial inputs and an uncalibrated size normalization. Raw score-implied probabilities and master-scale grades are not substituted for calibrated underwriting PD.",
+      "PIT/TTC transformations round-trip. Native generator extraction/project matches the annual transition matrix and its fivefold matrix composition; annual probabilities are not multiplied by five.",
+      "Workout LGD reconciles haircuts, EAD-based costs and delayed recovery. Downturn LGD is the supported stressed approximation, not an empirical recovery fit.",
+      "Native IFRS9 stages are explicitly set and inspected: a watchlist flag is an analyst policy choice in response to covenant weakness; the performing and defaulted cases are controlled comparators.",
+      "The quarterly ECL proof uses cumulative PD differences, midpoint EAD and EIR discounting. Fixed-LGD native scenario weighting is compared with explicit scenario-specific-LGD weighting through native compute_ecl calls.",
+      "Contractual held-loan amortization is supplied through EAD knots pinned to each quarterly integration midpoint; linear interpolation between knots is disclosed as a grid approximation.",
+      "CECL lifetime measurement and forecast/reversion principles are explained; the native IFRS lifetime output is not relabelled as a complete CECL implementation.",
+      "Merton risk-neutral DD/PD and equity-to-assets inversion are checked. An assumed-drift physical calculation is theoretical, not an empirically calibrated KMV EDF mapping."
+    ]
+  },
+  {
+    "lesson_id": "4.4",
+    "notebook": "05_portfolio/liquidity_risk.ipynb",
+    "cell_ids": [
+      "common-book-liquidity",
+      "constrained-common-universe",
+      "risk-budget-and-liquidity",
+      "exercise-tighten-constraint",
+      "exercise-liquidation-ranking",
+      "exercise-kyle-interpretation"
+    ],
+    "source_cells": [
+      {
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "id": "common-book-liquidity",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "id": "constrained-common-universe",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "id": "risk-budget-and-liquidity",
+        "role": "build"
+      },
+      {
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "id": "exercise-tighten-constraint",
+        "role": "exercise"
+      },
+      {
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "id": "exercise-liquidation-ranking",
+        "role": "exercise"
+      },
+      {
+        "notebook": "05_portfolio/liquidity_risk.ipynb",
+        "id": "exercise-kyle-interpretation",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.book_spec",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.instruments",
+      "_shared.analyst_liquidity.liquidity_panel",
+      "_shared.analyst_liquidity.position_factor_panel",
+      "finstack_quant.analytics.Performance",
+      "finstack_quant.models.factor.risk.evaluate_risk_budget",
+      "finstack_quant.models.factor.risk.parametric_var_decomposition",
+      "finstack_quant.models.liquidity.almgren_chriss_impact",
+      "finstack_quant.models.liquidity.amihud_illiquidity",
+      "finstack_quant.models.liquidity.kyle_lambda",
+      "finstack_quant.models.liquidity.lvar_bangia",
+      "finstack_quant.models.liquidity.roll_effective_spread",
+      "finstack_quant.portfolio.Constraint",
+      "finstack_quant.portfolio.MetricExpr",
+      "finstack_quant.portfolio.MissingMetricPolicy",
+      "finstack_quant.portfolio.Objective",
+      "finstack_quant.portfolio.PerPositionMetric",
+      "finstack_quant.portfolio.PortfolioOptimizationSpec",
+      "finstack_quant.portfolio.PositionFilter",
+      "finstack_quant.portfolio.WeightingScheme",
+      "finstack_quant.portfolio.optimize_portfolio",
+      "finstack_quant.portfolio.value_portfolio"
+    ],
+    "models": [],
+    "metrics": [],
+    "returned_types": [
+      "pandas.DataFrame"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Principal proof uses displayed calculations and explicit assertions. Additional mandatory labs remain mapped in curriculum.toml."
+    ]
+  },
+  {
+    "lesson_id": "4.5",
+    "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+    "cell_ids": [
+      "native-pm-report",
+      "report-source-replay",
+      "report-date-acquisition",
+      "report-pack-and-primitives",
+      "one-page-pm-report",
+      "exercise-redesign-report",
+      "exercise-add-stress-row"
+    ],
+    "source_cells": [
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "id": "native-pm-report",
+        "role": "build"
+      },
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "id": "report-source-replay",
+        "role": "build"
+      },
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "id": "report-date-acquisition",
+        "role": "build"
+      },
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "id": "report-pack-and-primitives",
+        "role": "build"
+      },
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "id": "one-page-pm-report",
+        "role": "build"
+      },
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "id": "exercise-redesign-report",
+        "role": "exercise"
+      },
+      {
+        "notebook": "09_reporting/reporting_performance_tearsheet.ipynb",
+        "id": "exercise-add-stress-row",
+        "role": "exercise"
+      }
+    ],
+    "imports": [
+      "_shared.analyst_book.AS_OF",
+      "_shared.analyst_book.RISK_METRICS",
+      "_shared.analyst_book.book_spec",
+      "_shared.analyst_book.build_book",
+      "_shared.analyst_book.build_market",
+      "_shared.analyst_book.expected_metrics",
+      "_shared.analyst_history.HISTORY_DATES",
+      "_shared.analyst_history.history_market",
+      "_shared.analyst_history.history_spec",
+      "_shared.analyst_liquidity.liquidity_panel",
+      "_shared.analyst_liquidity.position_factor_panel",
+      "finstack_quant.models.factor.risk.parametric_es_decomposition",
+      "finstack_quant.models.factor.risk.parametric_var_decomposition",
+      "finstack_quant.portfolio.Portfolio",
+      "finstack_quant.portfolio.aggregate_metrics",
+      "finstack_quant.portfolio.value_portfolio",
+      "finstack_quant.reporting.attribution_tearsheet",
+      "finstack_quant.reporting.charts.line_chart",
+      "finstack_quant.reporting.charts.waterfall_chart",
+      "finstack_quant.reporting.document.KPI",
+      "finstack_quant.reporting.document.Section",
+      "finstack_quant.reporting.document.TearSheet",
+      "finstack_quant.reporting.performance_tearsheet",
+      "finstack_quant.reporting.portfolio_risk_tearsheet",
+      "finstack_quant.reporting.scenario_tearsheet",
+      "finstack_quant.reporting.tables.data_table",
+      "finstack_quant.reporting.theme.INSTITUTIONAL",
+      "finstack_quant.scenarios.CurveKind",
+      "finstack_quant.scenarios.OperationSpec",
+      "finstack_quant.scenarios.ScenarioSpec",
+      "finstack_quant.scenarios.apply_scenario_to_market",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [],
+    "metrics": [
+      "cs01::ACME-HZD"
+    ],
+    "returned_types": [
+      "finstack_quant.reporting.document.TearSheet"
+    ],
+    "expected_exceptions": [],
+    "support_notes": [
+      "Principal proof uses displayed calculations and explicit assertions. Additional mandatory labs remain mapped in curriculum.toml."
+    ]
+  }
+]

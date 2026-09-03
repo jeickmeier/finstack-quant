@@ -1,0 +1,334 @@
+---
+id: '2.1'
+title: 'Bonds I: Price, Yield, and Convention'
+description: 'Analyst program lesson 2.1: Bonds I: Price, Yield, and Convention'
+desk_question: '"The screen says 98.35. What do we actually pay, and what are we earning?"'
+references:
+- '#icma-rule-book'
+- '#fabozzi-fixed-income-handbook'
+- '#tuckman-serrat-fixed-income'
+- '#sifma-mbs-standard-formulas'
+api:
+- finstack_quant.cashflows.builder.AmortizationSpec
+- finstack_quant.cashflows.builder.CashFlowSchedule
+- finstack_quant.cashflows.builder.FixedCouponSpec
+- finstack_quant.cashflows.builder.ScheduleParams
+- finstack_quant.cashflows.builder.StepUpCouponSpec
+- finstack_quant.core.dates.DayCount
+- finstack_quant.core.dates.add_business_days
+- finstack_quant.core.money.Money
+- finstack_quant.portfolio.mwr_xirr
+- finstack_quant.valuations.instruments.Bond
+- finstack_quant.valuations.instruments.bond_from_cashflows_json
+- finstack_quant.valuations.instruments.instrument_cashflows_json
+- finstack_quant.valuations.instruments.list_models_grouped
+- finstack_quant.valuations.instruments.list_standard_metrics
+- finstack_quant.valuations.instruments.price_instrument
+status: published
+---
+
+<DeskContext question={"The screen says 98.35. What do we actually pay, and what are we earning?"}>
+
+A bond screen shows 98.35. That number is ordinarily a clean quote per 100 of principal, not the total cash you transfer and not a promised annual return. To reconcile a trade, identify the face amount, settlement date, accrued interest, coupon schedule and redemption terms before interpreting its yield.
+
+You will build the book's USD corporate bond through the native instrument interface, reconcile cash and quote units, and compare settlement and yield conventions. The same tools then handle an amortizer, a step-up coupon and a callable workout. Every example starts from synthetic, dated contracts; no term sheet is inferred from a ticker.
+
+</DeskContext>
+
+<Standard>
+
+### From contractual cashflows to price
+
+For a default-free fixed schedule, valuation-date dirty value is
+
+$$P_0=\sum_i C_i D(0,t_i).$$
+
+A bullet returns all principal at maturity. An amortizer returns principal earlier, so future coupons must use the remaining principal. A step-up changes its coupon rate on specified dates. These are contractual changes to the cashflow vector, before a discount model is selected. A callable bond adds an issuer decision: its future cashflows depend on exercise and rates, so a straight fixed-cashflow PV cannot value that option.
+
+The public workflow separates these responsibilities. `Bond.builder()` creates an instrument. `price_instrument(instrument, market, as_of, model=..., metrics=...)` selects a registered pricing model and requests registered measures. `list_models_grouped()` reports models by instrument family; `list_standard_metrics()` reports metric names. A model called `discounting` is a registry selection, not a Python class you construct. The returned `ValuationResult` contains a currency price and named metrics; inspect `metric_keys()` rather than assuming an unqualified risk factor name exists.
+
+For bonds, `clean_price`, `dirty_price` and `accrued` are **currency amounts** in this workflow. The quote override `quoted_clean_price`, however, is **percent of par**. A 99 quote on USD 2m principal means USD 1.98m clean value. Mixing those representations causes a hundredfold or notional-scale error. The invariant is
+
+$$P_{\mathrm{dirty,settle}}=P_{\mathrm{clean,settle}}+AI_{\mathrm{settle}}.$$
+
+The valuation-date `price` and settlement-date dirty metric need not coincide: the latter refers to the quote's settlement date, with cashflow entitlement and settlement financing applied. Do not reconcile them by subtracting accrued interest alone.
+
+### Yield is a quote conversion
+
+A yield to maturity is the rate that reproduces a specified price under a specified timing and compounding rule. For regular semiannual periods, the familiar street equation is
+
+$$P=\sum_i \frac{C_i}{(1+y/2)^{n_i}},$$
+
+where fractional period counts handle settlement between coupons. The implementation also handles the schedule's coupon reference periods and payment dates. An ACT/ACT ICMA fraction needs the reference period; an actual day count divided by 365 is not a universal substitute.
+
+The solver finds a root of model price minus target price. For positive future cashflows on a bullet, price usually decreases monotonically over the admissible yield domain, allowing a bracketed root. Mixed-sign cashflows can have multiple roots or no meaningful IRR. A converged root is still only a quote convention: realized holding-period return also depends on reinvestment, sale price, default, costs and funding.
+
+An actual-date IRR, here `mwr_xirr`, discounts each payment using ACT/365F elapsed time and returns an effective annual rate. To compare it with a nominal semiannual street quote, first convert it with $y_{2}=2[(1+y_{\mathrm{eff}})^{1/2}-1]$. Comparing effective and nominal numbers directly confuses annualization with the remaining timing-convention difference. Our exercise solves both equations using the same dirty settlement price and the same entitled payments. The actual-date NPV is checked relative to principal because the native root tolerance is a rate tolerance; the street quote also reprices through the native quote path.
+
+### Settlement and entitlement
+
+A later settlement normally increases accrued interest within a coupon period. Two experiments answer different questions. **Fixed clean quote:** retain the screen's 99 quote, move T+1 to T+2, and dirty cash rises with accrued interest. **Fixed curve:** revalue from the same market discount factors and move settlement; dirty and clean values both reflect financing and entitlement, so the clean price is not invariant. Stating what was held fixed is essential to interpreting the result.
+
+An ex-coupon period changes who receives the next coupon. Depending on the market convention, accrued interest can become negative and the buyer may not be entitled to that payment. Do not add the upcoming coupon merely because its payment date is after settlement. The example uses the synthetic US corporate convention without a special ex-coupon window; another market requires its explicit rule. [ICMA](/references.html#icma-rule-book) and the [fixed-income handbook](/references.html#fabozzi-fixed-income-handbook) provide the convention context.
+
+### Workouts and changing coupons
+
+A step-up generally has more valuable contractual cashflows than the otherwise identical level-coupon bond. At the same quoted price its yield is therefore higher. At the same curve, its price rises instead; that is not the same experiment. Amortization usually reduces duration by returning principal earlier, but the exact result depends on the schedule and price.
+
+Yield to worst compares yields across eligible redemption paths under a quoting convention, including maturity. It is not an option-adjusted expected return and does not prove when the issuer will call. Our callable illustration supplies a 102 clean quote, a 101 call price and an explicit short-rate model parameter pair: absolute annual short-rate sigma 0.01 and mean reversion 0.03. Those are synthetic assumptions, not a lognormal option volatility quote. Callable pricing and OAS are developed in C1; here the purpose is to show the contractual call schedule and why `ytw` is no larger than `ytm` under the chosen quote.
+
+</Standard>
+
+<BuildIt>
+
+### Read the quote and reconcile the cash
+
+This calculation discovers the native model/metric registrations, prices a typed bond, round-trips a yield quote and runs both settlement experiments. In the output, `fixed_quote=True` means the clean quote stays at 99; all reported price metrics remain currency amounts.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="bond-price-proof" role="build" */}
+```python exec id=bond-price-proof role=build
+import copy, json, math
+from finstack_quant.valuations.instruments import Bond, price_instrument, list_models_grouped, list_standard_metrics
+from _shared.analyst_book import AS_OF, build_market, instruments
+
+market = build_market('foundations')
+base = instruments('foundations')['USD-CORP']
+typed = Bond.from_json(json.dumps(base))
+metrics = ['clean_price', 'dirty_price', 'accrued', 'ytm']
+priced = price_instrument(typed, market, AS_OF, metrics=metrics)
+assert abs(priced.get_metric('dirty_price') - priced.get_metric('clean_price') - priced.get_metric('accrued')) < 1e-6
+yield_quote = copy.deepcopy(base)
+yield_quote['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_ytm': priced.get_metric('ytm')}}
+roundtrip = price_instrument(json.dumps(yield_quote), market, AS_OF, metrics=metrics)
+assert abs(roundtrip.get_metric('dirty_price') - priced.get_metric('dirty_price')) < 0.01
+settlement_rows = []
+for fixed_quote in (False, True):
+    rows = []
+    for days in (1, 2):
+        bond = copy.deepcopy(base)
+        bond['instrument']['spec']['settlement_days'] = days
+        if fixed_quote:
+            bond['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_clean_price': 99.0}}
+        result = price_instrument(json.dumps(bond), market, AS_OF, metrics=metrics)
+        rows.append({name: result.get_metric(name) for name in metrics})
+        assert abs(rows[-1]['dirty_price'] - rows[-1]['clean_price'] - rows[-1]['accrued']) < 1e-6
+    assert rows[1]['accrued'] > rows[0]['accrued']
+    if fixed_quote:
+        assert abs(rows[1]['clean_price'] - rows[0]['clean_price']) < 1e-6
+    else:
+        assert abs(rows[1]['clean_price'] - rows[0]['clean_price']) > 1e-4
+    settlement_rows.append((fixed_quote, rows))
+assert 'discounting' in list_models_grouped()['bond'] and 'accrued' in list_standard_metrics()
+print(settlement_rows)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.1" block="bond-price-proof" />
+
+
+### Build a bond and inspect possible workouts
+
+The builder makes the required contractual fields visible. The call schedule belongs to an independent copy; the foundation book stays unchanged. Yield-to-worst requires a market clean quote, which we provide explicitly.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="bond-builder-and-workouts" role="build" */}
+```python exec id=bond-builder-and-workouts role=build
+import copy,json
+from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments import Bond,price_instrument
+from _shared.analyst_book import AS_OF,build_market,instruments
+raw=instruments('foundations')['USD-CORP']['instrument']['spec']
+built=(Bond.builder().id('TYPED-BOND').notional(Money(2_000_000,'USD'))
+       .issue_date(raw['issue_date']).maturity(raw['maturity'])
+       .cashflow_spec(raw['cashflow_spec']).discount_curve_id('USD-OIS').build())
+market=build_market('foundations')
+assert price_instrument(built,market,AS_OF).price>0
+callable_spec=instruments('foundations')['USD-CORP']
+callable_spec['instrument']['spec']['call_put']={'calls':[{'start_date':'2027-01-15','end_date':'2029-01-15','price_pct_of_par':101.0}],'puts':[]}
+callable_spec['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price':102.0},'model_config':{'hw1f_sigma':0.01,'hw1f_mean_reversion':0.03}}
+workouts=price_instrument(json.dumps(callable_spec),market,AS_OF,metrics=['ytm','ytw'])
+assert workouts.get_metric('ytw')<=workouts.get_metric('ytm')+1e-8
+print({'typed_price':price_instrument(built,market,AS_OF).price,'ytm_decimal':workouts.get_metric('ytm'),'ytw_decimal':workouts.get_metric('ytw')})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.1" block="bond-builder-and-workouts" />
+
+
+### Create an amortizing cashflow bond
+
+The native cashflow builder applies amortization to the principal schedule before coupons are computed. `bond_from_cashflows_json` returns a canonical JSON instrument that the same pricing entry point accepts.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="amortizer-proof" role="build" */}
+```python exec id=amortizer-proof role=build
+import json
+from datetime import date
+from decimal import Decimal
+from finstack_quant.cashflows.builder import CashFlowSchedule, FixedCouponSpec, ScheduleParams, AmortizationSpec
+from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments import bond_from_cashflows_json, price_instrument
+from _shared.analyst_book import AS_OF, build_market, instruments
+
+market = build_market('foundations')
+schedule = (CashFlowSchedule.builder().principal(Money(2_000_000.0, 'USD'), date(2024, 1, 15), date(2030, 1, 15))
+    .amortization(AmortizationSpec.linear_to(Money(0.0, 'USD')))
+    .fixed_cf(FixedCouponSpec(Decimal('0.055'), ScheduleParams.semiannual_30360()))
+    .build())
+amortizer = bond_from_cashflows_json('LESSON-AMORTIZER', schedule.to_json(), 'USD-OIS')
+amortized = price_instrument(amortizer, market, AS_OF, metrics=['duration_mod', 'ytm'])
+bullet = price_instrument(json.dumps(instruments('foundations')['USD-CORP']), market, AS_OF, metrics=['duration_mod'])
+assert amortized.price > 0
+assert amortized.get_metric('duration_mod') < bullet.get_metric('duration_mod')
+print({'amortizer_duration': amortized.get_metric('duration_mod'), 'bullet_duration': bullet.get_metric('duration_mod')})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.1" block="amortizer-proof" />
+
+
+### Create a coupon step-up
+
+The coupon changes from 5.5% to 6.5% in January 2027. Exported flows make the contractual effect inspectable. This initial price is curve-driven; exercise B holds the quote fixed instead.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="bond-step-up-yield" role="build" */}
+```python exec id=bond-step-up-yield role=build
+import json
+from datetime import date
+from finstack_quant.cashflows.builder import CashFlowSchedule,StepUpCouponSpec,ScheduleParams
+from finstack_quant.core.dates import DayCount
+from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments import bond_from_cashflows_json,price_instrument,instrument_cashflows_json
+from _shared.analyst_book import AS_OF,build_market
+step_schedule=(CashFlowSchedule.builder().principal(Money(2_000_000,'USD'),date(2024,1,15),date(2030,1,15))
+ .step_up_cf(StepUpCouponSpec(0.055,[(date(2027,1,15),0.065)],ScheduleParams('6M',DayCount.THIRTY_360,'weekends_only'))).build())
+step_bond=bond_from_cashflows_json('STEP-UP',step_schedule.to_json(),'USD-OIS')
+step_price=price_instrument(step_bond,build_market('foundations'),AS_OF,metrics=['ytm'])
+assert step_price.price>0
+print({'stepup_price_USD':step_price.price,'curve_implied_street_ytm':step_price.get_metric('ytm')})
+print(json.loads(instrument_cashflows_json(step_bond,build_market('foundations'),AS_OF,'discounting'))['flows'][:3])
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.1" block="bond-step-up-yield" />
+
+
+</BuildIt>
+
+<LabCard notebook="02_pricing/pricing_fundamentals.ipynb" title="Pricing Fundamentals" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<LabCard notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" title="Bonds And Fixed Income" description="Open the complete executable notebook, including the source calculations and required exercises." />
+
+<Exercise id="exercise-settlement-assumptions" title="A. Change settlement without changing the question" question={"Move settlement from T+1 to T+2 under both a fixed 99 clean quote and a fixed curve. Reconcile clean, dirty and accrued amounts."}>
+
+For the fixed quote, the clean currency amount is unchanged and accrued interest increases. Under a fixed curve, the assertion deliberately requires a clean-price change. Explain the difference using financing and the quote date, rather than attributing it to a bad day-count implementation.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="exercise-settlement-assumptions" role="exercise" */}
+```python exec id=exercise-settlement-assumptions role=exercise
+import copy, json, math
+from finstack_quant.valuations.instruments import Bond, price_instrument, list_models_grouped, list_standard_metrics
+from _shared.analyst_book import AS_OF, build_market, instruments
+
+market = build_market('foundations')
+base = instruments('foundations')['USD-CORP']
+typed = Bond.from_json(json.dumps(base))
+metrics = ['clean_price', 'dirty_price', 'accrued', 'ytm']
+priced = price_instrument(typed, market, AS_OF, metrics=metrics)
+assert abs(priced.get_metric('dirty_price') - priced.get_metric('clean_price') - priced.get_metric('accrued')) < 1e-6
+yield_quote = copy.deepcopy(base)
+yield_quote['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_ytm': priced.get_metric('ytm')}}
+roundtrip = price_instrument(json.dumps(yield_quote), market, AS_OF, metrics=metrics)
+assert abs(roundtrip.get_metric('dirty_price') - priced.get_metric('dirty_price')) < 0.01
+settlement_rows = []
+for fixed_quote in (False, True):
+    rows = []
+    for days in (1, 2):
+        bond = copy.deepcopy(base)
+        bond['instrument']['spec']['settlement_days'] = days
+        if fixed_quote:
+            bond['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_clean_price': 99.0}}
+        result = price_instrument(json.dumps(bond), market, AS_OF, metrics=metrics)
+        rows.append({name: result.get_metric(name) for name in metrics})
+        assert abs(rows[-1]['dirty_price'] - rows[-1]['clean_price'] - rows[-1]['accrued']) < 1e-6
+    assert rows[1]['accrued'] > rows[0]['accrued']
+    if fixed_quote:
+        assert abs(rows[1]['clean_price'] - rows[0]['clean_price']) < 1e-6
+    else:
+        assert abs(rows[1]['clean_price'] - rows[0]['clean_price']) > 1e-4
+    settlement_rows.append((fixed_quote, rows))
+assert 'discounting' in list_models_grouped()['bond'] and 'accrued' in list_standard_metrics()
+print(settlement_rows)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.1" block="exercise-settlement-assumptions" />
+
+</Exercise>
+
+<Exercise id="exercise-step-up-coupon" title="B. Increase future coupons" question={"Build the native step-up bond, then compare its yield with the bullet at the same 100 clean quote."}>
+
+The exercise creates fresh serialized copies of the displayed native schedule and foundation bond. Both have the same clean currency price. The extra future coupon cash must be offset by a higher discounting yield to reproduce that price; comparing their curve-driven yields would answer a different question.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="exercise-step-up-coupon" role="exercise" */}
+```python exec id=exercise-step-up-coupon role=exercise
+import copy,json
+from finstack_quant.valuations.instruments import price_instrument
+from _shared.analyst_book import AS_OF,build_market,instruments
+# Reuse the displayed native schedule, while creating independent instrument and market values.
+step=json.loads(step_bond);bullet=instruments('foundations')['USD-CORP']
+yields={}
+for name,contract in [('bullet',bullet),('stepup',step)]:
+ contract['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price':100.0}}
+ result=price_instrument(json.dumps(contract),build_market('foundations'),AS_OF,metrics=['ytm','clean_price'])
+ yields[name]=result.get_metric('ytm')
+ assert abs(result.get_metric('clean_price')-2_000_000)<0.01
+assert yields['stepup']>yields['bullet']
+print({'same_clean_price_pct':100.0,'street_yields_decimal':yields})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.1" block="exercise-step-up-coupon" />
+
+</Exercise>
+
+<Exercise id="exercise-street-true-yield" title="C. Separate yield conventions" question={"Calculate street YTM and an actual-date IRR for the same 99 quote, convert the IRR to a nominal semiannual rate, and explain the residual."}>
+
+First export the contract cashflows without a price-pinning quote, then use those amounts with the quoted dirty settlement price. The exporter verifies a model PV reconciliation, so a quoted price that differs from curve PV should not be passed as if it were an unquoted cashflow decomposition. The remaining roughly quarter-basis-point difference in this fixture reflects date/convention treatment after annualization is aligned.
+
+{/* notebook-block notebook="02_pricing/instruments/bonds_and_fixed_income.ipynb" cell="exercise-street-true-yield" role="exercise" */}
+```python exec id=exercise-street-true-yield role=exercise
+import json,math
+from datetime import date
+from finstack_quant.core.dates import add_business_days
+from finstack_quant.portfolio import mwr_xirr
+from finstack_quant.valuations.instruments import price_instrument,instrument_cashflows_json
+from _shared.analyst_book import AS_OF,build_market,instruments
+contract=instruments('foundations')['USD-CORP']
+contract['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price':99.0}}
+market=build_market('foundations')
+result=price_instrument(json.dumps(contract),market,AS_OF,metrics=['ytm','dirty_price'])
+settle=add_business_days(AS_OF,1,'usny')
+flow_contract=instruments('foundations')['USD-CORP']
+flows=json.loads(instrument_cashflows_json(json.dumps(flow_contract),market,AS_OF,'discounting'))['flows']
+dated=[(date.fromisoformat(f['date']),float(f['amount'])) for f in flows if date.fromisoformat(f['date'])>settle]
+price=result.get_metric('dirty_price');xirr=mwr_xirr([(settle,-price)]+dated)
+npv=-price+sum(amount/(1+xirr)**((day-settle).days/365) for day,amount in dated)
+street=result.get_metric('ytm');equivalent=2*((1+xirr)**0.5-1)
+assert abs(npv)/price<1e-8 and abs(equivalent-street)>1e-8
+contract['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_ytm':street}}
+assert abs(price_instrument(json.dumps(contract),market,AS_OF,metrics=['dirty_price']).get_metric('dirty_price')-price)<.01
+print({'settlement':settle,'street_semiannual_yield':street,'actual_date_effective_yield':xirr,'actual_date_semiannual_equivalent':equivalent,'difference_bp':(equivalent-street)*1e4,'XIRR_NPV_USD':npv})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="2.1" block="exercise-street-true-yield" />
+
+</Exercise>
+
+<CheckYourself>
+
+1. **Does 98.35 mean USD 98.35?** Only for exactly USD 100 of principal; it is normally a clean percentage-of-par quote.
+2. **What does a YTM root prove?** That a stated discount convention reproduces a stated price, not that the investor will realize that return.
+3. **Why does accrued interest not fully explain a fixed-curve settlement change?** Settlement financing and entitled cashflows also matter.
+4. **Can yield-to-worst value an issuer option?** No. It compares quote-based workout yields; option valuation requires a model of rates and exercise.
+5. **What must an amortizer change before pricing?** Both principal repayment dates and subsequent coupon bases.
+
+</CheckYourself>

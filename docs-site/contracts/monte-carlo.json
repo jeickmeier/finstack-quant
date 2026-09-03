@@ -1,0 +1,344 @@
+[
+  {
+    "lesson_id": "2.6",
+    "notebook": "07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb",
+    "cell_ids": [
+      "mc-bs-anchor",
+      "mc-convergence",
+      "mc-process-inputs",
+      "gbm-path-capture",
+      "mc-parallel-replay",
+      "antithetic-pair-arithmetic",
+      "mc-crn-greeks",
+      "heston-qe-pricing",
+      "mc-error-scaling",
+      "heston-feller-boundary",
+      "antithetic-even-payoff"
+    ],
+    "imports": [
+      "finstack_quant.models.bs_greeks",
+      "finstack_quant.models.bs_price",
+      "finstack_quant.models.monte_carlo.EuropeanPricer",
+      "finstack_quant.models.monte_carlo.LsmcPricer",
+      "finstack_quant.models.monte_carlo.finite_diff_delta",
+      "finstack_quant.models.monte_carlo.finite_diff_delta_crn",
+      "finstack_quant.models.monte_carlo.finite_diff_gamma",
+      "finstack_quant.models.monte_carlo.finite_diff_gamma_crn",
+      "finstack_quant.models.monte_carlo.heston_satisfies_feller",
+      "finstack_quant.models.monte_carlo.price_heston_call",
+      "finstack_quant.models.monte_carlo.price_heston_put",
+      "finstack_quant.models.monte_carlo.simulate_gbm_paths"
+    ],
+    "models": [],
+    "metrics": [],
+    "returned_types": [
+      "finstack_quant.models.monte_carlo.MoneyEstimate",
+      "finstack_quant.models.monte_carlo.Estimate",
+      "finstack_quant.models.monte_carlo.GbmPathSummary",
+      "finstack_quant.models.BsGreeks"
+    ],
+    "expected_exceptions": [
+      {
+        "operation": "finstack_quant.models.monte_carlo.simulate_gbm_paths",
+        "type": "ValueError",
+        "condition": "antithetic=True is not supported by the captured-path API; the message identifies antithetic capture."
+      }
+    ],
+    "support_notes": [
+      "EuropeanPricer, PathDependentPricer and LsmcPricer are fixed-GBM helpers; their models field is empty because no registry model key is supplied.",
+      "European serial and parallel estimates replay identically with the same seed, grid and inputs.",
+      "For one-step LsmcPricer antithetics, num_paths=N counts independent pair means and num_simulated_paths=2N counts generated trajectories. Compare with 2N plain samples at the same raw-path budget.",
+      "The captured GBM helper includes the initial state; it does not expose engine or scheme injection.",
+      "Four times as many independent samples halves the theoretical standard-error scale, not the realized absolute error of every seed.",
+      "The source set also includes stochastic_processes, discretization_schemes and monte_carlo_simulation; the principal notebook identifies the replay proof."
+    ],
+    "source_cells": [
+      {
+        "notebook": "07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb",
+        "id": "mc-bs-anchor",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb",
+        "id": "mc-convergence",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/stochastic_processes.ipynb",
+        "id": "mc-process-inputs",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/stochastic_processes.ipynb",
+        "id": "gbm-path-capture",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb",
+        "id": "mc-parallel-replay",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo_simulation.ipynb",
+        "id": "antithetic-pair-arithmetic",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb",
+        "id": "mc-crn-greeks",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/stochastic_processes.ipynb",
+        "id": "heston-qe-pricing",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/discretization_schemes.ipynb",
+        "id": "mc-error-scaling",
+        "role": "exercise"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/stochastic_processes.ipynb",
+        "id": "heston-feller-boundary",
+        "role": "exercise"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/discretization_schemes.ipynb",
+        "id": "antithetic-even-payoff",
+        "role": "exercise"
+      }
+    ]
+  },
+  {
+    "lesson_id": "2.7",
+    "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+    "cell_ids": [
+      "path-payoff-imports",
+      "asian-contract-benchmarks",
+      "nested-barrier-monitoring",
+      "lsmc-held-out-policy",
+      "bermudan-hw1f-pricing",
+      "lookback-matched-payoffs",
+      "lsmc-overfit-panel",
+      "quanto-correlation-proof",
+      "lsmc-held-out-price-plot",
+      "lsmc-policy-schematic",
+      "lsmc-path-count-study"
+    ],
+    "imports": [
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.market_data.MarketContext",
+      "finstack_quant.models.asian_option_price",
+      "finstack_quant.models.barrier_call",
+      "finstack_quant.models.bs_price",
+      "finstack_quant.models.monte_carlo.EuropeanPricer",
+      "finstack_quant.models.monte_carlo.LsmcPricer",
+      "finstack_quant.models.monte_carlo.PathDependentPricer",
+      "finstack_quant.models.monte_carlo.simulate_gbm_paths",
+      "finstack_quant.models.quanto_option_price",
+      "finstack_quant.valuations.instruments.Swaption",
+      "finstack_quant.valuations.instruments.list_models_grouped",
+      "finstack_quant.valuations.instruments.price_instrument"
+    ],
+    "models": [
+      "hull_white_1f",
+      "monte_carlo_hull_white_1f"
+    ],
+    "metrics": [
+      "mc_stderr",
+      "lsmc_num_paths",
+      "lsmc_seed",
+      "lsmc_ci95_low",
+      "lsmc_ci95_high"
+    ],
+    "returned_types": [
+      "finstack_quant.models.monte_carlo.MoneyEstimate",
+      "finstack_quant.models.monte_carlo.GbmPathSummary",
+      "finstack_quant.valuations.ValuationResult"
+    ],
+    "expected_exceptions": [
+      {
+        "operation": "finstack_quant.models.monte_carlo.LsmcPricer.price_american_put_unbiased",
+        "type": "ValueError",
+        "condition": "pricing_seed equals the training seed; the message identifies pricing_seed."
+      }
+    ],
+    "support_notes": [
+      "asian_option_price with arithmetic averaging is the Turnbull-Wakeman approximation; geometric averaging uses the exact benchmark. One terminal fixing reduces both to the matched European contract.",
+      "barrier_call prices continuous monitoring and accepts no monitoring-frequency parameter. The discrete sweep uses nested observations on the same captured fine paths.",
+      "price_american_put_unbiased evaluates a fitted exercise policy on independent pricing paths. Its Monte Carlo interval does not include exercise-grid or learned-policy error.",
+      "No exercise-boundary object is exposed by LsmcPricer. A clearly labelled prescribed schematic is independent of engine output; actual spot-price and path-count plots report held-out policy values with sampling bars and explicit policy/grid-error limits.",
+      "Fixed-strike lookback is computed directly on captured GBM paths and dominates the matched terminal vanilla payoff path by path. The continuous fixed-strike helper is deliberately excluded: its M>=K branch calls the floating-strike formula, creating a discontinuity at K=M (17.216802 at K=100 versus 19.167624 at K=100.000001 for S=M=100, r=5%, q=0, sigma=20%, T=1). No analytical accuracy claim is made for the substituted discrete payoff.",
+      "quanto_option_price is validated by a correlation sweep with domestic-currency-per-foreign FX quotation and unit contractual conversion: effective foreign-equity drift r_f-q-rho*sigma_s*sigma_fx; equal domestic/foreign rates with rho=0 reduce to the vanilla formula.",
+      "The mapped exotic_rates notebook prices an explicitly configured co-terminal Bermudan with both registered Hull-White 1F tree and Monte Carlo models. Seed replay, path count, finite standard error and a fixture-specific cross-method tolerance execute. The default LSMC diagnostic is not a held-out policy-error bound; this registered wrapper does not expose the independent pricing_seed argument of the standalone GBM helper."
+    ],
+    "source_cells": [
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "id": "path-payoff-imports",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "id": "asian-contract-benchmarks",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "id": "nested-barrier-monitoring",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "id": "lsmc-held-out-policy",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/exotic_rates.ipynb",
+        "id": "bermudan-hw1f-pricing",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "id": "lookback-matched-payoffs",
+        "role": "exercise"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "id": "lsmc-overfit-panel",
+        "role": "exercise"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "id": "quanto-correlation-proof",
+        "role": "exercise"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "id": "lsmc-held-out-price-plot",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "id": "lsmc-policy-schematic",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "id": "lsmc-path-count-study",
+        "role": "build"
+      }
+    ]
+  },
+  {
+    "lesson_id": "2.8",
+    "notebook": "02_pricing/instruments/structured_credit.ipynb",
+    "cell_ids": [
+      "structured-note-redemption",
+      "structured-rate-coupon-arithmetic",
+      "two-asset-waterfall",
+      "copula-tranche-losses",
+      "base-correlation-quote",
+      "correlation-equity-senior",
+      "tranche-loss-threshold"
+    ],
+    "imports": [
+      "_shared.analyst_tracks",
+      "finstack_quant.core.market_data.BaseCorrelationCurve",
+      "finstack_quant.core.market_data.DiscountCurve",
+      "finstack_quant.core.market_data.MarketContext",
+      "finstack_quant.core.money.Money",
+      "finstack_quant.models.correlation.CopulaSpec",
+      "finstack_quant.models.correlation.CreditExposure",
+      "finstack_quant.models.correlation.LatentSingleFactor",
+      "finstack_quant.models.correlation.PortfolioLossConfig",
+      "finstack_quant.models.correlation.simulate_portfolio_loss",
+      "finstack_quant.valuations.callable_range_accrual_accrued",
+      "finstack_quant.valuations.instruments.price_instrument",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_breakeven_cdr",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_discount_margin",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_metrics",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_oas",
+      "finstack_quant.valuations.instruments.structured_credit_tranche_scenario_table",
+      "finstack_quant.valuations.inverse_floater_coupon_profile",
+      "finstack_quant.valuations.snowball_coupon_profile",
+      "finstack_quant.valuations.tarn_coupon_profile"
+    ],
+    "models": [
+      "monte_carlo_gbm",
+      "hazard_rate"
+    ],
+    "metrics": [
+      "TrancheMetrics.pv (USD)",
+      "TrancheMetrics.price_pct (percent of par)",
+      "TrancheMetrics.wal (years)",
+      "OasResult.oas (decimal spread)",
+      "scenario writedown (USD)"
+    ],
+    "returned_types": [
+      "finstack_quant.valuations.ValuationResult",
+      "finstack_quant.valuations.instruments.TrancheMetrics",
+      "finstack_quant.valuations.instruments.OasResult",
+      "finstack_quant.valuations.instruments.ScenarioTable",
+      "finstack_quant.models.correlation.PortfolioLossResult",
+      "finstack_quant.models.correlation.TrancheLossStatistics"
+    ],
+    "expected_exceptions": [
+      {
+        "operation": "finstack_quant.valuations.instruments.structured_credit_tranche_discount_margin",
+        "type": "ValueError",
+        "condition": "The BBB fixture has a fixed coupon; the floating discount-margin solver rejects it."
+      }
+    ],
+    "support_notes": [
+      "The supported JSON instrument type is autocallable, dispatched through its registered GBM model. All observed fixings are supplied, so this proof takes the deterministic known-redemption branch.",
+      "Zero coupons, unreachable autocall barriers and a zero discount rate isolate the final capital-protection, participation and knock-in-put redemption contracts.",
+      "The note holder is short the knock-in put: principal is reduced by the put loss after breach. A breach followed by full spot recovery returns principal.",
+      "This proof is a payoff-contract identity, not an issuer-credit or new-issue valuation model.",
+      "StructuredCredit requires actual positive PoolAssets for pricing; metadata-only rep lines are not a substitute. The separate track fixture tests supply the pool, waterfall and base-correlation evidence.",
+      "The mapped exotic_rates notebook hand-reconciles the TARN target and truncated final coupon, snowball recursion, inverse-floater gearing, and an inclusive range-accrual observation fraction. These are coupon-profile arithmetic helpers, not complete callable-note or issuer-credit valuation models.",
+      "The two-asset cashflow waterfall now directly reconciles all three native tranche PVs to one-period receipts, with real positive PoolAssets.",
+      "Finite-pool Gaussian exposures use sqrt(asset correlation) loadings. Expected pool loss is PD times LGD times notional; exact pathwise loss tranches reconcile to native tranche statistics.",
+      "The native breakeven CDR is the first-writedown threshold, not a par-price target. OAS reprices model price to approximately zero spread; fixed-coupon discount margin is explicitly rejected.",
+      "Cash-stack attachment coordinates differ from the loss-only tranche coordinates used by PortfolioLossResult. Base-correlation knots are detachment percentage points; correlations are decimals."
+    ],
+    "source_cells": [
+      {
+        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "id": "structured-note-redemption",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/exotic_rates.ipynb",
+        "id": "structured-rate-coupon-arithmetic",
+        "role": "build"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "id": "two-asset-waterfall",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/correlation_and_credit_models.ipynb",
+        "id": "copula-tranche-losses",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/correlation_and_credit_models.ipynb",
+        "id": "base-correlation-quote",
+        "role": "build"
+      },
+      {
+        "notebook": "07_advanced_quant/correlation_and_credit_models.ipynb",
+        "id": "correlation-equity-senior",
+        "role": "exercise"
+      },
+      {
+        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "id": "tranche-loss-threshold",
+        "role": "exercise"
+      }
+    ]
+  }
+]

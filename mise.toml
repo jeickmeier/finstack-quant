@@ -373,15 +373,15 @@ description = "Initialize Python virtual environment"
 run = "uv venv --python 3.12 --allow-existing"
 
 [tasks.python-sync]
-description = "Sync Python dev dependencies (uv sync --group dev)"
-run = "uv sync --group dev"
+description = "Sync Python dev dependencies; python-build installs the native extension"
+run = "uv sync --group dev --no-install-project"
 
 [tasks.python-build]
 description = "Build Python bindings in-place (pass --release for optimized build)"
 usage = '''
 flag "--release" help="Build with release profile (slower compile, faster runtime)"
 '''
-run = 'uv run maturin develop{% if usage.release %} --release{% endif %}'
+run = 'uv run --no-sync maturin develop{% if usage.release %} --release{% endif %}'
 
 [tasks.materialization-benchmark-fixtures]
 description = "Generate deterministic portfolio materialization benchmark fixtures"
@@ -540,7 +540,7 @@ description = "Update Python dependencies"
 run = "uv lock --upgrade"
 
 [tasks.python-examples]
-description = "Run Python example notebooks"
+description = "Run every Python notebook; fail on skipped cells, errors, runtime warnings, or stderr"
 run = "uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py"
 
 # ─────────────────────────────────────────────────────────────────
@@ -929,3 +929,30 @@ uv run python scripts/sync_materialization_benchmark_digest.py \
   --document benchmarks/MATERIALIZATION_BENCHMARKS.md --write
 mise run materialization-benchmark-doc-check
 """
+[tasks.docs-site-curriculum]
+description = "Validate analyst curriculum mappings and supported Python imports"
+run = "uv run --no-sync python docs-site/gen/check_curriculum.py --check-api"
+
+[tasks.docs-site-snippets]
+description = "Execute displayed analyst lesson code and isolated exercise solutions"
+run = "uv run --no-sync python docs-site/gen/run_lesson_snippets.py --require-all"
+
+[tasks.docs-site-labs]
+description = "Execute clean copied notebooks with zero runtime warnings or stderr, then export rich labs"
+run = "uv run --no-sync python docs-site/gen/build_labs.py"
+
+[tasks.docs-site-test]
+description = "Test analyst curriculum, strict notebook execution, fixture and runner contracts"
+run = "uv run --no-sync pytest docs-site/tests finstack-quant-py/tests/test_run_all_notebooks.py finstack-quant-py/tests/test_analyst_fixtures.py finstack-quant-py/tests/test_analyst_tracks.py finstack-quant-py/tests/test_analyst_margin.py finstack-quant-py/tests/test_analyst_liquidity.py finstack-quant-py/tests/models/test_analyst_monte_carlo.py"
+
+[tasks.docs-site-prerequisites]
+description = "Verify all 33 workflows against current, warning-free executed notebook copies"
+run = "uv run --no-sync python docs-site/gen/verify_prerequisites.py"
+
+[tasks.docs-site-build]
+description = "Run the strict analyst publication gate, including warning-free labs, and build the local site"
+run = "uv run --no-sync python docs-site/gen/build_site.py"
+
+[tasks.docs-site-dev]
+description = "Open the local analyst documentation development server"
+run = "npm --prefix docs-site run dev"

@@ -1,0 +1,336 @@
+# Canonical execution order, dependencies, fixtures, labs and examples.
+fixtures = ["foundations", "rates", "options", "base", "common", "history", "borrower", "credit", "volatility", "waterfall", "liquidity"]
+
+[[lesson]]
+id = "1.1"
+part = "1"
+title = "Money, Currency, and Why Determinism Matters"
+path = "1/1.1-money-currency-and-why-determinism-matters.mdx"
+requires = []
+fixtures = ["foundations"]
+labs = ["01_foundations/core_types_and_money.ipynb", "01_foundations/registry_defaults_and_overrides.ipynb"]
+examples = []
+
+[[lesson]]
+id = "1.2"
+part = "1"
+title = "Time: Dates, Calendars, and Day Counts"
+path = "1/1.2-time-dates-calendars-and-day-counts.mdx"
+requires = ["1.1"]
+fixtures = ["foundations"]
+labs = ["01_foundations/dates/day_count_conventions.ipynb", "01_foundations/dates/holiday_calendars.ipynb", "01_foundations/dates/schedule_building.ipynb"]
+examples = []
+
+[[lesson]]
+id = "1.3"
+part = "1"
+title = "Rates, Compounding, and Discounting"
+path = "1/1.3-rates-compounding-and-discounting.mdx"
+requires = ["1.2"]
+fixtures = ["foundations"]
+labs = ["01_foundations/math_toolkit.ipynb", "01_foundations/market_data/discount_curves.ipynb"]
+examples = []
+
+[[lesson]]
+id = "1.4"
+part = "1"
+title = "Curves: Bootstrapping and the Multi-Curve World"
+path = "1/1.4-curves-bootstrapping-and-the-multi-curve-world.mdx"
+requires = ["1.3"]
+fixtures = ["foundations"]
+labs = ["01_foundations/market_data/discount_curves.ipynb", "01_foundations/market_bootstrap_tour.ipynb"]
+examples = []
+
+[[lesson]]
+id = "1.5"
+part = "1"
+title = "Market Data Beyond Rates: Vols, Hazards, FX Surfaces"
+path = "1/1.5-market-data-beyond-rates-vols-hazards-fx-surfaces.mdx"
+requires = ["1.4"]
+fixtures = ["foundations"]
+labs = ["01_foundations/market_data/vol_surfaces.ipynb", "01_foundations/market_data/hazard_curves.ipynb"]
+examples = []
+
+[[lesson]]
+id = "2.1"
+part = "2"
+title = "Bonds I: Price, Yield, and Convention"
+path = "2/2.1-bonds-i-price-yield-and-convention.mdx"
+requires = ["1.5"]
+fixtures = ["foundations"]
+labs = ["02_pricing/pricing_fundamentals.ipynb", "02_pricing/instruments/bonds_and_fixed_income.ipynb"]
+examples = []
+
+[[lesson]]
+id = "2.2"
+part = "2"
+title = "Bonds II: Duration, DV01, and Spread Measures"
+path = "2/2.2-bonds-ii-duration-dv01-and-spread-measures.mdx"
+requires = ["2.1"]
+fixtures = ["foundations"]
+labs = ["02_pricing/instruments/bonds_and_fixed_income.ipynb", "02_pricing/pnl_attribution.ipynb"]
+examples = []
+
+[[lesson]]
+id = "2.3"
+part = "2"
+title = "Swaps and Rates Derivatives"
+path = "2/2.3-swaps-and-rates-derivatives.mdx"
+requires = ["2.2"]
+fixtures = ["rates"]
+labs = ["02_pricing/instruments/rates_derivatives.ipynb"]
+examples = ["02_pricing/pricing_across_asset_classes.ipynb"]
+
+[[lesson]]
+id = "2.4"
+part = "2"
+title = "Options and Volatility: BSM, Greeks, and the Smile"
+path = "2/2.4-options-and-volatility-bsm-greeks-and-the-smile.mdx"
+requires = ["2.3"]
+fixtures = ["options"]
+labs = ["02_pricing/instruments/equity_and_options.ipynb", "01_foundations/market_data/sabr_volatility.ipynb"]
+examples = ["02_pricing/instruments/fourier_pricing.ipynb", "02_pricing/instruments/fx_instruments.ipynb"]
+
+[[lesson]]
+id = "2.5"
+part = "2"
+title = "Credit: Survival Curves, CDS, and the ISDA Model"
+path = "2/2.5-credit-survival-curves-cds-and-the-isda-model.mdx"
+requires = ["2.4"]
+fixtures = ["base"]
+labs = ["01_foundations/market_data/hazard_curves.ipynb", "02_pricing/instruments/credit_derivatives.ipynb"]
+examples = ["02_pricing/instruments/credit_events_and_restructuring.ipynb"]
+
+[[lesson]]
+id = "2.6"
+part = "2"
+title = "Monte Carlo I: Processes, Paths, and Honest Error Bars"
+path = "2/2.6-monte-carlo-i-processes-paths-and-honest-error-bars.mdx"
+requires = ["2.4"]
+fixtures = ["base"]
+labs = ["07_advanced_quant/monte_carlo/stochastic_processes.ipynb", "07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb", "07_advanced_quant/monte_carlo/discretization_schemes.ipynb"]
+examples = ["07_advanced_quant/monte_carlo_simulation.ipynb"]
+
+[[lesson]]
+id = "2.7"
+part = "2"
+title = "Monte Carlo II: Path Dependence and Early Exercise"
+path = "2/2.7-monte-carlo-ii-path-dependence-and-early-exercise.mdx"
+requires = ["2.6", "2.3"]
+fixtures = ["base"]
+labs = ["07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb", "02_pricing/instruments/exotic_rates.ipynb"]
+examples = []
+
+[[lesson]]
+id = "2.8"
+part = "2"
+title = "Structured Products and Correlation"
+path = "2/2.8-structured-products-and-correlation.mdx"
+requires = ["2.7", "2.5"]
+fixtures = ["base"]
+labs = ["02_pricing/instruments/structured_credit.ipynb", "07_advanced_quant/correlation_and_credit_models.ipynb"]
+examples = ["07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb", "02_pricing/instruments/exotic_rates.ipynb"]
+
+[[lesson]]
+id = "3.1"
+part = "3"
+title = "Performance: Measuring What Happened"
+path = "3/3.1-performance-measuring-what-happened.mdx"
+requires = ["2.5"]
+fixtures = ["base", "history"]
+labs = ["03_analytics/performance_analytics.ipynb"]
+examples = []
+
+[[lesson]]
+id = "3.2"
+part = "3"
+title = "Risk: VaR, Factors, and Credit Calibration"
+path = "3/3.2-risk-var-factors-and-credit-calibration.mdx"
+requires = ["3.1", "2.8"]
+fixtures = ["base", "history"]
+labs = ["03_analytics/risk_and_factor_analytics.ipynb", "03_analytics/factor_sensitivity.ipynb", "05_portfolio/credit_factor_hierarchy.ipynb"]
+examples = ["03_analytics/feature_transforms.ipynb"]
+
+[[lesson]]
+id = "3.3"
+part = "3"
+title = "Portfolio Aggregation and the FX Collapse"
+path = "3/3.3-portfolio-aggregation-and-the-fx-collapse.mdx"
+requires = ["3.2"]
+fixtures = ["base", "history"]
+labs = ["05_portfolio/portfolio_construction_and_valuation.ipynb"]
+examples = ["05_portfolio/multi_asset_portfolio_at_scale.ipynb"]
+
+[[lesson]]
+id = "3.4"
+part = "3"
+title = "Attribution: Where Did the P&L Come From?"
+path = "3/3.4-attribution-where-did-the-p-l-come-from.mdx"
+requires = ["3.3", "3.1"]
+fixtures = ["base", "history"]
+labs = ["03_analytics/portfolio_returns_and_attribution.ipynb", "02_pricing/pnl_attribution.ipynb"]
+examples = []
+
+[[lesson]]
+id = "3.5"
+part = "3"
+title = "Scenarios and Stress: Asking \"What If\" Precisely"
+path = "3/3.5-scenarios-and-stress-asking-what-if-precisely.mdx"
+requires = ["3.3"]
+fixtures = ["base", "history"]
+labs = ["06_scenarios/scenarios_and_stress_testing.ipynb", "05_portfolio/historical_replay.ipynb", "06_scenarios/composite_stress_tests.ipynb", "05_portfolio/horizon_total_return.ipynb"]
+examples = ["06_scenarios/credit_scenarios.ipynb", "06_scenarios/rate_scenarios.ipynb"]
+
+[[lesson]]
+id = "3.6"
+part = "3"
+title = "Margin, Collateral, and Capital: The Cost of Holding Risk"
+path = "3/3.6-margin-collateral-and-capital-the-cost-of-holding-risk.mdx"
+requires = ["3.4", "3.5"]
+fixtures = ["base", "history"]
+labs = ["07_advanced_quant/margin_collateral_and_xva.ipynb", "07_advanced_quant/regulatory_capital.ipynb"]
+examples = []
+
+[[lesson]]
+id = "4.1"
+part = "4"
+title = "Statement Modeling: Companies as Deterministic Graphs"
+path = "4/4.1-statement-modeling-companies-as-deterministic-graphs.mdx"
+requires = ["3.6"]
+fixtures = ["borrower", "base"]
+labs = ["04_statement_modeling/statement_modeling.ipynb", "04_statement_modeling/models/three_statement_model.ipynb", "04_statement_modeling/statement_analytics.ipynb"]
+examples = []
+
+[[lesson]]
+id = "4.2"
+part = "4"
+title = "Fundamental Valuation: DCF, Sensitivity, and Scenarios"
+path = "4/4.2-fundamental-valuation-dcf-sensitivity-and-scenarios.mdx"
+requires = ["4.1", "2.6"]
+fixtures = ["borrower", "base"]
+labs = ["04_statement_modeling/models/dcf_valuation.ipynb", "04_statement_modeling/models/lbo_analysis.ipynb"]
+examples = []
+
+[[lesson]]
+id = "4.3"
+part = "4"
+title = "Private Credit: Covenants, Scoring, and Expected Loss"
+path = "4/4.3-private-credit-covenants-scoring-and-expected-loss.mdx"
+requires = ["4.2", "2.5"]
+fixtures = ["common", "borrower"]
+labs = ["04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb", "04_statement_modeling/models/credit_scoring_and_pd.ipynb", "04_statement_modeling/models/covenant_monitoring.ipynb", "07_advanced_quant/correlation/structural_credit_models.ipynb"]
+examples = ["04_statement_modeling/models/credit_analysis.ipynb", "04_statement_modeling/models/debt_waterfall.ipynb"]
+
+[[lesson]]
+id = "4.4"
+part = "4"
+title = "Portfolio Construction and Liquidity"
+path = "4/4.4-portfolio-construction-and-liquidity.mdx"
+requires = ["4.3", "3.2"]
+fixtures = ["common", "borrower", "liquidity"]
+labs = ["05_portfolio/portfolio_optimization.ipynb", "05_portfolio/liquidity_risk.ipynb", "05_portfolio/portfolio_risk_decomposition.ipynb"]
+examples = []
+
+[[lesson]]
+id = "4.5"
+part = "4"
+title = "Reporting: Communicating to a PM"
+path = "4/4.5-reporting-communicating-to-a-pm.mdx"
+requires = ["4.4", "3.4"]
+fixtures = ["common", "borrower"]
+labs = ["09_reporting/reporting_performance_tearsheet.ipynb", "09_reporting/reporting_portfolio_risk_tearsheet.ipynb"]
+examples = ["09_reporting/reporting_attribution_tearsheet.ipynb", "09_reporting/reporting_scenario_tearsheet.ipynb", "09_reporting/reporting_credit_tearsheet.ipynb", "09_reporting/reporting_statement_tearsheet.ipynb", "03_analytics/performance_analytics.ipynb", "03_analytics/portfolio_returns_and_attribution.ipynb"]
+
+[[lesson]]
+id = "C1"
+part = "C"
+title = "Complex Bonds: Amortizers, Step-Ups, PIK, and Calls"
+path = "C/C1-complex-bonds-amortizers-step-ups-pik-and-calls.mdx"
+requires = ["4.3", "2.7"]
+fixtures = ["credit", "common"]
+labs = ["02_pricing/instruments/bonds_and_fixed_income.ipynb", "02_pricing/instruments/complex_cashflows.ipynb"]
+examples = []
+
+[[lesson]]
+id = "C2"
+part = "C"
+title = "Loans, Delayed Draws, and Revolvers"
+path = "C/C2-loans-delayed-draws-and-revolvers.mdx"
+requires = ["C1"]
+fixtures = ["credit", "common"]
+labs = ["02_pricing/instruments/loans_and_credit_facilities.ipynb"]
+examples = []
+
+[[lesson]]
+id = "C3"
+part = "C"
+title = "Securitized Products: CLO, ABS, CMBS, RMBS"
+path = "C/C3-securitized-products-clo-abs-cmbs-rmbs.mdx"
+requires = ["C2", "2.8"]
+fixtures = ["credit", "common"]
+labs = ["02_pricing/instruments/structured_credit.ipynb", "07_advanced_quant/correlation/clo_tranche_modeling.ipynb"]
+examples = []
+
+[[lesson]]
+id = "C4"
+part = "C"
+title = "Index Credit: CDX, Tranches, and Credit Index Options"
+path = "C/C4-index-credit-cdx-tranches-and-credit-index-options.mdx"
+requires = ["C3", "2.4", "3.5"]
+fixtures = ["credit", "common"]
+labs = ["02_pricing/instruments/credit_index_and_options.ipynb"]
+examples = []
+
+[[lesson]]
+id = "C5"
+part = "C"
+title = "Convertible Bonds"
+path = "C/C5-convertible-bonds.mdx"
+requires = ["C1", "2.4"]
+fixtures = ["credit", "common"]
+labs = ["02_pricing/instruments/convertible_bonds.ipynb"]
+examples = []
+
+[[lesson]]
+id = "V1"
+part = "V"
+title = "Exchange-Traded Futures and Options"
+path = "V/V1-exchange-traded-futures-and-options.mdx"
+requires = ["3.6"]
+fixtures = ["volatility", "base"]
+labs = ["02_pricing/instruments/futures_and_listed_options.ipynb"]
+examples = []
+
+[[lesson]]
+id = "V2"
+part = "V"
+title = "Volatility as an Asset: Variance Swaps and VIX"
+path = "V/V2-volatility-as-an-asset-variance-swaps-and-vix.mdx"
+requires = ["V1", "2.7"]
+fixtures = ["volatility", "base"]
+labs = ["02_pricing/instruments/vix_and_variance.ipynb", "02_pricing/instruments/total_return_and_variance_swaps.ipynb"]
+examples = []
+
+[[lesson]]
+id = "V3"
+part = "V"
+title = "Commodity Futures and Options"
+path = "V/V3-commodity-futures-and-options.mdx"
+requires = ["V1", "2.7"]
+fixtures = ["volatility", "base"]
+labs = ["02_pricing/instruments/commodities.ipynb"]
+examples = []
+
+[[lesson]]
+id = "capstone"
+part = "capstone"
+title = "Track capstones: from market inputs to the PM report"
+path = "capstone/capstone-track-capstones-from-market-inputs-to-the-pm-report.mdx"
+requires = ["4.5"]
+fixtures = ["common", "credit", "volatility", "history", "borrower"]
+labs = ["08_capstone/end_to_end_credit_portfolio_workflow.ipynb", "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb"]
+examples = ["07_advanced_quant/margin_collateral_and_xva.ipynb"]
+
+[lesson.variants]
+credit = ["C4", "C5"]
+volatility = ["V2", "V3"]

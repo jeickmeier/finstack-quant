@@ -1,0 +1,327 @@
+---
+id: V1
+title: Exchange-Traded Futures and Options
+description: 'Analyst program lesson V1: Exchange-Traded Futures and Options'
+desk_question: '"Replace the cash bond hedge with futures. How many contracts, which
+  delivery month, and what basis risk did we just take on?"'
+references:
+- '#hull-options-futures'
+- '#black-1976'
+- '#hull-white-1990-pricing-interest-rate-derivatives'
+- '#tuckman-serrat-fixed-income'
+- '#sifma-tba-good-delivery'
+api:
+- finstack_quant.valuations.instruments.price_instrument
+- finstack_quant.models.monte_carlo.LsmcPricer
+- finstack_quant.core.dates.next_imm
+- finstack_quant.core.dates.imm_option_expiry
+status: published
+---
+
+<DeskContext question="Can a Treasury future replace the swap hedge, and what risk remains after the DV01 appears matched?">
+
+A future packages price exposure into exchange contracts with multipliers, expiry rules and settlement obligations. A Treasury future also gives the short a delivery choice. The cheapest-to-deliver bond can change as rates or financing move, changing the hedge even if the contract count does not.
+
+Build the quote-to-dollar mapping first. Then compare candidate deliverables, compute rate sensitivities, size the hedge and identify the residual curve and delivery basis. Extend the same discipline to short-rate, equity and FX futures and their options.
+
+</DeskContext>
+
+<Standard>
+
+### Contract value, daily cash and initial margin
+
+For `n` contracts and multiplier `m`, a price-point change `dF` produces `n*m*dF` of variation margin. Quoted Treasury prices are percentages of contract face; an index future's multiplier is dollars per index point; an FX future multiplier represents base-currency units with P&L settled in quote currency. A quote tick is not a dollar until the multiplier and position count are applied.
+
+CME describes futures settlement variation as cash mark-to-market banked daily. Transferring a futures mark into cash and resetting its reference quote must preserve combined wealth; adding both the old mark and the cash again would double-count P&L. [CME money calculations](https://www.cmegroup.com/education/articles-and-reports/money-calculations-for-futures-and-options).
+
+Initial margin secures potential future exposure over a liquidation horizon. It is distinct from yesterday's cash variation margin. A clearinghouse applies its own product and portfolio methodology. SIMM is for non-cleared derivatives, and the BCBS schedule also addresses non-centrally cleared derivatives. They cannot generate an exchange initial-margin estimate by relabeling the same risk. This lesson uses no external exchange-margin fixture and makes the CCP comparison qualitative. The [margin lesson](/learn/3.6) teaches supported bilateral calculations. [ISDA SIMM scope](https://www.isda.org/isda-solutions-infohub/isda-simm/), [BCBS margin standard](https://www.bis.org/committees/bcbs/basel-framework/standard/mgn?allChapters=true).
+
+### Short-rate convexity and forward carry
+
+A forward pays at its contractual settlement; daily futures settlement changes the financing of gains and losses. In the native short-rate example, an absolute normal rate volatility produces the zero-mean-reversion convexity approximation `0.5*sigma^2*T_start*T_end`. Its input is a decimal rate volatility per square-root year, such as 50 bp represented by `0.005`. Feeding a 20% Black relative volatility into that field would be a unit error.
+
+The positive convexity adjustment raises the model futures rate relative to the unadjusted forward and therefore lowers the `100-rate-percent` price. The exercise displays the adjustment explicitly. It does not claim the approximation covers every overnight averaging convention or stochastic-rate model.
+
+Equity carry relates spot, dividends and financing to a forward price. FX carry relates the spot quote to the ratio of foreign and domestic discount factors. Once the forward is the input to Black-76, that carry is already embedded; adding spot financing again double-counts it. The matched spot-option calculation below gives the same discounted European payoff as the futures option.
+
+### Delivery choice and hedge ratios
+
+For a Treasury deliverable, the conversion factor standardizes its invoice convention. Financing to delivery, coupon timing and the conversion factor determine the model delivery cost. Compare each eligible bond under the same market and choose the cheapest; a hard-coded CTD is a scenario assumption, not an invariant.
+
+The two-bond basket switches CTD after a 150 bp Treasury shift. This is a candidate-basket clean-price proxy, not a full delivery-option model. Repo specials, delivery timing and cash-futures basis can remain material. A parallel DV01 hedge and a ten-year key-rate hedge answer different questions. The common book's actual ten-year bucket is small; the code reports it as observed and does not create a large exposure merely to make the example dramatic.
+
+Both native DV01s use signed dollar changes for a one-basis-point upward shift. A ratio of equal-sign long-asset sensitivities gives the contracts to short. A negative ratio means the opposite direction. Integer rounding leaves a residual, and matching an OIS bucket with a Treasury bucket retains cross-curve basis risk.
+
+### Exercise and expiry
+
+An American option on a future can have early-exercise value. The native listed-option terms control exercise style. The independent LSMC check maps a lognormal futures price to the generic GBM helper by setting its drift to zero under deterministic rates; its “dividend yield” parameter equals the discount rate solely to achieve that drift. It is not an actual dividend cashflow. Held-out pricing separates policy fitting from path valuation, while finite exercise spacing and policy approximation remain.
+
+An IMM date, an option expiry and a delivery date are different lifecycle events. Use the correct helper for the contract. Rolling closes one exposure and opens another. The far-minus-near quote reflects carry and basis; it is not an upfront premium for opening a fair futures contract. Daily settlement cash and collateral financing belong in the wealth ledger.
+
+</Standard>
+
+<BuildIt>
+
+### Establish the independent volatility market and delivery basket
+
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-workflow-1" role="build" */}
+```python exec id=v1-workflow-1 role=build
+from pathlib import Path
+import sys
+from copy import deepcopy
+from datetime import date
+import json
+import math
+import numpy as np
+import pandas as pd
+from _shared import analyst_tracks as tracks
+from finstack_quant.valuations.instruments import price_instrument
+AS_OF = tracks.AS_OF
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-workflow-1" />
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-workflow-2" role="build" */}
+```python exec id=v1-workflow-2 role=build
+from finstack_quant.core.market_data import DiscountCurve
+inputs = tracks.futures_inputs()
+market = tracks.build_market("vol")
+rows = []
+for rate in [0.04, 0.055]:
+    scenario_market = tracks.build_market("vol")
+    scenario_market.insert(DiscountCurve("USD-TREASURY", AS_OF,
+        [(t, math.exp(-rate*t)) for t in [0.0, 1.0, 5.0, 10.0, 20.0]], day_count="act_365f"))
+    for iid in ["UST-DELIVERABLE-A", "UST-DELIVERABLE-B"]:
+        future = deepcopy(inputs["UST-FUTURE"])
+        future["instrument"]["spec"].update({"ctd_bond_id": iid, "ctd_bond": inputs[iid]["instrument"]["spec"]})
+        value = price_instrument(json.dumps(future), scenario_market, AS_OF,
+            model="bond_future_clean_price_proxy", metrics=["futures_price", "dv01", "conversion_factor"])
+        rows.append({"treasury_rate": rate, "deliverable": iid, **value.metrics})
+delivery = pd.DataFrame(rows)
+cheapest = delivery.loc[delivery.groupby("treasury_rate")["futures_price"].idxmin()]
+assert cheapest["deliverable"].tolist() == ["UST-DELIVERABLE-A", "UST-DELIVERABLE-B"]
+print(delivery)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-workflow-2" />
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-workflow-3" role="build" */}
+```python exec id=v1-workflow-3 role=build
+print(cheapest[["treasury_rate", "deliverable", "futures_price", "dv01"]])
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-workflow-3" />
+
+The CTD selection changes after the curve shock. The displayed DV01 therefore changes for two reasons: the bond's rate sensitivity moves and the selected bond can change.
+
+### Compare listed exercise styles, reconcile VM and check ticks
+
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-workflow-4" role="build" */}
+```python exec id=v1-workflow-4 role=build
+option = inputs["SPX-FUTURE-CALL"]
+european = price_instrument(json.dumps(option), market, AS_OF, model="discounting").value.amount
+american_option = deepcopy(option)
+american_option["instrument"]["spec"]["terms"]["exercise_style"] = "american"
+american = price_instrument(json.dumps(american_option), market, AS_OF, model="discounting").value.amount
+assert american >= european > 0
+print(pd.Series({"European_USD": european, "American_USD": american, "exercise_premium_USD": american-european}))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-workflow-4" />
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-workflow-5" role="build" */}
+```python exec id=v1-workflow-5 role=build
+settlements = np.array([5300.0, 5320.0, 5290.0, 5310.0])
+contracts, multiplier = 2, 50.0
+variation_margin = contracts * multiplier * np.diff(settlements)
+assert variation_margin.sum() == contracts * multiplier * (settlements[-1] - settlements[0])
+print(pd.DataFrame({"from": settlements[:-1], "to": settlements[1:], "variation_margin_usd": variation_margin}))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-workflow-5" />
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-workflow-6" role="build" */}
+```python exec id=v1-workflow-6 role=build
+contracts = 1_000_000 / 100_000
+quote_move = 1 / 64
+tick_pnl = contracts * 100_000 / 100 * quote_move
+assert tick_pnl == contracts * 15.625
+print(pd.Series({"contracts": contracts, "quote_move": quote_move, "pnl_usd": tick_pnl}))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-workflow-6" />
+
+### Add rate, equity and FX futures
+
+The rate-volatility sweep isolates the convexity term. The equity and FX marks then reconcile directly to their contract-count/multiplier/price-difference identity.
+
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-rates-convexity" role="build" */}
+```python exec id=v1-rates-convexity role=build
+from _shared.instrument_fixtures import ir_future,instrument_envelope
+from finstack_quant.core.market_data import VolSurface
+from finstack_quant.core.dates import next_imm,imm_option_expiry
+_,ir_raw=ir_future(0)
+ir_raw["spec"].update({"expiry":"2025-06-18","fixing_date":"2025-06-18",
+    "period_start":"2025-06-18","period_end":"2025-09-17","vol_surface_id":"IR-NORMAL-VOL"})
+ir_raw["spec"]["contract_specs"]["convexity_adjustment"]=None
+convexity_rows=[]
+for normal_vol in [0.,.005,.01]:
+    m=tracks.build_market("vol")
+    m.insert(VolSurface("IR-NORMAL-VOL",[.25,.5,1.,2.],[0.,.03,.10],[[normal_vol]*3]*4))
+    future_result=price_instrument(json.dumps(instrument_envelope(ir_raw)),m,AS_OF,
+        metrics=["futures_price","implied_forward","convexity_adjustment"])
+    convexity_rows.append({"normal_rate_vol":normal_vol,**future_result.metrics})
+assert convexity_rows[0]["convexity_adjustment"]==0
+assert convexity_rows[-1]["convexity_adjustment"]>convexity_rows[1]["convexity_adjustment"]>0
+print(pd.DataFrame(convexity_rows))
+print({"next_IMM":next_imm(AS_OF),"June_IMM_option_expiry":imm_option_expiry(6,2025)})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-rates-convexity" />
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-equity-fx-carry" role="build" */}
+```python exec id=v1-equity-fx-carry role=build
+terms={"contracts":2.,"multiplier":50.,"currency":"USD","entry_price":5300.,
+    "last_trading_date":"2025-09-19","settlement_date":"2025-09-22","position":"long","settlement":{"type":"cash"}}
+equity_future=instrument_envelope({"type":"equity_future","spec":{"id":"V1-SPX-FUTURE",
+    "underlying_ticker":"SPX","underlying_currency":"USD","terms":terms,"discount_curve_id":"USD-OIS",
+    "spot_id":"SPX-SPOT","div_yield_id":"SPX-DIV"}})
+fx_terms={**terms,"contracts":4.,"multiplier":125000.,"entry_price":1.08}
+fx_future=instrument_envelope({"type":"fx_future","spec":{"id":"V1-EURUSD-FUTURE",
+    "base_currency":"EUR","quote_currency":"USD","terms":fx_terms,
+    "domestic_discount_curve_id":"USD-OIS","foreign_discount_curve_id":"EUR-OIS"}})
+carry_results={}
+for name,payload in [("equity",equity_future),("FX",fx_future)]:
+    result=price_instrument(json.dumps(payload),market,AS_OF,model="discounting",metrics=["futures_price"])
+    scale=payload["instrument"]["spec"]["terms"]
+    expected=(result.metrics["futures_price"]-scale["entry_price"])*scale["contracts"]*scale["multiplier"]
+    assert abs(result.value.amount-expected)<.01
+    carry_results[name]={"fair_future":result.metrics["futures_price"],"mark_usd":result.value.amount}
+print(pd.DataFrame(carry_results).T)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-equity-fx-carry" />
+
+### Match Black-76 to the same terminal spot-option payoff
+
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-black76-carry" role="build" */}
+```python exec id=v1-black76-carry role=build
+from finstack_quant.models import bs_price
+T=(date(2025,9,19)-AS_OF).days/365
+df=market.get_discount("USD-OIS").df(T);r=-math.log(df)/T
+forward,strike,sigma=5300.,5300.,.20
+# Choose a synthetic spot whose zero-dividend forward is the option's F.
+matched_spot=forward*df
+matched_value=2*50*bs_price(matched_spot,strike,r,0.,sigma,T,True)
+assert abs(matched_value-european)<.01
+print({"native_future_option":european,"matched_spot_option":matched_value,"forward":forward,"synthetic_spot":matched_spot})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-black76-carry" />
+
+</BuildIt>
+
+<LabCard notebook="02_pricing/instruments/futures_and_listed_options.ipynb" title="Listed futures, carry and delivery basis" description="Run the candidate delivery basket, convexity sweep, settlement identities and option exercise checks." />
+
+<Exercise id="v1-hedge" title="Size the hedge and retain the residual" question="Calculate a parallel Treasury-futures hedge for the common corporate bond and a separate hedge of the common book's actual USD ten-year bucket. State the direction and remaining basis risks.">
+
+The parallel solution first normalizes the future to one contract. The key-rate solution then uses the actual qualified ten-year buckets of the common book and Treasury future. A tiny target rounds to no exchange contracts; rounding cannot be avoided by reporting fictional fractional trading capacity. The residual is part of the recommendation.
+
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-exercise-hedge" role="exercise" */}
+```python exec id=v1-exercise-hedge role=exercise
+# Match the native common-book corporate bond's rate risk to one future contract.
+corporate=tracks.common.instruments("common")["USD-CORP"]
+bond_risk=price_instrument(json.dumps(corporate),market,AS_OF,metrics=["dv01","bucketed_dv01"])
+one_future=deepcopy(inputs["UST-FUTURE"])
+one_future["instrument"]["spec"]["notional"]={"amount":"100000","currency":"USD"}
+future_risk=price_instrument(json.dumps(one_future),market,AS_OF,model="bond_future_clean_price_proxy",metrics=["dv01"])
+contracts_to_short=bond_risk.metrics["dv01"]/future_risk.metrics["dv01"]
+residual=bond_risk.metrics["dv01"]-round(contracts_to_short)*future_risk.metrics["dv01"]
+assert abs(residual)<=.5*abs(future_risk.metrics["dv01"])+1e-8
+print({"exact_contracts_to_short":contracts_to_short,"rounded_contracts":round(contracts_to_short),"residual_dv01":residual})
+print({k:v for k,v in bond_risk.metrics.items() if k.startswith("bucketed_dv01::")})
+book_ten_year=0.0
+for iid,payload in tracks.common.instruments("common").items():
+    buckets=price_instrument(json.dumps(payload),market,AS_OF,metrics=["bucketed_dv01"]).metrics
+    book_ten_year+=buckets.get("bucketed_dv01::USD-OIS::10y",0.0)
+future_buckets=price_instrument(json.dumps(one_future),market,AS_OF,model="bond_future_clean_price_proxy",metrics=["bucketed_dv01"]).metrics
+future_ten_year=future_buckets["bucketed_dv01::USD-TREASURY::10y"]
+assert abs(future_ten_year)>1e-8
+ten_year_contracts=book_ten_year/future_ten_year
+assert abs(book_ten_year-ten_year_contracts*future_ten_year)<1e-8
+print({"common_book_USD_10y_dv01":book_ten_year,"future_10y_dv01":future_ten_year,"10y_contracts_to_short":ten_year_contracts})
+print("This cross-curve hedge leaves OIS–Treasury, key-rate, CTD-switch, repo, delivery and credit basis risk; a zero target needs no hedge.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-exercise-hedge" />
+
+</Exercise>
+
+<Exercise id="v1-american" title="Check American futures-option value independently" question="Compare the native American and European prices and benchmark the American value with held-out LSMC under matching deterministic-rate futures dynamics.">
+
+The tolerance includes four Monte Carlo standard errors and a separate 1% allowance for tree, exercise-grid and policy approximation differences. It is a diagnostic comparison rather than a claim that an estimated policy equals continuous-time optimal exercise. The native American-versus-European ordering remains the contract check.
+
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-exercise-american" role="exercise" */}
+```python exec id=v1-exercise-american role=exercise
+from finstack_quant.models.monte_carlo import LsmcPricer
+# Under deterministic rates, the futures price is a martingale: use the GBM helper with r-q=0.
+# Here div_yield=r is a drift-matching parameter, not a dividend paid by the future.
+lsmc=LsmcPricer(num_paths=8192,num_steps=32,seed=20250115)
+american_mc=lsmc.price_american_call_unbiased(spot=5300.,strike=5300.,rate=r,div_yield=r,
+    vol=.20,expiry=T,pricing_seed=20250116,currency="USD")
+mc_position=american_mc.mean.amount*2*50
+mc_stderr=american_mc.stderr*2*50
+assert american>=european
+assert abs(mc_position-american)<4*mc_stderr+.01*american
+print({"native_American":american,"native_European":european,
+    "held_out_LSMC":mc_position,"MC_standard_error":mc_stderr,
+    "native_early_exercise_premium":american-european})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-exercise-american" />
+
+</Exercise>
+
+<Exercise id="v1-roll" title="Account for rolling without inventing an upfront cost" question="Compute the quoted roll from the near to the far contract. Show that opening the far contract at its own fair quote has zero initial mark, and identify the cash accounts needed to measure realized roll performance.">
+
+The quote difference is displayed separately from the new contract's zero mark. Closing the old contract crystallizes the mark already represented in variation margin. Subsequent convergence, changing basis, transaction costs and collateral funding determine the economic outcome.
+
+{/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-exercise-roll" role="exercise" */}
+```python exec id=v1-exercise-roll role=exercise
+near,far=5300.,5325.
+contracts,multiplier=2,50.
+quoted_roll=contracts*multiplier*(far-near)
+# Closing the near future realizes its existing VM; opening the far future at its fair quote has zero initial model mark.
+rolled=deepcopy(equity_future)
+rolled["instrument"]["spec"]["terms"].update({"entry_price":far,"quoted_price":far,
+    "last_trading_date":"2025-12-19","settlement_date":"2025-12-22"})
+initial_mark=price_instrument(json.dumps(rolled),market,AS_OF,model="discounting").value.amount
+assert abs(initial_mark)<.01
+assert quoted_roll==2500.
+print({"far_minus_near_quote_dollars":quoted_roll,"new_contract_initial_mark":initial_mark})
+print("The quoted roll is a carry/basis comparison, not an upfront premium paid for a fair futures contract. Realized P&L and collateral financing must be tracked separately.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="V1" block="v1-exercise-roll" />
+
+</Exercise>
+
+<CheckYourself>
+
+- How many dollars does one quoted tick represent for each product?
+- Why does increasing normal rate volatility lower a short-rate future's price in this model?
+- Which risk changes when CTD switches, even if the number of futures is unchanged?
+- Why can matching a parallel DV01 leave a substantial key-rate mismatch?
+- Where is equity or FX carry represented when pricing an option from its forward?
+- Why are a far-minus-near quote and a cash payment to open a fair future different quantities?
+
+The physical UST future's standalone cashflow theta is unavailable. The volatility portfolio reports that limitation and requests its other supported metrics strictly. Do not fill the absent theta with zero. Its [capstone](/learn/capstone) preserves daily-settlement wealth accounting and keeps CCP initial margin distinct from the bilateral IRS margin example.
+
+</CheckYourself>

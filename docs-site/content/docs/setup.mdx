@@ -1,0 +1,45 @@
+---
+title: Set up your analyst workspace
+description: Run the Python examples, open the companion notebooks, and understand how lesson results are checked.
+---
+
+## Start in the repository
+
+The program uses the Python interface to finstack-quant. Work from a local checkout of this repository so the lessons and their shared inputs use the same version of the library.
+
+Use the versions of Python, Rust, and other tools declared in the repository's `mise.toml`. The Python environment is managed with `uv`.
+
+```sh
+mise install
+mise run python-sync
+mise run python-build
+```
+
+The development build is appropriate for lesson work. A release build is only necessary when measuring performance or validating release behavior.
+
+## Open the companion labs
+
+Each lesson links its companion notebook. Read the rendered lab in the browser, or download the `.ipynb` file and open it in your notebook editor using the repository's Python environment.
+
+The canonical notebooks live in `finstack-quant-py/examples/notebooks/`. Their `_shared/` directory contains the deterministic market, book, and history inputs reused throughout the course. Run notebooks from the checkout so those imports resolve.
+
+```sh
+cd finstack-quant-py
+uv run --no-sync python examples/notebooks/run_all_notebooks.py --help
+```
+
+## Read code and captured results together
+
+Python examples marked for execution are run by the documentation build harness. A captured-result panel shows the output from that run; it does not calculate a price in your browser. The result belongs to the exact lesson source and shared fixture used by that build.
+
+Every exercise is required. Open its solution after attempting the problem, compare your reasoning and outputs, and investigate differences in dates, units, conventions, or inputs before changing a tolerance.
+
+## Understand publication status
+
+A **draft** lesson is still being authored or verified. It may be readable before every numerical check or companion lab is ready. A **published** lesson has passed the program's publication gates. The program overview shows the current status of every unit.
+
+## Choose the appropriate book
+
+The core lessons develop a common portfolio. Credit and volatility lessons extend that portfolio independently. Each capstone combines the common portfolio with its own track's instruments; it does not require the other track's positions.
+
+Keep the fixture version, valuation date, currency policy, and market assumptions attached to every report. These are part of the answer, not incidental notebook settings.

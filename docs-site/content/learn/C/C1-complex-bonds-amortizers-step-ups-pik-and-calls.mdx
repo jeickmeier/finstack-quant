@@ -1,0 +1,303 @@
+---
+id: C1
+title: 'Complex Bonds: Amortizers, Step-Ups, PIK, and Calls'
+description: 'Analyst program lesson C1: Complex Bonds: Amortizers, Step-Ups, PIK,
+  and Calls'
+desk_question: '"This 8NC3 pays 6% cash + 2% PIK, steps up 25bp at year 4, amortizes
+  1%/quarter after year 5, and is callable at 103 declining. Price it."'
+references:
+- '#fabozzi-fixed-income-handbook'
+- '#tuckman-serrat-fixed-income'
+- '#merton-1974'
+- '#glasserman-2004-monte-carlo'
+api:
+- finstack_quant.valuations.instruments.Bond
+- finstack_quant.valuations.instruments.MertonMcConfig
+- finstack_quant.cashflows.builder.CashFlowSchedule
+- finstack_quant.cashflows.builder.AmortizationSpec
+- finstack_quant.models.credit.ToggleExerciseModel
+status: published
+---
+
+<DeskContext question="How do cash coupons, PIK, amortization, and issuer calls interact in this 8NC3 bond?">
+
+An 8NC3 has eight years to maturity and three years of call protection. This contract starts with 6% cash interest plus 2% PIK, steps its total coupon up 25 basis points after year four, begins repaying 1% of original face each quarter after year five, and becomes callable at 103 with a declining call price. Those terms define a changing principal balance and an exercise decision. A single yield does not describe either completely.
+
+The required output is a validated contract, a cash-versus-capitalized-interest ladder, a model price, and a quote-conditioned YTW/OAS report. Explain the value given up to the issuer before proposing a trade.
+
+</DeskContext>
+
+<Standard>
+
+### Start with the legal cashflows
+
+For a quarter of year fraction `a`, beginning principal `B`, and total coupon `c`, a 75/25 split pays `B*c*0.75*a` in cash and capitalizes `B*c*0.25*a`. PIK is additional principal owed to the holder; it is not cash available to reinvest today. The following coupon is computed on the accreted balance. Scheduled principal repayments then reduce exposure. The fixture uses an Act/365F discount curve and the bond's own coupon accrual convention; do not replace either with a generic quarter in a production schedule.
+
+Here the 25 bp step increases the *total* coupon from 8% to 8.25% while retaining the 75/25 split. A contract that keeps PIK at 2% and increases cash interest to 6.25% is a different instrument. The amortization is 1% of **original face**, not 1% of the PIK-accreted balance. A desk description must resolve both conventions.
+
+A fixed-to-floating bond has one fixed window and a subsequent floating window. The switch date belongs to the schedule. A floor, reset lag, forward index and payment convention belong to the floating specification. Building the cashflows first makes an accidental overlapping or missing coupon window visible.
+
+### Principal timing and issuer choice
+
+Weighted average life is the principal-weighted time to repayment. It is not duration: coupon payments and discount rates do not enter the basic WAL calculation. A bullet, linear amortizer, fixed-percent sinking fund and custom repayment schedule can have identical face and maturity but different WAL. PIK can change the principal to be repaid, so the controlled WAL comparison below uses cash-only coupons.
+
+A fixed-price call lets the issuer cap the holder's continuation value at the contractual redemption price. A make-whole clause instead derives redemption from remaining cashflows discounted at a reference curve plus a spread, subject to the call-price floor. The reference curve is an additional market dependency. The comparison below holds the call dates and price floors fixed and changes that protection alone.
+
+YTM assumes redemption at maturity. YTW selects the least favorable eligible redemption yield for the holder at the supplied price. OAS solves a model-dependent spread after allowing for the embedded option. The `embedded_option_value` output uses the holder's signed callable-minus-straight convention. Interpret its sign before calling it an “option cost.” Neither OAS nor YTW is meaningful without identifying the observed-price assumption.
+
+### Contractual PIK versus a PIK toggle
+
+A split coupon is predetermined. A toggle gives the issuer a choice to defer cash interest, potentially when its credit quality is weakest. The structural Monte Carlo example monitors a simulated issuer state and elects PIK below a distance-to-default threshold. Asset value, debt barrier and bond notional must use a consistent money scale. Otherwise the apparent credit-quality experiment may merely compare incompatible units.
+
+The native Merton path supports a fixed-rate bullet. It rejects this amortizing 8NC3. We therefore teach the same issuer-choice question on a matched, explicitly separate bullet bond and retain the cashflow/tree path for the full desk contract. The reported PIK fraction is a fraction of coupon decisions, not a probability of default. The seeded path results are model diagnostics, not an estimate calibrated to this issuer's actual behavior.
+
+</Standard>
+
+<BuildIt>
+
+### Validate and price the complete contract
+
+The common factory is a source of inputs, not a pricing wrapper. Inspect its canonical envelope and round-trip the native Bond before valuation. The credit extension includes this instrument independently of the volatility extension.
+
+{/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="complex-bond-pricing" role="build" */}
+```python exec id=complex-bond-pricing role=build
+from copy import deepcopy
+from datetime import date
+import json
+import math
+import numpy as np
+import pandas as pd
+from _shared import analyst_tracks as tracks
+from finstack_quant.valuations.instruments import price_instrument
+AS_OF=tracks.AS_OF
+from finstack_quant.valuations.instruments import Bond,validate_instrument_json
+complex_payload=tracks.complex_bond()
+complex_json=json.dumps(complex_payload)
+validate_instrument_json(complex_json)
+roundtrip=Bond.from_json(complex_json).to_json()
+assert json.loads(Bond.from_json(roundtrip).to_json())==json.loads(roundtrip)
+credit_market=tracks.build_market("credit")
+callable_value=price_instrument(complex_json,credit_market,AS_OF).value.amount
+assert callable_value>0
+print(pd.Series({"id":"ANALYST-PIK-CALLABLE","model_value_usd":callable_value}))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C1" block="complex-bond-pricing" />
+
+### Reconcile cash and PIK, then condition yield measures on a quote
+
+Remove issuer exercise only in the contractual twin used to inspect scheduled payments. That twin answers what is owed if it remains outstanding. The callable model answers what the holder owns when exercise is allowed. The first two coupons test that PIK accretion carries into the next coupon base; the full table reconciles discounted cashflows.
+
+{/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="pik-cash-ladder" role="build" */}
+```python exec id=pik-cash-ladder role=build
+from finstack_quant.valuations import instrument_cashflows
+contractual=deepcopy(complex_payload)
+contractual["instrument"]["spec"]["call_put"]=None
+contractual["instrument"]["spec"]["id"]="PIK-CONTRACTUAL-TWIN"
+flow_envelope,flows=instrument_cashflows(json.dumps(contractual),credit_market,AS_OF,model="discounting")
+coupons=flows.loc[flows["kind"]=="fixed"].copy()
+first_cash=1_000_000*.06*.25
+first_pik=1_000_000*.02*.25
+assert abs(coupons.iloc[0]["amount"]-first_cash)<.01
+assert abs(coupons.iloc[1]["amount"]-(1_000_000+first_pik)*.06*.25)<.01
+assert flow_envelope["reconciles_with_base_value"]
+assert abs(flows["pv"].sum()-float(flow_envelope["total_pv"]))<.01
+print(coupons[["date","amount","rate","pv"]].head(6))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C1" block="pik-cash-ladder" />
+
+The clean quote of 100 is a synthetic exercise input. It is deliberately supplied on a separate copy, so it cannot silently replace the model price used above.
+
+{/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="complex-bond-yield-oas" role="build" */}
+```python exec id=complex-bond-yield-oas role=build
+quoted=deepcopy(complex_payload)
+quoted["instrument"]["spec"]["instrument_pricing_overrides"]["market_quotes"]["quoted_clean_price"]=100.0
+quoted_risk=price_instrument(json.dumps(quoted),credit_market,AS_OF,metrics=["ytm","ytw","oas","embedded_option_value"])
+assert quoted_risk.metrics["ytw"]<=quoted_risk.metrics["ytm"]
+assert quoted_risk.metrics["embedded_option_value"]<=0
+print(pd.Series(quoted_risk.metrics))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C1" block="complex-bond-yield-oas" />
+
+### Build a fixed-to-floating schedule and compare principal rules
+
+The native schedule builder emits fixed and floating cashflow kinds. The JSON bridge then turns that schedule into a priced bond. The printed initial funding is an issuance flow; the holder's as-of asset valuation excludes the already-funded initial exchange.
+
+{/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="c1-fixed-float" role="build" */}
+```python exec id=c1-fixed-float role=build
+from decimal import Decimal
+from finstack_quant.cashflows.builder import (CashFlowSchedule,FixedCouponSpec,FixedWindow,
+    FloatingCouponSpec,FloatingRateSpec,CouponType,ScheduleParams,AmortizationSpec)
+from finstack_quant.cashflows.primitives import CFKind
+from finstack_quant.core.money import Money
+from finstack_quant.valuations.instruments import bond_from_cashflows_json
+floating=FloatingCouponSpec(rate_spec=FloatingRateSpec(index_id="USD-SOFR-3M",
+    spread_bp=Decimal("200"),reset_frequency="3M"),schedule=ScheduleParams.quarterly_act360())
+fixed_float=(CashFlowSchedule.builder().principal(Money(1_000_000.,"USD"),AS_OF,date(2027,1,15))
+    .fixed_to_float(date(2026,1,15),FixedWindow(Decimal("0.06"),ScheduleParams.semiannual_30360()),
+                    floating,CouponType.CASH).build(credit_market))
+fixed_float_json=bond_from_cashflows_json("FIXED-TO-FLOAT",fixed_float.to_json(),"USD-OIS")
+validate_instrument_json(fixed_float_json)
+fixed_float_value=price_instrument(fixed_float_json,credit_market,AS_OF).value.amount
+assert {CFKind.FIXED,CFKind.FLOAT_RESET}.issubset({flow.kind for flow in fixed_float.get_flows()})
+assert fixed_float_value>0
+print(pd.DataFrame([{"date":f.date,"kind":str(f.kind),"cash":f.amount.amount} for f in fixed_float.get_flows()]))
+print({"fixed_to_float_pv_usd":fixed_float_value})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C1" block="c1-fixed-float" />
+
+Each amortization case repays exactly the original cash-only principal. Read both that conservation check and WAL; an attractive shorter WAL is meaningless if principal has accidentally disappeared.
+
+{/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="c1-amortization" role="build" */}
+```python exec id=c1-amortization role=build
+amortizations={"bullet":AmortizationSpec.NONE,
+    "linear_to_zero":AmortizationSpec.linear_to(Money(0.,"USD")),
+    "ten_percent_original":AmortizationSpec.percent_of_original_per_period(.10),
+    "custom":AmortizationSpec.custom_principal([(date(2026,1,15),Money(400_000.,"USD"))])}
+amort_rows=[]
+for name,rule in amortizations.items():
+    schedule=(CashFlowSchedule.builder().principal(Money(1_000_000.,"USD"),AS_OF,date(2027,1,15))
+        .amortization(rule).fixed_cf(FixedCouponSpec(rate=Decimal("0.06"),schedule=ScheduleParams.quarterly_act360())).build())
+    principal_flows=[f for f in schedule.get_flows() if f.date>AS_OF and f.kind in (CFKind.AMORTIZATION,CFKind.NOTIONAL)]
+    paid=sum(f.amount.amount for f in principal_flows)
+    wal=sum(f.amount.amount*(f.date-AS_OF).days/365 for f in principal_flows)/paid
+    assert abs(paid-1_000_000)<.01
+    amort_rows.append({"rule":name,"principal_paid":paid,"principal_WAL_years":wal})
+amort_table=pd.DataFrame(amort_rows).set_index("rule")
+assert amort_table.loc["linear_to_zero","principal_WAL_years"]<amort_table.loc["bullet","principal_WAL_years"]
+print(amort_table)
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C1" block="c1-amortization" />
+
+### Price issuer toggle behavior on its supported model domain
+
+The three cases change issuer asset coverage while holding volatility, debt barrier, recovery, bond terms, threshold and random seed fixed. Higher PIK frequency can support issuer liquidity while increasing the holder's exposure at default. Price and default frequency must therefore be read alongside the PIK statistic.
+
+{/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="c1-toggle" role="build" */}
+```python exec id=c1-toggle role=build
+from finstack_quant.models.credit import MertonModel,ToggleExerciseModel
+from finstack_quant.valuations.instruments import MertonMcConfig,PikMode,PikSchedule,BarrierCrossing
+# Merton MC supports a bullet fixed-rate bond; it does not support the amortizing 8NC3.
+toggle_bond=Bond.fixed("TOGGLE-BULLET",1_000_000.,.08,AS_OF,date(2030,1,15),"none","USD-OIS",currency="USD")
+toggle_rows=[]
+for asset_value in [900_000.,1_300_000.,1_800_000.]:
+    config=(MertonMcConfig(MertonModel(asset_value,.25,800_000.,.04),.40).num_paths(2048).seed(20250115)
+        .antithetic(True).time_steps_per_year(12).barrier_crossing(BarrierCrossing.discrete())
+        .pik_schedule(PikSchedule.uniform(PikMode.toggle()))
+        .toggle_model(ToggleExerciseModel.threshold("distance_to_default",2.,"below")))
+    result=toggle_bond.price_merton_mc(config,.04,AS_OF)
+    assert 0<=result.average_pik_fraction<=1
+    assert result.average_pik_fraction==result.path_statistics.pik_exercise_rate
+    toggle_rows.append({"asset_value":asset_value,"clean_price_pct":result.clean_price_pct,
+        "PIK_fraction":result.average_pik_fraction,"default_rate":result.path_statistics.default_rate})
+print(pd.DataFrame(toggle_rows))
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C1" block="c1-toggle" />
+
+</BuildIt>
+
+<LabCard notebook="02_pricing/instruments/complex_cashflows.ipynb" title="Complex bond cashflows and issuer options" description="Run the full contract, fixed-to-floating schedule, principal comparison, and structural toggle experiment." />
+
+<Exercise id="c1-contract" title="Reconstruct the desk contract and quote report" question="Rebuild the 8NC3 economics in a validated JSON envelope. Report model value, then YTM, YTW and OAS at clean price 100. State which step-up and amortization conventions you chose.">
+
+The reconstruction preserves the published contract conventions. It compares the resulting model value with the reference, then attaches the quote only for yield and spread analysis. A different legal interpretation must be a new scenario, not an unexplained edit to the reference.
+
+{/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="c1-exercise-contract" role="exercise" */}
+```python exec id=c1-exercise-contract role=exercise
+# Start from the typed fixed-bond envelope and write every complex economic term.
+answer=json.loads(Bond.fixed("ANALYST-PIK-CALLABLE",1_000_000.,.08,AS_OF,date(2033,1,15),
+                            "short_front","USD-OIS",currency="USD").to_json())
+a=answer["instrument"]["spec"]
+coupon=a["cashflow_spec"]["fixed"];coupon.pop("rate")
+coupon.update({"initial_rate":"0.08","step_schedule":[["2029-01-15","0.0825"]],
+    "frequency":{"count":3,"unit":"months"},"day_count":"30_360",
+    "business_day_convention":"following","calendar_id":"weekends_only","stub":"none",
+    "end_of_month":False,"payment_lag_days":0,
+    "coupon_type":{"split":{"cash_pct":"0.75","pik_pct":"0.25"}}})
+amort_dates=[f"{year}-{month:02d}-15" for year in [2030,2031,2032]
+             for month in [1,4,7,10] if (year,month)>(2030,1)]
+a["cashflow_spec"]={"amortizing":{"base":{"step_up":coupon},"schedule":{
+    "custom_principal":{"items":[[day,{"amount":"10000","currency":"USD"}] for day in amort_dates]}}}}
+a["call_put"]={"puts":[],"calls":[{"start_date":f"{year}-01-15",
+    "end_date":f"{year+1}-01-14" if year<2032 else "2033-01-15",
+    "price_pct_of_par":call_price} for year,call_price in [(2028,103.),(2029,102.),(2030,101.),(2031,100.),(2032,100.)]]}
+a["settlement_days"]=1
+a["instrument_pricing_overrides"]={"market_quotes":{"implied_volatility":.01}}
+answer_json=validate_instrument_json(json.dumps(answer))
+answer_price=price_instrument(answer_json,credit_market,AS_OF).value.amount
+assert abs(answer_price-callable_value)<.01
+# Quote price and model value answer different questions.
+a["instrument_pricing_overrides"]["market_quotes"]["quoted_clean_price"]=100.
+answer_yields=price_instrument(json.dumps(answer),credit_market,AS_OF,metrics=["ytm","ytw","oas"])
+assert answer_yields.metrics["ytw"]<=answer_yields.metrics["ytm"]
+print({"model_value":answer_price,**answer_yields.metrics})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C1" block="c1-exercise-contract" />
+
+</Exercise>
+
+<Exercise id="c1-make-whole" title="Measure make-whole protection" question="Keep every call date and price floor unchanged. Replace the fixed redemption with a make-whole amount at the reference curve plus 25 bp. Quantify the holder's value difference.">
+
+The issuer's settlement amount is now bounded below by the old fixed price. The nonnegative value difference is a contract-ordering check for this controlled comparison. It does not say a make-whole bond has no rate or credit risk.
+
+{/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="c1-exercise-make-whole" role="exercise" */}
+```python exec id=c1-exercise-make-whole role=exercise
+make_whole=deepcopy(complex_payload)
+for call in make_whole["instrument"]["spec"]["call_put"]["calls"]:
+    call["make_whole"]={"reference_curve_id":"USD-OIS","spread_bp":25.}
+make_whole_pv=price_instrument(json.dumps(make_whole),credit_market,AS_OF).value.amount
+assert make_whole_pv>=callable_value-.01
+print({"fixed_call_usd":callable_value,"make_whole_usd":make_whole_pv,
+       "holder_protection_value_usd":make_whole_pv-callable_value})
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C1" block="c1-exercise-make-whole" />
+
+</Exercise>
+
+<Exercise id="c1-toggle" title="Interpret the toggle and enforce model scope" question="Which issuer elects PIK more often, and why? Show that the full amortizing contract is rejected by the bullet-only Monte Carlo path.">
+
+The weaker issuer crosses the chosen threshold more often. The negative test prevents an apparently valid number from being produced by a model that would ignore contractual principal repayments. Read the exception as a supported-domain boundary.
+
+{/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="c1-exercise-toggle" role="exercise" */}
+```python exec id=c1-exercise-toggle role=exercise
+assert toggle_rows[0]["PIK_fraction"]>toggle_rows[-1]["PIK_fraction"]
+try:
+    Bond.from_json(complex_json).price_merton_mc(config,.04,AS_OF)
+except ValueError as exc:
+    assert "amort" in str(exc).lower() or "fixed" in str(exc).lower()
+    print(type(exc).__name__,str(exc))
+else:raise AssertionError("The unsupported amortizing Merton path must be rejected")
+print("Below the distance-to-default threshold, surviving paths elect PIK; weaker asset cover raises its frequency.")
+```
+{/* /notebook-block */}
+
+<ExecutedOutput lesson="C1" block="c1-exercise-toggle" />
+
+</Exercise>
+
+<CheckYourself>
+
+- Can you reconcile cash coupons, PIK accretion, scheduled principal and final redemption without calling PIK cash income?
+- Does a lower WAL necessarily imply a smaller price loss under a rate shock? Explain the missing coupon/discounting information.
+- Which inputs change when you move from a fixed call to make-whole protection, and which stay fixed?
+- Why can a large OAS coexist with a low YTW? Identify the price and model assumptions before answering.
+- What does the structural PIK statistic measure, and why is its bullet example separate from the full 8NC3?
+
+A complete desk answer states the clean quote, redemption conventions, model, cashflow reconciliation, exercise cost and principal-at-risk path. Carry the validated instrument into the [credit capstone](/learn/capstone).
+
+</CheckYourself>

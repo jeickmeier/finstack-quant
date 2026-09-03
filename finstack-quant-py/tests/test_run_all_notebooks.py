@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 from types import ModuleType
 
@@ -47,6 +48,35 @@ def test_find_notebooks_skips_checkpoints(module: ModuleType, tmp_path: Path) ->
     assert [path.name for path in notebooks] == ["01_ok.ipynb"]
 
 
+def test_cli_executes_copy_outside_original_root(
+    module: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The original runner accepts a copied tree while retaining package discovery."""
+    source = tmp_path / "authored.ipynb"
+    _write_notebook(source, "from _shared import DEMO_AS_OF\nassert DEMO_AS_OF.year == 2025\nprint('copied tree')")
+    before = source.read_bytes()
+    copy_root = tmp_path / "build"
+    copy_root.mkdir()
+    copy = copy_root / source.name
+    copy.write_bytes(before)
+    monkeypatch.setattr("sys.argv", [str(RUNNER_PATH), "--notebook-root", str(copy_root), "--save-outputs"])
+    assert module.main() == 0
+    assert source.read_bytes() == before
+    assert nbformat.read(copy, as_version=4).cells[0].outputs
+    assert "authored.ipynb" in capsys.readouterr().out
+
+
+def test_cli_rejects_notebook_outside_selected_root(
+    module: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_notebook(tmp_path / "outside.ipynb", "assert True")
+    root = tmp_path / "selected"
+    root.mkdir()
+    monkeypatch.setattr("sys.argv", [str(RUNNER_PATH), "--notebook-root", str(root), "--directory", "../outside.ipynb"])
+    with pytest.raises(SystemExit, match="2"):
+        module.main()
+
+
 def test_run_notebook_reports_success(module: ModuleType, tmp_path: Path) -> None:
     """A successful notebook should report success and elapsed time."""
     notebook = tmp_path / "success.ipynb"
@@ -83,6 +113,83 @@ def test_run_notebook_reports_failure(module: ModuleType, tmp_path: Path) -> Non
     assert ok is False
     assert "boom" in message
     assert elapsed >= 0
+
+
+def test_run_notebook_rejects_python_warning_without_saving_source(module: ModuleType, tmp_path: Path) -> None:
+    """A warning is a failed verification run and must not persist outputs."""
+    notebook = tmp_path / "warning.ipynb"
+    _write_notebook(notebook, "import warnings\nwarnings.warn('visible warning', UserWarning)")
+    before = notebook.read_bytes()
+
+    ok, message, _elapsed = module.run_notebook(notebook, timeout=30, save_outputs=True)
+
+    assert ok is False
+    assert "visible warning" in message
+    assert notebook.read_bytes() == before
+
+
+def test_run_notebook_rejects_stderr_without_saving_source(module: ModuleType, tmp_path: Path) -> None:
+    """Nonempty stderr fails even when the cell raises no Python exception."""
+    notebook = tmp_path / "stderr.ipynb"
+    _write_notebook(notebook, "import sys\nprint('plain stderr diagnostic', file=sys.stderr)")
+    before = notebook.read_bytes()
+
+    ok, message, _elapsed = module.run_notebook(notebook, timeout=30, save_outputs=True)
+
+    assert ok is False
+    assert "plain stderr diagnostic" in message
+    assert notebook.read_bytes() == before
+
+
+def test_run_notebook_rejects_missing_cell_id_without_saving_source(module: ModuleType, tmp_path: Path) -> None:
+    """A raw v4.5 notebook must retain explicit IDs instead of relying on normalization."""
+    notebook = tmp_path / "missing_id.ipynb"
+    notebook.write_text(
+        json.dumps({
+            "cells": [
+                {
+                    "cell_type": "code",
+                    "execution_count": None,
+                    "metadata": {},
+                    "outputs": [],
+                    "source": ["assert True"],
+                }
+            ],
+            "metadata": {},
+            "nbformat": 4,
+            "nbformat_minor": 5,
+        }),
+        encoding="utf-8",
+    )
+    before = notebook.read_bytes()
+
+    ok, message, _elapsed = module.run_notebook(notebook, timeout=30, save_outputs=True)
+
+    assert ok is False
+    assert "missing an id field" in message
+    assert notebook.read_bytes() == before
+
+
+@pytest.mark.parametrize("tag", ["skip-execution", "raises-exception"])
+def test_execution_tags_cannot_hide_failures(module: ModuleType, tmp_path: Path, tag: str) -> None:
+    """Every nonempty lesson cell must execute and unexpected errors must fail."""
+    path = tmp_path / "tagged.ipynb"
+    notebook = new_notebook(cells=[new_code_cell("assert 2 + 2 == 5", metadata={"tags": [tag]})])
+    path.write_text(nbformat.writes(notebook))
+    ok, _, _ = module.run_notebook(path, timeout=30)
+    assert not ok
+
+
+def test_optimized_environment_keeps_notebook_assertions(
+    module: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The kernel must enforce checks even when its caller is optimized."""
+    monkeypatch.setenv("PYTHONOPTIMIZE", "1")
+    path = tmp_path / "optimized.ipynb"
+    _write_notebook(path, "assert 2 + 2 == 5")
+    ok, message, _ = module.run_notebook(path, timeout=30)
+    assert not ok
+    assert "AssertionError" in message
 
 
 def test_run_notebook_exposes_shared_helpers(module: ModuleType, tmp_path: Path) -> None:
