@@ -7,6 +7,8 @@ Uses nbclient to run each notebook programmatically.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib
 import os
 from pathlib import Path
 import sys
@@ -69,6 +71,7 @@ def run_notebook(notebook_path: Path, timeout: int, save_outputs: bool = False) 
             warnings.simplefilter("error")
             with open(notebook_path, encoding="utf-8") as f:
                 nb = nbformat.read(f, as_version=4)
+            nbformat.validate(nb)
         if any("skip-execution" in cell.get("metadata", {}).get("tags", []) for cell in nb.cells):
             raise ValueError("skip-execution tags are not allowed in verified notebooks")
 
@@ -90,12 +93,34 @@ def run_notebook(notebook_path: Path, timeout: int, save_outputs: bool = False) 
             ipython_dir = Path(ipc_dir) / "ipython"
             ipython_dir.mkdir()
             kernel_env["IPYTHONDIR"] = str(ipython_dir)
+            kernel_env["FINSTACK_EXPECTED_PYTHON"] = str(Path(sys.executable).resolve())
+            extension = importlib.import_module("finstack_quant.finstack_quant")
+            kernel_env["FINSTACK_EXPECTED_EXTENSION_SHA256"] = hashlib.sha256(
+                Path(extension.__file__).read_bytes()
+            ).hexdigest()
             # Configure warnings around each authored cell, after Jupyter has
             # booted and before it shuts down. This keeps kernel lifecycle
-            # deprecations separate from warnings caused by lesson code.
+            # deprecations separate from warnings caused by lesson code. The
+            # same guard proves the kernel uses this interpreter and extension.
             guard = nbformat.v4.new_code_cell(
+                "import hashlib as _finstack_hashlib\n"
+                "import importlib as _finstack_importlib\n"
+                "import os as _finstack_os\n"
+                "from pathlib import Path as _FinstackPath\n"
+                "import sys as _finstack_sys\n"
                 "import warnings as _finstack_warnings\n"
-                "_finstack_warning_filters = []\n"
+                "_finstack_expected_python = _FinstackPath("
+                "_finstack_os.environ['FINSTACK_EXPECTED_PYTHON']).resolve()\n"
+                "assert _FinstackPath(_finstack_sys.executable).resolve() == _finstack_expected_python, "
+                "'Notebook kernel interpreter mismatch: ' "
+                "+ f'{_finstack_sys.executable} != {_finstack_expected_python}'\n"
+                "_finstack_extension = _finstack_importlib.import_module('finstack_quant.finstack_quant')\n"
+                "_finstack_extension_sha256 = _finstack_hashlib.sha256("
+                "_FinstackPath(_finstack_extension.__file__).read_bytes()).hexdigest()\n"
+                "assert _finstack_extension_sha256 == "
+                "_finstack_os.environ['FINSTACK_EXPECTED_EXTENSION_SHA256'], "
+                "'Notebook kernel loaded a different finstack extension'\n"
+                "_finstack_warning_filters = list(_finstack_warnings.filters)\n"
                 "def _finstack_warning_start(info):\n"
                 "    global _finstack_warning_filters\n"
                 "    _finstack_warning_filters = list(_finstack_warnings.filters)\n"

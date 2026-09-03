@@ -7,11 +7,10 @@ import ast
 import json
 import sys
 
-from build_labs import notebook_dependencies
+from build_labs import lab_report_errors, notebook_dependencies
 from check_curriculum import resolve_api
 from common import (
     BUILD,
-    LAB_EXECUTION_POLICY,
     NOTEBOOKS,
     SITE,
     contained,
@@ -85,8 +84,8 @@ def verify(require_execution: bool = True) -> dict:
     lab_file = BUILD / "labs.json"
     lab_report = json.loads(lab_file.read_text()) if lab_file.exists() else {}
     labs = {entry["notebook"]: entry for entry in lab_report.get("labs", [])}
-    if require_execution and lab_report.get("execution_policy") != LAB_EXECUTION_POLICY:
-        errors.append("Lab evidence was not produced by the strict warning and stderr policy")
+    if require_execution:
+        errors.extend(lab_report_errors(lab_report))
     runtime, fixtures = runtime_identity(), fixture_digest()
     verified = []
     for contract in contracts:

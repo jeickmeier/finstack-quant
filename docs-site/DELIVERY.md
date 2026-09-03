@@ -29,45 +29,44 @@ handoff. Coverage maps 303 displayed executable blocks: 215 BuildIt blocks and
 88 numerical exercise solutions. One additional exercise group has a complete
 written solution. Each numerical solution executes from a fresh lesson baseline.
 
-The complete publication command is `mise run docs-site-build`. The full run
-executed all 300 then-current blocks in 1,085.20 seconds and all 98 notebooks in
-625.82 seconds. Principal workflows, coverage and evidence checks passed. Site
-compilation then found display-math delimiter and plugin-ordering issues. Their
-focused correction and successful 30.06-second continuation are retained in
-`.build/release.json`, including the original failed build stage.
+The complete publication command is `mise run docs-site-build`. A fresh strict
+run passed at 22:42:50 UTC on 3 September 2026 in 1,923.82 seconds. It executed
+all 303 displayed blocks across 33 lessons in 1,184.94 seconds and all 98 copied
+notebooks in 710.99 seconds. Both capstone references ran from independent fresh
+processes. The remaining prerequisite, coverage, curriculum, production-build
+and rendered-link stages all passed; the reader built 138 static routes.
 
-Final visual review added three required Monte Carlo II blocks: held-out prices
-against European/intrinsic values, an explicitly illustrative policy schematic,
-and a path-count study. It also improved the one-page PM report's tables and
-six-KPI layout and isolated test captures from published assets. The affected
-lessons and notebook copies were re-executed; the final publication continuation
-checks all source/runtime fingerprints before exporting the reader. Its status,
-stage results and times are recorded in `.build/release.json`.
+The executed notebook inventory contains 861 code cells. Every non-empty code
+cell has an execution count, with zero error outputs and zero non-empty `stderr`
+streams. Python warnings are promoted to exceptions during authored cell and
+snippet execution, so no runtime warning can produce passing evidence. All 98
+source notebooks validate against the notebook schema, have complete unique cell
+IDs, and retain zero outputs and zero execution counts.
 
-The final continuation passed at 05:22:26 UTC on 3 September 2026 in 23.84 seconds.
-It verified all 33 principal workflows and current execution evidence, built all
-138 static routes and passed the rendered local-link/asset gate. Both capstone
-references passed from independent fresh processes. Browser inspection covered
-the overview, desktop/mobile lesson layout, equations, expanded solutions,
-captured curve/Monte Carlo figures, notebook rendering, the one-page PM report
-and both capstone reports. `.build/visual-review.json` records that representative
-review; it does not claim exhaustive page-by-page or print/PDF verification.
+Evidence is bound to the Python interpreter, native extension, Python package
+sources, fixtures, notebook sources and declared dependencies. Each lab entry
+also records the strict policy, runner and builder hashes, and the executed-copy
+hash. Standalone validators reject failed, partial, duplicate, stale or relabelled
+lab reports. Snippet records similarly bind the policy, runner and worker hashes.
+The eight-stage release record and timings are in `.build/release.json`.
 
-The final focused suite passed 82 tests in 100.17 seconds, covering fixture
-pricing and reconciliation, the original notebook runner, snippets, source
-materialization, coverage and dependency/output publication checks. Ruff passed
-on all changed Python tooling, fixtures and tests. The reader's TypeScript check
-passed. After test-asset isolation changed, all 44 documentation-tool tests passed
-again in 2.51 seconds.
+The final focused suite passed 89 tests in 114.47 seconds with warnings treated as
+errors. It covers fixture pricing and reconciliation, notebook schema and kernel
+identity, warning and `stderr` failure propagation, snippets, source
+materialization, evidence provenance, coverage and publication checks. Ruff and
+the reader's TypeScript build passed.
 
-That evidence predates the strict notebook diagnostic gate and is superseded for
-zero-diagnostic release proof. Runtime Python warnings and non-empty kernel
-`stderr` are now release failures; they are not informational and have no
+The earlier visual review added the required Monte Carlo II diagnostics, improved
+the one-page PM report and inspected the overview, desktop/mobile lesson layout,
+equations, expanded solutions, captured figures, notebook rendering and both
+capstone reports. `.build/visual-review.json` records that representative review;
+the strict execution-policy change did not repeat an exhaustive visual or
+print/PDF review.
+
+Runtime Python warnings and non-empty `stderr` are release failures and have no
 allowlist. A structured model or scenario result named `warnings` remains domain
-data rather than a runtime diagnostic, and is acceptable only when the notebook
-asserts and explains the expected condition. Do not claim the strict gate passed
-until `mise run docs-site-build` has rerun all copied notebooks and recorded the
-warning-free evidence.
+data rather than a runtime diagnostic and is acceptable only when the lesson
+asserts and explains the expected condition.
 
 Seven distinct external URLs authored directly in lesson prose were checked.
 None was confirmed dead. The FASB pages require JavaScript, IFRS redirects to
@@ -87,9 +86,9 @@ The authoring window can span overlapping batch work and later verification.
 
 | Checkpoint | Recorded authoring window (UTC, 3 September 2026) | Displayed blocks | Execution including fresh exercise baselines | Learner time |
 | --- | --- | ---: | ---: | --- |
-| Part I | 03:49:51–04:13:42 | 26 | 12.11 s | Unmeasured |
-| Monte Carlo II | 03:52:23–04:11:19; final visual additions completed 05:21:24 | 11 | 34.64 s | Unmeasured |
-| C3 | 03:50:02–04:40:50 | 15 | 6.39 s | Unmeasured |
+| Part I | 03:49:51–04:13:42 | 26 | 15.81 s | Unmeasured |
+| Monte Carlo II | 03:52:23–04:11:19; final visual additions completed 05:21:24 | 11 | 32.61 s | Unmeasured |
+| C3 | 03:50:02–04:40:50 | 15 | 8.45 s | Unmeasured |
 
 The Part I retrospective retains the complete money/date/curve coverage and
 separates precision, market convention and calibration checks. The lessons now

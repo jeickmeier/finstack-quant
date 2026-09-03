@@ -22,6 +22,7 @@ from common import (
     NOTEBOOKS,
     REPO,
     SITE,
+    SNIPPET_EXECUTION_POLICY,
     curriculum,
     digest,
     fixture_digest,
@@ -40,6 +41,15 @@ class Block:
     role: str
     code: str
     line: int
+
+
+def snippet_provenance() -> dict:
+    """Bind captured outputs to the strict runner, worker and policy."""
+    return {
+        "execution_policy": SNIPPET_EXECUTION_POLICY,
+        "runner_sha256": digest(Path(__file__).resolve()),
+        "worker_sha256": digest(SITE / "gen" / "snippet_worker.py"),
+    }
 
 
 def extract_blocks(text: str, source: str = "<lesson>") -> list[Block]:
@@ -111,11 +121,10 @@ def validate_output_references(text: str, lesson_id: str, blocks: list[Block], s
     attribute = re.compile(r"\b(lesson|block)\s*=\s*([\"'])(.*?)\2", re.S)
     for tag in tags:
         fields = attribute.findall(tag)
-        if (
-            attribute.sub("", tag).strip() != "/"
-            or Counter(name for name, _, _ in fields) != {"lesson": 1, "block": 1}
-        ):
-            raise ValueError(f"{source}: ExecutedOutput requires literal lesson and block attributes and a closing '/>'")
+        if attribute.sub("", tag).strip() != "/" or Counter(name for name, _, _ in fields) != {"lesson": 1, "block": 1}:
+            raise ValueError(
+                f"{source}: ExecutedOutput requires literal lesson and block attributes and a closing '/>'"
+            )
         values = {name: value for name, _, value in fields}
         if values["lesson"] != lesson_id:
             raise ValueError(f"{source}: ExecutedOutput must reference its own lesson {lesson_id}")
@@ -133,7 +142,12 @@ def validate_output_references(text: str, lesson_id: str, blocks: list[Block], s
 
 def run_process(lesson_id: str, blocks: list[Block], capture: list[str], timeout: int) -> list[dict]:
     """Execute one build sequence or exercise replay in a fresh interpreter."""
-    payload = {"lesson_id": lesson_id, "blocks": [asdict(block) for block in blocks], "capture": capture}
+    payload = {
+        "lesson_id": lesson_id,
+        "blocks": [asdict(block) for block in blocks],
+        "capture": capture,
+        "expected_runtime": runtime_identity(),
+    }
     env = os.environ.copy()
     env["PYTHONOPTIMIZE"] = "0"
     env["PYTHONPATH"] = os.pathsep.join([str(NOTEBOOKS), str(REPO / "finstack-quant-py"), str(REPO)])
@@ -155,8 +169,9 @@ def run_process(lesson_id: str, blocks: list[Block], capture: list[str], timeout
             timeout=timeout,
             check=False,
         )
-        if completed.returncode:
-            raise RuntimeError(f"{lesson_id}: snippet process failed\n{completed.stderr}\n{completed.stdout}")
+        if completed.returncode or completed.stderr.strip():
+            reason = "failed" if completed.returncode else "emitted stderr"
+            raise RuntimeError(f"{lesson_id}: snippet process {reason}\n{completed.stderr}\n{completed.stdout}")
         return json.loads(result.read_text())
 
 
@@ -176,6 +191,7 @@ def run_lesson(record: dict, timeout: int = 600, require_blocks: bool = False) -
     fixtures_before = fixture_digest()
     notebooks_before = lesson_notebooks(record, NOTEBOOKS)
     runtime_before = runtime_identity()
+    provenance_before = snippet_provenance()
     if not blocks and (metadata["status"] == "published" or require_blocks):
         raise ValueError(f"{record['id']}: no executable proof blocks")
     builds = [block for block in blocks if block.role == "build"]
@@ -187,6 +203,7 @@ def run_lesson(record: dict, timeout: int = 600, require_blocks: bool = False) -
         or fixture_digest() != fixtures_before
         or lesson_notebooks(record, NOTEBOOKS) != notebooks_before
         or runtime_identity() != runtime_before
+        or snippet_provenance() != provenance_before
     ):
         raise RuntimeError(f"{record['id']}: lesson or fixture sources changed during execution; repeat the run")
     result = {
@@ -195,6 +212,7 @@ def run_lesson(record: dict, timeout: int = 600, require_blocks: bool = False) -
         "fixtures_sha256": fixtures_before,
         "notebooks_sha256": notebooks_before,
         "runtime": runtime_before,
+        **provenance_before,
         "status": "passed" if blocks else "draft",
         "duration_seconds": time.monotonic() - started,
         "blocks": output,

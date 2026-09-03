@@ -20,11 +20,11 @@ release compilation during dependency syncing.
 The publication build executes every displayed Python block, replays each exercise
 solution from a fresh lesson baseline, executes copies of the notebook collection,
 checks curriculum and output freshness, exports the site, and checks local links.
-Copied notebook execution is strict: exceptions, error outputs, Python warnings and
-non-empty kernel `stderr` streams fail the lab gate. There is no runtime-warning
-allowlist. A library result field or table column named `warnings` is domain data,
-not a Python runtime warning; a lesson may display such a record only when it
-asserts and interprets the expected analytical condition.
+Displayed snippets and copied notebooks are strict: exceptions, error outputs,
+Python warnings and non-empty `stderr` streams fail the gate. There is no
+runtime-warning allowlist. A library result field or table column named `warnings`
+is domain data, not a Python runtime warning; a lesson may display such a record
+only when it asserts and interprets the expected analytical condition.
 The `coverage/` inventories map every original exercise group to its visible
 solution and tagged source cells. The publication gate checks their completeness
 and records stage runtimes and exit codes in `.build/release.json`; `.build/labs.json`
@@ -47,12 +47,15 @@ mise run docs-site-dev
 `uv run --no-sync python docs-site/gen/verify_prerequisites.py` validates the 33 workflow
 contracts against the installed extension and freshly executed notebook copies.
 Its `--source-only` mode checks paths and imports without claiming execution.
-Evidence fingerprints the extension binary, shared factories, data files, mapped
-notebooks and declared cross-notebook dependencies. Source notebooks containing
-saved outputs or execution counts fail the build; clearing historical outputs is
-an authoring step, never a side effect of the execution runner. Expected domain
-warning records do not waive the zero-warning/zero-`stderr` execution contract and
-must not be added to an allowlist to hide a runtime diagnostic.
+Evidence fingerprints the interpreter, extension binary, shared factories, data
+files, mapped notebooks and declared cross-notebook dependencies. Per-result
+policy and runner hashes prevent an older permissive run from being relabelled as
+strict; executed-copy hashes prevent stale build notebooks from being accepted.
+Source notebooks containing saved outputs or execution counts fail the build;
+clearing historical outputs is an authoring step, never a side effect of the
+execution runner. Expected domain warning records do not waive the
+zero-warning/zero-`stderr` execution contract and must not be added to an allowlist
+to hide a runtime diagnostic.
 
 The development server uses existing evidence and is not a release gate. Run
 `npm --prefix docs-site run typecheck` for the reader's TypeScript checks. `out/`

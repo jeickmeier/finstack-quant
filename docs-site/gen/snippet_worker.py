@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import sys
 import time
+import warnings
 
 SITE = Path(__file__).resolve().parents[1]
 
@@ -26,6 +27,14 @@ def files() -> dict[Path, str]:
 def main() -> None:
     """Execute the supplied sequence and capture designated block outputs."""
     request = json.loads(Path(sys.argv[1]).read_text())
+    expected = request["expected_runtime"]
+    if Path(sys.executable).resolve() != Path(expected["python_executable"]):
+        raise RuntimeError("Snippet worker interpreter does not match the recorded runtime")
+    extension = __import__("finstack_quant.finstack_quant", fromlist=["finstack_quant"])
+    extension_sha256 = hashlib.sha256(Path(extension.__file__).read_bytes()).hexdigest()
+    if extension_sha256 != expected["extension_sha256"]:
+        raise RuntimeError("Snippet worker loaded a different finstack extension")
+    warnings.simplefilter("error")
     namespace = {"__name__": "__main__"}
     results = []
     figure_hashes = {}

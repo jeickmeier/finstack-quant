@@ -32,6 +32,26 @@ def test_optimized_environment_cannot_disable_checks(monkeypatch: pytest.MonkeyP
         run_process("test", [Block("optimized", "build", "assert 2 + 2 == 5\n", 1)], ["optimized"], 30)
 
 
+def test_python_warning_is_a_snippet_failure() -> None:
+    with pytest.raises(RuntimeError, match="visible warning"):
+        run_process(
+            "test",
+            [Block("warning", "build", "import warnings\nwarnings.warn('visible warning', UserWarning)\n", 1)],
+            ["warning"],
+            30,
+        )
+
+
+def test_stderr_is_a_snippet_failure() -> None:
+    with pytest.raises(RuntimeError, match="plain stderr diagnostic"):
+        run_process(
+            "test",
+            [Block("stderr", "build", "import sys\nprint('plain stderr diagnostic', file=sys.stderr)\n", 1)],
+            ["stderr"],
+            30,
+        )
+
+
 def test_asset_capture_preserves_build_state_and_exercise_baseline(isolated_snippet_site: Path) -> None:
     create = Block(
         "create-file",
@@ -135,7 +155,7 @@ def test_displayed_python_cannot_bypass_execution(language: str) -> None:
 
 def test_output_references_cover_every_block_and_ignore_displayed_literals() -> None:
     text = (
-        "```python exec id=proof\ntext = '<ExecutedOutput lesson=\"other\" block=\"literal\" />'\nassert text\n```\n"
+        '```python exec id=proof\ntext = \'<ExecutedOutput lesson="other" block="literal" />\'\nassert text\n```\n'
         '<ExecutedOutput\n block="proof"\n lesson="1.1"\n />\n'
         '{/* <ExecutedOutput lesson="other" block="comment" /> */}\n'
     )
@@ -218,7 +238,9 @@ def test_capstone_variant_requires_complete_own_track_only() -> None:
     assert any("Capstone volatility: must not require the other" in item for item in errors)
     incomplete = deepcopy(records)
     incomplete[-1]["variants"]["credit"] = ["C1"]
-    assert any("Capstone credit: missing track prerequisites ['C2']" in item for item in validate_dependencies(incomplete))
+    assert any(
+        "Capstone credit: missing track prerequisites ['C2']" in item for item in validate_dependencies(incomplete)
+    )
     records[-1]["variants"]["credit"] = ["C1", "C2"]
     assert validate_dependencies(records) == []
 
@@ -272,6 +294,72 @@ def test_source_execution_state_is_rejected(tmp_path: Path, monkeypatch: pytest.
         json.dumps({"cells": [{"cell_type": "code", "source": "assert True", "outputs": [], "execution_count": None}]})
     )
     build_labs.require_clean_source("lesson.ipynb")
+
+
+def test_lab_report_requires_complete_current_per_entry_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A strict top-level label cannot hide failed, partial or stale lab entries."""
+    import build_labs
+    from common import digest
+
+    notebooks = tmp_path / "notebooks"
+    notebooks.mkdir()
+    source = notebooks / "lesson.ipynb"
+    source.write_text(json.dumps({"cells": [], "metadata": {"analyst_dependencies": []}}))
+    (notebooks / "run_all_notebooks.py").write_text("# strict runner\n")
+    build = tmp_path / ".build"
+    executed = build / "notebooks" / "lesson.ipynb"
+    executed.parent.mkdir(parents=True)
+    executed.write_text("executed copy")
+    monkeypatch.setattr(build_labs, "NOTEBOOKS", notebooks)
+    monkeypatch.setattr(build_labs, "BUILD", build)
+    monkeypatch.setattr(build_labs, "fixture_digest", lambda: "fixtures")
+    monkeypatch.setattr(build_labs, "runtime_identity", lambda: {"python": "current"})
+    provenance = build_labs.lab_provenance()
+    entry = {
+        "notebook": "lesson.ipynb",
+        "source_sha256": digest(source),
+        "executed_sha256": digest(executed),
+        "fixtures_sha256": "fixtures",
+        "dependencies_sha256": {},
+        "runtime": {"python": "current"},
+        **provenance,
+    }
+    report = {**provenance, "labs": [entry], "failed": []}
+
+    assert build_labs.lab_report_errors(report) == []
+    assert any(
+        "complete source notebook set" in error for error in build_labs.lab_report_errors({**report, "labs": []})
+    )
+    assert any(
+        "failed notebooks" in error for error in build_labs.lab_report_errors({**report, "failed": ["lesson.ipynb"]})
+    )
+    assert any(
+        "Stale lab evidence" in error
+        for error in build_labs.lab_report_errors({**report, "labs": [{**entry, "builder_sha256": "old"}]})
+    )
+
+    other_source = notebooks / "other.ipynb"
+    other_source.write_text(json.dumps({"cells": [], "metadata": {"analyst_dependencies": []}}))
+    other_executed = build / "notebooks" / "other.ipynb"
+    other_executed.write_text("other executed copy")
+    other_entry = {
+        "notebook": "other.ipynb",
+        "source_sha256": digest(other_source),
+        "executed_sha256": digest(other_executed),
+        "fixtures_sha256": "fixtures",
+        "dependencies_sha256": {},
+        "runtime": {"python": "current"},
+        **provenance,
+    }
+    evidence_path = build / "labs.json"
+    evidence_path.write_text(json.dumps({**report, "labs": [entry, other_entry]}))
+    source.write_text(json.dumps({"cells": [], "metadata": {"analyst_dependencies": []}, "changed": True}))
+
+    preserved = build_labs.preserved_lab_entries(evidence_path, ["lesson.ipynb"], build_labs.source_notebooks())
+
+    assert [item["notebook"] for item in preserved] == ["other.ipynb"]
 
 
 def test_prerequisite_gate_rejects_unexecuted_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

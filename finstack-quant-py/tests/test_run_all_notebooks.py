@@ -170,6 +170,36 @@ def test_run_notebook_rejects_missing_cell_id_without_saving_source(module: Modu
     assert notebook.read_bytes() == before
 
 
+def test_run_notebook_rejects_invalid_schema_without_saving_source(module: ModuleType, tmp_path: Path) -> None:
+    """Schema-invalid notebooks fail before a kernel starts or outputs are saved."""
+    notebook = tmp_path / "invalid_schema.ipynb"
+    notebook.write_text(
+        json.dumps({
+            "cells": [
+                {
+                    "id": "invalid-metadata",
+                    "cell_type": "code",
+                    "execution_count": None,
+                    "metadata": {},
+                    "outputs": [],
+                    "source": 42,
+                }
+            ],
+            "metadata": {},
+            "nbformat": 4,
+            "nbformat_minor": 5,
+        }),
+        encoding="utf-8",
+    )
+    before = notebook.read_bytes()
+
+    ok, message, _elapsed = module.run_notebook(notebook, timeout=30, save_outputs=True)
+
+    assert ok is False
+    assert "not valid" in message or "not of type" in message
+    assert notebook.read_bytes() == before
+
+
 @pytest.mark.parametrize("tag", ["skip-execution", "raises-exception"])
 def test_execution_tags_cannot_hide_failures(module: ModuleType, tmp_path: Path, tag: str) -> None:
     """Every nonempty lesson cell must execute and unexpected errors must fail."""

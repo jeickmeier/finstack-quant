@@ -37,6 +37,84 @@ def source_notebooks() -> dict[str, str]:
     }
 
 
+def lab_provenance() -> dict:
+    """Bind every result to the runner, builder and strict execution policy."""
+    return {
+        "execution_policy": LAB_EXECUTION_POLICY,
+        "runner_sha256": digest(NOTEBOOKS / "run_all_notebooks.py"),
+        "builder_sha256": digest(Path(__file__).resolve()),
+    }
+
+
+def lab_report_errors(report: dict, require_complete: bool = True) -> list[str]:
+    """Return reasons that a lab report cannot support a publication claim."""
+    errors = []
+    provenance = lab_provenance()
+    if any(report.get(key) != value for key, value in provenance.items()):
+        errors.append("Lab evidence provenance does not match the current strict runner and builder")
+    failures = report.get("failed", [])
+    if failures:
+        errors.append(f"Lab evidence records failed notebooks: {sorted(failures)}")
+    entries = report.get("labs", [])
+    names = [entry.get("notebook") for entry in entries]
+    if not all(isinstance(name, str) for name in names):
+        errors.append("Lab evidence contains a record without a notebook path")
+    if len(names) != len(set(names)):
+        errors.append("Lab evidence contains duplicate notebook records")
+    expected = source_notebooks()
+    if require_complete and set(names) != set(expected):
+        errors.append(
+            "Lab evidence does not cover the complete source notebook set: "
+            f"missing={sorted(set(expected) - set(names))}, "
+            f"extra={sorted(str(name) for name in set(names) - set(expected))}"
+        )
+    fixtures = fixture_digest()
+    runtime = runtime_identity()
+    for entry in entries:
+        name = entry.get("notebook")
+        if name not in expected:
+            continue
+        if (
+            entry.get("source_sha256") != expected[name]
+            or entry.get("fixtures_sha256") != fixtures
+            or entry.get("runtime") != runtime
+            or entry.get("dependencies_sha256", {}) != notebook_dependencies(name)
+            or any(entry.get(key) != value for key, value in provenance.items())
+        ):
+            errors.append(f"Stale lab evidence: {name}")
+        executed = BUILD / "notebooks" / name
+        if not executed.is_file() or entry.get("executed_sha256") != digest(executed):
+            errors.append(f"Missing or stale executed notebook copy: {name}")
+    return errors
+
+
+def preserved_lab_entries(evidence_path: Path, selected: list[str], all_sources: dict[str, str]) -> list[dict]:
+    """Load unrelated current entries for a focused rebuild."""
+    selected_names = set(selected)
+    if not evidence_path.exists() or selected_names == set(all_sources):
+        return []
+    report = json.loads(evidence_path.read_text())
+    preserved = [entry for entry in report.get("labs", []) if entry.get("notebook") not in selected_names]
+    preserved_report = {
+        **report,
+        "labs": preserved,
+        "failed": [name for name in report.get("failed", []) if name not in selected_names],
+    }
+    errors = lab_report_errors(preserved_report, require_complete=False)
+    expected = set(all_sources) - selected_names
+    actual = {entry.get("notebook") for entry in preserved}
+    if actual != expected:
+        errors.append(
+            "Preserved lab evidence does not cover every unselected notebook: "
+            f"missing={sorted(expected - actual)}, extra={sorted(str(name) for name in actual - expected)}"
+        )
+    if errors:
+        raise ValueError(
+            "Cannot preserve unrelated lab evidence; run a complete lab build first:\n" + "\n".join(errors)
+        )
+    return preserved
+
+
 def notebook_dependencies(relative: str) -> dict[str, str]:
     """Fingerprint declared notebook source dependencies used by reference labs."""
     source = json.loads(contained(NOTEBOOKS, relative).read_text())
@@ -57,7 +135,7 @@ def require_clean_source(relative: str) -> None:
         raise ValueError(f"{relative}: clear source outputs and execution counts before building")
 
 
-def export_notebook(path: Path, relative: str) -> dict:
+def export_notebook(path: Path, relative: str, provenance: dict) -> dict:
     """Export computed HTML and downloadable Markdown without parsing HTML as MDX."""
     with warnings.catch_warnings():
         warnings.simplefilter("error")
@@ -116,9 +194,11 @@ def export_notebook(path: Path, relative: str) -> dict:
         "html": f"/lab-assets/{slug}.html",
         "code_cells": sum(c.cell_type == "code" for c in notebook.cells),
         "source_sha256": digest(NOTEBOOKS / relative),
+        "executed_sha256": digest(path),
         "fixtures_sha256": fixture_digest(),
         "dependencies_sha256": notebook_dependencies(relative),
         "runtime": runtime_identity(),
+        **provenance,
     }
 
 
@@ -146,6 +226,7 @@ def main() -> int:
     fixture_before = fixture_digest()
     runtime_before = runtime_identity()
     dependencies_before = {name: notebook_dependencies(name) for name in selected}
+    provenance_before = lab_provenance()
     # Focused runs use a fresh working tree and preserve unrelated executed copies.
     with TemporaryDirectory(prefix=".lab-run-", dir=SITE) as directory:
         copies = Path(directory) / "notebooks"
@@ -157,7 +238,7 @@ def main() -> int:
             ignore=shutil.ignore_patterns("__pycache__", ".ipynb_checkpoints", "*.html", "*.pdf"),
         )
         evidence_path = BUILD / "labs.json"
-        existing = json.loads(evidence_path.read_text()).get("labs", []) if evidence_path.exists() else []
+        existing = preserved_lab_entries(evidence_path, selected, before)
         evidence = {entry["notebook"]: entry for entry in existing if entry["notebook"] not in selected}
         failures = []
         try:
@@ -185,7 +266,7 @@ def main() -> int:
                         print(f"{relative}: notebook runner emitted stderr", file=sys.stderr, flush=True)
                     print(result.stdout + result.stderr, file=sys.stderr, flush=True)
                 else:
-                    evidence[relative] = export_notebook(copies / relative, relative)
+                    evidence[relative] = export_notebook(copies / relative, relative, provenance_before)
                     published_copy = BUILD / "notebooks" / relative
                     published_copy.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(copies / relative, published_copy)
@@ -198,6 +279,7 @@ def main() -> int:
                 or fixture_before != fixture_digest()
                 or runtime_before != runtime_identity()
                 or dependencies_before != {name: notebook_dependencies(name) for name in selected}
+                or provenance_before != lab_provenance()
             ):
                 # Also detects concurrent author edits: never claim a stable source run.
                 raise RuntimeError(
@@ -206,7 +288,7 @@ def main() -> int:
             write_json(
                 evidence_path,
                 {
-                    "execution_policy": LAB_EXECUTION_POLICY,
+                    **provenance_before,
                     "labs": list(evidence.values()),
                     "failed": failures,
                 },

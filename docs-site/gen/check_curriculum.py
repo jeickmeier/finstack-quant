@@ -12,7 +12,6 @@ import sys
 from common import (
     BUILD,
     ID_PATTERN,
-    LAB_EXECUTION_POLICY,
     NOTEBOOKS,
     REPO,
     SITE,
@@ -26,7 +25,7 @@ from common import (
     write_json,
 )
 from materialize_notebook_blocks import materialize_lesson
-from run_lesson_snippets import extract_blocks, validate_output_references
+from run_lesson_snippets import extract_blocks, snippet_provenance, validate_output_references
 
 
 def _dependency_closure(graph: dict[str, list[str]], requirements: list[str]) -> set[str]:
@@ -190,6 +189,7 @@ def check_evidence(
         or captured.get("fixtures_sha256") != fixture_hash
         or captured.get("notebooks_sha256") != lesson_notebooks(record)
         or captured.get("runtime") != runtime_identity()
+        or any(captured.get(key) != value for key, value in snippet_provenance().items())
     ):
         errors.append(f"{identifier}: missing, failed or stale snippet evidence")
     if {b["id"] for b in captured.get("blocks", [])} != {b.id for b in blocks}:
@@ -209,8 +209,10 @@ def check(site: Path = SITE, check_api: bool = False, require_evidence: bool = F
     lab_path = site / ".build" / "labs.json"
     lab_report = json.loads(lab_path.read_text()) if lab_path.exists() else {}
     lab_evidence = {item["notebook"]: item for item in lab_report.get("labs", [])}
-    if require_evidence and lab_report.get("execution_policy") != LAB_EXECUTION_POLICY:
-        errors.append("Lab evidence was not produced by the strict warning and stderr policy")
+    if require_evidence:
+        from build_labs import lab_report_errors
+
+        errors.extend(lab_report_errors(lab_report))
     references = reference_anchors((REPO / "docs" / "REFERENCES.md").read_text())
     fixture_hash = fixture_digest()
     expected_ids = (

@@ -934,7 +934,7 @@ description = "Validate analyst curriculum mappings and supported Python imports
 run = "uv run --no-sync python docs-site/gen/check_curriculum.py --check-api"
 
 [tasks.docs-site-snippets]
-description = "Execute displayed analyst lesson code and isolated exercise solutions"
+description = "Execute displayed lesson code with zero runtime warnings or stderr"
 run = "uv run --no-sync python docs-site/gen/run_lesson_snippets.py --require-all"
 
 [tasks.docs-site-labs]
@@ -943,7 +943,7 @@ run = "uv run --no-sync python docs-site/gen/build_labs.py"
 
 [tasks.docs-site-test]
 description = "Test analyst curriculum, strict notebook execution, fixture and runner contracts"
-run = "uv run --no-sync pytest docs-site/tests finstack-quant-py/tests/test_run_all_notebooks.py finstack-quant-py/tests/test_analyst_fixtures.py finstack-quant-py/tests/test_analyst_tracks.py finstack-quant-py/tests/test_analyst_margin.py finstack-quant-py/tests/test_analyst_liquidity.py finstack-quant-py/tests/models/test_analyst_monte_carlo.py"
+run = "uv run --no-sync pytest -W error --junitxml=docs-site/.build/release-tests.xml docs-site/tests finstack-quant-py/tests/test_run_all_notebooks.py finstack-quant-py/tests/test_analyst_fixtures.py finstack-quant-py/tests/test_analyst_tracks.py finstack-quant-py/tests/test_analyst_margin.py finstack-quant-py/tests/test_analyst_liquidity.py finstack-quant-py/tests/models/test_analyst_monte_carlo.py"
 
 [tasks.docs-site-prerequisites]
 description = "Verify all 33 workflows against current, warning-free executed notebook copies"

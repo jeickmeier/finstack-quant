@@ -24,6 +24,12 @@ LAB_EXECUTION_POLICY = {
     "cell_errors": "forbidden",
     "skipped_nonempty_cells": "forbidden",
 }
+SNIPPET_EXECUTION_POLICY = {
+    "python_warnings": "error",
+    "stderr": "forbidden",
+    "exceptions": "forbidden",
+    "assertions": "enabled",
+}
 
 
 def curriculum(site: Path = SITE) -> list[dict]:
@@ -68,6 +74,7 @@ def runtime_identity() -> dict[str, str]:
         python_sources.update(path.read_bytes())
     return {
         "python": sys.version.split()[0],
+        "python_executable": str(Path(sys.executable).resolve()),
         "package": extension.__version__,
         "extension_sha256": digest(binary),
         "python_sources_sha256": python_sources.hexdigest(),
