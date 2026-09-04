@@ -28,6 +28,7 @@ from common import (
     REPO,
     SITE,
     SNIPPET_EXECUTION_POLICY,
+    cell_source,
     contained,
     curriculum,
     digest,
@@ -129,10 +130,12 @@ def canonical_execution_blocks(record: dict, blocks: list[Block], notebook_root:
                 raise ValueError(f"{record['id']}: duplicate canonical source cell {identifier}")
             if cell.get("cell_type") != "code" or tag.get("role") != displayed.role:
                 raise ValueError(f"{record['id']}:{identifier}: canonical source type or role differs from display")
-            source = cell.get("source", "")
-            source = "".join(source) if isinstance(source, list) else source
-            if not isinstance(source, str):
+            raw_source = cell.get("source", "")
+            if not isinstance(raw_source, (str, list)) or (
+                isinstance(raw_source, list) and not all(isinstance(line, str) for line in raw_source)
+            ):
                 raise TypeError(f"{record['id']}:{identifier}: canonical cell source must be text")
+            source = cell_source(cell)
             published = without_assertions(source, f"{relative}:{identifier}")
             published = published + ("" if published.endswith("\n") else "\n")
             if published != displayed.code:
@@ -421,8 +424,9 @@ def run_lesson(record: dict, timeout: int = 600, require_blocks: bool = False) -
     materialize_lesson(record, content_root=CONTENT, notebook_root=NOTEBOOKS)
     path = CONTENT / record["path"]
     metadata, _ = frontmatter(path)
-    blocks = extract_blocks(path.read_text(), str(path))
-    validate_output_references(path.read_text(), record["id"], blocks, str(path))
+    text = path.read_text()
+    blocks = extract_blocks(text, str(path))
+    validate_output_references(text, record["id"], blocks, str(path))
     execution_blocks = canonical_execution_blocks(record, blocks, NOTEBOOKS)
     source_before = digest(path)
     fixtures_before = fixture_digest()

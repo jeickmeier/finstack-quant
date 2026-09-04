@@ -2,7 +2,7 @@
 
 import re
 
-from common import REPO, SITE
+from common import REPO, SITE, markdown_heading_slug
 from nbconvert.filters.markdown_mistune import markdown2html_mistune
 
 
@@ -13,7 +13,7 @@ def main() -> int:
 
     def heading_anchor(match: re.Match) -> str:
         """Preserve the syllabus's Markdown heading slugs in nbconvert HTML."""
-        slug = re.sub(r"[^\w\s-]", "", match[2].lower()).strip().replace(" ", "-")
+        slug = markdown_heading_slug(match[2])
         if slug in anchors:
             return match[0]
         anchors.add(slug)

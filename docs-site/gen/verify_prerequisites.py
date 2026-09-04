@@ -7,17 +7,21 @@ import ast
 import json
 import sys
 
-from build_labs import lab_report_errors, notebook_dependencies
+from build_labs import lab_report_errors
 from check_curriculum import resolve_api
 from common import (
     BUILD,
     NOTEBOOKS,
     SITE,
+    cell_source,
     contained,
     curriculum,
     digest,
     fixture_digest,
+    lab_entries_by_notebook,
     lesson_notebook_names,
+    notebook_dependencies,
+    read_lab_report,
     runtime_identity,
     write_json,
 )
@@ -38,8 +42,9 @@ def inspect_cells(
     if not tagged:
         return [], 0, []
     execution = labs.get(name, {})
+    original_digest = digest(original)
     if require_execution and (
-        execution.get("source_sha256") != digest(original)
+        execution.get("source_sha256") != original_digest
         or execution.get("fixtures_sha256") != fixtures
         or execution.get("runtime") != runtime
         or execution.get("dependencies_sha256", {}) != notebook_dependencies(name)
@@ -50,7 +55,7 @@ def inspect_cells(
     output_cells = {cell.get("metadata", {}).get("analyst_program", {}).get("id"): cell for cell in executed["cells"]}
     for cell in tagged:
         tag = cell["metadata"]["analyst_program"]
-        code = "".join(cell["source"])
+        code = cell_source(cell)
         if cell["cell_type"] != "code":
             errors.append(f"{identifier}: tagged non-code cell {tag['id']}")
             continue
@@ -65,7 +70,7 @@ def inspect_cells(
             "notebook": name,
             "id": tag["id"],
             "role": tag.get("role", "build"),
-            "source_sha256": digest(original),
+            "source_sha256": original_digest,
         })
     return cells, assertion_count, errors
 
@@ -82,9 +87,8 @@ def verify(require_execution: bool = True) -> dict:
         errors.append(
             f"Expected one contract per lesson; missing={sorted(set(records) - set(identifiers))}, extra={sorted(set(identifiers) - set(records))}"
         )
-    lab_file = BUILD / "labs.json"
-    lab_report = json.loads(lab_file.read_text()) if lab_file.exists() else {}
-    labs = {entry["notebook"]: entry for entry in lab_report.get("labs", [])}
+    lab_report = read_lab_report(BUILD)
+    labs = lab_entries_by_notebook(lab_report)
     if require_execution:
         errors.extend(lab_report_errors(lab_report))
     runtime, fixtures = runtime_identity(), fixture_digest()

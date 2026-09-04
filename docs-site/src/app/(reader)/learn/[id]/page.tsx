@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight, BookOpen, FlaskConical } from 'lucide-react';
 import { DocsBody, DocsPage, DocsTitle } from 'fumadocs-ui/layouts/docs/page';
 import { getMDXComponents } from '@/components/mdx';
-import { getLesson, getLessonLabs, getLessons, getProgression, groups, labHref } from '@/lib/curriculum';
+import { getLesson, getLessonLabs, getLessons, getProgression, groups, labHref, labSlug, labTitle } from '@/lib/curriculum';
 import { labSource, lessonSource } from '@/lib/source';
 import { referenceLink } from '@/lib/references';
 
@@ -38,8 +38,8 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
     </div>
     <DocsBody><Body components={getMDXComponents()} /></DocsBody>
     {lessonLabs.length > 0 && <section className="lesson-labs" aria-label="Companion labs"><h2><FlaskConical size={16} aria-hidden="true" /> Companion labs</h2>{lessonLabs.map((lab) => {
-      const title = lab.split('/').at(-1)?.replace(/\.ipynb$/, '').replaceAll('_', ' ');
-      return labSource.getPage(lab.replace(/\.ipynb$/, '').split('/'))
+      const title = labTitle(lab);
+      return labSource.getPage(labSlug(lab).split('/'))
         ? <Link key={lab} href={labHref(lab)}>{title}<ArrowRight size={16} aria-hidden="true" /></Link>
         : <p className="pending-lab" key={lab}>{title}<span>Awaiting validation</span></p>;
     })}</section>}

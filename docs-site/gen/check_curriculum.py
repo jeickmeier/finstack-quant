@@ -17,15 +17,21 @@ from common import (
     NOTEBOOKS,
     REPO,
     SITE,
+    cell_source,
     contained,
     curriculum,
+    curriculum_manifest,
     digest,
     fixture_digest,
     frontmatter,
+    lab_entries_by_notebook,
     lesson_labs,
     lesson_notebook_names,
     lesson_notebooks,
     notebook_closure,
+    notebook_dependencies,
+    read_lab_report,
+    reference_anchors,
     runtime_identity,
     write_json,
 )
@@ -144,19 +150,26 @@ def _validate_capstone(capstone: dict, graph: dict[str, list[str]]) -> list[str]
     return errors
 
 
-def validate_dependencies(records: list[dict]) -> list[str]:
-    """Check dependency closure, independent tracks and complete capstone variants."""
-    errors = []
-    ids = [record["id"] for record in records]
-    if len(ids) != len(set(ids)):
-        errors.append("Duplicate lesson IDs")
-    graph = {
+def _lesson_graph(records: list[dict], *, include_variants: bool = True) -> dict[str, list[str]]:
+    """Build prerequisite adjacency list, optionally including variant requirements."""
+    if not include_variants:
+        return {record["id"]: list(record.get("requires", [])) for record in records}
+    return {
         record["id"]: [
             *record.get("requires", []),
             *(item for requirements in record.get("variants", {}).values() for item in requirements),
         ]
         for record in records
     }
+
+
+def validate_dependencies(records: list[dict]) -> list[str]:
+    """Check dependency closure, independent tracks and complete capstone variants."""
+    errors = []
+    ids = [record["id"] for record in records]
+    if len(ids) != len(set(ids)):
+        errors.append("Duplicate lesson IDs")
+    graph = _lesson_graph(records)
     active, done = set(), set()
 
     def visit(identifier: str) -> None:
@@ -195,13 +208,7 @@ def validate_dependencies(records: list[dict]) -> list[str]:
 def validate_fixture_progression(records: list[dict], fixture_ids: set[str]) -> list[str]:
     """Require every shared fixture to be introduced once before it is consumed."""
     errors = []
-    graph = {
-        record["id"]: [
-            *record.get("requires", []),
-            *(item for requirements in record.get("variants", {}).values() for item in requirements),
-        ]
-        for record in records
-    }
+    graph = _lesson_graph(records)
     introduced_by: dict[str, str] = {}
     for record in records:
         for fixture in record.get("introduces", []):
@@ -334,10 +341,7 @@ def validate_fixture_builds(record: dict, body: str, fixture_sources: dict) -> l
     return errors
 
 
-def _notebook_source(cell: dict) -> str:
-    """Return one notebook cell source as text."""
-    source = cell.get("source", "")
-    return "".join(source) if isinstance(source, list) else str(source)
+_notebook_source = cell_source
 
 
 def _shared_imports(notebook: dict, module: str) -> tuple[set[str], dict[str, str]]:
@@ -549,13 +553,7 @@ def validate_shared_source_usage(records: list[dict], manifest: dict, notebook_r
     """Require every imported shared source to be introduced in the lesson closure."""
     errors = []
     by_id = {record["id"]: record for record in records}
-    graph = {
-        record["id"]: [
-            *record.get("requires", []),
-            *(item for requirements in record.get("variants", {}).values() for item in requirements),
-        ]
-        for record in records
-    }
+    graph = _lesson_graph(records)
     owners: dict[str, set[str]] = {}
     for fixture, paths in manifest.get("fixture_sources", {}).items():
         for source in paths:
@@ -634,7 +632,7 @@ def validate_track_fixture_calls(records: list[dict], notebook_root: Path = NOTE
     """Require tagged track-helper calls to declare their owning fixtures."""
     errors = []
     by_id = {record["id"]: record for record in records}
-    base_graph = {record["id"]: record.get("requires", []) for record in records}
+    base_graph = _lesson_graph(records, include_variants=False)
     variant_scopes = {
         (record["id"], relative): (available_fixtures, variant)
         for record in records
@@ -677,13 +675,7 @@ def validate_book_stage_calls(records: list[dict], notebook_root: Path = NOTEBOO
     """Reject cumulative book or market stages used before their owner lesson."""
     errors = []
     by_id = {record["id"]: record for record in records}
-    graph = {
-        record["id"]: [
-            *record.get("requires", []),
-            *(item for requirements in record.get("variants", {}).values() for item in requirements),
-        ]
-        for record in records
-    }
+    graph = _lesson_graph(records)
     owners = {fixture: record["id"] for record in records for fixture in record.get("introduces", [])}
     notebooks = {name for record in records for name in lesson_notebook_names(record)}
     for relative in sorted(notebooks):
@@ -780,7 +772,7 @@ def validate_lab_stage_exposure(records: list[dict], notebook_root: Path = NOTEB
     """Reject full labs that expose code from fixtures or lessons not yet available."""
     errors = []
     by_id = {record["id"]: record for record in records}
-    graph = {record["id"]: record.get("requires", []) for record in records}
+    graph = _lesson_graph(records, include_variants=False)
     for record in records:
         lesson_id = record["id"]
         for relative, available_lessons, available_fixtures, variant in _record_notebook_scopes(
@@ -799,15 +791,6 @@ def validate_lab_stage_exposure(records: list[dict], notebook_root: Path = NOTEB
                     )
                 )
     return errors
-
-
-def reference_anchors(text: str) -> set[str]:
-    """Collect explicit and standard Markdown heading anchors."""
-    anchors = set(re.findall(r'<a\s+(?:id|name)=["\']([^"\']+)', text))
-    for heading in re.findall(r"^#{1,6}\s+(.+)$", text, re.M):
-        slug = re.sub(r"[^\w\s-]", "", heading.lower()).strip().replace(" ", "-")
-        anchors.add(slug)
-    return anchors
 
 
 def resolve_api(name: str) -> None:
@@ -940,12 +923,17 @@ def validate_snippet_assets(identifier: str, captured_blocks: list[dict], site: 
 
 
 def check_evidence(
-    record: dict, path: Path, blocks: list, site: Path, lab_evidence: dict, fixture_hash: str
+    record: dict,
+    path: Path,
+    blocks: list,
+    site: Path,
+    lab_evidence: dict,
+    fixture_hash: str,
+    runtime: dict | None = None,
 ) -> list[str]:
     """Reject missing or stale execution output for snippets and companion labs."""
     identifier = record["id"]
-    from build_labs import notebook_dependencies
-
+    current_runtime = runtime_identity() if runtime is None else runtime
     errors = []
     for notebook in lesson_labs(record):
         lab = lab_evidence.get(notebook, {})
@@ -953,7 +941,7 @@ def check_evidence(
         if original.is_file() and (
             lab.get("source_sha256") != digest(original)
             or lab.get("fixtures_sha256") != fixture_hash
-            or lab.get("runtime") != runtime_identity()
+            or lab.get("runtime") != current_runtime
             or lab.get("dependencies_sha256", {}) != notebook_dependencies(notebook)
         ):
             errors.append(f"{identifier}: absent or stale executed lab evidence: {notebook}")
@@ -966,7 +954,7 @@ def check_evidence(
         or captured.get("source_sha256") != digest(path)
         or captured.get("fixtures_sha256") != fixture_hash
         or captured.get("notebooks_sha256") != lesson_notebooks(record)
-        or captured.get("runtime") != runtime_identity()
+        or captured.get("runtime") != current_runtime
         or any(captured.get(key) != value for key, value in snippet_provenance().items())
     )
     if evidence_stale:
@@ -984,10 +972,8 @@ def check_evidence(
 
 def check(site: Path = SITE, check_api: bool = False, require_evidence: bool = False) -> tuple[list[str], list[dict]]:
     """Validate the authored curriculum and return its frontend projection."""
-    import tomllib
-
-    records = curriculum(site)
-    manifest = tomllib.loads((site / "curriculum.toml").read_text())
+    manifest = curriculum_manifest(site)
+    records = manifest.get("lesson", [])
     fixture_ids = set(manifest.get("fixtures", []))
     errors = [
         *validate_dependencies(records),
@@ -1000,15 +986,15 @@ def check(site: Path = SITE, check_api: bool = False, require_evidence: bool = F
         *validate_lab_stage_exposure(records),
     ]
     projected = []
-    lab_path = site / ".build" / "labs.json"
-    lab_report = json.loads(lab_path.read_text()) if lab_path.exists() else {}
-    lab_evidence = {item["notebook"]: item for item in lab_report.get("labs", [])}
+    lab_report = read_lab_report(site / ".build")
+    lab_evidence = lab_entries_by_notebook(lab_report)
     if require_evidence:
         from build_labs import lab_report_errors
 
         errors.extend(lab_report_errors(lab_report))
     references = reference_anchors((REPO / "docs" / "REFERENCES.md").read_text())
     fixture_hash = fixture_digest()
+    runtime = runtime_identity()
     expected_ids = (
         {f"1.{n}" for n in range(1, 6)}
         | {f"2.{n}" for n in range(1, 9)}
@@ -1035,8 +1021,9 @@ def check(site: Path = SITE, check_api: bool = False, require_evidence: bool = F
                 for notebook in lesson_notebook_names(record)
                 if not contained(NOTEBOOKS, notebook).is_file()
             )
-            blocks = extract_blocks(path.read_text(), str(path))
-            validate_output_references(path.read_text(), identifier, blocks, str(path))
+            text = path.read_text()
+            blocks = extract_blocks(text, str(path))
+            validate_output_references(text, identifier, blocks, str(path))
             if metadata.get("status") == "published":
                 if not lesson_labs(record):
                     errors.append(f"{identifier}: published lesson has no lab")
@@ -1045,7 +1032,7 @@ def check(site: Path = SITE, check_api: bool = False, require_evidence: bool = F
                 if min(positions) < 0 or positions != sorted(positions):
                     errors.append(f"{identifier}: missing or out-of-order required lesson sections")
             if metadata.get("status") == "published" or require_evidence:
-                errors.extend(check_evidence(record, path, blocks, site, lab_evidence, fixture_hash))
+                errors.extend(check_evidence(record, path, blocks, site, lab_evidence, fixture_hash, runtime))
             projected.append({**record, **metadata})
         except (ValueError, TypeError, OSError, KeyError, SyntaxError) as error:
             errors.append(f"{identifier}: {error}")

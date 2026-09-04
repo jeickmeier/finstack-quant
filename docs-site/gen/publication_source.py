@@ -6,6 +6,8 @@ import ast
 from collections import defaultdict
 from typing import Any
 
+from common import cell_source
+
 _MUTATING_ASSERT_METHODS = {
     "__delitem__",
     "__setitem__",
@@ -197,10 +199,7 @@ def without_assertions(source: str, filename: str = "<python>") -> str:
     return result
 
 
-def _cell_source(cell: Any) -> str:
-    """Return a notebook cell source in its canonical text form."""
-    source = cell.get("source", "")
-    return "".join(source) if isinstance(source, list) else str(source)
+_cell_source = cell_source
 
 
 def notebook_assertion_count(notebook: Any, filename: str = "<notebook>") -> int:

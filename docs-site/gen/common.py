@@ -44,10 +44,15 @@ PUBLICATION_EXECUTION_INPUTS = {
 }
 
 
+def curriculum_manifest(site: Path = SITE) -> dict:
+    """Read the full curriculum TOML manifest."""
+    with (site / "curriculum.toml").open("rb") as handle:
+        return tomllib.load(handle)
+
+
 def curriculum(site: Path = SITE) -> list[dict]:
     """Read ordered curriculum records from the sole mapping manifest."""
-    with (site / "curriculum.toml").open("rb") as handle:
-        return tomllib.load(handle).get("lesson", [])
+    return curriculum_manifest(site).get("lesson", [])
 
 
 def lesson_labs(record: dict) -> list[str]:
@@ -81,6 +86,25 @@ def contained(root: Path, relative: str) -> Path:
     if not path.is_relative_to(root.resolve()) or Path(relative).is_absolute():
         raise ValueError(f"Path must remain inside {root}: {relative}")
     return path
+
+
+def cell_source(cell: dict) -> str:
+    """Return a notebook cell source in its canonical text form."""
+    source = cell.get("source", "")
+    return "".join(source) if isinstance(source, list) else str(source)
+
+
+def markdown_heading_slug(heading: str) -> str:
+    """Generate a standard URL/anchor slug from a Markdown heading."""
+    return re.sub(r"[^\w\s-]", "", heading.lower()).strip().replace(" ", "-")
+
+
+def reference_anchors(text: str) -> set[str]:
+    """Collect explicit and standard Markdown heading anchors."""
+    anchors = set(re.findall(r'<a\s+(?:id|name)=["\']([^"\']+)', text))
+    for heading in re.findall(r"^#{1,6}\s+(.+)$", text, re.M):
+        anchors.add(markdown_heading_slug(heading))
+    return anchors
 
 
 def digest(path: Path) -> str:
@@ -189,6 +213,23 @@ def lesson_notebooks(record: dict, notebook_root: Path = NOTEBOOKS) -> dict[str,
     """Fingerprint every mapped notebook and recursively declared source dependency."""
     names = notebook_closure(lesson_notebook_names(record), notebook_root)
     return {name: digest(contained(notebook_root, name)) for name in sorted(names)}
+
+
+def notebook_dependencies(relative: str, notebook_root: Path = NOTEBOOKS) -> dict[str, str]:
+    """Fingerprint recursively declared notebook source dependencies."""
+    names = notebook_closure([relative], notebook_root) - {relative}
+    return {name: digest(contained(notebook_root, name)) for name in sorted(names)}
+
+
+def read_lab_report(build_root: Path = BUILD) -> dict:
+    """Read the recorded labs report or return an empty dict if missing."""
+    path = build_root / "labs.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def lab_entries_by_notebook(report: dict) -> dict[str, dict]:
+    """Index lab report entries by relative notebook name."""
+    return {entry["notebook"]: entry for entry in report.get("labs", [])}
 
 
 def write_json(path: Path, value: object) -> None:

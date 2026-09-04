@@ -25,6 +25,7 @@ from common import (
     fixture_digest,
     lesson_notebook_names,
     notebook_closure,
+    notebook_dependencies,
     runtime_identity,
     write_json,
 )
@@ -331,12 +332,6 @@ def preserved_lab_entries(evidence_path: Path, selected: list[str], all_sources:
             "Cannot preserve unrelated lab evidence; run a complete lab build first:\n" + "\n".join(errors)
         )
     return preserved
-
-
-def notebook_dependencies(relative: str) -> dict[str, str]:
-    """Fingerprint recursively declared notebook source dependencies."""
-    names = notebook_closure([relative], NOTEBOOKS) - {relative}
-    return {name: digest(contained(NOTEBOOKS, name)) for name in sorted(names)}
 
 
 def require_clean_source(relative: str) -> None:

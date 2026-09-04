@@ -47,12 +47,20 @@ export function getLessonLabs(lesson: Lesson) {
 export function getProgression(lesson: Lesson) {
   const lessons = getLessons();
   const route = ['C', 'V'].includes(lesson.part)
-    ? [...lessons.filter((item) => ['1', '2', '3', '4', lesson.part, 'capstone'].includes(item.part))]
+    ? lessons.filter((item) => ['1', '2', '3', '4', lesson.part, 'capstone'].includes(item.part))
     : lessons.filter((item) => ['1', '2', '3', '4'].includes(item.part));
   const index = route.findIndex((item) => item.id === lesson.id);
   return { previous: route[index - 1], next: route[index + 1] };
 }
 
+export function labSlug(notebook: string) {
+  return notebook.replace(/\.ipynb$/, '');
+}
+
 export function labHref(notebook: string) {
-  return `/labs/${notebook.replace(/\.ipynb$/, '')}`;
+  return `/labs/${labSlug(notebook)}`;
+}
+
+export function labTitle(notebook: string) {
+  return notebook.split('/').at(-1)?.replace(/\.ipynb$/, '').replaceAll('_', ' ') ?? notebook;
 }

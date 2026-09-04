@@ -4,7 +4,7 @@ from pathlib import Path
 import tomllib
 
 from check_curriculum import validate_fixture_builds
-from common import frontmatter
+from common import curriculum_manifest, frontmatter
 
 
 def test_fixture_build_sources_must_match_manifest_exactly() -> None:
@@ -49,7 +49,7 @@ def test_unintroduced_fixture_build_is_rejected() -> None:
 
 def test_every_fixture_owner_lesson_lists_canonical_sources() -> None:
     site = Path(__file__).parents[1]
-    manifest = tomllib.loads((site / "curriculum.toml").read_text())
+    manifest = curriculum_manifest(site)
     errors = []
     for record in manifest["lesson"]:
         if not record.get("introduces"):

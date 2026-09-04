@@ -5,7 +5,7 @@ import tomllib
 
 from build_labs import published_notebooks, source_notebooks
 from check_curriculum import validate_instrument_fixture_usage
-from common import lesson_notebook_names
+from common import curriculum_manifest, lesson_notebook_names
 import nbformat
 
 
@@ -134,7 +134,7 @@ def test_capstone_variant_labs_cannot_import_the_other_track(tmp_path: Path) -> 
 
 def test_scale_notebook_is_executed_but_not_published() -> None:
     scale = "05_portfolio/multi_asset_portfolio_at_scale.ipynb"
-    manifest = tomllib.loads((Path(__file__).parents[1] / "curriculum.toml").read_text())
+    manifest = curriculum_manifest(Path(__file__).parents[1])
     mapped = {notebook for lesson in manifest["lesson"] for notebook in lesson_notebook_names(lesson)}
 
     assert scale in source_notebooks()

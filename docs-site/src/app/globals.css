@@ -210,7 +210,6 @@ button, summary { cursor: pointer; }
 .check-yourself { margin: 38px 0 24px; background: var(--soft); padding: 21px 24px; border-top: 2px solid var(--accent); }
 .check-heading { display: flex; align-items: center; gap: 11px; color: var(--accent); }
 .prose .check-heading h2 { margin: 0; font-size: 17px !important; }
-.availability-badge { display: inline-flex; border: 1px solid var(--rule); background: var(--soft); border-radius: 2px; font: 9px var(--font-mono); padding: 4px 7px; color: var(--accent); }
 .executed-output { border: 1px solid var(--rule); border-left: 2px solid var(--accent); margin: 20px 0; background: var(--paper); border-radius: 2px; overflow: hidden; }
 .executed-output figcaption { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 13px; background: var(--soft); border-bottom: 1px solid var(--rule); font: 9px var(--font-mono); color: var(--quiet); }
 .executed-output figcaption > span { display: inline-flex; align-items: center; gap: 8px; }

@@ -9,7 +9,7 @@ import re
 import shlex
 import sys
 
-from common import CONTENT, NOTEBOOKS, contained, curriculum, lesson_notebook_names
+from common import CONTENT, NOTEBOOKS, cell_source as raw_cell_source, contained, curriculum, lesson_notebook_names
 from publication_source import assertion_count, without_assertions
 from run_lesson_snippets import extract_blocks
 
@@ -18,7 +18,9 @@ MARKER_START = re.compile(r"^[ \t]*(?:<!--|\{/\*)\s*/?notebook-block\b")
 CELL_ID = re.compile(r"[a-z0-9][a-z0-9_-]*\Z")
 
 
-def cell_source(record: dict, fields: dict[str, str], notebook_root: Path) -> str:
+def cell_source(
+    record: dict, fields: dict[str, str], notebook_root: Path, cache: dict[str, dict] | None = None
+) -> str:
     """Resolve one mapped code cell and validate its author-owned metadata."""
     if set(fields) != {"notebook", "cell", "role"}:
         raise ValueError("Notebook block requires exactly notebook, cell and role attributes")
@@ -28,7 +30,12 @@ def cell_source(record: dict, fields: dict[str, str], notebook_root: Path) -> st
         raise ValueError(f"{record['id']}: notebook is not mapped in labs/examples: {relative}")
     if not CELL_ID.fullmatch(identifier) or role not in {"build", "exercise"}:
         raise ValueError(f"{record['id']}: invalid notebook cell ID or role")
-    notebook = json.loads(path.read_text())
+    if cache is not None and relative in cache:
+        notebook = cache[relative]
+    else:
+        notebook = json.loads(path.read_text())
+        if cache is not None:
+            cache[relative] = notebook
     tagged = {}
     for cell in notebook.get("cells", []):
         tag = cell.get("metadata", {}).get("analyst_program")
@@ -48,10 +55,11 @@ def cell_source(record: dict, fields: dict[str, str], notebook_root: Path) -> st
     if tag.get("lesson") != record["id"] or tag.get("role") != role:
         raise ValueError(f"{relative}:{identifier}: notebook metadata lesson/role differs from requested block")
     source = cell.get("source", "")
-    if isinstance(source, list) and all(isinstance(line, str) for line in source):
-        source = "".join(source)
-    if not isinstance(source, str):
+    if not isinstance(source, (str, list)) or (
+        isinstance(source, list) and not all(isinstance(line, str) for line in source)
+    ):
         raise TypeError(f"{relative}:{identifier}: cell source must be text")
+    source = raw_cell_source(cell)
     if role == "exercise" and not assertion_count(source, f"{relative}:{identifier}"):
         raise ValueError(f"{relative}:{identifier}: exercise source requires an explicit assertion")
     return source
@@ -72,9 +80,11 @@ def _marker_fields(value: str, lesson_id: str) -> dict[str, str]:
     return fields
 
 
-def _render_cell(record: dict, fields: dict[str, str], notebook_root: Path) -> tuple[str, bool]:
+def _render_cell(
+    record: dict, fields: dict[str, str], notebook_root: Path, cache: dict[str, dict] | None = None
+) -> tuple[str, bool]:
     """Render one sanitized notebook cell and report its canonical build gate."""
-    source = cell_source(record, fields, notebook_root)
+    source = cell_source(record, fields, notebook_root, cache)
     cell_name = f"{fields['notebook']}:{fields['cell']}"
     has_build_assertion = fields["role"] == "build" and bool(assertion_count(source, cell_name))
     published_source = without_assertions(source, cell_name)
@@ -100,6 +110,7 @@ def render_notebook_blocks(text: str, record: dict, notebook_root: Path = NOTEBO
     seen = set()
     fence = None
     canonical_build_has_assertion = False
+    notebook_cache: dict[str, dict] = {}
     for line in text.splitlines(keepends=True):
         stripped = line.rstrip("\r\n")
         marker = MARKER.fullmatch(stripped)
@@ -124,7 +135,7 @@ def render_notebook_blocks(text: str, record: dict, notebook_root: Path = NOTEBO
             if value != "/notebook-block" or opening is None:
                 raise ValueError(f"{record['id']}: unexpected notebook-block closing marker")
             fields = opening
-            rendered, has_build_assertion = _render_cell(record, fields, notebook_root)
+            rendered, has_build_assertion = _render_cell(record, fields, notebook_root, notebook_cache)
             canonical_build_has_assertion |= has_build_assertion
             ending = "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else ""
             output.append(rendered + ending)
