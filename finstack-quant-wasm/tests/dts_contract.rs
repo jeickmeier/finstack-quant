@@ -488,10 +488,41 @@ fn pricing_entry_points_declare_structured_valuation_results() {
         &dts,
         "measures: Record<string, number>;"
     ));
+    assert!(contains_ignoring_ws(&dts, "details?: ValuationDetails;"));
+    let monte_carlo = interface_block(&dts, "MonteCarloValuationDetails");
+    for field in [
+        "model_key: string;",
+        "standard_error: number;",
+        "training_paths: number;",
+        "training_simulated_paths: number;",
+        "make_whole_training_paths: number;",
+        "make_whole_training_simulated_paths: number;",
+        "estimator_paths: number;",
+        "simulated_paths: number;",
+        "seed: bigint;",
+        "time_grid: number[];",
+        "antithetic: boolean;",
+        "sobol: boolean;",
+        "brownian_bridge: boolean;",
+    ] {
+        assert!(
+            contains_ignoring_ws(monte_carlo, field),
+            "MonteCarloValuationDetails is missing `{field}`"
+        );
+    }
+    assert!(dts.contains("type: 'monte_carlo'; data: MonteCarloValuationDetails"));
     assert!(contains_ignoring_ws(
         &dts,
         "priceInstrument(instrumentJson: string, marketJson: string, asOf: string, model?: string | null, metrics?: string[] | null, pricingOptions?: string | null, marketHistory?: string | null): ValuationResult;",
     ));
+    let pricing_doc = preceding_jsdoc(&dts, "  priceInstrument(");
+    for model in ["discounting", "hazard_rate", "tree", "rates_credit"] {
+        assert!(
+            pricing_doc.contains(model),
+            "priceInstrument JSDoc omits explicit bond model `{model}`"
+        );
+    }
+    assert!(pricing_doc.contains("Stochastic `\"rates_credit\"` runs"));
     // The valuation-result *validator* still takes and returns a wire string.
     assert!(contains_ignoring_ws(
         &dts,

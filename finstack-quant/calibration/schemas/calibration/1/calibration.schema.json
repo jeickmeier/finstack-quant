@@ -2101,7 +2101,7 @@
         },
         {
           "const": "piecewise_quadratic_forward",
-          "description": "Piecewise quadratic forwards (smooth forward curve, C²).",
+          "description": "Piecewise quadratic forwards (C¹ forwards and C² log discount factors).",
           "type": "string"
         }
       ]

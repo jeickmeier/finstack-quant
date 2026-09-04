@@ -38,19 +38,28 @@ impl MetricCalculator for ConvexityCalculator {
         &[MetricId::Ytm]
     }
 
+    fn dynamic_dependencies<'a>(&'a self, context: &MetricContext) -> Cow<'a, [MetricId]> {
+        let Ok(bond) = context.instrument_as::<Bond>() else {
+            return Cow::Borrowed(self.dependencies());
+        };
+        let has_options = bond.return_floor.is_some()
+            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
+            Cow::Borrowed(&[])
+        } else {
+            Cow::Borrowed(self.dependencies())
+        }
+    }
+
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = context.instrument_as()?;
 
         // Callable/OAS model risk is opt-in. The default matches Bloomberg YAS
         // Workout risk: quoted-yield convexity on maturity/workout cashflows.
-        let has_options = bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.return_floor.is_some()
+            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
-            return Ok(super::effective::effective_convexity(
-                bond,
-                context.curves.as_ref(),
-                context.as_of,
-                None,
-            )? / 100.0);
+            return Ok(super::effective::effective_convexity(bond, context, None)? / 100.0);
         }
 
         let ytm = context

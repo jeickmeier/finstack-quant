@@ -82,12 +82,54 @@ impl BondEngine {
     /// # Errors
     ///
     /// Returns `Err` when:
+    /// - The bond has embedded call, put, or return-floor rights
     /// - Discount curve is not found in market context
     /// - Bond has no future cashflows
     /// - Cashflow schedule building fails
+    #[cfg(test)]
     pub(crate) fn price(bond: &Bond, context: &MarketContext, as_of: Date) -> Result<Money> {
         Self::price_with_explanation(bond, context, as_of, ExplainOpts::disabled())
             .map(|(pv, _)| pv)
+    }
+
+    /// Price a non-callable bond with a constant OAS applied to discounting.
+    ///
+    /// The input uses the bond's configured OAS quote compounding and is
+    /// converted to a continuously compounded spread before it is applied to
+    /// each contractual cashflow. Embedded rights are validated by the
+    /// model-dispatch boundary before this scalar kernel is called.
+    pub(crate) fn price_with_oas(
+        bond: &Bond,
+        context: &MarketContext,
+        as_of: Date,
+        oas_quote_decimal: f64,
+    ) -> Result<f64> {
+        if !oas_quote_decimal.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "discounting OAS must be finite, got {oas_quote_decimal}"
+            )));
+        }
+        let continuous_oas = bond
+            .instrument_pricing_overrides
+            .model_config
+            .oas_quote_compounding
+            .continuous_from_quote_decimal(oas_quote_decimal);
+        let flows = bond.pricing_dated_cashflows(context, as_of)?;
+        let discount = context.get_discount(bond.discount_curve_id.as_str())?;
+        let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::default();
+        for (date, amount) in flows {
+            let time = discount.day_count().year_fraction(
+                as_of,
+                date,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?;
+            pv.add(
+                amount.amount()
+                    * discount.df_between_dates(as_of, date)?
+                    * (-continuous_oas * time).exp(),
+            );
+        }
+        Ok(pv.total())
     }
 
     /// Price a bond with optional explanation trace.
@@ -111,6 +153,7 @@ impl BondEngine {
     /// # Errors
     ///
     /// Returns `Err` when:
+    /// - The bond has embedded call, put, or return-floor rights
     /// - Discount curve is not found in market context
     /// - Bond has no future cashflows
     /// - Cashflow schedule building fails
@@ -121,6 +164,12 @@ impl BondEngine {
         as_of: Date,
         explain: ExplainOpts,
     ) -> Result<(Money, Option<ExplanationTrace>)> {
+        if bond.has_exercise_rights() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Bond '{}' has embedded call, put, or return-floor rights; discounting is a non-callable model. Use 'tree' for rates-only optional pricing or 'rates_credit' for joint rates-credit optional pricing.",
+                bond.id
+            )));
+        }
         let flows = bond.pricing_dated_cashflows(context, as_of)?;
         let disc = context.get_discount(bond.discount_curve_id.as_str())?;
         if flows.is_empty() {
@@ -177,5 +226,35 @@ impl BondEngine {
         // Use Kahan compensated summation from finstack-quant-core for numerical stability
         let total = Money::new(kahan_sum(pv_values), ccy);
         Ok((total, trace))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+    use time::macros::date;
+
+    #[test]
+    fn public_discount_engine_rejects_embedded_rights() {
+        let mut bond = Bond::example().expect("example bond");
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: date!(2027 - 01 - 01),
+                end_date: date!(2027 - 01 - 01),
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+
+        let error = BondEngine::price_with_explanation(
+            &bond,
+            &MarketContext::new(),
+            date!(2025 - 01 - 01),
+            ExplainOpts::disabled(),
+        )
+        .expect_err("discounting must not silently ignore embedded rights");
+        assert!(error.to_string().contains("non-callable"), "{error}");
     }
 }

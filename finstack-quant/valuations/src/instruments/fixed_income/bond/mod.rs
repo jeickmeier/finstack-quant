@@ -4,6 +4,7 @@
 //! - Fixed-rate coupon bonds (bullet and amortizing)
 //! - Floating-rate notes (FRNs) with caps/floors
 //! - Callable and putable bonds (American/Bermudan exercise)
+//! - Minimum-MOIC and minimum-XIRR return-floor rights
 //! - Zero-coupon bonds
 //! - Custom cashflow schedules (including PIK and bespoke amortization)
 //!
@@ -28,10 +29,11 @@
 //! PV = Σ CF_i · DF(as_of → t_i)
 //! ```
 //!
-//! For bonds with embedded options (calls/puts), tree-based pricing is used
-//! to value the optionality. The short-rate / rates+credit trees operate on
-//! a time axis measured from `as_of` using the discount curve’s own
-//! day-count, so that:
+//! For bonds with embedded options (calls, puts, or return floors), model-based
+//! rollback values the optionality. The short-rate tree operates on the
+//! discount curve's day-count axis; the rates-credit lattice uses Act/365F.
+//! Cashflows, balances, and exercise dates are mapped with the same day count
+//! as their model grid, so that:
 //! - `t = 0` corresponds to the valuation date `as_of`
 //! - `t > 0` are year-fractions to future cashflow and exercise dates
 //!
@@ -56,14 +58,18 @@
 //!
 //! # Call/Put Exercise Convention
 //!
-//! For callable/putable bonds:
+//! For bonds with call, put, or return-floor rights:
 //!
 //! - **`CallPut.price_pct_of_par`** is applied to the **outstanding principal**
 //!   at the exercise date, not the original notional. This correctly handles
 //!   amortizing callable bonds.
-//! - **Exercise payoff**: Coupon is always paid regardless of exercise decision.
-//!   The exercise decision applies only to the principal redemption vs. continuation.
-//! - **Formula**: `node_value = coupon + min(max(continuation, put_price), call_price)`
+//! - **Exercise payoff**: Current contractual cash is paid regardless of the
+//!   exercise decision. The decision applies to risky continuation, including
+//!   within-step fractional-recovery-of-par value.
+//! - **Formula**: `node_value = current_cash + min(max(risky_continuation, put_price), call_price)`.
+//! - At maturity, exercise compares against pre-redemption principal. Current
+//!   coupon and non-redemption payments are added once; scheduled redemption is
+//!   the hold alternative.
 //!
 //! # Accrual and Ex-Coupon Conventions
 //!

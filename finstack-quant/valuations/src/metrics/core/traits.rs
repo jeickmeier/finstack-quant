@@ -475,6 +475,13 @@ impl MetricContext {
         self.pricing_dispatch.clone()
     }
 
+    /// Return the explicitly selected pricing model, if this metric request
+    /// was entered through the registered-pricer path.
+    #[inline]
+    pub(crate) fn pricing_model(&self) -> Option<crate::pricer::ModelKey> {
+        self.pricing_dispatch.model()
+    }
+
     /// Attach market history to this context (used by Historical VaR metrics).
     pub fn with_market_history(mut self, history: Arc<MarketHistory>) -> Self {
         self.inputs.market_history = Some(history);

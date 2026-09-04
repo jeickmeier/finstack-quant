@@ -21,9 +21,16 @@ impl MetricCalculator for DirtyPriceCalculator {
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = context.instrument_as()?;
-        if let Some(dirty) =
-            settlement_dirty_from_quote_overrides(bond, &context.curves, context.as_of)?
-        {
+        let pricing_dispatch = context.clone_pricer_dispatch();
+        if let Some(dirty) = settlement_dirty_from_quote_overrides(
+            bond,
+            &context.curves,
+            context.as_of,
+            context
+                .pricing_model()
+                .unwrap_or_else(|| bond.default_pricing_model()),
+            Some(&pricing_dispatch),
+        )? {
             return Ok(dirty);
         }
 
@@ -52,9 +59,16 @@ impl MetricCalculator for CleanPriceCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = context.instrument_as()?;
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
-        let dirty = if let Some(dirty) =
-            settlement_dirty_from_quote_overrides(bond, &context.curves, context.as_of)?
-        {
+        let pricing_dispatch = context.clone_pricer_dispatch();
+        let dirty = if let Some(dirty) = settlement_dirty_from_quote_overrides(
+            bond,
+            &context.curves,
+            context.as_of,
+            context
+                .pricing_model()
+                .unwrap_or_else(|| bond.default_pricing_model()),
+            Some(&pricing_dispatch),
+        )? {
             dirty
         } else {
             model_dirty_at_quote_date(

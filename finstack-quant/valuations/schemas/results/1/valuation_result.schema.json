@@ -252,7 +252,7 @@
       "type": "object"
     },
     "ModelKey": {
-      "description": "Pricing model selection for the pricer registry.\n\nDetermines which mathematical model is used to price an instrument.\nEach model has different computational characteristics and accuracy\nprofiles for different instrument types.\n\n# Model Categories\n\n## Analytical Models\n- [`Discounting`](Self::Discounting): Simple present value discounting\n- [`Black76`](Self::Black76): Black-76 formula for options\n- [`Normal`](Self::Normal): Bachelier (normal) model for rate options\n\n## Tree Models\n- [`Tree`](Self::Tree): Binomial/trinomial lattice\n- [`HullWhite1F`](Self::HullWhite1F): Hull-White one-factor short rate\n\n## Monte Carlo Models\n- [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation\n- [`MonteCarloHeston`](Self::MonteCarloHeston): Heston stochastic vol\n\n## Exotic Analytical\n- [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers\n- [`AsianGeometricBS`](Self::AsianGeometricBS): Geometric Asian (exact)\n- [`AsianTurnbullWakeman`](Self::AsianTurnbullWakeman): Arithmetic Asian (approx)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::pricer::ModelKey;\n\n// Select appropriate model for instrument type\nlet model = ModelKey::Discounting;  // For bonds\nlet model = ModelKey::Black76;      // For caps/floors\nlet model = ModelKey::MonteCarloGBM; // For path-dependent exotics\n\n// Parse from string\nlet model: ModelKey = \"black76\".parse().unwrap();\nassert_eq!(model, ModelKey::Black76);\n```",
+      "description": "Pricing model selection for the pricer registry.\n\nDetermines which mathematical model is used to price an instrument.\nEach model has different computational characteristics and accuracy\nprofiles for different instrument types.\n\n# Model Categories\n\n## Analytical Models\n- [`Discounting`](Self::Discounting): Simple present value discounting\n- [`Black76`](Self::Black76): Black-76 formula for options\n- [`Normal`](Self::Normal): Bachelier (normal) model for rate options\n\n## Tree Models\n- [`Tree`](Self::Tree): Binomial/trinomial lattice\n- [`HullWhite1F`](Self::HullWhite1F): Hull-White one-factor short rate\n\n## Credit Models\n- [`HazardRate`](Self::HazardRate): Fractional-recovery hazard-rate pricing\n- [`RatesCredit`](Self::RatesCredit): Joint short-rate and hazard-rate pricing\n\n## Monte Carlo Models\n- [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation\n- [`MonteCarloHeston`](Self::MonteCarloHeston): Heston stochastic vol\n\n## Exotic Analytical\n- [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers\n- [`AsianGeometricBS`](Self::AsianGeometricBS): Geometric Asian (exact)\n- [`AsianTurnbullWakeman`](Self::AsianTurnbullWakeman): Arithmetic Asian (approx)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::pricer::ModelKey;\n\n// Select appropriate model for instrument type\nlet model = ModelKey::Discounting;  // For bonds\nlet model = ModelKey::Black76;      // For caps/floors\nlet model = ModelKey::MonteCarloGBM; // For path-dependent exotics\n\n// Parse from string\nlet model: ModelKey = \"black76\".parse().unwrap();\nassert_eq!(model, ModelKey::Black76);\n```",
       "oneOf": [
         {
           "const": "discounting",
@@ -276,7 +276,12 @@
         },
         {
           "const": "hazard_rate",
-          "description": "Hazard rate model for credit instruments.\n\nUsed for: CDS, CDS indices, credit risky bonds.",
+          "description": "Hazard rate model for credit instruments.\n\nUsed for: CDS, CDS indices, and non-callable credit-risky bonds.",
+          "type": "string"
+        },
+        {
+          "const": "rates_credit",
+          "description": "Joint short-rate and hazard-rate model for credit-risky bonds.\n\nUsed for: callable, puttable, return-floor, and straight bonds whose\nrates and credit dynamics must be valued on one calibrated path.",
           "type": "string"
         },
         {
@@ -413,6 +418,18 @@
           "minimum": 0,
           "type": "integer"
         },
+        "make_whole_training_paths": {
+          "description": "Independent paths used to fit state-conditional make-whole reference\nvalues. Zero when no stochastic make-whole stage is required.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "make_whole_training_simulated_paths": {
+          "description": "Total factor paths simulated for state-conditional make-whole training,\nincluding antithetic partners. Zero when that stage is absent.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
         "model_key": {
           "$ref": "#/$defs/ModelKey",
           "description": "Registered model used for the simulation."
@@ -434,7 +451,7 @@
           "type": "boolean"
         },
         "standard_error": {
-          "description": "Standard error of the discounted PV mean in the result currency.",
+          "description": "Sampling standard error of the discounted PV mean in the result\ncurrency. For LSMC valuations, this measures pricing-path uncertainty\nunder the frozen fitted exercise policy. It excludes regression\napproximation, time-grid discretization, and model error.",
           "format": "double",
           "type": "number"
         },
@@ -445,11 +462,27 @@
             "type": "number"
           },
           "type": "array"
+        },
+        "training_paths": {
+          "description": "Number of independent paths used to fit an exercise or control policy.\n\nZero for Monte Carlo engines that do not have a separate training\nstage.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "training_simulated_paths": {
+          "description": "Total factor paths simulated in the policy-training stage, including\nantithetic partners. Zero when no policy is trained.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
         }
       },
       "required": [
         "model_key",
         "standard_error",
+        "training_paths",
+        "training_simulated_paths",
+        "make_whole_training_paths",
+        "make_whole_training_simulated_paths",
         "estimator_paths",
         "simulated_paths",
         "seed",

@@ -2,8 +2,9 @@
 //!
 //! Models the joint evolution of the risk-free short rate and the credit hazard
 //! rate using correlated binomial moves. Both factors are **calibrated** to their
-//! respective market curves (discount curve for rates, hazard curve for credit)
-//! via independent Arrow-Debreu forward induction, analogous to Ho-Lee calibration.
+//! respective conditional discount and survival targets via independent
+//! Arrow-Debreu forward induction, analogous to Ho-Lee calibration. Callers
+//! materialize those targets on one explicit valuation-origin time grid.
 //!
 //! # Volatility regimes
 //!
@@ -146,11 +147,12 @@ use finstack_quant_cashflows::builder::rate_helpers::{
     calculate_floating_rate, FloatingRateParams,
 };
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::HazardCurve;
-use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::BrentSolver;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::{Error, Result};
+
+use crate::monte_carlo::rng::philox::PhiloxRng;
+use crate::monte_carlo::traits::RandomStream;
 
 use super::short_rate_keys;
 use super::tree_framework::{CachedValues, NodeState, TreeModel, TreeValuator};
@@ -206,6 +208,108 @@ use super::tree_framework::{CachedValues, NodeState, TreeModel, TreeValuator};
 /// [`HullWhiteTree`]: super::hull_white_tree::HullWhiteTree
 pub const KAPPA_MAX: f64 = 0.15;
 
+/// Conditional discount and survival targets for rates-credit calibration.
+///
+/// Every target is measured from the pricing origin represented by
+/// `times[0]`. In particular, callers valuing after a curve's base date must
+/// pass conditional ratios such as `D(date) / D(as_of)` and
+/// `S(date) / S(as_of)`, rather than evaluating the curve at an elapsed time
+/// from its original base date. Making those values explicit prevents the
+/// model from silently mixing curve and valuation origins.
+///
+/// The current recombining additive-normal lattice requires an evenly spaced
+/// grid. `times` therefore contains `steps + 1` coordinates starting at zero,
+/// and both target arrays contain one value at every coordinate. Discount
+/// factors may exceed one when rates are negative; survival probabilities
+/// must be non-increasing and lie in `(0, 1]`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RatesCreditCalibrationTargets {
+    /// Evenly spaced year-fraction coordinates, starting at `0.0`.
+    pub times: Vec<f64>,
+    /// Conditional risk-free discount factors, with the first value equal to
+    /// `1.0`.
+    pub discount_factors: Vec<f64>,
+    /// Conditional survival probabilities, with the first value equal to
+    /// `1.0`.
+    pub survival_probabilities: Vec<f64>,
+    /// Fractional recovery of principal in `[0, 1]`.
+    pub recovery_rate: f64,
+}
+
+/// Joint transition probabilities from one rates-credit lattice node.
+///
+/// `up_down` means the rate factor moves up while the hazard factor moves
+/// down; the other names follow the same rate-first ordering. The four values
+/// are non-negative and sum to one. Their marginals exactly preserve the
+/// factor transition probabilities used during calibration.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RatesCreditTransition {
+    /// Probability that both the rate and hazard factors move up.
+    pub up_up: f64,
+    /// Probability that the rate factor moves up and the hazard factor moves
+    /// down.
+    pub up_down: f64,
+    /// Probability that the rate factor moves down and the hazard factor moves
+    /// up.
+    pub down_up: f64,
+    /// Probability that both the rate and hazard factors move down.
+    pub down_down: f64,
+}
+
+/// One state on a sampled rates-credit lattice path.
+///
+/// The interval weights apply from this state to the next grid point.
+/// Terminal states use the identity weights `discount_to_next = 1`,
+/// `survival_to_next = 1`, and `default_to_next = 0` because no interval
+/// follows them. Recovery is deliberately absent: it is a product payoff and
+/// timing convention, not part of factor-path generation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RatesCreditPathState {
+    /// Zero-based lattice step.
+    pub step: usize,
+    /// Year fraction from the calibration origin.
+    pub time: f64,
+    /// Rate-node index within this step.
+    pub rate_node: usize,
+    /// Hazard-node index within this step.
+    pub hazard_node: usize,
+    /// Raw calibrated short rate used for risk-free discounting.
+    pub short_rate: f64,
+    /// Non-negative effective hazard rate used for survival weighting.
+    pub hazard_rate: f64,
+    /// Risk-free discount factor from this step to the next.
+    pub discount_to_next: f64,
+    /// Conditional survival probability from this step to the next.
+    pub survival_to_next: f64,
+    /// Conditional default probability from this step to the next.
+    pub default_to_next: f64,
+}
+
+/// Compact restart point for a sampled rates-credit factor path.
+///
+/// The Philox draw offset is the lattice `step`, so the factor node indices
+/// are the only stochastic state required to resume the same `(seed,
+/// path_index, antithetic)` path without replaying its prefix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RatesCreditPathCheckpoint {
+    /// First lattice step returned by a resumed segment.
+    pub step: usize,
+    /// Rate-factor node index at `step`.
+    pub rate_node: usize,
+    /// Hazard-factor node index at `step`.
+    pub hazard_node: usize,
+}
+
+impl From<&RatesCreditPathState> for RatesCreditPathCheckpoint {
+    fn from(state: &RatesCreditPathState) -> Self {
+        Self {
+            step: state.step,
+            rate_node: state.rate_node,
+            hazard_node: state.hazard_node,
+        }
+    }
+}
+
 /// Configuration for rates + credit two-factor tree.
 ///
 /// Mean-reversion speeds (`rate_mean_reversion` and `hazard_mean_reversion`)
@@ -258,19 +362,18 @@ impl Default for RatesCreditConfig {
 
 /// Two-factor correlated binomial tree (short rate + hazard rate).
 ///
-/// Both factors are calibrated to market curves via `calibrate()`. Calling
-/// `price()` without prior calibration returns an error.
+/// Both factors are calibrated to explicit conditional targets via
+/// [`Self::calibrate`]. Calling `price()` without prior calibration returns an
+/// error.
 #[derive(Debug, Clone)]
 pub struct RatesCreditTree {
     /// Rates-credit tree configuration
     pub config: RatesCreditConfig,
-    /// Calibrated short rates: `rates[step][node_i]`.
-    /// Populated by `calibrate()`.
-    calibrated_rates: Vec<Vec<f64>>,
-    /// Calibrated hazard rates: `hazards[step][node_j]`.
-    /// Populated by `calibrate()`.
-    calibrated_hazards: Vec<Vec<f64>>,
-    /// Recovery rate from the hazard curve (populated by `calibrate()`).
+    /// Calibrated short-rate affine rows. Populated by `calibrate()`.
+    calibrated_rates: Vec<FactorRow>,
+    /// Calibrated hazard-rate affine rows. Populated by `calibrate()`.
+    calibrated_hazards: Vec<FactorRow>,
+    /// Recovery target supplied to `calibrate()`.
     recovery_rate: f64,
     /// Mean-reversion reference level for the rate factor (the calibrated
     /// `t = 0` instantaneous rate `r₀`). Populated by `calibrate()`. Pricing
@@ -286,6 +389,8 @@ pub struct RatesCreditTree {
     rate_variance_retention: VarianceRetention,
     /// Hazard-factor variance retention from the most recent `calibrate()`.
     hazard_variance_retention: VarianceRetention,
+    /// Explicit calibration coordinates. Empty until calibration succeeds.
+    calibration_times: Vec<f64>,
 }
 
 /// How much of the calibrated hazard lattice sits on the zero floor.
@@ -512,6 +617,36 @@ impl NodeCoupon {
     }
 }
 
+/// One recombining additive-normal factor row.
+///
+/// Every calibrated row is affine in its node index: `base + node * shift`.
+/// Retaining that exact representation keeps factor storage linear in the
+/// number of time steps while reconstructing the same node levels on demand.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct FactorRow {
+    base: f64,
+    shift: f64,
+    nodes: usize,
+}
+
+impl FactorRow {
+    #[inline]
+    fn value(self, node: usize) -> Option<f64> {
+        (node < self.nodes).then(|| self.value_unchecked(node))
+    }
+
+    #[inline]
+    fn value_unchecked(self, node: usize) -> f64 {
+        debug_assert!(node < self.nodes);
+        self.base + node as f64 * self.shift
+    }
+
+    #[inline]
+    fn values(self) -> impl ExactSizeIterator<Item = f64> {
+        (0..self.nodes).map(move |node| self.value_unchecked(node))
+    }
+}
+
 /// Per-factor lattice geometry and calibration target shared by the rate and
 /// hazard passes of [`RatesCreditTree::calibrate`].
 #[derive(Debug, Clone, Copy)]
@@ -522,8 +657,6 @@ struct FactorGrid {
     dt: f64,
     /// Annualised absolute (normal) volatility of this factor.
     sigma: f64,
-    /// Total horizon in years.
-    time_to_maturity: f64,
     /// Whether node values are passed through the non-negative transform.
     /// Set for the hazard factor; the rate factor allows negative rates.
     floor_at_zero: bool,
@@ -544,6 +677,7 @@ impl RatesCreditTree {
             hazard_floor_saturation: HazardFloorSaturation::default(),
             rate_variance_retention: VarianceRetention::default(),
             hazard_variance_retention: VarianceRetention::default(),
+            calibration_times: Vec::new(),
         }
     }
 
@@ -582,7 +716,7 @@ impl RatesCreditTree {
     /// probability pricing uses. Without mean reversion every `p` is exactly ½
     /// and retention is uniformly `1.0`, so the scan is skipped.
     fn scan_variance_retention(
-        levels: &[Vec<f64>],
+        levels: &[FactorRow],
         steps: usize,
         reference: f64,
         kappa: f64,
@@ -599,7 +733,7 @@ impl RatesCreditTree {
             total_nodes: 0,
         };
         for (step, row) in levels.iter().enumerate().take(steps) {
-            for &x in row {
+            for x in row.values() {
                 let p = Self::mean_reverting_up_prob(x, reference, kappa, sigma, dt);
                 let retention = 4.0 * p * (1.0 - p);
                 out.total_nodes += 1;
@@ -627,133 +761,220 @@ impl RatesCreditTree {
         raw.max(0.0)
     }
 
-    /// Calibrate both factors to market curves using Arrow-Debreu forward induction.
+    /// Validate explicit conditional calibration targets and return `(dt, T)`.
+    fn validate_calibration_targets(
+        &self,
+        targets: &RatesCreditCalibrationTargets,
+    ) -> Result<(f64, f64)> {
+        let steps = self.config.steps;
+        if steps == 0 {
+            return Err(Error::Validation(
+                "rates-credit tree calibration requires at least one step".to_string(),
+            ));
+        }
+        let expected_len = steps + 1;
+        for (name, len) in [
+            ("times", targets.times.len()),
+            ("discount_factors", targets.discount_factors.len()),
+            (
+                "survival_probabilities",
+                targets.survival_probabilities.len(),
+            ),
+        ] {
+            if len != expected_len {
+                return Err(Error::Validation(format!(
+                    "rates-credit calibration {name} must contain steps + 1 = \
+                     {expected_len} values, got {len}"
+                )));
+            }
+        }
+
+        let origin = targets.times[0];
+        if !origin.is_finite() || origin.abs() > 1e-12 {
+            return Err(Error::Validation(format!(
+                "rates-credit calibration times must start at 0.0, got {origin}"
+            )));
+        }
+        let dt = targets.times[1] - origin;
+        if !dt.is_finite() || dt <= 0.0 {
+            return Err(Error::Validation(format!(
+                "rates-credit calibration requires a positive finite first time step, got {dt}"
+            )));
+        }
+        let spacing_tolerance = 1e-12_f64.max(dt.abs() * 1e-10);
+        for (step, pair) in targets.times.windows(2).enumerate() {
+            let actual_dt = pair[1] - pair[0];
+            if !pair[1].is_finite()
+                || actual_dt <= 0.0
+                || (actual_dt - dt).abs() > spacing_tolerance
+            {
+                return Err(Error::Validation(format!(
+                    "rates-credit calibration requires an evenly spaced, strictly increasing \
+                     time grid; interval {step} has width {actual_dt}, expected {dt}"
+                )));
+            }
+        }
+
+        for (name, values) in [
+            ("discount_factors", targets.discount_factors.as_slice()),
+            (
+                "survival_probabilities",
+                targets.survival_probabilities.as_slice(),
+            ),
+        ] {
+            if (values[0] - 1.0).abs() > 1e-12 {
+                return Err(Error::Validation(format!(
+                    "conditional {name} must start at 1.0, got {}",
+                    values[0]
+                )));
+            }
+            if let Some((index, value)) = values
+                .iter()
+                .copied()
+                .enumerate()
+                .find(|(_, value)| !value.is_finite() || *value <= 0.0)
+            {
+                return Err(Error::Validation(format!(
+                    "rates-credit calibration {name}[{index}] must be positive and finite, \
+                     got {value}"
+                )));
+            }
+        }
+        for (step, pair) in targets.survival_probabilities.windows(2).enumerate() {
+            if pair[1] > pair[0] + 1e-12 || pair[1] > 1.0 + 1e-12 {
+                return Err(Error::Validation(format!(
+                    "conditional survival probabilities must be non-increasing and at most \
+                     1.0; interval {step} moves from {} to {}",
+                    pair[0], pair[1]
+                )));
+            }
+        }
+        if !targets.recovery_rate.is_finite() || !(0.0..=1.0).contains(&targets.recovery_rate) {
+            return Err(Error::Validation(format!(
+                "rates-credit recovery_rate must be finite and in [0, 1], got {}",
+                targets.recovery_rate
+            )));
+        }
+
+        for (name, value) in [
+            ("rate_vol", self.config.rate_vol),
+            ("hazard_vol", self.config.hazard_vol),
+            ("rate_mean_reversion", self.config.rate_mean_reversion),
+            ("hazard_mean_reversion", self.config.hazard_mean_reversion),
+        ] {
+            if !value.is_finite() || value < 0.0 {
+                return Err(Error::Validation(format!(
+                    "rates-credit {name} must be non-negative and finite, got {value}"
+                )));
+            }
+        }
+        if !self.config.correlation.is_finite() || !(-1.0..=1.0).contains(&self.config.correlation)
+        {
+            return Err(Error::Validation(format!(
+                "rates-credit correlation must be finite and in [-1, 1], got {}",
+                self.config.correlation
+            )));
+        }
+
+        for (name, kappa) in [
+            ("rate_mean_reversion", self.config.rate_mean_reversion),
+            ("hazard_mean_reversion", self.config.hazard_mean_reversion),
+        ] {
+            if kappa > KAPPA_MAX {
+                return Err(Error::Validation(format!(
+                    "{name} = {kappa:.4} exceeds the binomial-lattice limit \
+                     (KAPPA_MAX = {KAPPA_MAX}). At this speed the conditional variance of \
+                     the factor collapses to a fraction of its intended value, which \
+                     degrades option-value accuracy for callable bonds and term loans. \
+                     Use HullWhiteTree for mean reversion above this threshold."
+                )));
+            }
+        }
+
+        Ok((dt, targets.times[steps]))
+    }
+
+    /// Calibrate both factors to explicit conditional targets using
+    /// Arrow-Debreu forward induction.
     ///
-    /// - **Rate factor**: calibrated to the discount curve (Ho-Lee style theta adjustment)
-    /// - **Hazard factor**: calibrated to the hazard curve's survival probabilities
-    ///
-    /// After calibration, `price()` uses the stored per-node rates and hazards.
+    /// The rate factor matches `discount_factors`, and the hazard factor
+    /// matches `survival_probabilities`. Calibration commits atomically: when
+    /// validation or fitting fails, any earlier successful calibration on this
+    /// instance remains unchanged.
     ///
     /// # Arguments
     ///
-    /// * `disc` - Discount curve for risk-free rate calibration
-    /// * `hazard` - Hazard curve for credit intensity calibration
-    /// * `time_to_maturity` - Total time horizon in years
-    pub fn calibrate(
-        &mut self,
-        disc: &dyn Discounting,
-        hazard: &HazardCurve,
-        time_to_maturity: f64,
-    ) -> Result<()> {
+    /// * `targets` - evenly spaced coordinates and conditional discount,
+    ///   survival, and recovery inputs measured from the valuation origin
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] when the grid, targets, recovery, or model
+    /// configuration is invalid, or when the requested correlation is not
+    /// attainable on the calibrated lattice.
+    pub fn calibrate(&mut self, targets: &RatesCreditCalibrationTargets) -> Result<()> {
+        let (dt, _) = self.validate_calibration_targets(targets)?;
         let steps = self.config.steps;
-        if steps == 0 || time_to_maturity <= 0.0 {
-            return Err(Error::internal(
-                "rates-credit tree calibration requires positive steps and time_to_maturity",
-            ));
-        }
 
-        // Guard: mean-reversion speeds above KAPPA_MAX cause material
-        // conditional-variance collapse on the fixed-geometry binomial lattice.
-        // Discount-curve repricing is exact for any κ, but option values
-        // (callable bonds, term loans) degrade as κ grows — negligible for
-        // κ ≲ 0.10, material by κ ≈ 0.20+. Use HullWhiteTree for κ > KAPPA_MAX.
-        let kappa_r = self.config.rate_mean_reversion;
-        if kappa_r > KAPPA_MAX {
-            return Err(Error::Validation(format!(
-                "rate_mean_reversion = {kappa_r:.4} exceeds the binomial-lattice limit \
-                 (KAPPA_MAX = {KAPPA_MAX}). At this speed the conditional variance of \
-                 the rate factor collapses to a fraction of its intended value, which \
-                 degrades option-value accuracy for callable bonds and term loans. \
-                 Use HullWhiteTree for mean reversion above this threshold."
-            )));
-        }
-        let kappa_h = self.config.hazard_mean_reversion;
-        if kappa_h > KAPPA_MAX {
-            return Err(Error::Validation(format!(
-                "hazard_mean_reversion = {kappa_h:.4} exceeds the binomial-lattice limit \
-                 (KAPPA_MAX = {KAPPA_MAX}). At this speed the conditional variance of \
-                 the hazard factor collapses to a fraction of its intended value, which \
-                 degrades option-value accuracy for callable bonds and term loans. \
-                 Use HullWhiteTree for mean reversion above this threshold."
-            )));
-        }
+        // Build a complete candidate and commit only after every validation
+        // passes. A failed recalibration must not leave mixed old/new factors.
+        let mut candidate = Self::new(self.config.clone());
+        candidate.recovery_rate = targets.recovery_rate;
+        candidate.calibration_times = targets.times.clone();
 
-        let dt = time_to_maturity / steps as f64;
+        candidate.rate_ref = Self::initial_instantaneous(targets.discount_factors[1], dt);
+        candidate.hazard_ref = Self::initial_instantaneous(targets.survival_probabilities[1], dt);
 
-        self.recovery_rate = hazard.recovery_rate();
-
-        // Reference (reversion) levels: the t=0 instantaneous rate / hazard
-        // implied by each input curve. Both factors revert toward these levels
-        // during pricing; calibration uses the same levels so the tree reprices
-        // the input curves with mean reversion active.
-        self.rate_ref = Self::initial_instantaneous(|t| disc.df(t), dt);
-        self.hazard_ref = Self::initial_instantaneous(|t| hazard.sp(t), dt);
-
-        // --- Rate factor calibration (Ho-Lee style) ---
-        let rate_vol = self.config.rate_vol;
-        let rate_kappa = self.config.rate_mean_reversion;
-        let rate_ref = self.rate_ref;
-        let (calibrated_rates, _) = self.calibrate_factor_ho_lee(
+        let rate_vol = candidate.config.rate_vol;
+        let rate_kappa = candidate.config.rate_mean_reversion;
+        let rate_ref = candidate.rate_ref;
+        let (calibrated_rates, _) = candidate.calibrate_factor_ho_lee(
             FactorGrid {
                 steps,
                 dt,
                 sigma: rate_vol,
-                time_to_maturity,
                 floor_at_zero: false,
             },
-            |t| disc.df(t),
+            &targets.discount_factors,
             |r| Self::mean_reverting_up_prob(r, rate_ref, rate_kappa, rate_vol, dt),
         )?;
-        self.calibrated_rates = calibrated_rates;
+        candidate.calibrated_rates = calibrated_rates;
 
-        // --- Hazard factor calibration (same Ho-Lee approach targeting survival) ---
-        let hazard_vol = self.config.hazard_vol;
-        let hazard_kappa = self.config.hazard_mean_reversion;
-        let hazard_ref = self.hazard_ref;
-        let (calibrated_hazards, saturation) = self.calibrate_factor_ho_lee(
+        let hazard_vol = candidate.config.hazard_vol;
+        let hazard_kappa = candidate.config.hazard_mean_reversion;
+        let hazard_ref = candidate.hazard_ref;
+        let (calibrated_hazards, saturation) = candidate.calibrate_factor_ho_lee(
             FactorGrid {
                 steps,
                 dt,
                 sigma: hazard_vol,
-                time_to_maturity,
                 floor_at_zero: true,
             },
-            |t| hazard.sp(t),
+            &targets.survival_probabilities,
             |h| Self::mean_reverting_up_prob(h, hazard_ref, hazard_kappa, hazard_vol, dt),
         )?;
-        self.calibrated_hazards = calibrated_hazards;
-        self.hazard_floor_saturation = saturation;
+        candidate.calibrated_hazards = calibrated_hazards;
+        candidate.hazard_floor_saturation = saturation;
 
-        // Conditional-variance retention is fully determined once both factors
-        // are calibrated, for the same reason correlation feasibility is: the
-        // per-node marginal depends only on level, kappa, sigma and dt, none of
-        // which pricing touches. Recording it here means a caller can read what
-        // the configured (kappa, sigma, T, steps) actually produced instead of
-        // inferring it from KAPPA_MAX, which bounds kappa but not kappa*T.
-        self.rate_variance_retention = Self::scan_variance_retention(
-            &self.calibrated_rates,
+        candidate.rate_variance_retention = Self::scan_variance_retention(
+            &candidate.calibrated_rates,
             steps,
-            self.rate_ref,
+            candidate.rate_ref,
             rate_kappa,
             rate_vol,
             dt,
         );
-        self.hazard_variance_retention = Self::scan_variance_retention(
-            &self.calibrated_hazards,
+        candidate.hazard_variance_retention = Self::scan_variance_retention(
+            &candidate.calibrated_hazards,
             steps,
-            self.hazard_ref,
+            candidate.hazard_ref,
             hazard_kappa,
             hazard_vol,
             dt,
         );
+        candidate.validate_correlation_feasibility(dt)?;
 
-        // Correlation feasibility is fully determined once both factors are
-        // calibrated: each node's marginal up-probability is fixed by its
-        // level, mean reversion, volatility, and step size, and the OAS shift
-        // in `price()` never touches transition probabilities. Checking here
-        // means pricing can never meet an infeasible node.
-        self.validate_correlation_feasibility(dt)?;
-
+        *self = candidate;
         Ok(())
     }
 
@@ -806,11 +1027,47 @@ impl RatesCreditTree {
         )))
     }
 
+    /// Non-degenerate minimum and maximum marginal up-probabilities in a row.
+    ///
+    /// Degenerate marginals carry no correlation and therefore impose no
+    /// Fréchet constraint. The returned indices preserve a useful diagnostic
+    /// node when an extrema pair rejects the requested correlation.
+    fn marginal_probability_extrema(
+        row: FactorRow,
+        reference: f64,
+        kappa: f64,
+        sigma: f64,
+        dt: f64,
+    ) -> Option<((usize, f64), (usize, f64))> {
+        let mut minimum: Option<(usize, f64)> = None;
+        let mut maximum: Option<(usize, f64)> = None;
+        for (index, level) in row.values().enumerate() {
+            let probability = Self::mean_reverting_up_prob(level, reference, kappa, sigma, dt);
+            if probability <= 0.0 || probability >= 1.0 {
+                continue;
+            }
+            if minimum.is_none_or(|(_, current)| probability < current) {
+                minimum = Some((index, probability));
+            }
+            if maximum.is_none_or(|(_, current)| probability > current) {
+                maximum = Some((index, probability));
+            }
+        }
+        minimum.zip(maximum)
+    }
+
     /// Lattice-wide Fréchet-admissible correlation interval.
     ///
-    /// Returns the intersection over every node pair of the per-node
-    /// admissible interval, together with the first node (if any) at which
-    /// `probe` falls outside it.
+    /// For Bernoulli marginals, the upper correlation bound decreases with
+    /// the absolute distance between their logits, so a cross-extrema pair is
+    /// binding. The lower bound is least negative at either the joint minima
+    /// or the joint maxima. Checking all four combinations of the two
+    /// marginal extrema is therefore exactly equivalent to the Cartesian
+    /// node-pair scan, while reducing a `steps`-row scan from cubic to
+    /// quadratic work.
+    ///
+    /// Returns the intersection over those binding pairs together with one
+    /// pair (if any) at which `probe` falls outside the admissible interval.
     #[allow(clippy::type_complexity)]
     fn scan_correlation_feasibility(
         &self,
@@ -822,29 +1079,27 @@ impl RatesCreditTree {
         let mut worst = None;
 
         for step in 0..self.config.steps {
-            for (i, &r) in self.calibrated_rates[step].iter().enumerate() {
-                let p_r = Self::mean_reverting_up_prob(
-                    r,
-                    self.rate_ref,
-                    self.config.rate_mean_reversion,
-                    self.config.rate_vol,
-                    dt,
-                );
-                for (j, &h) in self.calibrated_hazards[step].iter().enumerate() {
-                    let p_h = Self::mean_reverting_up_prob(
-                        h,
-                        self.hazard_ref,
-                        self.config.hazard_mean_reversion,
-                        self.config.hazard_vol,
-                        dt,
-                    );
-                    // A degenerate marginal carries no correlation at all; the
-                    // joint reduces to the independent product there. Skipping
-                    // it here is correct — an unattainable correlation is not a
-                    // reason to reject a node that expresses none — but it does
-                    // mean the configured rho is inoperative at that node.
-                    // `VarianceRetention::clamped_nodes` counts exactly these,
-                    // so the loss is reported rather than silent.
+            let Some((rate_min, rate_max)) = Self::marginal_probability_extrema(
+                self.calibrated_rates[step],
+                self.rate_ref,
+                self.config.rate_mean_reversion,
+                self.config.rate_vol,
+                dt,
+            ) else {
+                continue;
+            };
+            let Some((hazard_min, hazard_max)) = Self::marginal_probability_extrema(
+                self.calibrated_hazards[step],
+                self.hazard_ref,
+                self.config.hazard_mean_reversion,
+                self.config.hazard_vol,
+                dt,
+            ) else {
+                continue;
+            };
+
+            for (i, p_r) in [rate_min, rate_max] {
+                for (j, p_h) in [hazard_min, hazard_max] {
                     let Some((node_lo, node_hi)) = Self::node_correlation_range(p_r, p_h) else {
                         continue;
                     };
@@ -867,22 +1122,18 @@ impl RatesCreditTree {
     /// across the whole lattice, so a caller can pick a workable correlation
     /// instead of discovering the limit through a calibration failure.
     ///
-    /// # Arguments
-    ///
-    /// * `time_to_maturity` - total lattice horizon in years (defines the
-    ///   step size the marginal probabilities are evaluated at)
-    ///
     /// Returns `1.0` for an uncalibrated tree or one without mean reversion,
     /// where every correlation in `[-1, 1]` is attainable.
-    pub fn max_feasible_correlation(&self, time_to_maturity: f64) -> f64 {
+    pub fn max_feasible_correlation(&self) -> f64 {
         if self.calibrated_rates.is_empty()
             || self.config.steps == 0
-            || time_to_maturity <= 0.0
             || (self.config.rate_mean_reversion == 0.0 && self.config.hazard_mean_reversion == 0.0)
         {
             return 1.0;
         }
-        let dt = time_to_maturity / self.config.steps as f64;
+        let Ok(dt) = self.calibrated_dt() else {
+            return 1.0;
+        };
         let (lo, hi, _) = self.scan_correlation_feasibility(dt, None);
         lo.abs().min(hi.abs()).max(0.0)
     }
@@ -924,8 +1175,7 @@ impl RatesCreditTree {
     pub fn rate_at_node(&self, step: usize, node: usize) -> Result<f64> {
         self.calibrated_rates
             .get(step)
-            .and_then(|row| row.get(node))
-            .copied()
+            .and_then(|row| row.value(node))
             .ok_or_else(|| {
                 Error::internal(format!(
                     "rates-credit tree rate node out of bounds: step={step}, node={node}"
@@ -940,8 +1190,7 @@ impl RatesCreditTree {
     pub fn hazard_at_node(&self, step: usize, node: usize) -> Result<f64> {
         self.calibrated_hazards
             .get(step)
-            .and_then(|row| row.get(node))
-            .copied()
+            .and_then(|row| row.value(node))
             .ok_or_else(|| {
                 Error::internal(format!(
                     "rates-credit tree hazard node out of bounds: step={step}, node={node}"
@@ -949,16 +1198,314 @@ impl RatesCreditTree {
             })
     }
 
-    /// Initial instantaneous rate implied by a target curve: `−ln(target(Δt))/Δt`.
+    /// Explicit time grid used by the most recent successful calibration.
     ///
-    /// Falls back to `0.03` if the target is non-positive (degenerate curve).
-    fn initial_instantaneous(target_fn: impl Fn(f64) -> f64, dt: f64) -> f64 {
-        let target_dt = target_fn(dt);
-        if target_dt > 0.0 && dt > 0.0 {
-            -target_dt.ln() / dt
-        } else {
-            0.03
+    /// # Errors
+    ///
+    /// Returns an error when the tree has not been calibrated.
+    pub fn time_grid(&self) -> Result<&[f64]> {
+        if self.calibration_times.len() != self.config.steps + 1 {
+            return Err(Error::internal(
+                "rates-credit tree must be calibrated before reading its time grid",
+            ));
         }
+        Ok(&self.calibration_times)
+    }
+
+    /// Return the calibrated uniform step size.
+    fn calibrated_dt(&self) -> Result<f64> {
+        let times = self.time_grid()?;
+        Ok(times[1] - times[0])
+    }
+
+    /// Validate that a legacy tree-pricing horizon matches calibration.
+    fn validate_pricing_horizon(&self, time_to_maturity: f64) -> Result<f64> {
+        let times = self.time_grid()?;
+        let calibrated_horizon = times[self.config.steps];
+        let tolerance = 1e-12_f64.max(calibrated_horizon.abs() * 1e-10);
+        if !time_to_maturity.is_finite()
+            || time_to_maturity <= 0.0
+            || (time_to_maturity - calibrated_horizon).abs() > tolerance
+        {
+            return Err(Error::Validation(format!(
+                "rates-credit pricing horizon {time_to_maturity} does not match the \
+                 calibrated horizon {calibrated_horizon}"
+            )));
+        }
+        self.calibrated_dt()
+    }
+
+    /// Joint movement probabilities from a calibrated node.
+    ///
+    /// # Arguments
+    ///
+    /// * `step` - interval start step in `0..config.steps`
+    /// * `rate_node` - rate-factor node index in `0..=step`
+    /// * `hazard_node` - hazard-factor node index in `0..=step`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the tree is uncalibrated or any index is outside
+    /// the calibrated lattice.
+    pub fn transition_probabilities(
+        &self,
+        step: usize,
+        rate_node: usize,
+        hazard_node: usize,
+    ) -> Result<RatesCreditTransition> {
+        if step >= self.config.steps || rate_node > step || hazard_node > step {
+            return Err(Error::Validation(format!(
+                "rates-credit transition requires step < {} and node indices <= step; \
+                 got step={step}, rate_node={rate_node}, hazard_node={hazard_node}",
+                self.config.steps
+            )));
+        }
+        let dt = self.calibrated_dt()?;
+        let rate = self.rate_at_node(step, rate_node)?;
+        let hazard = self.hazard_at_node(step, hazard_node)?;
+        let p_rate_up = Self::mean_reverting_up_prob(
+            rate,
+            self.rate_ref,
+            self.config.rate_mean_reversion,
+            self.config.rate_vol,
+            dt,
+        );
+        let p_hazard_up = Self::mean_reverting_up_prob(
+            hazard,
+            self.hazard_ref,
+            self.config.hazard_mean_reversion,
+            self.config.hazard_vol,
+            dt,
+        );
+        let (up_up, up_down, down_up, down_down) = self.joint_probabilities(p_rate_up, p_hazard_up);
+        Ok(RatesCreditTransition {
+            up_up,
+            up_down,
+            down_up,
+            down_down,
+        })
+    }
+
+    /// Sample one deterministic joint factor path with a dedicated Philox
+    /// substream.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - root Philox seed shared by a reproducible simulation run
+    /// * `path_index` - unique Philox substream identifier for this logical path
+    /// * `antithetic` - when true, use `1 - u` for every uniform from the same
+    ///   `(seed, path_index)` stream
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the tree is uncalibrated.
+    pub fn sample_path(
+        &self,
+        seed: u64,
+        path_index: u64,
+        antithetic: bool,
+    ) -> Result<Vec<RatesCreditPathState>> {
+        let mut path = Vec::with_capacity(self.config.steps + 1);
+        self.sample_path_into(seed, path_index, antithetic, &mut path)?;
+        Ok(path)
+    }
+
+    /// Sample one deterministic joint factor path into caller-owned storage.
+    ///
+    /// Reusing `output` avoids one allocation per path in streamed or blocked
+    /// simulations. Existing contents are cleared before the new path is
+    /// written.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - root Philox seed shared by a reproducible simulation run
+    /// * `path_index` - unique Philox substream identifier for this logical path
+    /// * `antithetic` - when true, mirror every uniform from the same Philox
+    ///   substream
+    /// * `output` - reusable destination receiving `config.steps + 1` states
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the tree is uncalibrated.
+    pub fn sample_path_into(
+        &self,
+        seed: u64,
+        path_index: u64,
+        antithetic: bool,
+        output: &mut Vec<RatesCreditPathState>,
+    ) -> Result<()> {
+        let dt = self.calibrated_dt()?;
+        let times = self.time_grid()?;
+        let mut rng = PhiloxRng::with_stream(seed, path_index);
+        let mut uniform = [0.0_f64; 1];
+        let mut rate_node = 0_usize;
+        let mut hazard_node = 0_usize;
+
+        output.clear();
+        output.reserve(self.config.steps + 1);
+        for (step, &time) in times.iter().enumerate() {
+            let short_rate = self.rate_at_node(step, rate_node)?;
+            let hazard_rate = Self::effective_hazard(self.hazard_at_node(step, hazard_node)?);
+            let (discount_to_next, survival_to_next, default_to_next) = if step < self.config.steps
+            {
+                let discount = (-short_rate * dt).exp();
+                let hazard_exponent = -hazard_rate * dt;
+                let survival = hazard_exponent.exp();
+                let default = -hazard_exponent.exp_m1();
+                (discount, survival, default)
+            } else {
+                (1.0, 1.0, 0.0)
+            };
+            output.push(RatesCreditPathState {
+                step,
+                time,
+                rate_node,
+                hazard_node,
+                short_rate,
+                hazard_rate,
+                discount_to_next,
+                survival_to_next,
+                default_to_next,
+            });
+
+            if step == self.config.steps {
+                break;
+            }
+            let probabilities = self.transition_probabilities(step, rate_node, hazard_node)?;
+            rng.fill_u01(&mut uniform);
+            let draw = if antithetic {
+                1.0 - uniform[0]
+            } else {
+                uniform[0]
+            };
+            let (rate_up, hazard_up) = Self::sampled_moves(probabilities, draw);
+            rate_node += usize::from(rate_up);
+            hazard_node += usize::from(hazard_up);
+        }
+        Ok(())
+    }
+
+    /// Resume a deterministic sampled factor path over one inclusive step range.
+    ///
+    /// The returned states are bit-for-bit identical to
+    /// `sample_path(seed, path_index, antithetic)?[checkpoint.step..=end_step]`.
+    /// This supports bounded-memory consumers that checkpoint product state at
+    /// time-block boundaries and must not replay the full factor-path prefix.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - Root Philox seed used for the original path.
+    /// * `path_index` - Philox substream identifier used for the original path.
+    /// * `antithetic` - Whether each uniform draw is mirrored as `1 - u`.
+    /// * `checkpoint` - Factor node indices and first lattice step of the segment.
+    /// * `end_step` - Last lattice step to return, inclusive.
+    /// * `output` - Reusable destination cleared before the segment is written.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tree is uncalibrated, the checkpoint is outside
+    /// the calibrated lattice, or `end_step` precedes the checkpoint or exceeds
+    /// the calibrated horizon.
+    pub fn sample_path_segment_into(
+        &self,
+        seed: u64,
+        path_index: u64,
+        antithetic: bool,
+        checkpoint: RatesCreditPathCheckpoint,
+        end_step: usize,
+        output: &mut Vec<RatesCreditPathState>,
+    ) -> Result<()> {
+        if checkpoint.step > end_step
+            || end_step > self.config.steps
+            || checkpoint.rate_node > checkpoint.step
+            || checkpoint.hazard_node > checkpoint.step
+        {
+            return Err(Error::Validation(format!(
+                "rates-credit path segment requires checkpoint nodes <= step and {} <= end_step <= {}; got checkpoint=({}, {}, {}), end_step={end_step}",
+                checkpoint.step,
+                self.config.steps,
+                checkpoint.step,
+                checkpoint.rate_node,
+                checkpoint.hazard_node
+            )));
+        }
+        let dt = self.calibrated_dt()?;
+        let times = self.time_grid()?;
+        let draw_offset = u64::try_from(checkpoint.step).map_err(|_| {
+            Error::Validation("rates-credit path checkpoint step exceeds Philox range".to_string())
+        })?;
+        let mut rng = PhiloxRng::with_stream_u01_offset(seed, path_index, draw_offset);
+        let mut uniform = [0.0_f64; 1];
+        let mut rate_node = checkpoint.rate_node;
+        let mut hazard_node = checkpoint.hazard_node;
+
+        output.clear();
+        output.reserve(end_step - checkpoint.step + 1);
+        for (step, &time) in times
+            .iter()
+            .enumerate()
+            .take(end_step + 1)
+            .skip(checkpoint.step)
+        {
+            let short_rate = self.rate_at_node(step, rate_node)?;
+            let hazard_rate = Self::effective_hazard(self.hazard_at_node(step, hazard_node)?);
+            let (discount_to_next, survival_to_next, default_to_next) = if step < self.config.steps
+            {
+                let discount = (-short_rate * dt).exp();
+                let hazard_exponent = -hazard_rate * dt;
+                (discount, hazard_exponent.exp(), -hazard_exponent.exp_m1())
+            } else {
+                (1.0, 1.0, 0.0)
+            };
+            output.push(RatesCreditPathState {
+                step,
+                time,
+                rate_node,
+                hazard_node,
+                short_rate,
+                hazard_rate,
+                discount_to_next,
+                survival_to_next,
+                default_to_next,
+            });
+
+            if step == end_step {
+                break;
+            }
+            let probabilities = self.transition_probabilities(step, rate_node, hazard_node)?;
+            rng.fill_u01(&mut uniform);
+            let draw = if antithetic {
+                1.0 - uniform[0]
+            } else {
+                uniform[0]
+            };
+            let (rate_up, hazard_up) = Self::sampled_moves(probabilities, draw);
+            rate_node += usize::from(rate_up);
+            hazard_node += usize::from(hazard_up);
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn sampled_moves(probabilities: RatesCreditTransition, draw: f64) -> (bool, bool) {
+        let up_up_cutoff = probabilities.up_up;
+        let up_down_cutoff = up_up_cutoff + probabilities.up_down;
+        let down_up_cutoff = up_down_cutoff + probabilities.down_up;
+        if draw < up_up_cutoff {
+            (true, true)
+        } else if draw < up_down_cutoff {
+            (true, false)
+        } else if draw < down_up_cutoff {
+            (false, true)
+        } else {
+            (false, false)
+        }
+    }
+
+    /// Initial instantaneous factor implied by the first target interval:
+    /// `−ln(target(Δt))/Δt`.
+    fn initial_instantaneous(target_dt: f64, dt: f64) -> f64 {
+        -target_dt.ln() / dt
     }
 
     /// Moment-matched up-probability for a mean-reverting factor on the additive
@@ -1013,8 +1560,8 @@ impl RatesCreditTree {
     /// and solves for a theta (drift) at each step so that the lattice-implied
     /// "discount factor" matches a target curve.
     ///
-    /// - For the rate factor: `target_fn(t) = disc.df(t)` (discount factor)
-    /// - For the hazard factor: `target_fn(t) = hazard.sp(t)` (survival probability)
+    /// - For the rate factor: conditional discount factors on the grid
+    /// - For the hazard factor: conditional survival probabilities on the grid
     ///
     /// Both share the same mathematical structure: the product `exp(-x * dt)` over
     /// path nodes must match the target curve value at each maturity.
@@ -1039,31 +1586,37 @@ impl RatesCreditTree {
     fn calibrate_factor_ho_lee(
         &self,
         grid: FactorGrid,
-        target_fn: impl Fn(f64) -> f64,
+        targets: &[f64],
         up_prob_fn: impl Fn(f64) -> f64,
-    ) -> Result<(Vec<Vec<f64>>, HazardFloorSaturation)> {
+    ) -> Result<(Vec<FactorRow>, HazardFloorSaturation)> {
         let FactorGrid {
             steps,
             dt,
             sigma,
-            time_to_maturity,
             floor_at_zero,
         } = grid;
-        let mut rates = vec![Vec::new(); steps + 1];
+        let mut rates = Vec::with_capacity(steps + 1);
+        let sqrt_dt = dt.sqrt();
+        let one_move = sigma * sqrt_dt;
+        let node_shift = 2.0 * one_move;
 
-        // Initial rate: r0 = -ln(target(dt)) / dt
-        let r0 = Self::initial_instantaneous(&target_fn, dt);
-        rates[0] = vec![if floor_at_zero {
+        // Initial rate: r0 = -ln(target(dt)) / dt.
+        let r0 = Self::initial_instantaneous(targets[1], dt);
+        let initial = if floor_at_zero {
             Self::effective_hazard(r0)
         } else {
             r0
-        }];
+        };
+        rates.push(FactorRow {
+            base: initial,
+            shift: node_shift,
+            nodes: 1,
+        });
 
         // Arrow-Debreu state prices
         let mut state_prices = vec![1.0];
         let mut saturation = HazardFloorSaturation::default();
 
-        let sqrt_dt = dt.sqrt();
         // Value actually used for discounting/survival at a node.
         let effective = |x: f64| -> f64 {
             if floor_at_zero {
@@ -1075,8 +1628,13 @@ impl RatesCreditTree {
 
         for step in 0..steps {
             let next_nodes = step + 2;
-            let mut next_rates_base = vec![0.0; next_nodes];
             let mut next_state_prices = vec![0.0; next_nodes];
+            let current_row = rates[step];
+            let next_rates_base = FactorRow {
+                base: current_row.value_unchecked(0) - one_move,
+                shift: node_shift,
+                nodes: next_nodes,
+            };
 
             // Propagate state prices and compute base rates (without theta).
             //
@@ -1084,36 +1642,32 @@ impl RatesCreditTree {
             // function the pricing pass applies, evaluated on the (calibrated)
             // current-row rate. Forward induction here is the exact dual of the
             // backward induction in `price()` because both use this probability.
-            for (i, &current_rate) in rates[step].iter().enumerate() {
+            for (i, current_rate) in current_row.values().enumerate() {
                 let q = state_prices[i];
                 let df_i = (-effective(current_rate) * dt).exp();
                 let p_up = up_prob_fn(current_rate);
 
                 // Up move (to node i+1)
-                let r_up_base = current_rate + sigma * sqrt_dt;
                 if i + 1 < next_nodes {
-                    next_rates_base[i + 1] = r_up_base;
                     next_state_prices[i + 1] += q * df_i * p_up;
                 }
 
                 // Down move (to node i)
-                let r_down_base = current_rate - sigma * sqrt_dt;
                 if i < next_nodes {
-                    next_rates_base[i] = r_down_base;
                     next_state_prices[i] += q * df_i * (1.0 - p_up);
                 }
             }
 
             // Solve for theta so the lattice reproduces the target curve at
             // the next maturity.
-            let next_next_time = (step + 2) as f64 * dt;
-            let theta = if next_next_time <= time_to_maturity + dt * 0.5 {
-                let p_target = target_fn(next_next_time);
+            let next_target_index = step + 2;
+            let theta = if next_target_index <= steps {
+                let p_target = targets[next_target_index];
                 if !floor_at_zero {
                     // Unfloored: exp(-θΔt) factors out, so theta is exact.
                     let mut p_model_base = 0.0;
                     for (j, &q_next) in next_state_prices.iter().enumerate() {
-                        p_model_base += q_next * (-next_rates_base[j] * dt).exp();
+                        p_model_base += q_next * (-next_rates_base.value_unchecked(j) * dt).exp();
                     }
                     if p_model_base > 0.0 && p_target > 0.0 {
                         -(p_target / p_model_base).ln() / dt
@@ -1123,7 +1677,7 @@ impl RatesCreditTree {
                 } else {
                     Self::solve_floored_theta(
                         &next_state_prices,
-                        &next_rates_base,
+                        next_rates_base,
                         dt,
                         p_target,
                         step + 1,
@@ -1134,20 +1688,20 @@ impl RatesCreditTree {
                 0.0
             };
 
-            // Apply theta to get final calibrated rates
-            let mut next_rates = vec![0.0; next_nodes];
-            for j in 0..next_nodes {
-                next_rates[j] = next_rates_base[j] + theta;
-            }
+            // Apply the calibrated row shift without materializing its nodes.
+            let next_rates = FactorRow {
+                base: next_rates_base.base + theta,
+                ..next_rates_base
+            };
             if floor_at_zero {
                 Self::record_floor_saturation(
-                    &next_rates,
+                    next_rates,
                     &next_state_prices,
                     step + 1,
                     &mut saturation,
                 );
             }
-            rates[step + 1] = next_rates;
+            rates.push(next_rates);
             state_prices = next_state_prices;
         }
 
@@ -1174,7 +1728,7 @@ impl RatesCreditTree {
     /// large for the hazard level.
     fn solve_floored_theta(
         state_prices: &[f64],
-        base: &[f64],
+        base: FactorRow,
         dt: f64,
         target: f64,
         step: usize,
@@ -1183,7 +1737,7 @@ impl RatesCreditTree {
         let survival_at = |theta: f64| -> f64 {
             state_prices
                 .iter()
-                .zip(base.iter())
+                .zip(base.values())
                 .map(|(q, b)| q * (-Self::effective_hazard(b + theta) * dt).exp())
                 .sum::<f64>()
         };
@@ -1195,7 +1749,7 @@ impl RatesCreditTree {
         // All-floored limit: θ low enough that *every* node hits zero hazard,
         // which is the highest survival the row can produce. That requires
         // θ ≤ −max_j(base_j) — the largest base node is the last one to floor.
-        let max_base = base.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let max_base = base.values().fold(f64::NEG_INFINITY, f64::max);
         let theta_all_floored = -max_base;
         if target >= total_mass {
             // Unreachable: even zero hazard everywhere survives less than the
@@ -1225,7 +1779,7 @@ impl RatesCreditTree {
     /// Record how much state-price mass sits on the zero hazard floor at a
     /// calibrated step.
     fn record_floor_saturation(
-        rates: &[f64],
+        rates: FactorRow,
         state_prices: &[f64],
         step: usize,
         saturation: &mut HazardFloorSaturation,
@@ -1235,9 +1789,9 @@ impl RatesCreditTree {
             return;
         }
         let floored: f64 = rates
-            .iter()
+            .values()
             .zip(state_prices.iter())
-            .filter(|(rate, _)| **rate <= 0.0)
+            .filter(|(rate, _)| *rate <= 0.0)
             .map(|(_, q)| *q)
             .sum();
         let share = (floored / total).clamp(0.0, 1.0);
@@ -1329,33 +1883,22 @@ impl RatesCreditTree {
     /// # Errors
     ///
     /// Returns an error when the tree is uncalibrated, the steps are not
-    /// strictly ordered within the lattice, or `time_to_maturity` is not
-    /// positive.
+    /// strictly ordered within the lattice, or `time_to_maturity` differs
+    /// from the calibrated horizon.
     pub fn conditional_discount_factors(
         &self,
         reset_step: usize,
         payment_step: usize,
         time_to_maturity: f64,
     ) -> Result<Vec<f64>> {
-        if self.calibrated_rates.is_empty() {
-            return Err(Error::internal(
-                "rates-credit tree must be calibrated before conditional discounting",
-            ));
-        }
         let steps = self.config.steps;
-        if time_to_maturity <= 0.0 || steps == 0 {
-            return Err(Error::internal(
-                "conditional discounting requires positive steps and time_to_maturity",
-            ));
-        }
+        let dt = self.validate_pricing_horizon(time_to_maturity)?;
         if reset_step >= payment_step || payment_step > steps {
             return Err(Error::Validation(format!(
                 "conditional discounting requires reset_step < payment_step <= steps, \
                  got reset_step={reset_step}, payment_step={payment_step}, steps={steps}"
             )));
         }
-        let dt = time_to_maturity / steps as f64;
-
         // Backward induction on the rate marginal: value 1 at payment_step,
         // discount with the raw calibrated node rate, transition with the
         // same mean-reversion-aware probability pricing uses.
@@ -1363,7 +1906,7 @@ impl RatesCreditTree {
         for k in (reset_step..payment_step).rev() {
             let mut next = vec![0.0; k + 1];
             for (i, slot) in next.iter_mut().enumerate() {
-                let r = self.calibrated_rates[k][i];
+                let r = self.calibrated_rates[k].value_unchecked(i);
                 let p_up = Self::mean_reverting_up_prob(
                     r,
                     self.rate_ref,
@@ -1389,12 +1932,12 @@ impl RatesCreditTree {
     /// the operator the main backward induction applies to a deterministic
     /// cashflow at that slice: per-step discounting at the raw calibrated
     /// rate **plus the active OAS**, per-step survival at the floored node
-    /// hazard, and the correlated joint transitions. The valuator applies
-    /// the reset slice's own survival weighting when it wraps the
-    /// continuation, so this fold deliberately stops one survival factor
-    /// short at the reset slice; a coupon paying at the terminal slice
-    /// seeds at `1` because `value_at_maturity` carries no survival
-    /// weighting.
+    /// hazard, and the correlated joint transitions. The valuator applies the
+    /// reset slice's own survival weighting when it wraps the continuation, so
+    /// this fold deliberately stops one survival factor short at the reset
+    /// slice. The payment-slice claim always seeds at `1`: cash paid at slice
+    /// `m` must not be survival-weighted over the following interval
+    /// `m -> m + 1`, whether or not `m` is terminal.
     ///
     /// The increment amount per rate node is `ΔC(i)` as documented on
     /// [`NodeCoupon`]; multiplying the unit fold by `ΔC(i)` is exact
@@ -1406,7 +1949,7 @@ impl RatesCreditTree {
         oas_decimal: f64,
     ) -> Result<Vec<f64>> {
         let steps = self.config.steps;
-        let dt = time_to_maturity / steps as f64;
+        let dt = self.validate_pricing_horizon(time_to_maturity)?;
         let max_nodes = steps + 1;
         let n = coupon.reset_step;
         let m = coupon.payment_step;
@@ -1432,19 +1975,12 @@ impl RatesCreditTree {
         let mut w_next = vec![0.0; max_nodes * max_nodes];
         for i in 0..=m {
             for j in 0..=m {
-                let seed = if m == steps {
-                    // value_at_maturity applies no survival weighting.
-                    1.0
-                } else {
-                    let h = Self::effective_hazard(self.calibrated_hazards[m][j]);
-                    (-h * dt).exp()
-                };
-                w[i * max_nodes + j] = seed;
+                w[i * max_nodes + j] = 1.0;
             }
         }
         for k in (n + 1..m).rev() {
             for i in 0..=k {
-                let r = self.calibrated_rates[k][i];
+                let r = self.calibrated_rates[k].value_unchecked(i);
                 let p_r = Self::mean_reverting_up_prob(
                     r,
                     self.rate_ref,
@@ -1454,7 +1990,7 @@ impl RatesCreditTree {
                 );
                 let df = (-(r + oas_decimal) * dt).exp();
                 for j in 0..=k {
-                    let h = self.calibrated_hazards[k][j];
+                    let h = self.calibrated_hazards[k].value_unchecked(j);
                     let p_h = Self::mean_reverting_up_prob(
                         h,
                         self.hazard_ref,
@@ -1479,7 +2015,7 @@ impl RatesCreditTree {
         // node's increment amount.
         let mut folded = vec![0.0; max_nodes * max_nodes];
         for (i, &delta) in delta_amounts.iter().enumerate() {
-            let r = self.calibrated_rates[n][i];
+            let r = self.calibrated_rates[n].value_unchecked(i);
             let p_r = Self::mean_reverting_up_prob(
                 r,
                 self.rate_ref,
@@ -1489,7 +2025,7 @@ impl RatesCreditTree {
             );
             let df = (-(r + oas_decimal) * dt).exp();
             for j in 0..=n {
-                let h = self.calibrated_hazards[n][j];
+                let h = self.calibrated_hazards[n].value_unchecked(j);
                 let p_h = Self::mean_reverting_up_prob(
                     h,
                     self.hazard_ref,
@@ -1552,8 +2088,8 @@ impl RatesCreditTree {
     ///
     /// # Errors
     ///
-    /// Returns an error when the tree is uncalibrated, the horizon is not
-    /// positive, a descriptor violates its invariants (see
+    /// Returns an error when the tree is uncalibrated, the supplied horizon
+    /// differs from calibration, a descriptor violates its invariants (see
     /// [`NodeCoupon`]), or the valuator fails.
     pub fn price_with_node_coupons<V: TreeValuator>(
         &self,
@@ -1563,19 +2099,8 @@ impl RatesCreditTree {
         valuator: &V,
         node_coupons: &[NodeCoupon],
     ) -> Result<f64> {
-        if self.calibrated_rates.is_empty() || self.calibrated_hazards.is_empty() {
-            return Err(Error::internal(
-                "rates-credit tree must be calibrated before pricing",
-            ));
-        }
-        if self.config.steps == 0 || time_to_maturity <= 0.0 {
-            return Err(Error::internal(
-                "rates-credit tree pricing requires positive steps and time_to_maturity",
-            ));
-        }
-
         let steps = self.config.steps;
-        let dt = time_to_maturity / steps as f64;
+        let dt = self.validate_pricing_horizon(time_to_maturity)?;
 
         // OAS from initial variables (bp units, same convention as ShortRateTree)
         let oas_decimal = initial_vars
@@ -1617,9 +2142,9 @@ impl RatesCreditTree {
 
         // Initialize terminal values
         for i in 0..=steps {
-            let r_t = self.calibrated_rates[steps][i];
+            let r_t = self.calibrated_rates[steps].value_unchecked(i);
             for j in 0..=steps {
-                let h_t = self.calibrated_hazards[steps][j];
+                let h_t = self.calibrated_hazards[steps].value_unchecked(j);
                 let cached = CachedValues {
                     interest_rate: Some(r_t.max(1e-8)),
                     hazard_rate: Some(Self::effective_hazard(h_t)),
@@ -1639,7 +2164,7 @@ impl RatesCreditTree {
         // Backward induction with double-buffering
         for k in (0..steps).rev() {
             for i in 0..=k {
-                let r_t = self.calibrated_rates[k][i];
+                let r_t = self.calibrated_rates[k].value_unchecked(i);
 
                 // Rate transition probability with mean reversion. This is the
                 // SAME function used during calibration; using an identical
@@ -1654,7 +2179,7 @@ impl RatesCreditTree {
                 );
 
                 for j in 0..=k {
-                    let h_t = self.calibrated_hazards[k][j];
+                    let h_t = self.calibrated_hazards[k].value_unchecked(j);
 
                     // Hazard transition probability with mean reversion (same
                     // function and reference level used during calibration).
@@ -1745,8 +2270,44 @@ impl TreeModel for RatesCreditTree {
 mod tests {
     use super::*;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::math::interp::InterpStyle;
+
+    fn targets_from_curves(
+        disc: &dyn Discounting,
+        hazard: &HazardCurve,
+        steps: usize,
+        horizon: f64,
+    ) -> RatesCreditCalibrationTargets {
+        let discount_at_origin = disc.df(0.0);
+        let survival_at_origin = hazard.sp(0.0);
+        let times: Vec<f64> = (0..=steps)
+            .map(|step| step as f64 * horizon / steps as f64)
+            .collect();
+        RatesCreditCalibrationTargets {
+            discount_factors: times
+                .iter()
+                .map(|&time| disc.df(time) / discount_at_origin)
+                .collect(),
+            survival_probabilities: times
+                .iter()
+                .map(|&time| hazard.sp(time) / survival_at_origin)
+                .collect(),
+            times,
+            recovery_rate: hazard.recovery_rate(),
+        }
+    }
+
+    fn calibrate_for_test(
+        tree: &mut RatesCreditTree,
+        disc: &dyn Discounting,
+        hazard: &HazardCurve,
+        horizon: f64,
+    ) -> Result<()> {
+        let targets = targets_from_curves(disc, hazard, tree.config.steps, horizon);
+        tree.calibrate(&targets)
+    }
 
     /// The default config is deterministic in both factors, so
     /// `..Default::default()` construction can never silently price
@@ -1759,6 +2320,273 @@ mod tests {
         assert_eq!(cfg.correlation, 0.0);
         assert_eq!(cfg.rate_mean_reversion, 0.0);
         assert_eq!(cfg.hazard_mean_reversion, 0.0);
+    }
+
+    #[test]
+    fn calibrated_factors_retain_one_affine_descriptor_per_step() {
+        let steps = 64;
+        let horizon = 10.0;
+        let times: Vec<f64> = (0..=steps)
+            .map(|step| step as f64 * horizon / steps as f64)
+            .collect();
+        let targets = RatesCreditCalibrationTargets {
+            discount_factors: times.iter().map(|&time| (-0.03 * time).exp()).collect(),
+            survival_probabilities: times.iter().map(|&time| (-0.02 * time).exp()).collect(),
+            times,
+            recovery_rate: 0.4,
+        };
+        let mut tree = RatesCreditTree::new(RatesCreditConfig {
+            steps,
+            rate_vol: 0.01,
+            hazard_vol: 0.005,
+            ..Default::default()
+        });
+        tree.calibrate(&targets).expect("calibrate affine rows");
+
+        assert_eq!(tree.calibrated_rates.len(), steps + 1);
+        assert_eq!(tree.calibrated_hazards.len(), steps + 1);
+        for step in 0..=steps {
+            let rate_row = tree.calibrated_rates[step];
+            let hazard_row = tree.calibrated_hazards[step];
+            assert_eq!(rate_row.nodes, step + 1);
+            assert_eq!(hazard_row.nodes, step + 1);
+            assert_eq!(
+                tree.rate_at_node(step, 0).expect("first rate"),
+                rate_row.base
+            );
+            assert_eq!(
+                tree.rate_at_node(step, step).expect("last rate"),
+                rate_row.base + step as f64 * rate_row.shift
+            );
+            assert_eq!(
+                tree.hazard_at_node(step, step).expect("last hazard"),
+                hazard_row.base + step as f64 * hazard_row.shift
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_conditional_targets_define_levels_and_horizon() {
+        let steps = 8;
+        let horizon = 2.0;
+        let times: Vec<f64> = (0..=steps)
+            .map(|step| step as f64 * horizon / steps as f64)
+            .collect();
+        let targets = RatesCreditCalibrationTargets {
+            discount_factors: times.iter().map(|&time| (-0.03 * time).exp()).collect(),
+            survival_probabilities: times.iter().map(|&time| (-0.02 * time).exp()).collect(),
+            times: times.clone(),
+            recovery_rate: 0.35,
+        };
+        let mut tree = RatesCreditTree::new(RatesCreditConfig {
+            steps,
+            ..Default::default()
+        });
+        tree.calibrate(&targets)
+            .expect("explicit targets calibrate");
+
+        assert_eq!(tree.time_grid().expect("grid"), times);
+        assert!((tree.rate_at_node(0, 0).expect("rate") - 0.03).abs() < 1e-12);
+        assert!((tree.hazard_at_node(0, 0).expect("hazard") - 0.02).abs() < 1e-12);
+        assert_eq!(tree.recovery_rate(), 0.35);
+
+        let err = tree
+            .conditional_discount_factors(0, 1, horizon + 0.25)
+            .expect_err("pricing with a different horizon must fail");
+        assert!(err.to_string().contains("does not match"));
+    }
+
+    #[test]
+    fn calibration_rejects_origin_and_grid_ambiguity() {
+        let mut tree = RatesCreditTree::new(RatesCreditConfig {
+            steps: 2,
+            ..Default::default()
+        });
+        let valid = RatesCreditCalibrationTargets {
+            times: vec![0.0, 0.5, 1.0],
+            discount_factors: vec![1.0, 0.98, 0.95],
+            survival_probabilities: vec![1.0, 0.99, 0.97],
+            recovery_rate: 0.4,
+        };
+
+        let mut shifted_origin = valid.clone();
+        shifted_origin.discount_factors[0] = 0.99;
+        assert!(tree.calibrate(&shifted_origin).is_err());
+
+        let mut uneven = valid.clone();
+        uneven.times[1] = 0.4;
+        assert!(tree.calibrate(&uneven).is_err());
+
+        let mut increasing_survival = valid;
+        increasing_survival.survival_probabilities[2] = 1.01;
+        assert!(tree.calibrate(&increasing_survival).is_err());
+    }
+
+    #[test]
+    fn extrema_correlation_scan_matches_exhaustive_node_pairs() {
+        let disc = sloped_discount_curve();
+        let haz = test_hazard_curve();
+        let steps = 16;
+        let horizon = 5.0;
+        let mut tree = RatesCreditTree::new(RatesCreditConfig {
+            steps,
+            rate_vol: 0.012,
+            hazard_vol: 0.05,
+            rate_mean_reversion: 0.10,
+            hazard_mean_reversion: 0.08,
+            ..Default::default()
+        });
+        calibrate_for_test(&mut tree, &disc, &haz, horizon).expect("calibrate");
+        let dt = tree.calibrated_dt().expect("dt");
+        let (extrema_lo, extrema_hi, _) = tree.scan_correlation_feasibility(dt, None);
+
+        let mut exhaustive_lo = -1.0_f64;
+        let mut exhaustive_hi = 1.0_f64;
+        for step in 0..steps {
+            for rate in tree.calibrated_rates[step].values() {
+                let p_rate = RatesCreditTree::mean_reverting_up_prob(
+                    rate,
+                    tree.rate_ref,
+                    tree.config.rate_mean_reversion,
+                    tree.config.rate_vol,
+                    dt,
+                );
+                for hazard in tree.calibrated_hazards[step].values() {
+                    let p_hazard = RatesCreditTree::mean_reverting_up_prob(
+                        hazard,
+                        tree.hazard_ref,
+                        tree.config.hazard_mean_reversion,
+                        tree.config.hazard_vol,
+                        dt,
+                    );
+                    if let Some((lo, hi)) =
+                        RatesCreditTree::node_correlation_range(p_rate, p_hazard)
+                    {
+                        exhaustive_lo = exhaustive_lo.max(lo);
+                        exhaustive_hi = exhaustive_hi.min(hi);
+                    }
+                }
+            }
+        }
+        assert!((extrema_lo - exhaustive_lo).abs() < 1e-14);
+        assert!((extrema_hi - exhaustive_hi).abs() < 1e-14);
+    }
+
+    #[test]
+    fn sampled_paths_are_seeded_weighted_and_antithetic() {
+        let steps = 12;
+        let horizon = 3.0;
+        let times: Vec<f64> = (0..=steps)
+            .map(|step| step as f64 * horizon / steps as f64)
+            .collect();
+        let targets = RatesCreditCalibrationTargets {
+            discount_factors: times.iter().map(|&time| (-0.025 * time).exp()).collect(),
+            survival_probabilities: times.iter().map(|&time| (-0.015 * time).exp()).collect(),
+            times,
+            recovery_rate: 0.4,
+        };
+        let mut tree = RatesCreditTree::new(RatesCreditConfig {
+            steps,
+            rate_vol: 0.01,
+            hazard_vol: 0.01,
+            correlation: 1.0,
+            ..Default::default()
+        });
+        tree.calibrate(&targets).expect("calibrate");
+
+        let path = tree.sample_path(42, 7, false).expect("path");
+        let replay = tree.sample_path(42, 7, false).expect("replay");
+        let antithetic = tree.sample_path(42, 7, true).expect("antithetic");
+        assert_eq!(path, replay);
+        assert_eq!(path.len(), steps + 1);
+        assert_eq!(antithetic.len(), steps + 1);
+
+        for (left, right) in path.iter().zip(&antithetic) {
+            assert_eq!(left.step, right.step);
+            assert_eq!(left.rate_node + right.rate_node, left.step);
+            assert_eq!(left.hazard_node + right.hazard_node, left.step);
+            assert!(left.discount_to_next.is_finite() && left.discount_to_next > 0.0);
+            assert!((left.survival_to_next + left.default_to_next - 1.0).abs() < 1e-14);
+        }
+        let terminal = path.last().expect("terminal");
+        assert_eq!(terminal.discount_to_next, 1.0);
+        assert_eq!(terminal.survival_to_next, 1.0);
+        assert_eq!(terminal.default_to_next, 0.0);
+
+        let mut reused = vec![RatesCreditPathState {
+            step: usize::MAX,
+            time: f64::NAN,
+            rate_node: 0,
+            hazard_node: 0,
+            short_rate: 0.0,
+            hazard_rate: 0.0,
+            discount_to_next: 0.0,
+            survival_to_next: 0.0,
+            default_to_next: 0.0,
+        }];
+        tree.sample_path_into(42, 7, false, &mut reused)
+            .expect("reused path");
+        assert_eq!(reused, path);
+
+        for (source, mirrored) in [(&path, false), (&antithetic, true)] {
+            for (start, end) in [(0, 3), (1, 7), (5, steps), (steps, steps)] {
+                let checkpoint = RatesCreditPathCheckpoint::from(&source[start]);
+                tree.sample_path_segment_into(42, 7, mirrored, checkpoint, end, &mut reused)
+                    .expect("resumed segment");
+                assert_eq!(reused, source[start..=end]);
+            }
+        }
+    }
+
+    #[test]
+    fn sampled_joint_moves_preserve_skewed_correlated_marginals() {
+        let steps = 8;
+        let horizon = 2.0;
+        let disc = sloped_discount_curve();
+        let hazard = test_hazard_curve();
+        let mut tree = RatesCreditTree::new(RatesCreditConfig {
+            steps,
+            rate_vol: 0.01,
+            hazard_vol: 0.02,
+            correlation: 0.20,
+            rate_mean_reversion: 0.10,
+            hazard_mean_reversion: 0.08,
+        });
+        calibrate_for_test(&mut tree, &disc, &hazard, horizon).expect("calibrate");
+
+        let transition = tree
+            .transition_probabilities(4, 0, 4)
+            .expect("skewed interior transition");
+        let expected_rate_up = transition.up_up + transition.up_down;
+        let expected_hazard_up = transition.up_up + transition.down_up;
+        assert!(
+            (expected_rate_up - 0.5).abs() > 0.01 || (expected_hazard_up - 0.5).abs() > 0.01,
+            "test transition must have a nontrivial skew: {transition:?}"
+        );
+        assert!(
+            (transition.up_up - expected_rate_up * expected_hazard_up).abs() > 1e-3,
+            "test transition must carry nonzero correlation: {transition:?}"
+        );
+
+        let draws = 50_000_usize;
+        let mut rng = PhiloxRng::with_stream(0x5eed, 17);
+        let mut uniform = [0.0_f64; 1];
+        let mut rate_ups = 0_usize;
+        let mut hazard_ups = 0_usize;
+        let mut joint_ups = 0_usize;
+        for _ in 0..draws {
+            rng.fill_u01(&mut uniform);
+            let (rate_up, hazard_up) = RatesCreditTree::sampled_moves(transition, uniform[0]);
+            rate_ups += usize::from(rate_up);
+            hazard_ups += usize::from(hazard_up);
+            joint_ups += usize::from(rate_up && hazard_up);
+        }
+        let empirical_rate_up = rate_ups as f64 / draws as f64;
+        let empirical_hazard_up = hazard_ups as f64 / draws as f64;
+        let empirical_joint_up = joint_ups as f64 / draws as f64;
+        assert!((empirical_rate_up - expected_rate_up).abs() < 0.01);
+        assert!((empirical_hazard_up - expected_hazard_up).abs() < 0.01);
+        assert!((empirical_joint_up - transition.up_up).abs() < 0.01);
     }
 
     // Lattice safety: marginals, correlation feasibility, floor saturation
@@ -1836,7 +2664,7 @@ mod tests {
                 correlation: rho,
                 ..RatesCreditConfig::default()
             });
-            tree.calibrate(&disc, &haz, 5.0)
+            calibrate_for_test(&mut tree, &disc, &haz, 5.0)
                 .unwrap_or_else(|e| panic!("rho={rho} must calibrate without mean reversion: {e}"));
         }
     }
@@ -1860,8 +2688,7 @@ mod tests {
         };
 
         let mut tree = RatesCreditTree::new(strong_reversion(0.9));
-        let err = tree
-            .calibrate(&disc, &haz, ttm)
+        let err = calibrate_for_test(&mut tree, &disc, &haz, ttm)
             .expect_err("rho = 0.9 must be infeasible under strong mean reversion");
         let msg = err.to_string();
         for needle in [
@@ -1878,8 +2705,8 @@ mod tests {
         // workable correlation without scraping the message. A tree calibrated
         // at zero correlation exposes it; a request inside it then prices.
         let mut probe = RatesCreditTree::new(strong_reversion(0.0));
-        probe.calibrate(&disc, &haz, ttm).expect("probe calibrates");
-        let bound = probe.max_feasible_correlation(ttm);
+        calibrate_for_test(&mut probe, &disc, &haz, ttm).expect("probe calibrates");
+        let bound = probe.max_feasible_correlation();
         assert!(
             (0.0..1.0).contains(&bound),
             "reported bound {bound} must be a proper fraction"
@@ -1891,8 +2718,7 @@ mod tests {
         );
 
         let mut feasible = RatesCreditTree::new(strong_reversion(bound * 0.95));
-        feasible
-            .calibrate(&disc, &haz, ttm)
+        calibrate_for_test(&mut feasible, &disc, &haz, ttm)
             .expect("a correlation inside the reported bound must calibrate");
         feasible
             .price(
@@ -1919,7 +2745,7 @@ mod tests {
             hazard_vol: 0.001,
             ..RatesCreditConfig::default()
         });
-        calm.calibrate(&disc, &haz, ttm).expect("calibrate calm");
+        calibrate_for_test(&mut calm, &disc, &haz, ttm).expect("calibrate calm");
         let calm_saturation = calm.hazard_floor_saturation();
         assert!(
             !calm_saturation.is_saturated(),
@@ -1934,9 +2760,7 @@ mod tests {
             hazard_vol: 0.20,
             ..RatesCreditConfig::default()
         });
-        violent
-            .calibrate(&disc, &haz, ttm)
-            .expect("calibrate violent");
+        calibrate_for_test(&mut violent, &disc, &haz, ttm).expect("calibrate violent");
         let violent_saturation = violent.hazard_floor_saturation();
         assert!(
             violent_saturation.is_saturated() && violent_saturation.max_mass_at_floor > 0.25,
@@ -1966,7 +2790,7 @@ mod tests {
                     rate_mean_reversion: kappa,
                     ..RatesCreditConfig::default()
                 });
-                tree.calibrate(&disc, &haz, ttm).expect("calibrate");
+                calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibrate");
                 let retention = tree.rate_variance_retention();
                 let label = format!("kappa={kappa}, T={ttm}, steps={steps}, sigma={rate_vol}");
 
@@ -2023,7 +2847,7 @@ mod tests {
             rate_mean_reversion: KAPPA_MAX,
             ..RatesCreditConfig::default()
         });
-        short.calibrate(&disc, &haz, 5.0).expect("calibrate short");
+        calibrate_for_test(&mut short, &disc, &haz, 5.0).expect("calibrate short");
         assert!(
             !short.rate_variance_retention().has_clamped_nodes(),
             "kappa*T = 0.75 must not clamp: {:?}",
@@ -2038,7 +2862,7 @@ mod tests {
             rate_mean_reversion: KAPPA_MAX,
             ..RatesCreditConfig::default()
         });
-        long.calibrate(&disc, &haz, 10.0).expect("calibrate long");
+        calibrate_for_test(&mut long, &disc, &haz, 10.0).expect("calibrate long");
         let retention = long.rate_variance_retention();
         assert!(
             retention.has_clamped_nodes(),
@@ -2070,7 +2894,7 @@ mod tests {
             hazard_mean_reversion: 0.08,
             ..RatesCreditConfig::default()
         });
-        tree.calibrate(&disc, &haz, 5.0).expect("calibrate");
+        calibrate_for_test(&mut tree, &disc, &haz, 5.0).expect("calibrate");
 
         // Rate factor has no mean reversion: undistorted default.
         assert_eq!(tree.rate_variance_retention(), VarianceRetention::default());
@@ -2111,7 +2935,7 @@ mod tests {
                 hazard_vol,
                 ..RatesCreditConfig::default()
             });
-            tree.calibrate(&disc, &haz, ttm).expect("calibrate");
+            calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibrate");
             tree.price(
                 HashMap::<&'static str, f64>::default(),
                 ttm,
@@ -2289,13 +3113,11 @@ mod tests {
             continuation_value: f64,
             dt: f64,
         ) -> Result<f64> {
-            let alive = self.cashflows.get(state.step).copied().unwrap_or(0.0) + continuation_value;
-            if let Some(hazard) = state.hazard_rate {
-                let p_surv = (-hazard.max(0.0) * dt).exp();
-                Ok(p_surv * alive)
-            } else {
-                Ok(alive)
-            }
+            let cash = self.cashflows.get(state.step).copied().unwrap_or(0.0);
+            let risky_continuation = state.hazard_rate.map_or(continuation_value, |hazard| {
+                (-hazard.max(0.0) * dt).exp() * continuation_value
+            });
+            Ok(cash + risky_continuation)
         }
     }
 
@@ -2315,7 +3137,7 @@ mod tests {
             hazard_vol: 0.0,
             ..Default::default()
         });
-        tree.calibrate(&disc, &haz, ttm).expect("calibration");
+        calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibration");
 
         let dt = ttm / steps as f64;
         let (n, m) = (16usize, 20usize);
@@ -2348,7 +3170,7 @@ mod tests {
             hazard_vol: 0.0,
             ..Default::default()
         });
-        tree.calibrate(&disc, &haz, ttm).expect("calibration");
+        calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibration");
 
         let conditional = tree
             .conditional_discount_factors(16, 24, ttm)
@@ -2405,7 +3227,7 @@ mod tests {
                 correlation: rho,
                 ..Default::default()
             });
-            tree.calibrate(&disc, &haz, ttm).expect("calibration");
+            calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibration");
             let mut vars = HashMap::<&'static str, f64>::default();
             vars.insert(short_rate_keys::OAS, 175.0);
             tree.price_with_node_coupons(
@@ -2439,6 +3261,77 @@ mod tests {
         );
     }
 
+    /// A node-coupon increment paid on an interior slice must have the same
+    /// value as an otherwise identical deterministic cashflow booked on that
+    /// slice. In particular, positive hazard applies only through the interval
+    /// ending at the payment slice; seeding the fold with survival from the
+    /// payment slice to the next one would default-discount the coupon twice.
+    #[test]
+    fn interior_node_coupon_payment_matches_cashflow_under_positive_hazard() {
+        let disc = sloped_discount_curve();
+        let haz = test_hazard_curve();
+        let steps = 12;
+        let ttm = 3.0;
+        let dt = ttm / steps as f64;
+        let (n, m) = (2usize, 7usize);
+        let tau = (m - n) as f64 * dt;
+        let notional = 1_000_000.0;
+        let mut tree = RatesCreditTree::new(RatesCreditConfig {
+            steps,
+            rate_vol: 0.0,
+            hazard_vol: 0.0,
+            ..Default::default()
+        });
+        calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibration");
+        assert!(tree.hazard_at_node(m, 0).expect("hazard") > 0.0);
+
+        let reset_df = tree
+            .conditional_discount_factors(n, m, ttm)
+            .expect("conditional discount")[0];
+        let node_forward = (1.0 / reset_df - 1.0) / tau;
+        let increment = notional * tau * node_forward;
+        let coupon = NodeCoupon {
+            reset_step: n,
+            payment_step: m,
+            accrual: tau,
+            notional,
+            base_index_rate: 0.0,
+            base_discount_forward: 0.0,
+            timing_scale: 1.0,
+            params: FloatingRateParams::default(),
+        };
+
+        let mut vars = HashMap::<&'static str, f64>::default();
+        vars.insert(short_rate_keys::OAS, 125.0);
+        let folded = tree
+            .price_with_node_coupons(
+                vars.clone(),
+                ttm,
+                &MarketContext::new(),
+                &SurvivalCashflowValuator {
+                    cashflows: vec![0.0; steps + 1],
+                },
+                std::slice::from_ref(&coupon),
+            )
+            .expect("node-coupon price");
+
+        let mut cashflows = vec![0.0; steps + 1];
+        cashflows[m] = increment;
+        let direct = tree
+            .price(
+                vars,
+                ttm,
+                &MarketContext::new(),
+                &SurvivalCashflowValuator { cashflows },
+            )
+            .expect("direct cashflow price");
+
+        assert!(
+            (folded - direct).abs() < 1.0e-8,
+            "interior payment must carry exactly the same discount and survival as current cash: folded={folded}, direct={direct}"
+        );
+    }
+
     /// The node-coupon path with an empty descriptor slice is exactly the
     /// plain pricing path.
     #[test]
@@ -2453,7 +3346,7 @@ mod tests {
             hazard_vol: 0.015,
             ..Default::default()
         });
-        tree.calibrate(&disc, &haz, ttm).expect("calibration");
+        calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibration");
 
         let mut cashflows = vec![0.0; steps + 1];
         cashflows[steps] = 1_000_000.0;
@@ -2492,7 +3385,7 @@ mod tests {
             hazard_vol: 0.0,
             ..Default::default()
         });
-        tree.calibrate(&disc, &haz, ttm).expect("calibration");
+        calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibration");
         let valuator = SurvivalCashflowValuator {
             cashflows: vec![0.0; steps + 1],
         };
@@ -2567,7 +3460,7 @@ mod tests {
             hazard_vol: 0.20,
             ..Default::default()
         });
-        tree.calibrate(&disc, &haz, 5.0).expect("calibration");
+        calibrate_for_test(&mut tree, &disc, &haz, 5.0).expect("calibration");
 
         let ctx = MarketContext::new();
         let vars = HashMap::<&'static str, f64>::default();
@@ -2603,7 +3496,7 @@ mod tests {
             hazard_vol: 0.0, // no hazard vol → pure rate test
             ..Default::default()
         });
-        tree.calibrate(&disc, &haz, ttm).expect("calibrate");
+        calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibrate");
 
         let ctx = MarketContext::new();
         let vars = HashMap::<&'static str, f64>::default();
@@ -2637,7 +3530,7 @@ mod tests {
             hazard_vol: 0.20,
             ..Default::default()
         });
-        tree.calibrate(&disc, &haz, ttm).expect("calibrate");
+        calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibrate");
 
         // Forward-propagate Arrow-Debreu state prices through the calibrated
         // hazard lattice to compute model survival probability at each step.
@@ -2651,7 +3544,9 @@ mod tests {
             let next_nodes = k + 2;
             let mut next_sp = vec![0.0_f64; next_nodes];
             for j in 0..=k {
-                let h_j = RatesCreditTree::effective_hazard(tree.calibrated_hazards[k][j]);
+                let h_j = RatesCreditTree::effective_hazard(
+                    tree.calibrated_hazards[k].value_unchecked(j),
+                );
                 let surv_df = (-h_j * dt).exp();
                 let q = state_prices[j];
                 // Up move to j+1, down move to j — p = 0.5 each (no mean reversion)
@@ -2693,7 +3588,7 @@ mod tests {
             ..Default::default()
         });
 
-        tree.calibrate(&disc, &haz, 2.0).expect("calibration");
+        calibrate_for_test(&mut tree, &disc, &haz, 2.0).expect("calibration");
 
         let price = tree
             .price(
@@ -2734,7 +3629,7 @@ mod tests {
                 rate_mean_reversion: kappa,
                 ..Default::default()
             });
-            tree.calibrate(&disc, &haz, ttm).expect("calibrate");
+            calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibrate");
 
             let ctx = MarketContext::new();
             let price = tree
@@ -2774,7 +3669,7 @@ mod tests {
                 hazard_mean_reversion: kappa,
                 ..Default::default()
             });
-            tree.calibrate(&disc, &haz, ttm).expect("calibrate");
+            calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibrate");
 
             // Forward-propagate Arrow-Debreu state prices through the
             // calibrated hazard lattice using the SAME mean-reversion
@@ -2842,9 +3737,7 @@ mod tests {
             rate_mean_reversion: 0.0,
             ..Default::default()
         });
-        two_factor
-            .calibrate(&disc, &haz, ttm)
-            .expect("calibrate 2F");
+        calibrate_for_test(&mut two_factor, &disc, &haz, ttm).expect("calibrate 2F");
 
         let mut short_rate = ShortRateTree::new(ShortRateTreeConfig::ho_lee(steps, vol));
         short_rate.calibrate(&disc, ttm).expect("calibrate SR");
@@ -2881,8 +3774,7 @@ mod tests {
             rate_mean_reversion: KAPPA_MAX,
             ..Default::default()
         });
-        tree_at_limit
-            .calibrate(&disc, &haz, 5.0)
+        calibrate_for_test(&mut tree_at_limit, &disc, &haz, 5.0)
             .expect("kappa == KAPPA_MAX must succeed");
 
         // Just above the threshold: must fail with Validation.
@@ -2894,7 +3786,7 @@ mod tests {
             rate_mean_reversion: over_rate,
             ..Default::default()
         });
-        match tree_over_rate.calibrate(&disc, &haz, 5.0) {
+        match calibrate_for_test(&mut tree_over_rate, &disc, &haz, 5.0) {
             Err(Error::Validation(msg)) => {
                 assert!(
                     msg.contains("rate_mean_reversion"),
@@ -2917,7 +3809,7 @@ mod tests {
             hazard_mean_reversion: over_hazard,
             ..Default::default()
         });
-        match tree_over_hazard.calibrate(&disc, &haz, 5.0) {
+        match calibrate_for_test(&mut tree_over_hazard, &disc, &haz, 5.0) {
             Err(Error::Validation(msg)) => {
                 assert!(
                     msg.contains("hazard_mean_reversion"),

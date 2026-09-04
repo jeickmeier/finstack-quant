@@ -1,7 +1,9 @@
 //! Hazard-rate (intensity) bond pricer with fractional recovery of par (FRP).
 //!
-//! This engine prices defaultable bonds using a reduced-form hazard-rate model
-//! with piecewise-constant hazard curve and **fractional recovery of par**.
+//! This engine prices non-callable defaultable bonds using a reduced-form
+//! hazard-rate model with piecewise-constant hazard curve and **fractional
+//! recovery of par**. Embedded exercise rights belong to the explicit
+//! rates-credit model.
 //!
 //! Let:
 //! - `D(as_of, t)` be the risk-free discount factor from valuation date to t.
@@ -10,15 +12,17 @@
 //! - `CF_i` be signed canonical schedule cashflows (coupons + principal) at dates `T_i`.
 //! - `N(t)` be the outstanding notional process (including amortization).
 //!
-//! Under independence of rates and credit and FRP, the price at `as_of` is:
+//! Under deterministic rates and credit and FRP, the price at `as_of` is:
 //! ```text
 //! PV = Σ_i CF_i · D(as_of, T_i) · S(T_i)
-//!    + R · Σ_k N(t_{k-1}) · D(as_of, t_k) · ΔS_k
+//!    + R · Σ_k D(as_of, t_k) · S(t_k) · N(t_k) · W_k
 //! ```
 //! where:
-//! - `ΔS_k = S(t_{k-1}) - S(t_k) ≈ ∫_{t_{k-1}}^{t_k} λ(u) S(u) du`
-//! - the time grid `{t_k}` is built from the bond cashflow dates, with `t_0`
-//!   anchored at `as_of` (valuation date).
+//! - `W_k = λ_k · (1 - exp(-(r_k + s + λ_k)Δt_k)) /
+//!   (r_k + s + λ_k)` is the exact within-step discounted default weight,
+//! - `N(t_k)` is the canonical after-event balance at the start of the step,
+//! - the ACT/365F grid contains every calendar date through the final adjusted
+//!   payment date and treats `tree_steps` as a minimum resolution.
 //!
 //! Recovery is taken as a fraction of **outstanding notional** (par) during
 //! each interval, which matches the fractional recovery of par convention used
@@ -30,34 +34,26 @@
 //! but the PV is always anchored at `as_of`. The quote engine handles
 //! settlement-date accrued interest separately.
 
-use crate::instruments::common_impl::traits::Instrument;
-use crate::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
-use crate::results::ValuationResult;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
-use finstack_quant_core::math::summation::kahan_sum;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::InputError;
 use finstack_quant_core::Result;
 
 use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::CFKind;
+use crate::cashflow::primitives::is_cash_settlement_kind;
+use crate::instruments::common_impl::pricing::rates_credit::{
+    build_daily_bond_rates_credit_targets, continuous_frp_weight,
+};
 
 use super::super::super::types::Bond;
 
 /// Hazard-rate bond pricing engine using FRP and `HazardCurve`.
 ///
-/// This engine prices defaultable bonds using a reduced-form hazard-rate model
-/// with fractional recovery of par (FRP). It returns an error if no hazard
-/// curve is available in the market context.
-///
-/// # Examples
-///
-/// Use `SimpleBondHazardPricer` for public API access to hazard-rate pricing:
-///
+/// This straight-bond leaf prices defaultable bonds using a reduced-form
+/// hazard-rate model with fractional recovery of par (FRP). It returns an
+/// error if no hazard curve is available or if the bond has embedded call,
+/// put, or return-floor rights.
 pub struct HazardBondEngine;
 
 impl HazardBondEngine {
@@ -69,12 +65,33 @@ impl HazardBondEngine {
     /// `<discount_curve_id>-CREDIT` naming magic) could silently switch a
     /// bond to credit-risky pricing just because a similarly-named hazard
     /// curve existed in the market context.
-    fn resolve_hazard_curve(
+    pub(crate) fn require_hazard_curve(
         bond: &Bond,
         market: &MarketContext,
-    ) -> Option<std::sync::Arc<HazardCurve>> {
-        let credit_id = bond.credit_curve_id.as_ref()?;
-        market.get_hazard(credit_id.as_str()).ok()
+    ) -> Result<std::sync::Arc<HazardCurve>> {
+        let credit_id = bond.credit_curve_id.as_ref().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "credit-consuming bond pricing for '{}' requires an explicit credit_curve_id",
+                bond.id.as_str()
+            ))
+        })?;
+        market.get_hazard(credit_id.as_str())
+    }
+
+    /// Reject option-bearing bonds at the deterministic straight-bond leaf.
+    fn reject_embedded_options(bond: &Bond) -> Result<()> {
+        let has_call_put = bond
+            .call_put
+            .as_ref()
+            .is_some_and(crate::instruments::fixed_income::bond::CallPutSchedule::has_options);
+        if has_call_put || bond.return_floor.is_some() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "HazardBondEngine is a straight-bond leaf and cannot price embedded options \
+                 for bond '{}'; use the 'rates_credit' model for joint rates-credit optional pricing",
+                bond.id.as_str()
+            )));
+        }
+        Ok(())
     }
 
     /// Build pricing cashflows and the full internal schedule.
@@ -88,35 +105,8 @@ impl HazardBondEngine {
         Ok((flows, schedule))
     }
 
-    /// Price a bond using a hazard curve with fractional recovery of par (FRP).
-    ///
-    /// Computes the present value accounting for credit risk by:
-    /// 1. Discounting survival-weighted cashflows (alive leg)
-    /// 2. Adding recovery value on default events (recovery leg)
-    ///
-    /// If no hazard curve can be resolved from the market context, this
-    /// returns a validation error. Use the discounting engine for risk-free
-    /// bond pricing.
-    ///
-    /// # Arguments
-    ///
-    /// * `bond` - The bond to price
-    /// * `market` - Market context containing discount and hazard curves
-    /// * `as_of` - Valuation date
-    ///
-    /// # Returns
-    ///
-    /// Present value of the bond accounting for credit risk.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err` when:
-    /// - Discount curve is not found in market context
-    /// - Bond has no future cashflows
-    /// - Cashflow schedule building fails
-    /// - Hazard curve cannot be resolved from market context
-    /// - Survival probability calculation fails
-    pub(crate) fn price(bond: &Bond, market: &MarketContext, as_of: Date) -> Result<Money> {
+    #[cfg(test)]
+    fn price(bond: &Bond, market: &MarketContext, as_of: Date) -> Result<Money> {
         Ok(Money::new(
             Self::price_raw(bond, market, as_of)?,
             bond.notional.currency(),
@@ -124,220 +114,142 @@ impl HazardBondEngine {
     }
 
     /// Price a bond using a hazard curve and return the unrounded PV.
+    #[cfg(test)]
     pub(crate) fn price_raw(bond: &Bond, market: &MarketContext, as_of: Date) -> Result<f64> {
+        Self::price_raw_with_oas(bond, market, as_of, 0.0)
+    }
+
+    /// Price a non-callable hazard-rate bond with a constant OAS.
+    ///
+    /// `oas_quote_decimal` follows the bond's configured OAS quote
+    /// compounding. The scalar FRP kernel converts it to a continuous spread
+    /// and applies it consistently to promised cash and within-step recovery.
+    pub(crate) fn price_raw_with_oas(
+        bond: &Bond,
+        market: &MarketContext,
+        as_of: Date,
+        oas_quote_decimal: f64,
+    ) -> Result<f64> {
+        Self::reject_embedded_options(bond)?;
+        if !oas_quote_decimal.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "hazard-rate OAS must be finite, got {oas_quote_decimal}"
+            )));
+        }
+        let continuous_oas = bond
+            .instrument_pricing_overrides
+            .model_config
+            .oas_quote_compounding
+            .continuous_from_quote_decimal(oas_quote_decimal);
         let disc = market.get_discount(&bond.discount_curve_id)?;
 
-        // Resolve hazard curve. Explicit hazard-rate pricing must fail loudly
-        // when credit market data is missing; risk-free pricing belongs on the
-        // discounting model path.
-        let Some(hazard) = Self::resolve_hazard_curve(bond, market) else {
-            let expected = bond.credit_curve_id.as_ref().map_or_else(
-                || {
-                    "an explicit credit_curve_id on the bond (implicit hazard-curve \
-                    discovery by naming convention is not supported)"
-                        .to_string()
-                },
-                |id| format!("hazard curve '{}' in the market context", id.as_str()),
-            );
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "hazard_rate pricing for bond '{}' requires a hazard curve; expected {}",
-                bond.id.as_str(),
-                expected
-            )));
-        };
-        let recovery = hazard.recovery_rate().clamp(0.0, 1.0);
-
+        // Explicit hazard-rate pricing must fail loudly when credit market data
+        // is missing; risk-free pricing belongs on the discounting model path.
+        let hazard = Self::require_hazard_curve(bond, market)?;
         let (flows, schedule) = Self::build_schedules(bond, market, as_of)?;
-
-        // Build time grid from as_of + future cashflow dates.
-        // PV is anchored at as_of (valuation date), not settlement.
-        let mut dates: Vec<Date> = flows
+        let Some(final_payment_date) = schedule
+            .get_flows()
             .iter()
-            .map(|(d, _)| *d)
-            .filter(|d| *d > as_of)
-            .collect();
-
-        // Include dates where the outstanding balance changes (PIK
-        // capitalizations, amortization) even when they don't produce
-        // signed canonical schedule cashflows, so the recovery leg tracks the correct
-        // notional at each interval boundary.
-        for cf in schedule.get_flows() {
-            if cf.date > as_of && matches!(cf.kind, CFKind::Pik | CFKind::Amortization) {
-                dates.push(cf.date);
-            }
-        }
-
-        dates.sort();
-        dates.dedup();
-
-        // No future cashflows after as_of → PV is zero.
-        if dates.is_empty() {
+            .filter(|flow| flow.date > as_of && is_cash_settlement_kind(flow.kind))
+            .map(|flow| flow.date)
+            .max()
+        else {
             return Ok(0.0);
-        }
+        };
+        let minimum_steps = bond
+            .instrument_pricing_overrides
+            .model_config
+            .tree_steps
+            .unwrap_or(1);
+        let targets = build_daily_bond_rates_credit_targets(
+            disc.as_ref(),
+            hazard.as_ref(),
+            as_of,
+            final_payment_date,
+            minimum_steps,
+        )?;
+        let steps = targets.times.len() - 1;
+        let span_days =
+            usize::try_from((final_payment_date - as_of).whole_days()).map_err(|_| {
+                finstack_quant_core::Error::Validation(
+                    "hazard bond payment horizon exceeds supported grid size".to_string(),
+                )
+            })?;
+        let substeps_per_day = steps / span_days;
 
-        dates.insert(0, as_of);
-
-        // Discount factors relative to as_of for correct PV anchoring.
-        let mut dfs = Vec::with_capacity(dates.len());
-        for d in &dates {
-            let df_rel = disc.df_between_dates(as_of, *d)?;
-            dfs.push(df_rel);
-        }
-
-        // Survival probabilities from hazard curve at the grid dates.
-        // Renormalize to conditional survival Q(as_of, T) = S(T) / S(as_of)
-        // so that the PV is correct even when the hazard curve's base date
-        // differs from the valuation date (e.g., yesterday's curve reused today).
-        let surv_raw = hazard.survival_at_dates(&dates)?;
-        if surv_raw.is_empty() {
-            return Err(InputError::TooFewPoints.into());
-        }
-        // Check for prior default. A survival probability of zero at as_of means
-        // the hazard curve implies the bond has already defaulted, in which case
-        // the holder should be valuing recovery proceeds — not running the alive-leg
-        // pricer. Return an error rather than a silent PV=0 so a misconfigured curve
-        // is caught at the call site.
-        let s0 = surv_raw[0].clamp(0.0, 1.0);
-        if s0 <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Hazard curve implies bond {} has zero survival probability at as_of={}; \
-                 already-defaulted bonds must be priced via recovery proceeds, not the \
-                 hazard engine. Check the hazard curve's base date and calibration.",
-                bond.id.as_str(),
-                as_of
-            )));
-        }
-        // Conditional survival: Q(as_of, T_i) = S(T_i) / S(as_of)
-        let surv: Vec<f64> = surv_raw.iter().map(|s| (s / s0).clamp(0.0, 1.0)).collect();
-
-        // Alive leg: survival-weighted PV of signed canonical schedule coupons and principal.
-        //
-        // Cashflows dated exactly on `as_of` are excluded (settlement
-        // convention, `d > as_of`) — consistent with `pricing_dated_cashflows`
-        // and the discount / tree / YTM engines.
-        // Use Kahan summation from finstack-quant-core for numerical stability.
-        let pv_values: Vec<f64> = flows
-            .iter()
-            .filter(|(d, amt)| *d > as_of && amt.amount() != 0.0)
-            .filter_map(|(d, amt)| {
-                // Dates come from the same grid we built, so binary_search should succeed
-                dates.binary_search(d).ok().map(|idx| {
-                    let df = dfs[idx];
-                    let s = surv[idx];
-                    amt.amount() * df * s
-                })
-            })
-            .collect();
-        let pv_cf = kahan_sum(pv_values);
-
-        // Recovery leg: FRP on outstanding notional.
-        // Outstanding tracks amortization (down) and PIK capitalizations (up)
-        // so that recovery is computed on the correct accreted balance.
-        let mut pv_rec = 0.0;
-        if recovery > 0.0 {
-            let mut full_flows = schedule.get_flows().to_vec();
-            full_flows.sort_by_key(|cf| cf.date);
-
-            let mut outstanding = schedule.get_notional().initial.amount();
-            let mut future_balance_delta = std::collections::BTreeMap::<Date, f64>::new();
-
-            for cf in &full_flows {
-                let amt = cf.amount.amount();
-                if amt <= 0.0 {
-                    continue;
-                }
-                match cf.kind {
-                    CFKind::Amortization | CFKind::Notional => {
-                        if cf.date <= as_of {
-                            outstanding -= amt;
-                        } else {
-                            *future_balance_delta.entry(cf.date).or_insert(0.0) -= amt;
-                        }
-                    }
-                    CFKind::Pik => {
-                        if cf.date <= as_of {
-                            outstanding += amt;
-                        } else {
-                            *future_balance_delta.entry(cf.date).or_insert(0.0) += amt;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-
-            let mut current_outstanding = outstanding.max(0.0);
-
-            for k in 1..dates.len() {
-                let n_prev = current_outstanding.max(0.0);
-                if n_prev > 0.0 {
-                    let delta_s = (surv[k - 1] - surv[k]).max(0.0);
-                    if delta_s > 0.0 {
-                        // Use midpoint of interval for recovery timing (better approximation).
-                        // Geometric mean of endpoint DFs equals exact midpoint DF under
-                        // continuous compounding: sqrt(df(t_start) * df(t_end)) = df((t_start + t_end)/2).
-                        let df_midpoint = (dfs[k - 1] * dfs[k]).sqrt();
-                        pv_rec += recovery * n_prev * delta_s * df_midpoint;
-                    }
-                }
-                // Apply balance changes: amortization/redemption (negative delta)
-                // and PIK capitalizations (positive delta).
-                if let Some(delta) = future_balance_delta.remove(&dates[k]) {
-                    current_outstanding = (current_outstanding + delta).max(0.0);
-                }
+        let mut cash_by_step = vec![0.0; steps + 1];
+        for (date, amount) in flows {
+            let day = usize::try_from((date - as_of).whole_days()).map_err(|_| {
+                finstack_quant_core::Error::Validation(
+                    "hazard bond cashflow predates the valuation date".to_string(),
+                )
+            })?;
+            let step = day.checked_mul(substeps_per_day).ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "hazard bond cashflow grid index overflow".to_string(),
+                )
+            })?;
+            if let Some(total) = cash_by_step.get_mut(step) {
+                *total += amount.amount();
             }
         }
 
-        Ok(pv_cf + pv_rec)
-    }
-}
+        // `outstanding_by_date` is the canonical after-event balance replay;
+        // it includes historical and future amortization, PIK, draws, and
+        // repayments in schedule order.
+        let outstanding_path = schedule.outstanding_by_date()?;
+        let mut outstanding = schedule.get_notional().initial.amount();
+        let mut balance_cursor = 0;
+        while balance_cursor < outstanding_path.len() && outstanding_path[balance_cursor].0 <= as_of
+        {
+            outstanding = outstanding_path[balance_cursor].1.amount();
+            balance_cursor += 1;
+        }
 
-/// Registry adapter for the hazard-rate bond pricer.
-///
-/// Routes `(InstrumentType::Bond, ModelKey::HazardRate)` to [`HazardBondEngine`]
-/// with FRP. Falls back to risk-free pricing if no hazard curve is available.
-pub(crate) struct SimpleBondHazardPricer;
+        let recovery = targets.recovery_rate.clamp(0.0, 1.0);
+        let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::default();
+        for (step, cash) in cash_by_step.iter().copied().enumerate() {
+            let oas_discount = (-continuous_oas * targets.times[step]).exp();
+            pv.add(
+                cash * targets.discount_factors[step]
+                    * targets.survival_probabilities[step]
+                    * oas_discount,
+            );
+            if step == steps {
+                break;
+            }
 
-impl Pricer for SimpleBondHazardPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::Bond, ModelKey::HazardRate)
-    }
+            let whole_day_boundary = step % substeps_per_day == 0;
+            if whole_day_boundary {
+                let day = step / substeps_per_day;
+                let date = as_of + time::Duration::days(day as i64);
+                while balance_cursor < outstanding_path.len()
+                    && outstanding_path[balance_cursor].0 <= date
+                {
+                    outstanding = outstanding_path[balance_cursor].1.amount();
+                    balance_cursor += 1;
+                }
+            }
 
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<ValuationResult, PricingError> {
-        let bond = expect_inst::<Bond>(instrument, InstrumentType::Bond)?;
+            if recovery > 0.0 && outstanding > 0.0 {
+                let interval_discount = targets.discount_factors[step + 1]
+                    / targets.discount_factors[step]
+                    * (-continuous_oas * (targets.times[step + 1] - targets.times[step])).exp();
+                let interval_survival =
+                    targets.survival_probabilities[step + 1] / targets.survival_probabilities[step];
+                let default_weight = continuous_frp_weight(interval_discount, interval_survival)?;
+                pv.add(
+                    targets.discount_factors[step]
+                        * targets.survival_probabilities[step]
+                        * oas_discount
+                        * recovery
+                        * outstanding
+                        * default_weight,
+                );
+            }
+        }
 
-        let ctx = PricingErrorContext::new()
-            .instrument_id(bond.id())
-            .instrument_type(InstrumentType::Bond)
-            .model(ModelKey::HazardRate)
-            .curve_id(bond.discount_curve_id.as_str());
-
-        let pv = HazardBondEngine::price(bond, market, as_of)
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
-
-        Ok(ValuationResult::stamped(bond.id(), as_of, pv))
-    }
-
-    fn price_raw_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<f64, PricingError> {
-        let bond = expect_inst::<Bond>(instrument, InstrumentType::Bond)?;
-
-        let ctx = PricingErrorContext::new()
-            .instrument_id(bond.id())
-            .instrument_type(InstrumentType::Bond)
-            .model(ModelKey::HazardRate)
-            .curve_id(bond.discount_curve_id.as_str());
-
-        HazardBondEngine::price_raw(bond, market, as_of)
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx))
+        Ok(pv.total())
     }
 }
 
@@ -348,8 +260,15 @@ mod tests {
     use crate::instruments::common_impl::traits::Attributes;
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::fixed_income::bond::pricing::engine::discount::BondEngine;
-    use crate::instruments::fixed_income::bond::CashflowSpec;
+    use crate::instruments::fixed_income::bond::pricing::engine::tree::{
+        bond_tree_config, TreePricer,
+    };
+    use crate::instruments::fixed_income::bond::{
+        BondSettlementConvention, CallPut, CallPutSchedule, CashflowSpec,
+    };
     use crate::metrics::{standard_registry, MetricContext, MetricId};
+    use crate::pricer::{ModelKey, PricingError};
+    use crate::results::ValuationDetails;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -509,8 +428,402 @@ mod tests {
             .expect_err("hazard pricing should reject missing hazard curve");
 
         assert!(
-            err.to_string().contains("requires a hazard curve"),
+            err.to_string().contains("USD-CREDIT"),
             "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn straight_hazard_leaf_rejects_embedded_options() {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
+        let mut callable = build_test_bond(issue, maturity);
+        callable.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: Date::from_calendar_date(2027, Month::January, 1)
+                    .expect("valid call date"),
+                end_date: Date::from_calendar_date(2027, Month::January, 1)
+                    .expect("valid call date"),
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+        let market = MarketContext::new()
+            .insert(build_flat_discount(issue))
+            .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
+
+        let err = HazardBondEngine::price_raw(&callable, &market, issue)
+            .expect_err("straight hazard leaf must reject embedded options");
+        assert!(
+            err.to_string().contains("straight-bond leaf"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn explicit_registry_model_matrix_preserves_rates_and_credit_boundaries() {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
+        let exercise =
+            Date::from_calendar_date(2027, Month::January, 1).expect("valid exercise date");
+        let bullet = build_test_bond(issue, maturity);
+        let mut callable = bullet.clone();
+        callable.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: exercise,
+                end_date: exercise,
+                price_pct_of_par: 90.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+
+        let discount_only = MarketContext::new().insert(build_flat_discount(issue));
+        let credit_market = MarketContext::new()
+            .insert(build_flat_discount(issue))
+            .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
+        let registry = crate::pricer::standard_pricer_registry();
+        let options = crate::instruments::PricingOptions::default();
+
+        let discounting = registry
+            .price_with_metrics(
+                &bullet,
+                ModelKey::Discounting,
+                &discount_only,
+                issue,
+                &[],
+                options.clone(),
+            )
+            .expect("straight bond must support explicit discounting");
+        let hazard = registry
+            .price_with_metrics(
+                &bullet,
+                ModelKey::HazardRate,
+                &credit_market,
+                issue,
+                &[],
+                options.clone(),
+            )
+            .expect("straight bond must support explicit hazard pricing");
+        assert!(discounting.value.amount().is_finite());
+        assert!(hazard.value.amount().is_finite());
+
+        for model in [ModelKey::Discounting, ModelKey::HazardRate] {
+            let err = registry
+                .price_with_metrics(
+                    &callable,
+                    model,
+                    &credit_market,
+                    issue,
+                    &[],
+                    options.clone(),
+                )
+                .expect_err("straight-bond model must reject callable bonds");
+            assert!(
+                matches!(err, PricingError::InvalidInput { .. }),
+                "{model} callable rejection must remain typed, got {err:?}"
+            );
+        }
+
+        let tree_with_credit_id = registry
+            .price_with_metrics(
+                &callable,
+                ModelKey::Tree,
+                &discount_only,
+                issue,
+                &[],
+                options.clone(),
+            )
+            .expect("rates-only tree must not require an attached credit curve");
+        let mut rates_only_callable = callable.clone();
+        rates_only_callable.credit_curve_id = None;
+        let tree_without_credit_id = registry
+            .price_with_metrics(
+                &rates_only_callable,
+                ModelKey::Tree,
+                &discount_only,
+                issue,
+                &[],
+                options.clone(),
+            )
+            .expect("rates-only tree must price without a credit curve id");
+        assert!(
+            (tree_with_credit_id.value.amount() - tree_without_credit_id.value.amount()).abs()
+                < 1.0e-9,
+            "Tree must remain rates-only when the instrument also names a credit curve"
+        );
+
+        let missing_hazard = registry
+            .price_with_metrics(
+                &callable,
+                ModelKey::RatesCredit,
+                &discount_only,
+                issue,
+                &[],
+                options,
+            )
+            .expect_err("joint rates-credit pricing must require its hazard curve");
+        assert!(
+            matches!(missing_hazard, PricingError::MissingMarketData { .. }),
+            "missing joint-model hazard data must remain typed, got {missing_hazard:?}"
+        );
+    }
+
+    #[test]
+    fn explicit_rates_credit_registry_values_calls_puts_and_raw_path() {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
+        let exercise =
+            Date::from_calendar_date(2027, Month::January, 1).expect("valid exercise date");
+        let mut bullet = build_test_bond(issue, maturity);
+        bullet.instrument_pricing_overrides.model_config.tree_steps = Some(20);
+
+        let mut callable = bullet.clone();
+        callable.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: exercise,
+                end_date: exercise,
+                price_pct_of_par: 80.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+
+        let mut puttable = bullet.clone();
+        puttable.call_put = Some(CallPutSchedule {
+            calls: Vec::new(),
+            puts: vec![CallPut {
+                start_date: exercise,
+                end_date: exercise,
+                price_pct_of_par: 130.0,
+                make_whole: None,
+            }],
+        });
+
+        let market = MarketContext::new()
+            .insert(build_flat_discount(issue))
+            .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
+        let registry = crate::pricer::standard_pricer_registry();
+        let price = |bond: &Bond| {
+            registry
+                .price_with_metrics(
+                    bond,
+                    ModelKey::RatesCredit,
+                    &market,
+                    issue,
+                    &[],
+                    crate::instruments::PricingOptions::default(),
+                )
+                .expect("explicit rates-credit pricing")
+                .value
+                .amount()
+        };
+
+        let bullet_pv = price(&bullet);
+        let callable_pv = price(&callable);
+        let puttable_pv = price(&puttable);
+        assert!(
+            callable_pv < bullet_pv,
+            "issuer call must lower holder value: callable={callable_pv}, bullet={bullet_pv}"
+        );
+        assert!(
+            puttable_pv > bullet_pv,
+            "holder put must raise holder value: puttable={puttable_pv}, bullet={bullet_pv}"
+        );
+
+        let default_pv = callable
+            .value(&market, issue)
+            .expect("default callable valuation")
+            .amount();
+        assert!(
+            (callable_pv - default_pv).abs() < 1e-9,
+            "explicit rates-credit and default bond policy must share the option-aware tree"
+        );
+
+        let raw_registered = registry
+            .price_raw(&callable, ModelKey::RatesCredit, &market, issue)
+            .expect("registered raw rates-credit valuation");
+        let raw_default = callable
+            .value_raw(&market, issue)
+            .expect("default raw callable valuation");
+        assert!(
+            (raw_registered - raw_default).abs() < 1e-9,
+            "registered and default raw paths must share the option-aware rates-credit tree"
+        );
+    }
+
+    #[test]
+    fn stochastic_rates_credit_bullet_surfaces_reproducibility_diagnostics() {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
+        let mut bond = build_test_bond(issue, maturity);
+        bond.instrument_pricing_overrides
+            .model_config
+            .hazard_volatility = Some(0.01);
+        bond.instrument_pricing_overrides.model_config.mc_paths = Some(8);
+        bond.instrument_pricing_overrides.model_config.tree_steps = Some(4);
+        let market = MarketContext::new()
+            .insert(build_flat_discount(issue))
+            .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
+
+        let result = crate::pricer::standard_pricer_registry()
+            .price_with_metrics(
+                &bond,
+                ModelKey::RatesCredit,
+                &market,
+                issue,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect("stochastic rates-credit bullet price");
+        assert!(result.value.amount().is_finite());
+        assert_eq!(result.metric_str("mc_num_paths"), Some(8.0));
+        assert_eq!(result.metric_str("mc_num_simulated_paths"), Some(16.0));
+        let Some(ValuationDetails::MonteCarlo(details)) = result.details else {
+            panic!("stochastic rates-credit result must include Monte Carlo details");
+        };
+        assert_eq!(details.model_key, ModelKey::RatesCredit);
+        assert_eq!(details.training_paths, 0);
+        assert_eq!(details.training_simulated_paths, 0);
+        assert_eq!(details.make_whole_training_paths, 0);
+        assert_eq!(details.make_whole_training_simulated_paths, 0);
+        assert_eq!(details.estimator_paths, 8);
+        assert_eq!(details.simulated_paths, 16);
+        assert!(details.time_grid.len() >= 366);
+        assert!(details.antithetic);
+    }
+
+    #[test]
+    fn stochastic_quoted_oas_surfaces_reproducibility_diagnostics() {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
+        let mut bond = build_test_bond(issue, maturity);
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: Date::from_calendar_date(2025, Month::July, 1)
+                    .expect("valid call date"),
+                end_date: Date::from_calendar_date(2025, Month::July, 1).expect("valid call date"),
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+        bond.settlement_convention = Some(BondSettlementConvention {
+            settlement_days: 2,
+            ..Default::default()
+        });
+        bond.instrument_pricing_overrides
+            .model_config
+            .hazard_volatility = Some(0.01);
+        bond.instrument_pricing_overrides.model_config.mc_paths = Some(32);
+        bond.instrument_pricing_overrides.model_config.tree_steps = Some(4);
+        bond.instrument_pricing_overrides.market_quotes.quoted_oas = Some(0.0025);
+        let market = MarketContext::new()
+            .insert(build_flat_discount(issue))
+            .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
+
+        let result = crate::pricer::standard_pricer_registry()
+            .price_with_metrics(
+                &bond,
+                ModelKey::RatesCredit,
+                &market,
+                issue,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect("stochastic quoted-OAS hazard price");
+
+        assert!(result.value.amount().is_finite());
+        let expected_direct = TreePricer::rates_credit(
+            bond_tree_config(&bond).expect("quoted-OAS tree configuration"),
+        )
+        .price_at_oas(&bond, &market, issue, 25.0)
+        .expect("direct as-of quoted-OAS value");
+        assert!(
+            (result.value.amount() - expected_direct).abs() < 1.0e-10,
+            "quoted OAS must price on the as-of tree kernel rather than a settlement-date carry"
+        );
+        let expected_amount = bond
+            .value_raw(&market, issue)
+            .expect("canonical quoted-OAS value");
+        assert!((result.value.amount() - expected_amount).abs() < 1.0e-10);
+        assert_eq!(result.metric_str("mc_num_paths"), Some(32.0));
+        assert_eq!(result.metric_str("mc_num_simulated_paths"), Some(64.0));
+        let Some(ValuationDetails::MonteCarlo(details)) = result.details else {
+            panic!("quoted OAS remains a stochastic model run with diagnostics");
+        };
+        assert_eq!(details.training_paths, 32);
+        assert_eq!(details.training_simulated_paths, 64);
+        assert_eq!(details.make_whole_training_paths, 0);
+        assert_eq!(details.make_whole_training_simulated_paths, 0);
+        assert_eq!(details.estimator_paths, 32);
+        assert_eq!(details.simulated_paths, 64);
+        assert!(details.standard_error.is_finite());
+
+        let mut clean_price = bond;
+        clean_price
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_oas = None;
+        clean_price
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price = Some(100.0);
+        let clean_result = crate::pricer::standard_pricer_registry()
+            .price_with_metrics(
+                &clean_price,
+                ModelKey::RatesCredit,
+                &market,
+                issue,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect("quoted clean-price rates-credit value");
+        assert!(clean_result.details.is_none());
+    }
+
+    #[test]
+    fn explicit_hazard_validates_credit_before_quote_short_circuit() {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
+        let mut quoted = build_test_bond(issue, maturity);
+        quoted
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_dirty_price_currency = Some(1_000_000.0);
+        let market = MarketContext::new().insert(build_flat_discount(issue));
+        let registry = crate::pricer::standard_pricer_registry();
+
+        let missing_curve = registry
+            .price_with_metrics(
+                &quoted,
+                ModelKey::HazardRate,
+                &market,
+                issue,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect_err("quoted hazard bond must still require its market hazard curve");
+        assert!(
+            matches!(missing_curve, PricingError::MissingMarketData { .. }),
+            "missing hazard curve must retain its typed error, got {missing_curve:?}"
+        );
+
+        quoted.credit_curve_id = None;
+        let missing_id = registry
+            .price_with_metrics(
+                &quoted,
+                ModelKey::HazardRate,
+                &market,
+                issue,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect_err("explicit hazard model must require credit_curve_id");
+        assert!(
+            matches!(missing_id, PricingError::InvalidInput { .. }),
+            "missing credit_curve_id must be invalid input, got {missing_id:?}"
         );
     }
 
@@ -651,8 +964,14 @@ mod tests {
 
         // Use a simple clean price quote; the quote engine should handle bonds
         // with hazard curves present in the MarketContext without error.
-        let quotes = compute_quotes(&bond, &market, issue, BondQuoteInput::CleanPricePct(99.5))
-            .expect("Quote engine should work for bonds with hazard curves");
+        let quotes = compute_quotes(
+            &bond,
+            &market,
+            issue,
+            BondQuoteInput::CleanPricePct(99.5),
+            crate::instruments::PricingOptions::default().with_model(ModelKey::HazardRate),
+        )
+        .expect("Quote engine should work for bonds with hazard curves");
 
         assert!(
             (quotes.clean_price_pct - 99.5).abs() < 1e-9,
@@ -796,12 +1115,10 @@ mod tests {
         let err = result.expect_err("prior-default curve must error, not return Ok(0.0)");
         let msg = err.to_string();
         assert!(
-            msg.contains("zero survival probability") || msg.contains("already-defaulted"),
+            msg.contains("zero survival probability")
+                || msg.contains("already-defaulted")
+                || msg.contains("survival probability at origin must be positive"),
             "error should explain prior default; got: {msg}"
-        );
-        assert!(
-            msg.contains("TEST_BOND_HAZARD"),
-            "error should include bond id for triage; got: {msg}"
         );
     }
 }

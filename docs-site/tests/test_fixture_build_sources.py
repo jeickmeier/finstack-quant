@@ -1,7 +1,6 @@
 """Fixture introduction cards expose the exact canonical source inventory."""
 
 from pathlib import Path
-import tomllib
 
 from check_curriculum import validate_fixture_builds
 from common import curriculum_manifest, frontmatter

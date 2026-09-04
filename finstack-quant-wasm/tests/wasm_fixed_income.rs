@@ -42,6 +42,66 @@ fn market_context_json() -> String {
     serde_json::to_string(&ctx).unwrap()
 }
 
+fn credit_market_context_json() -> String {
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+
+    let base = time::Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(base)
+        .day_count(DayCount::Act365F)
+        .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.82), (10.0, 0.67)])
+        .build()
+        .unwrap();
+    let hazard = HazardCurve::builder("ACME-HZD")
+        .base_date(base)
+        .recovery_rate(0.4)
+        .knots([(1.0, 0.02), (10.0, 0.02)])
+        .build()
+        .unwrap();
+    serde_json::to_string(&MarketContext::new().insert(disc).insert(hazard)).unwrap()
+}
+
+fn explicit_credit_bond_json(
+    id: &str,
+    call_price_pct: Option<f64>,
+    put_price_pct: Option<f64>,
+) -> String {
+    let mut envelope: serde_json::Value =
+        serde_json::from_str(&fixed_bond().to_json().unwrap()).unwrap();
+    let spec = &mut envelope["instrument"]["spec"];
+    spec["id"] = serde_json::json!(id);
+    spec["credit_curve_id"] = serde_json::json!("ACME-HZD");
+    spec["settlement_days"] = serde_json::json!(0);
+
+    if call_price_pct.is_some() || put_price_pct.is_some() {
+        let calls = call_price_pct
+            .map(|price_pct_of_par| {
+                serde_json::json!({
+                    "start_date": "2024-06-30",
+                    "end_date": "2024-06-30",
+                    "price_pct_of_par": price_pct_of_par,
+                })
+            })
+            .into_iter()
+            .collect::<Vec<_>>();
+        let puts = put_price_pct
+            .map(|price_pct_of_par| {
+                serde_json::json!({
+                    "start_date": "2024-06-30",
+                    "end_date": "2024-06-30",
+                    "price_pct_of_par": price_pct_of_par,
+                })
+            })
+            .into_iter()
+            .collect::<Vec<_>>();
+        spec["call_put"] = serde_json::json!({ "calls": calls, "puts": puts });
+    }
+
+    serde_json::to_string(&envelope).unwrap()
+}
+
 /// Strip the wall-clock `meta.timestamp` before comparing two results.
 /// Decode a `priceInstrument` return (a structured JS object, not a JSON
 /// string) and drop the wall-clock stamp so two runs are comparable.
@@ -169,6 +229,124 @@ fn bond_typed_to_json_prices_identically_to_handwritten_json() {
     )
     .expect("price via json");
     assert_eq!(without_timestamp(&typed), without_timestamp(&via_json));
+}
+
+#[wasm_bindgen_test]
+fn rates_credit_values_bond_call_and_put_rights() {
+    fn price(instrument_json: &str, market_json: &str, model: &str) -> f64 {
+        let result = price_instrument(
+            instrument_json,
+            market_json,
+            "2024-06-30",
+            Some(model.to_string()),
+            None,
+            None,
+            None,
+        )
+        .expect("selected bond model must price");
+        let parsed = without_timestamp(&result);
+        parsed["value"]["amount"]
+            .as_f64()
+            .or_else(|| parsed["value"]["amount"].as_str()?.parse().ok())
+            .expect("numeric valuation amount")
+    }
+
+    let market = credit_market_context_json();
+    let bullet_json = explicit_credit_bond_json("WASM-RATES-CREDIT-BULLET", None, None);
+    let callable_json = explicit_credit_bond_json("WASM-RATES-CREDIT-CALL", Some(80.0), None);
+    let puttable_json = explicit_credit_bond_json("WASM-RATES-CREDIT-PUT", None, Some(120.0));
+    let bullet = price(&bullet_json, &market, "rates_credit");
+    let callable = price(&callable_json, &market, "rates_credit");
+    let puttable = price(&puttable_json, &market, "rates_credit");
+    let hazard = price(&bullet_json, &market, "hazard_rate");
+    let tree = price(&callable_json, &market, "tree");
+
+    assert!(
+        0.0 < callable && callable < bullet && bullet < puttable,
+        "expected callable < bullet < puttable, got {callable} < {bullet} < {puttable}"
+    );
+    assert!(0.0 < hazard && hazard < 1_500_000.0);
+    assert!(0.0 < tree && tree < 1_500_000.0);
+
+    let callable_json = explicit_credit_bond_json("WASM-HAZARD-REJECTS-CALL", Some(80.0), None);
+    let error = price_instrument(
+        &callable_json,
+        &market,
+        "2024-06-30",
+        Some("hazard_rate".to_string()),
+        None,
+        None,
+        None,
+    )
+    .expect_err("hazard_rate must reject embedded exercise rights");
+    let message = js_sys::Reflect::get(&error, &wasm_bindgen::JsValue::from_str("message"))
+        .ok()
+        .and_then(|value| value.as_string())
+        .unwrap_or_default();
+    assert!(
+        message.contains("non-callable"),
+        "unexpected hazard-rate rejection: {message}"
+    );
+}
+
+#[wasm_bindgen_test]
+fn stochastic_rates_credit_result_exports_full_width_seed_as_bigint() {
+    // Keep this ID stable: its derived seed is intentionally above
+    // Number.MAX_SAFE_INTEGER and forms part of the lossless-export fixture.
+    let id = "WASM-HAZARD-BIGINT";
+    let mut instrument: serde_json::Value =
+        serde_json::from_str(&explicit_credit_bond_json(id, None, None)).unwrap();
+    instrument["instrument"]["spec"]["instrument_pricing_overrides"] = serde_json::json!({
+        "model_config": {
+            "hazard_volatility": 0.01,
+            "mc_paths": 2,
+            "tree_steps": 4
+        }
+    });
+
+    let result = price_instrument(
+        &serde_json::to_string(&instrument).unwrap(),
+        &credit_market_context_json(),
+        "2024-06-30",
+        Some("rates_credit".to_string()),
+        None,
+        None,
+        None,
+    )
+    .expect("stochastic rates-credit bond price must serialize");
+
+    let get = |target: &wasm_bindgen::JsValue, key: &str| {
+        js_sys::Reflect::get(target, &wasm_bindgen::JsValue::from_str(key))
+            .unwrap_or_else(|_| panic!("missing JavaScript property {key}"))
+    };
+    let details = get(&result, "details");
+    let data = get(&details, "data");
+    let seed = get(&data, "seed");
+
+    assert_eq!(
+        get(&data, "model_key").as_string().as_deref(),
+        Some("rates_credit")
+    );
+    assert_eq!(get(&data, "make_whole_training_paths").as_f64(), Some(0.0));
+    assert_eq!(
+        get(&data, "make_whole_training_simulated_paths").as_f64(),
+        Some(0.0)
+    );
+
+    assert_eq!(seed.js_typeof().as_string().as_deref(), Some("bigint"));
+    let expected = finstack_quant_models::monte_carlo::seed::derive_seed(
+        &finstack_quant_core::types::InstrumentId::from(id),
+        "bond_hazard_lsmc",
+    );
+    assert!(
+        expected > 9_007_199_254_740_991,
+        "fixture seed must exceed Number.MAX_SAFE_INTEGER"
+    );
+    let actual = js_sys::BigInt::new(&seed)
+        .expect("seed must be a BigInt")
+        .to_string(10)
+        .expect("base-10 BigInt conversion");
+    assert_eq!(String::from(actual), expected.to_string());
 }
 
 #[wasm_bindgen_test]

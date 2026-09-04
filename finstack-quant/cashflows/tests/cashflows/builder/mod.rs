@@ -11,6 +11,7 @@ mod amortization;
 mod conventions;
 mod credit_models;
 mod floating_rate;
+mod overnight_replay;
 mod principal_events;
 mod roll_rule;
 mod schedule;

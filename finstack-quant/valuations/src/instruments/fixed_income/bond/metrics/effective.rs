@@ -1,10 +1,10 @@
 //! Effective duration and convexity for bonds with embedded options.
 //!
-//! For callable/putable bonds, yield-based modified duration and convexity are
-//! inappropriate because they assume fixed cashflows. Effective duration and
-//! convexity measure price sensitivity by bumping the discount curve and
-//! repricing through the tree, which accounts for changes in exercise behavior
-//! as rates move.
+//! For bonds with call, put, or return-floor rights, yield-based modified
+//! duration and convexity are inappropriate because they assume fixed
+//! cashflows. Effective duration and convexity measure price sensitivity by
+//! bumping the discount curve and repricing through the option model, which
+//! accounts for changes in exercise behavior as rates move.
 //!
 //! # Formulas
 //!
@@ -15,11 +15,10 @@
 //!
 //! where `shock` is the parallel rate bump in decimal (e.g., 0.0025 for 25 bp).
 
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::Bond;
-use finstack_quant_core::dates::Date;
+use crate::metrics::MetricContext;
 use finstack_quant_core::market_data::bumps::MarketBump;
-use finstack_quant_core::market_data::context::{BumpSpec, MarketContext};
+use finstack_quant_core::market_data::context::BumpSpec;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 
@@ -35,38 +34,35 @@ pub(crate) struct EffectiveDurationResult {
 /// Calculate effective duration for a bond using parallel curve bumps.
 ///
 /// For bonds without embedded options, this produces results very close to
-/// modified duration. For callable/putable bonds, the tree pricer captures
-/// the change in exercise behavior as rates shift.
+/// modified duration. For bonds with call, put, or return-floor rights, the
+/// option model captures the change in exercise behavior as rates shift.
 pub(crate) fn effective_duration(
     bond: &Bond,
-    market: &MarketContext,
-    as_of: Date,
+    context: &MetricContext,
     shock_bp: Option<f64>,
 ) -> Result<f64> {
-    Ok(effective_duration_convexity(bond, market, as_of, shock_bp)?.duration)
+    Ok(effective_duration_convexity(bond, context, shock_bp)?.duration)
 }
 
 /// Calculate effective convexity for a bond using parallel curve bumps.
 pub(crate) fn effective_convexity(
     bond: &Bond,
-    market: &MarketContext,
-    as_of: Date,
+    context: &MetricContext,
     shock_bp: Option<f64>,
 ) -> Result<f64> {
-    Ok(effective_duration_convexity(bond, market, as_of, shock_bp)?.convexity)
+    Ok(effective_duration_convexity(bond, context, shock_bp)?.convexity)
 }
 
 /// Calculate both effective duration and convexity in one pass (three pricings).
 pub(crate) fn effective_duration_convexity(
     bond: &Bond,
-    market: &MarketContext,
-    as_of: Date,
+    context: &MetricContext,
     shock_bp: Option<f64>,
 ) -> Result<EffectiveDurationResult> {
     let shock_bp = shock_bp.unwrap_or(DEFAULT_SHOCK_BPS);
     let shock = shock_bp / 10_000.0;
 
-    let (risk_bond, base_price) = option_risk_bond_and_base_price(bond, market, as_of)?;
+    let (risk_bond, base_price) = option_risk_bond_and_base_price(bond, context)?;
 
     if base_price.abs() < 1e-10 {
         return Ok(EffectiveDurationResult {
@@ -76,17 +72,17 @@ pub(crate) fn effective_duration_convexity(
     }
 
     let curve_id = option_risk_curve_id(&risk_bond);
-    let market_up = market.bump([MarketBump::Curve {
+    let market_up = context.curves.bump([MarketBump::Curve {
         id: curve_id.clone(),
         spec: BumpSpec::parallel_bp(shock_bp),
     }])?;
-    let market_down = market.bump([MarketBump::Curve {
+    let market_down = context.curves.bump([MarketBump::Curve {
         id: curve_id,
         spec: BumpSpec::parallel_bp(-shock_bp),
     }])?;
 
-    let price_up = risk_bond.value(&market_up, as_of)?.amount();
-    let price_down = risk_bond.value(&market_down, as_of)?.amount();
+    let price_up = context.reprice_instrument_raw(&risk_bond, &market_up, context.as_of)?;
+    let price_down = context.reprice_instrument_raw(&risk_bond, &market_down, context.as_of)?;
 
     let duration = (price_down - price_up) / (2.0 * base_price * shock);
     let convexity = (price_up + price_down - 2.0 * base_price) / (base_price * shock * shock);
@@ -99,49 +95,46 @@ pub(crate) fn effective_duration_convexity(
 
 pub(crate) fn option_risk_bond_and_base_price(
     bond: &Bond,
-    market: &MarketContext,
-    as_of: Date,
+    context: &MetricContext,
 ) -> Result<(Bond, f64)> {
-    use crate::instruments::fixed_income::bond::pricing::engine::tree::{
-        bond_tree_config, TreePricer,
-    };
-    use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
-        clear_price_driving_overrides, settlement_dirty_from_quote_overrides,
-    };
-    use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
-
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions::clear_price_driving_overrides;
     let mut risk_bond = bond.clone();
-    let Some(dirty_at_quote) = settlement_dirty_from_quote_overrides(bond, market, as_of)? else {
-        let base = risk_bond.value(market, as_of)?.amount();
-        return Ok((risk_bond, base));
-    };
-
     if let Some(oas) = bond.instrument_pricing_overrides.market_quotes.quoted_oas {
         clear_price_driving_overrides(&mut risk_bond);
         risk_bond
             .instrument_pricing_overrides
             .market_quotes
             .quoted_oas = Some(oas);
-        let base = risk_bond.value(market, as_of)?.amount();
+        let base =
+            context.reprice_instrument_raw(&risk_bond, context.curves.as_ref(), context.as_of)?;
         return Ok((risk_bond, base));
     }
 
-    let quote_ctx = QuoteDateContext::new(bond, market, as_of)?;
-    let clean_price_pct =
-        (dirty_at_quote - quote_ctx.accrued_at_quote_date) / bond.notional.amount() * 100.0;
-    let oas_bp = TreePricer::with_config(bond_tree_config(bond)?).calculate_oas(
-        bond,
-        market,
-        as_of,
-        clean_price_pct,
-    )?;
+    if !bond
+        .instrument_pricing_overrides
+        .market_quotes
+        .has_price_driver()
+    {
+        let base =
+            context.reprice_instrument_raw(&risk_bond, context.curves.as_ref(), context.as_of)?;
+        return Ok((risk_bond, base));
+    }
+
+    let oas_decimal =
+        super::price_yield_spread::oas::oas_decimal_from_quote_overrides(bond, context)?
+            .ok_or_else(|| {
+                finstack_quant_core::Error::internal(
+                    "bond option risk found a price-driving quote but could not resolve its OAS",
+                )
+            })?;
 
     clear_price_driving_overrides(&mut risk_bond);
     risk_bond
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_oas = Some(oas_bp / 10_000.0);
-    let base = risk_bond.value(market, as_of)?.amount();
+        .quoted_oas = Some(oas_decimal);
+    let base =
+        context.reprice_instrument_raw(&risk_bond, context.curves.as_ref(), context.as_of)?;
     Ok((risk_bond, base))
 }
 
@@ -156,15 +149,23 @@ pub(crate) fn option_risk_curve_id(bond: &Bond) -> CurveId {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec};
-    use crate::instruments::InstrumentPricingOverrides;
+    use crate::instruments::{BondRiskBasis, InstrumentPricingOverrides, PricingOptions};
     use crate::metrics::{standard_registry, MetricContext, MetricId};
+    use crate::pricer::{
+        expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingDispatch,
+        PricingError,
+    };
+    use crate::results::ValuationResult;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
-    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use time::Month;
 
@@ -234,6 +235,78 @@ mod tests {
         bond
     }
 
+    fn test_context(
+        bond: &Bond,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> MetricContext {
+        let base = bond.value(market, as_of).expect("base bond value");
+        MetricContext::new(
+            Arc::new(bond.clone()),
+            Arc::new(market.clone()),
+            as_of,
+            base,
+            MetricContext::default_config(),
+        )
+    }
+
+    struct CurveSensitiveTreePricer {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl CurveSensitiveTreePricer {
+        fn price(
+            &self,
+            instrument: &dyn Instrument,
+            market: &MarketContext,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> f64 {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            let bond = expect_inst::<Bond>(instrument, InstrumentType::Bond)
+                .expect("effective-risk test pricer expects a bond");
+            let discount = market
+                .get_discount(bond.discount_curve_id.as_str())
+                .expect("test discount curve");
+            let df = discount
+                .df_between_dates(as_of, bond.maturity)
+                .expect("test discount factor");
+            let oas = bond
+                .instrument_pricing_overrides
+                .market_quotes
+                .quoted_oas
+                .expect("effective-risk clone must retain OAS");
+            bond.notional.amount() * df * (-oas * 5.0).exp()
+        }
+    }
+
+    impl Pricer for CurveSensitiveTreePricer {
+        fn key(&self) -> PricerKey {
+            PricerKey::new(InstrumentType::Bond, ModelKey::Tree)
+        }
+
+        fn price_dyn(
+            &self,
+            instrument: &dyn Instrument,
+            market: &MarketContext,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> std::result::Result<ValuationResult, PricingError> {
+            Ok(ValuationResult::stamped(
+                instrument.id(),
+                as_of,
+                Money::new(self.price(instrument, market, as_of), Currency::USD),
+            ))
+        }
+
+        fn price_raw_dyn(
+            &self,
+            instrument: &dyn Instrument,
+            market: &MarketContext,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> std::result::Result<f64, PricingError> {
+            Ok(self.price(instrument, market, as_of))
+        }
+    }
+
     /// Item 10 regression: effective duration/convexity must put all three
     /// prices (base, up, down) on a single valuation date.
     ///
@@ -288,13 +361,13 @@ mod tests {
         bond.call_put = Some(schedule);
 
         let shock_bp = 25.0;
-        let result = effective_duration_convexity(&bond, &market, as_of, Some(shock_bp))
+        let context = test_context(&bond, &market, as_of);
+        let result = effective_duration_convexity(&bond, &context, Some(shock_bp))
             .expect("effective duration/convexity");
 
         // Reconstruct the expected finite difference with all three prices on
         // the single `as_of` valuation date.
-        let (risk_bond, _) =
-            option_risk_bond_and_base_price(&bond, &market, as_of).expect("risk bond");
+        let (risk_bond, _) = option_risk_bond_and_base_price(&bond, &context).expect("risk bond");
         let curve_id = option_risk_curve_id(&risk_bond);
         let market_up = market
             .bump([MarketBump::Curve {
@@ -335,10 +408,9 @@ mod tests {
         );
     }
 
-    /// Item 10 regression for the OAS-quote path: with a settlement lag, the
-    /// `quoted_oas` inversion (`price_from_oas`) anchors at `quote_date`, while
-    /// the bumped legs reprice at `as_of`. Effective duration/convexity must
-    /// still place all three prices on the single `as_of` valuation date.
+    /// Item 10 regression for the OAS-quote path: even with a settlement lag,
+    /// direct quoted-OAS valuation and both bumped legs must place all three
+    /// prices on the single `as_of` valuation date.
     #[test]
     fn effective_duration_uses_single_valuation_date_oas_quote() {
         use crate::instruments::fixed_income::bond::BondSettlementConvention;
@@ -383,11 +455,11 @@ mod tests {
         bond.call_put = Some(schedule);
 
         let shock_bp = 25.0;
-        let result = effective_duration_convexity(&bond, &market, as_of, Some(shock_bp))
+        let context = test_context(&bond, &market, as_of);
+        let result = effective_duration_convexity(&bond, &context, Some(shock_bp))
             .expect("effective duration/convexity");
 
-        let (risk_bond, _) =
-            option_risk_bond_and_base_price(&bond, &market, as_of).expect("risk bond");
+        let (risk_bond, _) = option_risk_bond_and_base_price(&bond, &context).expect("risk bond");
         let curve_id = option_risk_curve_id(&risk_bond);
         let market_up = market
             .bump([MarketBump::Curve {
@@ -417,14 +489,70 @@ mod tests {
     }
 
     #[test]
+    fn quoted_oas_risk_does_not_preprice_after_the_final_cashflow() {
+        use crate::instruments::fixed_income::bond::BondSettlementConvention;
+
+        let as_of = finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, 1)
+            .expect("valid valuation date");
+        let maturity = as_of + time::Duration::days(1);
+        let mut overrides = InstrumentPricingOverrides::default()
+            .with_quoted_oas(0.005)
+            .with_tree_steps(1)
+            .with_mc_paths(8);
+        overrides.model_config.hw1f_sigma = Some(0.01);
+        overrides.model_config.hazard_volatility = Some(0.01);
+        let mut bond = Bond::builder()
+            .id("CALLABLE-OAS-AFTER-FINAL-CASH".into())
+            .notional(Money::new(1_000.0, Currency::USD))
+            .issue_date(as_of - time::Duration::days(365))
+            .maturity(maturity)
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .credit_curve_id_opt(Some(CurveId::new("ACME-HZD")))
+            .instrument_pricing_overrides(overrides)
+            .settlement_convention_opt(Some(BondSettlementConvention {
+                settlement_days: 3,
+                ..Default::default()
+            }))
+            .attributes(Default::default())
+            .build()
+            .expect("valid bond");
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: maturity,
+                end_date: maturity,
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+        let market = test_market(as_of)
+            .insert(HazardCurve::flat("ACME-HZD", as_of, 0.02, 0.4).expect("hazard curve"));
+
+        let context = test_context(&bond, &market, as_of);
+        let (risk_bond, base) = option_risk_bond_and_base_price(&bond, &context)
+            .expect("quoted OAS risk setup must not invoke an unused post-maturity kernel");
+        let direct = risk_bond
+            .value(&market, as_of)
+            .expect("direct as-of price")
+            .amount();
+        assert!(base > 0.0);
+        assert_eq!(base, direct);
+    }
+
+    #[test]
     fn bullet_effective_duration_matches_modified() {
         let as_of = finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, 1)
             .expect("ok");
         let market = test_market(as_of);
         let bond = bullet_bond(as_of);
 
-        let eff = effective_duration_convexity(&bond, &market, as_of, Some(25.0))
-            .expect("effective calc");
+        let risk_context = test_context(&bond, &market, as_of);
+        let eff =
+            effective_duration_convexity(&bond, &risk_context, Some(25.0)).expect("effective calc");
 
         // Compute modified duration via the metrics registry
         let base_pv = bond.value(&market, as_of).expect("value");
@@ -473,11 +601,13 @@ mod tests {
 
         let bullet = bullet_bond(as_of);
         let callable = callable_bond(as_of);
+        let bullet_context = test_context(&bullet, &market, as_of);
+        let callable_context = test_context(&callable, &market, as_of);
 
         let eff_bullet =
-            effective_duration(&bullet, &market, as_of, Some(25.0)).expect("bullet eff dur");
+            effective_duration(&bullet, &bullet_context, Some(25.0)).expect("bullet eff dur");
         let eff_callable =
-            effective_duration(&callable, &market, as_of, Some(25.0)).expect("callable eff dur");
+            effective_duration(&callable, &callable_context, Some(25.0)).expect("callable eff dur");
 
         // Callable bond effective duration <= bullet (call caps upside)
         assert!(
@@ -496,11 +626,13 @@ mod tests {
 
         let bullet = bullet_bond(as_of);
         let callable = callable_bond(as_of);
+        let bullet_context = test_context(&bullet, &market, as_of);
+        let callable_context = test_context(&callable, &market, as_of);
 
         let eff_bullet =
-            effective_duration_convexity(&bullet, &market, as_of, Some(25.0)).expect("bullet");
-        let eff_callable =
-            effective_duration_convexity(&callable, &market, as_of, Some(25.0)).expect("callable");
+            effective_duration_convexity(&bullet, &bullet_context, Some(25.0)).expect("bullet");
+        let eff_callable = effective_duration_convexity(&callable, &callable_context, Some(25.0))
+            .expect("callable");
 
         // Callable convexity should be lower (possibly negative) relative to bullet
         assert!(
@@ -509,5 +641,83 @@ mod tests {
             eff_callable.convexity,
             eff_bullet.convexity,
         );
+    }
+
+    #[test]
+    fn effective_risk_reprices_all_legs_through_selected_custom_model() {
+        let as_of = finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, 1)
+            .expect("valid date");
+        let market = test_market(as_of);
+        let mut bond = callable_bond(as_of);
+        bond.instrument_pricing_overrides.market_quotes.quoted_oas = Some(0.002);
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut registry = PricerRegistry::new();
+        registry
+            .register(CurveSensitiveTreePricer {
+                calls: Arc::clone(&calls),
+            })
+            .expect("unique custom pricer");
+        let mut context = MetricContext::new(
+            Arc::new(bond.clone()),
+            Arc::new(market),
+            as_of,
+            Money::new(900.0, Currency::USD),
+            MetricContext::default_config(),
+        );
+        context.set_pricer_dispatch(PricingDispatch::registered(
+            ModelKey::Tree,
+            Arc::new(registry),
+        ));
+
+        let result = effective_duration_convexity(&bond, &context, Some(25.0))
+            .expect("selected-model effective risk");
+        assert!(result.duration > 0.0);
+        assert!(result.convexity > 0.0);
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            3,
+            "base, up, and down must each use the selected registry pricer"
+        );
+    }
+
+    #[test]
+    fn callable_oas_metrics_requested_alone_preserve_selected_tree_dispatch() {
+        let as_of = finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, 1)
+            .expect("valid date");
+        let market = test_market(as_of);
+        let mut bond = callable_bond(as_of);
+        bond.instrument_pricing_overrides.market_quotes.quoted_oas = Some(0.002);
+        bond.metric_pricing_overrides = bond
+            .metric_pricing_overrides
+            .with_bond_risk_basis(BondRiskBasis::CallableOas);
+
+        for metric in [MetricId::DurationMod, MetricId::Convexity, MetricId::Dv01] {
+            let calls = Arc::new(AtomicUsize::new(0));
+            let mut registry = PricerRegistry::new();
+            registry
+                .register(CurveSensitiveTreePricer {
+                    calls: Arc::clone(&calls),
+                })
+                .expect("unique custom pricer");
+
+            let result = registry
+                .price_with_metrics(
+                    &bond,
+                    ModelKey::Tree,
+                    &market,
+                    as_of,
+                    std::slice::from_ref(&metric),
+                    PricingOptions::default(),
+                )
+                .expect("standalone callable-OAS metric");
+
+            assert!(result.measures[&metric].is_finite());
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                4,
+                "{metric} must use the selected Tree pricer for base, risk base, up, and down only"
+            );
+        }
     }
 }

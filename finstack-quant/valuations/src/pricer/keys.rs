@@ -314,6 +314,10 @@ impl std::str::FromStr for InstrumentType {
 /// - [`Tree`](Self::Tree): Binomial/trinomial lattice
 /// - [`HullWhite1F`](Self::HullWhite1F): Hull-White one-factor short rate
 ///
+/// ## Credit Models
+/// - [`HazardRate`](Self::HazardRate): Fractional-recovery hazard-rate pricing
+/// - [`RatesCredit`](Self::RatesCredit): Joint short-rate and hazard-rate pricing
+///
 /// ## Monte Carlo Models
 /// - [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation
 /// - [`MonteCarloHeston`](Self::MonteCarloHeston): Heston stochastic vol
@@ -374,8 +378,13 @@ pub enum ModelKey {
     HullWhite1F = 4,
     /// Hazard rate model for credit instruments.
     ///
-    /// Used for: CDS, CDS indices, credit risky bonds.
+    /// Used for: CDS, CDS indices, and non-callable credit-risky bonds.
     HazardRate = 5,
+    /// Joint short-rate and hazard-rate model for credit-risky bonds.
+    ///
+    /// Used for: callable, puttable, return-floor, and straight bonds whose
+    /// rates and credit dynamics must be valued on one calibrated path.
+    RatesCredit = 7,
     /// Bachelier (normal) model for rate options.
     ///
     /// Used for: inflation caps/floors, options on rates near zero.
@@ -514,6 +523,7 @@ impl ModelKey {
             ModelKey::Black76 => "black76",
             ModelKey::HullWhite1F => "hull_white_1f",
             ModelKey::HazardRate => "hazard_rate",
+            ModelKey::RatesCredit => "rates_credit",
             ModelKey::Normal => "normal",
             ModelKey::MonteCarloGBM => "monte_carlo_gbm",
             ModelKey::MonteCarloHeston => "monte_carlo_heston",

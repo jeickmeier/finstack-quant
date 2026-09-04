@@ -36,6 +36,7 @@
 //! floating PIK is rejected in that mode rather than misstating
 //! path-dependent principal.
 
+use crate::instruments::common_impl::pricing::rates_credit::build_rates_credit_targets;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::term_loan::TermLoan;
 use crate::instruments::pricing_overrides::resolve_rates_credit_config;
@@ -436,7 +437,7 @@ impl TermLoanValuator {
     ) -> Result<Vec<finstack_quant_models::trees::two_factor_rates_credit::NodeCoupon>> {
         use crate::instruments::common_impl::pricing::floating_reset_descriptors::{
             build_node_coupons, has_future_pik, params_from_spec, strips_index_constraints,
-            NodeCouponBuildInputs, SliceSnap,
+            NodeCouponBuildInputs,
         };
         use crate::instruments::fixed_income::term_loan::RateSpec;
 
@@ -472,7 +473,6 @@ impl TermLoanValuator {
                 time_steps: &self.time_steps,
                 day_count: disc.day_count(),
                 discount: disc.as_ref(),
-                snap: SliceSnap::Ceil,
                 strip_index_constraints: strips_index_constraints(float_spec),
             },
             |step| self.outstanding_at(step),
@@ -670,7 +670,15 @@ impl TermLoanTreePricer {
             // ModelConfig declares rather than a hard-coded pair.
             let cfg = resolve_rates_credit_config(&loan.instrument_pricing_overrides, steps)?;
             let mut tree = RatesCreditTree::new(cfg);
-            tree.calibrate(disc.as_ref(), hc.as_ref(), time_to_maturity)?;
+            let targets = build_rates_credit_targets(
+                disc.as_ref(),
+                hc.as_ref(),
+                origin,
+                loan.maturity,
+                time_to_maturity,
+                steps,
+            )?;
+            tree.calibrate(&targets)?;
 
             // Future floating resets re-fix off the rate node only when the
             // rate factor diffuses; deterministic-rate pricing keeps today's
@@ -782,7 +790,15 @@ impl TermLoanTreePricer {
         let rc_tree = if let Some(hc) = hazard_curve.as_ref() {
             let cfg = resolve_rates_credit_config(&loan.instrument_pricing_overrides, steps)?;
             let mut tree = RatesCreditTree::new(cfg);
-            tree.calibrate(disc.as_ref(), hc.as_ref(), time_to_maturity)?;
+            let targets = build_rates_credit_targets(
+                disc.as_ref(),
+                hc.as_ref(),
+                origin,
+                loan.maturity,
+                time_to_maturity,
+                steps,
+            )?;
+            tree.calibrate(&targets)?;
             Some(tree)
         } else {
             None

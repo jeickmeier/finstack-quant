@@ -22,7 +22,7 @@
 //! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
 use super::market_handle::JsMarket;
-use crate::utils::{to_js_err, to_js_error, to_js_value};
+use crate::utils::{to_js_err, to_js_error, to_js_value, to_js_value_with_bigints};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::results::ValuationResult;
@@ -62,11 +62,12 @@ pub(super) fn valuation_result_json(result: ValuationResult) -> Result<String, J
 ///
 /// The `price*` entry points return this rather than a JSON string so JS
 /// callers read `result.value.amount` / `result.measures.dv01` directly, the
-/// same way Python callers read `PyValuationResult` getters. Serialization
-/// goes through [`to_js_value`], whose JSON-compatible serializer emits plain
-/// objects for maps rather than ES2015 `Map`s.
+/// same way Python callers read `PyValuationResult` getters. It uses
+/// JSON-compatible map/object conventions while preserving every 64-bit
+/// integer as JavaScript `BigInt`. In particular, Monte Carlo seeds span the
+/// full `u64` range and cannot be narrowed to a JavaScript `number`.
 fn valuation_result_value(result: &ValuationResult) -> Result<JsValue, JsValue> {
-    to_js_value(result)
+    to_js_value_with_bigints(result)
 }
 
 pub(super) fn price_result_with_context(
@@ -230,10 +231,20 @@ pub fn bond_from_cashflows_json(
 ///
 /// Returns a plain JavaScript object (`instrument_id`, `as_of`, `value`,
 /// `measures`, `meta`, …) — the same document Python callers reach through
-/// `ValuationResult`. Pass it to `JSON.stringify` if a wire string is needed.
+/// `ValuationResult`.
 ///
 /// Omit `model` (or pass `"default"`) to use the instrument-native default
 /// model — matching the Python binding's `model="default"` default.
+/// For bonds, `"discounting"` is non-callable rates-only PV,
+/// `"hazard_rate"` is non-callable fractional recovery of par, `"tree"`
+/// values rates-only exercise rights, and `"rates_credit"` values joint
+/// rates-credit bonds including call, put, and return floors. When stochastic
+/// factors are configured under `"rates_credit"`, `result.details` is tagged
+/// `{ type: "monte_carlo", data: ... }` and reports the standard error, path
+/// counts, random seed, simulation time grid, and variance-reduction flags.
+/// That seed is a lossless JavaScript `BigInt`; callers serializing stochastic
+/// results must use a BigInt-aware replacer, for example
+/// `JSON.stringify(result, (_, value) => typeof value === "bigint" ? value.toString() : value)`.
 /// @param instrument_json - Required `finstack_quant.instrument/1` envelope.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -288,7 +299,9 @@ pub fn price_instrument(
 /// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
 ///
 /// `model` must be `"discounting"` or `"hazard_rate"`. Unsupported models or
-/// incompatible instrument types throw. For supported pairs, the envelope's
+/// incompatible instrument types throw. Hazard-rate export also rejects bonds
+/// with call, put, or return-floor rights because static rows cannot represent
+/// exercise-contingent value. For supported static-flow pairs, the envelope's
 /// `total_pv` matches the instrument's `base_value` within rounding.
 /// @param instrument_json - Required `finstack_quant.instrument/1` envelope.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -298,9 +311,10 @@ pub fn price_instrument(
 /// # Errors
 ///
 /// Throws a JavaScript exception if the instrument or market JSON or `asOf` is
-/// invalid, `model` is unsupported or incompatible with the instrument,
-/// required curves are missing, the schedule mixes currencies, canonical
-/// pricing fails, or the cash-flow envelope cannot be serialized.
+/// invalid, `model` is unsupported or incompatible with the instrument, a
+/// bond with embedded exercise rights is requested under a static cashflow
+/// model, required curves are missing, the schedule mixes currencies,
+/// canonical pricing fails, or the cash-flow envelope cannot be serialized.
 #[wasm_bindgen(js_name = instrumentCashflowsJson)]
 pub fn instrument_cashflows_json(
     instrument_json: &str,
@@ -352,8 +366,8 @@ pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
 ///
 /// The list is registry-derived rather than enum-derived, so it reflects real
 /// dispatch coverage: a model with no registered pricer is omitted. Returns a
-/// sorted array of canonical keys (`"discounting"`, `"black76"`, …) accepted by
-/// the `model` argument of `priceInstrument`.
+/// sorted array of canonical keys (`"discounting"`, `"rates_credit"`, …)
+/// accepted by the `model` argument of `priceInstrument`.
 ///
 /// # Errors
 ///
@@ -369,7 +383,9 @@ pub fn list_models() -> Result<JsValue, JsValue> {
 ///
 /// Returns a JSON object `{ instrument_type: [model_key, ...], ... }`. Only
 /// instrument types with at least one registered pricer appear, and each entry
-/// lists only the models that can actually price that instrument.
+/// lists only the models that can actually price that instrument. The
+/// `"bond"` entry includes `"discounting"`, `"hazard_rate"`, `"tree"`, and
+/// `"rates_credit"`.
 ///
 /// # Errors
 ///
@@ -406,7 +422,13 @@ pub fn listed_product_catalog(exchange: Option<String>) -> Result<JsValue, JsVal
 /// Price an instrument using a pre-parsed [`JsMarket`].
 ///
 /// Avoids the per-call market-parse overhead of `priceInstrument`. Returns the
-/// same plain JavaScript ValuationResult object.
+/// same plain JavaScript ValuationResult object. For bonds, `"discounting"`
+/// is non-callable rates-only PV, `"hazard_rate"` is non-callable fractional
+/// recovery of par, `"tree"` values rates-only exercise rights, and
+/// `"rates_credit"` values joint rates-credit bonds including call, put, and
+/// return floors. Stochastic `"rates_credit"` runs add tagged Monte Carlo diagnostics to
+/// `result.details`. Their `seed` is a lossless JavaScript `BigInt`, so
+/// `JSON.stringify` requires a BigInt-aware replacer.
 /// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
 /// @param market - Pre-parsed `Market` handle supplying curves, quotes, and FX data for this call.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -456,7 +478,9 @@ pub fn price_instrument_with_market(
     valuation_result_value(&result)
 }
 
-/// Per-flow cashflow envelope using a pre-parsed [`JsMarket`].
+/// Per-flow cashflow envelope using a pre-parsed [`JsMarket`]. Hazard-rate
+/// export rejects bonds with call, put, or return-floor rights because static
+/// rows cannot represent exercise-contingent value.
 /// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
 /// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -465,9 +489,10 @@ pub fn price_instrument_with_market(
 /// # Errors
 ///
 /// Throws a JavaScript exception if `instrumentJson` or `asOf` is invalid,
-/// `model` is unsupported or incompatible with the instrument, required curves
-/// are missing, the schedule mixes currencies, canonical pricing fails, or the
-/// cash-flow envelope cannot be serialized.
+/// `model` is unsupported or incompatible with the instrument, a bond with
+/// embedded exercise rights is requested under a static cashflow model,
+/// required curves are missing, the schedule mixes currencies, canonical
+/// pricing fails, or the cash-flow envelope cannot be serialized.
 #[wasm_bindgen(js_name = instrumentCashflowsWithMarketJson)]
 pub fn instrument_cashflows_with_market_json(
     instrument_json: &str,
@@ -518,6 +543,10 @@ mod tests {
         assert_eq!(
             finstack_quant_valuations::pricer::parse_model_key("hazard_rate").expect("ok"),
             finstack_quant_valuations::pricer::ModelKey::HazardRate
+        );
+        assert_eq!(
+            finstack_quant_valuations::pricer::parse_model_key("rates_credit").expect("ok"),
+            finstack_quant_valuations::pricer::ModelKey::RatesCredit
         );
         assert_eq!(
             finstack_quant_valuations::pricer::parse_model_key("normal").expect("ok"),

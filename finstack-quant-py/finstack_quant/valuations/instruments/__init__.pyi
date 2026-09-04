@@ -9,8 +9,9 @@ Inputs larger than 16 MiB raise ``ValueError`` before parsing.
 Examples
 --------
 >>> from finstack_quant.valuations.instruments import list_models, list_models_grouped
->>> ("discounting" in list_models(), "bond" in list_models_grouped())
-(True, True)
+>>> models = list_models_grouped()["bond"]
+>>> all(model in models for model in ("discounting", "hazard_rate", "tree", "rates_credit"))
+True
 
 """
 
@@ -697,7 +698,12 @@ class Bond:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         model : str, default "default"
-            Model key (``"discounting"``, ``"hazard_rate"``, ``"tree"``, ...).
+            Model key (``"discounting"``, ``"hazard_rate"``, ``"tree"``,
+            ``"rates_credit"``, ...). For bonds, ``"discounting"`` and
+            ``"hazard_rate"`` are non-callable rates-only and fractional-
+            recovery-of-par models;
+            ``"tree"`` values rates-only rights; ``"rates_credit"`` values
+            call, put, and return-floor rights jointly with credit risk.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
@@ -711,6 +717,8 @@ class Bond:
         -------
         ValuationResult
             Typed valuation envelope with price, currency and metrics.
+            Stochastic ``"rates_credit"`` pricing includes Monte Carlo
+            convergence and reproducibility diagnostics in ``details``.
 
         Raises
         ------
@@ -741,7 +749,12 @@ class Bond:
         metric_id : str
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
-            Model key.
+            ``"default"`` uses the bond-native selection. Explicit keys are
+            ``"discounting"`` for non-callable rates-only PV,
+            ``"hazard_rate"`` for non-callable fractional recovery of par,
+            ``"tree"`` for rates-only exercise rights, and ``"rates_credit"``
+            for joint rates-credit valuation including call, put, and
+            return-floor rights.
 
         Returns
         -------
@@ -925,12 +938,12 @@ class Bond:
     @property
     def credit_curve_id(self) -> str | None:
         """
-        Hazard curve identifier for credit-risky (``hazard_rate``) pricing.
+        Hazard curve identifier for ``hazard_rate`` and ``rates_credit`` pricing.
 
         Returns
         -------
         str | None
-            Curve id, or ``None`` when the bond is priced risk-free.
+            Curve id, or ``None`` when no credit-consuming model is configured.
 
         Notes
         -----
@@ -1356,12 +1369,12 @@ class BondBuilder:
         ...
     def credit_curve_id(self, value: str) -> BondBuilder:
         """
-        Set the hazard curve identifier for ``hazard_rate`` pricing.
+        Set the hazard curve identifier for ``hazard_rate`` and ``rates_credit`` pricing.
 
         Parameters
         ----------
         value : str
-            Hazard curve identifier for ``hazard_rate`` pricing.
+            Hazard curve identifier for scalar or joint rates-credit pricing.
 
         Returns
         -------
@@ -18163,8 +18176,12 @@ def price_instrument(
     model : str, default "default"
         Model key: ``"default"`` (the instrument's registered default),
         ``"discounting"``, ``"black76"``, ``"hazard_rate"``,
-        ``"hull_white_1f"``, ``"tree"``, ``"normal"``, ... — see
-        :func:`list_models_grouped`.
+        ``"hull_white_1f"``, ``"tree"``, ``"rates_credit"``, ``"normal"``,
+        ... — see :func:`list_models_grouped`. For bonds, ``"discounting"`` is
+        non-callable rates-only PV, ``"hazard_rate"`` is non-callable
+        fractional recovery of par,
+        ``"tree"`` values rates-only exercise rights, and ``"rates_credit"``
+        values joint rates-credit bonds including call, put, and return floors.
     metrics : list[str] or None, default None
         Metric IDs to compute, such as ``"ytm"``, ``"dv01"``,
         ``"duration_mod"``, ``"z_spread"``, ``"pv01"``, ``"bucketed_dv01"``,
@@ -18186,7 +18203,9 @@ def price_instrument(
     Returns
     -------
     ValuationResult
-        Typed valuation envelope including the requested metric values.
+        Typed valuation envelope including the requested metric values. A
+        stochastic ``"rates_credit"`` bond result also carries Monte Carlo
+        convergence and reproducibility diagnostics in ``details``.
 
     Raises
     ------
@@ -18207,6 +18226,18 @@ def price_instrument(
 
     Notes
     -----
+    When stochastic rate or credit factors are configured for a
+    ``"rates_credit"`` bond, ``result.details`` is tagged
+    ``{"type": "monte_carlo", "data": ...}``. Its data contains the
+    sampling-only standard error, configured independent exercise-policy paths
+    (``training_paths``), configured independent make-whole-reference paths
+    (``make_whole_training_paths``), the corresponding simulated-path counts
+    including antithetic partners, independent estimator paths and their total
+    simulated count, random seed, simulation time grid, and variance-reduction
+    flags. The standard error measures pricing-path sampling
+    uncertainty under the frozen fitted exercise policy and excludes regression
+    approximation, time-grid discretization, and model error.
+
     The wire payload is still one call away: ``result.to_json()`` returns the
     JSON that :meth:`ValuationResult.from_json` accepts, for pipelines that
     serialize results.
@@ -18249,6 +18280,9 @@ def instrument_cashflows_json(
     """
     Per-flow cashflow envelope for a discountable instrument.
 
+    Hazard-rate export rejects bonds with call, put, or return-floor rights
+    because static rows cannot represent their exercise-contingent value.
+
     Parameters
     ----------
     instrument : str or Bond or TermLoan or InterestRateSwap or Swaption or CapFloor or CreditDefaultSwap or CDSIndex or FxForward or FxOption or CDSTranche or ConvertibleBond or EquityOption or StructuredCredit or CompositeInstrument
@@ -18274,7 +18308,8 @@ def instrument_cashflows_json(
         from ``market``.
     ValueError
         If ``model`` is unsupported, the instrument/model pair is not
-        registered for cashflow export, or a payload is malformed.
+        registered for cashflow export, a bond with embedded exercise rights
+        is requested under a static cashflow model, or a payload is malformed.
     RuntimeError
         If the pricer fails numerically.
 
@@ -18313,7 +18348,7 @@ def list_models() -> list[str]:
     Returns
     -------
     list[str]
-        Canonical model keys such as ``"discounting"`` or ``"black76"``,
+        Canonical model keys such as ``"discounting"`` or ``"rates_credit"``,
         deduplicated and sorted.
 
     Notes
@@ -18324,8 +18359,8 @@ def list_models() -> list[str]:
     --------
     >>> from finstack_quant.valuations.instruments import list_models
     >>> models = list_models()
-    >>> (len(models), "discounting" in models, "black76" in models)
-    (28, True, True)
+    >>> all(model in models for model in ("discounting", "hazard_rate", "tree", "rates_credit"))
+    True
     """
     ...
 
@@ -18349,8 +18384,8 @@ def list_models_grouped() -> dict[str, list[str]]:
     --------
     >>> from finstack_quant.valuations.instruments import list_models_grouped
     >>> grouped = list_models_grouped()
-    >>> ("bond" in grouped, "discounting" in grouped["bond"])
-    (True, True)
+    >>> set(("discounting", "hazard_rate", "tree", "rates_credit")).issubset(grouped["bond"])
+    True
     """
     ...
 

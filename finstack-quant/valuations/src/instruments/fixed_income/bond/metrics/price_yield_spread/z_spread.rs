@@ -264,13 +264,18 @@ impl BondZSpreadPricingKernel {
     ) -> finstack_quant_core::Result<Self> {
         let quote_ctx = QuoteDateContext::new(bond, curves, as_of)?;
         let flows = quote_ctx.entitled_flows(bond, curves, as_of)?;
-        let (spread_flows, quote_date) = if let Some((_, workout_flows, workout_quote_date)) =
-            crate::instruments::fixed_income::bond::metrics::quoted_workout_path(
-                bond, curves, as_of, &flows,
-            )? {
-            (workout_flows, workout_quote_date)
-        } else {
-            (flows, quote_ctx.quote_date)
+        let workout = crate::instruments::fixed_income::bond::metrics::quoted_workout_path(
+            bond, curves, as_of, &flows,
+        )?;
+        let (spread_flows, quote_date) = match workout {
+            Some((_, workout_flows, workout_quote_date)) => (workout_flows, workout_quote_date),
+            None if bond.has_exercise_rights() => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Z-spread pricing for option-bearing bond '{}' requires an explicit quoted clean price to select a workout path; use OAS for model-based optional pricing",
+                    bond.id.as_str()
+                )));
+            }
+            None => (flows, quote_ctx.quote_date),
         };
         let disc = curves.get_discount(&bond.discount_curve_id)?;
         let day_count = disc.day_count();

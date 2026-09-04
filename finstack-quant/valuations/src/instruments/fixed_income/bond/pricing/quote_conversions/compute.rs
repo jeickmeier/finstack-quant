@@ -3,12 +3,14 @@ use super::spread_price::{
     price_from_z_spread,
 };
 use super::types::{BondQuoteInput, BondQuoteSet};
-use super::yield_price::{price_from_japanese_simple_yield, price_from_ytm};
+use super::yield_price::{price_from_japanese_simple_yield, price_from_ytm, price_from_ytw};
 use crate::constants::numerical::ZERO_TOLERANCE;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::fixed_income::bond::Bond;
-use crate::metrics::{standard_registry, MetricContext, MetricId, MetricRegistry};
+use crate::instruments::PricingOptions;
+use crate::metrics::{standard_registry, MetricContext, MetricId};
+use crate::pricer::{shared_standard_registry, ModelKey, PricingDispatch};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
@@ -37,7 +39,8 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 /// - Normalizes the chosen `quote_input` into a **canonical dirty price in currency**.
 /// - Derives the corresponding clean price (% of par) and stamps it into
 ///   `pricing_overrides.quoted_clean_price` on an internal bond clone.
-/// - Uses the standard metrics registry to compute the remaining metrics.
+/// - Uses the selected pricing and metric registries to compute the remaining
+///   metrics.
 ///
 /// # Arguments
 ///
@@ -50,6 +53,10 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 ///   interest and clean/dirty conversion are determined.
 /// * `quote_input` - One observed clean/dirty price, yield, or spread quote
 ///   used to seed the internally consistent quote set.
+/// * `options` - Pricing model, pricer registry, metric registry, configuration,
+///   market history, and recalibration provider used by the quote conversion
+///   and every downstream metric reprice. When no model is supplied, the
+///   bond's default model is used.
 ///
 /// # Returns
 ///
@@ -57,10 +64,10 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 ///
 /// # Errors
 ///
-/// Returns `Err` when:
-/// - Market curves are missing
-/// - Cashflow schedule building fails
-/// - Metric calculations fail
+/// Returns `Err` when the input quote cannot be normalized, required market
+/// data or cashflows are unavailable for that normalization, or the selected
+/// model cannot produce the base value. Metrics that do not apply to the bond
+/// are left unset in the returned quote set.
 ///
 /// # Examples
 ///
@@ -79,7 +86,14 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 /// #         .knots([(0.0, 1.0), (10.0, 0.6)])
 /// #         .build()?,
 /// # );
-/// let quotes = compute_quotes(&bond, &curves, as_of, BondQuoteInput::CleanPricePct(98.5))?;
+/// let quotes = compute_quotes(
+///     &bond,
+///     &curves,
+///     as_of,
+///     BondQuoteInput::CleanPricePct(98.5),
+///     finstack_quant_valuations::instruments::PricingOptions::default()
+///         .with_model(finstack_quant_valuations::pricer::ModelKey::Discounting),
+/// )?;
 /// assert_eq!(quotes.clean_price_pct, 98.5);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -88,7 +102,15 @@ pub fn compute_quotes(
     curves: &MarketContext,
     as_of: Date,
     quote_input: BondQuoteInput,
+    options: PricingOptions,
 ) -> Result<BondQuoteSet> {
+    let model = options.model.unwrap_or_else(|| bond.default_model());
+    let pricer_registry = options
+        .registry
+        .clone()
+        .unwrap_or_else(shared_standard_registry);
+    let pricing_dispatch = PricingDispatch::registered(model, Arc::clone(&pricer_registry));
+
     // Work on a local clone so we never mutate the caller's bond instance.
     let mut bond_for_metrics = bond.clone();
 
@@ -137,14 +159,18 @@ pub fn compute_quotes(
     }
     bond_for_metrics.validate()?;
 
-    let dirty_price_currency =
-        settlement_dirty_from_quote_overrides(&bond_for_metrics, curves, as_of)?.ok_or_else(
-            || {
-                finstack_quant_core::Error::Validation(
-                    "bond quote input did not produce a settlement dirty price".to_string(),
-                )
-            },
-        )?;
+    let dirty_price_currency = settlement_dirty_from_quote_overrides(
+        &bond_for_metrics,
+        curves,
+        as_of,
+        model,
+        Some(&pricing_dispatch),
+    )?
+    .ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "bond quote input did not produce a settlement dirty price".to_string(),
+        )
+    })?;
     let clean_price_currency = dirty_price_currency - accrued_currency;
     let clean_price_pct = clean_price_currency / notional * 100.0;
 
@@ -158,9 +184,15 @@ pub fn compute_quotes(
         .market_quotes
         .quoted_clean_price = Some(clean_price_pct);
 
-    // 2) Build metric context and use the standard registry for the rest.
-    let base_value = bond_for_metrics.value(curves, as_of)?;
-    let registry: MetricRegistry = standard_registry().clone();
+    // 2) Build metric context with the same model and registries for the rest.
+    let base_value = finstack_quant_core::money::Money::new(
+        pricing_dispatch.price_raw(&bond_for_metrics, curves, as_of)?,
+        bond_for_metrics.notional.currency(),
+    );
+    let metric_registry = match options.metric_registry.as_deref() {
+        Some(registry) => registry,
+        None => standard_registry(),
+    };
 
     let instrument_arc: Arc<dyn Instrument> = Arc::new(bond_for_metrics.clone());
     let curves_arc = Arc::new(curves.clone());
@@ -169,8 +201,19 @@ pub fn compute_quotes(
         curves_arc,
         as_of,
         base_value,
-        MetricContext::default_config(),
+        options
+            .config
+            .clone()
+            .unwrap_or_else(MetricContext::default_config),
     );
+    if let Some(history) = options.market_history.clone() {
+        ctx = ctx.with_market_history(history);
+    }
+    ctx.set_recalibration_provider(options.recalibration_provider.clone());
+    ctx.set_pricer_dispatch(pricing_dispatch);
+    ctx.set_instrument_overrides(bond_for_metrics.get_instrument_pricing_overrides().cloned());
+    ctx.set_metric_overrides(bond_for_metrics.get_metric_pricing_overrides().cloned());
+    bond_for_metrics.seed_metric_context(&mut ctx, curves, as_of);
     ctx.notional = Some(bond_for_metrics.notional);
 
     // Pre-populate accrued since we've already computed it.
@@ -194,7 +237,7 @@ pub fn compute_quotes(
     // and we want `compute_quotes` to return whatever is available rather than
     // failing the entire quote set.
     for metric_id in &metric_ids {
-        if let Err(err) = registry.compute(std::slice::from_ref(metric_id), &mut ctx) {
+        if let Err(err) = metric_registry.compute(std::slice::from_ref(metric_id), &mut ctx) {
             tracing::debug!(
                 metric_id = metric_id.as_str(),
                 error = %err,
@@ -239,11 +282,18 @@ pub fn compute_quotes(
 /// an `as_of` NPV must use
 /// [`crate::instruments::fixed_income::bond::pricing::settlement::quote_dirty_at_as_of`].
 ///
+/// `model` identifies the bond model for the native fallback. When
+/// `pricing_dispatch` is present, OAS quotes are priced through that dispatch
+/// so custom pricer registries remain authoritative; other quote forms retain
+/// their market-convention inversion helpers.
+///
 /// Returns `Ok(None)` when no price-driving override is configured.
 pub(crate) fn settlement_dirty_from_quote_overrides(
     bond: &Bond,
     curves: &MarketContext,
     as_of: Date,
+    model: ModelKey,
+    pricing_dispatch: Option<&PricingDispatch>,
 ) -> Result<Option<f64>> {
     let quotes = &bond.instrument_pricing_overrides.market_quotes;
     quotes.validate()?;
@@ -261,14 +311,14 @@ pub(crate) fn settlement_dirty_from_quote_overrides(
         let flows = quote_ctx.entitled_flows(bond, curves, as_of)?;
         price_from_ytm(bond, &flows, quote_ctx.quote_date, ytm)?
     } else if let Some(ytw) = quotes.quoted_ytw {
-        // For non-callable bonds, YTW == YTM. Exercise-aware callable pricing
-        // must use OAS rather than treating YTW as a path model.
-        let flows = quote_ctx.entitled_flows(bond, curves, as_of)?;
-        price_from_ytm(bond, &flows, quote_ctx.quote_date, ytw)?
+        price_from_ytw(bond, curves, as_of, ytw)?
     } else if let Some(z) = quotes.quoted_z_spread {
         price_from_z_spread(bond, curves, as_of, z)?
     } else if let Some(oas) = quotes.quoted_oas {
-        price_from_oas(bond, curves, quote_ctx.quote_date, oas)?
+        match pricing_dispatch {
+            Some(dispatch) => dispatch.price_raw(bond, curves, quote_ctx.quote_date)?,
+            None => price_from_oas(bond, curves, quote_ctx.quote_date, model, oas)?,
+        }
     } else if let Some(dm) = quotes.quoted_discount_margin {
         price_from_dm(bond, curves, quote_ctx.quote_date, dm)?
     } else if let Some(i_spread) = quotes.quoted_i_spread {

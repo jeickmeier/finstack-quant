@@ -5,10 +5,9 @@
 //! [`lower_return_floor`], which compiles a [`ReturnFloorSpec`] into a concrete
 //! [`CallPutSchedule`], and the MOIC/XIRR metrics.
 //!
-//! Floating-rate caveat (v1): cumulative coupons are forward-projected off the
-//! forward curve, which ignores the correlation between the realized rate path
-//! and when the floor binds. This is an approximation; the path-exact treatment
-//! is the deferred v2 Longstaff-Schwartz Monte Carlo payoff.
+//! Deterministic pricing lowers the floor onto every protected calendar date.
+//! Stochastic rates-credit pricing keeps the specification intact and evaluates
+//! its cumulative-distribution state on each simulated path.
 
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -17,6 +16,7 @@ use crate::cashflow::primitives::CFKind;
 use crate::instruments::fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorKind, ReturnFloorSpec,
 };
+use std::collections::{BTreeMap, BTreeSet};
 
 /// One candidate redemption date with the cash paid at it and the running state.
 #[derive(Clone, Copy, Debug)]
@@ -28,7 +28,7 @@ pub(crate) struct DistPoint {
     pub coupon: f64,
     /// Cumulative cash distributions paid strictly BEFORE this date, since issue.
     pub cum_before: f64,
-    /// Outstanding principal at this date (initial notional minus amortization since issue).
+    /// Outstanding principal after all same-date balance events are replayed.
     pub outstanding: f64,
 }
 
@@ -41,19 +41,15 @@ pub(crate) struct DistPoint {
 /// | CFKind                    | Treatment              |
 /// |---------------------------|------------------------|
 /// | `Fixed`, `FloatReset`, `Stub` | Cash coupon (counted) |
-/// | `Amortization`            | Cash + reduces outstanding |
-/// | `Notional`                | Excluded (final redemption / initial exchange) |
-/// | `PIK`                     | Excluded (non-cash)    |
-/// | Everything else           | Excluded               |
+/// | `Amortization`            | Cash; reduces outstanding |
+/// | `Notional`                | Excluded from cash; draws/repayments change outstanding |
+/// | `PIK`                     | Excluded from cash; increases outstanding |
+/// | Everything else           | Excluded from cash and balance |
 ///
-/// This classification is a deliberate, conservative v1 simplification. Only
-/// standard bond cash kinds are counted (`Fixed`/`FloatReset`/`Stub` coupons and
-/// `Amortization`). `Notional` (final redemption — the quantity the floor itself
-/// adjusts), `PIK` (non-cash), and any fee/inflation/prepayment kinds that a
-/// non-standard `custom_cashflows` schedule might carry are NOT counted.
-/// Dropping a real cash distribution is conservative for a MOIC/XIRR floor: it
-/// raises the required redemption, so the investor still clears the target. Do
-/// not "fix" this without accounting for that bias direction.
+/// Holder distributions remain limited to standard cash coupons and
+/// amortization. Principal is independently sourced from the schedule's
+/// canonical balance replay, so historical PIK, draws, and repayments are all
+/// reflected even when they are not holder cash distributions.
 ///
 /// The floor is an issuer-side term, so `anchor` should be the bond's issue
 /// date. Floating coupons are forward-projected via `full_cashflow_schedule`.
@@ -67,6 +63,7 @@ pub(crate) fn realized_distributions(
     anchor: Date,
 ) -> finstack_quant_core::Result<Vec<DistPoint>> {
     let schedule = bond.full_cashflow_schedule(curves)?;
+    let outstanding_by_date = schedule.outstanding_by_date()?;
     let initial = bond.notional.amount();
 
     // Sort defensively; schedule is usually already ordered. `schedule` is an
@@ -77,8 +74,8 @@ pub(crate) fn realized_distributions(
     let mut points: Vec<DistPoint> = Vec::new();
     // Cash paid strictly before the current date group, since `anchor`.
     let mut cum_before = 0.0_f64;
-    // Sum of amortization since issue (drives outstanding principal).
-    let mut amortized = 0.0_f64;
+    let mut outstanding = initial;
+    let mut outstanding_index = 0;
 
     let mut i = 0;
     while i < flows.len() {
@@ -92,10 +89,10 @@ pub(crate) fn realized_distributions(
             let cf = &flows[j];
             match cf.kind {
                 CFKind::Fixed | CFKind::FloatReset | CFKind::Stub => {
-                    coupon_at_d += cf.amount.amount().abs();
+                    coupon_at_d += cf.amount.amount().max(0.0);
                 }
                 CFKind::Amortization => {
-                    amort_at_d += cf.amount.amount().abs();
+                    amort_at_d += cf.amount.amount().max(0.0);
                 }
                 // Notional redemptions (initial or final), PIK (non-cash),
                 // fees, margin flows, etc. — excluded from distributions.
@@ -104,14 +101,24 @@ pub(crate) fn realized_distributions(
             j += 1;
         }
 
-        // Only record dates strictly after the anchor (issue date).
+        let outstanding_before = outstanding;
+        while outstanding_index < outstanding_by_date.len()
+            && outstanding_by_date[outstanding_index].0 <= d
+        {
+            outstanding = outstanding_by_date[outstanding_index].1.amount();
+            outstanding_index += 1;
+        }
+        let balance_changed = (outstanding - outstanding_before).abs() > f64::EPSILON;
+
+        // Record cash-distribution dates and non-cash balance events. Pure PIK
+        // dates therefore carry the seasoned outstanding state with zero cash.
         let cash_at_d = coupon_at_d + amort_at_d;
-        if d > anchor && (coupon_at_d > 0.0 || amort_at_d > 0.0) {
+        if d > anchor && (cash_at_d > 0.0 || balance_changed) {
             points.push(DistPoint {
                 date: d,
                 coupon: cash_at_d,
                 cum_before,
-                outstanding: initial - amortized,
+                outstanding,
             });
         }
 
@@ -120,7 +127,6 @@ pub(crate) fn realized_distributions(
         if d > anchor {
             cum_before += cash_at_d;
         }
-        amortized += amort_at_d;
         i = j;
     }
 
@@ -129,18 +135,9 @@ pub(crate) fn realized_distributions(
 
 // ── Return-floor lowering ─────────────────────────────────────────────────────
 
-/// Return `true` when `d` falls inside the protection window.
-fn in_window(window: &ProtectionWindow, d: Date, issue: Date, maturity: Date) -> bool {
-    match window {
-        ProtectionWindow::Full => d > issue && d < maturity,
-        ProtectionWindow::From(start) => d >= *start && d < maturity,
-        ProtectionWindow::Between { start, end } => d >= *start && d <= *end,
-    }
-}
-
 /// Lower a [`ReturnFloorSpec`] into a [`CallPutSchedule`].
 ///
-/// For each coupon date that falls inside the protection window and on or after
+/// For each calendar date that falls inside the protection window and on or after
 /// `as_of`, the minimum redemption price is computed so the investor meets the
 /// target MOIC or XIRR (anchored at the bond's issue date and issue price).
 /// Any contractual call already on the bond is merged at shared dates (max
@@ -159,29 +156,27 @@ fn in_window(window: &ProtectionWindow, d: Date, issue: Date, maturity: Date) ->
 /// # MOIC floor
 ///
 /// ```text
-/// R(t) = m * V0 − cash_incl(t)
-/// price_pct(t) = 100 * max(R(t), contractual(t), 100) / outstanding(t)
+/// dirty_required(t) = m * V0 − cash_through(t)
+/// clean_redemption(t) = max(dirty_required(t) − accrued(t), contractual_clean(t), par(t))
 /// ```
 ///
 /// # XIRR floor
 ///
 /// ```text
-/// R(t) = (1 + r)^yf(issue, t) * [ V0 − Σ q.coupon / (1+r)^yf(issue, q.date) ]
-/// price_pct(t) = 100 * max(R(t), contractual(t), 100) / outstanding(t)
+/// dirty_required(t) = (1 + r)^yf(issue, t)
+///                     * [ V0 − Σ q.coupon / (1+r)^yf(issue, q.date) ]
+/// clean_redemption(t) = max(dirty_required(t) − accrued(t), contractual_clean(t), par(t))
 /// ```
 ///
-/// # Limitations
-///
-/// Composition with contractual **make-whole** calls is not supported in v1: a
-/// make-whole call's effective price can exceed the floor, so silently keeping
-/// only its `price_pct_of_par` would under-price it. If a make-whole call is
-/// active at any candidate date, this function returns an error rather than
-/// mis-price.
+/// The exercise engine adds `accrued(t)` exactly once to that clean
+/// redemption. Thus prior cash plus dirty exercise proceeds meets the return
+/// target exactly whenever the return floor, rather than par or a contractual
+/// call floor, is binding.
 ///
 /// # Errors
 ///
-/// Returns `Err` if the spec fails validation, if cashflow generation fails, or
-/// if a contractual make-whole call is active within the protection window.
+/// Returns `Err` if the spec fails validation, cashflow generation fails, date
+/// arithmetic fails, or the XIRR day-count calculation fails.
 pub(crate) fn lower_return_floor(
     bond: &Bond,
     spec: &ReturnFloorSpec,
@@ -191,7 +186,9 @@ pub(crate) fn lower_return_floor(
     spec.validate()?;
     let v0 = spec.issue_price.resolve(bond.notional)?;
     let issue = bond.issue_date;
-    let dist = realized_distributions(bond, curves, issue)?;
+    let schedule = bond.full_cashflow_schedule(curves)?;
+    let accrual_index =
+        crate::cashflow::accrual::AccrualIndex::build(&schedule, &bond.accrual_config())?;
     // The XIRR floor discounts on the same basis as the verification metric
     // (`core::cashflow::xirr`, Act/365F) so the guarantee holds exactly.
     let day_count = spec.day_count.unwrap_or(DayCount::Act365F);
@@ -199,6 +196,7 @@ pub(crate) fn lower_return_floor(
     // Resolve the kind once so the loop is a single O(N) pass. For XIRR we carry a
     // running PV of coupons discounted from issue, accumulated one date at a time,
     // rather than re-summing every prior coupon per candidate (which is O(N²)).
+    #[derive(Clone, Copy)]
     enum Target {
         Moic(f64),
         Xirr(f64),
@@ -208,66 +206,145 @@ pub(crate) fn lower_return_floor(
         ReturnFloorKind::Xirr(rate) => Target::Xirr(rate.as_decimal()),
     };
 
-    let mut calls: Vec<CallPut> = Vec::new();
-    // XIRR only: discounted coupons paid up to and including the current date.
-    let mut pv_coupons = 0.0_f64;
-
-    for p in &dist {
-        // Accumulate this date's discounted coupon BEFORE any skip — a later
-        // in-window candidate still earned the coupons paid on skipped dates.
-        let yf_p = if let Target::Xirr(rate) = target {
-            let yf = day_count.year_fraction(issue, p.date, DayCountContext::default())?;
-            pv_coupons += p.coupon / (1.0_f64 + rate).powf(yf);
-            yf
-        } else {
-            0.0
-        };
-
-        // Skip dates outside the protection window, before `as_of`, or with no
-        // outstanding principal (the last guards fully-amortized custom schedules).
-        if !in_window(&spec.window, p.date, issue, bond.maturity)
-            || p.date < as_of
-            || p.outstanding <= 0.0
-        {
+    let mut distributions = BTreeMap::<Date, f64>::new();
+    for flow in schedule.get_flows() {
+        if flow.date <= issue {
             continue;
         }
-
-        let r = match target {
-            // MOIC: redemption lifting cumulative cash to m * V0.
-            Target::Moic(m) => m * v0 - (p.cum_before + p.coupon),
-            // XIRR: redemption R such that NPV from issue at the target rate is zero.
-            Target::Xirr(rate) => (v0 - pv_coupons) * (1.0_f64 + rate).powf(yf_p),
-        };
-
-        // Merge with any contractual call active at this date. Make-whole calls
-        // are not supported in v1 (their effective price can exceed the floor).
-        let contractual = match bond.call_put.as_ref().and_then(|cp| {
-            cp.calls
-                .iter()
-                .find(|c| p.date >= c.start_date && p.date <= c.end_date)
-        }) {
-            Some(c) if c.make_whole.is_some() => {
-                return Err(finstack_quant_core::Error::Validation(
-                    "return floor composition with make-whole contractual calls is not \
-                     supported in v1; remove the make-whole or the return floor"
-                        .to_string(),
-                ));
-            }
-            Some(c) => Some(c.price_pct_of_par),
-            None => None,
-        };
-
-        // Floor redemption as % of outstanding; never below contractual or par.
-        let floor_pct = 100.0 * r / p.outstanding;
-        let price_pct = floor_pct.max(contractual.unwrap_or(100.0)).max(100.0);
-
-        calls.push(CallPut {
-            start_date: p.date,
-            end_date: p.date,
-            price_pct_of_par: price_pct,
-            make_whole: None,
-        });
+        if matches!(
+            flow.kind,
+            CFKind::Fixed | CFKind::FloatReset | CFKind::Stub | CFKind::Amortization
+        ) {
+            *distributions.entry(flow.date).or_default() += flow.amount.amount().max(0.0);
+        }
     }
+    let outstanding_by_date = schedule.outstanding_by_date()?;
+    let outstanding_on = |date: Date| {
+        let index = outstanding_by_date.partition_point(|(event_date, _)| *event_date <= date);
+        if index == 0 {
+            bond.notional.amount()
+        } else {
+            outstanding_by_date[index - 1].1.amount()
+        }
+        .max(0.0)
+    };
+
+    let first_life_date = issue.next_day().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "return-floor issue date has no representable following day".to_string(),
+        )
+    })?;
+    let last_life_date = bond.maturity.previous_day().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "return-floor maturity has no representable preceding day".to_string(),
+        )
+    })?;
+    let (window_start, window_end) = match spec.window {
+        ProtectionWindow::Full => (first_life_date, last_life_date),
+        ProtectionWindow::From(start) => (start.max(first_life_date), last_life_date),
+        ProtectionWindow::Between { start, end } => {
+            (start.max(first_life_date), end.min(last_life_date))
+        }
+    };
+    let candidate_start = window_start.max(as_of);
+    let mut floor_by_date = BTreeMap::<Date, f64>::new();
+    if candidate_start <= window_end {
+        let mut cash_through = distributions
+            .range(..candidate_start)
+            .map(|(_, amount)| *amount)
+            .sum::<f64>();
+        let mut pv_distributions = match target {
+            Target::Moic(_) => 0.0,
+            Target::Xirr(rate) => distributions
+                .range(..candidate_start)
+                .map(|(date, amount)| {
+                    day_count
+                        .year_fraction(issue, *date, DayCountContext::default())
+                        .map(|yf| *amount / (1.0 + rate).powf(yf))
+                })
+                .collect::<finstack_quant_core::Result<Vec<_>>>()?
+                .into_iter()
+                .sum(),
+        };
+
+        let mut date = candidate_start;
+        loop {
+            let distribution = distributions.get(&date).copied().unwrap_or(0.0);
+            cash_through += distribution;
+            let yf = day_count.year_fraction(issue, date, DayCountContext::default())?;
+            if let Target::Xirr(rate) = target {
+                pv_distributions += distribution / (1.0 + rate).powf(yf);
+            }
+            let outstanding = outstanding_on(date);
+            if outstanding > 0.0 {
+                let dirty_required = match target {
+                    Target::Moic(multiple) => multiple * v0 - cash_through,
+                    Target::Xirr(rate) => (v0 - pv_distributions) * (1.0 + rate).powf(yf),
+                };
+                // Call schedule percentages are clean redemption amounts.
+                // BondValuator adds accrued interest to the exercise barrier,
+                // so subtract it here to avoid paying accrued twice relative
+                // to the total-return target.
+                let accrued = accrual_index.accrued_at(date)?;
+                let clean_required = dirty_required - accrued;
+                floor_by_date.insert(date, (100.0 * clean_required / outstanding).max(100.0));
+            }
+            if date == window_end {
+                break;
+            }
+            date = date.next_day().ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "return-floor protection window exceeds the supported date range".to_string(),
+                )
+            })?;
+        }
+    }
+
+    // Expand contractual call windows once so each protected date can carry
+    // both the return floor and the original make-whole terms. Multiple active
+    // issuer rights remain separate; the exercise engine selects the cheapest
+    // effective call after applying the common floor to every right.
+    let mut calls = Vec::<CallPut>::new();
+    let mut contractual_dates = BTreeSet::<Date>::new();
+    if let Some(call_put) = &bond.call_put {
+        for call in &call_put.calls {
+            let mut date = call.start_date.max(as_of);
+            let end = call.end_date.min(bond.maturity);
+            while date <= end {
+                contractual_dates.insert(date);
+                calls.push(CallPut {
+                    start_date: date,
+                    end_date: date,
+                    price_pct_of_par: floor_by_date
+                        .get(&date)
+                        .copied()
+                        .map_or(call.price_pct_of_par, |floor| {
+                            floor.max(call.price_pct_of_par)
+                        }),
+                    make_whole: call.make_whole.clone(),
+                });
+                if date == end {
+                    break;
+                }
+                date = date.next_day().ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "contractual call window exceeds the supported date range".to_string(),
+                    )
+                })?;
+            }
+        }
+    }
+    for (date, floor_pct) in floor_by_date {
+        if !contractual_dates.contains(&date) {
+            calls.push(CallPut {
+                start_date: date,
+                end_date: date,
+                price_pct_of_par: floor_pct,
+                make_whole: None,
+            });
+        }
+    }
+    calls.sort_by_key(|call| (call.start_date, call.end_date));
 
     // Preserve any existing puts (contractual calls already folded into `calls`).
     let puts = bond
@@ -293,10 +370,6 @@ impl Bond {
         let mut clone = self.clone();
         if let Some(spec) = self.return_floor.as_ref() {
             let merged = lower_return_floor(self, spec, curves, as_of)?;
-            clone
-                .instrument_pricing_overrides
-                .market_quotes
-                .implied_volatility = Some(0.01);
             clone.call_put = Some(merged);
             clone.return_floor = None;
         }
@@ -334,11 +407,18 @@ mod tests {
         let curves = MarketContext::new();
         let dist = realized_distributions(&bond, &curves, date!(2024 - 01 - 15)).unwrap();
 
-        // Bullet: outstanding stays at notional until maturity — no amortization.
+        // Bullet: outstanding stays at notional until the terminal redemption.
         assert!(
-            dist.iter().all(|d| (d.outstanding - 100.0).abs() < 1e-6),
+            dist.iter()
+                .filter(|d| d.date < bond.maturity)
+                .all(|d| (d.outstanding - 100.0).abs() < 1e-6),
             "Expected outstanding == 100.0 for bullet; got: {:?}",
             dist.iter().map(|d| d.outstanding).collect::<Vec<_>>()
+        );
+        assert!(
+            dist.last()
+                .is_some_and(|point| point.date == bond.maturity && point.outstanding.abs() < 1e-6),
+            "terminal redemption must reduce outstanding to zero: {dist:?}"
         );
 
         // Cumulative-before-date is monotonically non-decreasing.
@@ -365,6 +445,76 @@ mod tests {
                 d.coupon
             );
         }
+    }
+
+    #[test]
+    fn seasoned_pik_and_amortization_follow_canonical_balance_path() {
+        use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule, Notional};
+        use crate::cashflow::primitives::CashFlow;
+
+        let issue = date!(2024 - 01 - 01);
+        let pik_date = date!(2024 - 07 - 01);
+        let negative_cash_date = date!(2024 - 10 - 01);
+        let amort_date = date!(2025 - 01 - 01);
+        let maturity = date!(2026 - 01 - 01);
+        let money = |amount| Money::new(amount, Currency::USD);
+        let schedule = CashFlowSchedule::from_parts(
+            vec![
+                CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
+                CashFlow::new(pik_date, None, money(50.0), CFKind::Pik, 0.0, None),
+                CashFlow::new(
+                    negative_cash_date,
+                    None,
+                    money(-25.0),
+                    CFKind::Fixed,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(amort_date, None, money(50.0), CFKind::Fixed, 0.0, None),
+                CashFlow::new(
+                    amort_date,
+                    None,
+                    money(200.0),
+                    CFKind::Amortization,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(maturity, None, money(850.0), CFKind::Notional, 0.0, None),
+            ],
+            Notional::par(1_000.0, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta {
+                issue_date: Some(issue),
+                maturity_date: Some(maturity),
+                ..CashFlowMeta::default()
+            },
+        );
+        let bond = Bond::from_cashflows("SEASONED-PIK-AMORT", schedule, "USD-OIS", None)
+            .expect("custom bond");
+
+        let dist = realized_distributions(&bond, &MarketContext::new(), issue)
+            .expect("realized distributions");
+        let pik = dist
+            .iter()
+            .find(|point| point.date == pik_date)
+            .expect("pure PIK balance event");
+        assert_eq!(pik.coupon, 0.0, "PIK is not a holder cash distribution");
+        assert_eq!(pik.outstanding, 1_050.0);
+        assert!(
+            dist.iter().all(|point| point.date != negative_cash_date),
+            "negative signed cash is not a holder-positive distribution"
+        );
+
+        let amort = dist
+            .iter()
+            .find(|point| point.date == amort_date)
+            .expect("amortization distribution");
+        assert_eq!(amort.coupon, 250.0);
+        assert_eq!(
+            amort.cum_before, 0.0,
+            "negative signed cash must not increase realized holder distributions"
+        );
+        assert_eq!(amort.outstanding, 850.0);
     }
 
     #[test]
@@ -395,7 +545,8 @@ mod tests {
 
     // ── lower_return_floor tests ──────────────────────────────────────────────
 
-    use crate::instruments::fixed_income::bond::ReturnFloorSpec;
+    use crate::instruments::fixed_income::bond::{MakeWholeSpec, ReturnFloorSpec};
+    use finstack_quant_core::types::CurveId;
 
     #[test]
     fn moic_floor_steps_down_to_par() {
@@ -460,6 +611,106 @@ mod tests {
     }
 
     #[test]
+    fn floor_is_exercisable_between_coupon_dates() {
+        let bond = fixed_10pct_bullet();
+        let curves = MarketContext::new();
+        let between_coupon_date = date!(2024 - 03 - 20);
+        let schedule = lower_return_floor(
+            &bond,
+            &ReturnFloorSpec::moic(1.25),
+            &curves,
+            date!(2024 - 01 - 15),
+        )
+        .unwrap();
+
+        let call = schedule
+            .calls
+            .iter()
+            .find(|call| call.start_date == between_coupon_date)
+            .expect("full protection window must include every calendar date");
+        assert_eq!(call.end_date, between_coupon_date);
+        let full_schedule = bond.full_cashflow_schedule(&curves).unwrap();
+        let accrued =
+            crate::cashflow::accrual::AccrualIndex::build(&full_schedule, &bond.accrual_config())
+                .unwrap()
+                .accrued_at(between_coupon_date)
+                .unwrap();
+        assert!(accrued > 0.0, "fixture must exercise between coupons");
+        assert!(
+            (call.price_pct_of_par + accrued - 125.0).abs() < 1.0e-10,
+            "clean floor plus accrued must meet 1.25x exactly: clean={}, accrued={accrued}",
+            call.price_pct_of_par
+        );
+    }
+
+    #[test]
+    fn between_coupon_xirr_floor_adds_accrued_exactly_once() {
+        let bond = fixed_10pct_bullet();
+        let curves = MarketContext::new();
+        let exercise_date = date!(2024 - 03 - 20);
+        let target = 0.12;
+        let schedule = lower_return_floor(
+            &bond,
+            &ReturnFloorSpec::xirr(finstack_quant_core::types::Rate::from_decimal(target)),
+            &curves,
+            date!(2024 - 01 - 15),
+        )
+        .unwrap();
+        let call = schedule
+            .calls
+            .iter()
+            .find(|call| call.start_date == exercise_date)
+            .expect("between-coupon floor date");
+        let full_schedule = bond.full_cashflow_schedule(&curves).unwrap();
+        let accrued =
+            crate::cashflow::accrual::AccrualIndex::build(&full_schedule, &bond.accrual_config())
+                .unwrap()
+                .accrued_at(exercise_date)
+                .unwrap();
+        let flows = [
+            (bond.issue_date, -bond.notional.amount()),
+            (exercise_date, call.price_pct_of_par + accrued),
+        ];
+        let realized = finstack_quant_core::cashflow::xirr(&flows, None).unwrap();
+        assert!(
+            (realized - target).abs() < 1.0e-10,
+            "realized XIRR {realized} must equal target {target}; clean={}, accrued={accrued}",
+            call.price_pct_of_par
+        );
+    }
+
+    #[test]
+    fn floor_composes_with_make_whole_on_the_same_date() {
+        let mut bond = fixed_10pct_bullet();
+        let exercise_date = date!(2025 - 01 - 15);
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: exercise_date,
+                end_date: exercise_date,
+                price_pct_of_par: 101.0,
+                make_whole: Some(MakeWholeSpec {
+                    reference_curve_id: CurveId::new("USD-TREASURY"),
+                    spread_bp: 25.0,
+                }),
+            }],
+            puts: Vec::new(),
+        });
+        let schedule = lower_return_floor(
+            &bond,
+            &ReturnFloorSpec::moic(1.25),
+            &MarketContext::new(),
+            date!(2024 - 01 - 15),
+        )
+        .unwrap();
+        let call = schedule
+            .calls
+            .iter()
+            .find(|call| call.start_date == exercise_date && call.make_whole.is_some())
+            .expect("contractual make-whole must survive return-floor lowering");
+        assert!((call.price_pct_of_par - 115.0).abs() < 0.5);
+    }
+
+    #[test]
     fn effective_for_pricing_lowers_floor_into_call_put() {
         let curves = MarketContext::new();
         let as_of = date!(2024 - 01 - 15);
@@ -478,6 +729,14 @@ mod tests {
             .call_put
             .as_ref()
             .is_some_and(|c| !c.calls.is_empty()));
+        assert_eq!(
+            eff_floored
+                .instrument_pricing_overrides
+                .market_quotes
+                .implied_volatility,
+            None,
+            "return-floor lowering must not invent a short-rate volatility"
+        );
     }
 
     #[test]
@@ -649,22 +908,26 @@ mod tests {
 
             let dist = realized_distributions(&bond, &market, bond.issue_date)
                 .unwrap_or_else(|e| panic!("realized_distributions failed at rate={r}: {e}"));
+            let cashflow_schedule = bond
+                .full_cashflow_schedule(&market)
+                .expect("cashflow schedule");
+            let accrual_index = crate::cashflow::accrual::AccrualIndex::build(
+                &cashflow_schedule,
+                &bond.accrual_config(),
+            )
+            .expect("accrual index");
 
             for call in &sched.calls {
-                // Find the DistPoint whose date matches the call's start_date.
-                let point = dist
+                let cash_incl = dist
                     .iter()
-                    .find(|p| p.date == call.start_date)
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "No DistPoint found for call date {} at rate={r}",
-                            call.start_date
-                        )
-                    });
-
-                let cash_incl = point.cum_before + point.coupon;
-                // Redemption = price_pct_of_par% of par notional (V0 = 100).
-                let redemption = call.price_pct_of_par / 100.0 * v0;
+                    .filter(|point| point.date <= call.start_date)
+                    .map(|point| point.coupon)
+                    .sum::<f64>();
+                // Schedule prices are clean; exercise pays accrued once.
+                let redemption = call.price_pct_of_par / 100.0 * v0
+                    + accrual_index
+                        .accrued_at(call.start_date)
+                        .expect("call-date accrued");
                 let moic = (cash_incl + redemption) / v0;
 
                 assert!(
@@ -695,6 +958,14 @@ mod tests {
         let market = flat_discount_market(0.05, as_of);
         let sched = lower_return_floor(&bond, spec, &market, as_of).unwrap();
         let dist = realized_distributions(&bond, &market, bond.issue_date).unwrap();
+        let cashflow_schedule = bond
+            .full_cashflow_schedule(&market)
+            .expect("cashflow schedule");
+        let accrual_index = crate::cashflow::accrual::AccrualIndex::build(
+            &cashflow_schedule,
+            &bond.accrual_config(),
+        )
+        .expect("accrual index");
 
         // Find a call date where the floor binds strictly ABOVE par — an early
         // date where coupons received so far do not yet clear the target alone.
@@ -704,14 +975,17 @@ mod tests {
             .find(|c| c.price_pct_of_par > 100.0 + 1e-9)
             .expect("expected at least one early call where the floor binds above par");
 
-        let point = dist
+        let cash_incl = dist
             .iter()
-            .find(|p| p.date == binding_call.start_date)
-            .expect("DistPoint for the binding call date");
-        let cash_incl = point.cum_before + point.coupon;
+            .filter(|point| point.date <= binding_call.start_date)
+            .map(|point| point.coupon)
+            .sum::<f64>();
 
         // Sanity: the lowered redemption hits the target exactly (within tol).
-        let at_floor = binding_call.price_pct_of_par / 100.0 * v0;
+        let accrued = accrual_index
+            .accrued_at(binding_call.start_date)
+            .expect("call-date accrued");
+        let at_floor = binding_call.price_pct_of_par / 100.0 * v0 + accrued;
         let moic_at_floor = (cash_incl + at_floor) / v0;
         assert!(
             (moic_at_floor - moic_target).abs() < 1e-6,
@@ -719,7 +993,7 @@ mod tests {
         );
 
         // Mutation: a redemption 5 points BELOW the lowered price breaches target.
-        let short = (binding_call.price_pct_of_par - 5.0) / 100.0 * v0;
+        let short = (binding_call.price_pct_of_par - 5.0) / 100.0 * v0 + accrued;
         assert!(
             (cash_incl + short) / v0 < moic_target,
             "lowered redemption is not the binding minimum (date={}, price_pct={})",
@@ -751,13 +1025,16 @@ mod tests {
         );
 
         let dist = realized_distributions(&bond, &market, bond.issue_date).unwrap();
+        let cashflow_schedule = bond
+            .full_cashflow_schedule(&market)
+            .expect("cashflow schedule");
+        let accrual_index = crate::cashflow::accrual::AccrualIndex::build(
+            &cashflow_schedule,
+            &bond.accrual_config(),
+        )
+        .expect("accrual index");
 
         for call in &sched.calls {
-            let point = dist
-                .iter()
-                .find(|p| p.date == call.start_date)
-                .unwrap_or_else(|| panic!("No DistPoint for call date {}", call.start_date));
-
             // Reconstruct the investor cashflow stream for this call path:
             //   (issue, -V0), then each coupon point.date <= call.start_date,
             //   then the redemption at call.start_date.
@@ -773,9 +1050,18 @@ mod tests {
                 }
             }
 
-            // At the call date: coupon paid at that date + redemption.
-            let redemption = call.price_pct_of_par / 100.0 * v0;
-            flows.push((call.start_date, point.coupon + redemption));
+            // At the call date: any scheduled distribution is paid before
+            // exercise; between coupon dates this component is zero.
+            let distribution_on_call = dist
+                .iter()
+                .filter(|point| point.date == call.start_date)
+                .map(|point| point.coupon)
+                .sum::<f64>();
+            let redemption = call.price_pct_of_par / 100.0 * v0
+                + accrual_index
+                    .accrued_at(call.start_date)
+                    .expect("call-date accrued");
+            flows.push((call.start_date, distribution_on_call + redemption));
 
             let realized = finstack_quant_core::cashflow::xirr(&flows, None).unwrap_or_else(|e| {
                 panic!("XIRR solver failed at call date {}: {e}", call.start_date)
@@ -837,20 +1123,25 @@ mod tests {
                 realized_distributions(&bond, &market, bond.issue_date).unwrap_or_else(|e| {
                     panic!("realized_distributions failed at fwd_rate={fwd_rate}: {e}")
                 });
+            let cashflow_schedule = bond
+                .full_cashflow_schedule(&market)
+                .expect("cashflow schedule");
+            let accrual_index = crate::cashflow::accrual::AccrualIndex::build(
+                &cashflow_schedule,
+                &bond.accrual_config(),
+            )
+            .expect("accrual index");
 
             for call in &sched.calls {
-                let point = dist
+                let cash_incl = dist
                     .iter()
-                    .find(|p| p.date == call.start_date)
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "No DistPoint for call date {} at fwd_rate={fwd_rate}",
-                            call.start_date
-                        )
-                    });
-
-                let cash_incl = point.cum_before + point.coupon;
-                let redemption = call.price_pct_of_par / 100.0 * v0;
+                    .filter(|point| point.date <= call.start_date)
+                    .map(|point| point.coupon)
+                    .sum::<f64>();
+                let redemption = call.price_pct_of_par / 100.0 * v0
+                    + accrual_index
+                        .accrued_at(call.start_date)
+                        .expect("call-date accrued");
                 let moic = (cash_incl + redemption) / v0;
 
                 assert!(

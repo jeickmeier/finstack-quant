@@ -44,7 +44,9 @@
 pub(crate) mod compiler;
 mod coupon_api;
 pub mod emission;
+mod floating_replay;
 mod orchestrator;
+pub mod overnight;
 pub(crate) mod pipeline;
 mod principal;
 
@@ -56,7 +58,15 @@ pub mod rate_helpers;
 pub mod schedule;
 pub mod specs;
 
+pub use floating_replay::{
+    CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
+    FloatingCouponReplayState, FloatingCouponSettlement, FloatingRateObservation,
+};
 pub use orchestrator::{CashFlowBuilder, PrincipalEvent};
+pub use overnight::{
+    OvernightObservationSchedule, OvernightObservationSlice, OvernightRateAccumulator,
+    OvernightRateConstraints, OvernightRateReplay,
+};
 
 pub use periods::SchedulePeriod;
 pub use rate_helpers::{project_floating_rate, FloatingRateParams};

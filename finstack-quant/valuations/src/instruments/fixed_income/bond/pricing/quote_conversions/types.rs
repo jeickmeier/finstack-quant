@@ -14,9 +14,9 @@ pub enum BondQuoteInput {
     /// Yield to worst (decimal).
     ///
     /// For non-callable bonds this is equivalent to [`BondQuoteInput::Ytm`].
-    /// For callable bonds, prefer [`BondQuoteInput::Oas`] when exercise-aware
-    /// pricing is required — YTW inversion via this variant uses maturity flows
-    /// (consistent with `Bond::base_value`'s `quoted_ytw` path).
+    /// For callable, puttable, or return-floor bonds, inversion prices every
+    /// admissible workout path at this Street yield and selects the minimum
+    /// dirty price.
     Ytw(f64),
     /// Z-spread over the discount curve (decimal).
     ZSpread(f64),

@@ -1,8 +1,8 @@
-//! Embedded option value calculator for callable/putable bonds.
+//! Embedded option value calculator for callable, putable, and return-floor bonds.
 //!
-//! Computes the theoretical value of embedded call or put options by pricing:
-//! 1. With call/put constraints → P_embedded
-//! 2. Without call/put constraints on the tree calibration curve → P_straight
+//! Computes the theoretical value of embedded exercise rights by pricing:
+//! 1. With call, put, and return-floor constraints → P_embedded
+//! 2. Without those constraints under the same caller-selected model → P_straight
 //!
 //! The embedded option value is the difference between these prices.
 //!
@@ -50,126 +50,106 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use crate::instruments::fixed_income::bond::pricing::engine::tree::{bond_tree_config, TreePricer};
-use crate::instruments::fixed_income::bond::pricing::settlement::settlement_date;
+use crate::instruments::fixed_income::bond::pricing::quote_conversions::clear_price_driving_overrides;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 
-/// Calculates the embedded option value for callable/putable bonds.
+fn price_bond_with_context_model(
+    context: &MetricContext,
+    bond: &Bond,
+    model: crate::pricer::ModelKey,
+) -> finstack_quant_core::Result<f64> {
+    if context.pricing_model().is_some() {
+        context.reprice_instrument_raw(bond, context.curves.as_ref(), context.as_of)
+    } else {
+        bond.price_for_model_raw(model, context.curves.as_ref(), context.as_of)
+    }
+}
+
+/// Calculates the embedded option value for callable, putable, and
+/// return-floor bonds.
 ///
 /// Computes the difference between:
-/// - The option-embedded bond price (with call/put exercise decisions)
-/// - The deterministic straight-bond price on the same tree calibration curve
+/// - The option-embedded bond price (with call/put/return-floor exercise decisions)
+/// - The straight-bond price under the same caller-selected model and OAS
 ///
 /// # Returns
 ///
 /// - For **callable bonds**: Negative holder value (call reduces holder value)
 /// - For **putable bonds**: Positive holder value (put increases holder value)
 /// - For **bonds with both**: Net option value from investor perspective
+/// - For **return-floor bonds**: Holder value of the protected redemption path
 /// - For **straight bonds**: Zero (no embedded options)
 ///
 /// The value is returned in **currency units** (same as bond notional).
 ///
 /// # Dependencies
 ///
-/// None - this is a standalone metric using tree pricing.
+/// None. The metric reprices both legs through the caller-selected model and
+/// pricer registry.
 ///
 #[derive(Debug, Clone, Default)]
 pub(crate) struct EmbeddedOptionValueCalculator;
 
 impl MetricCalculator for EmbeddedOptionValueCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let bond: &Bond = context.instrument_as()?;
+        let bond: Bond = context.instrument_as::<Bond>()?.clone();
 
         // If bond has no embedded options, return 0
-        let has_options = bond
-            .call_put
-            .as_ref()
-            .map(|cp| cp.has_options())
-            .unwrap_or(false);
+        let has_options = bond.return_floor.is_some()
+            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
 
         if !has_options {
             return Ok(0.0);
         }
 
-        let market = context.curves.as_ref();
-        let as_of = context.as_of;
-        let quote_date = settlement_date(bond, as_of)?;
-
         let oas_decimal = if let Some(oas) = context.computed.get(&MetricId::Oas) {
             *oas
-        } else if let Some(oas) = bond.instrument_pricing_overrides.market_quotes.quoted_oas {
-            oas
-        } else if let Some(clean_price) = bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_clean_price
-        {
-            let pricer = TreePricer::with_config(bond_tree_config(bond)?);
-            pricer.calculate_oas(bond, market, as_of, clean_price)? / 10_000.0
         } else {
-            0.0
+            super::oas::oas_decimal_from_quote_overrides(&bond, context)?.unwrap_or(0.0)
         };
 
-        let tree_config = bond_tree_config(bond)?;
-        let continuous_oas = tree_config
-            .oas_quote_compounding
-            .continuous_from_quote_decimal(oas_decimal);
-        let pricer = TreePricer::with_config(tree_config.clone());
-        let oas_bp = oas_decimal * 10_000.0;
-        let price_with_options = pricer.price_at_oas(bond, market, quote_date, oas_bp)?;
-        let mut straight_bond = bond.clone();
+        let model = context
+            .pricing_model()
+            .unwrap_or_else(|| bond.default_pricing_model());
+        let mut optioned_bond = bond.clone();
+        clear_price_driving_overrides(&mut optioned_bond);
+        optioned_bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_oas = Some(oas_decimal);
+        let price_with_options = price_bond_with_context_model(context, &optioned_bond, model)?;
+        let mut straight_bond = bond;
         straight_bond.call_put = None;
-        if let Some(curve_id) = tree_config.tree_discount_curve_id {
-            straight_bond.discount_curve_id = curve_id;
-        }
-        let price_straight = straight_price_at_continuous_spread(
-            &straight_bond,
-            market,
-            quote_date,
-            continuous_oas,
-        )?;
+        straight_bond.return_floor = None;
+        clear_price_driving_overrides(&mut straight_bond);
+        straight_bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_oas = Some(oas_decimal);
+        let price_straight = price_bond_with_context_model(context, &straight_bond, model)?;
 
         Ok(price_with_options - price_straight)
     }
-}
-
-fn straight_price_at_continuous_spread(
-    bond: &Bond,
-    market: &finstack_quant_core::market_data::context::MarketContext,
-    quote_date: finstack_quant_core::dates::Date,
-    spread: f64,
-) -> finstack_quant_core::Result<f64> {
-    use finstack_quant_core::dates::DayCountContext;
-    use finstack_quant_core::math::summation::NeumaierAccumulator;
-
-    let curve = market.get_discount(&bond.discount_curve_id)?;
-    let flows = bond.pricing_dated_cashflows(market, quote_date)?;
-    let mut pv = NeumaierAccumulator::new();
-    for (date, amount) in flows {
-        if date <= quote_date {
-            continue;
-        }
-        let time = curve
-            .day_count()
-            .year_fraction(quote_date, date, DayCountContext::default())?;
-        let df = curve.df_between_dates(quote_date, date)? * (-spread * time).exp();
-        pv.add(amount.amount() * df);
-    }
-    Ok(pv.total())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
+    use crate::instruments::fixed_income::bond::pricing::engine::tree::{
+        bond_tree_config, TreePricer,
+    };
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_oas;
     use crate::instruments::fixed_income::bond::BondSettlementConvention;
     use crate::instruments::fixed_income::bond::CashflowSpec;
-    use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+    use crate::instruments::fixed_income::bond::{
+        CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorSpec,
+    };
     use crate::instruments::InstrumentPricingOverrides;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use std::sync::Arc;
@@ -396,6 +376,153 @@ mod tests {
             option_value > 0.0,
             "Putable bond should have positive put option value, got {}",
             option_value
+        );
+    }
+
+    #[test]
+    fn floor_only_bond_has_option_value_against_fully_straight_leg() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let mut bond = create_straight_bond();
+        bond.return_floor = Some(
+            ReturnFloorSpec::moic(1.0).window(ProtectionWindow::Between {
+                start: Date::from_calendar_date(2027, Month::January, 1).expect("valid date"),
+                end: Date::from_calendar_date(2027, Month::January, 2).expect("valid date"),
+            }),
+        );
+        let market = create_test_market();
+        let optioned = price_from_oas(&bond, &market, as_of, crate::pricer::ModelKey::Tree, 0.0)
+            .expect("floor-only price");
+        let mut straight = bond.clone();
+        straight.call_put = None;
+        straight.return_floor = None;
+        let straight_price = price_from_oas(
+            &straight,
+            &market,
+            as_of,
+            crate::pricer::ModelKey::Tree,
+            0.0,
+        )
+        .expect("fully straight price");
+
+        let base_value = bond.value(&market, as_of).expect("base price");
+        let mut context = MetricContext::new(
+            Arc::new(bond),
+            Arc::new(market),
+            as_of,
+            base_value,
+            MetricContext::default_config(),
+        );
+        let actual = EmbeddedOptionValueCalculator
+            .calculate(&mut context)
+            .expect("floor-only embedded option value");
+
+        assert!(
+            actual.abs() > 1.0e-6,
+            "a binding return floor must not be classified as a straight bond"
+        );
+        assert!(
+            (actual - (optioned - straight_price)).abs() < 1.0e-8,
+            "straight leg must remove call_put and return_floor: actual={actual}, expected={}",
+            optioned - straight_price
+        );
+    }
+
+    #[test]
+    fn standalone_eov_normalizes_equivalent_clean_and_dirty_quotes() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let market = create_test_market();
+        let mut clean_bond = create_callable_bond();
+        clean_bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price = Some(100.0);
+        clean_bond
+            .instrument_pricing_overrides
+            .model_config
+            .tree_steps = Some(16);
+        let quote_context =
+            crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext::new(
+                &clean_bond,
+                &market,
+                as_of,
+            )
+            .expect("quote context");
+        let dirty_amount = quote_context.dirty_from_clean_pct(100.0, clean_bond.notional.amount());
+        let mut dirty_bond = clean_bond.clone();
+        dirty_bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price = None;
+        dirty_bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_dirty_price_currency = Some(dirty_amount);
+
+        let calculate = |bond: Bond| {
+            let base_value = bond.value(&market, as_of).expect("quoted base value");
+            let mut context = MetricContext::new(
+                Arc::new(bond),
+                Arc::new(market.clone()),
+                as_of,
+                base_value,
+                MetricContext::default_config(),
+            );
+            EmbeddedOptionValueCalculator
+                .calculate(&mut context)
+                .expect("standalone EOV")
+        };
+        let from_clean = calculate(clean_bond);
+        let from_dirty = calculate(dirty_bond);
+        assert!(
+            (from_clean - from_dirty).abs() < 1.0e-8,
+            "equivalent settlement clean and dirty quotes must resolve the same OAS: clean={from_clean}, dirty={from_dirty}"
+        );
+    }
+
+    #[test]
+    fn credit_option_value_uses_same_rates_credit_model_for_straight_leg() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let mut bond = create_callable_bond();
+        bond.credit_curve_id = Some("USD-CREDIT".into());
+        bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
+            .with_quoted_oas(0.0025)
+            .with_hw1f_sigma(0.0)
+            .with_hazard_volatility(0.0)
+            .with_tree_steps(16);
+        let market = create_test_market().insert(
+            HazardCurve::builder("USD-CREDIT")
+                .base_date(as_of)
+                .recovery_rate(0.4)
+                .knots([(0.0, 0.02), (5.0, 0.02)])
+                .build()
+                .expect("valid hazard curve"),
+        );
+        let pricer = TreePricer::rates_credit(bond_tree_config(&bond).expect("tree config"));
+        let optioned = pricer
+            .price_at_oas(&bond, &market, as_of, 25.0)
+            .expect("optioned rates-credit price");
+        let mut straight = bond.clone();
+        straight.call_put = None;
+        let bullet = pricer
+            .price_at_oas(&straight, &market, as_of, 25.0)
+            .expect("straight rates-credit price");
+
+        let base_value = bond.value(&market, as_of).expect("base price");
+        let mut context = MetricContext::new(
+            Arc::new(bond),
+            Arc::new(market),
+            as_of,
+            base_value,
+            MetricContext::default_config(),
+        );
+        let actual = EmbeddedOptionValueCalculator
+            .calculate(&mut context)
+            .expect("embedded option value");
+
+        assert!(
+            (actual - (optioned - bullet)).abs() < 1e-8,
+            "both legs must retain the same hazard/recovery model: actual={actual}, expected={}",
+            optioned - bullet
         );
     }
 }

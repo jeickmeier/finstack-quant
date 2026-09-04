@@ -417,7 +417,20 @@ impl PyValuationResult {
     /// Model-specific structured pricing detail, or ``None``.
     ///
     /// Same tagged ``{type, data}`` shape as the Rust ``ValuationDetails``
-    /// enum. Absent when the pricer emitted only the scalar envelope.
+    /// enum. A stochastic ``"rates_credit"`` bond uses
+    /// ``type="monte_carlo"``; its
+    /// data contains ``model_key``, sampling-only ``standard_error``, configured
+    /// independent exercise-policy paths (``training_paths``) and the simulated
+    /// count including antithetic partners (``training_simulated_paths``),
+    /// configured independent make-whole-reference paths
+    /// (``make_whole_training_paths``) and their simulated count
+    /// (``make_whole_training_simulated_paths``), independent estimator paths
+    /// (``estimator_paths``) and their total simulated count (``simulated_paths``),
+    /// ``seed``, ``time_grid``, and variance-reduction flags. ``standard_error`` measures pricing-path
+    /// sampling uncertainty under the frozen fitted exercise policy and excludes
+    /// regression approximation, time-grid discretization, and model error. A
+    /// training stage that did not run reports zero paths.
+    /// Absent when the pricer emitted only the scalar envelope.
     #[getter]
     fn details<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner

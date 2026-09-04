@@ -148,6 +148,8 @@ impl MetricCalculator for MoicToWorstCalculator {
         let eff = bond.effective_for_pricing(&ctx.curves, ctx.as_of)?;
         let flows = lifetime_dated_cashflows(&eff, &ctx.curves)?;
         let schedule = eff.full_cashflow_schedule(&ctx.curves)?;
+        let accrual_index =
+            crate::cashflow::accrual::AccrualIndex::build(&schedule, &eff.accrual_config())?;
 
         let candidates = crate::instruments::fixed_income::bond::pricing::quote_conversions::enumerate_exit_paths(
             &eff, &flows, ctx.as_of,
@@ -170,11 +172,16 @@ impl MetricCalculator for MoicToWorstCalculator {
                 .filter(|(d, _)| *d > t0 && *d <= cand.date)
                 .map(|(_, m)| m.amount().max(0.0))
                 .sum();
-            let outstanding = crate::instruments::fixed_income::bond::pricing::quote_conversions::outstanding_principal_at_date(
+            // Call/put schedule prices are clean. Exercise pays accrued after
+            // same-day scheduled distributions, matching the pricing kernel.
+            let redemption = crate::instruments::fixed_income::bond::pricing::quote_conversions::exercise_redemption_amount(
+                &eff,
+                &ctx.curves,
+                &flows,
                 &schedule,
-                cand.date,
-            );
-            let redemption = outstanding * cand.price_pct_of_par / 100.0;
+                &accrual_index,
+                &cand,
+            )?;
             worst = worst.min((coupons + redemption) / v0);
         }
 
@@ -185,10 +192,11 @@ impl MetricCalculator for MoicToWorstCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule, MakeWholeSpec};
     use crate::metrics::{MetricCalculator, MetricContext};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Rate;
     use std::sync::Arc;
@@ -362,5 +370,74 @@ mod tests {
             "actual={actual}, expected={expected}"
         );
         assert!((actual - initial_notional_result).abs() > 0.01);
+    }
+
+    #[test]
+    fn moic_to_worst_applies_make_whole_reference_value() {
+        let issue = date!(2025 - 01 - 15);
+        let call_date = date!(2025 - 12 - 15);
+        let mut make_whole_bond = Bond::fixed(
+            "MOIC-MAKE-WHOLE",
+            Money::new(100.0, Currency::USD),
+            Rate::from_percent(10.0),
+            issue,
+            date!(2027 - 01 - 15),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        make_whole_bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: call_date,
+                end_date: call_date,
+                price_pct_of_par: 50.0,
+                make_whole: Some(MakeWholeSpec {
+                    reference_curve_id: "USD-REF".into(),
+                    spread_bp: 0.0,
+                }),
+            }],
+            puts: Vec::new(),
+        });
+        let mut fixed_strike_bond = make_whole_bond.clone();
+        fixed_strike_bond
+            .call_put
+            .as_mut()
+            .expect("call schedule")
+            .calls[0]
+            .make_whole = None;
+        let curves = Arc::new(
+            MarketContext::new()
+                .insert(
+                    DiscountCurve::builder("USD-OIS")
+                        .base_date(issue)
+                        .knots([(0.0, 1.0), (2.0, 0.90)])
+                        .build()
+                        .expect("discount curve"),
+                )
+                .insert(
+                    DiscountCurve::builder("USD-REF")
+                        .base_date(issue)
+                        .knots([(0.0, 1.0), (2.0, 1.0)])
+                        .build()
+                        .expect("reference curve"),
+                ),
+        );
+        let calculate = |bond: Bond, calculator: &dyn MetricCalculator| {
+            let mut ctx = MetricContext::new(
+                Arc::new(bond),
+                Arc::clone(&curves),
+                issue,
+                Money::new(100.0, Currency::USD),
+                MetricContext::default_config(),
+            );
+            calculator.calculate(&mut ctx).expect("MOIC")
+        };
+
+        let maturity = calculate(make_whole_bond.clone(), &MoicCalculator);
+        let make_whole = calculate(make_whole_bond, &MoicToWorstCalculator);
+        let fixed_strike = calculate(fixed_strike_bond, &MoicToWorstCalculator);
+
+        assert!((make_whole - maturity).abs() < 1e-12);
+        assert!(make_whole - fixed_strike > 0.25);
     }
 }

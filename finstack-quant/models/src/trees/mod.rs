@@ -25,4 +25,7 @@ pub use tree_framework::{
     single_factor_equity_state, state_keys, EvolutionParams, NodeState, TreeGreeks, TreeModel,
     TreeValuator,
 };
-pub use two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree, KAPPA_MAX};
+pub use two_factor_rates_credit::{
+    RatesCreditCalibrationTargets, RatesCreditConfig, RatesCreditPathState, RatesCreditTransition,
+    RatesCreditTree, KAPPA_MAX,
+};

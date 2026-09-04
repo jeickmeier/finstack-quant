@@ -4,9 +4,11 @@
 //! declares that on any EARLY issuer-called or prepaid redemption, the
 //! redemption price is floored so the investor's realized return (measured from
 //! the issue date against the issue price `V0`) meets a target — either a
-//! money multiple (MOIC) or an annualized internal rate of return (XIRR). The
-//! spec is lowered into a concrete [`crate::instruments::fixed_income::bond::CallPutSchedule`]
-//! at pricing time; see `bond/pricing/return_floor.rs`.
+//! money multiple (MOIC) or an annualized internal rate of return (XIRR).
+//! Deterministic pricing lowers the spec into a concrete
+//! [`crate::instruments::fixed_income::bond::CallPutSchedule`]. Stochastic
+//! rates-credit pricing evaluates the same return condition on simulated cash
+//! distributions at each exercise date.
 //!
 //! **The floor does NOT guarantee the held-to-maturity return.** It only
 //! protects early exits. The maturity path is whatever the contractual cashflows
@@ -73,9 +75,11 @@ pub enum ReturnFloorKind {
 pub enum IssuePrice {
     /// Par notional (default). `V0 = notional`.
     Par,
-    /// Explicit cash amount funded at issue. Must match the bond's notional currency.
+    /// Explicit finite positive cash amount funded at issue. Must match the
+    /// bond's notional currency.
     Amount(Money),
-    /// Percent of par, e.g. `98.0` for 2 points of original issue discount.
+    /// Finite positive percent of par, e.g. `98.0` for 2 points of original
+    /// issue discount.
     /// `V0 = notional * pct / 100`.
     PctOfPar(f64),
 }
@@ -90,10 +94,12 @@ impl IssuePrice {
     /// and the MOIC/XIRR metrics so the two cannot drift.
     ///
     /// # Errors
-    /// Returns [`finstack_quant_core::Error::Validation`] if an [`IssuePrice::Amount`]
-    /// is denominated in a different currency than `notional`.
+    /// Returns [`finstack_quant_core::Error::Validation`] if the resolved issue
+    /// price is not finite and strictly positive, or if an
+    /// [`IssuePrice::Amount`] is denominated in a different currency than
+    /// `notional`.
     pub(crate) fn resolve(self, notional: Money) -> finstack_quant_core::Result<f64> {
-        Ok(match self {
+        let resolved = match self {
             IssuePrice::Par => notional.amount(),
             IssuePrice::PctOfPar(pct) => notional.amount() * pct / 100.0,
             IssuePrice::Amount(m) => {
@@ -104,7 +110,13 @@ impl IssuePrice {
                 }
                 m.amount()
             }
-        })
+        };
+        if !resolved.is_finite() || resolved <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "return floor issue price must resolve to a finite amount > 0, got {resolved}"
+            )));
+        }
+        Ok(resolved)
     }
 }
 
@@ -162,7 +174,7 @@ pub enum ProtectionWindow {
 /// standard private-credit loan model (often called a "prepayment premium" or
 /// "call protection" in credit agreements). The floor is anchored at the issue
 /// date and issue price `V0`. The spec is lowered into a concrete call schedule
-/// at pricing time; see `bond/pricing/return_floor.rs`.
+/// deterministically or evaluated path by path by the rates-credit LSMC engine.
 ///
 /// **Call-protection only**: the floor applies to EARLY issuer redemptions
 /// within the [`ProtectionWindow`] and never at maturity. The held-to-maturity
@@ -183,34 +195,37 @@ pub enum ProtectionWindow {
 /// **MOIC floor** — minimum money-on-invested-capital multiple `m`:
 ///
 /// ```text
-/// R(t) = m · V0 − cash_through(t)
+/// dirty_required(t) = m · V0 − cash_through(t)
 /// ```
 ///
-/// The required redemption at `t` is `max(R(t), contractual_call(t), V0)`.
+/// The clean redemption amount is `dirty_required(t) − accrued(t)`, floored by
+/// the contractual clean call amount and par. The exercise engine adds
+/// `accrued(t)` exactly once, so the holder's total cash meets the target when
+/// the return floor binds.
 ///
 /// **XIRR floor** — minimum annualized IRR `r`:
 ///
 /// ```text
-/// R(t) = (1 + r)^yf(issue, t) · (V0 − Σ_{q ≤ t} coupon_q / (1 + r)^yf(issue, q))
+/// dirty_required(t) = (1 + r)^yf(issue, t)
+///                     · (V0 − Σ_{q ≤ t} coupon_q / (1 + r)^yf(issue, q))
 /// ```
 ///
 /// The day-count convention for `yf` defaults to `Act/365F`, matching
 /// [`finstack_quant_core::cashflow::xirr`] so the verification metrics
 /// reproduce the floor target exactly.
 ///
-/// Both floors are then clamped to `max(R(t), 100.0)` (never below par) and
-/// divided by the outstanding notional at `t`.
+/// For both floors, accrued interest is subtracted before the clean redemption
+/// is clamped at par and divided by outstanding notional. Accrued is added once
+/// to the exercise proceeds by the pricing kernel.
 ///
-/// # Limitations (v1)
+/// # Pricing behavior
 ///
-/// - **Floating-rate coupons**: forward-projected using the yield curve at
-///   pricing time. Path-accurate LSMC (where rate paths determine both coupon
-///   magnitudes and call-trigger probabilities simultaneously) is deferred to v2.
-/// - **Make-whole calls**: contractual make-whole provisions cannot compose
-///   with a return floor in v1 — attempting this returns a validation error.
-///   Make-whole effective prices are path-dependent and cannot be pre-computed
-///   statically when lowering the floor.
-/// - **`min_moic` / `min_xirr` shortcuts**: these set
+/// - Deterministic pricing produces a daily concrete call schedule.
+/// - Stochastic factors use pathwise cash and PIK state in the bond LSMC engine,
+///   including term-reset and overnight floating coupons.
+/// - Contractual make-whole calls compose with the floor: every issuer exercise
+///   amount is the greater of the return floor and that call's effective amount.
+/// - **`min_moic` / `min_xirr` shortcuts** set
 ///   [`ProtectionWindow::Full`] (prepayable across the bond's entire life).
 ///   Narrow the window via [`ReturnFloorSpec::window`] if a no-call period
 ///   applies.
@@ -365,6 +380,11 @@ impl ReturnFloorSpec {
     /// # Returns
     ///
     /// `self` with `issue_price` updated (fluent builder).
+    ///
+    /// # Arguments
+    ///
+    /// * `price` - Invested capital at issue: par, a finite positive percent
+    ///   of par, or a finite positive cash amount in the bond's currency.
     #[must_use]
     pub fn issue_price(mut self, price: IssuePrice) -> Self {
         self.issue_price = price;
@@ -379,7 +399,8 @@ impl ReturnFloorSpec {
     ///
     /// # Arguments
     ///
-    /// * `window` - Positive rolling-window length measured in observations.
+    /// * `window` - Calendar-date interval during which an issuer-triggered
+    ///   early redemption receives return-floor protection.
     #[must_use]
     pub fn window(mut self, window: ProtectionWindow) -> Self {
         self.window = window;
@@ -408,8 +429,10 @@ impl ReturnFloorSpec {
     /// # Errors
     ///
     /// Returns `Err` if:
-    /// - The MOIC multiple is `<= 0`.
+    /// - The MOIC multiple is not finite or is `<= 0`.
     /// - The XIRR rate is not finite or is `<= -1` (i.e., `-100%` or worse).
+    /// - An explicit issue-price amount or percent of par is not finite and
+    ///   strictly positive.
     /// - A [`ProtectionWindow::Between`] window has `start >= end`.
     ///
     /// # Examples
@@ -422,9 +445,9 @@ impl ReturnFloorSpec {
     /// ```
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         match self.kind {
-            ReturnFloorKind::Moic(m) if m <= 0.0 => {
+            ReturnFloorKind::Moic(m) if !m.is_finite() || m <= 0.0 => {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "return floor MOIC must be > 0, got {m}"
+                    "return floor MOIC must be finite and > 0, got {m}"
                 )));
             }
             ReturnFloorKind::Xirr(r) if r.as_decimal() <= -1.0 || !r.as_decimal().is_finite() => {
@@ -434,6 +457,20 @@ impl ReturnFloorSpec {
                 )));
             }
             _ => {}
+        }
+        let invalid_issue_price = match self.issue_price {
+            IssuePrice::PctOfPar(pct) if !pct.is_finite() || pct <= 0.0 => Some(pct),
+            IssuePrice::Amount(amount)
+                if !amount.amount().is_finite() || amount.amount() <= 0.0 =>
+            {
+                Some(amount.amount())
+            }
+            IssuePrice::Par | IssuePrice::PctOfPar(_) | IssuePrice::Amount(_) => None,
+        };
+        if let Some(value) = invalid_issue_price {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "return floor issue price must be finite and > 0, got {value}"
+            )));
         }
         if let ProtectionWindow::Between { start, end } = self.window {
             if start >= end {
@@ -449,6 +486,7 @@ impl ReturnFloorSpec {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::currency::Currency;
     use finstack_quant_core::types::Rate;
 
     #[test]
@@ -471,6 +509,36 @@ mod tests {
     #[test]
     fn validate_rejects_nonpositive_multiple() {
         assert!(ReturnFloorSpec::moic(0.0).validate().is_err());
+        assert!(ReturnFloorSpec::moic(f64::NAN).validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_invalid_explicit_issue_prices() {
+        for pct in [f64::NAN, 0.0, -1.0] {
+            assert!(ReturnFloorSpec::moic(1.0)
+                .issue_price(IssuePrice::PctOfPar(pct))
+                .validate()
+                .is_err());
+        }
+        for amount in [0.0, -100.0] {
+            assert!(ReturnFloorSpec::moic(1.0)
+                .issue_price(IssuePrice::Amount(Money::new(amount, Currency::USD)))
+                .validate()
+                .is_err());
+        }
+    }
+
+    #[test]
+    fn resolve_rejects_nonpositive_and_currency_mismatched_issue_prices() {
+        let notional = Money::new(100.0, Currency::USD);
+        assert!(IssuePrice::PctOfPar(0.0).resolve(notional).is_err());
+        assert!(IssuePrice::PctOfPar(f64::NAN).resolve(notional).is_err());
+        assert!(IssuePrice::Amount(Money::new(-1.0, Currency::USD))
+            .resolve(notional)
+            .is_err());
+        assert!(IssuePrice::Amount(Money::new(100.0, Currency::EUR))
+            .resolve(notional)
+            .is_err());
     }
 
     #[test]

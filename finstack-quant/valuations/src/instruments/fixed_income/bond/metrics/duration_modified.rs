@@ -3,6 +3,7 @@
 use crate::instruments::Bond;
 use crate::instruments::BondRiskBasis;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use std::borrow::Cow;
 
 /// Calculates modified duration for bonds.
 ///
@@ -11,9 +12,9 @@ use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 /// D_mod = D_mac / (1 + y/m)
 /// ```
 ///
-/// For bonds **with** embedded options (callable/putable), computes effective
-/// duration via parallel curve bumps, which properly accounts for changes in
-/// exercise behavior as rates shift.
+/// For bonds **with** embedded options (call, put, or return-floor rights),
+/// computes effective duration via parallel curve bumps, which accounts for
+/// changes in exercise behavior as rates shift.
 ///
 /// # Dependencies
 ///
@@ -28,19 +29,28 @@ impl MetricCalculator for ModifiedDurationCalculator {
         &[MetricId::DurationMac, MetricId::Ytm]
     }
 
+    fn dynamic_dependencies<'a>(&'a self, context: &MetricContext) -> Cow<'a, [MetricId]> {
+        let Ok(bond) = context.instrument_as::<Bond>() else {
+            return Cow::Borrowed(self.dependencies());
+        };
+        let has_options = bond.return_floor.is_some()
+            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
+            Cow::Borrowed(&[])
+        } else {
+            Cow::Borrowed(self.dependencies())
+        }
+    }
+
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = context.instrument_as()?;
 
         // Callable/OAS model risk is opt-in. The default matches Bloomberg YAS
         // Workout risk: quoted-yield duration on maturity/workout cashflows.
-        let has_options = bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.return_floor.is_some()
+            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
-            return super::effective::effective_duration(
-                bond,
-                context.curves.as_ref(),
-                context.as_of,
-                None,
-            );
+            return super::effective::effective_duration(bond, context, None);
         }
 
         let ytm = context

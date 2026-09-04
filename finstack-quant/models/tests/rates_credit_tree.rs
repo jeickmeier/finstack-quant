@@ -15,10 +15,13 @@
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve, ParInterp};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::HashMap;
 use finstack_quant_models::trees::tree_framework::{NodeState, TreeModel, TreeValuator};
-use finstack_quant_models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
+use finstack_quant_models::trees::two_factor_rates_credit::{
+    RatesCreditCalibrationTargets, RatesCreditConfig, RatesCreditTree,
+};
 use time::Month;
 
 /// Pays $1 at maturity, conditioned on no default. Tree multiplies by survival
@@ -70,6 +73,41 @@ fn hazard_curve(spread_bp: f64, recovery: f64) -> HazardCurve {
         .expect("hazard curve")
 }
 
+fn calibration_targets(
+    discount: &dyn Discounting,
+    hazard: &HazardCurve,
+    steps: usize,
+    horizon: f64,
+) -> RatesCreditCalibrationTargets {
+    let discount_at_origin = discount.df(0.0);
+    let survival_at_origin = hazard.sp(0.0);
+    let times: Vec<f64> = (0..=steps)
+        .map(|step| step as f64 * horizon / steps as f64)
+        .collect();
+    RatesCreditCalibrationTargets {
+        discount_factors: times
+            .iter()
+            .map(|&time| discount.df(time) / discount_at_origin)
+            .collect(),
+        survival_probabilities: times
+            .iter()
+            .map(|&time| hazard.sp(time) / survival_at_origin)
+            .collect(),
+        times,
+        recovery_rate: hazard.recovery_rate(),
+    }
+}
+
+fn calibrate_tree(
+    tree: &mut RatesCreditTree,
+    discount: &dyn Discounting,
+    hazard: &HazardCurve,
+    horizon: f64,
+) {
+    let targets = calibration_targets(discount, hazard, tree.config.steps, horizon);
+    tree.calibrate(&targets).expect("calibrate");
+}
+
 #[test]
 fn rates_credit_tree_reproduces_disc_curve_when_hazard_is_silent() {
     // hazard_vol = 0 collapses the joint tree to a pure rate tree. The pricing
@@ -86,7 +124,7 @@ fn rates_credit_tree_reproduces_disc_curve_when_hazard_is_silent() {
         hazard_vol: 0.0,
         ..Default::default()
     });
-    tree.calibrate(&disc, &haz, ttm).expect("calibrate");
+    calibrate_tree(&mut tree, &disc, &haz, ttm);
 
     let ctx = MarketContext::new();
     let vars = HashMap::<&'static str, f64>::default();
@@ -119,7 +157,7 @@ fn rates_credit_tree_correlation_extremes_are_well_defined() {
             correlation: rho,
             ..Default::default()
         });
-        tree.calibrate(&disc, &haz, ttm).expect("calibrate");
+        calibrate_tree(&mut tree, &disc, &haz, ttm);
         let vars = HashMap::<&'static str, f64>::default();
         tree.price(vars, ttm, &ctx, &val).expect("price")
     };

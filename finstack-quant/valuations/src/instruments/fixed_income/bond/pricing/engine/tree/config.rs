@@ -277,8 +277,10 @@ pub fn bond_tree_config(bond: &Bond) -> finstack_quant_core::Result<TreePricerCo
         Some(crate::instruments::common_impl::parameters::VolatilityModel::Black)
     );
 
-    // For callable/putable bonds, select only explicitly parameterized models.
-    let tree_model = if bond.call_put.is_some() {
+    // Embedded exercise rights, including a return floor that will be lowered
+    // to an issuer call schedule on deterministic paths, select only
+    // explicitly parameterized models.
+    let tree_model = if bond.call_put.is_some() || bond.return_floor.is_some() {
         if uses_black_lognormal {
             let Some(sigma) = implied_volatility else {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -399,7 +401,7 @@ impl TreePricerConfig {
 mod tests {
     use super::*;
     use crate::instruments::common_impl::parameters::VolatilityModel;
-    use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+    use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule, ReturnFloorSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
     use time::macros::date;
@@ -464,5 +466,33 @@ mod tests {
 
         let err = bond_tree_config(&bond).expect_err("missing BDT vol must error");
         assert!(err.to_string().contains("implied_volatility"));
+    }
+
+    #[test]
+    fn black_lognormal_return_floor_config_requires_and_uses_implied_vol() {
+        let mut bond = Bond::fixed(
+            "BDT-RETURN-FLOOR",
+            Money::new(1_000.0, Currency::USD),
+            finstack_quant_core::types::Rate::from_decimal(0.05),
+            date!(2025 - 01 - 01),
+            date!(2030 - 01 - 01),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("fixed bond should build");
+        bond.return_floor = Some(ReturnFloorSpec::moic(1.0));
+        bond.instrument_pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
+
+        let err = bond_tree_config(&bond).expect_err("floor-only BDT bond needs a volatility");
+        assert!(err.to_string().contains("implied_volatility"));
+
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.20);
+        let config = bond_tree_config(&bond).expect("floor-only option config");
+        assert!(matches!(
+            config.tree_model,
+            TreeModelChoice::BlackDermanToy { sigma, .. } if (sigma - 0.20).abs() < 1e-12
+        ));
     }
 }

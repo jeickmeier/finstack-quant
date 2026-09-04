@@ -3,23 +3,23 @@
 //! Covers: Bond, IRS, FRA, BasisSwap, Deposit, InterestRateFuture, InterestRateFutureOption,
 //! BondFuture, CapFloor, Swaption, Repo, DCF.
 
-use super::{register_generic, InstrumentType, PricerRegistry};
+use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 
 /// Register the rates-instrument shard of the standard pricer registry.
 pub(crate) fn register_rates_pricers(
     registry: &mut PricerRegistry,
 ) -> std::result::Result<(), crate::pricer::PricingError> {
     // Bond pricers
-    register_generic!(
-        registry,
-        InstrumentType::Bond,
-        crate::instruments::fixed_income::bond::Bond
-    );
-    registry.register(
-        crate::instruments::fixed_income::bond::pricing::engine::SimpleBondHazardPricer,
-    )?;
-    registry
-        .register(crate::instruments::fixed_income::bond::pricing::engine::SimpleBondOasPricer)?;
+    for model in [
+        ModelKey::Discounting,
+        ModelKey::Tree,
+        ModelKey::HazardRate,
+        ModelKey::RatesCredit,
+    ] {
+        registry.register(
+            crate::instruments::fixed_income::bond::pricing::engine::BondPricer::new(model),
+        )?;
+    }
     registry.register(
         crate::instruments::fixed_income::bond::pricing::engine::SimpleBondMertonMcPricer,
     )?;

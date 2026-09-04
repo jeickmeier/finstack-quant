@@ -14,6 +14,7 @@ pub(crate) mod floating_reset_descriptors;
 mod generic;
 pub(crate) mod overnight;
 pub mod overnight_conventions;
+pub(crate) mod rates_credit;
 pub mod swap_legs;
 pub mod time;
 mod trs;

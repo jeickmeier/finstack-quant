@@ -1203,13 +1203,8 @@ fn test_overnight_lockout_flat_curve() {
 /// the accrual period, so rates sampled under a SONIA-style 5 BD shift
 /// must differ from in-arrears rates on any non-flat forward curve.
 ///
-/// Before the fix: `sample_overnight_rates` only ever sampled the accrual
-/// window and the shift was applied post-hoc as index rewriting, which on a
-/// rising curve produced identical rates to the accrual-window sample for the
-/// earliest `shift_days` observations (falling back to `daily_rates[0]`).
-///
-/// After the fix: on a steeply-rising forward curve `shifted < arrears` for
-/// every coupon because the observations genuinely come from `shift_days`
+/// On a steeply-rising forward curve `shifted < arrears` for every coupon
+/// because the compiled observations genuinely come from `shift_days`
 /// business days earlier in time.
 #[test]
 fn test_overnight_observation_shift_samples_pre_accrual_window() {
@@ -1308,16 +1303,9 @@ fn test_overnight_observation_shift_samples_pre_accrual_window() {
 /// each accrual date — the rate observation is shifted but the
 /// accrual-period weight is preserved.
 ///
-/// Before the follow-up: `compute_overnight_rate::CompoundedWithLookback`
-/// did index-rewriting inside the accrual-window sample. For the first
-/// `lookback_days` business days it fell back to `daily_rates[0]` (the
-/// first rate of the accrual window), effectively muting the first week of
-/// the lookback shift and producing a biased coupon rate.
-///
-/// After the follow-up: `sample_overnight_rates_with_lookback` in
-/// coupons.rs looks up each rate via `add_business_days(-lookback)`, so on
-/// a rising forward curve every accrual-business-day observation is
-/// strictly earlier in time than its in-arrears counterpart.
+/// `OvernightObservationSchedule` compiles every lookback date before rate
+/// replay, so on a rising forward curve every accrual-business-day observation
+/// is strictly earlier in time than its in-arrears counterpart.
 #[test]
 fn test_overnight_lookback_samples_pre_accrual_rates() {
     use finstack_quant_core::market_data::context::MarketContext;

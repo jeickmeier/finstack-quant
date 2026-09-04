@@ -4,13 +4,14 @@ Covers the B1a remediation slice: ``InterestRateSwap.from_conventions``,
 ``FloatLegSpec.reset_lag_days`` defaulting to ``0`` (spot fixing) so a swap
 starting on the valuation date prices off forwards without fixings, the
 ``compounding`` keyword, ``Bond.builder`` with a credit curve priced under
-``hazard_rate``, typed getters, leg-spec pickling, ``float | Rate`` and
+``hazard_rate`` / ``rates_credit``, typed getters, leg-spec pickling, ``float | Rate`` and
 ISO-string date acceptance, and builder ``__repr__``.
 """
 
 from __future__ import annotations
 
 import datetime
+import json
 import pickle
 
 import pytest
@@ -41,6 +42,7 @@ from finstack_quant.valuations.instruments import (
     SwaptionBuilder,
     TermLoan,
     TermLoanBuilder,
+    list_models_grouped,
     price_instrument,
 )
 
@@ -379,47 +381,98 @@ def test_bond_constructors_and_examples() -> None:
     assert Bond.example().min_xirr(0.12).return_floor is not None
 
 
-def test_bond_builder_callable_credit_bond_prices_under_hazard_rate() -> None:
+def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
     base = Bond.example().to_dict()
-    bond = (
-        Bond
-        .builder()
-        .id("CALLABLE-CREDIT")
-        .notional(1_000_000.0, currency="USD")
-        .issue_date("2024-01-15")
-        .maturity("2034-01-15")
-        .cashflow_spec(base["cashflow_spec"])
-        .discount_curve_id("USD-OIS")
-        .credit_curve_id("ACME-HZD")
-        .call_put({
-            "calls": [{"start_date": "2029-01-15", "end_date": "2034-01-15", "price_pct_of_par": 100.0}],
+
+    def build_credit_bond(bond_id: str, call_put: dict[str, object] | None = None) -> Bond:
+        builder = (
+            Bond
+            .builder()
+            .id(bond_id)
+            .notional(1_000_000.0, currency="USD")
+            .issue_date("2024-01-15")
+            .maturity("2034-01-15")
+            .cashflow_spec(base["cashflow_spec"])
+            .discount_curve_id("USD-OIS")
+            .credit_curve_id("ACME-HZD")
+            .attributes({"issuer": "ACME"})
+        )
+        if call_put is not None:
+            builder = builder.call_put(call_put)
+        return builder.build()
+
+    bullet = build_credit_bond("BULLET-CREDIT")
+    callable_bond = build_credit_bond(
+        "CALLABLE-CREDIT",
+        {
+            "calls": [
+                {
+                    "start_date": AS_OF.isoformat(),
+                    "end_date": AS_OF.isoformat(),
+                    "price_pct_of_par": 80.0,
+                }
+            ],
             "puts": [],
-        })
-        .attributes({"issuer": "ACME"})
-        .build()
+        },
     )
-    assert bond.credit_curve_id == "ACME-HZD"
-    assert bond.call_put is not None
-    assert bond.call_put["calls"][0]["price_pct_of_par"] == pytest.approx(100.0)
-    assert bond.attributes.get_meta("issuer") == "ACME"
-    result = bond.price(_market(), AS_OF, model="hazard_rate")
-    assert result.currency == "USD"
-    assert 0.0 < result.price < 1_500_000.0
-    # ``discounting`` still applies the bond's own credit curve, so the risk-free
-    # comparison has to drop ``credit_curve_id`` entirely.
-    risk_free = (
-        Bond
-        .builder()
-        .id("CALLABLE-RISKFREE")
-        .notional(1_000_000.0, currency="USD")
-        .issue_date("2024-01-15")
-        .maturity("2034-01-15")
-        .cashflow_spec(base["cashflow_spec"])
-        .discount_curve_id("USD-OIS")
-        .build()
-        .price(_market(), AS_OF, model="discounting")
+    puttable_bond = build_credit_bond(
+        "PUTTABLE-CREDIT",
+        {
+            "calls": [],
+            "puts": [
+                {
+                    "start_date": AS_OF.isoformat(),
+                    "end_date": AS_OF.isoformat(),
+                    "price_pct_of_par": 120.0,
+                }
+            ],
+        },
     )
-    assert result.price < risk_free.price
+    assert callable_bond.credit_curve_id == "ACME-HZD"
+    assert callable_bond.call_put is not None
+    assert callable_bond.call_put["calls"][0]["price_pct_of_par"] == pytest.approx(80.0)
+    assert callable_bond.attributes.get_meta("issuer") == "ACME"
+
+    market = _market()
+    bond_models = set(list_models_grouped()["bond"])
+    assert {"discounting", "hazard_rate", "tree", "rates_credit"} <= bond_models
+
+    bullet_result = bullet.price(market, AS_OF, model="rates_credit")
+    callable_result = callable_bond.price(market, AS_OF, model="rates_credit")
+    puttable_result = puttable_bond.price(market, AS_OF, model="rates_credit")
+    hazard_result = bullet.price(market, AS_OF, model="hazard_rate")
+    tree_result = callable_bond.price(market, AS_OF, model="tree")
+    assert bullet_result.currency == "USD"
+    assert 0.0 < callable_result.price < bullet_result.price < puttable_result.price < 1_500_000.0
+    assert 0.0 < hazard_result.price < 1_500_000.0
+    assert 0.0 < tree_result.price < 1_500_000.0
+    with pytest.raises(ValueError, match="non-callable"):
+        callable_bond.price(market, AS_OF, model="hazard_rate")
+
+    # Explicit discounting is rates-only even when the bond carries a credit
+    # curve identifier; it must not silently switch to the hazard kernel.
+    risk_free = bullet.price(market, AS_OF, model="discounting")
+    assert hazard_result.price < risk_free.price
+    assert bullet_result.price < risk_free.price
+
+    stochastic_document = json.loads(bullet.to_json())
+    stochastic_spec = stochastic_document["instrument"]["spec"]
+    stochastic_spec["maturity"] = "2026-01-15"
+    stochastic_spec["instrument_pricing_overrides"] = {
+        "model_config": {"hazard_volatility": 0.01, "mc_paths": 2, "tree_steps": 4}
+    }
+    stochastic_result = price_instrument(json.dumps(stochastic_document), market, AS_OF, model="rates_credit")
+    assert stochastic_result.details is not None
+    assert stochastic_result.details["type"] == "monte_carlo"
+    diagnostics = stochastic_result.details["data"]
+    assert diagnostics["model_key"] == "rates_credit"
+    assert diagnostics["training_paths"] == 0
+    assert diagnostics["training_simulated_paths"] == 0
+    assert diagnostics["make_whole_training_paths"] == 0
+    assert diagnostics["make_whole_training_simulated_paths"] == 0
+    assert diagnostics["estimator_paths"] == 2
+    assert diagnostics["simulated_paths"] == 4
+    assert diagnostics["seed"] > 2**53 - 1
 
 
 def test_bond_getters_and_pricing_helpers() -> None:

@@ -1,7 +1,6 @@
 """Mapped labs expose instrument families only after their fixture stage exists."""
 
 from pathlib import Path
-import tomllib
 
 from build_labs import published_notebooks, source_notebooks
 from check_curriculum import validate_instrument_fixture_usage

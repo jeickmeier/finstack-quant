@@ -1,16 +1,14 @@
-//! Behavioral baselines for callable credit-risky pricing on the
-//! rates-credit tree path.
+//! Behavioral baselines for callable credit-risky pricing on the explicit
+//! rates-credit path.
 //!
 //! These pin the PV/OAS numbers produced by the two-factor rates-credit
-//! lattice for a callable bond and a callable term loan. They exist so the
-//! configuration refactor (public `hazard_volatility` /
-//! `rate_credit_correlation` inputs, one shared resolver, and the removal of
-//! the implicit stochastic defaults) can prove it did not move any price.
+//! model for a callable bond and a callable term loan. They exist so the
+//! public `hazard_volatility` / `rate_credit_correlation` inputs, the shared
+//! resolver, and the deterministic seed remain wired consistently.
 //!
 //! The pinned regime is the one the engines used implicitly before the
 //! refactor — short-rate vol `0.01`, hazard vol `0.20`, no mean reversion,
-//! zero correlation — now stated explicitly through `ModelConfig`. If a
-//! number here moves, the lattice or the routing changed, not the wiring.
+//! zero correlation — stated explicitly through `ModelConfig`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -124,34 +122,27 @@ fn callable_credit_loan() -> TermLoan {
 
 /// Apply the baseline regime explicitly through the public model config.
 ///
-/// Before the refactor this is a no-op on the bond path (the engine already
-/// used these values implicitly) and is ignored on the hazard factor; after
-/// the refactor it is the only way to select the regime.
+/// The native bond path infers `rates_credit` when these joint-factor inputs
+/// are present.
 fn apply_baseline_regime(
     overrides: &mut finstack_quant_valuations::instruments::InstrumentPricingOverrides,
 ) {
     overrides.model_config.hw1f_sigma = Some(BASELINE_RATE_VOL);
     overrides.model_config.hazard_volatility = Some(BASELINE_HAZARD_VOL);
+    // These tests pin routing and qualitative model behavior. A small,
+    // deterministic sample keeps the integration suite fast; production uses
+    // the full default budget unless callers override `mc_paths`.
+    overrides.model_config.mc_paths = Some(128);
 }
 
 /// PV of the callable credit-risky bond under the baseline regime.
 ///
 /// # Why this moved from the pre-refactor number
 ///
-/// The pre-refactor engine produced `743_256.32` for this instrument. That
-/// number was wrong, and the correction is deliberate: calibration solved the
-/// per-step hazard shift against **raw** additive-normal node values while
-/// backward induction applied `max(0, h)`. Because the floor only ever raises
-/// a hazard, pricing defaulted the instrument faster than the calibration
-/// believed — on this fixture the survival the valuator actually saw was
-/// `0.99173` at `t = 0.2` where the market curve said `0.99601`, roughly 43 bp
-/// of spurious default probability inside the first fifth of a year, which
-/// compounds to about a 24% PV understatement over the five-year life.
-///
-/// Both passes now share one non-negative transform, so the lattice reproduces
-/// the survival curve the valuator consumes. The remaining gap to the
-/// deterministic-credit price is genuine hazard-volatility convexity.
-const BASELINE_BOND_PV: f64 = 982_040.340_830_378;
+/// The callable stochastic bond now uses the pathwise LSMC exercise engine.
+/// The pinned value uses the deterministic instrument-derived seed and the
+/// test-only 128-estimator budget set by [`apply_baseline_regime`].
+const BASELINE_BOND_PV: f64 = 986_735.637_112_065;
 /// PV of the callable credit-risky term loan under the same regime, corrected
 /// by the same calibration/valuation consistency fix.
 const BASELINE_LOAN_PV: f64 = 9_817_924.463_984_11;
@@ -206,8 +197,8 @@ fn callable_credit_term_loan_pv_and_oas_baseline() {
     );
 }
 
-/// One instrument reaches every applicable regime by changing only
-/// `ModelConfig` — no second model key, no engine switch, no rebuild.
+/// The joint rates-credit model reaches all four factor-volatility regimes by
+/// changing only `ModelConfig`.
 #[test]
 fn all_four_regimes_are_selected_by_model_config_alone() {
     use finstack_quant_valuations::instruments::Instrument;
@@ -222,6 +213,7 @@ fn all_four_regimes_are_selected_by_model_config_alone() {
         bond.instrument_pricing_overrides
             .model_config
             .rate_credit_correlation = rho;
+        bond.instrument_pricing_overrides.model_config.mc_paths = Some(128);
         bond.value(&market, as_of()).unwrap().amount()
     };
 
@@ -265,7 +257,8 @@ fn all_four_regimes_are_selected_by_model_config_alone() {
 /// has no hazard factor at all.
 #[test]
 fn hazard_inputs_without_a_credit_curve_fail_validation() {
-    use finstack_quant_valuations::instruments::Instrument;
+    use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+    use finstack_quant_valuations::pricer::ModelKey;
 
     let market = market();
     for (label, apply) in [
@@ -297,6 +290,26 @@ fn hazard_inputs_without_a_credit_curve_fail_validation() {
             msg.contains(label) && msg.contains("credit_curve_id"),
             "error must name the inert field and the missing curve: {msg}"
         );
+
+        let default_registry_error = bond
+            .price_with_metrics(&market, as_of(), &[], PricingOptions::default())
+            .expect_err("the registry's native default must reject the same orphan credit input");
+        let default_registry_message = default_registry_error.to_string();
+        assert!(
+            default_registry_message.contains(label)
+                && default_registry_message.contains("credit_curve_id"),
+            "default registry error must name the inert field and missing curve: {default_registry_message}"
+        );
+
+        let explicit_tree = bond
+            .price_with_metrics(
+                &market,
+                as_of(),
+                &[],
+                PricingOptions::default().with_model(ModelKey::Tree),
+            )
+            .expect("an explicit Tree selection must ignore credit-only model inputs");
+        assert!(explicit_tree.value.amount().is_finite());
     }
 }
 

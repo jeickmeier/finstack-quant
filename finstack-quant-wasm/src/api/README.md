@@ -150,6 +150,14 @@ export that is not in it is invisible to TypeScript users, and
   any count that can plausibly grow must be guarded with
   `utils::check_js_safe_count` rather than silently rounding past
   `Number.MAX_SAFE_INTEGER`. `attribution/mod.rs` documents why it is exempt.
+  For LSMC valuations, `standard_error` measures pricing-path sampling uncertainty
+  under the frozen fitted exercise policy and excludes regression approximation,
+  time-grid discretization, and model error. Structured valuation results follow
+  this rule for Monte Carlo `seed`; use a
+  BigInt-aware replacer such as
+  `JSON.stringify(result, (_, value) => typeof value === "bigint" ? value.toString() : value)`
+  when a portable JSON document is needed. The decimal string retains the full
+  seed even though ordinary `JSON.stringify(result)` rejects `BigInt`.
 
 - **Doc comments before the attribute.** Every JS-facing callable documents each
   caller-supplied input with a substantive `@param` in its `///` block, placed

@@ -145,6 +145,7 @@ fn test_model_key_display() {
     assert_eq!(ModelKey::Black76.to_string(), "black76");
     assert_eq!(ModelKey::HullWhite1F.to_string(), "hull_white_1f");
     assert_eq!(ModelKey::HazardRate.to_string(), "hazard_rate");
+    assert_eq!(ModelKey::RatesCredit.to_string(), "rates_credit");
 }
 
 #[test]
@@ -332,7 +333,13 @@ fn standard_pricer_registry_has_exact_expected_coverage() {
     let expected = BTreeMap::from([
         (
             I::Bond,
-            vec![M::Discounting, M::Tree, M::HazardRate, M::MertonMc],
+            vec![
+                M::Discounting,
+                M::Tree,
+                M::HazardRate,
+                M::RatesCredit,
+                M::MertonMc,
+            ],
         ),
         (I::Cds, vec![M::HazardRate]),
         (I::CdsIndex, vec![M::HazardRate]),
@@ -539,6 +546,7 @@ fn test_model_key_repr_values() {
     assert_eq!(ModelKey::Black76 as u16, 3);
     assert_eq!(ModelKey::HullWhite1F as u16, 4);
     assert_eq!(ModelKey::HazardRate as u16, 5);
+    assert_eq!(ModelKey::RatesCredit as u16, 7);
 }
 
 #[test]
@@ -595,6 +603,7 @@ fn test_list_models_mirrors_the_standard_pricer_registry_and_is_deterministic() 
     assert_eq!(list_models(), expected);
     assert_eq!(list_models(), list_models());
     assert!(list_models().contains(&"discounting".to_string()));
+    assert!(list_models().contains(&"rates_credit".to_string()));
 
     // Every advertised name must round-trip through the canonical parser.
     for name in list_models() {

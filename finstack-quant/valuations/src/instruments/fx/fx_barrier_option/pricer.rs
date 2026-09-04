@@ -177,6 +177,10 @@ impl FxBarrierOptionMcPricer {
             diagnostics: Some(crate::results::MonteCarloValuationDetails {
                 model_key: ModelKey::MonteCarloGBM,
                 standard_error: result.stderr,
+                training_paths: 0,
+                training_simulated_paths: 0,
+                make_whole_training_paths: 0,
+                make_whole_training_simulated_paths: 0,
                 estimator_paths: result.num_paths,
                 simulated_paths: result.num_simulated_paths,
                 seed,

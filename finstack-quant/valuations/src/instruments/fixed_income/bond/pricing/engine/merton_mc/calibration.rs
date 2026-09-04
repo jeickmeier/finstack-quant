@@ -3,7 +3,8 @@
 use super::{CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode, PikSchedule};
 use crate::cashflow::builder::specs::CouponType;
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
-    price_from_japanese_simple_yield, price_from_ytm, price_from_z_spread, BondQuoteInput,
+    price_from_japanese_simple_yield, price_from_ytm, price_from_ytw, price_from_z_spread,
+    BondQuoteInput,
 };
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::fixed_income::bond::types::Bond;
@@ -106,13 +107,11 @@ fn target_pv_from_quote(
         BondQuoteInput::JapaneseSimpleYield(simple_yield) => {
             price_from_japanese_simple_yield(bond, quote_date, simple_yield)?
         }
-        BondQuoteInput::Ytm(ytm) | BondQuoteInput::Ytw(ytm) => {
-            // YTW inversion uses maturity flows (same convention as
-            // `Bond::base_value`'s `quoted_ytw` path); for callable bonds,
-            // prefer `Oas` for exercise-aware pricing.
+        BondQuoteInput::Ytm(ytm) => {
             let flows = bond.pricing_dated_cashflows(market, as_of)?;
             price_from_ytm(bond, &flows, quote_date, ytm)?
         }
+        BondQuoteInput::Ytw(ytw) => price_from_ytw(bond, market, as_of, ytw)?,
         // `price_from_z_spread` derives the settlement origin internally,
         // so it takes the valuation `as_of` (not the pre-computed quote_date).
         BondQuoteInput::ZSpread(z) => price_from_z_spread(bond, market, as_of, z)?,

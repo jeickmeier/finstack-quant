@@ -152,11 +152,10 @@ fn test_bond_valuator_with_calls() {
 }
 
 #[test]
-fn test_bond_valuator_maps_call_window_to_interior_coupon_steps() {
-    // A call window is exercisable throughout [start, end]: the tree must book
-    // exercise opportunities at the endpoints AND every coupon date inside the
-    // window (matching the YTW enumeration). The semi-annual test bond has a
-    // coupon at 2027-07-01 strictly inside the 2027-01-01..2028-01-01 window.
+fn test_bond_valuator_maps_call_window_to_calendar_steps() {
+    // A call window is exercisable on every calendar date in [start, end]. On
+    // this coarser uniform grid, adjacent dates coalesce onto tree steps, but
+    // the result must still contain more than the old endpoint/coupon-only set.
     let bond = create_test_bond();
     let mut json = serde_json::to_value(&bond).expect("Bond serialization should succeed");
     json.as_object_mut()
@@ -180,9 +179,9 @@ fn test_bond_valuator_maps_call_window_to_interior_coupon_steps() {
         .expect("BondValuator creation should succeed in test");
 
     let call_steps = valuator.call_vec.iter().filter(|c| c.is_some()).count();
-    assert_eq!(
-        call_steps, 3,
-        "call window should exercise at endpoints plus the interior coupon date"
+    assert!(
+        call_steps > 3,
+        "daily call window should map to more than endpoint/coupon-only steps, got {call_steps}"
     );
 }
 
@@ -361,6 +360,7 @@ fn test_rates_credit_default_lowers_price() {
         .unwrap_or(0.0);
     let steps = 40usize;
 
+    let maturity = bond.maturity;
     let valuator_low = BondValuator::new(bond.clone(), &ctx_low, as_of, time_to_maturity, steps)
         .expect("valuator");
     let valuator_high =
@@ -377,9 +377,17 @@ fn test_rates_credit_default_lowers_price() {
         steps,
         ..Default::default()
     });
-    tree_low
-        .calibrate(disc_low.as_ref(), low_hc_ref.as_ref(), time_to_maturity)
-        .expect("calibration low");
+    let low_targets =
+        crate::instruments::common_impl::pricing::rates_credit::build_rates_credit_targets(
+            disc_low.as_ref(),
+            low_hc_ref.as_ref(),
+            as_of,
+            maturity,
+            time_to_maturity,
+            steps,
+        )
+        .expect("low targets");
+    tree_low.calibrate(&low_targets).expect("calibration low");
 
     let disc_high = ctx_high
         .get_discount("USD-OIS")
@@ -391,8 +399,18 @@ fn test_rates_credit_default_lowers_price() {
         steps,
         ..Default::default()
     });
+    let high_targets =
+        crate::instruments::common_impl::pricing::rates_credit::build_rates_credit_targets(
+            disc_high.as_ref(),
+            high_hc_ref.as_ref(),
+            as_of,
+            maturity,
+            time_to_maturity,
+            steps,
+        )
+        .expect("high targets");
     tree_high
-        .calibrate(disc_high.as_ref(), high_hc_ref.as_ref(), time_to_maturity)
+        .calibrate(&high_targets)
         .expect("calibration high");
 
     let vars = HashMap::<&'static str, f64>::default();

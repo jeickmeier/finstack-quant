@@ -3,7 +3,7 @@
 //! This module centralizes the tagged-instrument JSON pipeline used by the
 //! Python and WASM bindings: parse instrument JSON, optionally merge metric
 //! pricing overrides, parse the as-of date and model key, and dispatch through
-//! the standard pricer registry.
+//! the caller-selected registry or the shared standard registry.
 
 use super::{shared_standard_registry, ModelKey};
 use crate::instruments::json_loader::MAX_JSON_BYTES;
@@ -15,6 +15,7 @@ use finstack_quant_core::Error;
 use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// Standard option Greek metric IDs exposed by host-language option wrappers.
 pub const STANDARD_OPTION_GREEKS: &[&str] = &[
@@ -322,8 +323,8 @@ fn resolve_model_key(
     }
 }
 
-/// Price an already parsed and validated instrument using the shared standard
-/// registry.
+/// Price an already parsed and validated instrument using the caller-selected
+/// registry or the shared standard registry.
 ///
 /// Host bindings call this after [`parse_boxed_instrument_from_json`] so
 /// malformed instruments are reported before market extraction without
@@ -331,7 +332,7 @@ fn resolve_model_key(
 ///
 /// # Arguments
 ///
-/// * `instrument` - Validated instrument to dispatch through the standard
+/// * `instrument` - Validated instrument to dispatch through the selected
 ///   pricer registry.
 /// * `market` - Market context supplying curves, quotes, fixings, and FX data.
 /// * `as_of` - ISO-8601 valuation date.
@@ -341,7 +342,9 @@ fn resolve_model_key(
 /// * `market_history_json` - Optional serialized market history required by
 ///   historical risk metrics.
 /// * `pricing_options` - Pricing services and configuration supplied by the
-///   caller.
+///   caller. When it contains a pricer registry, that registry drives both the
+///   base value and every nested metric reprice; otherwise the shared standard
+///   registry is used.
 ///
 /// # Errors
 ///
@@ -360,7 +363,10 @@ pub fn price_instrument(
     let instrument = instrument.as_instrument();
     let as_of = finstack_quant_core::dates::parse_iso_date(as_of)?;
     let model = resolve_model_key(instrument, model)?;
-    let registry = shared_standard_registry();
+    let registry = pricing_options
+        .registry
+        .as_ref()
+        .map_or_else(shared_standard_registry, Arc::clone);
     let metric_registry = pricing_options.metric_registry.clone();
     let metric_registry = metric_registry
         .as_deref()
@@ -597,9 +603,15 @@ mod tests {
     use crate::instruments::fx::FxOption;
     use crate::instruments::rates::ir_future::InterestRateFuture;
     use crate::instruments::rates::swaption::Swaption;
+    use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
+    use crate::pricer::{
+        expect_inst, InstrumentType, Pricer, PricerKey, PricerRegistry, PricingError,
+    };
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     fn price_instrument_from_json(
         instrument_json: &str,
@@ -671,6 +683,39 @@ mod tests {
             .build()
             .expect("curve");
         MarketContext::new().insert(disc)
+    }
+
+    struct FixedJsonBondPricer {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl Pricer for FixedJsonBondPricer {
+        fn key(&self) -> PricerKey {
+            PricerKey::new(InstrumentType::Bond, ModelKey::Discounting)
+        }
+
+        fn price_dyn(
+            &self,
+            instrument: &dyn Instrument,
+            _market: &MarketContext,
+            as_of: Date,
+        ) -> std::result::Result<ValuationResult, PricingError> {
+            let bond = expect_inst::<Bond>(instrument, InstrumentType::Bond)?;
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(ValuationResult::stamped(
+                bond.id(),
+                as_of,
+                Money::new(321.0, bond.notional.currency()),
+            ))
+        }
+    }
+
+    struct RepriceJsonMetric;
+
+    impl MetricCalculator for RepriceJsonMetric {
+        fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+            context.reprice_raw(context.curves.as_ref(), context.as_of)
+        }
     }
 
     #[test]
@@ -1066,6 +1111,10 @@ mod tests {
             parse_model_key("hazard_rate").expect("ok"),
             ModelKey::HazardRate
         );
+        assert_eq!(
+            parse_model_key("rates_credit").expect("ok"),
+            ModelKey::RatesCredit
+        );
         assert_eq!(parse_model_key("normal").expect("ok"), ModelKey::Normal);
         assert_eq!(
             parse_model_key("monte_carlo_gbm").expect("ok"),
@@ -1090,6 +1139,49 @@ mod tests {
         )
         .expect("price");
         assert_eq!(result.instrument_id, "TEST-BOND");
+    }
+
+    #[test]
+    fn json_pricing_preserves_custom_registry_for_base_and_metric_repricing() {
+        let parsed = parse_boxed_instrument_from_json(&bond_instrument_json(), None)
+            .expect("validated bond JSON");
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut pricers = PricerRegistry::new();
+        pricers
+            .register(FixedJsonBondPricer {
+                calls: Arc::clone(&calls),
+            })
+            .expect("unique custom pricer");
+        let metric_id = MetricId::custom("json_registry_reprice");
+        let mut metrics = MetricRegistry::new();
+        metrics
+            .register_metric(
+                metric_id.clone(),
+                Arc::new(RepriceJsonMetric),
+                &[InstrumentType::Bond],
+            )
+            .expect("unique custom metric");
+
+        let result = price_instrument(
+            &parsed,
+            &MarketContext::new(),
+            "2024-01-01",
+            "discounting",
+            &[metric_id.to_string()],
+            None,
+            crate::instruments::PricingOptions::default()
+                .with_registry(Arc::new(pricers))
+                .with_metric_registry(Arc::new(metrics)),
+        )
+        .expect("custom JSON registry must drive base and nested repricing");
+
+        assert_eq!(result.value.amount(), 321.0);
+        assert_eq!(result.measures.get(&metric_id), Some(&321.0));
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            2,
+            "base PV and metric reprice must use the same custom registry"
+        );
     }
 
     #[test]

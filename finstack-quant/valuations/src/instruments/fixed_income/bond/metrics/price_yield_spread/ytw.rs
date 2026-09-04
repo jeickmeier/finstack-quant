@@ -90,18 +90,22 @@ impl MetricCalculator for YtwCalculator {
         let dirty_amt = quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount());
         let dirty_now = Money::new(dirty_amt, bond.notional.currency());
 
-        // Build full schedule for accurate outstanding principal on amortizing bonds
-        let schedule = bond.full_cashflow_schedule(&context.curves)?;
+        // Lower return-floor protection into its pricing-effective call
+        // schedule before scanning workouts. Contractual cashflows are
+        // unchanged, while floor-only bonds gain their admissible early exits.
+        let effective_bond = bond.effective_for_pricing(&context.curves, context.as_of)?;
+        let schedule = effective_bond.full_cashflow_schedule(&context.curves)?;
 
         // Delegate candidate scanning and YTM solving to shared helper.
         // Use quote_date as the time origin to match market convention.
         let (best_ytm, _best_flows) =
             crate::instruments::fixed_income::bond::pricing::quote_conversions::solve_ytw_from_flows(
-                bond,
+                &effective_bond,
+                &context.curves,
                 flows,
                 quote_ctx.quote_date,
                 dirty_now,
-                Some(&schedule),
+                &schedule,
             )?;
 
         Ok(best_ytm)

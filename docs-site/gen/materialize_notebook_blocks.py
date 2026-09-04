@@ -18,9 +18,7 @@ MARKER_START = re.compile(r"^[ \t]*(?:<!--|\{/\*)\s*/?notebook-block\b")
 CELL_ID = re.compile(r"[a-z0-9][a-z0-9_-]*\Z")
 
 
-def cell_source(
-    record: dict, fields: dict[str, str], notebook_root: Path, cache: dict[str, dict] | None = None
-) -> str:
+def cell_source(record: dict, fields: dict[str, str], notebook_root: Path, cache: dict[str, dict] | None = None) -> str:
     """Resolve one mapped code cell and validate its author-owned metadata."""
     if set(fields) != {"notebook", "cell", "role"}:
         raise ValueError("Notebook block requires exactly notebook, cell and role attributes")

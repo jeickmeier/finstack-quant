@@ -16,6 +16,7 @@ use finstack_quant_valuations::instruments::{
     Instrument, InstrumentPricingOverrides, PricingOptions,
 };
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::pricer::ModelKey;
 use time::macros::date;
 
 fn build_callable_credit_bond(as_of: time::Date) -> Bond {
@@ -24,7 +25,7 @@ fn build_callable_credit_bond(as_of: time::Date) -> Bond {
         Money::new(1_000_000.0, Currency::USD),
         finstack_quant_core::types::Rate::from_decimal(0.06),
         as_of,
-        date!(2032 - 01 - 01),
+        date!(2027 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
         "USD-OIS",
     )
@@ -36,8 +37,8 @@ fn build_callable_credit_bond(as_of: time::Date) -> Bond {
         .implied_volatility = Some(0.01);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 01),
-            end_date: date!(2028 - 01 - 01),
+            start_date: date!(2026 - 01 - 01),
+            end_date: date!(2026 - 01 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -49,16 +50,34 @@ fn build_callable_credit_bond(as_of: time::Date) -> Bond {
 fn build_market(as_of: time::Date) -> MarketContext {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
-        .knots([(0.0, 1.0), (3.0, 0.91), (7.0, 0.78)])
+        .knots([(0.0, 1.0), (1.0, 0.96), (2.0, 0.91)])
         .build()
         .expect("discount curve should build");
     let hazard = HazardCurve::builder("USD-CREDIT")
         .base_date(as_of)
         .recovery_rate(0.4)
-        .knots([(0.0, 0.015), (7.0, 0.015)])
+        .knots([(0.0, 0.015), (2.0, 0.015)])
         .build()
         .expect("hazard curve should build");
     MarketContext::new().insert(disc).insert(hazard)
+}
+
+fn build_replayable_market(as_of: time::Date) -> MarketContext {
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (1.0, 0.96), (2.0, 0.91), (5.0, 0.78)])
+        .build()
+        .expect("discount curve should build");
+    let source = MarketContext::new().insert(disc);
+    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+        &source,
+        as_of,
+        "USD-CREDIT",
+        "USD-CREDIT-ENTITY",
+        "USD-OIS",
+    )
+    .expect("hazard calibration should succeed");
+    source.insert(hazard)
 }
 
 #[test]
@@ -70,7 +89,7 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
     // CS01 bumps the hazard and reprices through the same tree.
     let mut unquoted = build_callable_credit_bond(as_of);
     unquoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_hw1f_sigma(0.02);
+        InstrumentPricingOverrides::default().with_hw1f_sigma(0.0);
     let base = unquoted
         .price_with_metrics(
             &market,
@@ -90,7 +109,7 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
     let mut quoted = build_callable_credit_bond(as_of);
     quoted.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(model_clean)
-        .with_hw1f_sigma(0.02);
+        .with_hw1f_sigma(0.0);
     let result = quoted
         .price_with_metrics(
             &market,
@@ -148,4 +167,65 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
         (cs01 - base_cs01).abs() < (base_cs01.abs() * 0.05 + 1.0),
         "quoted callable-credit CS01 ({cs01:.4}) should reconcile with unquoted ({base_cs01:.4})"
     );
+}
+
+#[test]
+fn test_unquoted_callable_explicit_models_skip_quote_spread_dependencies() {
+    let as_of = date!(2025 - 01 - 01);
+    let market = build_replayable_market(as_of);
+    let mut bond = build_callable_credit_bond(as_of);
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default().with_hw1f_sigma(0.0);
+
+    let rates_credit = bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[
+                MetricId::Cs01,
+                MetricId::BucketedCs01,
+                MetricId::BucketedDv01,
+            ],
+            crate::test_support::credit::pricing_options().with_model(ModelKey::RatesCredit),
+        )
+        .expect("unquoted callable RatesCredit risk should not require Z-spread");
+    for metric in ["cs01", "bucketed_cs01", "bucketed_dv01"] {
+        let value = rates_credit.measures[metric];
+        assert!(
+            value.is_finite() && value.abs() > 1e-6,
+            "{metric} should be finite and non-zero, got {value}"
+        );
+    }
+    assert!(rates_credit.measures.iter().any(|(key, value)| {
+        key.as_str().starts_with("bucketed_cs01::USD-CREDIT::") && value.abs() > 1e-6
+    }));
+    assert!(rates_credit
+        .measures
+        .iter()
+        .any(|(key, value)| { key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6 }));
+
+    let tree = bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[
+                MetricId::Cs01,
+                MetricId::BucketedCs01,
+                MetricId::BucketedDv01,
+            ],
+            PricingOptions::default().with_model(ModelKey::Tree),
+        )
+        .expect("unquoted callable Tree risk should not require Z-spread");
+    for metric in ["cs01", "bucketed_cs01", "bucketed_dv01"] {
+        let value = tree.measures[metric];
+        assert!(
+            value.is_finite() && value.abs() > 1e-6,
+            "Tree {metric} should be finite and non-zero, got {value}"
+        );
+    }
+    let bucketed_dv01 = tree.measures["bucketed_dv01"];
+    assert!(bucketed_dv01.is_finite() && bucketed_dv01.abs() > 1e-6);
+    assert!(tree
+        .measures
+        .iter()
+        .any(|(key, value)| key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6));
 }

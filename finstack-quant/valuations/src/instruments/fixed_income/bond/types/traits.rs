@@ -10,129 +10,38 @@ use super::CashflowSpec;
 impl crate::instruments::common_impl::traits::Instrument for Bond {
     impl_instrument_base!(crate::pricer::InstrumentType::Bond);
 
+    fn default_model(&self) -> crate::pricer::ModelKey {
+        self.default_pricing_model()
+    }
+
     fn base_value(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        use crate::instruments::fixed_income::bond::pricing::quote_conversions;
+        Ok(finstack_quant_core::money::Money::new(
+            self.base_value_raw_impl(curves, as_of)?,
+            self.notional.currency(),
+        ))
+    }
 
-        // Lower any guaranteed-return floor into a concrete call schedule, then
-        // price the resulting callable bond through the normal path. The cloned
-        // bond has `return_floor == None`, so this recursion terminates.
-        if self.return_floor.is_some() {
-            let effective = self.effective_for_pricing(curves, as_of)?;
-            return effective.base_value(curves, as_of);
-        }
+    fn base_value_raw(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<f64> {
+        self.base_value_raw_impl(curves, as_of)
+    }
 
-        // Scenario spread shock: applied as an additional flat Z-spread on top
-        // of either the quoted Z-spread or the curve-implied (zero-spread)
-        // price. Restricted to configurations where that is exact — vanilla
-        // discount-priced bonds — so the shock can never silently no-op:
-        // unsupported configurations error with guidance instead.
-        if let Some(shock_bp) = self.scenario_pricing_overrides.scenario_spread_shock_bp {
-            if self
-                .call_put
-                .as_ref()
-                .is_some_and(super::definitions::CallPutSchedule::has_options)
-            {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "scenario_spread_shock_bp is not supported for bond '{}' with embedded \
-                     options; shock the discount curve or use quoted_oas instead",
-                    self.id
-                )));
-            }
-            if self.credit_curve_id.is_some() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "scenario_spread_shock_bp is not supported for hazard-priced bond '{}' \
-                     (credit curve assigned); bump the hazard curve instead (e.g. a par-CDS \
-                     curve shock)",
-                    self.id
-                )));
-            }
-            if self
-                .instrument_pricing_overrides
-                .market_quotes
-                .has_non_z_price_driver()
-            {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "scenario_spread_shock_bp on bond '{}' conflicts with a price-pinning \
-                     quote override; remove the quote or quote via quoted_z_spread so the \
-                     shock can compose additively",
-                    self.id
-                )));
-            }
-            let z_eff = self
-                .instrument_pricing_overrides
-                .market_quotes
-                .quoted_z_spread
-                .unwrap_or(0.0)
-                + shock_bp * 1e-4;
-            let dirty_at_quote =
-                quote_conversions::price_from_z_spread(self, curves, as_of, z_eff)?;
-            let quote_date =
-                crate::instruments::fixed_income::bond::pricing::settlement::settlement_date(
-                    self, as_of,
-                )?;
-            let pv_as_of =
-                crate::instruments::fixed_income::bond::pricing::settlement::quote_dirty_at_as_of(
-                    self,
-                    curves,
-                    as_of,
-                    quote_date,
-                    dirty_at_quote,
-                )?;
-            return Ok(finstack_quant_core::money::Money::new(
-                pv_as_of,
-                self.notional.currency(),
-            ));
-        }
-
-        // Quote drivers normalize to a settlement dirty price first, then carry
-        // that value back to the invariant `as_of` NPV contract.
-        if let Some(dirty_at_quote) =
-            quote_conversions::settlement_dirty_from_quote_overrides(self, curves, as_of)?
-        {
-            let quote_date =
-                crate::instruments::fixed_income::bond::pricing::settlement::settlement_date(
-                    self, as_of,
-                )?;
-            let pv_as_of =
-                crate::instruments::fixed_income::bond::pricing::settlement::quote_dirty_at_as_of(
-                    self,
-                    curves,
-                    as_of,
-                    quote_date,
-                    dirty_at_quote,
-                )?;
-            return Ok(finstack_quant_core::money::Money::new(
-                pv_as_of,
-                self.notional.currency(),
-            ));
-        }
-
-        // Check if bond has embedded options requiring tree-based pricing
-        if let Some(ref cp) = self.call_put {
-            if cp.has_options() {
-                return self.value_with_tree(curves, as_of);
-            }
-        }
-
-        // When a credit curve is assigned, use the hazard-rate engine so that PV
-        // incorporates survival probabilities. This makes Bond::value consistent
-        // with CS01 metrics and enables meaningful credit P&L attribution.
-        // Missing hazard market data is an input error; use discount-only pricing
-        // explicitly when credit risk should be ignored.
-        if self.credit_curve_id.is_some() {
-            return crate::instruments::fixed_income::bond::pricing::engine::hazard::HazardBondEngine::price(
-                self, curves, as_of,
-            );
-        }
-
-        // Standard cashflow discounting for straight bonds without credit curves.
-        crate::instruments::fixed_income::bond::pricing::engine::discount::BondEngine::price(
-            self, curves, as_of,
-        )
+    fn base_value_raw_with_currency(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
+        Ok((
+            self.base_value_raw_impl(curves, as_of)?,
+            self.notional.currency(),
+        ))
     }
 
     fn market_dependencies(
@@ -197,10 +106,11 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         // Mirrors the guards in `base_value`: the shock is exact only for
         // bonds without embedded options, without an assigned credit curve,
         // and without a price-pinning quote other than `quoted_z_spread`.
-        !self
-            .call_put
-            .as_ref()
-            .is_some_and(super::definitions::CallPutSchedule::has_options)
+        self.return_floor.is_none()
+            && !self
+                .call_put
+                .as_ref()
+                .is_some_and(super::definitions::CallPutSchedule::has_options)
             && self.credit_curve_id.is_none()
             && !self
                 .instrument_pricing_overrides
@@ -262,6 +172,22 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
 
 // Declare canonical market dependencies for DV01/CS01 calculators.
 impl Bond {
+    /// Reject embedded bondholder or issuer rights that the Merton MC payoff
+    /// kernel does not model.
+    pub(crate) fn validate_merton_mc_embedded_rights(&self) -> finstack_quant_core::Result<()> {
+        let has_call_put = self
+            .call_put
+            .as_ref()
+            .is_some_and(super::definitions::CallPutSchedule::has_options);
+        if has_call_put || self.return_floor.is_some() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Merton MC pricing does not support embedded call, put, or return-floor rights for bond '{}'; select model 'tree' for rates-only optionality or 'rates_credit' for joint rates-credit optionality",
+                self.id
+            )));
+        }
+        Ok(())
+    }
+
     /// Advanced Merton Monte Carlo structural-credit price for this bond.
     ///
     /// Host and registry callers should use
@@ -283,6 +209,24 @@ impl Bond {
     ///
     /// If the config already has a non-default `pik_schedule`, it is used
     /// as-is (the config schedule takes precedence).
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Structural-credit dynamics, recovery, PIK behavior, path
+    ///   count, seed, and time discretization for this simulation.
+    /// * `discount_rate` - Flat annual continuously compounded risk-free rate
+    ///   as a decimal. It drives risk-neutral asset drift and discounts cashflows
+    ///   when `config.cashflow_dfs` is absent.
+    /// * `as_of` - Valuation date from which remaining maturity and coupon times
+    ///   are measured under the bond cashflow day-count convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the bond contains call, put, or
+    /// return-floor rights because this Merton payoff kernel does not model
+    /// issuer or holder exercise. Use the rates-only `tree` model or the joint
+    /// `rates_credit` model for embedded optionality. Other errors report
+    /// unsupported cashflow shapes, invalid dates, or invalid MC inputs.
     pub fn price_merton_mc(
         &self,
         config: &crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig,
@@ -296,6 +240,8 @@ impl Bond {
             MertonMcConfig, MertonMcEngine, PikMode, PikSchedule,
         };
         use rust_decimal::prelude::ToPrimitive;
+
+        self.validate_merton_mc_embedded_rights()?;
 
         let notional = self.notional.amount();
 

@@ -1,19 +1,22 @@
 //! Tree-based pricing engine for bonds with embedded options and OAS calculations.
 //!
-//! This module provides tree-based pricing for callable/putable bonds and option-adjusted
-//! spread (OAS) calculations using either:
-//! - **Short-rate tree**: For bonds without credit risk
-//! - **Rates+credit tree**: For bonds with credit risk (two-factor model)
+//! This module provides option rollback and option-adjusted spread (OAS)
+//! calculations for two explicitly selected model families:
+//! - **`tree`**: Rates-only pricing. An attached credit curve does not switch
+//!   the model family or affect value.
+//! - **`rates_credit`**: Joint rates-credit pricing. The bond must name a
+//!   hazard curve; positive rate or hazard volatility uses Monte Carlo and
+//!   reports sampling diagnostics.
 //!
 //! # Pricing Models
 //!
 //! ## Short-Rate Tree
-//! Used for bonds without embedded credit risk. The tree models interest rate evolution
-//! and applies call/put constraints via backward induction.
+//! The tree models interest-rate evolution and applies call, put, and
+//! deterministic return-floor constraints by backward induction.
 //!
 //! ## Rates+Credit Tree
-//! Used when a hazard curve is present in the market context. Models both interest rate
-//! and credit risk evolution, with default events and recovery payments.
+//! Selected only by `ModelKey::RatesCredit`. It models both interest-rate and
+//! credit-risk evolution, including default events and recovery payments.
 //!
 //! # See Also
 //!
@@ -23,74 +26,12 @@
 
 mod bond_valuator;
 mod config;
+pub(crate) mod lsmc;
 #[cfg(test)]
 mod tests;
 mod tree_pricer;
 
 pub use bond_valuator::BondValuator;
 pub use config::{bond_tree_config, TreeModelChoice, TreePricerConfig};
+pub(crate) use tree_pricer::TreePriceOutcome;
 pub use tree_pricer::TreePricer;
-
-use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::fixed_income::bond::types::Bond;
-use crate::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
-use crate::results::ValuationResult;
-use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::context::MarketContext;
-use indexmap::IndexMap;
-
-/// Registry adapter for the option-adjusted-spread (OAS) bond pricer.
-///
-/// Routes `(InstrumentType::Bond, ModelKey::Tree)` to [`TreePricer::calculate_oas`].
-/// Requires a quoted clean price in the bond's `pricing_overrides`.
-pub(crate) struct SimpleBondOasPricer;
-
-impl Pricer for SimpleBondOasPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::Bond, ModelKey::Tree)
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<ValuationResult, PricingError> {
-        let bond = expect_inst::<Bond>(instrument, InstrumentType::Bond)?;
-
-        let ctx = PricingErrorContext::new()
-            .instrument_id(bond.id())
-            .instrument_type(InstrumentType::Bond)
-            .model(ModelKey::Tree)
-            .curve_id(bond.discount_curve_id.as_str());
-
-        let pv = bond
-            .base_value(market, as_of)
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
-
-        let clean_pct = bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_clean_price
-            .ok_or_else(|| {
-                PricingError::invalid_input_with_context(
-                    "OAS requires quoted clean price",
-                    ctx.clone(),
-                )
-            })?;
-
-        let config = bond_tree_config(bond)
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
-        let oas_bp = TreePricer::with_config(config)
-            .calculate_oas(bond, market, as_of, clean_pct)
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx))?;
-
-        let mut measures = IndexMap::new();
-        measures.insert(crate::metrics::MetricId::custom("oas_bp"), oas_bp);
-
-        let result = ValuationResult::stamped(bond.id(), as_of, pv);
-        Ok(result.with_measures(measures))
-    }
-}

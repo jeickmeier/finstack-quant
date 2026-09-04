@@ -633,7 +633,21 @@ class ValuationResult:
         Model-specific structured pricing detail, if the pricer emitted one.
 
         Tagged ``{"type": ..., "data": ...}`` document matching Rust
-        ``ValuationDetails``. ``None`` when the envelope is scalar-only.
+        ``ValuationDetails``. A stochastic ``"rates_credit"`` bond uses
+        ``type="monte_carlo"``. Its ``data`` contains ``model_key``,
+        sampling-only ``standard_error``, configured independent exercise-policy
+        paths (``training_paths``) and their simulated count including
+        antithetic partners (``training_simulated_paths``), configured
+        independent make-whole-reference paths (``make_whole_training_paths``)
+        and their simulated count (``make_whole_training_simulated_paths``),
+        independent estimator paths (``estimator_paths``) and their simulated
+        count (``simulated_paths``), ``seed``, ``time_grid``, and the
+        ``antithetic``, ``sobol``, and ``brownian_bridge`` flags. An unused
+        training stage reports zero paths. ``standard_error`` measures
+        pricing-path sampling uncertainty under the frozen fitted exercise
+        policy and excludes regression approximation, time-grid discretization,
+        and model error.
+        ``None`` when the envelope is scalar-only.
 
         Returns
         -------
@@ -670,7 +684,9 @@ def instrument_cashflows(
     Parses the JSON envelope returned by the low-level binding and constructs
     a per-flow ``pandas.DataFrame`` with ``date`` / ``reset_date`` parsed as
     ``datetime64``. See :func:`instrument_cashflows_json` for argument and
-    error semantics.
+    error semantics. Hazard-rate export rejects bonds with call, put, or
+    return-floor rights because static rows cannot represent their
+    exercise-contingent value.
 
     Parameters
     ----------
@@ -706,8 +722,9 @@ def instrument_cashflows(
         JSON string.
     ValueError
         If instrument or market JSON is malformed, ``as_of`` or ``model``
-        is invalid, the instrument/model pair is unsupported, or the
-        generated cashflow schedule fails validation.
+        is invalid, the instrument/model pair is unsupported, a hazard-rate
+        bond contains embedded exercise rights, or the generated cashflow
+        schedule fails validation.
     KeyError
         If a curve, fixing, or other market datum required for cashflow
         generation or pricing is missing.

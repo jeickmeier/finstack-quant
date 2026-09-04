@@ -12,6 +12,7 @@ use finstack_quant_valuations::instruments::fixed_income::bond::{
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_valuations::pricer::ModelKey;
 use std::sync::Arc;
 use time::macros::date;
 
@@ -560,13 +561,11 @@ fn test_embedded_option_value_uses_solved_oas_and_holder_sign() {
     let actual = result.measures["embedded_option_value"];
 
     let mut straight_bond = bond.clone();
-    straight_bond
-        .instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
-    straight_bond.call_put = Some(CallPutSchedule::default());
-    let expected = price_from_oas(&bond, &market, as_of, oas).expect("callable OAS price")
-        - price_from_oas(&straight_bond, &market, as_of, oas).expect("straight OAS price");
+    straight_bond.call_put = None;
+    let expected = price_from_oas(&bond, &market, as_of, ModelKey::Tree, oas)
+        .expect("callable OAS price")
+        - price_from_oas(&straight_bond, &market, as_of, ModelKey::Tree, oas)
+            .expect("straight OAS price");
 
     assert!(
         (actual - expected).abs() < 1e-6,
@@ -579,7 +578,7 @@ fn test_embedded_option_value_uses_solved_oas_and_holder_sign() {
 }
 
 #[test]
-fn test_embedded_option_value_uses_settlement_date_oas_pricing_basis() {
+fn test_embedded_option_value_uses_as_of_oas_pricing_basis() {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
 
     let as_of = date!(2025 - 01 - 02);
@@ -643,19 +642,15 @@ fn test_embedded_option_value_uses_settlement_date_oas_pricing_basis() {
     let actual = result.measures["embedded_option_value"];
 
     let mut straight_bond = bond.clone();
-    straight_bond
-        .instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
-    straight_bond.call_put = Some(CallPutSchedule::default());
-    let expected = price_from_oas(&bond, &market, quote_date, quoted_oas)
-        .expect("callable quote-date OAS price")
-        - price_from_oas(&straight_bond, &market, quote_date, quoted_oas)
-            .expect("straight quote-date OAS price");
+    straight_bond.call_put = None;
+    let expected = price_from_oas(&bond, &market, as_of, ModelKey::Tree, quoted_oas)
+        .expect("callable as-of OAS price")
+        - price_from_oas(&straight_bond, &market, as_of, ModelKey::Tree, quoted_oas)
+            .expect("straight as-of OAS price");
 
     assert!(
         (actual - expected).abs() < 1e-6,
-        "embedded option value should use quote-date OAS pricing basis: actual={actual}, expected={expected}"
+        "embedded option value should use the as-of OAS pricing basis: actual={actual}, expected={expected}"
     );
 }
 
@@ -911,8 +906,8 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
         .build()
         .unwrap();
     let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
-    let dirty_at_quote =
-        price_from_oas(&bond, &market, quote_date, target_oas).expect("quote-date OAS price");
+    let dirty_at_quote = price_from_oas(&bond, &market, quote_date, ModelKey::Tree, target_oas)
+        .expect("quote-date OAS price");
     let schedule = bond
         .cashflow_schedule(&market, quote_date)
         .expect("cashflow schedule");
@@ -992,8 +987,8 @@ fn test_callable_bond_value_uses_same_bdt_tree_dispatch_as_oas_pricer() {
     let direct_value = bond
         .value(&market, as_of)
         .expect("direct value should price");
-    let canonical_tree_value =
-        price_from_oas(&bond, &market, as_of, 0.0).expect("canonical tree value should price");
+    let canonical_tree_value = price_from_oas(&bond, &market, as_of, ModelKey::Tree, 0.0)
+        .expect("canonical tree value should price");
 
     assert!(
         (direct_value.amount() - canonical_tree_value).abs() < 1e-6,
@@ -1222,8 +1217,15 @@ fn test_ytm_roundtrip_settlement_lag_two_days() {
 
     // Choose an explicit YTM and derive the implied clean price.
     let target_ytm = 0.055_f64;
-    let quotes = compute_quotes(&bond, &market, as_of, BondQuoteInput::Ytm(target_ytm))
-        .expect("compute_quotes from YTM should succeed");
+    let quotes = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::Ytm(target_ytm),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
+    )
+    .expect("compute_quotes from YTM should succeed");
     let clean_pct = quotes.clean_price_pct;
 
     // Feed the clean price back and re-solve YTM.

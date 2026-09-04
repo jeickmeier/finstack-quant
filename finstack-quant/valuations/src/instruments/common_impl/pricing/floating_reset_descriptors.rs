@@ -9,9 +9,8 @@
 //! projected pre-composition index rate. No second coupon specification is
 //! introduced.
 //!
-//! Shared by the callable-bond and callable-term-loan tree engines; each
-//! passes its own slice-snapping convention so a coupon's reset/payment
-//! slices land on the same steps that engine snaps exercise dates to.
+//! Used by the callable-term-loan recombining-tree engine. Credit-risky bonds
+//! replay their floating and PIK state pathwise in the LSMC engine.
 //!
 //! # What stays deterministic
 //!
@@ -56,40 +55,14 @@ pub(crate) fn strips_index_constraints(spec: &FloatingRateSpec) -> bool {
         && spec.overnight_index_constraints == OvernightIndexConstraintApplication::Daily
 }
 
-/// How an engine maps an event time onto its uniform tree grid.
-///
-/// Descriptors must use the same convention the engine uses for exercise
-/// dates, so a call on a reset or payment date lands on the same step and
-/// is recognised as boundary-aligned.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SliceSnap {
-    /// Nearest grid step (bond convention).
-    Nearest,
-    /// First grid step at or after the event time (term-loan convention).
-    Ceil,
-}
-
-impl SliceSnap {
-    fn apply(self, time_steps: &[f64], t: f64) -> usize {
-        let n = time_steps.len() - 1;
-        if t <= time_steps[0] {
-            return 0;
-        }
-        if t >= time_steps[n] {
-            return n;
-        }
-        match self {
-            Self::Nearest => {
-                let upper = time_steps.partition_point(|&g| g <= t);
-                let lower = upper - 1;
-                if (t - time_steps[lower]) <= (time_steps[upper] - t) {
-                    lower
-                } else {
-                    upper
-                }
-            }
-            Self::Ceil => time_steps.partition_point(|&g| g < t),
-        }
+fn ceil_step(time_steps: &[f64], t: f64) -> usize {
+    let last = time_steps.len() - 1;
+    if t <= time_steps[0] {
+        0
+    } else if t >= time_steps[last] {
+        last
+    } else {
+        time_steps.partition_point(|&grid_time| grid_time < t)
     }
 }
 
@@ -107,8 +80,6 @@ pub(crate) struct NodeCouponBuildInputs<'a> {
     pub day_count: DayCount,
     /// The tree's discount curve (slice forwards and timing corrections).
     pub discount: &'a dyn Discounting,
-    /// The engine's exercise-date snapping convention.
-    pub snap: SliceSnap,
     /// Whether to drop index-level floor/cap from the composition because
     /// the leg applies them **daily** inside an overnight-compounded
     /// observation window (`OvernightIndexConstraintApplication::Daily`);
@@ -176,8 +147,8 @@ pub(crate) fn build_node_coupons(
         let t_pay = inputs
             .day_count
             .year_fraction(inputs.grid_origin, cf.date, ctx)?;
-        let reset_step = inputs.snap.apply(inputs.time_steps, t_start.max(0.0));
-        let payment_step = inputs.snap.apply(inputs.time_steps, t_pay);
+        let reset_step = ceil_step(inputs.time_steps, t_start.max(0.0));
+        let payment_step = ceil_step(inputs.time_steps, t_pay);
         if reset_step >= payment_step {
             return Err(Error::Validation(format!(
                 "floating coupon accruing {} to {} (paid {}) snaps to a single \
@@ -219,42 +190,6 @@ pub(crate) fn build_node_coupons(
     Ok(coupons)
 }
 
-/// Reject exercise steps strictly inside a node-dependent coupon period.
-///
-/// Between a future reset and its payment the coupon amount is known only
-/// at the reset node, so an exercise decision there would need
-/// path-dependent state the recombining lattice does not carry. Exercise
-/// **at** the reset slice (coupon forfeited by redemption) and **at** the
-/// payment slice (coupon paid regardless) both remain exact.
-///
-/// # Errors
-///
-/// Returns [`Error::Validation`] naming the offending step and period.
-pub(crate) fn validate_exercise_alignment(
-    coupons: &[NodeCoupon],
-    exercise_steps: impl Iterator<Item = usize>,
-    instrument_label: &str,
-) -> Result<()> {
-    for step in exercise_steps {
-        for coupon in coupons {
-            if step > coupon.reset_step && step < coupon.payment_step {
-                return Err(Error::Validation(format!(
-                    "{instrument_label}: exercise step {step} falls strictly inside \
-                     the floating coupon period spanning tree slices \
-                     [{}, {}]. Under stochastic rates the coupon amount there \
-                     depends on the rate node at the reset slice, which the \
-                     recombining lattice cannot carry through a mid-period \
-                     exercise. Align call/put dates with the coupon's reset or \
-                     payment dates, or price with deterministic rates \
-                     (hw1f_sigma unset).",
-                    coupon.reset_step, coupon.payment_step
-                )));
-            }
-        }
-    }
-    Ok(())
-}
-
 /// Whether the schedule carries any capitalizing (PIK) flow after the
 /// valuation origin.
 ///
@@ -274,38 +209,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn slice_snap_conventions() {
+    fn term_loan_events_snap_to_the_next_slice() {
         let grid = [0.0, 0.5, 1.0, 1.5, 2.0];
-        assert_eq!(SliceSnap::Nearest.apply(&grid, 0.70), 1);
-        assert_eq!(SliceSnap::Nearest.apply(&grid, 0.80), 2);
-        assert_eq!(SliceSnap::Ceil.apply(&grid, 0.70), 2);
-        assert_eq!(SliceSnap::Ceil.apply(&grid, 0.50), 1);
-        assert_eq!(SliceSnap::Nearest.apply(&grid, -0.1), 0);
-        assert_eq!(SliceSnap::Ceil.apply(&grid, 9.0), 4);
-    }
-
-    #[test]
-    fn alignment_rejects_interior_exercise_only() {
-        let coupon = NodeCoupon {
-            reset_step: 4,
-            payment_step: 8,
-            accrual: 0.5,
-            notional: 100.0,
-            base_index_rate: 0.03,
-            base_discount_forward: 0.03,
-            timing_scale: 1.0,
-            params: FloatingRateParams::default(),
-        };
-        let coupons = [coupon];
-        // Boundary steps are fine.
-        validate_exercise_alignment(&coupons, [4usize, 8].into_iter(), "TEST")
-            .expect("boundary exercise is aligned");
-        // Steps outside the period are fine.
-        validate_exercise_alignment(&coupons, [2usize, 9].into_iter(), "TEST")
-            .expect("outside exercise is aligned");
-        // Interior step is rejected with the period named.
-        let err = validate_exercise_alignment(&coupons, [6usize].into_iter(), "TEST")
-            .expect_err("interior exercise must be rejected");
-        assert!(err.to_string().contains("[4, 8]"), "unexpected: {err}");
+        assert_eq!(ceil_step(&grid, 0.70), 2);
+        assert_eq!(ceil_step(&grid, 0.50), 1);
+        assert_eq!(ceil_step(&grid, -0.1), 0);
+        assert_eq!(ceil_step(&grid, 9.0), 4);
     }
 }

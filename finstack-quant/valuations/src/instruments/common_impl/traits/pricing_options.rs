@@ -26,8 +26,9 @@ pub struct PricingOptions {
     ///
     /// When `None`, [`super::Instrument::price_with_metrics`] uses
     /// [`super::Instrument::default_model`]. Set this to select a different registered
-    /// pricing path, such as hazard-rate or tree/OAS pricing, without dropping
-    /// down to [`crate::pricer::PricerRegistry`] directly.
+    /// pricing path, such as hazard-rate, rates-only tree, or joint
+    /// rates-credit pricing, without dropping down to
+    /// [`crate::pricer::PricerRegistry`] directly.
     pub model: Option<ModelKey>,
     /// Optional explicit pricer registry override.
     pub registry: Option<Arc<PricerRegistry>>,

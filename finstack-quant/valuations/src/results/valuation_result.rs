@@ -11,6 +11,14 @@ use finstack_quant_covenants::CovenantReport;
 
 use indexmap::IndexMap;
 
+fn serialize_path_count<S>(value: &usize, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let value = u32::try_from(*value).map_err(serde::ser::Error::custom)?;
+    serializer.serialize_u32(value)
+}
+
 /// Model-specific typed valuation details.
 ///
 /// These details are for rich structured outputs that do not fit the scalar
@@ -75,11 +83,34 @@ pub struct FxValuationDetails {
 pub struct MonteCarloValuationDetails {
     /// Registered model used for the simulation.
     pub model_key: ModelKey,
-    /// Standard error of the discounted PV mean in the result currency.
+    /// Sampling standard error of the discounted PV mean in the result
+    /// currency. For LSMC valuations, this measures pricing-path uncertainty
+    /// under the frozen fitted exercise policy. It excludes regression
+    /// approximation, time-grid discretization, and model error.
     pub standard_error: f64,
+    /// Number of independent paths used to fit an exercise or control policy.
+    ///
+    /// Zero for Monte Carlo engines that do not have a separate training
+    /// stage.
+    #[serde(serialize_with = "serialize_path_count")]
+    pub training_paths: usize,
+    /// Total factor paths simulated in the policy-training stage, including
+    /// antithetic partners. Zero when no policy is trained.
+    #[serde(serialize_with = "serialize_path_count")]
+    pub training_simulated_paths: usize,
+    /// Independent paths used to fit state-conditional make-whole reference
+    /// values. Zero when no stochastic make-whole stage is required.
+    #[serde(serialize_with = "serialize_path_count")]
+    pub make_whole_training_paths: usize,
+    /// Total factor paths simulated for state-conditional make-whole training,
+    /// including antithetic partners. Zero when that stage is absent.
+    #[serde(serialize_with = "serialize_path_count")]
+    pub make_whole_training_simulated_paths: usize,
     /// Number of independent path estimators contributing to the mean.
+    #[serde(serialize_with = "serialize_path_count")]
     pub estimator_paths: usize,
     /// Total number of simulated paths, including antithetic partners.
+    #[serde(serialize_with = "serialize_path_count")]
     pub simulated_paths: usize,
     /// Deterministic random seed used for the run.
     pub seed: u64,

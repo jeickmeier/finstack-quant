@@ -2,11 +2,16 @@
 //!
 //! # Engines (`engine/`)
 //!
-//! Core pricing math + the thin `Simple*Pricer` registry adapters that route
-//! `(InstrumentType::Bond, ModelKey::*)` to the appropriate engine:
-//! - **Discount**: PV = sum(CF_i * DF_i) using discount curves
-//! - **Hazard**: Survival-weighted PV + fractional recovery of par (FRP)
-//! - **Tree**: Binomial tree for callable/putable bonds and OAS
+//! Core pricing math plus the bond registry adapter that preserves the
+//! caller-selected model:
+//! - **Discounting**: Non-callable PV from projected cashflows and discount
+//!   curves; an attached credit curve is ignored
+//! - **Hazard rate**: Non-callable survival-weighted PV plus fractional
+//!   recovery of par; an explicit hazard curve is required
+//! - **Tree**: Rates-only option rollback and OAS; an attached credit curve is
+//!   ignored
+//! - **Rates credit**: Joint rates-credit rollback and OAS, including call,
+//!   put, and return-floor rights
 //! - **Merton MC**: Structural credit Monte Carlo for PIK bonds (feature-gated)
 //!
 //! # Utilities

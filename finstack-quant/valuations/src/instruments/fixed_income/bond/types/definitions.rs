@@ -107,7 +107,9 @@ pub struct Bond {
     ///
     /// When present, the bond is treated as prepayable across the protection
     /// window with redemption floored so the investor meets the target MOIC/XIRR.
-    /// Lowered into `call_put` at pricing time.
+    /// Deterministic pricing lowers it into `call_put`; stochastic
+    /// rates-credit pricing evaluates it against each simulated distribution
+    /// and balance path.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default)]
     pub return_floor: Option<super::return_floor::ReturnFloorSpec>,

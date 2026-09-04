@@ -16,7 +16,7 @@ pub(crate) mod moosmuller_ytm;
 pub(crate) mod oas;
 /// Price calculators (clean and dirty)
 pub(crate) mod prices;
-/// Callable/putable bond OAS model vega
+/// Embedded-option bond OAS model vega
 pub(crate) mod vega;
 /// Yield-to-maturity (YTM) calculator
 pub(crate) mod ytm;

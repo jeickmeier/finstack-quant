@@ -178,6 +178,15 @@ through `crate::utils::to_js_value`, never `serde_wasm_bindgen::to_value`, whose
 shapes are pinned by `tests/return_shapes.rs`, which no `mise` task selects — run it
 explicitly with `cargo nextest run -p finstack-quant-wasm --test return_shapes`.
 
+For LSMC valuations, `standard_error` measures pricing-path sampling uncertainty
+under the frozen fitted exercise policy and excludes regression approximation,
+time-grid discretization, and model error. Monte Carlo valuation details expose
+their full-width deterministic `seed` as a JavaScript `bigint`. Preserve it when producing application JSON with a replacer,
+for example
+`JSON.stringify(result, (_, value) => typeof value === "bigint" ? value.toString() : value)`.
+The resulting decimal string is lossless; ordinary `JSON.stringify(result)` throws
+when Monte Carlo details are present.
+
 **Errors.** Bindings that route through `crate::utils::to_js_err` — the large
 majority — throw a real `Error` whose `name` is `FinstackError` and whose `kind` is
 `not_found`, `validation`, or `computation`. The persisted-contract entry points

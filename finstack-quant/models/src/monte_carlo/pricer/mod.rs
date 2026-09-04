@@ -17,5 +17,6 @@ pub mod heston;
 pub mod lsmc;
 pub mod lsq;
 pub mod path_dependent;
+pub mod polynomial;
 
 pub use european::EuropeanPricer;

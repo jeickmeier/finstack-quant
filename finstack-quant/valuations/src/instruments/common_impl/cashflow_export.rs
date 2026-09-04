@@ -38,6 +38,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{Error, Result};
 use serde::Serialize;
 
+use crate::instruments::fixed_income::bond::Bond;
 use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
 use crate::instruments::fixed_income::mbs_passthrough::{
     pricer::project_cashflows as project_mbs_cashflows, AgencyMbsPassthrough,
@@ -225,6 +226,23 @@ fn build_envelope(
         return Err(Error::Validation(format!(
             "model '{model}' not supported for instrument_cashflows; supported: 'discounting', 'hazard_rate'"
         )));
+    }
+
+    if let Some(bond) = instrument.as_any().downcast_ref::<Bond>() {
+        let has_embedded_options = bond
+            .call_put
+            .as_ref()
+            .is_some_and(crate::instruments::fixed_income::bond::CallPutSchedule::has_options)
+            || bond.return_floor.is_some();
+        if has_embedded_options {
+            return Err(Error::Validation(format!(
+                "instrument_cashflows: static cashflow rows cannot decompose the \
+                 exercise-contingent value of bond '{}' under model '{}'; request the model \
+                 price directly",
+                bond.id(),
+                model_key.as_str()
+            )));
+        }
     }
 
     let requested_as_of = finstack_quant_core::dates::parse_iso_date(as_of)
@@ -540,7 +558,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::bond::Bond;
     use crate::instruments::fixed_income::revolving_credit::{
         BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
     };
@@ -561,6 +578,25 @@ mod tests {
             instrument: InstrumentJson::Bond(bond.clone()),
         };
         serde_json::to_string(&envelope).expect("serialize bond envelope")
+    }
+
+    #[test]
+    fn cashflow_export_rejects_exercise_contingent_bond_rows() {
+        let bond = Bond::example_callable().expect("callable example");
+        for model in ["discounting", "hazard_rate"] {
+            let err = instrument_cashflows_json(
+                &serialize_bond(&bond),
+                &MarketContext::new(),
+                "2025-01-01",
+                model,
+            )
+            .expect_err("static rows cannot represent exercise-contingent value");
+
+            assert!(
+                err.to_string().contains("exercise-contingent value"),
+                "unexpected error for {model}: {err}"
+            );
+        }
     }
 
     #[test]

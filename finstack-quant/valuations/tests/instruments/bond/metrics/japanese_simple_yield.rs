@@ -13,6 +13,7 @@ use finstack_quant_valuations::instruments::{
     BondConvention, Instrument, InstrumentPricingOverrides,
 };
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::pricer::ModelKey;
 use time::macros::date;
 
 fn flat_jpy_market(as_of: time::Date) -> MarketContext {
@@ -121,6 +122,8 @@ fn quote_engine_seeds_from_japanese_simple_yield_without_street_ytm() {
         &market,
         as_of,
         BondQuoteInput::JapaneseSimpleYield(target),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
     )
     .expect("quote engine");
 
@@ -245,6 +248,8 @@ fn quote_engine_japanese_simple_yield_rejects_frn() {
         &market,
         as_of,
         BondQuoteInput::JapaneseSimpleYield(0.02),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
     )
     .expect_err("FRN is not a bullet fixed-rate quote");
     assert!(

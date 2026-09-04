@@ -2,10 +2,12 @@
 //!
 use super::super::super::super::types::Bond;
 use super::TreePricer;
-use finstack_quant_core::dates::Date;
+use crate::instruments::common_impl::pricing::rates_credit::continuous_frp_weight;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Duration};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
+use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
 use finstack_quant_models::{NodeState, TreeValuator};
 
 /// Bond valuator for tree-based pricing of callable/putable bonds.
@@ -41,6 +43,13 @@ pub struct BondValuator {
     /// time offsets. The offsets let OAS discounting preserve each original
     /// cashflow date even when a uniform tree grid is used.
     cashflow_components: Vec<Vec<(f64, f64)>>,
+    /// Positive notional repayments mapped with the same timing convention as
+    /// `cashflow_vec`. At the terminal node these are the contractual
+    /// redemption alternative to a maturity call or put, rather than an
+    /// unconditional payment in addition to exercise proceeds.
+    redemption_vec: Vec<f64>,
+    /// OAS timing components for `redemption_vec`.
+    redemption_components: Vec<Vec<(f64, f64)>>,
     /// Call prices indexed by time step (sparse via Option for memory efficiency).
     /// `Some(price)` indicates a call option is exercisable at that step.
     /// Price is computed as `outstanding_principal × (price_pct / 100)`.
@@ -54,9 +63,8 @@ pub struct BondValuator {
     pub(super) outstanding_principal_vec: Vec<f64>,
     /// Time steps for tree pricing
     time_steps: Vec<f64>,
-    /// Valuation origin (the tree's `t = 0`), kept for node-coupon
-    /// descriptor construction on the stochastic-rate rates-credit path.
-    as_of: Date,
+    /// Base discount factors at each time step, conditional on `as_of`.
+    step_discount_factors: Vec<f64>,
     /// Optional recovery rate sourced from a hazard curve in MarketContext
     recovery_rate: Option<f64>,
     /// Issuer call exercise friction in **cents per 100** of outstanding principal.
@@ -122,10 +130,26 @@ impl BondValuator {
         as_of: Date,
     ) -> Result<Vec<f64>> {
         let discount_curve = market_context.get_discount(&bond.discount_curve_id)?;
-        let dc_curve = discount_curve.day_count();
+        Self::mandatory_grid_times_with_day_count(
+            bond,
+            market_context,
+            as_of,
+            discount_curve.day_count(),
+        )
+    }
+
+    /// Collect mandatory grid times on an explicitly selected model time
+    /// basis. The rates-credit lattice uses this with ACT/365F, while the
+    /// risk-free trees retain the discount curve's day count through
+    /// [`Self::mandatory_grid_times`].
+    pub(crate) fn mandatory_grid_times_with_day_count(
+        bond: &Bond,
+        market_context: &MarketContext,
+        as_of: Date,
+        grid_day_count: DayCount,
+    ) -> Result<Vec<f64>> {
         let flows = bond.pricing_dated_cashflows(market_context, as_of)?;
         let cashflow_dates: Vec<Date> = flows.iter().map(|(date, _)| *date).collect();
-
         let mut dates: Vec<Date> = cashflow_dates
             .iter()
             .copied()
@@ -138,7 +162,6 @@ impl BondValuator {
                     opt.end_date,
                     as_of,
                     bond.maturity,
-                    &cashflow_dates,
                 ));
             }
         }
@@ -147,13 +170,7 @@ impl BondValuator {
 
         dates
             .into_iter()
-            .map(|d| {
-                dc_curve.year_fraction(
-                    as_of,
-                    d,
-                    finstack_quant_core::dates::DayCountContext::default(),
-                )
-            })
+            .map(|d| grid_day_count.year_fraction(as_of, d, DayCountContext::default()))
             .collect()
     }
 
@@ -162,61 +179,66 @@ impl BondValuator {
         end_date: Date,
         as_of: Date,
         maturity: Date,
-        cashflow_dates: &[Date],
     ) -> Vec<Date> {
         // A call/put period is an exercise *window*: the option is exercisable
-        // throughout `[start_date, end_date]`. Exercise at the window endpoints
-        // plus every cashflow (coupon) date inside the window, matching the
-        // YTW enumeration in `quote_conversions::solve_ytw_from_flows`.
-        // Endpoint-only exercise materially undervalues the issuer option for
-        // multi-coupon windows.
-        let mut dates: Vec<Date> = [start_date, end_date]
-            .into_iter()
-            .chain(
-                cashflow_dates
-                    .iter()
-                    .copied()
-                    .filter(|d| *d >= start_date && *d <= end_date),
-            )
-            .filter(|date| *date > as_of && *date <= maturity)
-            .collect();
-        dates.sort_unstable();
-        dates.dedup();
+        // on every calendar date in `[start_date, end_date]`, including the
+        // valuation date when the right is already active. Restricting the
+        // window to endpoints and coupon dates misses economically valid
+        // between-coupon exercise.
+        let first = start_date.max(as_of);
+        let last = end_date.min(maturity);
+        if first > last {
+            return Vec::new();
+        }
+
+        let mut dates = Vec::with_capacity((last - first).whole_days().max(0) as usize + 1);
+        let mut date = first;
+        loop {
+            dates.push(date);
+            if date == last {
+                break;
+            }
+            let Some(next) = date.next_day() else {
+                break;
+            };
+            date = next;
+        }
         dates
     }
 
-    fn make_whole_call_price(
-        call: &crate::instruments::fixed_income::bond::CallPut,
+    pub(crate) fn make_whole_call_price(
+        spec: &crate::instruments::fixed_income::bond::MakeWholeSpec,
         reference_curve: &dyn finstack_quant_core::market_data::traits::Discounting,
-        time_steps: &[f64],
-        cashflow_vec: &[f64],
-        step: usize,
+        exercise_date: Date,
+        flows: &[(Date, finstack_quant_core::money::Money)],
         floor_price: f64,
-    ) -> f64 {
-        let call_time = *time_steps.get(step).unwrap_or(&0.0);
-        let spread = call
-            .make_whole
-            .as_ref()
-            .map(|spec| spec.spread_bp / 10_000.0)
-            .unwrap_or(0.0);
+        accrued_cash: f64,
+    ) -> Result<f64> {
+        let spread = spec.spread_bp / 10_000.0;
 
         let mut pv_remaining = 0.0;
-        for (future_step, amount) in cashflow_vec.iter().enumerate().skip(step + 1) {
-            let amount = *amount;
+        for (payment_date, amount) in flows {
+            if *payment_date <= exercise_date {
+                continue;
+            }
+            let amount = amount.amount();
             if amount.abs() <= f64::EPSILON {
                 continue;
             }
-            let future_time = *time_steps.get(future_step).unwrap_or(&call_time);
-            if future_time <= call_time {
-                continue;
-            }
-
-            let tau = future_time - call_time;
-            let df_ratio = reference_curve.df(future_time) / reference_curve.df(call_time);
+            let tau = reference_curve.day_count().year_fraction(
+                exercise_date,
+                *payment_date,
+                DayCountContext::default(),
+            )?;
+            let df_ratio = reference_curve.df_between_dates(exercise_date, *payment_date)?;
             pv_remaining += amount * df_ratio * (-spread * tau).exp();
         }
 
-        floor_price.max(pv_remaining)
+        // `pv_remaining` is the dirty reference value at the exercise date:
+        // the next full coupon includes interest accrued through that date.
+        // Compare like with like by removing accrued before applying the clean
+        // contractual floor. The caller adds accrued exactly once afterward.
+        Ok(floor_price.max(pv_remaining - accrued_cash))
     }
 
     /// Create a new bond valuator for tree pricing.
@@ -280,111 +302,125 @@ impl BondValuator {
         as_of: Date,
         time_steps: Vec<f64>,
     ) -> Result<Self> {
+        let grid_day_count = market_context
+            .get_discount(&bond.discount_curve_id)?
+            .day_count();
+        Self::new_with_time_steps_and_day_count(
+            bond,
+            market_context,
+            as_of,
+            time_steps,
+            grid_day_count,
+        )
+    }
+
+    /// Create a bond valuator on an explicit time grid and model day-count
+    /// basis. This is the rates-credit entry point: callers pass
+    /// [`DayCount::Act365F`] so every balance, cashflow, reset, and exercise
+    /// date is mapped on the same axis used by that lattice.
+    ///
+    /// Timing corrections use conditional discount factors evaluated by
+    /// calendar date. They therefore remain valid when `grid_day_count`
+    /// differs from the discount curve's own day-count convention.
+    pub(crate) fn new_with_time_steps_and_day_count(
+        bond: Bond,
+        market_context: &MarketContext,
+        as_of: Date,
+        time_steps: Vec<f64>,
+        grid_day_count: DayCount,
+    ) -> Result<Self> {
         use crate::cashflow::primitives::CFKind;
 
-        if time_steps.len() < 2 || !time_steps.windows(2).all(|w| w[1] > w[0]) {
+        if time_steps.len() < 2
+            || time_steps[0].abs() > 1e-12
+            || !time_steps.windows(2).all(|w| w[1] > w[0])
+        {
             return Err(finstack_quant_core::Error::Validation(
-                "BondValuator time grid must be strictly increasing with at least 2 points"
+                "BondValuator time grid must start at zero and be strictly increasing with at least 2 points"
                     .to_string(),
             ));
         }
         let num_steps = time_steps.len();
 
-        let curves = market_context;
         let discount_curve = market_context.get_discount(&bond.discount_curve_id)?;
-        let dc_curve = discount_curve.day_count();
-        let flows = bond.pricing_dated_cashflows(curves, as_of)?;
-
-        // Build outstanding principal schedule from the full cashflow schedule.
-        // This tracks notional minus cumulative amortization at each step for
-        // correct call/put redemption pricing on amortizing bonds.
         let full_schedule = bond.full_cashflow_schedule(market_context)?;
-        let mut outstanding_principal_vec = vec![bond.notional.amount(); num_steps];
 
-        let mut amort_events: Vec<(Date, f64)> = full_schedule
-            .get_flows()
-            .iter()
-            .filter(|cf| matches!(cf.kind, CFKind::Amortization | CFKind::Notional))
-            .filter(|cf| cf.date > as_of && cf.amount.amount() > 0.0)
-            .map(|cf| (cf.date, cf.amount.amount()))
-            .collect();
-        amort_events.sort_by_key(|(d, _)| *d);
-
-        // Track cumulative amortization and map to time steps
-        let mut cumulative_amort = 0.0;
-        let initial_notional = bond.notional.amount();
-        let mut amort_idx = 0;
-
-        for step in 0..num_steps {
-            let step_time = time_steps[step];
-            // Half the distance to the next grid point (or the previous one
-            // at the final step): an amortization belongs to this step when
-            // it is closer to it than to the next.
-            let half_step = if step + 1 < num_steps {
-                (time_steps[step + 1] - step_time) / 2.0
-            } else {
-                (step_time - time_steps[step - 1]) / 2.0
-            };
-
-            // Process any amortization events that occur at or before this step time
-            while amort_idx < amort_events.len() {
-                let (amort_date, amort_amt) = amort_events[amort_idx];
-                // Propagate day-count failures: a silent 0.0 would book the
-                // amortization at step 0 and misstate outstanding principal.
-                let amort_time = dc_curve.year_fraction(
-                    as_of,
-                    amort_date,
-                    finstack_quant_core::dates::DayCountContext::default(),
-                )?;
-
-                if amort_time <= step_time + half_step {
-                    // This amortization has occurred by this step
-                    cumulative_amort += amort_amt;
-                    amort_idx += 1;
-                } else {
-                    break;
-                }
-            }
-
-            outstanding_principal_vec[step] = (initial_notional - cumulative_amort).max(0.0);
-        }
-
-        // Collect exercise dates so we can snap coincident coupons to the same
-        // tree step used for the call/put (ceil mapping), preventing timing
-        // mismatches between coupon receipt and exercise decision.
+        // Exercise windows are inclusive of the valuation date. Contractual
+        // holder cash on that date is paid before the exercise decision, while
+        // ordinary settlement pricing continues to exclude `as_of` cashflows.
         let mut exercise_dates = std::collections::HashSet::new();
-        let cashflow_dates: Vec<Date> = flows.iter().map(|(date, _)| *date).collect();
         if let Some(ref call_put) = bond.call_put {
-            for call in &call_put.calls {
+            for option in call_put.calls.iter().chain(&call_put.puts) {
                 exercise_dates.extend(Self::exercise_dates_for_period(
-                    call.start_date,
-                    call.end_date,
+                    option.start_date,
+                    option.end_date,
                     as_of,
                     bond.maturity,
-                    &cashflow_dates,
                 ));
             }
-            for put in &call_put.puts {
-                exercise_dates.extend(Self::exercise_dates_for_period(
-                    put.start_date,
-                    put.end_date,
-                    as_of,
-                    bond.maturity,
-                    &cashflow_dates,
-                ));
+        }
+        let flows = if exercise_dates.contains(&as_of) {
+            bond.pricing_dated_cashflows_from_schedule_inclusive(&full_schedule, as_of, as_of)?
+        } else {
+            bond.pricing_dated_cashflows_from_schedule(&full_schedule, as_of, as_of)?
+        };
+        // A business-day adjustment can move the final contractual payment
+        // beyond the unadjusted bond maturity. Use the actual final payment
+        // as the date-axis bound; a risk-free tree that still ends at
+        // contractual maturity receives the exact DF(payment)/DF(slice)
+        // correction, while the daily rates-credit grid can extend through
+        // the adjusted payment itself.
+        let grid_horizon_date = flows
+            .iter()
+            .map(|(date, _)| *date)
+            .max()
+            .unwrap_or(bond.maturity)
+            .max(bond.maturity);
+        let step_discount_factors = Self::conditional_discount_factors_on_grid(
+            as_of,
+            grid_horizon_date,
+            grid_day_count,
+            &time_steps,
+            discount_curve.as_ref(),
+        )?;
+
+        // Build the outstanding principal schedule from the canonical replay.
+        // This captures historical and future amortization, PIK capitalization,
+        // prepayments, and notional events instead of reconstructing only future
+        // positive amortization from original par.
+        let outstanding_by_date = full_schedule.outstanding_by_date()?;
+        let mut outstanding_principal_vec = vec![bond.notional.amount(); num_steps];
+        let mut balance_events = Vec::with_capacity(outstanding_by_date.len());
+        for (date, balance) in &outstanding_by_date {
+            // Historical events all belong to the initial node. Some day-count
+            // implementations reject reversed date ranges, so do not ask them
+            // to manufacture negative model times.
+            let event_time = if *date <= as_of {
+                0.0
+            } else {
+                grid_day_count.year_fraction(as_of, *date, DayCountContext::default())?
+            };
+            balance_events.push((event_time, balance.amount()));
+        }
+        let mut event_idx = 0;
+        let mut outstanding = bond.notional.amount();
+        for (step, step_time) in time_steps.iter().copied().enumerate() {
+            while event_idx < balance_events.len()
+                && balance_events[event_idx].0 <= step_time + f64::EPSILON
+            {
+                outstanding = balance_events[event_idx].1;
+                event_idx += 1;
             }
+            outstanding_principal_vec[step] = outstanding.max(0.0);
         }
 
         // Pre-allocate vectors for O(1) access during backward induction
         let mut cashflow_vec = vec![0.0; num_steps];
         let mut cashflow_components = vec![Vec::new(); num_steps];
         for (date, amount) in &flows {
-            if *date > as_of {
-                let time_frac = dc_curve.year_fraction(
-                    as_of,
-                    *date,
-                    finstack_quant_core::dates::DayCountContext::default(),
-                )?;
+            if *date >= as_of {
+                let time_frac =
+                    grid_day_count.year_fraction(as_of, *date, DayCountContext::default())?;
                 // Continuous (fractional) grid position of the cashflow,
                 // clamped to the grid.
                 let raw_clamped = Self::fractional_step(&time_steps, time_frac);
@@ -393,13 +429,15 @@ impl BondValuator {
                 // exercise step to prevent timing mismatches between coupon
                 // receipt and exercise decision.
                 if exercise_dates.contains(date) {
-                    let step = Self::nearest_step(&time_steps, time_frac).clamp(1, num_steps - 1);
+                    let step = Self::nearest_step(&time_steps, time_frac);
                     let adjusted_amount = Self::value_at_step_time(
                         amount.amount(),
-                        time_frac,
-                        time_steps[step],
+                        *date,
+                        step,
+                        &step_discount_factors,
                         discount_curve.as_ref(),
-                    );
+                        as_of,
+                    )?;
                     cashflow_vec[step] += adjusted_amount;
                     cashflow_components[step].push((adjusted_amount, time_frac - time_steps[step]));
                 } else {
@@ -431,10 +469,12 @@ impl BondValuator {
                     if step_idx < num_steps {
                         let adjusted_amount = Self::value_at_step_time(
                             amount.amount() * (1.0 - weight),
-                            time_frac,
-                            time_steps[step_idx],
+                            *date,
+                            step_idx,
+                            &step_discount_factors,
                             discount_curve.as_ref(),
-                        );
+                            as_of,
+                        )?;
                         cashflow_vec[step_idx] += adjusted_amount;
                         cashflow_components[step_idx]
                             .push((adjusted_amount, time_frac - time_steps[step_idx]));
@@ -444,10 +484,12 @@ impl BondValuator {
                     if step_idx + 1 < num_steps {
                         let adjusted_amount = Self::value_at_step_time(
                             amount.amount() * weight,
-                            time_frac,
-                            time_steps[step_idx + 1],
+                            *date,
+                            step_idx + 1,
+                            &step_discount_factors,
                             discount_curve.as_ref(),
-                        );
+                            as_of,
+                        )?;
                         cashflow_vec[step_idx + 1] += adjusted_amount;
                         cashflow_components[step_idx + 1]
                             .push((adjusted_amount, time_frac - time_steps[step_idx + 1]));
@@ -456,10 +498,104 @@ impl BondValuator {
             }
         }
 
+        // Keep positive notional settlements separate so terminal exercise can
+        // replace contractual redemption while leaving coupons and scheduled
+        // amortization payable exactly once.
+        let mut redemption_vec = vec![0.0; num_steps];
+        let mut redemption_components = vec![Vec::new(); num_steps];
+        for flow in full_schedule.get_flows().iter().filter(|flow| {
+            (flow.date > as_of || (flow.date == as_of && exercise_dates.contains(&as_of)))
+                && flow.kind == CFKind::Notional
+                && flow.amount.amount() > 0.0
+        }) {
+            let event_time =
+                grid_day_count.year_fraction(as_of, flow.date, DayCountContext::default())?;
+            let raw_clamped = Self::fractional_step(&time_steps, event_time);
+            if exercise_dates.contains(&flow.date) {
+                let step = Self::nearest_step(&time_steps, event_time);
+                let adjusted = Self::value_at_step_time(
+                    flow.amount.amount(),
+                    flow.date,
+                    step,
+                    &step_discount_factors,
+                    discount_curve.as_ref(),
+                    as_of,
+                )?;
+                redemption_vec[step] += adjusted;
+                redemption_components[step].push((adjusted, event_time - time_steps[step]));
+            } else {
+                let lower = raw_clamped.floor() as usize;
+                let upper_weight = raw_clamped - lower as f64;
+                if lower < num_steps {
+                    let adjusted = Self::value_at_step_time(
+                        flow.amount.amount() * (1.0 - upper_weight),
+                        flow.date,
+                        lower,
+                        &step_discount_factors,
+                        discount_curve.as_ref(),
+                        as_of,
+                    )?;
+                    redemption_vec[lower] += adjusted;
+                    redemption_components[lower].push((adjusted, event_time - time_steps[lower]));
+                }
+                if lower + 1 < num_steps {
+                    let adjusted = Self::value_at_step_time(
+                        flow.amount.amount() * upper_weight,
+                        flow.date,
+                        lower + 1,
+                        &step_discount_factors,
+                        discount_curve.as_ref(),
+                        as_of,
+                    )?;
+                    redemption_vec[lower + 1] += adjusted;
+                    redemption_components[lower + 1]
+                        .push((adjusted, event_time - time_steps[lower + 1]));
+                }
+            }
+        }
+
         // Sparse vectors for call/put (most steps have no option)
         // Call/put redemption uses outstanding principal at exercise date, not original notional.
         let mut call_vec: Vec<Option<f64>> = vec![None; num_steps];
         let mut put_vec: Vec<Option<f64>> = vec![None; num_steps];
+        let mut call_barriers_by_date = std::collections::BTreeMap::<Date, f64>::new();
+        let mut put_barriers_by_date = std::collections::BTreeMap::<Date, f64>::new();
+        let exercise_outstanding = |date: Date| {
+            let path_idx =
+                outstanding_by_date.partition_point(|(event_date, _)| *event_date <= date);
+            let after_events = if path_idx == 0 {
+                bond.notional.amount()
+            } else {
+                outstanding_by_date[path_idx - 1].1.amount()
+            };
+            if date == bond.maturity {
+                // The final positive notional flow zeroes the replayed balance,
+                // but a maturity option is quoted on principal immediately
+                // before that contractual redemption. Same-day amortization has
+                // already reduced the balance at this point.
+                after_events
+                    + full_schedule
+                        .get_flows()
+                        .iter()
+                        .filter(|flow| {
+                            flow.date == date
+                                && flow.kind == CFKind::Notional
+                                && flow.amount.amount() > 0.0
+                        })
+                        .map(|flow| flow.amount.amount())
+                        .sum::<f64>()
+            } else {
+                after_events
+            }
+            .max(0.0)
+        };
+        // No recovery interval follows the terminal node. Keep its principal
+        // state immediately before final redemption so maturity exercise and
+        // call friction use the contractual balance rather than the zero
+        // post-redemption replay value.
+        if let Some(last) = outstanding_principal_vec.last_mut() {
+            *last = exercise_outstanding(bond.maturity);
+        }
         if let Some(ref call_put) = bond.call_put {
             let accrual_cfg = bond.accrual_config();
             let accrual_index =
@@ -470,38 +606,43 @@ impl BondValuator {
                     call.end_date,
                     as_of,
                     bond.maturity,
-                    &cashflow_dates,
                 ) {
-                    let exercise_time = dc_curve.year_fraction(
+                    let exercise_time = grid_day_count.year_fraction(
                         as_of,
                         exercise_date,
-                        finstack_quant_core::dates::DayCountContext::default(),
+                        DayCountContext::default(),
                     )?;
-                    let step =
-                        Self::nearest_step(&time_steps, exercise_time).clamp(1, num_steps - 1);
-                    let outstanding = outstanding_principal_vec[step];
+                    let step = Self::nearest_step(&time_steps, exercise_time);
+                    let outstanding = exercise_outstanding(exercise_date);
                     let floor_price = outstanding * (call.price_pct_of_par / 100.0);
+                    let accrued_on_call = accrual_index.accrued_at(exercise_date)?;
                     let clean_call_price = if let Some(spec) = &call.make_whole {
                         let reference_curve =
                             market_context.get_discount(&spec.reference_curve_id)?;
                         Self::make_whole_call_price(
-                            call,
+                            spec,
                             reference_curve.as_ref(),
-                            &time_steps,
-                            &cashflow_vec,
-                            step,
+                            exercise_date,
+                            &flows,
                             floor_price,
-                        )
+                            accrued_on_call,
+                        )?
                     } else {
                         floor_price
                     };
-                    let accrued_on_call = accrual_index.accrued_at(exercise_date)?;
+                    let dirty_call_price = clean_call_price + accrued_on_call;
+                    call_barriers_by_date
+                        .entry(exercise_date)
+                        .and_modify(|existing| *existing = existing.min(dirty_call_price))
+                        .or_insert(dirty_call_price);
                     let call_price = Self::value_at_step_time(
-                        clean_call_price + accrued_on_call,
-                        exercise_time,
-                        time_steps[step],
+                        dirty_call_price,
+                        exercise_date,
+                        step,
+                        &step_discount_factors,
                         discount_curve.as_ref(),
-                    );
+                        as_of,
+                    )?;
                     call_vec[step] = Some(
                         call_vec[step].map_or(call_price, |existing| existing.min(call_price)),
                     );
@@ -513,27 +654,46 @@ impl BondValuator {
                     put.end_date,
                     as_of,
                     bond.maturity,
-                    &cashflow_dates,
                 ) {
-                    let exercise_time = dc_curve.year_fraction(
+                    let exercise_time = grid_day_count.year_fraction(
                         as_of,
                         exercise_date,
-                        finstack_quant_core::dates::DayCountContext::default(),
+                        DayCountContext::default(),
                     )?;
-                    let step =
-                        Self::nearest_step(&time_steps, exercise_time).clamp(1, num_steps - 1);
+                    let step = Self::nearest_step(&time_steps, exercise_time);
                     // Use outstanding principal at exercise step, not original notional
-                    let outstanding = outstanding_principal_vec[step];
+                    let outstanding = exercise_outstanding(exercise_date);
                     let clean_put_price = outstanding * (put.price_pct_of_par / 100.0);
                     let accrued_on_put = accrual_index.accrued_at(exercise_date)?;
+                    let dirty_put_price = clean_put_price + accrued_on_put;
+                    put_barriers_by_date
+                        .entry(exercise_date)
+                        .and_modify(|existing| *existing = existing.max(dirty_put_price))
+                        .or_insert(dirty_put_price);
                     let put_price = Self::value_at_step_time(
-                        clean_put_price + accrued_on_put,
-                        exercise_time,
-                        time_steps[step],
+                        dirty_put_price,
+                        exercise_date,
+                        step,
+                        &step_discount_factors,
                         discount_curve.as_ref(),
-                    );
+                        as_of,
+                    )?;
                     put_vec[step] =
                         Some(put_vec[step].map_or(put_price, |existing| existing.max(put_price)));
+                }
+            }
+
+            for (date, put_price) in &put_barriers_by_date {
+                if let Some(call_price) = call_barriers_by_date.get(date) {
+                    if *put_price > call_price + 1e-10 {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "Bond '{}' has incompatible call/put barriers on {}: holder put payoff {} exceeds issuer call payoff {}",
+                            bond.id.as_str(),
+                            date,
+                            put_price,
+                            call_price
+                        )));
+                    }
                 }
             }
         }
@@ -551,105 +711,16 @@ impl BondValuator {
             bond,
             cashflow_vec,
             cashflow_components,
+            redemption_vec,
+            redemption_components,
             call_vec,
             put_vec,
             outstanding_principal_vec,
             time_steps,
-            as_of,
+            step_discount_factors,
             recovery_rate,
             call_friction_cents,
         })
-    }
-
-    /// Build node-coupon descriptors for future floating resets and
-    /// validate that the bond's schedule supports stochastic-rate pricing.
-    ///
-    /// Called by the tree pricer **only** on the rates-credit path with a
-    /// positive short-rate volatility; deterministic-rate pricing never
-    /// invokes it, so instruments that price today keep pricing unchanged.
-    /// The deterministic projection of every coupon stays in
-    /// `cashflow_vec`; the descriptors carry only the node-dependent
-    /// increment (see
-    /// [`NodeCoupon`](finstack_quant_models::trees::two_factor_rates_credit::NodeCoupon)).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::Error::Validation`] when:
-    /// - a future floating coupon's reset and payment collapse onto one
-    ///   tree slice (grid too coarse),
-    /// - a call/put exercise step falls strictly inside a future floating
-    ///   coupon period (path-dependent fixing state is unsupported), or
-    /// - the schedule capitalizes (PIK) after the valuation date on a
-    ///   floating bond (path-dependent principal is unsupported).
-    pub(crate) fn stochastic_node_coupons(
-        &self,
-        market_context: &MarketContext,
-    ) -> Result<Vec<finstack_quant_models::trees::two_factor_rates_credit::NodeCoupon>> {
-        use crate::instruments::common_impl::pricing::floating_reset_descriptors::{
-            build_node_coupons, has_future_pik, params_from_spec, strips_index_constraints,
-            validate_exercise_alignment, NodeCouponBuildInputs, SliceSnap,
-        };
-        use crate::instruments::fixed_income::bond::CashflowSpec;
-
-        let CashflowSpec::Floating(ref floating) = self.bond.cashflow_spec else {
-            return Ok(Vec::new());
-        };
-        let full_schedule = self.bond.full_cashflow_schedule(market_context)?;
-        let discount_curve = market_context.get_discount(&self.bond.discount_curve_id)?;
-
-        // PIK first: a 100% PIK floating leg emits no cash FloatReset flows
-        // at all, so an empty descriptor list must not be read as "nothing
-        // stochastic here" — the capitalized amounts themselves are
-        // node-dependent.
-        if has_future_pik(&full_schedule, self.as_of) {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Bond '{}' capitalizes coupons (PIK) after the valuation date \
-                 while pricing floating resets under stochastic rates. A future \
-                 floating PIK coupon makes outstanding principal path-dependent, \
-                 which the recombining rates-credit lattice cannot represent. \
-                 Price with deterministic rates (hw1f_sigma unset) or remove the \
-                 PIK feature.",
-                self.bond.id.as_str()
-            )));
-        }
-
-        let coupons = build_node_coupons(
-            &NodeCouponBuildInputs {
-                schedule: &full_schedule,
-                params: params_from_spec(&floating.rate_spec),
-                grid_origin: self.as_of,
-                time_steps: &self.time_steps,
-                day_count: discount_curve.day_count(),
-                discount: discount_curve.as_ref(),
-                snap: SliceSnap::Nearest,
-                strip_index_constraints: strips_index_constraints(&floating.rate_spec),
-            },
-            |step| self.outstanding_principal_at(step),
-        )?;
-        if coupons.is_empty() {
-            return Ok(coupons);
-        }
-
-        let exercise_steps = self
-            .call_vec
-            .iter()
-            .enumerate()
-            .filter(|(_, c)| c.is_some())
-            .map(|(step, _)| step)
-            .chain(
-                self.put_vec
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, p)| p.is_some())
-                    .map(|(step, _)| step),
-            );
-        validate_exercise_alignment(
-            &coupons,
-            exercise_steps,
-            &format!("Bond '{}'", self.bond.id.as_str()),
-        )?;
-
-        Ok(coupons)
     }
 
     /// Get the total holder-view cashflow amount at this time step.
@@ -679,23 +750,136 @@ impl BondValuator {
             .unwrap_or(0.0)
     }
 
+    /// Positive contractual notional repayment at a tree step, preserving the
+    /// original event date under OAS discounting.
+    #[inline]
+    fn redemption_at_oas(&self, step: usize, oas_rate: f64) -> f64 {
+        if oas_rate.abs() <= f64::EPSILON {
+            return self.redemption_vec.get(step).copied().unwrap_or(0.0);
+        }
+        self.redemption_components
+            .get(step)
+            .map(|components| {
+                components
+                    .iter()
+                    .map(|(amount, event_minus_step)| amount * (-oas_rate * event_minus_step).exp())
+                    .sum()
+            })
+            .unwrap_or(0.0)
+    }
+
     /// Check if there's a call option at this time step.
     #[inline]
     fn call_at(&self, step: usize) -> Option<f64> {
         self.call_vec.get(step).copied().flatten()
     }
 
+    /// Conditional discount factors from `as_of` to each model slice,
+    /// obtained only through calendar-date curve queries. For a slice between
+    /// two calendar dates, interpolate log discount factors on the model
+    /// day-count coordinate. This mirrors the rates-credit target builder and
+    /// avoids passing ACT/365F coordinates to a curve whose own basis differs.
+    fn conditional_discount_factors_on_grid(
+        as_of: Date,
+        maturity: Date,
+        grid_day_count: DayCount,
+        time_steps: &[f64],
+        discount_curve: &dyn finstack_quant_core::market_data::traits::Discounting,
+    ) -> Result<Vec<f64>> {
+        let span_days = (maturity - as_of).whole_days();
+        if span_days <= 0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BondValuator grid maturity {maturity} must be after origin {as_of}"
+            )));
+        }
+
+        let context = DayCountContext::default();
+        let grid_horizon = grid_day_count.year_fraction(as_of, maturity, context)?;
+        let maturity_df = discount_curve.df_between_dates(as_of, maturity)?;
+        if !grid_horizon.is_finite() || grid_horizon <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BondValuator grid horizon must be positive and finite, got {grid_horizon}"
+            )));
+        }
+        if !maturity_df.is_finite() || maturity_df <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BondValuator conditional discount factor at maturity must be positive and finite, got {maturity_df}"
+            )));
+        }
+        let mut factors = Vec::with_capacity(time_steps.len());
+
+        for &step_time in time_steps {
+            if step_time <= 0.0 {
+                factors.push(1.0);
+                continue;
+            }
+            if step_time >= grid_horizon {
+                factors.push(maturity_df);
+                continue;
+            }
+
+            let mut lower_days = 0_i64;
+            let mut upper_days = span_days;
+            while lower_days + 1 < upper_days {
+                let mid_days = lower_days + (upper_days - lower_days) / 2;
+                let mid_date = as_of + Duration::days(mid_days);
+                let mid_time = grid_day_count.year_fraction(as_of, mid_date, context)?;
+                if mid_time <= step_time {
+                    lower_days = mid_days;
+                } else {
+                    upper_days = mid_days;
+                }
+            }
+
+            let lower_date = as_of + Duration::days(lower_days);
+            let upper_date = as_of + Duration::days(upper_days);
+            let lower_time = grid_day_count.year_fraction(as_of, lower_date, context)?;
+            let upper_time = grid_day_count.year_fraction(as_of, upper_date, context)?;
+            let lower_df = discount_curve.df_between_dates(as_of, lower_date)?;
+            let upper_df = discount_curve.df_between_dates(as_of, upper_date)?;
+            if !lower_df.is_finite() || !upper_df.is_finite() || lower_df <= 0.0 || upper_df <= 0.0
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "BondValuator requires positive finite conditional discount factors, got {lower_df} and {upper_df}"
+                )));
+            }
+            let denominator = upper_time - lower_time;
+            let weight = if denominator.abs() <= f64::EPSILON {
+                1.0
+            } else {
+                ((step_time - lower_time) / denominator).clamp(0.0, 1.0)
+            };
+            factors.push(((1.0 - weight) * lower_df.ln() + weight * upper_df.ln()).exp());
+        }
+
+        Ok(factors)
+    }
+
     fn value_at_step_time(
         cash_value_at_event_time: f64,
-        event_time: f64,
-        step_time: f64,
+        event_date: Date,
+        step: usize,
+        step_discount_factors: &[f64],
         discount_curve: &dyn finstack_quant_core::market_data::traits::Discounting,
-    ) -> f64 {
-        let step_df = discount_curve.df(step_time);
+        as_of: Date,
+    ) -> Result<f64> {
+        let step_df = step_discount_factors.get(step).copied().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "BondValuator step {step} is outside its discount-factor grid"
+            ))
+        })?;
         if step_df <= f64::EPSILON {
-            return cash_value_at_event_time;
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BondValuator conditional discount factor at step {step} must be positive, got {step_df}"
+            )));
         }
-        cash_value_at_event_time * discount_curve.df(event_time) / step_df
+        let event_df = discount_curve.df_between_dates(as_of, event_date)?;
+        if !event_df.is_finite() || event_df <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BondValuator conditional discount factor for event date {event_date} must be positive and finite, got {event_df}"
+            )));
+        }
+        Ok(cash_value_at_event_time * event_df / step_df)
     }
 
     /// Check if there's a put option at this time step.
@@ -714,6 +898,36 @@ impl BondValuator {
             .get(step)
             .copied()
             .unwrap_or(self.bond.notional.amount())
+    }
+
+    /// Apply holder put and issuer call rights to a value that excludes current
+    /// contractual payments. Call friction raises only the issuer's exercise
+    /// threshold; it never changes holder proceeds.
+    #[inline]
+    fn apply_exercise(&self, step: usize, risky_continuation: f64) -> f64 {
+        let mut exercised_or_held = risky_continuation;
+        if let Some(put_price) = self.put_at(step) {
+            exercised_or_held = exercised_or_held.max(put_price);
+        }
+        if let Some(call_price) = self.call_at(step) {
+            let outstanding = self.outstanding_principal_at(step);
+            let friction_amount = outstanding * (self.call_friction_cents / 10_000.0);
+            if exercised_or_held > call_price + friction_amount {
+                exercised_or_held = call_price;
+            }
+        }
+        exercised_or_held
+    }
+
+    /// Terminal contractual payment with maturity exercise applied to the
+    /// redemption component only. Coupons and scheduled amortization remain
+    /// payable; the final notional repayment is the hold alternative.
+    #[inline]
+    fn terminal_value(&self, step: usize, oas_rate: f64) -> f64 {
+        let current_payments = self.cashflow_at_oas(step, oas_rate);
+        let contractual_redemption = self.redemption_at_oas(step, oas_rate);
+        let other_payments = current_payments - contractual_redemption;
+        other_payments + self.apply_exercise(step, contractual_redemption)
     }
 
     /// Price the bond using a calibrated Hull-White trinomial tree with OAS.
@@ -739,7 +953,7 @@ impl BondValuator {
         let comp = hw_tree.config().compounding;
         let oas_rate = oas_bp / 10_000.0;
 
-        let terminal_cf = self.cashflow_at_oas(final_step, oas_rate);
+        let terminal_cf = self.terminal_value(final_step, oas_rate);
         let terminal_values = vec![terminal_cf; hw_tree.num_nodes(final_step)];
 
         hw_tree.backward_induction(&terminal_values, |step, _node_idx, continuation| {
@@ -748,24 +962,108 @@ impl BondValuator {
             // over this step's (possibly non-uniform) interval.
             let oas_adjusted = continuation * comp.df(oas_rate, hw_tree.dt_at_step(step));
 
-            let coupon = self.cashflow_at_oas(step, oas_rate);
-            let mut principal_value = oas_adjusted;
-
-            if let Some(put_price) = self.put_at(step) {
-                principal_value = principal_value.max(put_price);
-            }
-
-            if let Some(call_price) = self.call_at(step) {
-                let outstanding = self.outstanding_principal_at(step);
-                let friction_amount = outstanding * (self.call_friction_cents / 10_000.0);
-                let threshold = call_price + friction_amount;
-                if principal_value > threshold {
-                    principal_value = principal_value.min(call_price);
-                }
-            }
-
-            coupon + principal_value
+            self.cashflow_at_oas(step, oas_rate) + self.apply_exercise(step, oas_adjusted)
         })
+    }
+
+    /// Price a calibrated rates-credit tree whose rate and hazard factors are
+    /// both deterministic. The collapsed lattice has one economically unique
+    /// state per slice, so a scalar reverse pass avoids the cubic joint-node
+    /// rollback required for stochastic factors while preserving the same
+    /// risky-continuation, FRP recovery, exercise, and payment ordering.
+    ///
+    /// `oas_bp` is a continuously compounded spread in basis points, matching
+    /// the internal quote conversion used by [`TreePricer`].
+    pub(crate) fn price_deterministic_rates_credit(
+        &self,
+        tree: &RatesCreditTree,
+        oas_bp: f64,
+    ) -> Result<f64> {
+        if tree.config.rate_vol != 0.0 || tree.config.hazard_vol != 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "deterministic rates-credit bond rollback requires zero rate_vol and hazard_vol, got {} and {}",
+                tree.config.rate_vol, tree.config.hazard_vol
+            )));
+        }
+        if !oas_bp.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "deterministic rates-credit bond OAS must be finite, got {oas_bp}"
+            )));
+        }
+
+        let tree_times = tree.time_grid()?;
+        if tree_times.len() != self.time_steps.len()
+            || tree_times
+                .iter()
+                .zip(&self.time_steps)
+                .any(|(tree_time, value_time)| {
+                    let tolerance = 1.0e-12_f64.max(tree_time.abs() * 1.0e-10);
+                    (tree_time - value_time).abs() > tolerance
+                })
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "deterministic rates-credit tree grid does not match BondValuator grid".to_string(),
+            ));
+        }
+
+        let last = tree_times.len() - 1;
+        let oas_rate = oas_bp / 10_000.0;
+        let recovery_rate = tree.recovery_rate().clamp(0.0, 1.0);
+        let mut value = self.terminal_value(last, oas_rate);
+
+        for step in (0..last).rev() {
+            let dt = tree_times[step + 1] - tree_times[step];
+            let short_rate = tree.rate_at_node(step, 0)?;
+            let hazard = tree.hazard_at_node(step, 0)?.max(0.0);
+            let interval_discount = (-(short_rate + oas_rate) * dt).exp();
+            let survival = (-hazard * dt).exp();
+            let recovery_weight = continuous_frp_weight(interval_discount, survival)?;
+            let recovery = recovery_rate * self.outstanding_principal_at(step) * recovery_weight;
+            let risky_continuation = survival * interval_discount * value + recovery;
+            value = self.cashflow_at_oas(step, oas_rate)
+                + self.apply_exercise(step, risky_continuation);
+        }
+
+        Ok(value)
+    }
+
+    /// Price embedded options against the deterministic discount curve used to
+    /// build this valuator. This is the zero-short-rate-volatility limit of the
+    /// risk-free tree and avoids inventing volatility merely to satisfy a
+    /// stochastic tree constructor.
+    pub(crate) fn price_deterministic_discount_curve(&self, oas_bp: f64) -> Result<f64> {
+        if !oas_bp.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "deterministic bond OAS must be finite, got {oas_bp}"
+            )));
+        }
+        if self.step_discount_factors.len() != self.time_steps.len() {
+            return Err(finstack_quant_core::Error::internal(
+                "BondValuator discount-factor and time grids differ in length",
+            ));
+        }
+
+        let last = self.time_steps.len() - 1;
+        let oas_rate = oas_bp / 10_000.0;
+        let mut value = self.terminal_value(last, oas_rate);
+        for step in (0..last).rev() {
+            let current_df = self.step_discount_factors[step];
+            let next_df = self.step_discount_factors[step + 1];
+            if !current_df.is_finite()
+                || !next_df.is_finite()
+                || current_df <= 0.0
+                || next_df <= 0.0
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "BondValuator deterministic discount factors must be positive and finite at step {step}"
+                )));
+            }
+            let dt = self.time_steps[step + 1] - self.time_steps[step];
+            let interval_df = next_df / current_df * (-oas_rate * dt).exp();
+            value = self.cashflow_at_oas(step, oas_rate)
+                + self.apply_exercise(step, interval_df * value);
+        }
+        Ok(value)
     }
 
     /// Resolve the recovery rate from the bond's explicit `credit_curve_id`
@@ -789,76 +1087,38 @@ impl TreeValuator for BondValuator {
         let final_step = self.time_steps.len() - 1;
         let oas_rate =
             state.get_var_or(finstack_quant_models::short_rate_keys::OAS, 0.0) / 10_000.0;
-        let cashflow = self.cashflow_at_oas(final_step, oas_rate);
-        Ok(cashflow)
+        Ok(self.terminal_value(final_step, oas_rate))
     }
 
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64> {
         let step = state.step;
         let oas_rate =
             state.get_var_or(finstack_quant_models::short_rate_keys::OAS, 0.0) / 10_000.0;
-        let coupon = self.cashflow_at_oas(step, oas_rate);
-
-        // Call/put exercise logic:
-        // - Coupon is ALWAYS paid on coupon dates regardless of exercise decision
-        // - Call/put redemption is principal-only (price_pct_of_par × outstanding)
-        // - Exercise decision compares continuation vs redemption value
-        //
-        // Formula: value = coupon + min(max(continuation, put_redemption), call_redemption)
-        //
-        // This ensures:
-        // 1. Coupon is received regardless of exercise
-        // 2. Put floor: holder can demand redemption if continuation < put_price
-        // 3. Call cap: issuer can redeem if continuation > call_price
-
-        // Start with continuation value (principal path if not exercised)
-        let mut principal_value = continuation_value;
-
-        // Put option: holder can exercise if redemption > continuation
-        if let Some(put_price) = self.put_at(step) {
-            principal_value = principal_value.max(put_price);
-        }
-
-        // Call option: issuer can exercise if redemption < continuation, subject to friction.
-        //
-        // With friction, the issuer only calls when continuation exceeds:
-        //   call_price + (outstanding_principal × call_friction_cents / 10_000)
-        //
-        // (because 1 cent per 100 of par = 0.0001 of notional).
-        if let Some(call_price) = self.call_at(step) {
-            let outstanding = self.outstanding_principal_at(step);
-            let friction_amount = outstanding * (self.call_friction_cents / 10_000.0);
-            let threshold = call_price + friction_amount;
-            if principal_value > threshold {
-                principal_value = principal_value.min(call_price);
-            }
-        }
-
-        // Coupon is added after exercise decision (coupon is paid regardless)
-        let alive_value = coupon + principal_value;
-
-        // Default handling: if hazard rate is present, compute survival/default weighting.
-        // Use cached fields instead of hash lookups for performance.
-        //
-        // Recovery convention: recovery is received at the *current* node upon
-        // default (standard Hull/Brigo-Mercurio convention). No additional one-
-        // period discounting is applied — `alive_value` and `recovery` are both
-        // in PV-at-this-node terms.
-        if let Some(hazard) = state.hazard_rate {
-            let p_surv = (-hazard.max(0.0) * dt).exp();
-            let default_prob = (1.0 - p_surv).clamp(0.0, 1.0);
-            // Use outstanding principal at this step for recovery (FRP convention)
+        // The tree has already rate/OAS-discounted `continuation_value` from
+        // the child slice to this node. Apply only survival to that value, and
+        // add continuously paid FRP recovery with the same interval discount.
+        // Current contractual payments are at this node, so they are neither
+        // survival weighted over the next interval nor included in recovery.
+        let risky_continuation = if let Some(hazard) = state.hazard_rate {
+            let hazard = hazard.max(0.0);
+            let survival = (-hazard * dt).exp();
+            let interval_df = state.discount_factor().unwrap_or_else(|| {
+                let rate = state.interest_rate().unwrap_or(0.0) + oas_rate;
+                (-rate * dt).exp()
+            });
+            let recovery_weight = continuous_frp_weight(interval_df, survival)?;
             let outstanding = self.outstanding_principal_at(step);
             let recovery = self
                 .recovery_rate
-                .map(|rr| rr.clamp(0.0, 1.0) * outstanding)
+                .map(|rr| rr.clamp(0.0, 1.0) * outstanding * recovery_weight)
                 .unwrap_or(0.0);
-            let node_value = p_surv * alive_value + default_prob * recovery;
-            Ok(node_value)
+            survival * continuation_value + recovery
         } else {
-            // No hazard info at this node; return alive path value
-            Ok(alive_value)
-        }
+            continuation_value
+        };
+
+        let current_payments = self.cashflow_at_oas(step, oas_rate);
+        Ok(current_payments + self.apply_exercise(step, risky_continuation))
     }
 }
 
@@ -876,14 +1136,481 @@ const _: () = {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec};
+    use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule, Notional};
+    use crate::cashflow::primitives::{CFKind, CashFlow};
+    use crate::instruments::fixed_income::bond::{
+        Bond, CallPut, CallPutSchedule, CashflowSpec, MakeWholeSpec,
+    };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::HashMap;
     use finstack_quant_models::trees::tree_framework::map_date_to_step;
+    use finstack_quant_models::trees::two_factor_rates_credit::{
+        RatesCreditCalibrationTargets, RatesCreditConfig,
+    };
+    use finstack_quant_models::{state_keys, NodeState};
     use time::macros::date;
+
+    fn node_test_valuator(
+        current_payment: f64,
+        terminal_redemption: f64,
+        call: [Option<f64>; 2],
+        put: [Option<f64>; 2],
+        outstanding: f64,
+        recovery_rate: Option<f64>,
+        call_friction_cents: f64,
+    ) -> BondValuator {
+        let as_of = date!(2025 - 01 - 01);
+        let maturity = date!(2026 - 01 - 01);
+        let bond = Bond::fixed(
+            "NODE-TEST",
+            Money::new(100.0, Currency::USD),
+            finstack_quant_core::types::Rate::from_decimal(0.0),
+            as_of,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        BondValuator {
+            bond,
+            cashflow_vec: vec![current_payment, current_payment + terminal_redemption],
+            cashflow_components: vec![Vec::new(), Vec::new()],
+            redemption_vec: vec![0.0, terminal_redemption],
+            redemption_components: vec![Vec::new(), Vec::new()],
+            call_vec: call.to_vec(),
+            put_vec: put.to_vec(),
+            outstanding_principal_vec: vec![outstanding, 0.0],
+            time_steps: vec![0.0, 1.0],
+            step_discount_factors: vec![1.0, 1.0],
+            recovery_rate,
+            call_friction_cents,
+        }
+    }
+
+    #[test]
+    fn risky_hold_is_survival_weighted_before_exercise_and_current_payment_is_not() {
+        let valuator = node_test_valuator(5.0, 100.0, [None; 2], [None; 2], 100.0, Some(0.4), 0.0);
+        let market = MarketContext::new();
+        let rate: f64 = 0.03;
+        let hazard: f64 = 0.10;
+        let dt: f64 = 1.0;
+        let interval_df = (-rate * dt).exp();
+        let mut vars = HashMap::default();
+        vars.insert(state_keys::INTEREST_RATE, rate);
+        vars.insert(state_keys::HAZARD_RATE, hazard);
+        vars.insert(state_keys::DF, interval_df);
+        let state = NodeState::new(0, 0.0, &vars, &market);
+        let discounted_continuation = 100.0 * interval_df;
+
+        let actual = valuator
+            .value_at_node(&state, discounted_continuation, dt)
+            .expect("node value");
+        let survival = (-hazard * dt).exp();
+        let recovery =
+            0.4 * 100.0 * hazard * (1.0 - (-(rate + hazard) * dt).exp()) / (rate + hazard);
+        let expected = 5.0 + survival * discounted_continuation + recovery;
+        assert!(
+            (actual - expected).abs() < 1e-12,
+            "actual={actual}, expected={expected}"
+        );
+    }
+
+    #[test]
+    fn immediate_put_is_not_survival_discounted_and_ends_recovery_exposure() {
+        let valuator = node_test_valuator(
+            5.0,
+            100.0,
+            [None; 2],
+            [Some(100.0), None],
+            100.0,
+            Some(0.4),
+            0.0,
+        );
+        let market = MarketContext::new();
+        let mut vars = HashMap::default();
+        vars.insert(state_keys::INTEREST_RATE, 0.0);
+        vars.insert(state_keys::HAZARD_RATE, 1.0);
+        vars.insert(state_keys::DF, 1.0);
+        let state = NodeState::new(0, 0.0, &vars, &market);
+
+        let actual = valuator
+            .value_at_node(&state, 0.0, 1.0)
+            .expect("node value");
+        assert_eq!(actual, 105.0);
+    }
+
+    #[test]
+    fn within_step_recovery_has_stable_zero_denominator_limit() {
+        let survival = (-0.10_f64).exp();
+        let weight = continuous_frp_weight(0.10_f64.exp(), survival).expect("recovery weight");
+        assert!((weight - 0.10).abs() < 1e-12, "weight={weight}");
+    }
+
+    #[test]
+    fn deterministic_rates_credit_scalar_pass_matches_one_step_frp() {
+        let valuator = node_test_valuator(0.0, 100.0, [None; 2], [None; 2], 100.0, Some(0.4), 0.0);
+        let rate = 0.03_f64;
+        let hazard = 0.10_f64;
+        let discount = (-rate).exp();
+        let survival = (-hazard).exp();
+        let mut tree = RatesCreditTree::new(RatesCreditConfig {
+            steps: 1,
+            ..RatesCreditConfig::default()
+        });
+        tree.calibrate(&RatesCreditCalibrationTargets {
+            times: vec![0.0, 1.0],
+            discount_factors: vec![1.0, discount],
+            survival_probabilities: vec![1.0, survival],
+            recovery_rate: 0.4,
+        })
+        .expect("calibration");
+
+        let actual = valuator
+            .price_deterministic_rates_credit(&tree, 0.0)
+            .expect("scalar price");
+        let recovery =
+            0.4 * 100.0 * continuous_frp_weight(discount, survival).expect("recovery weight");
+        let expected = discount * survival * 100.0 + recovery;
+        assert!(
+            (actual - expected).abs() < 1.0e-12,
+            "actual={actual}, expected={expected}"
+        );
+    }
+
+    #[test]
+    fn terminal_put_replaces_redemption_and_preserves_coupon() {
+        let valuator = node_test_valuator(
+            50.0,
+            1_000.0,
+            [None; 2],
+            [None, Some(1_100.0)],
+            1_000.0,
+            None,
+            0.0,
+        );
+        let market = MarketContext::new();
+        let vars = HashMap::default();
+        let state = NodeState::new(1, 1.0, &vars, &market);
+
+        let actual = valuator.value_at_maturity(&state).expect("terminal value");
+        assert_eq!(actual, 1_150.0);
+    }
+
+    #[test]
+    fn call_friction_changes_threshold_but_not_holder_proceeds() {
+        let valuator = node_test_valuator(
+            0.0,
+            100.0,
+            [Some(100.0), None],
+            [None; 2],
+            100.0,
+            None,
+            100.0,
+        );
+        assert_eq!(valuator.apply_exercise(0, 100.5), 100.5);
+        assert_eq!(valuator.apply_exercise(0, 101.5), 100.0);
+    }
+
+    #[test]
+    fn exercise_window_includes_every_calendar_date_and_as_of() {
+        let dates = BondValuator::exercise_dates_for_period(
+            date!(2025 - 01 - 01),
+            date!(2025 - 01 - 03),
+            date!(2025 - 01 - 01),
+            date!(2026 - 01 - 01),
+        );
+        assert_eq!(
+            dates,
+            vec![
+                date!(2025 - 01 - 01),
+                date!(2025 - 01 - 02),
+                date!(2025 - 01 - 03)
+            ]
+        );
+    }
+
+    #[test]
+    fn explicit_grid_day_count_controls_event_mapping_when_curve_basis_differs() {
+        let as_of = date!(2024 - 01 - 01);
+        let exercise = date!(2024 - 06 - 29);
+        let maturity = date!(2025 - 01 - 01);
+        let mut bond = Bond::fixed(
+            "ACT365F-GRID",
+            Money::new(100.0, Currency::USD),
+            finstack_quant_core::types::Rate::from_decimal(0.0),
+            as_of,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: exercise,
+                end_date: exercise,
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: vec![],
+        });
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 1.0), (1.1, 0.94)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+        let horizon = DayCount::Act365F
+            .year_fraction(as_of, maturity, DayCountContext::default())
+            .expect("ACT/365F horizon");
+        // The exercise time is 180/365 = 0.49315. On the curve's ACT/360
+        // basis it would be 0.5, which would snap to step 2 on this grid.
+        let grid = vec![0.0, 0.49, 0.497, horizon];
+
+        let valuator = BondValuator::new_with_time_steps_and_day_count(
+            bond,
+            &market,
+            as_of,
+            grid,
+            DayCount::Act365F,
+        )
+        .expect("valuator");
+
+        assert!(valuator.call_vec[1].is_some());
+        assert!(valuator.call_vec[2].is_none());
+    }
+
+    #[test]
+    fn canonical_balance_replay_carries_historical_amortization_and_pik() {
+        let issue = date!(2024 - 01 - 01);
+        let as_of = date!(2025 - 01 - 01);
+        let maturity = date!(2026 - 01 - 01);
+        let money = |amount| Money::new(amount, Currency::USD);
+        let schedule = CashFlowSchedule::from_parts(
+            vec![
+                CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
+                CashFlow::new(
+                    date!(2024 - 06 - 01),
+                    None,
+                    money(200.0),
+                    CFKind::Amortization,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(
+                    date!(2024 - 12 - 01),
+                    None,
+                    money(50.0),
+                    CFKind::Pik,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(maturity, None, money(850.0), CFKind::Notional, 0.0, None),
+            ],
+            Notional::par(1_000.0, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta {
+                issue_date: Some(issue),
+                maturity_date: Some(maturity),
+                ..CashFlowMeta::default()
+            },
+        );
+        let mut bond =
+            Bond::from_cashflows("SEASONED-PIK", schedule, "USD-OIS", None).expect("custom bond");
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: as_of,
+                end_date: as_of,
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: vec![CallPut {
+                start_date: maturity,
+                end_date: maturity,
+                price_pct_of_par: 110.0,
+                make_whole: None,
+            }],
+        });
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, 0.95)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+
+        let valuator = BondValuator::new(bond, &market, as_of, 1.0, 4).expect("valuator");
+        assert!((valuator.outstanding_principal_vec[0] - 850.0).abs() < 1e-12);
+        assert_eq!(valuator.call_vec[0], Some(850.0));
+        assert!((valuator.put_vec[4].expect("terminal put") - 935.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn as_of_coupon_and_amortization_are_paid_before_immediate_call() {
+        let issue = date!(2024 - 01 - 01);
+        let as_of = date!(2025 - 01 - 01);
+        let maturity = date!(2026 - 01 - 01);
+        let money = |amount| Money::new(amount, Currency::USD);
+        let schedule = CashFlowSchedule::from_parts(
+            vec![
+                CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
+                CashFlow::new(as_of, None, money(50.0), CFKind::Fixed, 0.0, None),
+                CashFlow::new(as_of, None, money(200.0), CFKind::Amortization, 0.0, None),
+                CashFlow::new(maturity, None, money(800.0), CFKind::Notional, 0.0, None),
+            ],
+            Notional::par(1_000.0, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta {
+                issue_date: Some(issue),
+                maturity_date: Some(maturity),
+                ..CashFlowMeta::default()
+            },
+        );
+        let mut bond =
+            Bond::from_cashflows("SAME-DAY-EXERCISE", schedule, "USD-OIS", None).expect("bond");
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: as_of,
+                end_date: as_of,
+                price_pct_of_par: 90.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, 1.0)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+
+        let valuator = BondValuator::new(bond, &market, as_of, 1.0, 1).expect("valuator");
+        assert_eq!(valuator.cashflow_vec[0], 250.0);
+        assert_eq!(valuator.outstanding_principal_vec[0], 800.0);
+        assert_eq!(valuator.call_vec[0], Some(720.0));
+        let price = valuator
+            .price_deterministic_discount_curve(0.0)
+            .expect("price");
+        assert_eq!(price, 970.0);
+    }
+
+    #[test]
+    fn make_whole_reference_value_adds_near_coupon_accrued_once() {
+        let issue = date!(2025 - 01 - 01);
+        let exercise = date!(2025 - 06 - 30);
+        let maturity = date!(2026 - 01 - 01);
+        let mut bond = Bond::fixed(
+            "MAKE-WHOLE-ACCRUED",
+            Money::new(1_000.0, Currency::USD),
+            finstack_quant_core::types::Rate::from_decimal(0.10),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: exercise,
+                end_date: exercise,
+                price_pct_of_par: 50.0,
+                make_whole: Some(MakeWholeSpec {
+                    reference_curve_id: "USD-OIS".into(),
+                    spread_bp: 0.0,
+                }),
+            }],
+            puts: Vec::new(),
+        });
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(issue)
+            .knots([(0.0, 1.0), (1.0, 1.0)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+        let flows = bond
+            .pricing_dated_cashflows(&market, issue)
+            .expect("cashflows");
+        let first_future_date = flows
+            .iter()
+            .find_map(|(date, _)| (*date > exercise).then_some(*date))
+            .expect("future coupon");
+        assert_eq!(first_future_date, date!(2025 - 07 - 01));
+        let reference_dirty = flows
+            .iter()
+            .filter(|(date, _)| *date > exercise)
+            .map(|(_, amount)| amount.amount())
+            .sum::<f64>();
+        let day_count = market
+            .get_discount("USD-OIS")
+            .expect("discount curve")
+            .day_count();
+        let exercise_time = day_count
+            .year_fraction(issue, exercise, DayCountContext::default())
+            .expect("exercise time");
+        let maturity_time = day_count
+            .year_fraction(issue, maturity, DayCountContext::default())
+            .expect("maturity time");
+
+        let valuator = BondValuator::new_with_time_steps(
+            bond,
+            &market,
+            issue,
+            vec![0.0, exercise_time, maturity_time],
+        )
+        .expect("valuator");
+        let dirty_call = valuator.call_vec[1].expect("make-whole call");
+
+        assert!(reference_dirty > 1_000.0);
+        assert!(
+            (dirty_call - reference_dirty).abs() < 1.0e-10,
+            "the dirty reference PV already contains accrued cash: call={dirty_call}, reference={reference_dirty}"
+        );
+    }
+
+    #[test]
+    fn incompatible_same_date_put_above_call_is_rejected() {
+        let as_of = date!(2025 - 01 - 01);
+        let maturity = date!(2026 - 01 - 01);
+        let exercise = date!(2025 - 07 - 01);
+        let mut bond = Bond::fixed(
+            "BAD-BARRIERS",
+            Money::new(100.0, Currency::USD),
+            finstack_quant_core::types::Rate::from_decimal(0.0),
+            as_of,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: exercise,
+                end_date: exercise,
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: vec![CallPut {
+                start_date: exercise,
+                end_date: exercise,
+                price_pct_of_par: 101.0,
+                make_whole: None,
+            }],
+        });
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, 0.95)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+
+        let error = BondValuator::new(bond, &market, as_of, 1.0, 12)
+            .err()
+            .expect("crossed barriers must fail");
+        assert!(error.to_string().contains("incompatible call/put barriers"));
+    }
 
     /// Item 8 regression: off-grid coupons on the **non-exercise** path are
     /// distributed across the two bracketing tree steps, and each distributed
@@ -1171,12 +1898,26 @@ mod tests {
 
         let valuator =
             BondValuator::new(bond, &market, as_of, time_to_maturity, tree_steps).expect("tree");
+        let grid = (0..=tree_steps)
+            .map(|index| index as f64 * time_to_maturity / tree_steps as f64)
+            .collect::<Vec<_>>();
+        let step_dfs = BondValuator::conditional_discount_factors_on_grid(
+            as_of,
+            maturity,
+            day_count,
+            &grid,
+            discount_curve.as_ref(),
+        )
+        .expect("step discount factors");
         let expected = BondValuator::value_at_step_time(
             raw_exercise_date_cashflow,
-            event_time,
-            step_time,
+            call_date,
+            step,
+            &step_dfs,
             discount_curve.as_ref(),
-        );
+            as_of,
+        )
+        .expect("timing-adjusted cashflow");
         let actual = valuator.cashflow_vec[step];
 
         assert!(

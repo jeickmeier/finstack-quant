@@ -87,6 +87,9 @@ impl Pricer for SimpleBondMertonMcPricer {
             .model(ModelKey::MertonMc)
             .curve_id(bond.discount_curve_id.as_str());
 
+        bond.validate_merton_mc_embedded_rights()
+            .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
+
         let mc_override = bond
             .instrument_pricing_overrides
             .model_config
@@ -227,6 +230,9 @@ impl Pricer for SimpleBondMertonMcPricer {
             .model(ModelKey::MertonMc)
             .curve_id(bond.discount_curve_id.as_str());
 
+        bond.validate_merton_mc_embedded_rights()
+            .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
+
         let mc_override = bond
             .instrument_pricing_overrides
             .model_config
@@ -281,5 +287,141 @@ impl Pricer for SimpleBondMertonMcPricer {
             .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx))?;
 
         Ok(mc_result.clean_price_pct / 100.0 * bond.notional.amount())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule, ReturnFloorSpec};
+    use crate::instruments::PricingOptions;
+    use crate::pricer::{standard_pricer_registry, PricingError};
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::StubKind;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::types::Rate;
+    use finstack_quant_models::credit::MertonModel;
+    use time::macros::date;
+
+    fn test_bond_and_config() -> (Bond, MertonMcConfig) {
+        let config = MertonMcConfig::new(
+            MertonModel::new(200.0, 0.20, 100.0, 0.03).expect("valid Merton model"),
+            0.40,
+        )
+        .expect("valid Merton MC config")
+        .num_paths(32)
+        .time_steps_per_year(4)
+        .antithetic(false)
+        .seed(7);
+        let mut bond = Bond::fixed(
+            "MERTON_OPTION_GUARD",
+            Money::new(100.0, Currency::USD),
+            Rate::from_decimal(0.05),
+            date!(2024 - 01 - 15),
+            date!(2029 - 01 - 15),
+            StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("valid bond");
+        bond.instrument_pricing_overrides = bond
+            .instrument_pricing_overrides
+            .clone()
+            .with_merton_mc(config.clone());
+        (bond, config)
+    }
+
+    fn test_market() -> MarketContext {
+        MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(date!(2025 - 01 - 15))
+                .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+                .build()
+                .expect("valid discount curve"),
+        )
+    }
+
+    fn assert_option_guidance(message: &str) {
+        assert!(message.contains("does not support embedded call, put, or return-floor rights"));
+        assert!(message.contains("'tree'"));
+        assert!(message.contains("'rates_credit'"));
+    }
+
+    #[test]
+    fn public_and_registered_merton_paths_reject_embedded_rights() {
+        let as_of = date!(2025 - 01 - 15);
+        let market = test_market();
+        let (straight, config) = test_bond_and_config();
+
+        let direct = straight
+            .price_merton_mc(&config, 0.03, as_of)
+            .expect("straight Merton pricing remains supported");
+        assert!(direct.clean_price_pct.is_finite());
+        let registered_straight = standard_pricer_registry()
+            .price_with_metrics(
+                &straight,
+                ModelKey::MertonMc,
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default(),
+            )
+            .expect("registered straight Merton pricing remains supported");
+        assert!(registered_straight.value.amount().is_finite());
+
+        let mut callable = straight.clone();
+        callable.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: date!(2027 - 01 - 15),
+                end_date: date!(2027 - 01 - 15),
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+        let direct_error = callable
+            .price_merton_mc(&config, 0.03, as_of)
+            .expect_err("typed Merton pricing must reject callable bonds");
+        assert_option_guidance(&direct_error.to_string());
+
+        let money_error = standard_pricer_registry()
+            .price_with_metrics(
+                &callable,
+                ModelKey::MertonMc,
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default(),
+            )
+            .expect_err("registered Merton pricing must reject callable bonds");
+        assert!(matches!(money_error, PricingError::InvalidInput { .. }));
+        assert_option_guidance(&money_error.to_string());
+
+        let mut puttable = straight.clone();
+        puttable.call_put = Some(CallPutSchedule {
+            calls: Vec::new(),
+            puts: vec![CallPut {
+                start_date: date!(2027 - 01 - 15),
+                end_date: date!(2027 - 01 - 15),
+                price_pct_of_par: 110.0,
+                make_whole: None,
+            }],
+        });
+        let put_error = puttable
+            .price_merton_mc(&config, 0.03, as_of)
+            .expect_err("typed Merton pricing must reject puttable bonds");
+        assert_option_guidance(&put_error.to_string());
+
+        let mut floored = straight;
+        floored.return_floor = Some(ReturnFloorSpec::moic(1.10));
+        let floor_error = floored
+            .price_merton_mc(&config, 0.03, as_of)
+            .expect_err("typed Merton pricing must reject return floors");
+        assert_option_guidance(&floor_error.to_string());
+
+        let raw_error = standard_pricer_registry()
+            .price_raw(&floored, ModelKey::MertonMc, &market, as_of)
+            .expect_err("registered raw Merton pricing must reject return floors");
+        assert!(matches!(raw_error, PricingError::InvalidInput { .. }));
+        assert_option_guidance(&raw_error.to_string());
     }
 }

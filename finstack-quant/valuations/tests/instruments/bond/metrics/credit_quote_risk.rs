@@ -14,9 +14,10 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::{
-    Instrument, InstrumentPricingOverrides, PricingOptions,
+    BondRiskBasis, Instrument, InstrumentPricingOverrides, PricingOptions,
 };
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::pricer::ModelKey;
 use time::macros::date;
 
 fn build_credit_bond(as_of: time::Date) -> Bond {
@@ -158,4 +159,153 @@ fn test_quoted_credit_bond_offmodel_changes_hazard_cs01() {
         "off-model quote should recalibrate the hazard and change CS01: \
          model={cs01_model:.4}, distressed={cs01_distressed:.4}"
     );
+}
+
+#[test]
+fn test_quoted_credit_bond_quote_space_cs01_preserves_hazard_replay() {
+    let as_of = date!(2025 - 01 - 01);
+    let market = build_market(as_of);
+
+    let unquoted = build_credit_bond(as_of);
+    let base = unquoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::CleanPrice],
+            PricingOptions::default(),
+        )
+        .expect("unquoted credit bond should price");
+    let model_clean_pct = base.measures["clean_price"] / 1_000_000.0 * 100.0;
+
+    let mut quoted = build_credit_bond(as_of);
+    quoted.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(model_clean_pct);
+    let result = quoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Cs01, MetricId::BucketedCs01],
+            crate::test_support::credit::pricing_options(),
+        )
+        .expect("quote-space CS01 should replay the calibrated hazard curve");
+
+    let cs01 = result.measures["cs01"];
+    assert!(
+        cs01.is_finite() && cs01.abs() > 1e-3,
+        "quote-space CS01 should be finite and non-zero, got {cs01}"
+    );
+    let bucket_prefix = "bucketed_cs01::USD-CREDIT::";
+    assert!(
+        result
+            .measures
+            .iter()
+            .any(|(key, value)| key.as_str().starts_with(bucket_prefix) && value.abs() > 1e-6),
+        "quote-space bucketed CS01 should populate '{bucket_prefix}'"
+    );
+}
+
+#[test]
+fn test_quoted_credit_bond_callable_oas_dv01_matches_unquoted_model_risk() {
+    let as_of = date!(2025 - 01 - 01);
+    let market = build_market(as_of);
+
+    let mut unquoted = build_credit_bond(as_of);
+    unquoted.metric_pricing_overrides = unquoted
+        .metric_pricing_overrides
+        .with_bond_risk_basis(BondRiskBasis::CallableOas);
+    let base = unquoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::CleanPrice, MetricId::Dv01, MetricId::BucketedDv01],
+            PricingOptions::default(),
+        )
+        .expect("unquoted OAS-basis credit risk should price");
+    let model_clean_pct = base.measures["clean_price"] / 1_000_000.0 * 100.0;
+    let base_dv01 = base.measures["dv01"];
+    let base_bucketed = base.measures["bucketed_dv01"];
+
+    let mut quoted = build_credit_bond(as_of);
+    quoted.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(model_clean_pct);
+    quoted.metric_pricing_overrides = quoted
+        .metric_pricing_overrides
+        .with_bond_risk_basis(BondRiskBasis::CallableOas);
+    let result = quoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Dv01, MetricId::BucketedDv01],
+            PricingOptions::default(),
+        )
+        .expect("quoted OAS-basis credit risk should retain the model quote anchor");
+    let quoted_dv01 = result.measures["dv01"];
+    let quoted_bucketed = result.measures["bucketed_dv01"];
+
+    assert!(
+        quoted_dv01.abs() > 1e-3 && quoted_bucketed.abs() > 1e-3,
+        "quoted OAS-basis DV01 must not collapse to zero: scalar={quoted_dv01}, bucketed={quoted_bucketed}"
+    );
+    assert!(
+        (quoted_dv01 - base_dv01).abs() < base_dv01.abs() * 0.05 + 1.0,
+        "quoted scalar DV01 ({quoted_dv01}) should match unquoted model risk ({base_dv01})"
+    );
+    assert!(
+        (quoted_bucketed - base_bucketed).abs() < base_bucketed.abs() * 0.05 + 1.0,
+        "quoted bucketed DV01 ({quoted_bucketed}) should match unquoted model risk ({base_bucketed})"
+    );
+}
+
+#[test]
+fn test_direct_hazard_risk_propagates_unattainable_quote_calibration_error() {
+    let as_of = date!(2025 - 01 - 01);
+    let market = build_market(as_of);
+    let mut quoted = build_credit_bond(as_of);
+    quoted.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(10_000.0);
+
+    let err = quoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Cs01Hazard],
+            PricingOptions::default(),
+        )
+        .expect_err("an unattainable quote must fail hazard-shift calibration");
+    let message = err.to_string();
+    assert!(
+        message.contains("no sign change") || message.contains("convergence"),
+        "error should preserve the typed root-solve failure, got: {message}"
+    );
+}
+
+#[test]
+fn test_explicit_discounting_with_attached_credit_uses_plain_rate_bucketed_dv01() {
+    let as_of = date!(2025 - 01 - 01);
+    let market = build_market(as_of);
+    let mut quoted = build_credit_bond(as_of);
+    quoted.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
+
+    let result = quoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[
+                MetricId::BucketedDv01,
+                MetricId::Cs01Hazard,
+                MetricId::BucketedCs01Hazard,
+            ],
+            PricingOptions::default().with_model(ModelKey::Discounting),
+        )
+        .expect("explicit Discounting must ignore the attached credit curve for rate risk");
+
+    let aggregate = result.measures["bucketed_dv01"];
+    assert!(aggregate.is_finite() && aggregate.abs() > 1e-6);
+    assert!(result
+        .measures
+        .iter()
+        .any(|(key, value)| key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6));
+    assert_eq!(result.measures["cs01_hazard"], 0.0);
+    assert_eq!(result.measures["bucketed_cs01_hazard"], 0.0);
 }

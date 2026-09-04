@@ -3259,7 +3259,12 @@ export declare class Performance {
    * @returns `{ alpha, betas, r_squared, adjusted_r_squared, residual_vol }` for the selected ticker.
    * @throws Error - Rejects a non-numeric `factor_returns` matrix, an unknown `returnKind`, an out-of-range `ticker_idx`, no factors, too few observations, non-finite or length-mismatched inputs, a singular factor design, or a result that cannot be serialized to JavaScript.
    */
-  multiFactorGreeks(tickerIdx: number, factorReturns: NumericMatrix, returnKind?: string, riskFreeRate?: number): MultiFactorResult;
+  multiFactorGreeks(
+    tickerIdx: number,
+    factorReturns: NumericMatrix,
+    returnKind?: string,
+    riskFreeRate?: number
+  ): MultiFactorResult;
   /**
    * Period-to-date lookback returns.
    *
@@ -5188,7 +5193,7 @@ export interface BondConstructor {
     couponRate: Rate,
     issue: string,
     maturity: string,
-    stub: "none" | "short_front" | "short_back" | "long_front" | "long_back",
+    stub: 'none' | 'short_front' | 'short_back' | 'long_front' | 'long_back',
     discountCurveId: string
   ): Bond;
   /**
@@ -5305,13 +5310,89 @@ export interface MoneyValue {
 }
 
 /**
+ * Convergence and reproducibility diagnostics for a Monte Carlo valuation.
+ */
+export interface MonteCarloValuationDetails {
+  /**
+   * Registered model key used for the simulation.
+   */
+  model_key: string;
+  /**
+   * Sampling standard error of the discounted PV mean in the result currency.
+   * For LSMC valuations, this measures pricing-path uncertainty under the
+   * frozen fitted exercise policy. It excludes regression approximation,
+   * time-grid discretization, and model error.
+   */
+  standard_error: number;
+  /**
+   * Configured independent paths used to fit the exercise or control policy.
+   */
+  training_paths: number;
+  /**
+   * Training factor paths including antithetic partners.
+   */
+  training_simulated_paths: number;
+  /**
+   * Configured independent paths used to fit state-conditional make-whole
+   * reference values; zero when that stage is absent.
+   */
+  make_whole_training_paths: number;
+  /**
+   * Make-whole training paths including antithetic partners; zero when that
+   * stage is absent.
+   */
+  make_whole_training_simulated_paths: number;
+  /**
+   * Independent path estimators contributing to the reported mean.
+   */
+  estimator_paths: number;
+  /**
+   * Total estimator paths including antithetic partners.
+   */
+  simulated_paths: number;
+  /**
+   * Deterministic random seed used for the run, preserved across the full
+   * unsigned 64-bit range.
+   */
+  seed: bigint;
+  /**
+   * Simulation times in year fractions, including zero and maturity.
+   */
+  time_grid: number[];
+  /**
+   * Whether antithetic variates were enabled.
+   */
+  antithetic: boolean;
+  /**
+   * Whether Sobol quasi-random sampling was enabled.
+   */
+  sobol: boolean;
+  /**
+   * Whether Brownian-bridge ordering was enabled for Sobol paths.
+   */
+  brownian_bridge: boolean;
+}
+
+/**
+ * Model-specific detail carried by a valuation result.
+ */
+export type ValuationDetails =
+  | { type: 'monte_carlo'; data: MonteCarloValuationDetails }
+  | {
+      type: 'composite' | 'credit_derivative' | 'structured_credit_stochastic' | 'fx';
+      data: unknown;
+    };
+
+/**
  * Valuation envelope returned by the `priceInstrument*` entry points.
  *
  * This is the same document Python callers hold as
  * `finstack_quant.valuations.ValuationResult` — field names are the canonical
- * Rust serde names, so `JSON.stringify(result)` is byte-comparable with the
- * Python `to_json()` output. Python's `price` / `currency` getters correspond
- * to `value.amount` / `value.currency` here.
+ * Rust serde names. Monte Carlo details carry `seed` as a lossless `bigint`,
+ * so stringify stochastic results with a BigInt-aware replacer such as
+ * `JSON.stringify(result, (_, value) => typeof value === "bigint" ? value.toString() : value)`.
+ * Python's `price` / `currency` getters correspond to `value.amount` /
+ * `value.currency` here.
  */
 export interface ValuationResult {
   /**
@@ -5336,8 +5417,11 @@ export interface ValuationResult {
   measures: Record<string, number>;
   /**
    * Model-specific structured detail, when the pricer emits one.
+   *
+   * Stochastic `"rates_credit"` bond pricing emits `type: "monte_carlo"` with
+   * convergence, path-count, seed, time-grid, and variance-reduction data.
    */
-  details?: { type: string; data: unknown };
+  details?: ValuationDetails;
   /**
    * Policy stamps: numeric mode, rounding context, FX policy, timing.
    */
@@ -5359,7 +5443,7 @@ export interface ListedProductCoverage {
   /**
    * Exchange venue that lists the product family.
    */
-  exchange: "cme" | "eurex" | "montreal" | "sgx";
+  exchange: 'cme' | 'eurex' | 'montreal' | 'sgx';
   /**
    * Comma-separated exchange root symbols covered by this row.
    */
@@ -5375,7 +5459,7 @@ export interface ListedProductCoverage {
   /**
    * Exchange form: future, option on future, or direct option.
    */
-  product_kind: "future" | "option_on_future" | "option";
+  product_kind: 'future' | 'option_on_future' | 'option';
   /**
    * Canonical Finstack instrument-type tag used for valuation dispatch.
    */
@@ -5383,7 +5467,7 @@ export interface ListedProductCoverage {
   /**
    * Core valuation readiness of the mapped instrument route.
    */
-  status: "native" | "composed" | "partial";
+  status: 'native' | 'composed' | 'partial';
   /**
    * Exchange-contract features exercised by the mapped valuation route.
    */
@@ -5416,7 +5500,7 @@ export interface ValuationMarketNamespace {
    * @throws Error - Throws when `exchange` is unsupported, the embedded listed-product sidecar is invalid, or rows cannot be converted to JavaScript.
    */
   listedProductCatalog(
-    exchange?: "cme" | "eurex" | "montreal" | "sgx" | null
+    exchange?: 'cme' | 'eurex' | 'montreal' | 'sgx' | null
   ): ListedProductCoverage[];
 }
 
@@ -5468,7 +5552,13 @@ export interface ValuationInstrumentsNamespace {
    *
    * Pass `model = "default"` to use the instrument-native default model.
    * Fields are readable directly (`result.value.amount`,
-   * `result.measures.dv01`); call `JSON.stringify` for the wire document.
+   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`
+   * seed; use a BigInt-aware replacer when stringifying them.
+   * For bonds, `"discounting"` is non-callable rates-only PV,
+   * `"hazard_rate"` is non-callable fractional recovery of par, `"tree"`
+   * values rates-only exercise rights, and `"rates_credit"` values joint
+   * rates-credit bonds including call, put, and return floors. Stochastic `"rates_credit"` runs add
+   * `type: "monte_carlo"` diagnostics to `result.details`.
    * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -5492,6 +5582,13 @@ export interface ValuationInstrumentsNamespace {
    * Price an instrument using a pre-parsed [`Market`].
    *
    * Avoids the per-call market-parse overhead of `priceInstrument`.
+   * For bonds, `"discounting"` is non-callable rates-only PV,
+   * `"hazard_rate"` is non-callable fractional recovery of par, `"tree"`
+   * values rates-only exercise rights, and `"rates_credit"` values joint
+   * rates-credit bonds including call, put, and return floors. Stochastic `"rates_credit"` runs add
+   * `type: "monte_carlo"` diagnostics to `result.details`.
+   * Their `seed` is a lossless `bigint`, so `JSON.stringify` requires a
+   * BigInt-aware replacer.
    * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
    * @param market - Pre-parsed `Market` handle supplying curves, quotes, and FX data for this call.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -5515,14 +5612,16 @@ export interface ValuationInstrumentsNamespace {
    * Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
    *
    * `model` must be `"discounting"` or `"hazard_rate"`. Unsupported models or
-   * incompatible instrument types throw. For supported pairs, the envelope's
+   * incompatible instrument types throw. Hazard-rate export also rejects bonds
+   * with call, put, or return-floor rights because static rows cannot represent
+   * exercise-contingent value. For supported static-flow pairs, the envelope's
    * `total_pv` matches the instrument's `base_value` within rounding.
    * @returns Per-flow cashflow envelope JSON (discount factor, survival, PV).
    * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, required curves are missing, the schedule mixes currencies, canonical pricing fails, or the cash-flow envelope cannot be serialized.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, canonical pricing fails, or the cash-flow envelope cannot be serialized.
    */
   instrumentCashflowsJson(
     instrumentJson: string,
@@ -5531,13 +5630,15 @@ export interface ValuationInstrumentsNamespace {
     model: string
   ): string;
   /**
-   * Per-flow cashflow envelope using a pre-parsed [`Market`].
+   * Per-flow cashflow envelope using a pre-parsed [`Market`]. Hazard-rate export
+   * rejects bonds with call, put, or return-floor rights because static rows
+   * cannot represent exercise-contingent value.
    * @returns Per-flow cashflow envelope JSON using the pre-parsed market.
    * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
    * @param market - Market context or JSON payload supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
-   * @throws Error - Throws a JavaScript exception if `instrumentJson` or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, required curves are missing, the schedule mixes currencies, canonical pricing fails, or the cash-flow envelope cannot be serialized.
+   * @throws Error - Throws a JavaScript exception if `instrumentJson` or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, canonical pricing fails, or the cash-flow envelope cannot be serialized.
    */
   instrumentCashflowsWithMarketJson(
     instrumentJson: string,
@@ -5550,8 +5651,8 @@ export interface ValuationInstrumentsNamespace {
    *
    * The list is registry-derived rather than enum-derived, so it reflects real
    * dispatch coverage: a model with no registered pricer is omitted. Returns a
-   * sorted array of canonical keys (`"discounting"`, `"black76"`, …) accepted
-   * by the `model` argument of `priceInstrument`.
+   * sorted array of canonical keys (`"discounting"`, `"rates_credit"`, …)
+   * accepted by the `model` argument of `priceInstrument`.
    * @returns Returns the resulting `string[]` collection in ascending model-key order.
    * @throws Error - Throws a JavaScript exception if the model key list cannot be converted to a JavaScript value.
    */
@@ -5561,7 +5662,9 @@ export interface ValuationInstrumentsNamespace {
    *
    * Returns a JSON object `{ instrument_type: [model_key, ...], ... }`. Only
    * instrument types with at least one registered pricer appear, and each
-   * entry lists only the models that can actually price that instrument.
+   * entry lists only the models that can actually price that instrument. The
+   * `"bond"` entry includes `"discounting"`, `"hazard_rate"`, `"tree"`, and
+   * `"rates_credit"`.
    * @returns Returns the resulting `Record<string, string[]>` value keyed by instrument type.
    * @throws Error - Throws a JavaScript exception if the grouped model registry cannot be converted to a JavaScript value.
    */
@@ -6564,11 +6667,7 @@ export interface ModelCreditNamespace {
    * @param horizon - Forward-looking model horizon measured in years.
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `asset_drift` is not finite, or if the model uses driftless CreditGrades dynamics.
    */
-  mertonDefaultProbabilityWithDrift(
-    modelJson: string,
-    assetDrift: number,
-    horizon: number
-  ): number;
+  mertonDefaultProbabilityWithDrift(modelJson: string, assetDrift: number, horizon: number): number;
   /**
    * Compute distance-to-default from a Merton model JSON payload.
    *
@@ -6589,11 +6688,7 @@ export interface ModelCreditNamespace {
    * @param horizon - Forward-looking model horizon measured in years.
    * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `asset_drift` is not finite, or if the model uses driftless CreditGrades dynamics.
    */
-  mertonDistanceToDefaultWithDrift(
-    modelJson: string,
-    assetDrift: number,
-    horizon: number
-  ): number;
+  mertonDistanceToDefaultWithDrift(modelJson: string, assetDrift: number, horizon: number): number;
   /**
    * Compute the Moody's KMV default point, short-term debt plus half of long-term debt, for use as a structural default barrier.
    * @returns Default point in the same monetary units as the debt inputs.
@@ -7159,10 +7254,7 @@ export interface CompositeNamespace {
    * @returns Net primitive quantity-delta array.
    * @throws Error - Throws for malformed envelopes, invalid frozen states, or conflicting primitive definitions.
    */
-  executionTrades(
-    instrument: CompositeJsonInput,
-    previous?: CompositeJsonInput
-  ): CompositeTrade[];
+  executionTrades(instrument: CompositeJsonInput, previous?: CompositeJsonInput): CompositeTrade[];
   /**
    * Initialize on the first supplied snapshot and calculate dated history.
    *
@@ -7659,11 +7751,7 @@ export interface ModelsNamespace {
    * @returns Undiscounted expiry payoff in the same units as `spot` and `strike`.
    * @throws If `spot` is non-finite or negative, or `strike` is non-finite or not strictly positive.
    */
-  vanillaExpiryPayoff(
-    spot: number,
-    strike: number,
-    isCall: boolean
-  ): number;
+  vanillaExpiryPayoff(spot: number, strike: number, isCall: boolean): number;
   /**
    * Black-Scholes / Garman-Kohlhagen Greeks as a `{delta, gamma, vega, theta, rho_r, rho_q}` object.
    *

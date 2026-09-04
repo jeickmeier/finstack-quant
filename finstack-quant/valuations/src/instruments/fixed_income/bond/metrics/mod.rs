@@ -24,7 +24,7 @@
 //!
 //! ## Spread Metrics
 //! - **Z-Spread**: Zero-volatility spread over discount curve
-//! - **OAS**: Option-adjusted spread (for callable/putable bonds)
+//! - **OAS**: Option-adjusted spread (for call, put, or return-floor rights)
 //! - **I-Spread**: Interpolated spread (YTM - par swap rate)
 //! - **Discount Margin**: Spread measure for floating-rate notes
 //! - **Asset Swap Spreads**: Par and market asset swap spreads
@@ -116,7 +116,12 @@ pub(crate) fn quoted_workout_path(
     as_of: Date,
     flows: &[(Date, Money)],
 ) -> finstack_quant_core::Result<Option<QuotedWorkoutPath>> {
-    if !bond.call_put.as_ref().is_some_and(|cp| cp.has_options()) {
+    let effective_bond = bond.effective_for_pricing(curves, as_of)?;
+    if !effective_bond
+        .call_put
+        .as_ref()
+        .is_some_and(|cp| cp.has_options())
+    {
         return Ok(None);
     }
 
@@ -136,14 +141,15 @@ pub(crate) fn quoted_workout_path(
         quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount()),
         bond.notional.currency(),
     );
-    let schedule = bond.full_cashflow_schedule(curves)?;
+    let schedule = effective_bond.full_cashflow_schedule(curves)?;
     let (workout_yield, workout_flows) =
         crate::instruments::fixed_income::bond::pricing::quote_conversions::solve_ytw_from_flows(
-            bond,
+            &effective_bond,
+            curves,
             flows,
             quote_ctx.quote_date,
             dirty_now,
-            Some(&schedule),
+            &schedule,
         )?;
 
     Ok(Some((workout_yield, workout_flows, quote_ctx.quote_date)))

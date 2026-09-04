@@ -949,7 +949,12 @@ impl PyBond {
     /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Valuation date.
     /// model : str, default "default"
-    ///     Model key (``"discounting"``, ``"hazard_rate"``, ``"tree"``, …).
+    ///     Model key (``"discounting"``, ``"hazard_rate"``, ``"tree"``,
+    ///     ``"rates_credit"``, …). For bonds, ``"discounting"`` and
+    ///     ``"hazard_rate"`` are non-callable rates-only and fractional-
+    ///     recovery-of-par models;
+    ///     ``"tree"`` values rates-only rights; ``"rates_credit"`` values
+    ///     call, put, and return-floor rights jointly with credit risk.
     /// metrics : list[str], optional
     ///     Metric identifiers to compute (e.g. ``["ytm", "dv01"]``).
     /// pricing_options : dict | str, optional
@@ -960,7 +965,9 @@ impl PyBond {
     /// Returns
     /// -------
     /// ValuationResult
-    ///     Typed valuation envelope.
+    ///     Typed valuation envelope. Stochastic ``"rates_credit"`` pricing
+    ///     includes Monte Carlo convergence and reproducibility diagnostics in
+    ///     ``details``.
     ///
     /// Raises
     /// ------
@@ -1011,7 +1018,11 @@ impl PyBond {
     /// metric_id : str
     ///     Registered metric identifier.
     /// model : str, default "default"
-    ///     Model key.
+    ///     ``"default"`` uses the bond-native selection. Explicit keys are
+    ///     ``"discounting"`` for non-callable rates-only PV, ``"hazard_rate"``
+    ///     for non-callable fractional recovery of par, ``"tree"`` for
+    ///     rates-only exercise rights, and ``"rates_credit"`` for joint
+    ///     rates-credit valuation including call, put, and return-floor rights.
     ///
     /// Returns
     /// -------
@@ -1485,12 +1496,12 @@ impl PyBondBuilder {
         Ok(slf)
     }
 
-    /// Set the hazard curve identifier for credit-risky (``"hazard_rate"``) pricing.
+    /// Set the hazard curve identifier for ``"hazard_rate"`` or ``"rates_credit"`` pricing.
     ///
     /// Parameters
     /// ----------
     /// value : str
-    ///     Hazard curve identifier.
+    ///     Hazard curve identifier consumed by scalar or joint rates-credit pricing.
     ///
     /// Returns
     /// -------

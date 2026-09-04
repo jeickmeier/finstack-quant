@@ -4,6 +4,8 @@ use super::ExitCandidate;
 use crate::cashflow::accrual::AccrualIndex;
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
+use crate::instruments::fixed_income::bond::pricing::engine::tree::BondValuator;
+use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::fixed_income::bond::pricing::ytm_solver::{solve_ytm, YtmPricingSpec};
 use crate::instruments::fixed_income::bond::Bond;
 use finstack_quant_core::dates::{Date, DayCountContext};
@@ -573,23 +575,88 @@ pub(crate) fn price_from_japanese_simple_yield(
 
 /// Compute outstanding principal at a given date from the cashflow schedule.
 ///
-/// This is used by YTW and other yield calculations to determine the
-/// redemption amount for amortizing callable/putable bonds.
-pub(crate) fn outstanding_principal_at_date(schedule: &CashFlowSchedule, target_date: Date) -> f64 {
-    let initial = schedule.get_notional().initial.amount();
-    let mut outstanding = initial;
-
-    // Sum all amortization and principal payments up to (and including) target_date
-    for cf in schedule.get_flows() {
-        if cf.date > target_date {
-            break;
-        }
-        if matches!(cf.kind, CFKind::Amortization | CFKind::Notional) && cf.amount.amount() > 0.0 {
-            outstanding -= cf.amount.amount();
-        }
+/// This is used by YTW and other return calculations to determine the
+/// redemption amount for callable/putable bonds after every seasoned balance
+/// event, including amortization, PIK, later draws, and repayments.
+pub(crate) fn outstanding_principal_at_date(
+    schedule: &CashFlowSchedule,
+    target_date: Date,
+) -> finstack_quant_core::Result<f64> {
+    let path = schedule.outstanding_by_date()?;
+    let index = path.partition_point(|(date, _)| *date <= target_date);
+    Ok(if index == 0 {
+        schedule.get_notional().initial.amount()
+    } else {
+        path[index - 1].1.amount()
     }
+    .max(0.0))
+}
 
-    outstanding.max(0.0)
+/// Resolve the principal struck by an exercise right and any contractual
+/// redemption that the exercise proceeds replace on the same date.
+///
+/// Scheduled amortization and PIK are applied before exercise. At contractual
+/// maturity, however, the positive `Notional` flow is the hold alternative,
+/// so the strike is quoted on the balance immediately before that redemption
+/// and the normal redemption must be removed from the candidate cashflow path.
+pub(crate) fn exercise_principal_and_replaced_redemption(
+    schedule: &CashFlowSchedule,
+    exercise_date: Date,
+    maturity: Date,
+) -> finstack_quant_core::Result<(f64, f64)> {
+    let after_events = outstanding_principal_at_date(schedule, exercise_date)?;
+    let replaced_redemption = if exercise_date == maturity {
+        schedule
+            .get_flows()
+            .iter()
+            .filter(|flow| {
+                flow.date == exercise_date
+                    && flow.kind == CFKind::Notional
+                    && flow.amount.amount() > 0.0
+            })
+            .map(|flow| flow.amount.amount())
+            .sum()
+    } else {
+        0.0
+    };
+    Ok((
+        (after_events + replaced_redemption).max(0.0),
+        replaced_redemption,
+    ))
+}
+
+/// Resolve the dirty exercise-date cash amount for one workout candidate.
+///
+/// Issuer calls retain the deterministic make-whole term and use the same
+/// reference-curve valuation as the tree pricer. Put candidates have no
+/// make-whole term. The returned amount is net of any contractual maturity
+/// redemption already present in the truncated flow path.
+pub(crate) fn exercise_redemption_amount(
+    bond: &Bond,
+    curves: &MarketContext,
+    flows: &[(Date, Money)],
+    schedule: &CashFlowSchedule,
+    accrual_index: &AccrualIndex,
+    candidate: &ExitCandidate,
+) -> finstack_quant_core::Result<f64> {
+    let (outstanding, replaced_redemption) =
+        exercise_principal_and_replaced_redemption(schedule, candidate.date, bond.maturity)?;
+    let accrued = accrual_index.accrued_at(candidate.date)?;
+    let floor_price = outstanding * candidate.price_pct_of_par / 100.0;
+    let clean_redemption = if let Some(spec) = &candidate.make_whole {
+        let reference_curve = curves.get_discount(&spec.reference_curve_id)?;
+        BondValuator::make_whole_call_price(
+            spec,
+            reference_curve.as_ref(),
+            candidate.date,
+            flows,
+            floor_price,
+            accrued,
+        )?
+    } else {
+        floor_price
+    };
+    Ok(clean_redemption + accrued - replaced_redemption)
 }
 
 /// Enumerate call/put exit candidates for yield-to-worst analysis.
@@ -597,7 +664,7 @@ pub(crate) fn outstanding_principal_at_date(schedule: &CashFlowSchedule, target_
 /// For each call or put window `[start_date, end_date]` in `bond.call_put`,
 /// this function produces one `ExitCandidate` per admissible exercise date:
 ///
-/// 1. Seed with `start_date` and `end_date`.
+/// 1. Seed with the exact contractual `start_date` and `end_date`.
 /// 2. Extend with any flow dates that fall within `[start_date, end_date]`.
 /// 3. Sort and de-duplicate the resulting dates.
 /// 4. Retain only dates in `[as_of, bond.maturity]`.
@@ -622,28 +689,14 @@ pub(crate) fn enumerate_exit_paths(
     let mut put_candidates: Vec<ExitCandidate> = Vec::new();
 
     let push_period_candidates = |candidates: &mut Vec<ExitCandidate>,
-                                  start_date: Date,
-                                  end_date: Date,
-                                  price_pct_of_par: f64| {
-        let align_to_flow_date = |boundary: Date| {
-            flows
-                .iter()
-                .map(|(date, _)| *date)
-                .filter_map(|date| {
-                    let distance = (date - boundary).whole_days().unsigned_abs();
-                    (distance <= 7).then_some((distance, date))
-                })
-                .min()
-                .map_or(boundary, |(_, date)| date)
-        };
-        let aligned_start = align_to_flow_date(start_date);
-        let aligned_end = align_to_flow_date(end_date);
-        let mut exercise_dates = vec![aligned_start, aligned_end];
+                                  option: &crate::instruments::fixed_income::bond::CallPut,
+                                  retain_make_whole: bool| {
+        let mut exercise_dates = vec![option.start_date, option.end_date];
         exercise_dates.extend(
             flows
                 .iter()
                 .map(|(date, _)| *date)
-                .filter(|date| *date >= aligned_start && *date <= aligned_end),
+                .filter(|date| *date >= option.start_date && *date <= option.end_date),
         );
         exercise_dates.sort_unstable();
         exercise_dates.dedup();
@@ -652,39 +705,34 @@ pub(crate) fn enumerate_exit_paths(
             if exercise_date >= as_of && exercise_date <= bond.maturity {
                 candidates.push(ExitCandidate {
                     date: exercise_date,
-                    price_pct_of_par,
+                    price_pct_of_par: option.price_pct_of_par,
+                    make_whole: if retain_make_whole {
+                        option.make_whole.clone()
+                    } else {
+                        None
+                    },
                 });
             }
         }
     };
 
     for c in &cp.calls {
-        push_period_candidates(
-            &mut call_candidates,
-            c.start_date,
-            c.end_date,
-            c.price_pct_of_par,
-        );
+        push_period_candidates(&mut call_candidates, c, true);
     }
     for p in &cp.puts {
-        push_period_candidates(
-            &mut put_candidates,
-            p.start_date,
-            p.end_date,
-            p.price_pct_of_par,
-        );
+        push_period_candidates(&mut put_candidates, p, false);
     }
 
-    // Adjacent step-down windows share boundary dates. At such a boundary the
-    // issuer exercises the cheapest call, while the holder exercises the most
-    // valuable put. Retaining both stale and current strikes creates
-    // economically impossible YTW paths.
+    // Adjacent call windows can share boundary dates while carrying different
+    // make-whole terms or reference curves. Retain every contractual call
+    // candidate so each consumer can evaluate the realized redemption and
+    // select the issuer-cheapest path. For puts, the holder exercises the
+    // highest fixed strike, so same-date candidates can be collapsed here.
     call_candidates.sort_by(|left, right| {
         left.date
             .cmp(&right.date)
             .then_with(|| left.price_pct_of_par.total_cmp(&right.price_pct_of_par))
     });
-    call_candidates.dedup_by_key(|candidate| candidate.date);
     put_candidates.sort_by(|left, right| {
         left.date
             .cmp(&right.date)
@@ -694,6 +742,154 @@ pub(crate) fn enumerate_exit_paths(
     call_candidates.extend(put_candidates);
 
     call_candidates
+}
+
+/// Build every exercise and rolled-maturity cashflow path from one quote-date
+/// entitlement set.
+fn workout_cashflow_paths(
+    bond: &Bond,
+    curves: &MarketContext,
+    flows: &[(Date, Money)],
+    quote_date: Date,
+    schedule: &CashFlowSchedule,
+) -> finstack_quant_core::Result<Vec<Vec<(Date, Money)>>> {
+    let has_quote_date_exercise = bond.call_put.as_ref().is_some_and(|option_schedule| {
+        option_schedule
+            .calls
+            .iter()
+            .chain(&option_schedule.puts)
+            .any(|option| option.start_date <= quote_date && quote_date <= option.end_date)
+    });
+    let inclusive_flows;
+    let path_flows = if has_quote_date_exercise {
+        // Contractual holder cash on a live exercise date is paid before the
+        // exercise decision. Rebuild from the materialized schedule so a
+        // no-lag quote does not lose a same-day coupon at the usual strict
+        // settlement boundary.
+        inclusive_flows =
+            bond.pricing_dated_cashflows_from_schedule_inclusive(schedule, quote_date, quote_date)?;
+        inclusive_flows.as_slice()
+    } else {
+        flows
+    };
+    let mut candidates = enumerate_exit_paths(bond, path_flows, quote_date);
+
+    // Contractual maturity can precede its business-day-adjusted final payment.
+    // The held path must retain that rolled cash rather than truncating it at
+    // the unadjusted maturity date.
+    let maturity_candidate = path_flows
+        .iter()
+        .map(|(date, _)| *date)
+        .max()
+        .map_or(bond.maturity, |last| last.max(bond.maturity));
+    candidates.push(ExitCandidate {
+        date: maturity_candidate,
+        price_pct_of_par: 0.0,
+        make_whole: None,
+    });
+
+    let accrual_index = AccrualIndex::build(schedule, &bond.accrual_config())?;
+    let mut paths = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        let mut path: Vec<(Date, Money)> = path_flows
+            .iter()
+            .copied()
+            .filter(|(date, _)| {
+                (*date > quote_date || (has_quote_date_exercise && *date == quote_date))
+                    && *date <= candidate.date
+            })
+            .collect();
+        let redemption = if candidate.price_pct_of_par > 0.0 {
+            exercise_redemption_amount(
+                bond,
+                curves,
+                path_flows,
+                schedule,
+                &accrual_index,
+                &candidate,
+            )?
+        } else {
+            0.0
+        };
+        path.push((
+            candidate.date,
+            Money::new(redemption, bond.notional.currency()),
+        ));
+        paths.push(path);
+    }
+
+    Ok(paths)
+}
+
+/// Price a workout path while retaining holder cash paid on the exercise date.
+fn price_workout_path_from_yield(
+    bond: &Bond,
+    path: &[(Date, Money)],
+    quote_date: Date,
+    ytw: f64,
+) -> finstack_quant_core::Result<f64> {
+    let immediate_cash = path
+        .iter()
+        .filter(|(date, _)| *date == quote_date)
+        .map(|(_, amount)| amount.amount())
+        .sum::<f64>();
+    Ok(immediate_cash + price_from_ytm(bond, path, quote_date, ytw)?)
+}
+
+/// Solve one workout path after separating non-discountable quote-date cash.
+fn solve_workout_path_yield(
+    bond: &Bond,
+    path: &[(Date, Money)],
+    quote_date: Date,
+    dirty_price_target: Money,
+) -> finstack_quant_core::Result<f64> {
+    let immediate_cash = path
+        .iter()
+        .filter(|(date, _)| *date == quote_date)
+        .map(|(_, amount)| amount.amount())
+        .sum::<f64>();
+    let future_flows: Vec<_> = path
+        .iter()
+        .copied()
+        .filter(|(date, _)| *date > quote_date)
+        .collect();
+    let target = dirty_price_target.amount();
+    let residual_target = target - immediate_cash;
+    let tolerance = 1e-12 * target.abs().max(immediate_cash.abs()).max(1.0);
+
+    if future_flows.is_empty() {
+        return Ok(if immediate_cash < target - tolerance {
+            // A lower immediate payoff is the limiting worst path as the
+            // holding-period yield tends to negative infinity.
+            f64::NEG_INFINITY
+        } else {
+            // Immediate cash at or above the target does not lower the minimum
+            // finite yield supplied by another workout path.
+            f64::INFINITY
+        });
+    }
+    if residual_target <= tolerance {
+        return Ok(f64::INFINITY);
+    }
+
+    let coupon_rate = match &bond.cashflow_spec {
+        crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) => {
+            spec.rate.to_f64().unwrap_or(0.0)
+        }
+        _ => 0.0,
+    };
+    solve_ytm(
+        &future_flows,
+        quote_date,
+        Money::new(residual_target, dirty_price_target.currency()),
+        YtmPricingSpec {
+            day_count: bond.cashflow_spec.day_count(),
+            notional: bond.notional,
+            coupon_rate,
+            compounding: YieldCompounding::Street,
+            frequency: bond.cashflow_spec.frequency(),
+        },
+    )
 }
 
 /// Solve yield-to-worst over all call/put/maturity candidates for a given flow set.
@@ -711,150 +907,585 @@ pub(crate) fn enumerate_exit_paths(
 /// # Arguments
 ///
 /// * `bond` - The bond to calculate YTW for
+/// * `curves` - Market context supplying any make-whole reference curves.
 /// * `flows` - Holder-view cashflows (coupons + principal)
 /// * `as_of` - Valuation/quote date
 /// * `dirty_price_target` - Target dirty price to match
-/// * `schedule` - Optional full cashflow schedule for accurate outstanding principal
-///   computation on amortizing bonds. When `None`, falls back to original notional.
+/// * `schedule` - Full cashflow schedule used for canonical outstanding
+///   principal and same-day maturity-redemption replacement.
 pub(crate) fn solve_ytw_from_flows(
     bond: &Bond,
+    curves: &MarketContext,
     flows: &[(Date, Money)],
     as_of: Date,
     dirty_price_target: Money,
-    schedule: Option<&CashFlowSchedule>,
+    schedule: &CashFlowSchedule,
 ) -> finstack_quant_core::Result<(f64, Vec<(Date, Money)>)> {
-    // Generate call/put candidates + maturity.
-    // Call/put paths come from enumerate_exit_paths; maturity is appended separately.
-    let exit_paths = enumerate_exit_paths(bond, flows, as_of);
-    let mut candidates: Vec<(Date, Money)> = exit_paths
-        .into_iter()
-        .map(|ec| {
-            (
-                ec.date,
-                Money::new(ec.price_pct_of_par, bond.notional.currency()),
-            )
-        })
-        .collect();
-
-    // At maturity, principal redemption is already present in the cashflow schedule,
-    // so use a zero additional redemption here to avoid double-counting.
-    //
-    // The redemption Notional flow is dated on the BDC-adjusted maturity, which can
-    // roll past the unadjusted `bond.maturity` (e.g. maturity falling on a holiday),
-    // so truncate the maturity candidate at the final projected flow date instead of
-    // dropping the redemption.
-    let maturity_candidate = flows
-        .iter()
-        .map(|(d, _)| *d)
-        .max()
-        .map_or(bond.maturity, |last| last.max(bond.maturity));
-    candidates.push((
-        maturity_candidate,
-        Money::new(0.0, bond.notional.currency()),
-    ));
-
     let mut best_yield = f64::INFINITY;
     let mut best_flows: Vec<(Date, Money)> = Vec::new();
-
-    let accrual_cfg = bond.accrual_config();
-    let accrual_index = match schedule {
-        Some(sched) => Some(AccrualIndex::build(sched, &accrual_cfg)?),
-        None => None,
-    };
-
-    for (exercise_date, pct_or_zero) in candidates {
-        // Truncate flows to exercise and add redemption
-        let mut ex_flows: Vec<(Date, Money)> = Vec::with_capacity(flows.len());
-        for &(d, a) in flows {
-            if d > as_of && d <= exercise_date {
-                ex_flows.push((d, a));
-            }
-        }
-
-        // Compute redemption amount:
-        // - For maturity: pct is 0, so redemption is 0 (already in flows)
-        // - For call/put: use dirty street redemption at exercise date
-        let redemption = if pct_or_zero.amount() > 0.0 {
-            // This is a call/put candidate, pct_or_zero holds the price_pct_of_par
-            let pct = pct_or_zero.amount();
-            // Use full schedule for accurate outstanding principal when available;
-            // otherwise fall back to original notional (valid for bullet bonds).
-            let outstanding = if let Some(sched) = schedule {
-                outstanding_principal_at_date(sched, exercise_date)
-            } else {
-                bond.notional.amount()
-            };
-            let accrued = match accrual_index.as_ref() {
-                Some(index) => index.accrued_at(exercise_date)?,
-                None => 0.0,
-            };
-            Money::new(
-                outstanding * (pct / 100.0) + accrued,
-                bond.notional.currency(),
-            )
-        } else {
-            Money::new(0.0, bond.notional.currency())
-        };
-        ex_flows.push((exercise_date, redemption));
-
-        // Solve yield that matches target dirty price
-        let coupon_rate = match &bond.cashflow_spec {
-            crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) => {
-                spec.rate.to_f64().unwrap_or(0.0)
-            }
-            _ => 0.0,
-        };
-        let y = solve_ytm(
-            &ex_flows,
-            as_of,
-            dirty_price_target,
-            YtmPricingSpec {
-                day_count: bond.cashflow_spec.day_count(),
-                notional: bond.notional,
-                coupon_rate,
-                compounding: YieldCompounding::Street,
-                frequency: bond.cashflow_spec.frequency(),
-            },
-        )?;
+    for path in workout_cashflow_paths(bond, curves, flows, as_of, schedule)? {
+        let y = solve_workout_path_yield(bond, &path, as_of, dirty_price_target)?;
         if y < best_yield {
             best_yield = y;
-            best_flows = ex_flows;
+            best_flows = path;
         }
     }
 
     Ok((best_yield, best_flows))
 }
 
-/// Price from Yield-To-Worst by scanning call/put candidates and selecting the lowest yield path.
+/// Convert a Street yield-to-worst quote into settlement dirty price.
+///
+/// Every admissible call, put, and rolled-maturity path is priced at `ytw`.
+/// Because each path yield decreases monotonically as dirty price increases,
+/// the inverse of `YTW(P) = min_i yield_i(P)` is the minimum path price at the
+/// target yield. Return-floor protection is first lowered into its effective
+/// call schedule, and make-whole calls use their deterministic reference-curve
+/// redemption.
 ///
 /// # Arguments
 ///
 /// * `bond` - Callable or puttable bond whose cashflow schedule and exercise
 ///   candidates define the yield-to-worst paths.
-/// * `curves` - Market context supplying curve and schedule dependencies.
-/// * `as_of` - Valuation date from which candidate cashflows are generated.
-/// * `dirty_price_target` - Target dirty price in the bond notional currency
-///   used to solve each candidate Street yield.
+/// * `curves` - Market context supplying schedule inputs and any make-whole
+///   reference curves.
+/// * `as_of` - Valuation or trade date; settlement and coupon entitlement are
+///   derived from the bond's quote convention.
+/// * `ytw` - Annual Street-compounded yield to worst as a decimal.
+///
+/// # Returns
+///
+/// Settlement-date dirty price in the bond's notional currency.
+///
+/// # Errors
+///
+/// Returns an error when `ytw` is non-finite, required curves or schedules are
+/// unavailable, return-floor lowering fails, or a path cannot be priced under
+/// the bond's Street yield convention.
 pub fn price_from_ytw(
     bond: &Bond,
     curves: &MarketContext,
     as_of: Date,
-    dirty_price_target: Money,
+    ytw: f64,
 ) -> finstack_quant_core::Result<f64> {
-    // Build signed canonical schedule flows and full schedule for accurate amortizing bond handling
-    let flows = bond.pricing_dated_cashflows(curves, as_of)?;
-    let schedule = bond.full_cashflow_schedule(curves)?;
-    let (best_yield, best_flows) =
-        solve_ytw_from_flows(bond, &flows, as_of, dirty_price_target, Some(&schedule))?;
+    if !ytw.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "yield to worst must be finite, got {ytw}"
+        )));
+    }
 
-    // Re-price along the worst-yield path for a consistent price result
-    let best_price = price_from_ytm_compounded(
-        bond,
-        &best_flows,
-        as_of,
-        best_yield,
-        YieldCompounding::Street,
+    let effective_bond = bond.effective_for_pricing(curves, as_of)?;
+    let quote_ctx = QuoteDateContext::new(&effective_bond, curves, as_of)?;
+    let flows = quote_ctx.entitled_flows(&effective_bond, curves, as_of)?;
+    let schedule = effective_bond.full_cashflow_schedule(curves)?;
+    let paths = workout_cashflow_paths(
+        &effective_bond,
+        curves,
+        &flows,
+        quote_ctx.quote_date,
+        &schedule,
     )?;
 
-    Ok(best_price)
+    let mut best_price: Option<f64> = None;
+    for path in paths {
+        let price =
+            price_workout_path_from_yield(&effective_bond, &path, quote_ctx.quote_date, ytw)?;
+        best_price = Some(best_price.map_or(price, |current| current.min(price)));
+    }
+    best_price.ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "yield-to-worst inversion produced no workout paths".to_string(),
+        )
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cashflow::builder::{CashFlowMeta, Notional};
+    use crate::cashflow::primitives::CashFlow;
+    use crate::instruments::fixed_income::bond::{
+        CallPut, CallPutSchedule, MakeWholeSpec, ProtectionWindow, ReturnFloorSpec,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::types::Rate;
+    use time::macros::date;
+
+    #[test]
+    fn exit_windows_keep_exact_contractual_boundaries() {
+        let mut bond = Bond::example().expect("example bond");
+        let start = date!(2027 - 01 - 10);
+        let flow_date = date!(2027 - 01 - 15);
+        let end = date!(2027 - 01 - 20);
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: start,
+                end_date: end,
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+        let flows = vec![(flow_date, Money::new(5.0, Currency::USD))];
+
+        let dates: Vec<_> = enumerate_exit_paths(&bond, &flows, date!(2026 - 01 - 01))
+            .into_iter()
+            .map(|candidate| candidate.date)
+            .collect();
+        assert_eq!(dates, vec![start, flow_date, end]);
+    }
+
+    #[test]
+    fn same_date_calls_retain_distinct_make_whole_terms_while_puts_collapse() {
+        let mut bond = Bond::example().expect("example bond");
+        let exercise_date = date!(2027 - 01 - 15);
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![
+                CallPut {
+                    start_date: date!(2027 - 01 - 10),
+                    end_date: exercise_date,
+                    price_pct_of_par: 100.0,
+                    make_whole: Some(MakeWholeSpec {
+                        reference_curve_id: "REF-A".into(),
+                        spread_bp: 25.0,
+                    }),
+                },
+                CallPut {
+                    start_date: exercise_date,
+                    end_date: date!(2027 - 01 - 20),
+                    price_pct_of_par: 99.0,
+                    make_whole: Some(MakeWholeSpec {
+                        reference_curve_id: "REF-B".into(),
+                        spread_bp: 50.0,
+                    }),
+                },
+            ],
+            puts: vec![
+                CallPut {
+                    start_date: exercise_date,
+                    end_date: exercise_date,
+                    price_pct_of_par: 98.0,
+                    make_whole: None,
+                },
+                CallPut {
+                    start_date: exercise_date,
+                    end_date: exercise_date,
+                    price_pct_of_par: 101.0,
+                    make_whole: None,
+                },
+            ],
+        });
+
+        let candidates = enumerate_exit_paths(&bond, &[], date!(2026 - 01 - 01));
+        let calls: Vec<_> = candidates
+            .iter()
+            .filter(|candidate| candidate.date == exercise_date)
+            .filter_map(|candidate| candidate.make_whole.as_ref())
+            .collect();
+        let puts: Vec<_> = candidates
+            .iter()
+            .filter(|candidate| candidate.date == exercise_date && candidate.make_whole.is_none())
+            .collect();
+
+        assert_eq!(calls.len(), 2);
+        assert!(calls
+            .iter()
+            .any(|spec| spec.reference_curve_id.as_str() == "REF-A"));
+        assert!(calls
+            .iter()
+            .any(|spec| spec.reference_curve_id.as_str() == "REF-B"));
+        assert_eq!(puts.len(), 1);
+        assert_eq!(puts[0].price_pct_of_par, 101.0);
+    }
+
+    #[test]
+    fn make_whole_redemption_uses_reference_value_above_fixed_floor() {
+        let as_of = date!(2025 - 01 - 01);
+        let exercise_date = date!(2026 - 01 - 01);
+        let mut bond = Bond::fixed(
+            "MW-WORKOUT",
+            Money::new(100.0, Currency::USD),
+            Rate::from_decimal(0.10),
+            as_of,
+            date!(2027 - 01 - 01),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        bond.settlement_convention = None;
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: exercise_date,
+                end_date: exercise_date,
+                price_pct_of_par: 50.0,
+                make_whole: Some(MakeWholeSpec {
+                    reference_curve_id: "USD-REF".into(),
+                    spread_bp: 0.0,
+                }),
+            }],
+            puts: Vec::new(),
+        });
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (2.0, 0.90)])
+                    .build()
+                    .expect("discount curve"),
+            )
+            .insert(
+                DiscountCurve::builder("USD-REF")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (2.0, 1.0)])
+                    .build()
+                    .expect("reference curve"),
+            );
+        let flows = bond
+            .pricing_dated_cashflows(&market, as_of)
+            .expect("pricing flows");
+        let schedule = bond
+            .full_cashflow_schedule(&market)
+            .expect("cashflow schedule");
+        let accrual_index =
+            AccrualIndex::build(&schedule, &bond.accrual_config()).expect("accrual index");
+        let candidate = enumerate_exit_paths(&bond, &flows, as_of)
+            .into_iter()
+            .find(|candidate| candidate.date == exercise_date)
+            .expect("make-whole candidate");
+
+        let redemption = exercise_redemption_amount(
+            &bond,
+            &market,
+            &flows,
+            &schedule,
+            &accrual_index,
+            &candidate,
+        )
+        .expect("make-whole redemption");
+        let remaining_reference_value: f64 = flows
+            .iter()
+            .filter(|(date, _)| *date > exercise_date)
+            .map(|(_, amount)| amount.amount())
+            .sum();
+
+        assert!((redemption - remaining_reference_value).abs() < 1e-10);
+        assert!(redemption > 100.0);
+    }
+
+    #[test]
+    fn quoted_workout_uses_make_whole_redemption_when_selecting_ytw_path() {
+        let as_of = date!(2025 - 01 - 15);
+        let exercise_date = date!(2025 - 12 - 15);
+        let mut make_whole_bond = Bond::fixed(
+            "MW-QUOTED-WORKOUT",
+            Money::new(100.0, Currency::USD),
+            Rate::from_decimal(0.10),
+            as_of,
+            date!(2027 - 01 - 15),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        make_whole_bond.settlement_convention = None;
+        make_whole_bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price = Some(100.0);
+        make_whole_bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: exercise_date,
+                end_date: exercise_date,
+                price_pct_of_par: 50.0,
+                make_whole: Some(MakeWholeSpec {
+                    reference_curve_id: "USD-REF".into(),
+                    spread_bp: 0.0,
+                }),
+            }],
+            puts: Vec::new(),
+        });
+        let mut fixed_strike_bond = make_whole_bond.clone();
+        fixed_strike_bond
+            .call_put
+            .as_mut()
+            .expect("call schedule")
+            .calls[0]
+            .make_whole = None;
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (2.0, 0.90)])
+                    .build()
+                    .expect("discount curve"),
+            )
+            .insert(
+                DiscountCurve::builder("USD-REF")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (2.0, 1.0)])
+                    .build()
+                    .expect("reference curve"),
+            );
+
+        let make_whole_flows = make_whole_bond
+            .pricing_dated_cashflows(&market, as_of)
+            .expect("pricing flows");
+        let (_, make_whole_path, _) =
+            crate::instruments::fixed_income::bond::metrics::quoted_workout_path(
+                &make_whole_bond,
+                &market,
+                as_of,
+                &make_whole_flows,
+            )
+            .expect("make-whole workout")
+            .expect("callable workout path");
+        let fixed_flows = fixed_strike_bond
+            .pricing_dated_cashflows(&market, as_of)
+            .expect("pricing flows");
+        let (_, fixed_path, _) =
+            crate::instruments::fixed_income::bond::metrics::quoted_workout_path(
+                &fixed_strike_bond,
+                &market,
+                as_of,
+                &fixed_flows,
+            )
+            .expect("fixed-strike workout")
+            .expect("callable workout path");
+
+        let make_whole_exit = make_whole_path
+            .iter()
+            .map(|(date, _)| *date)
+            .max()
+            .expect("make-whole exit date");
+        let fixed_exit = fixed_path
+            .iter()
+            .map(|(date, _)| *date)
+            .max()
+            .expect("fixed-strike exit date");
+        assert!(make_whole_exit > exercise_date);
+        assert_eq!(fixed_exit, exercise_date);
+
+        let target_ytw = 0.10;
+        let maturity_price = price_from_ytm(&make_whole_bond, &make_whole_flows, as_of, target_ytw)
+            .expect("maturity price");
+        let make_whole_price = price_from_ytw(&make_whole_bond, &market, as_of, target_ytw)
+            .expect("make-whole YTW price");
+        let fixed_price = price_from_ytw(&fixed_strike_bond, &market, as_of, target_ytw)
+            .expect("fixed-strike YTW price");
+        assert!((make_whole_price - maturity_price).abs() < 1e-10);
+        assert!(fixed_price + 25.0 < make_whole_price);
+    }
+
+    #[test]
+    fn price_from_ytw_matches_ytm_for_bullet_with_rolled_final_payment() {
+        let as_of = date!(2025 - 01 - 03);
+        let mut bond = Bond::fixed(
+            "YTW-ROLLED-MATURITY",
+            Money::new(100.0, Currency::USD),
+            Rate::from_decimal(0.05),
+            as_of,
+            date!(2026 - 01 - 03),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        bond.settlement_convention = None;
+        let market = MarketContext::new();
+        let quote_ctx = QuoteDateContext::new(&bond, &market, as_of).expect("quote context");
+        let flows = quote_ctx
+            .entitled_flows(&bond, &market, as_of)
+            .expect("entitled flows");
+        assert!(flows.iter().any(|(date, _)| *date > bond.maturity));
+
+        let target_yield = 0.04;
+        let expected =
+            price_from_ytm(&bond, &flows, quote_ctx.quote_date, target_yield).expect("YTM price");
+        let actual =
+            price_from_ytw(&bond, &market, as_of, target_yield).expect("YTW inverse price");
+
+        assert!((actual - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn same_day_coupon_precedes_exercise_in_ytw_price_and_round_trip() {
+        let issue = date!(2024 - 01 - 15);
+        let as_of = date!(2025 - 01 - 15);
+        let mut bond = Bond::fixed(
+            "YTW-SAME-DAY-EXERCISE",
+            Money::new(100.0, Currency::USD),
+            Rate::from_decimal(0.10),
+            issue,
+            date!(2026 - 01 - 15),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        bond.settlement_convention = None;
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: as_of,
+                end_date: as_of,
+                price_pct_of_par: 101.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+        let market = MarketContext::new();
+        let schedule = bond
+            .full_cashflow_schedule(&market)
+            .expect("cashflow schedule");
+        let inclusive_flows = bond
+            .pricing_dated_cashflows_from_schedule_inclusive(&schedule, as_of, as_of)
+            .expect("inclusive exercise flows");
+        let same_day_coupon: f64 = inclusive_flows
+            .iter()
+            .filter(|(date, _)| *date == as_of)
+            .map(|(_, amount)| amount.amount())
+            .sum();
+        assert!((same_day_coupon - 5.0).abs() < 1e-10);
+
+        let target_ytw = 0.10;
+        let maturity_price = same_day_coupon
+            + price_from_ytm(&bond, &inclusive_flows, as_of, target_ytw)
+                .expect("maturity path price");
+        let immediate_call_cash = same_day_coupon + 101.0;
+        assert!(immediate_call_cash > maturity_price);
+
+        let inverted =
+            price_from_ytw(&bond, &market, as_of, target_ytw).expect("same-day YTW price");
+        assert!((inverted - maturity_price).abs() < 1e-10);
+
+        let strict_flows = bond
+            .pricing_dated_cashflows(&market, as_of)
+            .expect("strict quote flows");
+        let (solved, selected_path) = solve_ytw_from_flows(
+            &bond,
+            &market,
+            &strict_flows,
+            as_of,
+            Money::new(inverted, Currency::USD),
+            &schedule,
+        )
+        .expect("same-day YTW solve");
+        assert!((solved - target_ytw).abs() < 1e-10);
+        assert!(selected_path
+            .iter()
+            .any(|(date, amount)| *date == as_of && amount.amount() > 0.0));
+    }
+
+    #[test]
+    fn price_from_ytw_lowers_return_floor_only_bond_into_workout_paths() {
+        let as_of = date!(2025 - 01 - 15);
+        let exercise_date = date!(2025 - 12 - 15);
+        let mut bullet = Bond::fixed(
+            "YTW-RETURN-FLOOR",
+            Money::new(100.0, Currency::USD),
+            Rate::from_decimal(0.10),
+            as_of,
+            date!(2030 - 01 - 15),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("bond");
+        bullet.settlement_convention = None;
+        let floored = bullet
+            .clone()
+            .with_return_floor(
+                ReturnFloorSpec::moic(0.50).window(ProtectionWindow::Between {
+                    start: exercise_date,
+                    end: exercise_date.next_day().expect("following date"),
+                }),
+            );
+        assert!(floored.call_put.is_none());
+
+        let market = MarketContext::new();
+        let target_ytw = 0.0;
+        let bullet_price =
+            price_from_ytw(&bullet, &market, as_of, target_ytw).expect("bullet YTW price");
+        let floored_price =
+            price_from_ytw(&floored, &market, as_of, target_ytw).expect("floor YTW price");
+
+        let effective = floored
+            .effective_for_pricing(&market, as_of)
+            .expect("lowered floor");
+        assert!(effective.return_floor.is_none());
+        assert!(effective
+            .call_put
+            .as_ref()
+            .is_some_and(CallPutSchedule::has_options));
+        let quote_ctx = QuoteDateContext::new(&effective, &market, as_of).expect("quote context");
+        let flows = quote_ctx
+            .entitled_flows(&effective, &market, as_of)
+            .expect("entitled flows");
+        let schedule = effective
+            .full_cashflow_schedule(&market)
+            .expect("cashflow schedule");
+        let paths =
+            workout_cashflow_paths(&effective, &market, &flows, quote_ctx.quote_date, &schedule)
+                .expect("lowered workout paths");
+        assert!(paths.iter().any(|path| {
+            path.iter()
+                .map(|(date, _)| *date)
+                .max()
+                .is_some_and(|date| date <= exercise_date.next_day().expect("following date"))
+        }));
+        let manual_min = paths
+            .iter()
+            .map(|path| {
+                price_workout_path_from_yield(&effective, path, quote_ctx.quote_date, target_ytw)
+                    .expect("path price")
+            })
+            .fold(f64::INFINITY, f64::min);
+
+        assert!((floored_price - manual_min).abs() < 1e-12);
+        assert!(floored_price + 25.0 < bullet_price);
+    }
+
+    #[test]
+    fn terminal_exercise_replaces_contractual_redemption() {
+        let issue = date!(2025 - 01 - 01);
+        let maturity = date!(2026 - 01 - 01);
+        let schedule = CashFlowSchedule::from_parts(
+            vec![
+                CashFlow::new(
+                    issue,
+                    None,
+                    Money::new(-100.0, Currency::USD),
+                    CFKind::Notional,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(
+                    maturity,
+                    None,
+                    Money::new(5.0, Currency::USD),
+                    CFKind::Fixed,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(
+                    maturity,
+                    None,
+                    Money::new(100.0, Currency::USD),
+                    CFKind::Notional,
+                    0.0,
+                    None,
+                ),
+            ],
+            Notional::par(100.0, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta {
+                issue_date: Some(issue),
+                maturity_date: Some(maturity),
+                ..CashFlowMeta::default()
+            },
+        );
+
+        let (principal, replaced) =
+            exercise_principal_and_replaced_redemption(&schedule, maturity, maturity)
+                .expect("terminal principal decomposition");
+        assert_eq!(principal, 100.0);
+        assert_eq!(replaced, 100.0);
+    }
 }

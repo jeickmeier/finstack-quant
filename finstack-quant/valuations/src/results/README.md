@@ -16,7 +16,7 @@ an optional explanation trace.
 | `as_of` | `Date` | Valuation date (T+0), wire-encoded as an ISO date |
 | `value` | `Money` | PV in the instrument's native currency. Never present in `measures` |
 | `measures` | `IndexMap<MetricId, f64>` | Requested metrics, in request order. Units follow the `MetricId` contract |
-| `details` | `Option<ValuationDetails>` | Model-specific detail; also `FxValuationDetails`, `CreditDerivativeValuationDetails` |
+| `details` | `Option<ValuationDetails>` | Model-specific detail for FX, credit derivatives, composite instruments, structured-credit stochastic runs, and Monte Carlo valuations |
 | `meta` | `ResultsMeta` | Re-exported from `finstack_quant_core::config`: numeric mode, rounding context, FX policy, timing |
 | `covenants` | `Option<IndexMap<String, CovenantReport>>` | Present for loans and structured credit |
 | `explanation` | `Option<ExplanationTrace>` | Step trace, enabled via `ExplainOpts` |
@@ -65,6 +65,16 @@ Constructors and builders:
 Accessors: `metric(MetricId)`, `metric_str(&str)`, `metric_series(&MetricId)`
 (bucketed series read back as `(labels, value)` pairs), `all_covenants_passed()`,
 and `failed_covenants()`.
+
+`MonteCarloValuationDetails` reports the model key, sampling standard error,
+configured independent exercise-policy paths, configured independent
+make-whole-reference paths, estimator paths, each stage's total simulated path
+count including antithetic partners, seed, time grid, and variance-reduction
+flags. For LSMC valuations, the standard error covers pricing-path sampling
+uncertainty under the frozen fitted exercise policy; it excludes regression
+approximation, time-grid discretization, and model error. A stage that did not
+run reports zero paths; a scalar engine leaves
+`details` absent.
 
 ## FX policy metadata
 
@@ -116,8 +126,8 @@ releases. This crate has no DataFrame dependency of its own.
 ## Verification
 
 ```bash
-cargo nextest run -p finstack-quant-valuations --lib results
-mise run rust-check-schemas   # ValuationResult schema lives in ../../schemas/results/
+mise run rust-test-filter -- finstack-quant-valuations results
+mise run gen-check   # ValuationResult schema lives in ../../schemas/results/
 ```
 
 ## Related

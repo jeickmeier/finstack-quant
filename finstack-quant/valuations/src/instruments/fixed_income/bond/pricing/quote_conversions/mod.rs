@@ -29,7 +29,7 @@ pub use yield_price::{
 pub(crate) use annuity::asset_swap_projection_rate;
 pub(crate) use compute::{clear_price_driving_overrides, settlement_dirty_from_quote_overrides};
 pub(crate) use yield_price::{
-    enumerate_exit_paths, icma_reference_period, outstanding_principal_at_date,
+    enumerate_exit_paths, exercise_redemption_amount, icma_reference_period,
     price_from_japanese_simple_yield, solve_ytw_from_flows,
 };
 
@@ -37,13 +37,15 @@ pub(crate) use yield_price::{
 ///
 /// Represents a single admissible exercise date and the corresponding clean
 /// redemption price expressed as a percentage of par (e.g. `103.0` for 103%).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) struct ExitCandidate {
-    /// The admissible exercise date (call or put date, aligned to a flow date
-    /// where possible, and clipped to `[as_of, bond.maturity]`).
+    /// The exact admissible exercise date, clipped to
+    /// `[as_of, bond.maturity]`.
     pub(crate) date: finstack_quant_core::dates::Date,
     /// Clean redemption price as percent of par (e.g. `103.0` for 103%).
     pub(crate) price_pct_of_par: f64,
+    /// Deterministic make-whole term retained for issuer-call candidates.
+    pub(crate) make_whole: Option<crate::instruments::fixed_income::bond::MakeWholeSpec>,
 }
 
 #[cfg(test)]

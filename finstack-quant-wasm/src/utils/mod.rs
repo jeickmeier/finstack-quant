@@ -209,6 +209,17 @@ pub fn to_js_value<T: serde::Serialize>(value: &T) -> Result<JsValue, JsValue> {
         .map_err(to_js_err)
 }
 
+/// Serialize a value to a JSON-compatible `JsValue` while preserving Rust
+/// 64-bit integers as JavaScript `BigInt` values.
+///
+/// This is reserved for structured host results whose full-width integer
+/// fields, such as Monte Carlo seeds, must remain lossless.
+pub(crate) fn to_js_value_with_bigints<T: serde::Serialize>(value: &T) -> Result<JsValue, JsValue> {
+    let serializer = serde_wasm_bindgen::Serializer::json_compatible()
+        .serialize_large_number_types_as_bigints(true);
+    value.serialize(&serializer).map_err(to_js_err)
+}
+
 pub(crate) fn to_js_value_with_kind<T: serde::Serialize>(
     value: &T,
     kind: &'static str,

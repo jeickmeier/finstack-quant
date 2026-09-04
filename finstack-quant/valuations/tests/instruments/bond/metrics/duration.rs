@@ -3,7 +3,9 @@
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule};
+use finstack_quant_valuations::instruments::fixed_income::bond::{
+    Bond, CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorSpec,
+};
 use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
@@ -250,6 +252,19 @@ fn callable_risk_market(
     finstack_quant_core::market_data::context::MarketContext::new().insert(curve)
 }
 
+fn floor_only_risk_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
+    let mut bond = callable_risk_bond(as_of);
+    bond.id = "FLOOR-ONLY-RISK".into();
+    bond.call_put = None;
+    bond.return_floor = Some(
+        ReturnFloorSpec::moic(1.0).window(ProtectionWindow::Between {
+            start: date!(2028 - 01 - 01),
+            end: date!(2028 - 01 - 02),
+        }),
+    );
+    bond
+}
+
 #[test]
 fn test_callable_quoted_bond_defaults_to_workout_risk_basis() {
     let as_of = date!(2025 - 01 - 01);
@@ -344,6 +359,72 @@ fn test_callable_quoted_bond_can_request_callable_oas_risk_basis() {
     assert!(
         (callable_result.measures["dv01"] - bullet_result.measures["dv01"]).abs() > 1e-2,
         "callable_oas basis should use option-aware DV01"
+    );
+}
+
+#[test]
+fn test_floor_only_bond_uses_workout_schedule_and_option_aware_risk() {
+    use finstack_quant_valuations::instruments::BondRiskBasis;
+
+    let as_of = date!(2025 - 01 - 01);
+    let floor = floor_only_risk_bond(as_of);
+    let market = callable_risk_market(as_of);
+    let workout = floor
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[
+                MetricId::Ytm,
+                MetricId::Ytw,
+                MetricId::DurationMac,
+                MetricId::DurationMod,
+                MetricId::Convexity,
+                MetricId::Dv01,
+                MetricId::YieldDv01,
+                MetricId::EmbeddedOptionValue,
+            ],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("floor-only workout risk metrics should compute");
+
+    let expected_workout_mod =
+        workout.measures["duration_mac"] / (1.0 + workout.measures["ytw"] / 2.0);
+    assert!(
+        (workout.measures["ytm"] - workout.measures["ytw"]).abs() > 1.0e-3,
+        "floor-generated workout must differ from maturity for this premium bond"
+    );
+    assert!(
+        (workout.measures["duration_mod"] - expected_workout_mod).abs() < 1.0e-10,
+        "floor-only duration must use the floor-generated workout yield"
+    );
+    assert!(
+        (workout.measures["dv01"] - workout.measures["yield_dv01"]).abs() < 1.0e-8,
+        "floor-only Workout DV01 must use the option-aware yield basis"
+    );
+    assert!(
+        workout.measures["embedded_option_value"].abs() > 1.0e-6,
+        "floor-only EOV must not collapse to zero"
+    );
+
+    let mut callable_oas = floor;
+    callable_oas.metric_pricing_overrides = callable_oas
+        .metric_pricing_overrides
+        .with_bond_risk_basis(BondRiskBasis::CallableOas);
+    let option_aware = callable_oas
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::DurationMod, MetricId::Convexity, MetricId::Dv01],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("floor-only callable-OAS risk metrics should compute");
+    assert!(
+        (option_aware.measures["duration_mod"] - workout.measures["duration_mod"]).abs() > 1.0e-4,
+        "CallableOas duration must use floor optionality"
+    );
+    assert!(
+        (option_aware.measures["convexity"] - workout.measures["convexity"]).abs() > 1.0e-4,
+        "CallableOas convexity must use floor optionality"
     );
 }
 

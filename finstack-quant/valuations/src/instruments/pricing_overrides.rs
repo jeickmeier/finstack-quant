@@ -546,10 +546,13 @@ pub struct ModelConfig {
     /// Price/accrual target convention for OAS inversion.
     #[serde(default)]
     pub oas_price_basis: OasPriceBasis,
-    /// Optional Monte Carlo path count for path-dependent GBM pricers (Asians, lookbacks, autocallables, etc.).
+    /// Optional independent-estimator count for Monte Carlo pricers.
     ///
-    /// When set, overrides the default simulation size (typically 100,000 paths). Intended for tests,
-    /// benchmarks, and controlled revaluation—not a market quote.
+    /// When set, overrides the selected pricer's default simulation size.
+    /// Antithetic sampling evaluates two factor paths per independent estimator.
+    /// The rates-credit bond engine defaults to 20,000 estimators per training
+    /// and pricing stage; other pricers retain their own defaults. Intended for
+    /// tests, benchmarks, and controlled revaluation, not as a market quote.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mc_paths: Option<usize>,
     /// Optional antithetic-variates override for Monte Carlo pricing.
@@ -561,8 +564,10 @@ pub struct ModelConfig {
     /// Optional absolute target for the Monte Carlo confidence-interval
     /// half-width in instrument currency.
     ///
-    /// The engine may stop before `mc_paths` after its minimum sample count
-    /// when this positive finite target is reached.
+    /// Engines that support adaptive sampling may stop before `mc_paths` after
+    /// their minimum sample count when this positive finite target is reached.
+    /// The rates-credit bond engine always consumes its fixed estimator budget
+    /// and validates this target against the final 95% confidence interval.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mc_target_ci_half_width: Option<f64>,
     /// Apply ISDA half-day accrual-on-default bias.
@@ -838,7 +843,15 @@ impl InstrumentPricingOverrides {
         self
     }
 
-    /// Set the path count for path-dependent Monte Carlo pricing.
+    /// Set the independent-estimator count for Monte Carlo pricing.
+    ///
+    /// Antithetic sampling evaluates two factor paths per estimator. The
+    /// rates-credit bond engine uses the full count independently in its policy
+    /// training and pricing stages.
+    ///
+    /// # Arguments
+    ///
+    /// * `paths` - Positive number of independent Monte Carlo estimators.
     pub fn with_mc_paths(mut self, paths: usize) -> Self {
         self.model_config.mc_paths = Some(paths);
         self
@@ -856,6 +869,9 @@ impl InstrumentPricingOverrides {
     }
 
     /// Set an absolute Monte Carlo confidence-interval half-width target.
+    ///
+    /// Rates-credit bond pricing evaluates this requirement only after consuming
+    /// the configured fixed estimator budget.
     ///
     /// # Arguments
     ///

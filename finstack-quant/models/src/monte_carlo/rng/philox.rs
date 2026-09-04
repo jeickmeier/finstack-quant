@@ -118,6 +118,28 @@ impl PhiloxRng {
         rng
     }
 
+    /// Create a stream positioned at the requested uniform draw.
+    ///
+    /// Each `fill_u01` scalar consumes two consecutive 32-bit words. Philox is
+    /// counter based, so positioning can select the containing four-word block
+    /// directly instead of generating and discarding every preceding draw.
+    #[inline]
+    pub(crate) fn with_stream_u01_offset(seed: u64, stream_id: u64, offset: u64) -> Self {
+        let block_index = offset / 2;
+        let word_index = usize::from(!offset.is_multiple_of(2)) * 2;
+        let mut rng = Self {
+            key: seed,
+            stream_id,
+            counter: block_index,
+            idx: 4,
+            block: [0; 4],
+            spare_normal: None,
+        };
+        rng.generate_block();
+        rng.idx = word_index;
+        rng
+    }
+
     /// Generate a new block of random values.
     ///
     /// This is a hot path method called frequently during simulation.

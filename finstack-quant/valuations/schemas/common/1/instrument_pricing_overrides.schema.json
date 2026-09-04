@@ -136,7 +136,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Yield to worst (decimal).\n\nFor non-callable bonds this is equivalent to [`BondQuoteInput::Ytm`].\nFor callable bonds, prefer [`BondQuoteInput::Oas`] when exercise-aware\npricing is required — YTW inversion via this variant uses maturity flows\n(consistent with `Bond::base_value`'s `quoted_ytw` path).",
+          "description": "Yield to worst (decimal).\n\nFor non-callable bonds this is equivalent to [`BondQuoteInput::Ytm`].\nFor callable, puttable, or return-floor bonds, inversion prices every\nadmissible workout path at this Street yield and selects the minimum\ndirty price.",
           "properties": {
             "ytw": {
               "format": "double",
@@ -1702,7 +1702,7 @@
           ]
         },
         "mc_paths": {
-          "description": "Optional Monte Carlo path count for path-dependent GBM pricers (Asians, lookbacks, autocallables, etc.).\n\nWhen set, overrides the default simulation size (typically 100,000 paths). Intended for tests,\nbenchmarks, and controlled revaluation—not a market quote.",
+          "description": "Optional independent-estimator count for Monte Carlo pricers.\n\nWhen set, overrides the selected pricer's default simulation size.\nAntithetic sampling evaluates two factor paths per independent estimator.\nThe rates-credit bond engine defaults to 20,000 estimators per training\nand pricing stage; other pricers retain their own defaults. Intended for\ntests, benchmarks, and controlled revaluation, not as a market quote.",
           "format": "uint",
           "minimum": 0,
           "type": [
@@ -1711,7 +1711,7 @@
           ]
         },
         "mc_target_ci_half_width": {
-          "description": "Optional absolute target for the Monte Carlo confidence-interval\nhalf-width in instrument currency.\n\nThe engine may stop before `mc_paths` after its minimum sample count\nwhen this positive finite target is reached.",
+          "description": "Optional absolute target for the Monte Carlo confidence-interval\nhalf-width in instrument currency.\n\nEngines that support adaptive sampling may stop before `mc_paths` after\ntheir minimum sample count when this positive finite target is reached.\nThe rates-credit bond engine always consumes its fixed estimator budget\nand validates this target against the final 95% confidence interval.",
           "format": "double",
           "type": [
             "number",

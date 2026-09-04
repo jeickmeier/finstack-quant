@@ -1,7 +1,8 @@
 # Bond
 
 Fixed, floating, step-up, amortizing, callable/putable and PIK bonds, with
-discount, hazard, tree (OAS) and Merton structural-credit pricing paths.
+discounting, hazard, rates-only tree, joint rates-credit and Merton
+structural-credit pricing paths.
 
 `Bond` is the reference instrument of `finstack-quant-valuations`: several other
 instruments (asset-swap legs, convertibles, bond futures) reuse its cashflow
@@ -45,11 +46,11 @@ bond/
 ├── cashflows.rs             # holder-view (Date, Money) projection
 ├── json.rs                  # bond_from_cashflows_json
 ├── pricing/
-│   ├── engine/              # pricing math + the thin Simple*Pricer registry adapters
+│   ├── engine/              # pricing math + the model-preserving BondPricer adapter
 │   │   ├── discount.rs      # BondEngine: PV = Σ CF_i × DF_i
-│   │   ├── hazard.rs        # HazardBondEngine + SimpleBondHazardPricer (survival-weighted PV + FRP)
-│   │   ├── tree/            # TreePricer + SimpleBondOasPricer (callable/putable, OAS)
-│   │   └── merton_mc/       # MertonMcEngine + SimpleBondMertonMcPricer (structural credit, PIK)
+│   │   ├── hazard.rs        # HazardBondEngine: non-callable survival-weighted PV + FRP
+│   │   ├── tree/            # TreePricer: rates-only and joint rates-credit optionality + OAS
+│   │   └── merton_mc/       # MertonMcEngine: structural credit and PIK
 │   ├── quote_conversions/   # yield↔price, spread↔price, annuity helpers
 │   ├── ytm_solver.rs        # Newton/Brent yield-to-maturity solver
 │   ├── return_floor.rs      # lowers ReturnFloorSpec into a CallPutSchedule at pricing time
@@ -65,20 +66,24 @@ bond/
 
 ### Engines vs pricers
 
-Each `engine/*` file holds the pricing math **and** the thin `Simple*Pricer`
-registry adapter next to it. The adapter downcasts the instrument, calls the
-engine, and wraps the result in a `ValuationResult`. Registration happens once,
-in `src/pricer/rates.rs`:
+The shared `BondPricer` registry adapter downcasts the instrument, preserves
+the caller-selected model, calls the corresponding engine, and wraps the
+result in a `ValuationResult`. Registration happens once in
+`src/pricer/rates.rs`:
 
-| Engine | `ModelKey` | Registered pricer |
-|--------|-----------|-------------------|
-| `BondEngine` | `Discounting` | generic pricer (`register_generic!` → `Instrument::base_value`) |
-| `HazardBondEngine` | `HazardRate` | `SimpleBondHazardPricer` |
-| `TreePricer` | `Tree` | `SimpleBondOasPricer` |
-| `MertonMcEngine` | `MertonMc` | `SimpleBondMertonMcPricer` |
+| Explicit model | Rates | Credit | Embedded rights |
+|----------------|-------|--------|-----------------|
+| `Discounting` | Deterministic discount curve | Ignored | Rejected |
+| `HazardRate` | Deterministic discount curve | Required hazard curve with FRP | Rejected |
+| `Tree` | Rates-only tree (or deterministic zero-vol rollback) | Ignored | Call, put, and return floor |
+| `RatesCredit` | Joint rates-credit tree or Monte Carlo | Required hazard curve with FRP | Call, put, and return floor |
 
-Adding a model means one file under `pricing/engine/` and one `registry.register(...)`
-line in `src/pricer/rates.rs`.
+`MertonMc` remains a separate structural-credit model for PIK bonds. The
+instrument-native default selects `RatesCredit` for a credit-risky bond with
+embedded rights or stochastic rate/credit inputs, `HazardRate` for any other
+bond with `credit_curve_id`, `Tree` for a rates-only bond with rights, and
+`Discounting` otherwise. Passing an explicit model always constrains the
+kernel; it never triggers this inference.
 
 ## Construction
 
@@ -136,14 +141,20 @@ risk-free benchmark PV, not a corporate market value. Choose one credit basis:
 - **Straight bond:** calibrate `ZSpread` from a clean market quote with
   `pricing::quote_conversions::compute_quotes`, or set `quoted_z_spread` as the
   price driver. The Z-spread shifts the risk-free discount curve.
-- **Callable/putable bond:** calibrate or supply `quoted_oas`; the tree prices
-  the option-adjusted spread over the risk-free curve.
+- **Rates-only callable/putable bond:** use `ModelKey::Tree`; calibrate or
+  supply `quoted_oas` for the option-adjusted spread over the risk-free curve.
 - **Hazard basis:** set `credit_curve_id` to a calibrated survival/hazard curve
-  in the market context. `HazardBondEngine` combines that curve and recovery
-  with the risk-free discount curve.
+  in the market context. Use `ModelKey::HazardRate` for a non-callable FRP
+  valuation and `ModelKey::RatesCredit` when rates and credit must be valued
+  jointly or the credit-risky bond has call, put, or return-floor rights.
+  Nonzero rate or hazard volatility on `RatesCredit` uses Monte Carlo and
+  returns reproducibility and standard-error diagnostics.
 
-Do not set both a hazard curve and a Z-spread/OAS price driver: quote drivers
-take precedence over the hazard engine, making the selected credit basis ambiguous.
+A hazard curve and quoted OAS can be combined: the OAS is applied inside the
+explicitly selected `HazardRate` or `RatesCredit` kernel. Other price-driving
+quotes pin settlement value; quote-aware risk metrics replace that pin with a
+model-consistent spread while preserving the selected model. Explicit
+`Discounting` and `Tree` selections ignore an attached hazard curve.
 
 ### Floating-rate notes
 
@@ -216,15 +227,20 @@ let callable = Bond::builder()
 ```
 
 `price_pct_of_par` is applied to the **outstanding** principal at the exercise
-date, so amortizing callables are handled correctly. At a node the coupon is
-always paid; the exercise decision applies to principal only:
-`node_value = coupon + min(max(continuation, put_price), call_price)`.
+date after same-date balance events, so amortization and PIK are respected.
+Each step first forms risky discounted continuation plus within-step recovery,
+then applies the holder put and issuer call barriers, and finally adds the
+current cash payment once. Exercise terminates all later cash and recovery
+exposure. Exercise windows are inclusive calendar-date ranges, including an
+active right on `as_of` and rights on the terminal date.
 
 ### PIK bonds
 
 PIK coupons accrete to notional instead of paying cash. Set
 `CouponType::Pik` (or `Split { cash_pct, pik_pct }`) on `FixedCouponSpec` /
-`FloatingCouponSpec` and price under `ModelKey::MertonMc`.
+`FloatingCouponSpec`. Hazard-rate pricing replays the accreted balance, and
+the stochastic rates-credit path evaluates floating PIK coupons pathwise.
+`ModelKey::MertonMc` remains available for structural-credit pricing.
 
 The Merton MC engine (`pricing::engine::merton_mc`) prices PIK bonds in a
 structural credit framework:
@@ -303,7 +319,9 @@ Registered for `InstrumentType::Bond` in `metrics/mod.rs`:
 
 `Theta` is registered universally by `metrics::standard_registry()`.
 Duration and convexity switch to the effective (option-aware) computation in
-`metrics/effective.rs` when the bond carries a call/put schedule.
+`metrics/effective.rs` when the bond carries a call/put schedule or return-floor
+rights. Deterministic return floors use the pricing-effective daily call
+schedule; stochastic rates-credit floors retain their path-dependent state.
 
 ## Return floors (guaranteed minimum MOIC / XIRR)
 
@@ -338,9 +356,11 @@ let nc2 = Bond::example()?.with_return_floor(
 `.window(ProtectionWindow::{Full, From(d), Between { start, end }})`,
 `.day_count(DayCount)` (defaults to Act/365F, matching `core::cashflow::xirr`).
 
-The spec is lowered into a `CallPutSchedule` at pricing time
-(`pricing/return_floor.rs`), making every in-window coupon date a
-floor-protected call date.
+For deterministic pricing the spec is lowered into a `CallPutSchedule` at
+pricing time (`pricing/return_floor.rs`), making every protected calendar date
+a floor-protected call date. Stochastic rates-credit pricing keeps the return
+floor as path state and evaluates it against simulated distributions and
+outstanding balance.
 
 **`*ToWorst` honesty caveat**: `MoicToWorst` / `XirrToWorst` take the minimum
 over *all* exit paths, including the unfloored maturity path, so they are not
@@ -350,16 +370,8 @@ floor's actual guarantee (every early-call path meets the target) is verified by
 the unit tests in `pricing/return_floor.rs` and by
 [`tests/return_floor_example.rs`](../../../../tests/return_floor_example.rs).
 
-### Known limitations
+### Convenience limitation
 
-- **Floating coupons** are forward-projected from the curve at pricing time;
-  path-accurate LSMC (rate paths driving coupon and call trigger together) is
-  not implemented.
-- **Make-whole calls** cannot compose with a return floor; the combination is
-  a validation error because make-whole effective prices are path dependent.
-- **Amortizing to-worst**: `MoicToWorst` / `XirrToWorst` use the initial
-  notional as the redemption basis — exact for bullets, overstated for
-  amortizers.
 - `min_moic` / `min_xirr` imply `ProtectionWindow::Full`; use
   `.with_return_floor(...)` with an explicit window for a no-call period.
 
@@ -379,8 +391,6 @@ Both paths use the canonical `finstack_quant.instrument/1` envelope with
 
 ## Other limitations
 
-- Deterministic curve inputs outside the Merton MC engine; no stochastic
-  rate/credit paths.
 - No tax/withholding, fail penalties, or settlement-date PV.
 - Merton MC DV01/CS01 require re-running the simulation with bumped curves;
   only cash-equivalent Z-spread and YTM are computed inline.
@@ -391,11 +401,8 @@ Both paths use the canonical `finstack_quant.instrument/1` envelope with
 ## Verification
 
 ```bash
-cargo nextest run -p finstack-quant-valuations --test instruments bond::
-
-mise run rust-test
-
-mise run rust-lint
+mise run rust-test-filter -- finstack-quant-valuations bond
+mise run rust-lint-crate -- finstack-quant-valuations
 ```
 
 ## See also

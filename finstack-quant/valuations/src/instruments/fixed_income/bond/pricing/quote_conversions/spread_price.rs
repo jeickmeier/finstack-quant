@@ -2,10 +2,9 @@ use super::annuity::{
     asset_swap_forward_components, fixed_leg_annuity, par_rate_and_annuity_from_discount,
 };
 use super::compute::clear_price_driving_overrides;
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::BondZSpreadPricingKernel;
-use crate::instruments::fixed_income::bond::pricing::engine::tree::{bond_tree_config, TreePricer};
 use crate::instruments::fixed_income::bond::{Bond, CashflowSpec};
+use crate::pricer::ModelKey;
 use finstack_quant_core::dates::calendar::calendar_by_id;
 use finstack_quant_core::dates::{Date, DayCount, ScheduleBuilder, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -36,10 +35,12 @@ fn resolved_asw_forward_curve_id(bond: &Bond) -> Option<CurveId> {
 /// price_from_z_spread(bond, market, as_of, ZSpreadCalculator.solve(...)) == dirty
 /// ```
 ///
-/// holds for **any** bond, including callable/putable bonds whose quoted
-/// yield-to-worst selects an early workout path and bonds with a non-zero
-/// `settlement_days` lag (`quote_date != as_of`). Callers must pass the
-/// valuation date as `as_of`; workout selection and settlement are handled
+/// holds for bullet bonds and for callable/putable bonds with a quoted clean
+/// price that selects an explicit yield-to-worst workout path. An
+/// option-bearing bond without that quoted workout price is rejected; use OAS
+/// for model-based optional pricing. Bonds with a non-zero `settlement_days`
+/// lag (`quote_date != as_of`) remain settlement-anchored. Callers must pass
+/// the valuation date as `as_of`; workout selection and settlement are handled
 /// here.
 ///
 /// [`ZSpreadCalculator`]: crate::instruments::fixed_income::bond::ZSpreadCalculator
@@ -53,6 +54,12 @@ fn resolved_asw_forward_curve_id(bond: &Bond) -> Option<CurveId> {
 /// * `as_of` - Valuation/trade date; the helper derives settlement internally.
 /// * `z` - Annual z-spread as a decimal zero-rate shift under the bond's
 ///   contractual compounding convention.
+///
+/// # Errors
+///
+/// Returns an error when required curves or cashflows are unavailable, or
+/// when an option-bearing bond has no quoted clean price from which to select
+/// an explicit workout path.
 pub fn price_from_z_spread(
     bond: &Bond,
     curves: &MarketContext,
@@ -62,7 +69,7 @@ pub fn price_from_z_spread(
     BondZSpreadPricingKernel::new(bond, curves, as_of)?.price(z)
 }
 
-/// Price from Option-Adjusted Spread using the short-rate tree pricer.
+/// Price from Option-Adjusted Spread using an explicit bond model.
 ///
 /// The public API takes **decimal spread units** (`oas_decimal`), where
 /// `0.01` corresponds to **100 basis points**. Internally, the tree
@@ -81,18 +88,26 @@ pub fn price_from_z_spread(
 ///   cashflows are used for OAS valuation.
 /// * `curves` - Market context supplying the discount curve and tree inputs.
 /// * `as_of` - Valuation date supplied to the short-rate tree pricer.
+/// * `model` - Caller-selected bond model. `discounting` and `hazard_rate`
+///   require a non-callable bond; `tree` and `rates_credit` value embedded
+///   rights under their respective factor families.
 /// * `oas_decimal` - Option-adjusted spread as a decimal, such as `0.01` for
 ///   100 basis points.
+///
+/// Deterministic return floors are first lowered into their daily effective
+/// call schedule. Stochastic rates-credit pricing retains the floor
+/// specification because its required redemption depends on the simulated
+/// distribution path.
 pub fn price_from_oas(
     bond: &Bond,
     curves: &MarketContext,
     as_of: Date,
+    model: ModelKey,
     oas_decimal: f64,
 ) -> finstack_quant_core::Result<f64> {
-    // Convert decimal spread (0.01 = 100bp) to basis points for the tree.
-    let oas_bp = oas_decimal * 10_000.0;
-    let pricer = TreePricer::with_config(bond_tree_config(bond)?);
-    pricer.price_at_oas(bond, curves, as_of, oas_bp)
+    Ok(bond
+        .price_at_oas_for_model_outcome(model, curves, as_of, oas_decimal)?
+        .amount)
 }
 
 /// Price from Discount Margin for FRNs by adding DM (decimal) to the **discount rate**.
@@ -135,11 +150,13 @@ pub fn price_from_dm(
     let mut b = bond.clone();
     clear_price_driving_overrides(&mut b);
 
-    // DM discounting semantics apply to bonds with floating coupons (plain
-    // FRNs and amortizing floaters); other cashflow specs fall back to the
-    // plain model PV.
+    // DM discounting semantics apply only to bonds with floating coupons
+    // (plain FRNs and amortizing floaters).
     if !b.has_floating_coupons() {
-        return Ok(b.value(curves, as_of)?.amount());
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "discount margin pricing requires a floating-rate bond; bond '{}' has no floating coupons",
+            b.id.as_str()
+        )));
     }
     // Coupons stay at the contractual quoted margin; the DM shifts the
     // discount rate via the shared Z-spread discounting mechanics.

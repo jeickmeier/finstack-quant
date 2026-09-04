@@ -18,6 +18,7 @@ use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_c
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::pricer::ModelKey;
 use time::macros::date;
 
 fn build_simple_discount_curve(as_of: time::Date) -> DiscountCurve {
@@ -49,8 +50,15 @@ fn test_quote_engine_roundtrip_ytm_and_zspread_fixed_bond() {
 
     // YTM → price → YTM
     let target_ytm = 0.045;
-    let quotes_from_ytm =
-        compute_quotes(&bond, &market, as_of, BondQuoteInput::Ytm(target_ytm)).unwrap();
+    let quotes_from_ytm = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::Ytm(target_ytm),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
+    )
+    .unwrap();
     let clean_pct = quotes_from_ytm.clean_price_pct;
 
     // Feed the resulting clean price back into the standard metrics pipeline.
@@ -79,8 +87,15 @@ fn test_quote_engine_roundtrip_ytm_and_zspread_fixed_bond() {
 
     // Z-spread → price → Z-spread
     let target_z = 0.0123;
-    let quotes_from_z =
-        compute_quotes(&bond, &market, as_of, BondQuoteInput::ZSpread(target_z)).unwrap();
+    let quotes_from_z = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::ZSpread(target_z),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
+    )
+    .unwrap();
     let clean_pct_z = quotes_from_z.clean_price_pct;
 
     let mut bond_with_price_z = bond;
@@ -150,6 +165,8 @@ fn test_quote_engine_roundtrip_dm_for_frn() {
         &market,
         as_of,
         BondQuoteInput::DiscountMargin(target_dm),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
     )
     .unwrap();
     let clean_pct = quotes.clean_price_pct;
@@ -211,8 +228,15 @@ fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
 
     // OAS → price → OAS
     let target_oas = 0.01; // 100bp in decimal
-    let quotes_oas =
-        compute_quotes(&bond, &market, as_of, BondQuoteInput::Oas(target_oas)).unwrap();
+    let quotes_oas = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::Oas(target_oas),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
+    )
+    .unwrap();
     let clean_pct_oas = quotes_oas.clean_price_pct;
 
     let mut bond_with_oas_price = bond.clone();
@@ -243,6 +267,8 @@ fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
         &market,
         as_of,
         BondQuoteInput::AswMarket(target_asw_mkt),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
     )
     .unwrap();
     let clean_pct_asw = quotes_asw.clean_price_pct;
@@ -289,8 +315,15 @@ fn test_quote_engine_roundtrip_i_spread_fixed_bond() {
     let market = MarketContext::new().insert(disc);
 
     let target_ispr = 0.0075; // 75bp
-    let quotes =
-        compute_quotes(&bond, &market, as_of, BondQuoteInput::ISpread(target_ispr)).unwrap();
+    let quotes = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::ISpread(target_ispr),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
+    )
+    .unwrap();
     let clean_pct = quotes.clean_price_pct;
 
     let mut bond_with_price = bond;
@@ -334,8 +367,15 @@ fn test_quote_engine_asw_market_rejects_matured_schedule() {
     let disc = build_simple_discount_curve(issue);
     let market = MarketContext::new().insert(disc);
 
-    let err = compute_quotes(&bond, &market, as_of, BondQuoteInput::AswMarket(0.005))
-        .expect_err("ASW market inversion should fail for matured schedule");
+    let err = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::AswMarket(0.005),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
+    )
+    .expect_err("ASW market inversion should fail for matured schedule");
     let msg = format!("{err}");
     assert!(
         msg.contains("ASW market price inversion requires at least two fixed-leg schedule dates"),
@@ -367,6 +407,8 @@ fn test_quote_engine_spread_and_yield_paths_reprice_to_same_clean_price() {
         &market,
         as_of,
         BondQuoteInput::CleanPricePct(base_clean_pct),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
     )
     .expect("base quote set");
 
@@ -374,12 +416,33 @@ fn test_quote_engine_spread_and_yield_paths_reprice_to_same_clean_price() {
     let z = base.z_spread.expect("z-spread should be available");
     let i = base.i_spread.expect("i-spread should be available");
 
-    let from_ytm =
-        compute_quotes(&bond, &market, as_of, BondQuoteInput::Ytm(ytm)).expect("ytm repricing");
-    let from_z =
-        compute_quotes(&bond, &market, as_of, BondQuoteInput::ZSpread(z)).expect("z repricing");
-    let from_i =
-        compute_quotes(&bond, &market, as_of, BondQuoteInput::ISpread(i)).expect("i repricing");
+    let from_ytm = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::Ytm(ytm),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
+    )
+    .expect("ytm repricing");
+    let from_z = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::ZSpread(z),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
+    )
+    .expect("z repricing");
+    let from_i = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::ISpread(i),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
+    )
+    .expect("i repricing");
 
     // Tight for YTM and Z-spread, looser for I-spread due to proxy par-swap approximation.
     assert!(
@@ -421,8 +484,15 @@ fn test_quote_engine_i_spread_rejects_matured_schedule() {
     let disc = build_simple_discount_curve(issue);
     let market = MarketContext::new().insert(disc);
 
-    let err = compute_quotes(&bond, &market, as_of, BondQuoteInput::ISpread(0.005))
-        .expect_err("I-spread quote inversion should fail for matured schedule");
+    let err = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::ISpread(0.005),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
+    )
+    .expect_err("I-spread quote inversion should fail for matured schedule");
     let msg = format!("{err}");
     assert!(
         msg.contains("Invalid date range"),

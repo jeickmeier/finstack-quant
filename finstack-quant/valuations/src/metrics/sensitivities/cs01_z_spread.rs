@@ -452,7 +452,7 @@ fn active_model_consumes_credit<I: Instrument + ?Sized>(
         .clone_pricer_dispatch()
         .model()
         .unwrap_or_else(|| instrument.default_model());
-    matches!(model, ModelKey::Tree | ModelKey::HazardRate)
+    matches!(model, ModelKey::HazardRate | ModelKey::RatesCredit)
 }
 
 #[cfg(test)]

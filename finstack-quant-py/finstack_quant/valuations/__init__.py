@@ -62,9 +62,10 @@ def instrument_cashflows(
 ) -> tuple[dict, "pd.DataFrame"]:
     """Per-flow DF / survival / PV DataFrame for a discountable instrument.
 
-    Supports ``model in {"discounting", "hazard_rate"}``. The returned
-    ``envelope["total_pv"]`` reconciles with the instrument's ``base_value``
-    for the supported model-instrument pairs.
+    Supports ``model in {"discounting", "hazard_rate"}``. Hazard-rate export
+    rejects bonds with call, put, or return-floor rights because static rows
+    cannot represent exercise-contingent value. For supported static-flow
+    pairs, ``envelope["total_pv"]`` reconciles with ``base_value``.
 
     Args:
         instrument: Typed instrument (``Bond``, ``InterestRateSwap``, ...) or a
@@ -84,8 +85,9 @@ def instrument_cashflows(
     Raises:
         KeyError: If a curve or fixing series the instrument depends on is
             missing from ``market``.
-        ValueError: If ``model`` is unsupported or the instrument type isn't
-            priced under that model.
+        ValueError: If ``model`` is unsupported, the instrument type isn't
+            priced under that model, or a bond with embedded exercise rights
+            is requested under a static cashflow model.
         RuntimeError: If the pricer fails numerically.
 
     Examples:

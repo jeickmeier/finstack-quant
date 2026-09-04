@@ -515,8 +515,12 @@ pub(crate) fn market_history_json(
 /// model : str
 ///     Model key: ``"default"`` (the instrument's registered default),
 ///     ``"discounting"``, ``"black76"``, ``"hazard_rate"``, ``"hull_white_1f"``,
-///     ``"tree"``, ``"normal"``, ``"monte_carlo_gbm"``, ... — see
-///     ``list_models_grouped()``.
+///     ``"tree"``, ``"rates_credit"``, ``"normal"``, ``"monte_carlo_gbm"``,
+///     ... — see ``list_models_grouped()``. For bonds, ``"discounting"`` is
+///     non-callable rates-only PV, ``"hazard_rate"`` is non-callable
+///     fractional recovery of par,
+///     ``"tree"`` values rates-only exercise rights, and ``"rates_credit"``
+///     values joint rates-credit bonds including call, put, and return floors.
 /// metrics : list[str] | None
 ///     Metric identifiers to compute (e.g. ``["ytm", "dv01", "duration_mod"]``;
 ///     see ``list_standard_metrics()``). ``None`` or ``[]`` means valuation
@@ -535,7 +539,9 @@ pub(crate) fn market_history_json(
 /// -------
 /// ValuationResult
 ///     Typed valuation envelope carrying value, currency, metrics, and
-///     covenant flags.
+///     covenant flags. A stochastic ``"rates_credit"`` bond result also
+///     carries Monte Carlo convergence and reproducibility diagnostics in
+///     ``details``.
 ///
 /// Raises
 /// ------
@@ -553,6 +559,21 @@ pub(crate) fn market_history_json(
 ///
 /// Notes
 /// -----
+/// When stochastic rate or credit factors are configured for a
+/// ``"rates_credit"`` bond, ``result.details`` is tagged
+/// ``{"type": "monte_carlo", "data": ...}``.
+/// Its data contains the sampling-only standard error, configured independent
+/// exercise-policy paths (``training_paths``) and their total simulated count
+/// including antithetic partners (``training_simulated_paths``), configured
+/// independent make-whole-reference paths (``make_whole_training_paths``) and
+/// their simulated count (``make_whole_training_simulated_paths``), independent
+/// estimator paths (``estimator_paths``) and their simulated count
+/// (``simulated_paths``), random seed, simulation time grid, and
+/// variance-reduction flags. The standard error measures pricing-path
+/// sampling uncertainty under the frozen fitted exercise policy and excludes
+/// regression approximation, time-grid discretization, and model error. A
+/// training stage that did not run reports zero paths.
+///
 /// The wire payload is still one call away: ``result.to_json()`` returns the
 /// JSON that ``ValuationResult.from_json`` accepts, for pipelines that
 /// serialize results.
@@ -641,7 +662,8 @@ fn list_standard_metrics_grouped() -> std::collections::BTreeMap<String, Vec<Str
 /// Returns
 /// -------
 /// list[str]
-///     Canonical model keys (e.g. ``"discounting"``, ``"black76"``), sorted.
+///     Canonical model keys (e.g. ``"discounting"``, ``"rates_credit"``),
+///     sorted.
 #[pyfunction]
 fn list_models() -> Vec<String> {
     finstack_quant_valuations::pricer::list_models()
@@ -656,7 +678,9 @@ fn list_models() -> Vec<String> {
 /// Returns
 /// -------
 /// dict[str, list[str]]
-///     Model keys grouped by canonical instrument-type name.
+///     Model keys grouped by canonical instrument-type name. The ``"bond"``
+///     entry includes ``"discounting"``, ``"hazard_rate"``, ``"tree"``, and
+///     ``"rates_credit"``.
 #[pyfunction]
 fn list_models_grouped() -> std::collections::BTreeMap<String, Vec<String>> {
     finstack_quant_valuations::pricer::list_models_grouped()
@@ -707,9 +731,11 @@ fn listed_product_catalog<'py>(
 /// Supported ``model`` values are ``"discounting"`` (DF-only PV) and
 /// ``"hazard_rate"`` (DF × survival + recovery on principal). Any other model
 /// key, or an instrument type that isn't priced under the chosen model in the
-/// standard registry, raises ``ValueError``. For the supported combinations,
-/// the returned envelope's ``total_pv`` reconciles with the instrument's
-/// ``base_value``.
+/// standard registry, raises ``ValueError``. Hazard-rate export also rejects a
+/// bond with call, put, or return-floor rights because static rows cannot
+/// represent its exercise-contingent value. For supported static-flow
+/// combinations, the returned envelope's ``total_pv`` reconciles with the
+/// instrument's ``base_value``.
 ///
 /// Parameters
 /// ----------
@@ -738,7 +764,8 @@ fn listed_product_catalog<'py>(
 ///     If a curve or fixing series the instrument depends on is missing.
 /// ValueError
 ///     If ``model`` is unsupported, the instrument/model pair is not
-///     registered, or a payload is malformed.
+///     registered, a bond with embedded exercise rights is requested under a
+///     static cashflow model, or a payload is malformed.
 /// RuntimeError
 ///     If the pricer fails numerically.
 #[pyfunction]

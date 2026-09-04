@@ -1,15 +1,12 @@
-//! Acceptance tests for node-dependent floating resets on the rates-credit
-//! lattice (callable-integration plan, Milestone 4).
+//! Acceptance tests for path-dependent floating resets under the rates-credit
+//! model.
 //!
-//! The design values a future floating coupon as its deterministic
-//! projection (booked exactly as before) plus a node-dependent increment
-//! folded at the reset slice. Two identities anchor the tests:
+//! Stochastic factors are sampled with a deterministic seed so paired cases
+//! share random numbers. Two identities anchor the tests:
 //!
 //! - **FRN invariance**: for an option-free floater with zero rate/credit
-//!   correlation, the folded increment prices to zero *exactly* — for any
-//!   rate vol, hazard vol, and OAS — so PV must not move with `hw1f_sigma`.
-//!   This is the lattice form of the classic result that a forward-set
-//!   floating leg is worth its curve projection.
+//!   correlation, rate volatility does not change the value of a forward-set
+//!   floating leg beyond Monte Carlo tolerance.
 //! - **Optionality breaks the invariance the right way**: an all-in cap is
 //!   a short caplet strip (PV falls as rate vol rises), an all-in floor is
 //!   a long floorlet strip (PV rises), and a non-zero rate/credit
@@ -36,7 +33,8 @@ use finstack_quant_valuations::instruments::fixed_income::term_loan::{
     AmortizationSpec, LoanCall, LoanCallSchedule, LoanCallType, RateSpec, TermLoan,
     TermLoanTreePricer,
 };
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations::results::ValuationDetails;
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -83,13 +81,11 @@ fn market() -> MarketContext {
         .insert(hazard_curve())
 }
 
-/// Quarterly USD-SOFR-3M + 200 bp floater on the rates-credit tree path.
+/// Quarterly USD-SOFR-3M + 200 bp floater on the rates-credit path.
 ///
 /// Zero reset lag keeps the first (current) period's observation exactly on
 /// the valuation date — a known fixing that must stay deterministic — while
-/// every later reset is a future observation. The far-out-of-the-money call
-/// (300% of par, on coupon dates) routes the bond onto the callable tree
-/// without ever being exercised, so option-free identities apply exactly.
+/// every later reset is a future observation.
 fn floating_credit_bond() -> Bond {
     let mut bond = Bond::fixed(
         "FRN-CREDIT-RESETS",
@@ -110,15 +106,6 @@ fn floating_credit_bond() -> Bond {
     )
     .unwrap();
     bond.credit_curve_id = Some(CurveId::from("USD-HAZ"));
-    bond.call_put = Some(CallPutSchedule {
-        calls: vec![CallPut {
-            start_date: date!(2026 - 01 - 01),
-            end_date: date!(2029 - 01 - 01),
-            price_pct_of_par: 300.0,
-            make_whole: None,
-        }],
-        puts: vec![],
-    });
     bond
 }
 
@@ -143,6 +130,15 @@ fn with_all_in_floor(mut bond: Bond, floor_bp: i64) -> Bond {
 }
 
 fn price(bond: &Bond, sigma: Option<f64>, hazard_vol: Option<f64>, rho: Option<f64>) -> f64 {
+    price_estimate(bond, sigma, hazard_vol, rho).0
+}
+
+fn price_estimate(
+    bond: &Bond,
+    sigma: Option<f64>,
+    hazard_vol: Option<f64>,
+    rho: Option<f64>,
+) -> (f64, f64) {
     let mut bond = bond.clone();
     bond.instrument_pricing_overrides.model_config.hw1f_sigma = sigma;
     bond.instrument_pricing_overrides
@@ -151,33 +147,57 @@ fn price(bond: &Bond, sigma: Option<f64>, hazard_vol: Option<f64>, rho: Option<f
     bond.instrument_pricing_overrides
         .model_config
         .rate_credit_correlation = rho;
-    bond.value(&market(), as_of()).unwrap().amount()
+    bond.instrument_pricing_overrides.model_config.mc_paths = Some(512);
+    let result = finstack_quant_valuations::pricer::standard_pricer_registry()
+        .price_with_metrics(
+            &bond,
+            ModelKey::RatesCredit,
+            &market(),
+            as_of(),
+            &[],
+            Default::default(),
+        )
+        .unwrap();
+    let standard_error = match &result.details {
+        Some(ValuationDetails::MonteCarlo(details)) => details.standard_error,
+        _ => 0.0,
+    };
+    (result.value.amount(), standard_error)
 }
 
-/// Option-free floater, zero correlation: the folded increments net to
-/// zero, so PV must be invariant to the short-rate volatility — with and
-/// without a stochastic hazard factor. This single identity exercises the
-/// forward derivation, the pricing-measure fold, and the absence of any
-/// double count end to end.
+fn monte_carlo_tolerance(left_standard_error: f64, right_standard_error: f64) -> f64 {
+    let combined = left_standard_error.hypot(right_standard_error);
+    (4.0 * combined).max(0.05)
+}
+
+/// Option-free floater, zero correlation: expected PV is invariant to the
+/// short-rate volatility, with and without a stochastic hazard factor. The
+/// stochastic bullet path is sampled, so the comparison uses the reported
+/// sampling error rather than requiring exact pathwise equality.
 #[test]
 fn frn_pv_invariant_to_rate_vol_without_correlation() {
     let bond = floating_credit_bond();
 
     let deterministic = price(&bond, Some(0.0), None, None);
-    let stochastic_rates = price(&bond, Some(0.012), None, None);
+    let (stochastic_rates, stochastic_rates_se) = price_estimate(&bond, Some(0.012), None, None);
+    let rates_tolerance = monte_carlo_tolerance(stochastic_rates_se, 0.0);
     assert!(
-        (stochastic_rates - deterministic).abs() < 0.05,
+        (stochastic_rates - deterministic).abs() <= rates_tolerance,
         "option-free FRN PV must not move with rate vol at rho = 0: \
-         sigma=0 -> {deterministic:.6}, sigma=0.012 -> {stochastic_rates:.6}"
+         sigma=0 -> {deterministic:.6}, sigma=0.012 -> {stochastic_rates:.6}, \
+         MC standard error -> {stochastic_rates_se:.6}, \
+         tolerance -> {rates_tolerance:.6}"
     );
 
-    let both_factors = price(&bond, Some(0.012), Some(0.02), None);
-    let credit_only = price(&bond, Some(0.0), Some(0.02), None);
+    let (both_factors, both_factors_se) = price_estimate(&bond, Some(0.012), Some(0.02), None);
+    let (credit_only, credit_only_se) = price_estimate(&bond, Some(0.0), Some(0.02), None);
+    let independent_factors_tolerance = monte_carlo_tolerance(both_factors_se, credit_only_se);
     assert!(
-        (both_factors - credit_only).abs() < 0.05,
+        (both_factors - credit_only).abs() <= independent_factors_tolerance,
         "with independent factors the rate vol still must not move an \
          option-free FRN: credit-only -> {credit_only:.6}, \
-         both -> {both_factors:.6}"
+         both -> {both_factors:.6}, combined MC tolerance -> \
+         {independent_factors_tolerance:.6}"
     );
 }
 
@@ -245,18 +265,16 @@ fn correlation_moves_floating_pv() {
     );
 }
 
-/// A call date strictly inside a future floating coupon period requires
-/// path-dependent fixing state the recombining lattice cannot carry. It
-/// must fail loudly in stochastic-rate mode and keep pricing untouched in
-/// deterministic-rate mode.
+/// A call date strictly inside a future floating coupon period retains the
+/// simulated fixing state and is exercisable under stochastic rates.
 #[test]
-fn mid_period_call_fails_only_with_stochastic_rates() {
+fn mid_period_call_prices_with_stochastic_rates() {
     let mut bond = floating_credit_bond();
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2027 - 02 - 15),
             end_date: date!(2027 - 02 - 15),
-            price_pct_of_par: 102.0,
+            price_pct_of_par: 95.0,
             make_whole: None,
         }],
         puts: vec![],
@@ -266,19 +284,15 @@ fn mid_period_call_fails_only_with_stochastic_rates() {
     let deterministic = price(&bond, Some(0.0), Some(0.02), None);
     assert!(deterministic.is_finite() && deterministic > 0.0);
 
-    // Stochastic rates: explicit validation error naming the misalignment.
-    let mut stochastic = bond;
-    stochastic
-        .instrument_pricing_overrides
-        .model_config
-        .hw1f_sigma = Some(0.012);
-    let err = stochastic
-        .value(&market(), as_of())
-        .expect_err("mid-period call under stochastic rates must be rejected");
-    let msg = err.to_string();
+    let uncallable = price(&floating_credit_bond(), Some(0.012), Some(0.02), None);
+    let stochastic = price(&bond, Some(0.012), Some(0.02), None);
     assert!(
-        msg.contains("strictly inside"),
-        "error must name the misaligned exercise: {msg}"
+        stochastic.is_finite() && stochastic > 0.0,
+        "between-reset stochastic call must produce a finite positive value: {stochastic}"
+    );
+    assert!(
+        stochastic < uncallable - 1_000.0,
+        "a binding issuer call must reduce holder value: callable={stochastic}, bullet={uncallable}"
     );
 }
 

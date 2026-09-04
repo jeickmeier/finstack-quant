@@ -19,7 +19,6 @@ from common import (
     SITE,
     cell_source,
     contained,
-    curriculum,
     curriculum_manifest,
     digest,
     fixture_digest,
