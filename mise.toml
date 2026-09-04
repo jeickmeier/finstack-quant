@@ -950,8 +950,12 @@ description = "Verify all 33 workflows against current, warning-free executed no
 run = "uv run --no-sync python docs-site/gen/verify_prerequisites.py"
 
 [tasks.docs-site-build]
-description = "Run the strict analyst publication gate, including warning-free labs, and build the local site"
-run = "uv run --no-sync python docs-site/gen/build_site.py"
+description = "Build the current Python extension, run the strict analyst publication gate, and build the local site"
+run = """
+mise run python-sync
+mise run python-build --release
+uv run --no-sync python docs-site/gen/build_site.py
+"""
 
 [tasks.docs-site-dev]
 description = "Open the local analyst documentation development server"

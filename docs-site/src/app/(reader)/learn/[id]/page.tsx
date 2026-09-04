@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight, BookOpen, FlaskConical } from 'lucide-react';
 import { DocsBody, DocsPage, DocsTitle } from 'fumadocs-ui/layouts/docs/page';
 import { getMDXComponents } from '@/components/mdx';
-import { getLesson, getLessons, getProgression, groups, labHref } from '@/lib/curriculum';
+import { getLesson, getLessonLabs, getLessons, getProgression, groups, labHref } from '@/lib/curriculum';
 import { labSource, lessonSource } from '@/lib/source';
 import { referenceLink } from '@/lib/references';
 
@@ -25,6 +25,7 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
   const groupLessons = getLessons().filter((item) => item.part === lesson.part);
   const position = groupLessons.findIndex((item) => item.id === id) + 1;
   const { previous, next } = getProgression(lesson);
+  const lessonLabs = getLessonLabs(lesson);
 
   return <DocsPage toc={page.data.toc} footer={{ enabled: false }}>
     <div id="main-content" className="lesson-masthead">
@@ -36,7 +37,7 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
       {lesson.variants && <div className="capstone-variants"><p>Complete the common program and the prerequisites for your chosen capstone.</p>{Object.entries(lesson.variants).map(([variant, requirements]) => <div className="prerequisites" key={variant}><span>{variant === 'credit' ? 'Credit capstone' : 'Volatility capstone'}:</span>{requirements.map((requirement) => <Link key={requirement} href={`/learn/${requirement}`}>{requirement}</Link>)}</div>)}</div>}
     </div>
     <DocsBody><Body components={getMDXComponents()} /></DocsBody>
-    {lesson.labs.length > 0 && <section className="lesson-labs" aria-label="Companion labs"><h2><FlaskConical size={16} aria-hidden="true" /> Companion labs</h2>{lesson.labs.map((lab) => {
+    {lessonLabs.length > 0 && <section className="lesson-labs" aria-label="Companion labs"><h2><FlaskConical size={16} aria-hidden="true" /> Companion labs</h2>{lessonLabs.map((lab) => {
       const title = lab.split('/').at(-1)?.replace(/\.ipynb$/, '').replaceAll('_', ' ');
       return labSource.getPage(lab.replace(/\.ipynb$/, '').split('/'))
         ? <Link key={lab} href={labHref(lab)}>{title}<ArrowRight size={16} aria-hidden="true" /></Link>

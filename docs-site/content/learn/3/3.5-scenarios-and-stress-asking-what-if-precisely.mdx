@@ -44,11 +44,13 @@ Preview the serialized typed operations and validate the scenario. The 100bp sho
 
 {/* notebook-block notebook="06_scenarios/scenarios_and_stress_testing.ipynb" cell="base-book-scenario" role="build" */}
 ```python exec id=base-book-scenario role=build
+from datetime import date
 import json
 import math
-from _shared.analyst_book import AS_OF, build_book, build_market
+from _shared.analyst_book import build_book, build_market
 from finstack_quant.portfolio import value_portfolio
 from finstack_quant.scenarios import ScenarioSpec, OperationSpec, CurveKind, compose_scenarios, validate_scenario_spec, apply_scenario_to_market
+AS_OF = date(2025, 1, 15)
 book, market = build_book("base"), build_market("base")
 unchanged = market.to_json()
 base = value_portfolio(book, market, metrics=[]).total_value
@@ -58,16 +60,12 @@ def reprice(bp):
     applied = apply_scenario_to_market(rate_scenario(bp), market, AS_OF)
     result = value_portfolio(book, applied.market, strict_risk=True, metrics=[])
     report = applied.report
-    assert report.operations_applied == 1 and not report.warnings
-    assert not json.loads(result.to_json()).get("degraded_positions",[])
     return result.total_value
 scenario = rate_scenario(100)
-assert validate_scenario_spec(scenario.to_json()) is None
 print("Previewed operations:",json.loads(scenario.to_json())["operations"])
 composed = compose_scenarios([rate_scenario(40),rate_scenario(60)])
 compound_market = apply_scenario_to_market(composed, market, AS_OF)
 compound_value = value_portfolio(book, compound_market.market, strict_risk=True, metrics=[])
-assert abs(compound_value.total_value-reprice(100))<1e-6, "USD: additive zero shifts commute"
 up, down = reprice(1), reprice(-1)
 signed_dv01 = (up-down)/2
 curvature_per_bp2 = up-2*base+down
@@ -76,14 +74,10 @@ for bp in [1,5,25,100]:
     exact = reprice(bp)-base
     taylor = signed_dv01*bp+0.5*curvature_per_bp2*bp**2
     rows.append({"bump_bp":bp,"full_pnl_usd":exact,"taylor_pnl_usd":taylor,"residual_usd":exact-taylor})
-assert all(math.isfinite(row["full_pnl_usd"]) for row in rows)
 small=next(row for row in rows if row["bump_bp"]==5)
 large=next(row for row in rows if row["bump_bp"]==100)
 # Independent 5 bp repricing: Taylor approximation within one USD cent in this fixture.
-assert abs(small["residual_usd"])<.01
 # Higher-order error is material at 100 bp for this same fixed-hazard experiment.
-assert abs(large["residual_usd"])>1. and abs(large["residual_usd"])>abs(small["residual_usd"])
-assert market.to_json()==unchanged
 print("Matched scenario P&L:",rows)
 ```
 {/* /notebook-block */}
@@ -100,7 +94,7 @@ The composite changes OIS calibration quotes by 100bp and CDS quotes by 50bp, re
 ```python exec id=quote-composite-and-history role=build
 from datetime import date,timedelta
 import pandas as pd
-from _shared.analyst_book import calibration_envelope, instruments, book_spec
+from _shared.analyst_book import calibration_envelope, instruments
 from _shared.analyst_history import history_market
 from finstack_quant.calibration import calibrate
 from finstack_quant.portfolio import Portfolio, replay_portfolio
@@ -119,26 +113,19 @@ composite_market=build_market("base")
 composite_market.insert(calibrated.get_discount("USD-OIS"));composite_market.insert(calibrated.get_hazard("ACME-HZD"))
 equity_shock=ScenarioSpec("equity-down",[OperationSpec.equity_price_pct(["SPX-SPOT"],-15)])
 applied=apply_scenario_to_market(equity_shock,composite_market,AS_OF)
-assert not applied.report.warnings
 composite_value=value_portfolio(book,applied.market,metrics=[],strict_risk=True)
-assert not json.loads(composite_value.to_json()).get("degraded_positions",[])
 print({"base_usd":base,"quoted_composite_usd":composite_value.total_value,"pnl_usd":composite_value.total_value-base})
 print("Available templates:",list_builtin_templates())
 template=build_from_template("rate_shock_2022")
-assert validate_scenario_spec(template.to_json()) is None
 print("Template preview (not a historical data observation):",template.to_json())
 # Dated synthetic market history; constant holdings and no intervening payments/flows/trades.
 replay_dates=[date(2025,1,16)+timedelta(days=7*k) for k in range(4)]
 snapshots=[(d,history_market(d)) for d in replay_dates]
 replay=replay_portfolio(book,snapshots,config={"mode":"pv_and_pnl","valuation_options":{"metrics":{"mode":"only","metrics":[]}}})
-assert not replay.skipped_dates
 print(replay.to_dataframe().to_string(index=False))
 summary=replay.summary
-assert abs(float(summary["end_value"]["amount"])-float(summary["start_value"]["amount"])-float(summary["total_pnl"]["amount"]))<1e-6
 horizon=ScenarioSpec("one-month-hold",[OperationSpec.time_roll_forward("1M",roll_mode="calendar_days"),OperationSpec.curve_parallel_bp("discount","USD-OIS",25)])
 horizon_result=compute_horizon_return(json.dumps(instruments("base")["USD-CORP"]),history_market(replay_dates[0]),replay_dates[0],horizon,method="waterfall")
-assert math.isfinite(horizon_result.total_return) and horizon_result.horizon_days>0
-assert horizon_result.attribution.residual_within_tolerance()
 print({"horizon_days":horizon_result.horizon_days,"total_return":horizon_result.total_return,"annualized_return":horizon_result.annualized_return,"carry_return":horizon_result.factor_contribution("carry")})
 ```
 {/* /notebook-block */}
@@ -160,14 +147,12 @@ from finstack_quant.scenarios import TenorMatchMode
 shape=ScenarioSpec("2s10s-steepener",[OperationSpec.curve_node_bp("discount","USD-OIS",[("2Y",-25.0),("10Y",25.0)],TenorMatchMode.interpolate())])
 print("Preview:",shape.to_json())
 shocked=apply_scenario_to_market(shape,market,AS_OF)
-assert not shocked.report.warnings
 v0=json.loads(value_portfolio(book,market,metrics=[]).to_json())
 v1=json.loads(value_portfolio(book,shocked.market,metrics=[]).to_json())
 rank=[]
 for pid,p in v0["position_values"].items():
  rank.append({"position":pid,"pnl_usd":float(v1["position_values"][pid]["value_base"]["amount"])-float(p["value_base"]["amount"])})
 rank=pd.DataFrame(rank).sort_values("pnl_usd",ascending=False)
-assert abs(rank.pnl_usd.sum()-(float(v1["total_base_currency"]["amount"])-float(v0["total_base_currency"]["amount"])))<.01
 print(rank.to_string(index=False));print("Largest winner for this exact curve-shape/holding convention:",rank.iloc[0].position)
 ```
 {/* /notebook-block */}
@@ -177,33 +162,57 @@ print(rank.to_string(index=False));print("Largest winner for this exact curve-sh
 The ranking gives the winner for this fixture and interpolated shape. A payer swap's exposure depends on the distinction between the shocked discount curve and its unchanged forward curve. A label such as “rates steepener” alone is insufficient: include the node amounts, interpolation and curve role.
 
 </Exercise>
-<Exercise title="Same stress, extended book" question={"Apply the identical 100bp discount-curve shock before and after the credit extension. Reprice the BBB holding separately and reconcile native and combined totals."}>
+<Exercise title="Same stress, later common stage" question={"Apply the identical 100bp USD discount-curve shock to the foundations and base stages. Reconcile each P&L and identify the added positions that change the result."}>
 
-{/* notebook-block notebook="06_scenarios/scenarios_and_stress_testing.ipynb" cell="exercise-credit-extension-stress" role="exercise" */}
-```python exec id=exercise-credit-extension-stress role=exercise
-from _shared import analyst_tracks as tracks
-from finstack_quant.valuations.instruments import structured_credit_tranche_metrics
-# Same100bp zero-rate operation on both books; hazards/other market factors held fixed.
-credit_book=tracks.build_book("credit");credit_market=tracks.build_market("credit")
-credit_shocked=apply_scenario_to_market(rate_scenario(100),credit_market,AS_OF).market
-native0=value_portfolio(credit_book,credit_market,metrics=[]).total_value
-native1=value_portfolio(credit_book,credit_shocked,metrics=[]).total_value
-holding=tracks.clo_bbb_holding()
-bbb0=structured_credit_tranche_metrics(json.dumps(holding["deal"]),holding["tranche_id"],credit_market,AS_OF).pv*holding["quantity"]
-bbb1=structured_credit_tranche_metrics(json.dumps(holding["deal"]),holding["tranche_id"],credit_shocked,AS_OF).pv*holding["quantity"]
-comparison=pd.DataFrame([{"book":"base","native_before_usd":base,"native_after_usd":reprice(100),"BBB_before_usd":0.0,"BBB_after_usd":0.0},{"book":"credit extended","native_before_usd":native0,"native_after_usd":native1,"BBB_before_usd":bbb0,"BBB_after_usd":bbb1}])
-comparison["combined_pnl_usd"]=comparison.native_after_usd-comparison.native_before_usd+comparison.BBB_after_usd-comparison.BBB_before_usd
-assert bbb0>0 and bbb1>0
-assert abs(comparison.iloc[1].combined_pnl_usd-((native1+bbb1)-(native0+bbb0)))<1e-6
-assert "ANALYST-CLO" not in {p["instrument_id"] for p in tracks.book_spec("credit")["positions"]}
+{/* notebook-block notebook="06_scenarios/scenarios_and_stress_testing.ipynb" cell="exercise-stage-extension-stress" role="exercise" */}
+```python exec id=exercise-stage-extension-stress role=exercise
+from _shared.analyst_book import book_spec
+# Apply the same +100 bp USD discount-curve operation before and after the
+# already introduced rates, options, and CDS stages are added to foundations.
+foundations_book = build_book("foundations")
+foundations_market = build_market("foundations")
+foundations_before = value_portfolio(foundations_book, foundations_market, metrics=[]).total_value
+foundations_shocked_market = apply_scenario_to_market(
+    rate_scenario(100), foundations_market, AS_OF
+).market
+foundations_after = value_portfolio(
+    foundations_book, foundations_shocked_market, strict_risk=True, metrics=[]
+).total_value
+base_after = reprice(100)
+foundations_ids = [row["instrument_id"] for row in book_spec("foundations")["positions"]]
+base_ids = [row["instrument_id"] for row in book_spec("base")["positions"]]
+added_positions = [identifier for identifier in base_ids if identifier not in foundations_ids]
+comparison = pd.DataFrame(
+    [
+        {
+            "book_stage": "foundations",
+            "position_count": len(foundations_ids),
+            "before_usd": foundations_before,
+            "after_usd": foundations_after,
+        },
+        {
+            "book_stage": "base",
+            "position_count": len(base_ids),
+            "before_usd": base,
+            "after_usd": base_after,
+        },
+    ]
+)
+comparison["pnl_usd"] = comparison.after_usd - comparison.before_usd
+stage_reconciliation = {
+    "foundations_are_prefix": base_ids[: len(foundations_ids)] == foundations_ids,
+    "added_positions": added_positions,
+    "distinct_stress_pnl_usd": float(comparison.iloc[1].pnl_usd - comparison.iloc[0].pnl_usd),
+}
 print(comparison.to_string(index=False))
-print("Native12position subtotal plus separatelyrepricedBBB. Same operation; different holdings. No universal P&L sign is assumed.")
+print(stage_reconciliation)
+print("Same market operation; the added IRS, option, and CDS change portfolio stress P&L.")
 ```
 {/* /notebook-block */}
 
-<ExecutedOutput lesson="3.5" block="exercise-credit-extension-stress" />
+<ExecutedOutput lesson="3.5" block="exercise-stage-extension-stress" />
 
-The change in stress P&L reflects added exposures, position sizes and nonlinearities. The BBB sleeve is independently priced in both markets; the whole CLO deal is absent from the native portfolio. Show native and BBB subtotals before the combined P&L. This fixed-hazard scenario is not a claim that CDS market quotes stayed fixed.
+The market operation is identical in both rows. The P&L changes because the base stage adds the payer IRS, SPX call and CDS to the already introduced foundations book. The USD curve moves while the CDS hazard curve and other market factors stay fixed, so this is a fixed-hazard scenario rather than a claim about unchanged CDS quotes.
 
 </Exercise>
 

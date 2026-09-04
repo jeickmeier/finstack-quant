@@ -6,6 +6,7 @@ from pathlib import Path
 from check_curriculum import check_evidence
 from common import digest
 from materialize_notebook_blocks import materialize_lesson, render_notebook_blocks
+from publication_source import assertion_count, without_assertions
 import pytest
 from run_lesson_snippets import extract_blocks
 
@@ -42,7 +43,8 @@ def test_exact_cell_text_and_prose_survive_idempotent_materialization(tmp_path: 
     rendered = render_notebook_blocks(before, record(), tmp_path)
     assert rendered.startswith("Intro with CRLF.\r\n")
     assert rendered.endswith("\r\n<Exercise>Hand-authored prose.</Exercise>\r\n")
-    assert extract_blocks(rendered)[0].code == code
+    assert extract_blocks(rendered)[0].code == without_assertions(code)
+    assert assertion_count(extract_blocks(rendered)[0].code) == 0
     assert "````python exec id=proof role=build" in rendered
     assert '{/* notebook-block notebook="lab.ipynb" cell="proof" role="build" */}' in rendered
     assert render_notebook_blocks(rendered, record(), tmp_path) == rendered
@@ -111,6 +113,17 @@ def test_duplicate_cells_includes_and_authored_ids_are_rejected(tmp_path: Path) 
 
 
 @pytest.mark.parametrize(
+    "statement",
+    ["raise AssertionError('visible validation')", "raise builtins.AssertionError('visible validation')"],
+)
+def test_displayed_python_rejects_explicit_assertion_error(statement: str) -> None:
+    text = f"```python exec id=proof role=build\nif False:\n    {statement}\n```\n"
+
+    with pytest.raises(ValueError, match="explicit raise AssertionError"):
+        extract_blocks(text)
+
+
+@pytest.mark.parametrize(
     "text",
     [
         '<!-- notebook-block notebook="lab.ipynb" cell="proof" role="build" -->\n',
@@ -153,15 +166,155 @@ def test_setup_cells_are_displayed_but_build_and_each_exercise_need_checks(tmp_p
 def test_snippet_runner_materializes_before_execution(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import run_lesson_snippets as runner
 
-    write_notebook(tmp_path, [tagged_cell(code="value = 41 + 1\nassert value == 42\nprint(value)\n")])
+    notebooks = tmp_path / "notebooks"
+    notebooks.mkdir()
+    write_notebook(notebooks, [tagged_cell(code="value = 41 + 1\nassert value == 42\nprint(value)\n")])
     path = tmp_path / "lesson.mdx"
-    path.write_text(
-        "---\nstatus: published\n---\n\n" + region() + '<ExecutedOutput lesson="2.6" block="proof" />\n'
-    )
+    path.write_text("---\nstatus: published\n---\n\n" + region() + '<ExecutedOutput lesson="2.6" block="proof" />\n')
     monkeypatch.setattr(runner, "CONTENT", tmp_path)
-    monkeypatch.setattr(runner, "NOTEBOOKS", tmp_path)
+    monkeypatch.setattr(runner, "NOTEBOOKS", notebooks)
     monkeypatch.setattr(runner, "BUILD", tmp_path / ".build")
     result = runner.run_lesson(record(), timeout=30)
     assert result["status"] == "passed"
     assert result["blocks"][0]["stdout"] == "42\n"
+    assert result["canonical_validation"]["status"] == "passed"
+    assert result["canonical_validation"]["assertions"] == 1
     assert result["source_sha256"] == digest(path)
+    assert assertion_count(extract_blocks(path.read_text())[0].code) == 0
+    assert "assert value == 42" in (notebooks / "lab.ipynb").read_text()
+
+
+def test_snippet_runner_executes_hidden_canonical_assertions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import run_lesson_snippets as runner
+
+    notebooks = tmp_path / "notebooks"
+    notebooks.mkdir()
+    write_notebook(notebooks, [tagged_cell(code="value = 41 + 1\nassert value == 41\nprint(value)\n")])
+    path = tmp_path / "lesson.mdx"
+    path.write_text("---\nstatus: published\n---\n\n" + region() + '<ExecutedOutput lesson="2.6" block="proof" />\n')
+    monkeypatch.setattr(runner, "CONTENT", tmp_path)
+    monkeypatch.setattr(runner, "NOTEBOOKS", notebooks)
+    monkeypatch.setattr(runner, "BUILD", tmp_path / ".build")
+
+    with pytest.raises(RuntimeError, match="AssertionError"):
+        runner.run_lesson(record(), timeout=30)
+    assert assertion_count(extract_blocks(path.read_text())[0].code) == 0
+
+
+def test_snippet_runner_rejects_an_obviously_mutating_assertion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import run_lesson_snippets as runner
+
+    code = "items = []\nassert items.append(1) is None\nprint(items[0])\n"
+    write_notebook(tmp_path, [tagged_cell(code=code)])
+    path = tmp_path / "lesson.mdx"
+    path.write_text("---\nstatus: published\n---\n\n" + region() + '<ExecutedOutput lesson="2.6" block="proof" />\n')
+    monkeypatch.setattr(runner, "CONTENT", tmp_path)
+    monkeypatch.setattr(runner, "NOTEBOOKS", tmp_path)
+    monkeypatch.setattr(runner, "BUILD", tmp_path / ".build")
+
+    with pytest.raises(ValueError, match=r"assertions must be observational; append\(\)"):
+        runner.run_lesson(record(), timeout=30)
+    assert not (tmp_path / ".build/snippets/2.6.json").exists()
+
+
+def test_snippet_runner_strips_assertions_from_declared_dynamic_dependency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import run_lesson_snippets as runner
+
+    notebooks = tmp_path / "notebooks"
+    notebooks.mkdir()
+    dependency = notebooks / "dependency.ipynb"
+    dependency.write_text(
+        json.dumps({
+            "cells": [
+                {
+                    "cell_type": "code",
+                    "metadata": {},
+                    "source": [
+                        "items = []\n",
+                        "def populate():\n",
+                        "    items.append('canonical')\n",
+                        "    return True\n",
+                        "assert populate()\n",
+                        "dependency_value = len(items)\n",
+                    ],
+                }
+            ],
+            "metadata": {},
+        })
+    )
+    code = """import json
+from pathlib import Path
+import sys
+
+dependency_path = next(
+    Path(entry) / "dependency.ipynb"
+    for entry in sys.path
+    if (Path(entry) / "dependency.ipynb").is_file()
+)
+dependency_notebook = json.loads(dependency_path.read_text())
+dependency_scope = {}
+for dependency_cell in dependency_notebook["cells"]:
+    dependency_source = dependency_cell["source"]
+    if isinstance(dependency_source, list):
+        dependency_source = "".join(dependency_source)
+    exec(compile(dependency_source, str(dependency_path), "exec"), dependency_scope)
+dependency_value = dependency_scope["dependency_value"]
+print(dependency_value)
+assert dependency_value == 1
+"""
+    notebook = write_notebook(notebooks, [tagged_cell(code=code)])
+    payload = json.loads(notebook.read_text())
+    payload["metadata"] = {"analyst_dependencies": [dependency.name]}
+    notebook.write_text(json.dumps(payload))
+    path = tmp_path / "lesson.mdx"
+    path.write_text("---\nstatus: published\n---\n\n" + region() + '<ExecutedOutput lesson="2.6" block="proof" />\n')
+    monkeypatch.setattr(runner, "CONTENT", tmp_path)
+    monkeypatch.setattr(runner, "NOTEBOOKS", notebooks)
+    monkeypatch.setattr(runner, "BUILD", tmp_path / ".build")
+
+    materialize_lesson(record(), tmp_path, notebooks)
+    displayed = extract_blocks(path.read_text())
+    canonical = runner.canonical_execution_blocks(record(), displayed, notebooks)
+    with runner.publication_notebook_root(record(), notebooks) as published_notebooks:
+        published_result = runner.run_process("2.6", displayed, ["proof"], 30, published_notebooks)
+    canonical_result = runner.run_process("2.6", canonical, ["proof"], 30, notebooks, publish_assets=False)
+
+    assert published_result[0]["stdout"] == "0\n"
+    assert canonical_result[0]["stdout"] == "1\n"
+    with pytest.raises(RuntimeError, match="canonical checks change learner-visible results"):
+        runner.run_lesson(record(), timeout=30)
+
+    assert not (tmp_path / ".build/snippets/2.6.json").exists()
+    assert "assert populate()" in dependency.read_text()
+
+
+def test_publication_projection_includes_resources_but_only_mapped_notebooks(tmp_path: Path) -> None:
+    import run_lesson_snippets as runner
+
+    notebook_root = tmp_path / "notebooks"
+    lesson_dir = notebook_root / "02_pricing"
+    lesson_dir.mkdir(parents=True)
+    notebook = lesson_dir / "lab.ipynb"
+    notebook.write_text(json.dumps({"cells": [], "metadata": {"analyst_dependencies": []}}))
+    (lesson_dir / "credit_factor_hierarchy.json").write_text('{"root": "credit"}\n')
+    future = lesson_dir / "future_lesson.ipynb"
+    future.write_text(json.dumps({"cells": [], "metadata": {"analyst_dependencies": []}}))
+    lesson = {
+        "id": "3.2",
+        "path": "lesson.mdx",
+        "labs": ["02_pricing/lab.ipynb"],
+        "examples": [],
+    }
+
+    with runner.publication_notebook_root(lesson, notebook_root) as projected:
+        resource = projected / "02_pricing/credit_factor_hierarchy.json"
+        assert json.loads(resource.read_text()) == {"root": "credit"}
+        assert (projected / "02_pricing/lab.ipynb").is_file()
+        assert not (projected / "02_pricing/future_lesson.ipynb").exists()
+
+    assert notebook.is_file()
+    assert future.is_file()

@@ -17,6 +17,7 @@ from common import (
     curriculum,
     digest,
     fixture_digest,
+    lesson_notebook_names,
     runtime_identity,
     write_json,
 )
@@ -93,7 +94,7 @@ def verify(require_execution: bool = True) -> dict:
         if identifier not in records:
             continue
         record = records[identifier]
-        allowed = set(record.get("labs", []) + record.get("examples", []))
+        allowed = set(lesson_notebook_names(record))
         errors.extend(
             f"{identifier}: missing contract field {field}"
             for field in (

@@ -328,7 +328,7 @@
       "base-book-scenario",
       "quote-composite-and-history",
       "exercise-twist",
-      "exercise-credit-extension-stress"
+      "exercise-stage-extension-stress"
     ],
     "source_cells": [
       {
@@ -348,7 +348,7 @@
       },
       {
         "notebook": "06_scenarios/scenarios_and_stress_testing.ipynb",
-        "id": "exercise-credit-extension-stress",
+        "id": "exercise-stage-extension-stress",
         "role": "exercise"
       }
     ],
@@ -360,7 +360,6 @@
       "_shared.analyst_book.calibration_envelope",
       "_shared.analyst_book.instruments",
       "_shared.analyst_history.history_market",
-      "_shared.analyst_tracks",
       "finstack_quant.calibration.calibrate",
       "finstack_quant.portfolio.Portfolio",
       "finstack_quant.portfolio.replay_portfolio",
@@ -374,8 +373,7 @@
       "finstack_quant.scenarios.compose_scenarios",
       "finstack_quant.scenarios.compute_horizon_return",
       "finstack_quant.scenarios.list_builtin_templates",
-      "finstack_quant.scenarios.validate_scenario_spec",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_metrics"
+      "finstack_quant.scenarios.validate_scenario_spec"
     ],
     "models": [],
     "metrics": [],

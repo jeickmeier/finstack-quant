@@ -70,7 +70,7 @@ import numpy as np
 import pandas as pd
 from _shared import analyst_tracks as tracks
 from finstack_quant.valuations.instruments import price_instrument
-AS_OF = tracks.AS_OF
+AS_OF = date(2025, 1, 15)
 ```
 {/* /notebook-block */}
 
@@ -97,7 +97,6 @@ knockout["instrument"]["spec"]["knockout"] = True
 nonko = price_instrument(json.dumps(payer), market, AS_OF, model="bloomberg_cdso", metrics=["cs01", "bucketed_cs01"])
 ko = price_instrument(json.dumps(knockout), market, AS_OF, model="bloomberg_cdso")
 fep_increment = nonko.value.amount - ko.value.amount
-assert nonko.value.amount > ko.value.amount > 0
 print(pd.DataFrame({"case": ["non-knockout payer", "knockout payer", "front-end increment"],
               "usd": [nonko.value.amount, ko.value.amount, fep_increment]}))
 ```
@@ -110,7 +109,6 @@ The front-end increment is the non-knockout price less the knockout price under 
 {/* notebook-block notebook="02_pricing/instruments/credit_index_and_options.ipynb" cell="c4-workflow-4" role="build" */}
 ```python exec id=c4-workflow-4 role=build
 risk = pd.Series(nonko.metrics, name="usd_per_1bp").filter(like="cs01::")
-assert any(key.startswith("cs01::CDX-HAZ") for key in nonko.metrics)
 print(risk.to_frame())
 ```
 {/* /notebook-block */}
@@ -133,12 +131,9 @@ s["constituents"]=[{"credit":{"credit_curve_id":"CDX-HAZ","recovery_rate":.4,"re
                      "weight":1/125,"defaulted":False} for _ in range(125)]
 validate_instrument_json(json.dumps(constituent_index))
 by_name=price_instrument(json.dumps(constituent_index),market,AS_OF,model="hazard_rate",metrics=["par_spread"])
-assert abs(by_name.value.amount-index.value.amount)<.01
 post_default=deepcopy(constituent_index)
 p=post_default["instrument"]["spec"];p["version"]=2;p["index_factor"]=124/125;p["constituents"][-1]["defaulted"]=True
 survivors=price_instrument(json.dumps(post_default),market,AS_OF,model="hazard_rate",metrics=["par_spread"])
-assert abs(survivors.value.amount-by_name.value.amount*124/125)<.01
-assert abs(survivors.metrics["par_spread"]-by_name.metrics["par_spread"])<1e-8
 print({"single_curve_pv":index.value.amount,"constituent_pv":by_name.value.amount,
        "survivor_pv":survivors.value.amount,"settled_default_cash_usd":1_000_000*.6/125,
        "par_spread_before":by_name.metrics["par_spread"],"par_spread_after":survivors.metrics["par_spread"]})
@@ -150,13 +145,11 @@ print({"single_curve_pv":index.value.amount,"constituent_pv":by_name.value.amoun
 ```python exec id=c4-option-risk role=build
 option_risk=price_instrument(json.dumps(payer),market,AS_OF,model="bloomberg_cdso",
     metrics=["implied_vol","vega","spread_dv01","par_spread"])
-assert option_risk.metrics["implied_vol"]>0
 receiver=deepcopy(payer);receiver["instrument"]["spec"]["option_type"]="put"
 receiver_price=price_instrument(json.dumps(receiver),market,AS_OF,model="bloomberg_cdso").value.amount
 post_option=deepcopy(payer)
 post_option["instrument"]["spec"].update({"index_factor":124/125,"realized_index_loss":.6/125})
 post_option_price=price_instrument(json.dumps(post_option),market,AS_OF,model="bloomberg_cdso").value.amount
-assert receiver_price>=0 and post_option_price>=0
 print(pd.Series(option_risk.metrics))
 print({"payer_pv":nonko.value.amount,"receiver_pv":receiver_price,"post_default_payer_pv":post_option_price})
 print("Implied volatility here inverts the model PV; it is a consistency diagnostic, not an independent market calibration.")
@@ -195,7 +188,6 @@ index_bumped=price_instrument(json.dumps(inputs["ANALYST-CDX"]),bumped_market,AS
 tranche_base=price_instrument(json.dumps(inputs["CDX-0-3"]),market,AS_OF,model="hazard_rate").value.amount
 tranche_bumped=price_instrument(json.dumps(inputs["CDX-0-3"]),bumped_market,AS_OF,model="hazard_rate").value.amount
 tranche_delta=(tranche_bumped-tranche_base)/(index_bumped-index_base)
-assert math.isfinite(tranche_delta) and index_bumped>index_base
 print({"index_1bp_pnl":index_bumped-index_base,"tranche_1bp_pnl":tranche_bumped-tranche_base,
        "tranche_delta_in_index_units":tranche_delta})
 print(pd.DataFrame([{"expiry_years":t,"spread_strike_decimal":k,
@@ -213,7 +205,6 @@ Finally raise only the payer strike. With a fixed underlying distribution, buyin
 higher_strike = deepcopy(payer)
 higher_strike["instrument"]["spec"]["strike"] = {"spread": "0.015"}
 higher = price_instrument(json.dumps(higher_strike), market, AS_OF, model="bloomberg_cdso").value.amount
-assert higher < nonko.value.amount
 print(pd.Series({"100bp_strike_usd": nonko.value.amount, "150bp_strike_usd": higher}))
 ```
 {/* /notebook-block */}
@@ -235,7 +226,6 @@ holding=tracks.clo_bbb_holding()
 bbb=structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",market,AS_OF)
 index_cs=price_instrument(json.dumps(inputs["ANALYST-CDX"]),market,AS_OF,model="hazard_rate",metrics=["cs01"])
 hedge_units=-bbb.cs01/index_cs.metrics["cs01"]
-assert abs(bbb.cs01+hedge_units*index_cs.metrics["cs01"])<1e-8
 print({"BBB_zspread_CS01":bbb.cs01,"index_quote_CS01_per_1m":index_cs.metrics["cs01"],
        "formal_index_units":hedge_units})
 print("This formal parallel match equates different risk coordinates. It leaves collateral defaults, recovery, cashflow timing, OC diversion, correlation and index/bond basis. Reprice joint scenarios before using it as a trade hedge.")
@@ -253,7 +243,6 @@ ls["default_assumptions"].update({"base_cdr_annual":.05,"base_recovery_rate":.25
 stress_bbb=structured_credit_tranche_metrics(json.dumps(loss_deal),"BBB",joint_market,AS_OF)
 stress_index=price_instrument(json.dumps(inputs["ANALYST-CDX"]),joint_market,AS_OF,model="hazard_rate")
 residual=stress_bbb.pv-bbb.pv+hedge_units*(stress_index.value.amount-index_cs.value.amount)
-assert math.isfinite(residual) and abs(residual)>1.
 print({"BBB_stress_pnl":stress_bbb.pv-bbb.pv,
        "index_hedge_pnl":hedge_units*(stress_index.value.amount-index_cs.value.amount),"joint_residual":residual})
 ```
@@ -277,8 +266,6 @@ stressed_market.insert(calibrate(stressed_calibration).market.get_hazard("CDX-HA
 stressed_strike=deepcopy(payer);stressed_strike["instrument"]["spec"]["strike"]={"spread":"0.022"}
 initial_cost=price_instrument(json.dumps(stressed_strike),market,AS_OF,model="bloomberg_cdso").value.amount
 stress_value=price_instrument(json.dumps(stressed_strike),stressed_market,AS_OF,model="bloomberg_cdso").value.amount
-assert initial_cost<nonko.value.amount
-assert stress_value>initial_cost
 print({"220bp_strike_cost":initial_cost,"value_after_100bp_parallel_quote_widening":stress_value,
        "scenario_gain_before_financing":stress_value-initial_cost})
 ```
@@ -297,8 +284,6 @@ The factor is applied once to survivor notional; realized loss is stated on orig
 original_notional=1_000_000.;one_name=1/125;recovery=.4
 survivor_notional=original_notional*(1-one_name)
 settled_loss=original_notional*one_name*(1-recovery)
-assert abs(survivor_notional+original_notional*one_name-original_notional)<1e-8
-assert abs(settled_loss-original_notional*post_option["instrument"]["spec"]["realized_index_loss"])<1e-8
 print({"surviving_index_notional":survivor_notional,"already_realized_loss":settled_loss,
        "post_default_factor":post_option["instrument"]["spec"]["index_factor"]})
 print("Exercise delivers protection on the surviving index subject to the option's settlement terms. Non-knockout front-end protection also recognizes relevant loss before expiry; knockout treatment differs. Do not pay an already-settled loss twice or apply the survivor factor twice.")

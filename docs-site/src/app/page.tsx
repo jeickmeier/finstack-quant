@@ -2,12 +2,12 @@ import Link from 'next/link';
 import { ArrowDown, ArrowRight, ArrowUpRight, BookOpen, FlaskConical } from 'lucide-react';
 import { BrandLink } from '@/components/brand';
 import { SiteControls } from '@/components/site-controls';
-import { getLessons, groups } from '@/lib/curriculum';
+import { getLessonLabs, getLessons, groups } from '@/lib/curriculum';
 
 export default function OverviewPage() {
   const lessons = getLessons();
   const published = lessons.filter((lesson) => lesson.status === 'published').length;
-  const labCount = new Set(lessons.flatMap((lesson) => lesson.labs)).size;
+  const labCount = new Set(lessons.flatMap(getLessonLabs)).size;
 
   return <div className="program-shell">
     <header className="program-header"><BrandLink /><nav aria-label="Main navigation"><a href="#curriculum">Curriculum</a><Link href="/labs">Labs</Link><Link href="/docs/setup">Setup</Link></nav><SiteControls /></header>

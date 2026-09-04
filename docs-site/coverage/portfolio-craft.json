@@ -178,12 +178,12 @@
       },
       {
         "original_group": "b",
-        "original_requirement": "Compare identical stress on base versus native credit extension plus separately repriced BBB",
+        "original_requirement": "Compare the identical discount-curve stress on the foundations and base stages and identify the added positions",
         "notebook": "06_scenarios/scenarios_and_stress_testing.ipynb",
-        "cell_id": "exercise-credit-extension-stress",
+        "cell_id": "exercise-stage-extension-stress",
         "role": "exercise",
         "status": "proven",
-        "solution_and_assertions": "Complete source solution and financial assertions appear in the tagged notebook cell and displayed lesson."
+        "solution_and_assertions": "The tagged source displays both stage values, P&L, added positions and reconciliation; private acceptance checks gate the numerical result."
       }
     ],
     "authoring_started_utc": "2026-09-03T03:50:00Z",

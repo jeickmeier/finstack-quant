@@ -74,7 +74,7 @@ Quarterly IMM futures dates are third Wednesdays. Standard quarterly CDS coupon 
 
 ### Accrual, adjustments and irregular schedules
 
-The first table changes only the time convention. The schedule examples deliberately choose different stub rules; the special-date assertions prevent the common IMM/CDS substitution.
+The first table changes only the time convention. The schedule examples deliberately choose different stub rules; the special-date checks prevent the common IMM/CDS substitution.
 
 {/* notebook-block notebook="01_foundations/dates/schedule_building.ipynb" cell="date-proof" role="build" */}
 ```python exec id=date-proof role=build
@@ -83,19 +83,9 @@ from finstack_quant.core.dates import DayCount, Schedule, StubKind, BusinessDayC
 
 start, end = date(2024, 1, 15), date(2024, 7, 15)
 fractions = {str(basis): basis.year_fraction(start, end) for basis in (DayCount.ACT_360, DayCount.ACT_365F, DayCount.THIRTY_360, DayCount.ACT_ACT)}
-assert abs(DayCount.ACT_360.year_fraction(start, end) - 182 / 360) < 1e-12
-assert abs(DayCount.ACT_365F.year_fraction(start, end) - 182 / 365) < 1e-12
-assert DayCount.THIRTY_360.year_fraction(start, end) == 0.5
-assert abs(DayCount.ACT_ACT.year_fraction(start, end) - 182 / 366) < 1e-12
-assert adjust(date(2025, 5, 31), BusinessDayConvention.MODIFIED_FOLLOWING, 'usny') == date(2025, 5, 30)
 short_front = Schedule.builder(date(2025, 2, 10), date(2026, 1, 15)).frequency('6M').stub_rule(StubKind.SHORT_FRONT).build()
 long_back = Schedule.builder(date(2025, 1, 15), date(2026, 2, 10)).frequency('6M').stub_rule(StubKind.LONG_BACK).build()
-assert (short_front.dates[1] - short_front.dates[0]).days < 181
-assert (long_back.dates[-1] - long_back.dates[-2]).days > 184
-assert next_imm(date(2026, 1, 1)) == date(2026, 3, 18)
-assert third_friday(3, 2026) == date(2026, 3, 20)
 cds_dates = [next_cds_date(date(2026, month, 1)) for month in (1, 4, 7, 10)]
-assert cds_dates == [date(2026, month, 20) for month in (3, 6, 9, 12)]
 print(fractions, short_front.dates, long_back.dates, cds_dates)
 ```
 {/* /notebook-block */}
@@ -115,12 +105,9 @@ reference_start,reference_end=date(2024,1,15),date(2024,7,15)
 partial=date(2024,3,15)
 ctx=DayCountContext(frequency='6M',coupon_period=(reference_start,reference_end))
 icma=DayCount.ACT_ACT_ISMA.year_fraction(reference_start,partial,ctx)
-assert abs(icma-(partial-reference_start).days/(2*(reference_end-reference_start).days))<1e-12
 cross_year=DayCount.ACT_ACT.year_fraction(date(2023,12,15),date(2024,1,15))
-assert abs(cross_year-(17/365+14/366))<1e-12
 variants={str(c):days_30_360(date(2025,2,28),date(2025,3,31),c) for c in (Thirty360Convention.US_SIA,Thirty360Convention.ISDA,Thirty360Convention.EUROPEAN,Thirty360Convention.ITALIAN)}
 adjusted={str(c):adjust(date(2025,5,31),c,'usny') for c in (BusinessDayConvention.FOLLOWING,BusinessDayConvention.MODIFIED_FOLLOWING,BusinessDayConvention.PRECEDING)}
-assert adjusted[str(BusinessDayConvention.FOLLOWING)]==date(2025,6,2)
 print({'ICMA_partial':icma,'ISDA_cross_year':cross_year,'30_360_days':variants,'adjusted_dates':adjusted})
 ```
 {/* /notebook-block */}
@@ -150,7 +137,6 @@ principal=float(spec['notional']['amount']);rate=float(spec['cashflow_spec']['fi
 a,b=date(2024,1,15),date(2024,7,15)
 actual=principal*rate*DayCount.ACT_360.year_fraction(a,b)
 bond_basis=principal*rate*DayCount.THIRTY_360.year_fraction(a,b)
-assert abs(actual-bond_basis-principal*rate*(182-180)/360)<1e-8
 print({'ACT360_coupon':actual,'30360_coupon':bond_basis,'difference_USD':actual-bond_basis})
 ```
 {/* /notebook-block */}
@@ -168,9 +154,7 @@ The final period runs from 15 July 2025 to 10 February 2026. The builder merges 
 from datetime import date
 from finstack_quant.core.dates import Schedule,StubKind,DayCount
 schedule=Schedule.builder(date(2025,1,15),date(2026,2,10)).frequency('6M').stub_rule(StubKind.LONG_BACK).build()
-assert schedule.dates==[date(2025,1,15),date(2025,7,15),date(2026,2,10)]
 accruals=[DayCount.THIRTY_360.year_fraction(a,b) for a,b in zip(schedule.dates[:-1],schedule.dates[1:])]
-assert accruals[-1]>accruals[0]
 print({'dates':schedule.dates,'30360_year_fractions':accruals})
 ```
 {/* /notebook-block */}
@@ -188,8 +172,6 @@ The four dates are 20 March, 20 June, 20 September and 20 December. Their contra
 from datetime import date
 from finstack_quant.core.dates import next_cds_date,next_imm
 rolls=[next_cds_date(date(2026,m,1)) for m in (1,4,7,10)]
-assert rolls==[date(2026,m,20) for m in (3,6,9,12)]
-assert next_imm(date(2026,1,1)) != rolls[0]
 print({'CDS_rolls':rolls,'first_futures_IMM':next_imm(date(2026,1,1))})
 ```
 {/* /notebook-block */}

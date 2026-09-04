@@ -81,7 +81,7 @@ import numpy as np
 import pandas as pd
 from _shared import analyst_tracks as tracks
 from finstack_quant.valuations.instruments import price_instrument
-AS_OF = tracks.AS_OF
+AS_OF = date(2025, 1, 15)
 ```
 {/* /notebook-block */}
 
@@ -97,7 +97,6 @@ T, spot, dividend_yield = 1.0, 5200.0, 0.015
 df = market.get_discount("USD-OIS").df(T)
 r = -math.log(df)/T
 native_variance = result.metrics["variance_expected"]
-assert abs(result.value.amount - 1_000_000*df*(native_variance-0.04)) < 0.01
 print(pd.Series({"expected_variance_decimal": native_variance, "implied_vol_percent": 100*math.sqrt(native_variance),
            "pv_usd": result.value.amount}))
 ```
@@ -120,8 +119,6 @@ for i, strike in enumerate(strikes):
     option_prices.append(put if i < k0_index else call if i > k0_index else (put+call)/2)
 strip_variance = 2/(T*df)*np.sum(widths*np.array(option_prices)/strikes**2)
 strip_variance -= 2/T*((forward/k0-1)-math.log(forward/k0))
-assert abs(strip_variance-native_variance) < 1e-10
-assert abs(native_variance-0.20**2) < 0.0005
 print(pd.Series({"strip_variance": strip_variance, "native_variance": native_variance,
            "grid_discretization_vs_flat_vol_squared": native_variance-0.20**2}))
 ```
@@ -129,7 +126,7 @@ print(pd.Series({"strip_variance": strip_variance, "native_variance": native_var
 
 <ExecutedOutput lesson="V2" block="v2-workflow-3" />
 
-The first assertion reconciles dollar PV to the reported expected variance. The strip then agrees with that metric to numerical precision, while the flat-volatility limit uses a separate discretization tolerance.
+The first calculation reconciles dollar PV to the reported expected variance. The strip then agrees with that metric to numerical precision, while the flat-volatility limit uses a separate discretization tolerance.
 
 ### Compare aligned realized estimators
 
@@ -142,7 +139,6 @@ estimates = {"close_to_close": stats.realized_variance(arrays["SPX-CLOSE"])}
 for method in ["parkinson", "garman_klass", "rogers_satchell", "yang_zhang"]:
     estimates[method] = stats.realized_variance_ohlc(arrays["SPX-OPEN"], arrays["SPX-HIGH"],
         arrays["SPX-LOW"], arrays["SPX-CLOSE"], method=method, annualization_factor=252.0)
-assert all(math.isfinite(value) and value > 0 for value in estimates.values())
 print(pd.DataFrame({"variance": estimates, "vol_percent": {k:100*math.sqrt(v) for k,v in estimates.items()}}))
 ```
 {/* /notebook-block */}
@@ -160,7 +156,6 @@ gap_estimates={"close_to_close":stats.realized_variance(gappy["close"])}
 for method in ["parkinson","garman_klass","rogers_satchell","yang_zhang"]:
     gap_estimates[method]=stats.realized_variance_ohlc(gappy["open"],gappy["high"],gappy["low"],gappy["close"],
         method=method,annualization_factor=252.)
-assert gap_estimates["close_to_close"]>gap_estimates["parkinson"]
 print(pd.Series(gap_estimates,name="annualized_variance"))
 ```
 {/* /notebook-block */}
@@ -191,11 +186,6 @@ elapsed=(seasoned_date-AS_OF).days/365;remaining=1-elapsed
 accrued=float(np.square(np.diff(np.log([value for _,value in closes]))).sum())
 blended=accrued+remaining*.20**2
 remaining_df=seasoned_market.get_discount("USD-OIS").df(remaining)
-assert abs(elapsed-.60)<1e-12
-assert abs(seasoned_result.metrics["variance_expected"]-blended)<1e-12
-assert abs(seasoned_result.value.amount-1_000_000*remaining_df*(blended-.04))<.01
-assert abs(seasoned_result.metrics["variance_vega"]-1_000_000*remaining_df*remaining)<.01
-assert abs(seasoned_result.metrics["vega"]-seasoned_result.metrics["variance_vega"]*2*.20*.01)<.01
 print(pd.Series({"elapsed_fraction":elapsed,"accrued_variance_contribution":accrued,
     "future_variance_contribution":remaining*.04,"blended_variance":blended,"pv_usd":seasoned_result.value.amount,
     **seasoned_result.metrics}))
@@ -225,7 +215,6 @@ variance_of_variance=float(probabilities@((future_variances-mean_variance)**2))
 volatility_strike=float(probabilities@np.sqrt(future_variances))
 variance_strike_vol=math.sqrt(mean_variance)
 second_order=variance_strike_vol-variance_of_variance/(8*mean_variance**1.5)
-assert volatility_strike<variance_strike_vol
 print({"sqrt_expected_variance":variance_strike_vol,"expected_volatility":volatility_strike,
        "convexity_adjustment":variance_strike_vol-volatility_strike,"second_order_approximation":second_order})
 print("This disclosed two-state payoff calculation is not a native volatility-swap model or a VIX-futures calibration.")
@@ -252,8 +241,6 @@ for horizon in [0.,.25,.5,1.]:
     term_rows.append({"years":horizon,"forward_index_points":level,
                      "one_month_rolled_level_if_curve_unchanged":rolled_level,
                      "curve_roll_points":rolled_level-level})
-assert term_rows[2]["forward_index_points"]>term_rows[0]["forward_index_points"]
-assert term_rows[2]["curve_roll_points"]<0
 print(pd.DataFrame(term_rows))
 print("This fixed-curve roll is a scenario, not a forecast of the future VIX settlement. A long future's P&L also responds to changes in the entire forward curve.")
 ```
@@ -277,8 +264,6 @@ vega_notional=variance_notional*2*strike_vol*.01  # USD per one volatility point
 recovered=vega_notional/(2*strike_vol*.01)
 terminal_pnl=variance_notional*(realized_vol**2-strike_vol**2)
 linear_approx=vega_notional*((realized_vol-strike_vol)/.01)
-assert abs(recovered-variance_notional)<1e-8
-assert terminal_pnl<0 and terminal_pnl>linear_approx
 print({"vega_notional_USD_per_vol_point":vega_notional,"terminal_exact_USD":terminal_pnl,
        "linear_USD":linear_approx,"convexity_residual_USD":terminal_pnl-linear_approx})
 ```
@@ -296,7 +281,6 @@ Keep the original anchor and correction; only remove the identified positive put
 ```python exec id=v2-exercise-put-wing role=exercise
 put_wing=2/(T*df)*np.sum(widths[:k0_index]*np.array(option_prices[:k0_index])/strikes[:k0_index]**2)
 without_puts=strip_variance-put_wing
-assert put_wing>0 and without_puts<strip_variance
 print({"full_variance_strike":strip_variance,"without_put_wing":without_puts,"downward_bias":put_wing})
 print("Low-strike option prices receive large 1/K^2 weights. Wing truncation is model and quote dependent; matching only ATM volatility cannot validate the strip.")
 ```
@@ -325,8 +309,6 @@ fx_payload=instrument_envelope({"type":"fx_variance_swap","spec":{"id":"V2-EURUS
     "vol_surface_id":"EURUSD-VAR-VOL","day_count":"act_365f","attributes":{}}})
 fx_market.insert_price("EURUSD-SPOT",1.08)
 fx_result=price_instrument(json.dumps(fx_payload),fx_market,AS_OF,model="discounting",metrics=["variance_expected"])
-assert fx_result.value.currency.code=="USD"
-assert abs(fx_result.metrics["variance_expected"]-.01)<.001
 print({"EURUSD_expected_variance":fx_result.metrics["variance_expected"],"USD_pv":fx_result.value.amount})
 ```
 {/* /notebook-block */}

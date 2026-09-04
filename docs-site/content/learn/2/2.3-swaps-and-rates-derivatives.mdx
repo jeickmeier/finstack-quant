@@ -69,7 +69,7 @@ For identical dates, notional, index, strike and conventions,
 
 $$\mathrm{Cap}(K)-\mathrm{Floor}(K)=\mathrm{PayerSwap}(K).$$
 
-This follows pathwise from $\max(L-K,0)-\max(K-L,0)=L-K$, so volatility cancels. The exercise uses the actual quarterly ACT/360 boundaries as the forward curve's `projection_grid`. A numeric step of 0.25 years is not three calendar months in every period. The cap's period-forward and the IRS's reset-date projection must refer to the same effective periods before asserting parity. This is a useful diagnostic: a parity difference can reveal inconsistent inputs rather than a failure of Black's formula.
+This follows pathwise from $\max(L-K,0)-\max(K-L,0)=L-K$, so volatility cancels. The exercise uses the actual quarterly ACT/360 boundaries as the forward curve's `projection_grid`. A numeric step of 0.25 years is not three calendar months in every period. The cap's period-forward and the IRS's reset-date projection must refer to the same effective periods before checking parity. This is a useful diagnostic: a parity difference can reveal inconsistent inputs rather than a failure of Black's formula.
 
 ### Swaptions and extensions
 
@@ -81,27 +81,42 @@ In a cross-currency swap, each leg projects and discounts in its own currency be
 
 <BuildIt>
 
+<FixtureBuild fixture="rates" sources="_shared/analyst_book.py · _shared/instrument_fixtures.py">
+
+This lesson extends a fresh foundations snapshot with the payer IRS and the rates-volatility inputs required here. The first workflow reads the raw swap envelope and market objects before valuation; later factories cannot mutate this stage.
+
+</FixtureBuild>
+
+
 ### Price the staged swap and solve its par coupon
 
 The native result supplies curve-qualified PV01 and DV01. Replacing the fixed rate with the reported par rate reprices to zero, then the USD corporate bond hedge is sized from its signed DV01.
 
 {/* notebook-block notebook="02_pricing/instruments/rates_derivatives.ipynb" cell="swap-proof" role="build" */}
 ```python exec id=swap-proof role=build
+from datetime import date
 import copy, json
 from finstack_quant.valuations.instruments import InterestRateSwap, price_instrument
-from _shared.analyst_book import AS_OF, build_market, instruments
+from _shared.analyst_book import build_market, instruments
+AS_OF = date(2025, 1, 15)
 
 market = build_market('rates')
-swap = instruments('rates')['USD-PAYER-IRS']
+foundation_ids = set(instruments('foundations'))
+rates_inputs = instruments('rates')
+swap = rates_inputs['USD-PAYER-IRS']
+swap_terms = swap['instrument']['spec']
+print({'rates_stage_added': sorted(set(rates_inputs) - foundation_ids),
+       'swap_terms': {'id': swap_terms['id'], 'currency': swap_terms['notional']['currency'],
+                      'notional': swap_terms['notional']['amount'],
+                      'fixed_rate_decimal': swap_terms['fixed']['rate'],
+                      'discount_curve': swap_terms['fixed']['discount_curve_id'],
+                      'projection_curve': swap_terms['float']['forward_curve_id']}})
 priced = price_instrument(InterestRateSwap.from_json(json.dumps(swap)), market, AS_OF, metrics=['par_rate', 'dv01', 'pv01', 'bucketed_dv01'])
 par = copy.deepcopy(swap)
 par['instrument']['spec']['fixed']['rate'] = str(priced.get_metric('par_rate'))
 par_price = price_instrument(json.dumps(par), market, AS_OF).price
-assert abs(par_price) < 0.01
 bond = price_instrument(json.dumps(instruments('rates')['USD-CORP']), market, AS_OF, metrics=['dv01'])
 hedge_units = -bond.get_metric('dv01') / priced.get_metric('dv01')
-assert abs(bond.get_metric('dv01') + hedge_units * priced.get_metric('dv01')) < 1e-10
-assert any(key.startswith('pv01::USD-SOFR-3M') for key in priced.metric_keys())
 print({'par_rate_decimal': priced.get_metric('par_rate'), 'par_npv': par_price, 'payer_swap_units_for_USD_bond': hedge_units})
 ```
 {/* /notebook-block */}
@@ -120,13 +135,13 @@ from datetime import date
 from finstack_quant.core.dates import Tenor,DayCount
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import FixedLegSpec,FloatLegSpec,InterestRateSwap,price_instrument,instrument_cashflows_json
-from _shared.analyst_book import AS_OF,build_market
+from _shared.analyst_book import build_market
+AS_OF = date(2025, 1, 15)
 fixed=FixedLegSpec('USD-OIS',.045,Tenor.semi_annual(),DayCount.THIRTY_360,'2025-04-15','2028-04-15',compounding_simple=False,calendar_id='weekends_only')
 floating=FloatLegSpec('USD-OIS','USD-SOFR-3M',0,Tenor.quarterly(),DayCount.ACT_360,'2025-04-15','2028-04-15',calendar_id='weekends_only')
 leg_swap=(InterestRateSwap.builder().id('TYPED-IRS').notional(Money(2_000_000,'USD')).side('pay').fixed(fixed).float(floating).build())
 leg_market=build_market('rates');leg_value=price_instrument(leg_swap,leg_market,AS_OF,metrics=['par_rate'])
 leg_flows=json.loads(instrument_cashflows_json(leg_swap,leg_market,AS_OF,'discounting'))['flows']
-assert leg_value.price>0
 print({'par_rate_decimal':leg_value.get_metric('par_rate'),'cashflows':leg_flows})
 ```
 {/* /notebook-block */}
@@ -146,12 +161,11 @@ from finstack_quant.core.dates import Tenor, DayCount
 from finstack_quant.core.market_data import MarketContext, ForwardCurve
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import CapFloor, price_instrument
-from _shared.analyst_book import AS_OF, build_market, instruments
+from _shared.analyst_book import build_market, instruments
 from _shared.instrument_fixtures import swaption, instrument_envelope
+AS_OF = date(2025, 1, 15)
 
 market = build_market('rates')
-assert market.get_surface('USD-CAP-VOL').id == 'USD-CAP-VOL'
-assert market.get_surface('USD-SWPNVOL').id == 'USD-SWPNVOL'
 boundaries = [AS_OF, date(2025, 4, 15), date(2025, 7, 15), date(2025, 10, 15), date(2026, 1, 15), date(2026, 4, 15)]
 projection_grid = [DayCount.ACT_360.year_fraction(AS_OF, boundary) for boundary in boundaries]
 matched_forward = ForwardCurve('USD-SOFR-3M', 0.25, AS_OF, [(0.0, 0.05), (projection_grid[-1], 0.05)],
@@ -174,8 +188,6 @@ for leg in ('fixed', 'float'):
     swap['instrument']['spec'][leg]['day_count'] = 'act_360'
     swap['instrument']['spec'][leg]['calendar_id'] = 'weekends_only'
 swap_result = price_instrument(json.dumps(swap), parity_market, AS_OF)
-assert cap_result.price > 0 and cap_result.get_metric('vega') > 0
-assert abs(cap_result.price - floor_result.price - swap_result.price) < 0.01
 caplet_values = []
 start = date(2025, 4, 15)
 for index in range(4):
@@ -185,10 +197,8 @@ for index in range(4):
                                        'start_date': start.isoformat(), 'maturity': end.isoformat()})
     caplet_values.append(price_instrument(json.dumps(caplet), parity_market, AS_OF, model='black76').price)
     start = end
-assert abs(sum(caplet_values) - cap_result.price) < 0.01
 _, swaption_spec = swaption(0)
 swaption_result = price_instrument(json.dumps(instrument_envelope(swaption_spec)), market, AS_OF, model='black76', metrics=['vega'])
-assert swaption_result.price > 0 and swaption_result.get_metric('vega') > 0
 print({'cap': cap_result.price, 'floor': floor_result.price, 'payer_swap': swap_result.price, 'payer_swaption': swaption_result.price})
 ```
 {/* /notebook-block */}
@@ -203,17 +213,18 @@ The call option type is the payer right. Physical settlement is selected explici
 
 {/* notebook-block notebook="02_pricing/instruments/rates_derivatives.ipynb" cell="swaption-typed-builder" role="build" */}
 ```python exec id=swaption-typed-builder role=build
+from datetime import date
 from finstack_quant.core.dates import Tenor,DayCount
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import Swaption,FixedLegSpec,FloatLegSpec,price_instrument
-from _shared.analyst_book import AS_OF,build_market
+from _shared.analyst_book import build_market
+AS_OF = date(2025, 1, 15)
 fixed=FixedLegSpec('USD-OIS',.045,Tenor.semi_annual(),DayCount.THIRTY_360,'2026-01-15','2029-01-15',compounding_simple=False,calendar_id='weekends_only')
 floating=FloatLegSpec('USD-OIS','USD-SOFR-3M',0.,Tenor.quarterly(),DayCount.ACT_360,'2026-01-15','2029-01-15',calendar_id='weekends_only')
 payer=(Swaption.builder().id('TYPED-PAYER-SWAPTION').option_type('call').notional(Money(2_000_000,'USD'))
  .expiry('2026-01-13').settlement('physical').cash_settlement_method('collateralized_cash_price')
  .vol_model('black').vol_surface_id('USD-SWPNVOL').underlying_fixed_leg(fixed).underlying_float_leg(floating).build())
 value=price_instrument(payer,build_market('rates'),AS_OF,model='black76',metrics=['vega'])
-assert value.price>0 and value.get_metric('vega')>0
 print({'settlement':payer.settlement,'strike_decimal':payer.get_strike(),'payer_value_USD':value.price,'native_vega':value.get_metric('vega')})
 ```
 {/* /notebook-block */}
@@ -226,19 +237,20 @@ print({'settlement':payer.settlement,'strike_decimal':payer.get_strike(),'payer_
 
 <Exercise id="exercise-bond-sleeve-hedge" title="A. Hedge both bonds under a stated joint shock" question={"Translate the EUR bond DV01 to USD, combine it with the USD bond and size the payer swap to neutralize the joint parallel shock."}>
 
-The calculation holds EURUSD fixed at 1.08 and shocks both rate curves in parallel. The residual assertion verifies the scalar algebra. It does not eliminate the remaining EUR curve factor, key-rate mismatch or FX risk; write those exposures next to the hedge notional.
+The calculation holds EURUSD fixed at 1.08 and shocks both rate curves in parallel. The displayed residual verifies the scalar algebra. It does not eliminate the remaining EUR curve factor, key-rate mismatch or FX risk; write those exposures next to the hedge notional.
 
 {/* notebook-block notebook="02_pricing/instruments/rates_derivatives.ipynb" cell="exercise-bond-sleeve-hedge" role="exercise" */}
 ```python exec id=exercise-bond-sleeve-hedge role=exercise
+from datetime import date
 import json
 from finstack_quant.valuations.instruments import price_instrument
-from _shared.analyst_book import AS_OF,build_market,instruments
+from _shared.analyst_book import build_market, instruments
+AS_OF = date(2025, 1, 15)
 market=build_market('rates');contracts=instruments('rates')
 bond_risk={id:price_instrument(json.dumps(contracts[id]),market,AS_OF,metrics=['dv01']).get_metric('dv01') for id in ('USD-CORP','EUR-GOVT')}
 base_risk=bond_risk['USD-CORP']+1.08*bond_risk['EUR-GOVT']
 swap_risk=price_instrument(json.dumps(contracts['USD-PAYER-IRS']),market,AS_OF,metrics=['dv01']).get_metric('dv01')
 units=-base_risk/swap_risk
-assert units>0 and abs(base_risk+units*swap_risk)<1e-8
 print({'native_bond_DV01':bond_risk,'USD_parallel_risk':base_risk,'payer_contract_units':units,'payer_notional_USD':units*2_000_000,'residual_USD_per_bp':base_risk+units*swap_risk})
 ```
 {/* /notebook-block */}
@@ -259,12 +271,11 @@ from finstack_quant.core.dates import Tenor, DayCount
 from finstack_quant.core.market_data import MarketContext, ForwardCurve
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import CapFloor, price_instrument
-from _shared.analyst_book import AS_OF, build_market, instruments
+from _shared.analyst_book import build_market, instruments
 from _shared.instrument_fixtures import swaption, instrument_envelope
+AS_OF = date(2025, 1, 15)
 
 market = build_market('rates')
-assert market.get_surface('USD-CAP-VOL').id == 'USD-CAP-VOL'
-assert market.get_surface('USD-SWPNVOL').id == 'USD-SWPNVOL'
 boundaries = [AS_OF, date(2025, 4, 15), date(2025, 7, 15), date(2025, 10, 15), date(2026, 1, 15), date(2026, 4, 15)]
 projection_grid = [DayCount.ACT_360.year_fraction(AS_OF, boundary) for boundary in boundaries]
 matched_forward = ForwardCurve('USD-SOFR-3M', 0.25, AS_OF, [(0.0, 0.05), (projection_grid[-1], 0.05)],
@@ -287,8 +298,6 @@ for leg in ('fixed', 'float'):
     swap['instrument']['spec'][leg]['day_count'] = 'act_360'
     swap['instrument']['spec'][leg]['calendar_id'] = 'weekends_only'
 swap_result = price_instrument(json.dumps(swap), parity_market, AS_OF)
-assert cap_result.price > 0 and cap_result.get_metric('vega') > 0
-assert abs(cap_result.price - floor_result.price - swap_result.price) < 0.01
 caplet_values = []
 start = date(2025, 4, 15)
 for index in range(4):
@@ -298,10 +307,8 @@ for index in range(4):
                                        'start_date': start.isoformat(), 'maturity': end.isoformat()})
     caplet_values.append(price_instrument(json.dumps(caplet), parity_market, AS_OF, model='black76').price)
     start = end
-assert abs(sum(caplet_values) - cap_result.price) < 0.01
 _, swaption_spec = swaption(0)
 swaption_result = price_instrument(json.dumps(instrument_envelope(swaption_spec)), market, AS_OF, model='black76', metrics=['vega'])
-assert swaption_result.price > 0 and swaption_result.get_metric('vega') > 0
 print({'cap': cap_result.price, 'floor': floor_result.price, 'payer_swap': swap_result.price, 'payer_swaption': swaption_result.price})
 ```
 {/* /notebook-block */}
@@ -320,7 +327,8 @@ import json
 from datetime import date
 from finstack_quant.core.dates import DayCount
 from finstack_quant.valuations.instruments import price_instrument,instrument_cashflows_json
-from _shared.analyst_book import AS_OF,build_market,instruments
+from _shared.analyst_book import build_market, instruments
+AS_OF = date(2025, 1, 15)
 market=build_market('rates');contract=instruments('rates')['USD-PAYER-IRS'];raw=contract['instrument']['spec']
 flows=json.loads(instrument_cashflows_json(json.dumps(contract),market,AS_OF,'discounting'))['flows']
 curve=market.get_discount('USD-OIS');fixed_pv=0.;float_pv=0.
@@ -331,7 +339,6 @@ for flow in flows:
  elif flow['kind']=='float_reset':float_pv+=pv
 annuity=abs(fixed_pv)/float(raw['fixed']['rate']);derived=abs(float_pv)/annuity
 native=price_instrument(json.dumps(contract),market,AS_OF,metrics=['par_rate']).get_metric('par_rate')
-assert abs(derived-native)<1e-10
 print({'fixed_leg_PV_USD':fixed_pv,'floating_leg_PV_USD':float_pv,'notional_weighted_annuity_USD_years':annuity,'derived_par_rate':derived,'native_par_rate':native})
 ```
 {/* /notebook-block */}

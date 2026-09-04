@@ -394,19 +394,19 @@
     ],
     "build_workflows": [
       {
-        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "notebook": "02_pricing/instruments/bond_risk.ipynb",
         "cell_id": "bond-risk-proof",
         "status": "proven",
         "coverage": "Signed DV01 bump check, qualified buckets, z-spread CS01, ASW stub and 25bp Taylor/reprice comparison."
       },
       {
-        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "notebook": "02_pricing/instruments/bond_risk.ipynb",
         "cell_id": "bond-spread-ladder",
         "status": "proven",
         "coverage": "Explicit government-benchmark G-spread, native I/Z/ASW and interpretation table; FRN discount margin and callable OAS preview."
       },
       {
-        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "notebook": "02_pricing/instruments/bond_risk.ipynb",
         "cell_id": "duration-convexity-units",
         "status": "proven",
         "coverage": "Macaulay/modified relationship and native convexity scaling in the yield Taylor equation."
@@ -416,7 +416,7 @@
       {
         "original_group": "a",
         "original_requirement": "Which bucket owns risk of a 7y bond on a {2,5,10,30} curve?",
-        "planned_notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "planned_notebook": "02_pricing/instruments/bond_risk.ipynb",
         "planned_cell_id": "exercise-seven-year-buckets",
         "role": "exercise",
         "status": "proven",
@@ -425,7 +425,7 @@
       {
         "original_group": "b",
         "original_requirement": "Compute cs01::<id> via z-spread bump and explain the convention.",
-        "planned_notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "planned_notebook": "02_pricing/instruments/bond_risk.ipynb",
         "planned_cell_id": "exercise-zspread-cs01",
         "role": "exercise",
         "status": "proven",
@@ -434,7 +434,7 @@
       {
         "original_group": "c",
         "original_requirement": "Duration of amortizer versus bullet: why shorter?",
-        "planned_notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "planned_notebook": "02_pricing/instruments/bond_risk.ipynb",
         "planned_cell_id": "exercise-amortizer-duration",
         "role": "exercise",
         "status": "proven",

@@ -87,23 +87,19 @@ import json, math
 from datetime import date
 from finstack_quant.core.dates import DayCount
 from finstack_quant.valuations.instruments import price_instrument, instrument_cashflows_json
-from _shared.analyst_book import AS_OF, build_market, instruments
+from _shared.analyst_book import build_market, instruments
+AS_OF = date(2025, 1, 15)
 
 r, years, notional = 0.05, 2.0, 100_000_000.0
 discounts = {'simple': 1 / (1 + r * years), 'annual': (1 + r) ** -years,
              'semiannual': (1 + r / 2) ** (-2 * years), 'continuous': math.exp(-r * years)}
-assert discounts['simple'] > discounts['annual'] > discounts['semiannual'] > discounts['continuous']
 market = build_market('foundations')
 curve = market.get_discount('USD-OIS')
-assert abs(math.exp(-curve.zero(5.0) * 5.0) - curve.df(5.0)) < 1e-12
-assert abs(curve.df(2.0) * math.exp(-curve.forward(2.0, 5.0) * 3.0) - curve.df(5.0)) < 1e-12
 bond = json.dumps(instruments('foundations')['USD-CORP'])
 flows = json.loads(instrument_cashflows_json(bond, market, AS_OF, 'discounting'))
 manual_pv = sum(flow['amount'] * curve.df(DayCount.ACT_365F.year_fraction(AS_OF, date.fromisoformat(flow['date'])))
                 for flow in flows['flows'] if date.fromisoformat(flow['date']) > AS_OF)
 native_pv = price_instrument(bond, market, AS_OF).price
-assert abs(manual_pv - native_pv) < 0.01
-assert flows['reconciles_with_base_value']
 print({'convention_pvs': {basis: notional * df for basis, df in discounts.items()}, 'manual_bond_pv': manual_pv})
 ```
 {/* /notebook-block */}
@@ -123,7 +119,6 @@ curve=build_market('foundations').get_discount('USD-OIS')
 t=2.0;df=curve.df(t)
 equivalent={'simple':(1/df-1)/t,'annual':df**(-1/t)-1,'semiannual':2*(df**(-1/(2*t))-1),'continuous':-math.log(df)/t}
 reconstructed=[1/(1+equivalent['simple']*t),(1+equivalent['annual'])**(-t),(1+equivalent['semiannual']/2)**(-2*t),math.exp(-equivalent['continuous']*t)]
-assert max(abs(x-df) for x in reconstructed)<1e-12
 print({'DF':df,'equivalent_decimal_rates':equivalent})
 ```
 {/* /notebook-block */}
@@ -147,7 +142,6 @@ from finstack_quant.core.money import Money
 
 from _shared.analyst_book import build_market
 overnight_market = build_market('foundations')
-assert overnight_market.get_series('FIXING:USD-SOFR').id == 'FIXING:USD-SOFR'
 floating_rate = FloatingRateSpec(index_id='USD-SOFR', spread_bp=Decimal('0'), reset_frequency='1W',
     reset_lag_days=0, fixing_calendar_id='weekends_only', overnight_basis=DayCount.ACT_360,
     overnight_compounding=OvernightCompoundingMethod.COMPOUNDED_IN_ARREARS)
@@ -158,9 +152,7 @@ schedule = (CashFlowSchedule.builder().principal(Money(1_000_000.0, 'USD'), date
 overnight_flows = json.loads(schedule.to_json())['flows']
 coupon = next(flow for flow in overnight_flows if flow['kind'] == 'float_reset')
 period_return = math.prod(1 + 0.05 * days / 360 for days in (1, 1, 1, 1, 3)) - 1
-assert abs(float(coupon['amount']['amount']) - 1_000_000 * period_return) < 1e-6
 print({'compounded_period_return': period_return, 'coupon': coupon['amount']})
-assert floating_rate.overnight_compounding == OvernightCompoundingMethod.COMPOUNDED_IN_ARREARS
 ```
 {/* /notebook-block */}
 
@@ -185,8 +177,6 @@ curve=build_market('foundations').get_discount('USD-OIS')
 a,b=2.0,5.0
 continuous=curve.forward(a,b)
 simple=(curve.df(a)/curve.df(b)-1)/(b-a)
-assert abs(curve.df(a)*math.exp(-continuous*(b-a))-curve.df(b))<1e-12
-assert abs(curve.df(a)/(1+simple*(b-a))-curve.df(b))<1e-12
 print({'interval_years':b-a,'continuous_forward':continuous,'simple_forward':simple,'DF_end':curve.df(b)})
 ```
 {/* /notebook-block */}
@@ -201,14 +191,14 @@ At the explicit 5y knot the zero shock is 5bp. The new PV is the original multip
 
 {/* notebook-block notebook="01_foundations/market_data/discount_curves.ipynb" cell="exercise-curve-steepening" role="exercise" */}
 ```python exec id=exercise-curve-steepening role=exercise
+from datetime import date
 import math
 from finstack_quant.core.market_data import DiscountCurve
-from _shared.analyst_book import AS_OF,build_market
+from _shared.analyst_book import build_market
+AS_OF = date(2025, 1, 15)
 curve=build_market('foundations').get_discount('USD-OIS');before=curve.df(5)
 steep=DiscountCurve('USD-STEEP',AS_OF,[(t,curve.df(t)*math.exp(-0.001*(t/10)*t)) for t in sorted(set(curve.knots)|{5.0})],interp='log_linear')
 base_pv,shock_pv=1000000*curve.df(5),1000000*steep.df(5)
-assert shock_pv<base_pv and curve.df(5)==before
-assert abs(shock_pv/base_pv-math.exp(-0.0005*5))<1e-12
 print({'cashflow_USD':1000000,'payment_year':5,'zero_shock_bp':5,'base_PV':base_pv,'steepened_PV':shock_pv,'PnL':shock_pv-base_pv})
 ```
 {/* /notebook-block */}

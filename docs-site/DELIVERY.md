@@ -8,8 +8,8 @@ the canonical syllabus and site specification reflect the approved corrections.
 
 ## Prerequisite checkpoint
 
-P1 passed on 3 September 2026 at 03:50 UTC against Python 3.12.13 and the built
-finstack-quant 0.8.0 extension. The checkpoint executed 98 copied notebooks,
+The initial P1 checkpoint passed on 3 September 2026 at 03:50 UTC against Python
+3.12.13 and the built finstack-quant 0.8.0 extension. The checkpoint executed 98 copied notebooks,
 verified 33 principal workflows, passed 63 focused tests and built 138 static
 routes with resolving local links. Representative inspection covered the program
 overview, equations, Monte Carlo plots and a rich reporting tear sheet.
@@ -24,35 +24,46 @@ Runtime, fixture and source fingerprints are retained in `.build/p1-exit.json`.
 
 All 33 lessons are authored and marked published in the local reader, including
 both independent capstone reference submissions. The source inventory contains
-98 output-free notebooks, including the five new notebooks required by the
+100 output-free notebooks, including the five new notebooks required by the
 handoff. Coverage maps 303 displayed executable blocks: 215 BuildIt blocks and
 88 numerical exercise solutions. One additional exercise group has a complete
 written solution. Each numerical solution executes from a fresh lesson baseline.
 
 The complete publication command is `mise run docs-site-build`. A fresh strict
-run passed at 22:42:50 UTC on 3 September 2026 in 1,923.82 seconds. It executed
-all 303 displayed blocks across 33 lessons in 1,184.94 seconds and all 98 copied
-notebooks in 710.99 seconds. Both capstone references ran from independent fresh
-processes. The remaining prerequisite, coverage, curriculum, production-build
-and rendered-link stages all passed; the reader built 138 static routes.
+run passed at 04:33:59 UTC on 4 September 2026. The release-profile native build
+completed in 23 minutes 56 seconds; after installation, the recorded nine-stage
+site gate passed in 1,155.30 seconds. It executed all 303 displayed blocks across
+33 lessons in 484.46 seconds and all 100 copied notebooks in 639.44 seconds. Both
+capstone references ran from independent fresh processes. The remaining
+prerequisite, coverage, curriculum, production-build and rendered-link stages
+all passed; the reader built 126 static routes.
+
+A post-release assertion-filter hardening replay completed at 05:21 UTC. It
+repeated all 303 lesson blocks and all 100 notebooks, rebuilt the 126 static
+routes, and passed the curriculum, evidence, and rendered-link gates. The
+learner-source filter now rejects both Python `assert` statements and explicit
+`raise AssertionError` fallbacks.
 
 The executed notebook inventory contains 861 code cells. Every non-empty code
 cell has an execution count, with zero error outputs and zero non-empty `stderr`
 streams. Python warnings are promoted to exceptions during authored cell and
-snippet execution, so no runtime warning can produce passing evidence. All 98
+snippet execution, so no runtime warning can produce passing evidence. All 100
 source notebooks validate against the notebook schema, have complete unique cell
-IDs, and retain zero outputs and zero execution counts.
+IDs, and retain zero outputs and zero execution counts. The canonical executions
+reached and passed 828 private acceptance checks. All 86 learner-facing notebook
+downloads contain zero assertion constructs; 14 repository-only notebooks
+remain execution gated without public artifacts.
 
 Evidence is bound to the Python interpreter, native extension, Python package
 sources, fixtures, notebook sources and declared dependencies. Each lab entry
 also records the strict policy, runner and builder hashes, and the executed-copy
 hash. Standalone validators reject failed, partial, duplicate, stale or relabelled
 lab reports. Snippet records similarly bind the policy, runner and worker hashes.
-The eight-stage release record and timings are in `.build/release.json`.
+The nine-stage release record and timings are in `.build/release.json`.
 
-The final focused suite passed 89 tests in 114.47 seconds with warnings treated as
-errors. It covers fixture pricing and reconciliation, notebook schema and kernel
-identity, warning and `stderr` failure propagation, snippets, source
+The final aggregate suite passed 185 tests in 346.67 seconds with warnings
+treated as errors. It covers fixture pricing and reconciliation, notebook schema
+and kernel identity, warning and `stderr` failure propagation, snippets, source
 materialization, evidence provenance, coverage and publication checks. Ruff and
 the reader's TypeScript build passed.
 
@@ -66,7 +77,7 @@ print/PDF review.
 Runtime Python warnings and non-empty `stderr` are release failures and have no
 allowlist. A structured model or scenario result named `warnings` remains domain
 data rather than a runtime diagnostic and is acceptable only when the lesson
-asserts and explains the expected condition.
+checks and explains the expected condition.
 
 Seven distinct external URLs authored directly in lesson prose were checked.
 None was confirmed dead. The FASB pages require JavaScript, IFRS redirects to
@@ -86,9 +97,9 @@ The authoring window can span overlapping batch work and later verification.
 
 | Checkpoint | Recorded authoring window (UTC, 3 September 2026) | Displayed blocks | Execution including fresh exercise baselines | Learner time |
 | --- | --- | ---: | ---: | --- |
-| Part I | 03:49:51–04:13:42 | 26 | 15.81 s | Unmeasured |
-| Monte Carlo II | 03:52:23–04:11:19; final visual additions completed 05:21:24 | 11 | 32.61 s | Unmeasured |
-| C3 | 03:50:02–04:40:50 | 15 | 8.45 s | Unmeasured |
+| Part I | 03:49:51–04:13:42 | 26 | 23.02 s | Unmeasured |
+| Monte Carlo II | 03:52:23–04:11:19; final visual additions completed 05:21:24 | 11 | 13.46 s | Unmeasured |
+| C3 | 03:50:02–04:40:50 | 15 | 6.77 s | Unmeasured |
 
 The Part I retrospective retains the complete money/date/curve coverage and
 separates precision, market convention and calibration checks. The lessons now

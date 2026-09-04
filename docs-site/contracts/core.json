@@ -446,7 +446,7 @@
   },
   {
     "lesson_id": "2.2",
-    "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+    "notebook": "02_pricing/instruments/bond_risk.ipynb",
     "cell_ids": [
       "bond-risk-proof",
       "duration-convexity-units",
@@ -457,32 +457,32 @@
     ],
     "source_cells": [
       {
-        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "notebook": "02_pricing/instruments/bond_risk.ipynb",
         "cell_id": "bond-risk-proof",
         "role": "build"
       },
       {
-        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "notebook": "02_pricing/instruments/bond_risk.ipynb",
         "cell_id": "duration-convexity-units",
         "role": "build"
       },
       {
-        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "notebook": "02_pricing/instruments/bond_risk.ipynb",
         "cell_id": "bond-spread-ladder",
         "role": "build"
       },
       {
-        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "notebook": "02_pricing/instruments/bond_risk.ipynb",
         "cell_id": "exercise-seven-year-buckets",
         "role": "exercise"
       },
       {
-        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "notebook": "02_pricing/instruments/bond_risk.ipynb",
         "cell_id": "exercise-zspread-cs01",
         "role": "exercise"
       },
       {
-        "notebook": "02_pricing/instruments/bonds_and_fixed_income.ipynb",
+        "notebook": "02_pricing/instruments/bond_risk.ipynb",
         "cell_id": "exercise-amortizer-duration",
         "role": "exercise"
       }

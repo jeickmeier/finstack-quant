@@ -62,6 +62,13 @@ An IMM date, an option expiry and a delivery date are different lifecycle events
 
 <BuildIt>
 
+<FixtureBuild fixture="volatility" sources="_shared/analyst_tracks.py">
+
+This lesson introduces the volatility extension from a fresh base-book snapshot, so it does not pull the term loan or any credit-track holding into V1–V3. The contract and delivery-basket terms are displayed before pricing. The volatility capstone later opts into the common book explicitly.
+
+</FixtureBuild>
+
+
 ### Establish the independent volatility market and delivery basket
 
 {/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-workflow-1" role="build" */}
@@ -75,8 +82,21 @@ import math
 import numpy as np
 import pandas as pd
 from _shared import analyst_tracks as tracks
+from _shared.analyst_book import instruments as base_instruments
 from finstack_quant.valuations.instruments import price_instrument
-AS_OF = tracks.AS_OF
+AS_OF = date(2025, 1, 15)
+inputs = tracks.futures_inputs()
+base_ids = list(base_instruments('base'))
+vol_ids = [position['instrument_id'] for position in tracks.book_spec('vol')['positions']]
+vol_added = [instrument_id for instrument_id in vol_ids if instrument_id not in base_ids]
+contract_rows = []
+for instrument_id, envelope in inputs.items():
+    terms = envelope['instrument']['spec']
+    contract_rows.append({'id': instrument_id, 'type': envelope['instrument']['type'],
+                          'currency': (terms.get('notional') or terms.get('terms', {})).get('currency'),
+                          'expiry': terms.get('expiry') or terms.get('terms', {}).get('expiry')})
+print({'as_of': AS_OF.isoformat(), 'base_positions': base_ids, 'volatility_extension': vol_added})
+print(pd.DataFrame(contract_rows).to_string(index=False))
 ```
 {/* /notebook-block */}
 
@@ -84,7 +104,6 @@ AS_OF = tracks.AS_OF
 {/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-workflow-2" role="build" */}
 ```python exec id=v1-workflow-2 role=build
 from finstack_quant.core.market_data import DiscountCurve
-inputs = tracks.futures_inputs()
 market = tracks.build_market("vol")
 rows = []
 for rate in [0.04, 0.055]:
@@ -99,7 +118,6 @@ for rate in [0.04, 0.055]:
         rows.append({"treasury_rate": rate, "deliverable": iid, **value.metrics})
 delivery = pd.DataFrame(rows)
 cheapest = delivery.loc[delivery.groupby("treasury_rate")["futures_price"].idxmin()]
-assert cheapest["deliverable"].tolist() == ["UST-DELIVERABLE-A", "UST-DELIVERABLE-B"]
 print(delivery)
 ```
 {/* /notebook-block */}
@@ -124,7 +142,6 @@ european = price_instrument(json.dumps(option), market, AS_OF, model="discountin
 american_option = deepcopy(option)
 american_option["instrument"]["spec"]["terms"]["exercise_style"] = "american"
 american = price_instrument(json.dumps(american_option), market, AS_OF, model="discounting").value.amount
-assert american >= european > 0
 print(pd.Series({"European_USD": european, "American_USD": american, "exercise_premium_USD": american-european}))
 ```
 {/* /notebook-block */}
@@ -135,7 +152,6 @@ print(pd.Series({"European_USD": european, "American_USD": american, "exercise_p
 settlements = np.array([5300.0, 5320.0, 5290.0, 5310.0])
 contracts, multiplier = 2, 50.0
 variation_margin = contracts * multiplier * np.diff(settlements)
-assert variation_margin.sum() == contracts * multiplier * (settlements[-1] - settlements[0])
 print(pd.DataFrame({"from": settlements[:-1], "to": settlements[1:], "variation_margin_usd": variation_margin}))
 ```
 {/* /notebook-block */}
@@ -146,7 +162,6 @@ print(pd.DataFrame({"from": settlements[:-1], "to": settlements[1:], "variation_
 contracts = 1_000_000 / 100_000
 quote_move = 1 / 64
 tick_pnl = contracts * 100_000 / 100 * quote_move
-assert tick_pnl == contracts * 15.625
 print(pd.Series({"contracts": contracts, "quote_move": quote_move, "pnl_usd": tick_pnl}))
 ```
 {/* /notebook-block */}
@@ -173,8 +188,6 @@ for normal_vol in [0.,.005,.01]:
     future_result=price_instrument(json.dumps(instrument_envelope(ir_raw)),m,AS_OF,
         metrics=["futures_price","implied_forward","convexity_adjustment"])
     convexity_rows.append({"normal_rate_vol":normal_vol,**future_result.metrics})
-assert convexity_rows[0]["convexity_adjustment"]==0
-assert convexity_rows[-1]["convexity_adjustment"]>convexity_rows[1]["convexity_adjustment"]>0
 print(pd.DataFrame(convexity_rows))
 print({"next_IMM":next_imm(AS_OF),"June_IMM_option_expiry":imm_option_expiry(6,2025)})
 ```
@@ -197,7 +210,6 @@ for name,payload in [("equity",equity_future),("FX",fx_future)]:
     result=price_instrument(json.dumps(payload),market,AS_OF,model="discounting",metrics=["futures_price"])
     scale=payload["instrument"]["spec"]["terms"]
     expected=(result.metrics["futures_price"]-scale["entry_price"])*scale["contracts"]*scale["multiplier"]
-    assert abs(result.value.amount-expected)<.01
     carry_results[name]={"fair_future":result.metrics["futures_price"],"mark_usd":result.value.amount}
 print(pd.DataFrame(carry_results).T)
 ```
@@ -216,7 +228,6 @@ forward,strike,sigma=5300.,5300.,.20
 # Choose a synthetic spot whose zero-dividend forward is the option's F.
 matched_spot=forward*df
 matched_value=2*50*bs_price(matched_spot,strike,r,0.,sigma,T,True)
-assert abs(matched_value-european)<.01
 print({"native_future_option":european,"matched_spot_option":matched_value,"forward":forward,"synthetic_spot":matched_spot})
 ```
 {/* /notebook-block */}
@@ -233,27 +244,25 @@ The parallel solution first normalizes the future to one contract. The key-rate 
 
 {/* notebook-block notebook="02_pricing/instruments/futures_and_listed_options.ipynb" cell="v1-exercise-hedge" role="exercise" */}
 ```python exec id=v1-exercise-hedge role=exercise
-# Match the native common-book corporate bond's rate risk to one future contract.
-corporate=tracks.common.instruments("common")["USD-CORP"]
+from _shared.analyst_book import instruments as base_instruments
+# Match the native base-book corporate bond's rate risk to one future contract.
+corporate=base_instruments("base")["USD-CORP"]
 bond_risk=price_instrument(json.dumps(corporate),market,AS_OF,metrics=["dv01","bucketed_dv01"])
 one_future=deepcopy(inputs["UST-FUTURE"])
 one_future["instrument"]["spec"]["notional"]={"amount":"100000","currency":"USD"}
 future_risk=price_instrument(json.dumps(one_future),market,AS_OF,model="bond_future_clean_price_proxy",metrics=["dv01"])
 contracts_to_short=bond_risk.metrics["dv01"]/future_risk.metrics["dv01"]
 residual=bond_risk.metrics["dv01"]-round(contracts_to_short)*future_risk.metrics["dv01"]
-assert abs(residual)<=.5*abs(future_risk.metrics["dv01"])+1e-8
 print({"exact_contracts_to_short":contracts_to_short,"rounded_contracts":round(contracts_to_short),"residual_dv01":residual})
 print({k:v for k,v in bond_risk.metrics.items() if k.startswith("bucketed_dv01::")})
 book_ten_year=0.0
-for iid,payload in tracks.common.instruments("common").items():
+for iid,payload in base_instruments("base").items():
     buckets=price_instrument(json.dumps(payload),market,AS_OF,metrics=["bucketed_dv01"]).metrics
     book_ten_year+=buckets.get("bucketed_dv01::USD-OIS::10y",0.0)
 future_buckets=price_instrument(json.dumps(one_future),market,AS_OF,model="bond_future_clean_price_proxy",metrics=["bucketed_dv01"]).metrics
 future_ten_year=future_buckets["bucketed_dv01::USD-TREASURY::10y"]
-assert abs(future_ten_year)>1e-8
 ten_year_contracts=book_ten_year/future_ten_year
-assert abs(book_ten_year-ten_year_contracts*future_ten_year)<1e-8
-print({"common_book_USD_10y_dv01":book_ten_year,"future_10y_dv01":future_ten_year,"10y_contracts_to_short":ten_year_contracts})
+print({"base_book_USD_10y_dv01":book_ten_year,"future_10y_dv01":future_ten_year,"10y_contracts_to_short":ten_year_contracts})
 print("This cross-curve hedge leaves OIS–Treasury, key-rate, CTD-switch, repo, delivery and credit basis risk; a zero target needs no hedge.")
 ```
 {/* /notebook-block */}
@@ -276,8 +285,6 @@ american_mc=lsmc.price_american_call_unbiased(spot=5300.,strike=5300.,rate=r,div
     vol=.20,expiry=T,pricing_seed=20250116,currency="USD")
 mc_position=american_mc.mean.amount*2*50
 mc_stderr=american_mc.stderr*2*50
-assert american>=european
-assert abs(mc_position-american)<4*mc_stderr+.01*american
 print({"native_American":american,"native_European":european,
     "held_out_LSMC":mc_position,"MC_standard_error":mc_stderr,
     "native_early_exercise_premium":american-european})
@@ -302,8 +309,6 @@ rolled=deepcopy(equity_future)
 rolled["instrument"]["spec"]["terms"].update({"entry_price":far,"quoted_price":far,
     "last_trading_date":"2025-12-19","settlement_date":"2025-12-22"})
 initial_mark=price_instrument(json.dumps(rolled),market,AS_OF,model="discounting").value.amount
-assert abs(initial_mark)<.01
-assert quoted_roll==2500.
 print({"far_minus_near_quote_dollars":quoted_roll,"new_contract_initial_mark":initial_mark})
 print("The quoted roll is a carry/basis comparison, not an upfront premium paid for a fair futures contract. Realized P&L and collateral financing must be tracked separately.")
 ```

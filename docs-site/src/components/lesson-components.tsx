@@ -20,6 +20,17 @@ export function BuildIt({ children, title = 'Build it' }: SectionProps) {
   return <section className="lesson-section" id="build-it"><h2>{title}</h2>{children}</section>;
 }
 
+export function FixtureBuild({ fixture, sources, children }: {
+  fixture: string; sources: string; children?: ReactNode;
+}) {
+  return <aside className="fixture-build">
+    <p className="section-eyebrow">Shared fixture introduced here</p>
+    <h3>{fixture}</h3>
+    <p className="fixture-sources"><code>{sources}</code></p>
+    {children && <div>{children}</div>}
+  </aside>;
+}
+
 export function LabCard({ title = 'Open the companion lab', href, description, children, notebook }: {
   title?: string; href?: string; description?: string; children?: ReactNode; notebook?: string;
 }) {
@@ -65,7 +76,7 @@ export function ExecutedOutput({ lesson, block }: { lesson: string; block: strin
   return <figure className="executed-output">
     <figcaption><span><Terminal size={14} aria-hidden="true" />Captured output</span><code>{block}</code></figcaption>
     {result ? <>
-      {result.stdout ? <pre><code>{result.stdout}</code></pre> : <p className="output-note">Assertions passed. This block produced no printed output.</p>}
+      {result.stdout ? <pre><code>{result.stdout}</code></pre> : <p className="output-note">Validated successfully. This block produced no printed output.</p>}
       {result.assets.map((asset) => {
         if (asset.includes('..') || /^[a-z]+:/i.test(asset)) throw new Error(`Unsafe snippet asset: ${asset}`);
         const url = asset.startsWith('/') ? asset : `/${asset}`;

@@ -1,6 +1,19 @@
 # Canonical execution order, dependencies, fixtures, labs and examples.
 fixtures = ["foundations", "rates", "options", "base", "common", "history", "borrower", "credit", "volatility", "waterfall", "liquidity"]
 
+[fixture_sources]
+foundations = ["_shared/__init__.py", "_shared/analyst_book.py", "_shared/instrument_fixtures.py", "_shared/market.py", "_shared/notebook_helpers.py", "_shared/paths.py", "_shared/synthetic.py"]
+rates = ["_shared/analyst_book.py", "_shared/instrument_fixtures.py"]
+options = ["_shared/analyst_book.py", "_shared/instrument_fixtures.py"]
+base = ["_shared/analyst_book.py", "_shared/instrument_fixtures.py"]
+waterfall = ["_shared/analyst_tracks.py"]
+history = ["_shared/analyst_history.py"]
+borrower = ["_shared/borrower_model.py"]
+common = ["_shared/analyst_book.py", "_shared/instrument_fixtures.py"]
+liquidity = ["_shared/analyst_liquidity.py"]
+credit = ["_shared/analyst_tracks.py"]
+volatility = ["_shared/analyst_tracks.py"]
+
 [[lesson]]
 id = "1.1"
 part = "1"
@@ -10,6 +23,7 @@ requires = []
 fixtures = ["foundations"]
 labs = ["01_foundations/core_types_and_money.ipynb", "01_foundations/registry_defaults_and_overrides.ipynb"]
 examples = []
+introduces = ["foundations"]
 
 [[lesson]]
 id = "1.2"
@@ -39,7 +53,7 @@ path = "1/1.4-curves-bootstrapping-and-the-multi-curve-world.mdx"
 requires = ["1.3"]
 fixtures = ["foundations"]
 labs = ["01_foundations/market_data/discount_curves.ipynb", "01_foundations/market_bootstrap_tour.ipynb"]
-examples = []
+examples = ["01_foundations/market_data/forward_curves.ipynb"]
 
 [[lesson]]
 id = "1.5"
@@ -49,7 +63,7 @@ path = "1/1.5-market-data-beyond-rates-vols-hazards-fx-surfaces.mdx"
 requires = ["1.4"]
 fixtures = ["foundations"]
 labs = ["01_foundations/market_data/vol_surfaces.ipynb", "01_foundations/market_data/hazard_curves.ipynb"]
-examples = []
+examples = ["01_foundations/market_data/inflation_curves.ipynb"]
 
 [[lesson]]
 id = "2.1"
@@ -59,7 +73,7 @@ path = "2/2.1-bonds-i-price-yield-and-convention.mdx"
 requires = ["1.5"]
 fixtures = ["foundations"]
 labs = ["02_pricing/pricing_fundamentals.ipynb", "02_pricing/instruments/bonds_and_fixed_income.ipynb"]
-examples = []
+examples = ["02_pricing/instruments/inflation_linked.ipynb"]
 
 [[lesson]]
 id = "2.2"
@@ -68,8 +82,8 @@ title = "Bonds II: Duration, DV01, and Spread Measures"
 path = "2/2.2-bonds-ii-duration-dv01-and-spread-measures.mdx"
 requires = ["2.1"]
 fixtures = ["foundations"]
-labs = ["02_pricing/instruments/bonds_and_fixed_income.ipynb", "02_pricing/pnl_attribution.ipynb"]
-examples = []
+labs = ["02_pricing/instruments/bond_risk.ipynb", "02_pricing/pnl_attribution.ipynb"]
+examples = ["03_analytics/breakeven_analysis.ipynb"]
 
 [[lesson]]
 id = "2.3"
@@ -80,6 +94,7 @@ requires = ["2.2"]
 fixtures = ["rates"]
 labs = ["02_pricing/instruments/rates_derivatives.ipynb"]
 examples = ["02_pricing/pricing_across_asset_classes.ipynb"]
+introduces = ["rates"]
 
 [[lesson]]
 id = "2.4"
@@ -90,6 +105,7 @@ requires = ["2.3"]
 fixtures = ["options"]
 labs = ["02_pricing/instruments/equity_and_options.ipynb", "01_foundations/market_data/sabr_volatility.ipynb"]
 examples = ["02_pricing/instruments/fourier_pricing.ipynb", "02_pricing/instruments/fx_instruments.ipynb"]
+introduces = ["options"]
 
 [[lesson]]
 id = "2.5"
@@ -100,13 +116,14 @@ requires = ["2.4"]
 fixtures = ["base"]
 labs = ["01_foundations/market_data/hazard_curves.ipynb", "02_pricing/instruments/credit_derivatives.ipynb"]
 examples = ["02_pricing/instruments/credit_events_and_restructuring.ipynb"]
+introduces = ["base"]
 
 [[lesson]]
 id = "2.6"
 part = "2"
 title = "Monte Carlo I: Processes, Paths, and Honest Error Bars"
 path = "2/2.6-monte-carlo-i-processes-paths-and-honest-error-bars.mdx"
-requires = ["2.4"]
+requires = ["2.5"]
 fixtures = ["base"]
 labs = ["07_advanced_quant/monte_carlo/stochastic_processes.ipynb", "07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb", "07_advanced_quant/monte_carlo/discretization_schemes.ipynb"]
 examples = ["07_advanced_quant/monte_carlo_simulation.ipynb"]
@@ -127,9 +144,10 @@ part = "2"
 title = "Structured Products and Correlation"
 path = "2/2.8-structured-products-and-correlation.mdx"
 requires = ["2.7", "2.5"]
-fixtures = ["base"]
-labs = ["02_pricing/instruments/structured_credit.ipynb", "07_advanced_quant/correlation_and_credit_models.ipynb"]
-examples = ["07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb", "02_pricing/instruments/exotic_rates.ipynb"]
+fixtures = ["base", "waterfall"]
+labs = ["02_pricing/instruments/structured_products_foundations.ipynb", "07_advanced_quant/correlation_and_credit_models.ipynb"]
+examples = []
+introduces = ["waterfall"]
 
 [[lesson]]
 id = "3.1"
@@ -140,6 +158,7 @@ requires = ["2.5"]
 fixtures = ["base", "history"]
 labs = ["03_analytics/performance_analytics.ipynb"]
 examples = []
+introduces = ["history"]
 
 [[lesson]]
 id = "3.2"
@@ -159,7 +178,7 @@ path = "3/3.3-portfolio-aggregation-and-the-fx-collapse.mdx"
 requires = ["3.2"]
 fixtures = ["base", "history"]
 labs = ["05_portfolio/portfolio_construction_and_valuation.ipynb"]
-examples = ["05_portfolio/multi_asset_portfolio_at_scale.ipynb"]
+examples = []
 
 [[lesson]]
 id = "3.4"
@@ -179,7 +198,7 @@ path = "3/3.5-scenarios-and-stress-asking-what-if-precisely.mdx"
 requires = ["3.3"]
 fixtures = ["base", "history"]
 labs = ["06_scenarios/scenarios_and_stress_testing.ipynb", "05_portfolio/historical_replay.ipynb", "06_scenarios/composite_stress_tests.ipynb", "05_portfolio/horizon_total_return.ipynb"]
-examples = ["06_scenarios/credit_scenarios.ipynb", "06_scenarios/rate_scenarios.ipynb"]
+examples = ["06_scenarios/credit_scenarios.ipynb", "06_scenarios/rate_scenarios.ipynb", "06_scenarios/scenario_impact_analysis.ipynb"]
 
 [[lesson]]
 id = "3.6"
@@ -199,7 +218,8 @@ path = "4/4.1-statement-modeling-companies-as-deterministic-graphs.mdx"
 requires = ["3.6"]
 fixtures = ["borrower", "base"]
 labs = ["04_statement_modeling/statement_modeling.ipynb", "04_statement_modeling/models/three_statement_model.ipynb", "04_statement_modeling/statement_analytics.ipynb"]
-examples = []
+examples = ["04_statement_modeling/models/normalization_and_adjustments.ipynb"]
+introduces = ["borrower"]
 
 [[lesson]]
 id = "4.2"
@@ -209,7 +229,7 @@ path = "4/4.2-fundamental-valuation-dcf-sensitivity-and-scenarios.mdx"
 requires = ["4.1", "2.6"]
 fixtures = ["borrower", "base"]
 labs = ["04_statement_modeling/models/dcf_valuation.ipynb", "04_statement_modeling/models/lbo_analysis.ipynb"]
-examples = []
+examples = ["04_statement_modeling/models/comparable_company_analysis.ipynb"]
 
 [[lesson]]
 id = "4.3"
@@ -220,6 +240,7 @@ requires = ["4.2", "2.5"]
 fixtures = ["common", "borrower"]
 labs = ["04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb", "04_statement_modeling/models/credit_scoring_and_pd.ipynb", "04_statement_modeling/models/covenant_monitoring.ipynb", "07_advanced_quant/correlation/structural_credit_models.ipynb"]
 examples = ["04_statement_modeling/models/credit_analysis.ipynb", "04_statement_modeling/models/debt_waterfall.ipynb"]
+introduces = ["common"]
 
 [[lesson]]
 id = "4.4"
@@ -230,6 +251,7 @@ requires = ["4.3", "3.2"]
 fixtures = ["common", "borrower", "liquidity"]
 labs = ["05_portfolio/portfolio_optimization.ipynb", "05_portfolio/liquidity_risk.ipynb", "05_portfolio/portfolio_risk_decomposition.ipynb"]
 examples = []
+introduces = ["liquidity"]
 
 [[lesson]]
 id = "4.5"
@@ -239,7 +261,7 @@ path = "4/4.5-reporting-communicating-to-a-pm.mdx"
 requires = ["4.4", "3.4"]
 fixtures = ["common", "borrower"]
 labs = ["09_reporting/reporting_performance_tearsheet.ipynb", "09_reporting/reporting_portfolio_risk_tearsheet.ipynb"]
-examples = ["09_reporting/reporting_attribution_tearsheet.ipynb", "09_reporting/reporting_scenario_tearsheet.ipynb", "09_reporting/reporting_credit_tearsheet.ipynb", "09_reporting/reporting_statement_tearsheet.ipynb", "03_analytics/performance_analytics.ipynb", "03_analytics/portfolio_returns_and_attribution.ipynb"]
+examples = ["09_reporting/reporting_attribution_tearsheet.ipynb", "09_reporting/reporting_scenario_tearsheet.ipynb", "09_reporting/reporting_credit_tearsheet.ipynb", "09_reporting/reporting_statement_tearsheet.ipynb", "09_reporting/reporting_instrument_tearsheet.ipynb", "03_analytics/performance_analytics.ipynb", "03_analytics/portfolio_returns_and_attribution.ipynb"]
 
 [[lesson]]
 id = "C1"
@@ -247,9 +269,10 @@ part = "C"
 title = "Complex Bonds: Amortizers, Step-Ups, PIK, and Calls"
 path = "C/C1-complex-bonds-amortizers-step-ups-pik-and-calls.mdx"
 requires = ["4.3", "2.7"]
-fixtures = ["credit", "common"]
+fixtures = ["credit", "common", "waterfall"]
 labs = ["02_pricing/instruments/bonds_and_fixed_income.ipynb", "02_pricing/instruments/complex_cashflows.ipynb"]
 examples = []
+introduces = ["credit"]
 
 [[lesson]]
 id = "C2"
@@ -257,7 +280,7 @@ part = "C"
 title = "Loans, Delayed Draws, and Revolvers"
 path = "C/C2-loans-delayed-draws-and-revolvers.mdx"
 requires = ["C1"]
-fixtures = ["credit", "common"]
+fixtures = ["credit", "common", "waterfall"]
 labs = ["02_pricing/instruments/loans_and_credit_facilities.ipynb"]
 examples = []
 
@@ -267,7 +290,7 @@ part = "C"
 title = "Securitized Products: CLO, ABS, CMBS, RMBS"
 path = "C/C3-securitized-products-clo-abs-cmbs-rmbs.mdx"
 requires = ["C2", "2.8"]
-fixtures = ["credit", "common"]
+fixtures = ["credit", "common", "waterfall"]
 labs = ["02_pricing/instruments/structured_credit.ipynb", "07_advanced_quant/correlation/clo_tranche_modeling.ipynb"]
 examples = []
 
@@ -277,7 +300,7 @@ part = "C"
 title = "Index Credit: CDX, Tranches, and Credit Index Options"
 path = "C/C4-index-credit-cdx-tranches-and-credit-index-options.mdx"
 requires = ["C3", "2.4", "3.5"]
-fixtures = ["credit", "common"]
+fixtures = ["credit", "common", "waterfall"]
 labs = ["02_pricing/instruments/credit_index_and_options.ipynb"]
 examples = []
 
@@ -287,7 +310,7 @@ part = "C"
 title = "Convertible Bonds"
 path = "C/C5-convertible-bonds.mdx"
 requires = ["C1", "2.4"]
-fixtures = ["credit", "common"]
+fixtures = ["credit", "common", "waterfall"]
 labs = ["02_pricing/instruments/convertible_bonds.ipynb"]
 examples = []
 
@@ -299,7 +322,8 @@ path = "V/V1-exchange-traded-futures-and-options.mdx"
 requires = ["3.6"]
 fixtures = ["volatility", "base"]
 labs = ["02_pricing/instruments/futures_and_listed_options.ipynb"]
-examples = []
+examples = ["02_pricing/instruments/repo_and_financing.ipynb"]
+introduces = ["volatility"]
 
 [[lesson]]
 id = "V2"
@@ -327,10 +351,14 @@ part = "capstone"
 title = "Track capstones: from market inputs to the PM report"
 path = "capstone/capstone-track-capstones-from-market-inputs-to-the-pm-report.mdx"
 requires = ["4.5"]
-fixtures = ["common", "credit", "volatility", "history", "borrower"]
-labs = ["08_capstone/end_to_end_credit_portfolio_workflow.ipynb", "08_capstone/end_to_end_volatility_portfolio_workflow.ipynb"]
+fixtures = ["common", "history", "borrower"]
+labs = []
 examples = ["07_advanced_quant/margin_collateral_and_xva.ipynb"]
 
 [lesson.variants]
 credit = ["C4", "C5"]
 volatility = ["V2", "V3"]
+
+[lesson.variant_labs]
+credit = ["08_capstone/end_to_end_credit_portfolio_workflow.ipynb"]
+volatility = ["08_capstone/end_to_end_volatility_portfolio_workflow.ipynb"]

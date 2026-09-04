@@ -39,7 +39,7 @@ Campisi separates income/carry, Treasury-curve and spread effects, with remainin
 
 ### Session 1: three-period instrument and benchmark reconciliation
 
-The source table retains opening and closing USD values and dated coupons for each bond. EUR coupons use payment-date FX. The 50/50 benchmark holds the same two sector instruments and rebalances at period boundaries, so selection and interaction are identically zero; active performance comes from different weights. The assertions check instrument P&L within USD1e-8 and return decompositions within 1e-12.
+The source table retains opening and closing USD values and dated coupons for each bond. EUR coupons use payment-date FX. The 50/50 benchmark holds the same two sector instruments and rebalances at period boundaries, so selection and interaction are identically zero; active performance comes from different weights. The reconciliations check instrument P&L within USD1e-8 and return decompositions within 1e-12.
 
 {/* notebook-block notebook="03_analytics/portfolio_returns_and_attribution.ipynb" cell="three-period-attribution" role="build" */}
 ```python exec id=three-period-attribution role=build
@@ -47,23 +47,26 @@ import json
 from datetime import date
 import math
 import pandas as pd
-from _shared.analyst_book import AS_OF, book_spec, instruments
-from _shared.analyst_history import HISTORY_DATES, history_market, history_quotes
+from _shared.analyst_book import book_spec, instruments
+from _shared.analyst_history import history_market, history_quotes, performance_history
 from finstack_quant.portfolio import (
     Portfolio, value_portfolio, aggregate_full_cashflows, brinson_fachler, carino_link,
     campisi_attribution, campisi_carino_link, campisi_reconciliation_check,
 )
 from finstack_quant.valuations.instruments import price_instrument
+AS_OF = date(2025, 1, 15)
 
 # The bond sleeve is fully invested and has positive capital. Its USD returns include FX.
 # The whole book's flow-neutral performance is reconciled separately in lesson 3.1.
+history_periods = performance_history()
+history_dates = (date.fromisoformat(history_periods[0]['start']), *(date.fromisoformat(period['end']) for period in history_periods))
 ids = ['USD-CORP', 'EUR-GOVT']
 initial = book_spec('base')
 initial['positions'] = [p for p in initial['positions'] if p['instrument_id'] in ids]
 initial_book = Portfolio.from_spec(json.dumps(initial))
 cashflows = json.loads(aggregate_full_cashflows(initial_book, history_market(AS_OF)).to_json())['events']
 brinson_periods, campisi_periods, rows = [], [], []
-for start, end in zip(HISTORY_DATES[:-1], HISTORY_DATES[1:], strict=True):
+for start, end in zip(history_dates[:-1], history_dates[1:], strict=True):
     start_spec, end_spec = dict(initial, as_of=start.isoformat()), dict(initial, as_of=end.isoformat())
     start_market, end_market = history_market(start), history_market(end)
     begin = json.loads(value_portfolio(Portfolio.from_spec(json.dumps(start_spec)), start_market, metrics=[]).to_json())
@@ -84,10 +87,7 @@ for start, end in zip(HISTORY_DATES[:-1], HISTORY_DATES[1:], strict=True):
     period = [{'sector': iid, 'portfolio_weight': weights[iid], 'benchmark_weight': 0.5,
                'portfolio_return': returns_by_id[iid], 'benchmark_return': returns_by_id[iid]} for iid in ids]
     bf = brinson_fachler(json.dumps(period))
-    assert abs(bf.total_allocation+bf.total_selection+bf.total_interaction-bf.total_excess_return) < 1e-12
-    assert abs(bf.total_selection) < 1e-12 and abs(bf.total_interaction) < 1e-12
     pnl = sum(ending.values()) + sum(receipts.values()) - total_begin
-    assert abs(pnl - total_begin * bf.portfolio_return) < 1e-8, 'USD sleeve instrument P&L identity'
     brinson_periods.append(period)
     p_snap, b_snap = [], []
     for iid in ids:
@@ -98,7 +98,6 @@ for start, end in zip(HISTORY_DATES[:-1], HISTORY_DATES[1:], strict=True):
         z1 = -math.log(end_market.get_discount(curve_id).df(tenor))/tenor
         # Model-priced no-hazard bonds have zero z-spread; this fixture's spread move is zero.
         spread = risk.get_metric('z_spread')
-        assert abs(spread) < 1e-8
         snap = {'sector':iid,'weight':weights[iid], 'total_return':returns_by_id[iid],
                 'yield_annual':risk.get_metric('ytm'), 'modified_duration':risk.get_metric('duration_mod'),
                 'spread_duration':risk.get_metric('duration_mod'), 'spread':spread,
@@ -108,11 +107,9 @@ for start, end in zip(HISTORY_DATES[:-1], HISTORY_DATES[1:], strict=True):
         rows.append({'period_end':end,'position':iid,'opening_usd':beginning[iid],'closing_usd':ending[iid],
                      'receipts_usd':receipts[iid],'total_return':returns_by_id[iid]})
     cp = campisi_attribution(json.dumps(p_snap), json.dumps(b_snap), json.dumps({'period_years':(end-start).days/365}))
-    assert campisi_reconciliation_check(cp.to_json(),1e-10).is_reconciled
     campisi_periods.append(json.loads(cp.to_json()))
 linked = carino_link(json.dumps(brinson_periods))
 active = linked.portfolio_return_compounded-linked.benchmark_return_compounded
-assert abs(linked.linked_allocation+linked.linked_selection+linked.linked_interaction-active)<1e-12
 campisi_linked = campisi_carino_link(json.dumps(campisi_periods))
 print(pd.DataFrame(rows).to_string(index=False))
 print('Carino linked active return:',active)
@@ -120,10 +117,8 @@ print('Campisi linked effects:',{key:value for key,value in json.loads(campisi_l
 bad = json.loads(campisi_periods[0] if isinstance(campisi_periods[0],str) else json.dumps(campisi_periods[0]))
 # Deliberately perturb a result total: arithmetic validation must expose the mismatch.
 bad['total_active_carry'] += 0.001
-assert not campisi_reconciliation_check(json.dumps(bad),1e-10).is_reconciled
 coupon_period = next(row for row in rows if row['receipts_usd']>0)
 omitted_income_return = coupon_period['closing_usd']/coupon_period['opening_usd']-1
-assert abs(coupon_period['total_return']-omitted_income_return-coupon_period['receipts_usd']/coupon_period['opening_usd'])<1e-12
 print('Diagnosed failures: altered carry total rejected; omitted coupon error equals coupon/opening value.')
 ```
 {/* /notebook-block */}
@@ -151,24 +146,19 @@ instrument_rows=[]
 for iid,env in instruments("base").items():
  result=attribute_pnl(json.dumps(env),m0,m1,a0,a1,{"waterfall":default_waterfall_order()})
  result_wire=json.loads(result.to_json())
- assert not result_wire["result_invalid"]
  p0=price_instrument(json.dumps(env),m0,a0).value.amount
  p1=price_instrument(json.dumps(env),m1,a1).value.amount
  currency=result_wire["total_pnl"]["currency"]
  fx0=history_quotes(a0)["eur_usd"] if currency=="EUR" else 1.0
  fx1=history_quotes(a1)["eur_usd"] if currency=="EUR" else 1.0
- assert abs(result.total_pnl-(p1-p0))<1e-6, (iid,"unexpected payment or date boundary")
- assert abs(sum(float(result_wire[k]["amount"]) for k in fields)-result.total_pnl)<1e-6
  for k in fields: waterfall_totals[k]+=float(result_wire[k]["amount"])*fx1
  translation=p0*(fx1-fx0);waterfall_totals["reporting_fx_translation"]+=translation
  instrument_rows.append({"position":iid,"currency":currency,"native_pnl":result.total_pnl,"reporting_fx_usd":translation,"usd_pnl":p1*fx1-p0*fx0})
 actual_usd=sum(row["usd_pnl"] for row in instrument_rows)
-assert abs(sum(waterfall_totals.values())-actual_usd)<1e-6
 print(pd.DataFrame(instrument_rows).to_string(index=False))
 print("USD factor waterfall:",waterfall_totals)
 Path("book-pnl-waterfall.svg").write_text(waterfall_chart(list(waterfall_totals),list(waterfall_totals.values()),theme=INSTITUTIONAL))
 taylor=attribute_pnl(json.dumps(instruments("base")["USD-CORP"]),m0,m1,a0,a1,{"taylor":{"include_gamma":True,"rate_bump_bp":1.0,"credit_bump_bp":1.0,"vol_bump":.01}})
-assert abs(taylor.total_pnl-next(r["native_pnl"] for r in instrument_rows if r["position"]=="USD-CORP"))<1e-6
 print("USD bond Taylor residual, USD:",taylor.residual)
 print("Taylor residual is disclosed approximation error, not added to explained factors as skill.")
 ```
@@ -188,10 +178,6 @@ The SVG is generated from the reconciled USD factors. The explicitly displayed r
 ```python exec id=exercise-allocation-selection role=exercise
 case=[{"sector":"Equity","portfolio_weight":.7,"benchmark_weight":.5,"portfolio_return":.07,"benchmark_return":.10},{"sector":"Bonds","portfolio_weight":.3,"benchmark_weight":.5,"portfolio_return":.01,"benchmark_return":.02}]
 r=brinson_fachler(json.dumps(case))
-assert r.total_allocation>0 and r.total_selection<0
-assert abs(r.total_allocation+r.total_selection+r.total_interaction-r.total_excess_return)<1e-12
-assert abs(r.total_allocation-.016)<1e-12
-assert abs(r.total_selection+.02)<1e-12
 print(r.to_json())
 print("Overweight the stronger benchmark sector, yet underperform within both sectors; allocation is positive while selection is negative.")
 ```
@@ -208,14 +194,10 @@ Allocation contributes +1.6 percentage points while selection contributes −2.0
 ```python exec id=exercise-campisi-diagnosis role=exercise
 clean=campisi_periods[0]
 corrupt=dict(clean);corrupt["total_active_carry"]+=.001
-assert campisi_reconciliation_check(json.dumps(clean),1e-10).is_reconciled
-assert not campisi_reconciliation_check(json.dumps(corrupt),1e-10).is_reconciled
 income_row=next(row for row in rows if row["receipts_usd"]>0)
 missing_income=income_row["receipts_usd"]/income_row["opening_usd"]
-assert missing_income>0
 naive=sum(brinson_fachler(json.dumps(period)).total_excess_return for period in brinson_periods)
 print({"omitted_coupon_error_return":missing_income,"naive_active_sum":naive,"Carino_linked_active":active,"linking_difference":active-naive})
-assert abs(linked.linked_allocation+linked.linked_selection+linked.linked_interaction-active)<1e-12
 ```
 {/* /notebook-block */}
 

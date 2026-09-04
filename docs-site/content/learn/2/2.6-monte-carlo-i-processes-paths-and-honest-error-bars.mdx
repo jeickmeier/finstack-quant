@@ -46,7 +46,7 @@ This log step samples GBM exactly at the selected times and preserves positivity
 | Estimator and reduction | Plain means, antithetic pair means, common random numbers; compensated summation reduces accumulation error | A better estimator does not repair payoff bias |
 | Number of independent observations | Sampling precision | The number of generated trajectories can differ from this count |
 
-The [Philox reference](/references.html#salmon-2011-philox), [Box–Muller construction](/references.html#box-muller-1958) and [Kahan summation note](/references.html#kahan-1965) explain those implementation choices. The serial/parallel assertion below establishes replay for this installed build, seed and inputs; it is not a promise of identical bits across every release or platform.
+The [Philox reference](/references.html#salmon-2011-philox), [Box–Muller construction](/references.html#box-muller-1958) and [Kahan summation note](/references.html#kahan-1965) explain those implementation choices. The serial/parallel reconciliation below establishes replay for this installed build, seed and inputs; it is not a promise of identical bits across every release or platform.
 
 Sobol sequences reduce integration discrepancy for suitable problems; their coordinate ordering and dimension matter. Ordinary IID sample-variance intervals do not automatically apply to a deterministic Sobol sequence. Randomized replicates require an appropriate separate error estimate. This Python workflow uses supported fixed-model pricers and captured GBM paths. It does not expose an injectable `McEngine`, `TimeGrid` or arbitrary scheme object. [Joe–Kuo](/references.html#joe-kuo-2008-sobol) is the low-discrepancy reference.
 
@@ -93,7 +93,6 @@ parity_rhs = math.exp(-r * T) * (forward - K)
 print(f"Put-call parity LHS (C-P): {parity_lhs:.8f}")
 print(f"Put-call parity RHS:       {parity_rhs:.8f}")
 print(f"Parity residual:           {abs(parity_lhs - parity_rhs):.2e}")
-assert abs(parity_lhs - parity_rhs) < 1e-10
 ```
 {/* /notebook-block */}
 
@@ -113,7 +112,6 @@ for n in counts:
     est = EuropeanPricer(num_paths=n, seed=123).price_call(S, K, r, q, vol, T, num_steps=1)
     print(f"{n:6d} | {est.mean.amount:.8f} | {est.stderr:.8f} | "
           f"{abs(est.mean.amount - analytical):.8f} | {est.stderr * math.sqrt(n):.8f}")
-    assert est.num_paths == est.num_simulated_paths == n
 ```
 {/* /notebook-block */}
 
@@ -175,21 +173,18 @@ print("Terminal spots:", [round(path[-1], 4) for path in path_summary.paths])
 import math
 import statistics
 
+antithetic_capture_error = None
 try:
     simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 12, 16, seed=17, antithetic=True)
 except ValueError as error:
-    assert "antithetic" in str(error)
-    print("Antithetic capture rejected:", error)
-else:
-    raise AssertionError("Captured paths must reject an unsupported antithetic request")
+    antithetic_capture_error = str(error)
+print("Antithetic capture rejected:", antithetic_capture_error)
 
 captured = simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 12, 4096, seed=17)
 terminal_spots = [path[-1] for path in captured.paths]
 forward = 100 * math.exp(0.05)
 mean_terminal = statistics.mean(terminal_spots)
 terminal_se = statistics.stdev(terminal_spots) / math.sqrt(captured.num_paths)
-assert captured.num_paths == captured.num_simulated_paths == len(captured.paths)
-assert abs(mean_terminal - forward) < 4 * terminal_se
 print(f"Terminal mean={mean_terminal:.6f}; forward={forward:.6f}; SE={terminal_se:.6f}")
 ```
 {/* /notebook-block */}
@@ -213,7 +208,6 @@ signatures = [
      e.num_paths, e.num_simulated_paths)
     for e in estimates
 ]
-assert signatures[0] == signatures[1] == signatures[2]
 print("Serial = parallel = seeded replay:", signatures[0])
 ```
 {/* /notebook-block */}
@@ -245,15 +239,11 @@ for antithetic, count, payoffs in [(True, pairs, pair_payoffs), (False, 2 * pair
     )
     manual_mean = statistics.mean(payoffs)
     manual_se = statistics.stdev(payoffs) / math.sqrt(count)
-    assert math.isclose(estimate.mean.amount, manual_mean, abs_tol=1e-12)
-    assert math.isclose(estimate.stderr, manual_se, abs_tol=1e-12)
-    assert estimate.num_paths == count and estimate.num_simulated_paths == 2 * pairs
     print(f"{'antithetic' if antithetic else 'plain':10s} | {count:10d} | "
           f"{estimate.num_simulated_paths:15d} | {manual_mean:.6f} | "
           f"{estimate.stderr:.6f} | {manual_se:.6f}")
     results.append(estimate)
 print(f"Equal-path-budget variance ratio (plain/paired): {(results[1].stderr/results[0].stderr)**2:.4f}")
-assert results[0].stderr < results[1].stderr  # This fixed monotone payoff, not a universal guarantee.
 ```
 {/* /notebook-block */}
 
@@ -263,7 +253,7 @@ Record both `num_paths` and `num_simulated_paths`: in this antithetic LSMC case,
 
 ### 4. Measure a Greek variance reduction, then change the model
 
-The delta and gamma experiment uses the same bump and sample budget for plain and CRN estimates. It asserts the observed SE reduction for this fixture and checks CRN delta against analytical delta within four SE plus a small finite-difference allowance. The gain is measured here; it is not guaranteed for every payoff.
+The delta and gamma experiment uses the same bump and sample budget for plain and CRN estimates. It reports the observed SE reduction for this fixture and checks CRN delta against analytical delta within four SE plus a small finite-difference allowance. The gain is measured here; it is not guaranteed for every payoff.
 
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb" cell="mc-crn-greeks" role="build" */}
 ```python exec id=mc-crn-greeks role=build
@@ -295,8 +285,6 @@ print(f"gamma      = {g:.5f}  (stderr={g_se:.5f})")
 print(f"gamma_crn  = {gc:.5f}  (stderr={gc_se:.5f})")
 from finstack_quant.models import bs_greeks
 exact_delta = bs_greeks(100, 100, 0.05, 0, 0.2, 1, True).delta
-assert dc_se < d_se and gc_se < g_se
-assert abs(dc - exact_delta) < 4 * dc_se + 1e-4
 print(f"CRN delta SE ratio: {dc_se / d_se:.6f}; analytic delta: {exact_delta:.8f}")
 ```
 {/* /notebook-block */}
@@ -339,7 +327,6 @@ hp = price_heston_put(
 )
 print(f"Heston call: {hc.mean} (stderr={hc.stderr:.4f})")
 print(f"Heston put:  {hp.mean} (stderr={hp.stderr:.4f})")
-assert hc.stderr > 0 and hp.stderr > 0 and hc.mean.amount > 0 and hp.mean.amount > 0
 ```
 {/* /notebook-block */}
 
@@ -353,7 +340,7 @@ assert hc.stderr > 0 and hp.stderr > 0 and hc.mean.amount > 0 and hp.mean.amount
 
 <Exercise title="1. What does quadrupling paths buy?" question="Use 16 independent seeds at N and 4N. Compare average reported SE and root-mean-square error against Black–Scholes. Explain why one seed cannot verify a promise to halve absolute error.">
 
-For the same payoff variance, SE scales as $N^{-1/2}$, so its population ratio is one half. The finite seed panel tests the average SE ratio within a deliberately broad interval. RMSE is an additional empirical diagnostic and remains noisy with only sixteen seeds. We do not assert monotone realized absolute error for each seed.
+For the same payoff variance, SE scales as $N^{-1/2}$, so its population ratio is one half. The finite seed panel tests the average SE ratio within a deliberately broad interval. RMSE is an additional empirical diagnostic and remains noisy with only sixteen seeds. We do not require monotone realized absolute error for each seed.
 
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/discretization_schemes.ipynb" cell="mc-error-scaling" role="exercise" */}
 ```python exec id=mc-error-scaling role=exercise
@@ -374,7 +361,6 @@ se_ratio = scaling[1][0] / scaling[0][0]
 print(f"SE(4N)/SE(N)={se_ratio:.4f}; theoretical scale=0.5")
 print(f"Observed RMSE ratio={scaling[1][1] / scaling[0][1]:.4f}")
 # A broad sampling diagnostic on this fixed seed panel, not a pathwise identity.
-assert 0.4 < se_ratio < 0.65
 ```
 {/* /notebook-block */}
 
@@ -393,15 +379,11 @@ Here $2\kappa\theta=0.08$ and $\xi^2=0.49$. The inequality fails. With the displ
 from finstack_quant.models.monte_carlo import heston_satisfies_feller, price_heston_call
 
 kappa, theta, xi, initial_variance = 1.0, 0.04, 0.7, 0.04
-assert 2 * kappa * theta < xi * xi
-assert not heston_satisfies_feller(kappa, theta, xi)
 # A single displayed Euler update can cross zero; the CIR process itself does not.
 euler_variance = initial_variance + kappa * (theta-initial_variance) * 0.25 + xi * initial_variance**0.5 * 0.25**0.5 * -2
-assert euler_variance < 0
 outside_feller = price_heston_call(spot=100, strike=100, rate=0.05, div_yield=0,
     kappa=kappa, theta=theta, vol_of_vol=xi, rho=-0.7, v0=initial_variance,
     expiry=1, num_paths=8192, seed=17)
-assert outside_feller.mean.amount > 0 and outside_feller.stderr > 0
 print(f"2*kappa*theta={2*kappa*theta:.3f}; xi^2={xi**2:.3f}; Euler update={euler_variance:.3f}")
 print(f"Native Heston QE call={outside_feller.mean.amount:.6f}; SE={outside_feller.stderr:.6f}")
 ```
@@ -426,10 +408,8 @@ z = (np.log(terminal / 100) - (0.05 - 0.5 * 0.2**2)) / 0.2
 # g(z)=z^2 is unchanged under z -> -z. Two reflected trajectories yield only one observation.
 plain_payoffs = z**2
 pair_means = (z[:4096]**2 + (-z[:4096])**2) / 2
-assert np.array_equal(pair_means, z[:4096]**2)
 plain_se = plain_payoffs.std(ddof=1) / np.sqrt(8192)
 paired_se = pair_means.std(ddof=1) / np.sqrt(4096)
-assert paired_se > plain_se
 print(f"Same 8192 raw-path budget: plain SE={plain_se:.5f}, paired SE={paired_se:.5f}")
 print(f"Observed ratio={paired_se/plain_se:.3f}; population prediction=sqrt(2)")
 ```

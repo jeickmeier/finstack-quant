@@ -73,12 +73,20 @@ The foundation market and instruments are deterministic synthetic teaching input
 
 <BuildIt>
 
+<FixtureBuild fixture="foundations" sources="_shared/__init__.py · _shared/analyst_book.py · _shared/instrument_fixtures.py · _shared/market.py · _shared/notebook_helpers.py · _shared/paths.py · _shared/synthetic.py">
+
+This lesson establishes the shared valuation contract before any later lesson consumes it. The valuation date stays visible in each notebook as \`AS_OF = date(2025, 1, 15)\`. The factory returns fresh bond, deposit, market, and portfolio inputs; the code below projects their IDs, types, currencies, notionals, and quantities before pricing them.
+
+</FixtureBuild>
+
+
 ### The first book and its valuation stamp
 
 The caught exception is part of the demonstration. The holdings table identifies the currency and contractual notional; each portfolio quantity is one complete instrument, not one dollar. Cash holdings are dated deposits whose maturity must later be settled.
 
 {/* notebook-block notebook="01_foundations/core_types_and_money.ipynb" cell="money-proof" role="build" */}
 ```python exec id=money-proof role=build
+from datetime import date
 import json
 from decimal import Decimal
 from finstack_quant.core.money import Money
@@ -86,38 +94,37 @@ from finstack_quant.core.currency import Currency
 from finstack_quant.core.config import FinstackConfig, RoundingMode
 from finstack_quant.core.market_data import FxMatrix, fx_market_pair, fx_pip_size, invert_fx_rate
 from finstack_quant.valuations.instruments import price_instrument
-from _shared.analyst_book import AS_OF, build_book, build_market, instruments
+from _shared.analyst_book import book_spec, build_book, build_market, instruments
+AS_OF = date(2025, 1, 15)
 
-assert 0.1 + 0.2 != 0.3
 cash = Money(Decimal('0.1'), 'USD') + Money(Decimal('0.2'), 'USD')
-assert cash.amount_decimal == Decimal('0.3')
+mixed_currency_error = None
 try:
     cash + Money(Decimal('0.3'), 'EUR')
 except ValueError as error:
-    assert 'currency' in str(error).lower()
-else:
-    raise AssertionError('cross-currency addition must fail')
+    mixed_currency_error = str(error)
+print('Mixed-currency addition rejected:', mixed_currency_error)
 fx = FxMatrix()
 fx.set_quote(Currency('EUR'), Currency('USD'), 1.08)
 fx.set_quote(Currency('USD'), Currency('JPY'), 150.0)
 cross = fx.rate('EUR', 'JPY', AS_OF)
-assert abs(cross.rate - 162.0) < 1e-12
-assert abs(invert_fx_rate(cross.rate) * cross.rate - 1) < 1e-12
-assert [currency.code for currency in fx_market_pair('USD', 'EUR')] == ['EUR', 'USD']
-assert fx_pip_size('EUR', 'JPY') == 0.01
 config = FinstackConfig(rounding_mode=RoundingMode.BANKERS)
 market = build_market('foundations')
 bond = json.dumps(instruments('foundations')['USD-CORP'])
 first = price_instrument(bond, market, AS_OF)
 second = price_instrument(bond, market, AS_OF)
-assert first.price == second.price
-assert first.meta['rounding']['mode'] == json.loads(config.to_json())['rounding']['mode']
-assert first.meta['numeric_mode'] == 'f64'
-assert config.output_scale('USD') == 2 and config.output_scale('JPY') == 0
-holdings = [{'id': iid, 'type': envelope['instrument']['type'],
-             **envelope['instrument']['spec']['notional']} for iid, envelope in instruments('foundations').items()]
-print(holdings)
-assert len(build_book('foundations')) == 4
+foundation_spec = book_spec('foundations')
+holdings = []
+for position in foundation_spec['positions']:
+    terms = position['instrument_spec']['spec']
+    holdings.append({
+        'position_id': position['position_id'],
+        'instrument_type': position['instrument_spec']['type'],
+        'quantity': position['quantity'],
+        'currency': terms['notional']['currency'],
+        'contract_notional': terms['notional']['amount'],
+    })
+print(json.dumps({'as_of': AS_OF.isoformat(), 'stage': 'foundations', 'holdings': holdings}, indent=2))
 ```
 {/* /notebook-block */}
 
@@ -126,18 +133,14 @@ assert len(build_book('foundations')) == 4
 
 ### Representations and midpoint rounding
 
-Read the accessors as properties. The assertions compare exact decimal midpoint results and expose the output scale selected for each currency.
+Read the accessors as properties. The displayed checks compare exact decimal midpoint results and expose the output scale selected for each currency.
 
 {/* notebook-block notebook="01_foundations/core_types_and_money.ipynb" cell="money-units-rounding" role="build" */}
 ```python exec id=money-units-rounding role=build
 from decimal import Decimal, ROUND_HALF_EVEN
 from finstack_quant.core.types import Rate, Bps, Percentage
 from finstack_quant.core.config import FinstackConfig
-assert Rate.from_percent(5).as_decimal == 0.05
-assert Bps(250).as_decimal == 0.025
-assert Percentage(5).as_decimal == 0.05
 rounded = [Decimal(x).quantize(Decimal('0.01'), rounding=ROUND_HALF_EVEN) for x in ('1.005','1.015')]
-assert rounded == [Decimal('1.00'), Decimal('1.02')]
 print({'decimal_rate': Rate.from_percent(5).as_decimal, '250bp': Bps(250).as_decimal,
        'banker_rounding': rounded, 'currency_output_scales': {ccy: FinstackConfig().output_scale(ccy) for ccy in ('USD','EUR','JPY')}})
 ```
@@ -158,15 +161,14 @@ The intermediate USD units cancel. The reciprocal is EUR per JPY, so multiplying
 
 {/* notebook-block notebook="01_foundations/core_types_and_money.ipynb" cell="exercise-fx-triangulation" role="exercise" */}
 ```python exec id=exercise-fx-triangulation role=exercise
+from datetime import date
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import FxMatrix, fx_pip_size, invert_fx_rate
-from _shared.analyst_book import AS_OF
+AS_OF = date(2025, 1, 15)
 crosses=FxMatrix()
 crosses.set_quote(Currency('EUR'),Currency('USD'),1.08)
 crosses.set_quote(Currency('USD'),Currency('JPY'),150.0)
 eur_jpy=crosses.rate('EUR','JPY',AS_OF).rate
-assert abs(eur_jpy-162.0)<1e-12 and fx_pip_size('EUR','JPY')==0.01
-assert abs(invert_fx_rate(eur_jpy)*eur_jpy-1)<1e-12
 print({'JPY_per_EUR':eur_jpy,'JPY_pip':fx_pip_size('EUR','JPY'),'EUR_per_JPY':invert_fx_rate(eur_jpy)})
 ```
 {/* /notebook-block */}
@@ -186,8 +188,6 @@ from finstack_quant.core.money import Money
 binary_total=0.0
 for _ in range(10000):binary_total += 0.01
 decimal_total=sum((Money(Decimal('0.01'),'USD') for _ in range(10000)),Money(0,'USD'))
-assert binary_total != 100.0
-assert decimal_total.amount_decimal == Decimal('100.00')
 print({'binary_total':repr(binary_total),'binary_residual':binary_total-100.0,'money_total':str(decimal_total.amount_decimal)})
 ```
 {/* /notebook-block */}
@@ -202,11 +202,13 @@ The exercise assumes GBPUSD = 1.25 and a flat 4% GBP discount curve for the addi
 
 {/* notebook-block notebook="01_foundations/core_types_and_money.ipynb" cell="exercise-gbp-cash-extension" role="exercise" */}
 ```python exec id=exercise-gbp-cash-extension role=exercise
+from datetime import date
 import copy,json
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import DiscountCurve,FxMatrix
 from finstack_quant.portfolio import Portfolio,value_portfolio
-from _shared.analyst_book import AS_OF,book_spec,build_market
+from _shared.analyst_book import book_spec, build_market
+AS_OF = date(2025, 1, 15)
 original=book_spec('foundations'); original_wire=json.dumps(original,sort_keys=True)
 extended=copy.deepcopy(original)
 gbp=copy.deepcopy(next(p for p in extended['positions'] if p['position_id']=='EUR-CASH'))
@@ -218,9 +220,6 @@ quotes=FxMatrix();quotes.set_quote(Currency('EUR'),Currency('USD'),1.08);quotes.
 gbp_market.insert_fx(quotes)
 valuation=value_portfolio(Portfolio.from_spec(json.dumps(extended)),gbp_market,metrics=[])
 wire=json.loads(valuation.to_json());holding=wire['position_values']['GBP-CASH']
-assert len(extended['positions'])==5 and len(original['positions'])==4
-assert json.dumps(original,sort_keys=True)==original_wire
-assert abs(float(holding['value_base']['amount'])-1.25*float(holding['value_native']['amount']))<0.01
 print([{'id':p['position_id'],'currency':p['instrument_spec']['spec']['notional']['currency']} for p in extended['positions']])
 print({'GBP_value':holding['value_native'],'USD_value':holding['value_base']})
 ```

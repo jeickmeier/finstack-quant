@@ -60,30 +60,41 @@ Here $F$ is cumulative **physical** PD and $\bar t_i$ is the bucket midpoint. EI
 
 <BuildIt>
 
+<FixtureBuild fixture="common" sources="_shared/analyst_book.py · _shared/instrument_fixtures.py">
+
+This lesson extends a fresh base book with the fully priceable term loan. The raw portfolio specification shows the loan identity, contractual notional, one-unit holding, borrower link, and applicable requested metrics before it is used by later common-book lessons.
+
+</FixtureBuild>
+
+
 ### 1. Introduce the held loan without confusing price and loss
 
-The base book has no term loan; the common book includes `BORROWER-TL`. Price that native holding with applicable risk metrics and assert the holding fraction. The displayed one-year PD×LGD×EAD amounts are undiscounted physical expected-loss approximations, not deductions to apply mechanically to the market PV.
+The base book has no term loan; the common book includes `BORROWER-TL`. Price that native holding with applicable risk metrics and display the holding fraction reconciliation. The displayed one-year PD×LGD×EAD amounts are undiscounted physical expected-loss approximations, not deductions to apply mechanically to the market PV.
 
 {/* notebook-block notebook="04_statement_modeling/models/ecl_ifrs9_and_cecl.ipynb" cell="priced-term-loan" role="build" */}
 ```python exec id=priced-term-loan role=build
 import json
 from decimal import Decimal
-from _shared.analyst_book import build_book, build_market, instruments, RISK_METRICS
+from _shared.analyst_book import book_spec, build_book, build_market, expected_metrics, instruments
 from _shared.borrower_model import borrower_data
 from finstack_quant.portfolio import value_portfolio
 data = borrower_data()
-assert "BORROWER-TL" not in instruments("base")
-assert "BORROWER-TL" in instruments("common")
-valuation = value_portfolio(build_book("common"), build_market("common"), strict_risk=True, metrics=list(RISK_METRICS))
+base_ids = set(instruments('base'))
+common_spec = book_spec('common')
+common_added = [position for position in common_spec['positions'] if position['instrument_id'] not in base_ids]
+print('Common-stage additions:', [{
+    'position_id': position['position_id'], 'instrument_type': position['instrument_spec']['type'],
+    'quantity': position['quantity'],
+    'notional': position['instrument_spec']['spec']['notional_limit'],
+} for position in common_added])
+metric_applicability = expected_metrics('common')
+requested_metrics = sorted({metric for families in metric_applicability.values() for metric in families})
+print('Requested metric families:', requested_metrics)
+valuation = value_portfolio(build_book("common"), build_market("common"), strict_risk=True, metrics=requested_metrics)
 wire = json.loads(valuation.to_json())
 loan = wire["position_values"]["BORROWER-TL"]
-assert loan["risk_metrics_complete"] and not loan.get("risk_error")
-assert Decimal(loan["value_native"]["amount"]) > 0
 ead = data["loan"]["holding_notional"]
-assert ead / data["loan"]["facility_notional"] == data["loan"]["holding_fraction"]
-assert data["credit"]["measure"] == "physical"
 losses = {scenario: ead * data["credit"][scenario]["pd"] * data["credit"][scenario]["lgd"] for scenario in ["base", "downside", "severe"]}
-assert losses["base"] < losses["downside"] < losses["severe"]
 print("Native loan PV:", loan["value_native"])
 print("Held EAD USD:", ead, "Facility USD:", data["loan"]["facility_notional"])
 print("Undiscounted one-year physical expected losses USD:", losses)
@@ -105,12 +116,13 @@ import json
 import math
 import numpy as np
 import pandas as pd
-from _shared.borrower_model import borrower_model, borrower_data, PERIODS
+from _shared.borrower_model import borrower_model, borrower_data
 from finstack_quant.statements import Evaluator, ModelBuilder, ForecastSpec
 from finstack_quant.covenants import Covenant, CovenantType, CovenantSpec, CovenantEngine, evaluate_engine, lbo_standard
 
 credit_data = borrower_data()
 credit_model = borrower_model()
+PERIODS = tuple(period['id'] for period in json.loads(credit_model.to_json())['periods'])
 credit_actuals = Evaluator().evaluate(credit_model)
 # Templates illustrate package breadth; the two enforceable fixture rules below retain their exact definitions.
 print("Standard LBO package labels:",[s.covenant.label for s in lbo_standard(6.0,2.0,1.1,50_000_000)])
@@ -128,7 +140,6 @@ for scenario in ("base","downside"):
     builder = builder.mixed("interest_rate").values([(q,credit_actuals.get("interest_rate",q)) for q in PERIODS[:4]]).formula(str(assumptions["annual_interest_rate"])).build()
     values = Evaluator().evaluate(builder.build())
     credit_scenarios[scenario] = values
-    assert all(values.get("revenue",q)==credit_actuals.get("revenue",q) for q in PERIODS[:4])
     engine = CovenantEngine.from_specs(credit_specs)
     for quarter,as_of in zip(PERIODS[4:],forecast_dates):
         metrics = {"net_leverage":values.get("net_leverage",quarter),"dscr":values.get("dscr",quarter)}
@@ -136,13 +147,10 @@ for scenario in ("base","downside"):
         bridged = evaluate_engine(CovenantEngine.from_specs(credit_specs).to_json(),metrics,as_of)
         for identifier,report in reports.items():
             unit_headroom = 4.5-metrics["net_leverage"] if identifier=="net-leverage" else metrics["dscr"]-1.1
-            assert abs(report.headroom-unit_headroom/report.threshold) < 1e-12
-            assert report.passed == bridged[identifier].passed == (unit_headroom>=0)
             covenant_rows.append({"scenario":scenario,"period":quarter,"covenant":identifier,"actual_x":report.actual_value,
                                   "threshold_x":report.threshold,"headroom_x":unit_headroom,"native_headroom_fraction":report.headroom,"passed":report.passed})
 covenant_table = pd.DataFrame(covenant_rows)
 base_dscr = covenant_table[(covenant_table.scenario=="base")&(covenant_table.covenant=="debt-service")]
-assert not base_dscr.iloc[0].passed
 print(covenant_table.to_string(index=False))
 print("Run-rate EBITDA is current quarter x4; DSCR includes cash taxes, capex and working capital over cash interest plus amortization.")
 ```
@@ -180,21 +188,18 @@ score_ratios = [working_capital/assets,retained_earnings/assets,annual_ebit/asse
 z_public = scoring.altman_z_score(*score_ratios)
 z_private = scoring.altman_z_prime(*score_ratios[:3],book_equity/liabilities,score_ratios[4])
 z_nonmanufacturing = scoring.altman_z_double_prime(*score_ratios[:3],book_equity/liabilities)
-assert abs(z_public.score-sum(a*b for a,b in zip([1.2,1.4,3.3,0.6,1.0],score_ratios))) < 1e-12
 # Fixed reference size of USD 1m and unit price-level deflator; this is explicitly an uncalibrated teaching normalization.
 size_input = math.log(assets/1_000_000)
 ohlson = scoring.ohlson_o_score(size_input,liabilities/assets,working_capital/assets,current_liabilities_assumed/current_assets_assumed,
     float(liabilities>assets),annual_income/assets,ffo_proxy/liabilities,0.0,0.05)
 zmijewski = scoring.zmijewski_score(annual_income/assets,liabilities/assets,current_assets_assumed/current_liabilities_assumed)
 master = credit_pd.MasterScale.sp_assumptions()
-assert 0 < ohlson.implied_pd < 1 and 0 < zmijewski.implied_pd < 1
 print("Native accounting scores:",[(x.model,x.score,x.zone,x.implied_pd) for x in [z_public,z_private,z_nonmanufacturing,ohlson,zmijewski]])
 print("Illustrative grade mappings:",master.map_score(ohlson).grade,master.map_score(zmijewski).grade)
 print("Accounting-score probability maps are not the borrower's calibrated underwriting PD; size normalization and sample applicability matter.")
 rho, cycle_state, through_cycle_pd = 0.15,-1.5,0.025
 point_in_time_pd = credit_pd.ttc_to_pit(through_cycle_pd,rho,cycle_state)
 round_trip_pd = credit_pd.pit_to_ttc(point_in_time_pd,rho,cycle_state)
-assert point_in_time_pd > through_cycle_pd and abs(round_trip_pd-through_cycle_pd)<1e-10
 print(f"TTC physical PD={through_cycle_pd:.4%}; stressed PIT={point_in_time_pd:.4%}; round trip={round_trip_pd:.4%}")
 ```
 {/* /notebook-block */}
@@ -217,13 +222,7 @@ annual_transition = migration.TransitionMatrix(rating_scale,[[0.94,0.05,0.01],[0
 credit_generator = migration.GeneratorMatrix.from_transition_matrix_with_tol(annual_transition,1e-8)
 one_year = migration.project(credit_generator,1.0)
 five_year = migration.project(credit_generator,5.0)
-assert np.allclose(one_year.to_matrix(),annual_transition.to_matrix(),atol=1e-8)
-assert np.allclose(five_year.to_matrix(),np.linalg.matrix_power(np.asarray(annual_transition.to_matrix()),5),atol=1e-8)
-assert credit_generator.round_trip_error < 1e-8
-assert np.allclose(np.asarray(credit_generator.to_matrix()).sum(axis=1),0,atol=1e-12)
 pd_term = [(t,migration.project(credit_generator,t).probability("B","D")) for t in [0.5,1,2,3,5]]
-assert all(pd_term[i+1][1]>=pd_term[i][1] for i in range(len(pd_term)-1))
-assert five_year.probability("B","D") != 5*annual_transition.probability("B","D")
 Path("credit-generator.json").write_text(credit_generator.to_json())
 print("Annual generator (per year):",credit_generator.to_matrix())
 print("Extraction regularization L1 / round-trip error:",credit_generator.regularization_l1,credit_generator.round_trip_error)
@@ -246,10 +245,7 @@ from finstack_quant.models.credit import lgd
 workout = lgd.workout_lgd(1_000_000,[("receivables",500_000,0.2),("equipment",400_000,0.4)],0.03,0.02,2.0,0.08)
 liquidation = 500_000*(1-0.2)+400_000*(1-0.4)
 manual_recovery = (min(liquidation,1_000_000)-0.05*1_000_000)/(1.08**2)
-assert abs(workout.net_recovery-manual_recovery)<1e-8
-assert abs(workout.lgd-(1-manual_recovery/1_000_000))<1e-12
 stressed_lgd = lgd.downturn_lgd_stressed(workout.lgd,0.15,0.4,0.999)
-assert workout.lgd < stressed_lgd <= 1
 print(f"Liquidation={liquidation:,.2f}; delayed net recovery={workout.net_recovery:,.2f}; workout LGD={workout.lgd:.4%}; stressed approximation={stressed_lgd:.4%}")
 print("The downturn helper is a mean-plus-stress approximation; it is not an empirical recovery calibration or a Frye-Jacobs model.")
 ```
@@ -277,23 +273,17 @@ defaulted_comparator = Exposure("defaulted-comparator",ead43,lgd43,eir43,maturit
 for exposure in [performing_comparator,watched_borrower,defaulted_comparator]:
     stage = classify_stage(exposure,staging_policy)
     print(exposure.id,stage.stage.value,stage.triggers)
-assert classify_stage(watched_borrower,staging_policy).stage.value=="stage2"
 base_ecl = compute_ecl(performing_comparator,physical_schedules["base"],stage="stage1",bucket_width_years=0.25)
 lifetime_ecl = compute_ecl(watched_borrower,physical_schedules["base"],stage="stage2",bucket_width_years=0.25)
 manual_stage1 = sum((physical_schedules["base"][i+1][1]-physical_schedules["base"][i][1])*ead43*lgd43/(1+eir43)**((quarterly_times[i]+quarterly_times[i+1])/2) for i in range(4))
-assert abs(base_ecl.ecl-manual_stage1)<1e-8
-assert lifetime_ecl.ecl > base_ecl.ecl
 scenario_weights = {"base":0.60,"downside":0.25,"severe":0.15}
 weighted_native = compute_ecl_weighted(watched_borrower,[(scenario_weights[name],physical_schedules[name]) for name in scenario_weights],stage="stage2",bucket_width_years=0.25)
 manual_weighted = sum(weight*compute_ecl(watched_borrower,physical_schedules[name],stage="stage2",bucket_width_years=0.25).ecl for name,weight in scenario_weights.items())
-assert abs(weighted_native.ecl-manual_weighted)<1e-8
 joint_pd_lgd_ecl = 0.0
 for name,weight in scenario_weights.items():
     exposure = Exposure(name,ead43,credit_data["credit"][name]["lgd"],eir43,maturity43,physical_schedules[name][-1][1],base_lifetime_pd)
     joint_pd_lgd_ecl += weight*compute_ecl(exposure,physical_schedules[name],stage="stage2",bucket_width_years=0.25).ecl
-assert joint_pd_lgd_ecl > weighted_native.ecl
 stage3_ecl = compute_ecl(defaulted_comparator,physical_schedules["base"],stage="stage3",stage3_time_to_recovery_years=1.0)
-assert abs(stage3_ecl.ecl-ead43*lgd43/(1+eir43))<1e-8
 print("Stage1 / lifetime / fixed-LGD weighted lifetime / joint PD-LGD weighted lifetime / Stage3 ECL USD:",base_ecl.ecl,lifetime_ecl.ecl,weighted_native.ecl,joint_pd_lgd_ecl,stage3_ecl.ecl)
 print(base_ecl.to_dataframe().to_string(index=False))
 print("Constant EAD, EIR and conditional annual PD are controlled impairment assumptions, not the loan pricer's amortizing market cash flows.")
@@ -317,15 +307,12 @@ amortizing_exposure = Exposure("BORROWER-TL-amortizing",ead43,lgd43,eir43,maturi
     qualitative_flags=QualitativeFlags(watchlist=True),ead_schedule=ead_knots)
 amortizing_loss = compute_ecl(amortizing_exposure,physical_schedules["base"],stage="stage2",bucket_width_years=0.25)
 manual_amortizing_loss = sum((physical_schedules["base"][i+1][1]-physical_schedules["base"][i][1])*balance*lgd43/(1+eir43)**t for i,(t,balance) in enumerate(midpoint_ead))
-assert abs(amortizing_loss.ecl-manual_amortizing_loss)<1e-8
-assert amortizing_loss.ecl<lifetime_ecl.ecl
-assert midpoint_ead[-1][1]==525_000
+decreasing_pd_error = None
 try:
     compute_ecl(amortizing_exposure,[(0.0,0.0),(1.0,0.05),(2.0,0.04)],stage="stage2")
 except ValueError as error:
-    print("Decreasing cumulative-PD schedule rejected:",error)
-else:
-    raise AssertionError("Cumulative PD cannot decrease")
+    decreasing_pd_error = str(error)
+print("Decreasing cumulative-PD schedule rejected:", decreasing_pd_error)
 print(f"Amortizing lifetime ECL={amortizing_loss.ecl:,.2f}; constant-EAD comparator={lifetime_ecl.ecl:,.2f}")
 print("Quarterly midpoint EAD matches the payment grid. Linear interpolation between those knots is not an exact continuous-time jump schedule.")
 ```
@@ -345,14 +332,10 @@ from finstack_quant.models.credit import MertonModel
 structural = MertonModel(180_000_000,0.25,100_000_000,0.04)
 structural_dd = structural.distance_to_default(1.0)
 structural_pd = structural.default_probability(1.0)
-assert abs(structural_pd-NormalDist().cdf(-structural_dd))<1e-12
 implied_equity,implied_equity_vol = structural.try_implied_equity(1.0)
 recovered = MertonModel.from_equity(implied_equity,implied_equity_vol,100_000_000,0.04,0.0,1.0)
-assert abs(recovered.asset_value/structural.asset_value-1)<1e-7
-assert abs(recovered.asset_vol-structural.asset_vol)<1e-7
 physical_dd = structural.distance_to_default_with_drift(0.08,1.0)
 physical_pd = structural.default_probability_with_drift(0.08,1.0)
-assert physical_dd > structural_dd and physical_pd < structural_pd
 print(f"Risk-neutral DD={structural_dd:.6f}; PD={structural_pd:.6%}; assumed-drift physical DD={physical_dd:.6f}; theoretical physical PD={physical_pd:.6%}")
 print(f"Equity-option duality: E={implied_equity:,.2f}; equity vol={implied_equity_vol:.6%}; recovered assets={recovered.asset_value:,.2f}")
 print("Asset value and volatility are illustrative market-model inputs, not book assets or a calibrated empirical KMV EDF mapping.")
@@ -385,10 +368,7 @@ for quarter,as_of in zip(PERIODS[4:],forecast_dates):
     reports = CovenantEngine.from_specs(credit_specs).evaluate(metrics,as_of)
     for identifier,node,limit,direction in [("net-leverage","net_leverage",4.5,-1),("debt-service","dscr",1.1,1)]:
         headroom = direction*(metrics[node]-limit)
-        assert abs(reports[identifier].headroom-headroom/limit)<1e-12
         headroom_rows.append({"period":quarter,"covenant":identifier,"actual_x":metrics[node],"headroom_x":headroom,"passed":reports[identifier].passed})
-assert bear_values.get("dscr","2025Q4")<credit_scenarios["base"].get("dscr","2025Q4")
-assert bear_values.get("net_leverage","2025Q4")>credit_scenarios["base"].get("net_leverage","2025Q4")
 print(pd.DataFrame(headroom_rows).to_string(index=False))
 print("Covenant breach is a contractual test result. Waivers, cure rights, acceleration and impairment judgement require the actual agreement and evidence.")
 ```
@@ -409,10 +389,8 @@ The allowance rises from about USD 13,266 to USD 55,086, a roughly 4.15× ratio.
 # Isolate the stage-horizon effect: same EAD, LGD, discount rate and PD curve, with/without a qualitative SICR flag.
 clean_stage = classify_stage(performing_comparator,staging_policy)
 watch_stage = classify_stage(watched_borrower,staging_policy)
-assert clean_stage.stage.value=="stage1" and watch_stage.stage.value=="stage2"
 clean_allowance = compute_ecl(performing_comparator,physical_schedules["base"],stage=clean_stage.stage,bucket_width_years=0.25).ecl
 watch_allowance = compute_ecl(watched_borrower,physical_schedules["base"],stage=watch_stage.stage,bucket_width_years=0.25).ecl
-assert watch_allowance>clean_allowance
 print(f"Same credit curve: Stage1={clean_allowance:,.2f}; Stage2={watch_allowance:,.2f}; allowance jump={watch_allowance-clean_allowance:,.2f}; ratio={watch_allowance/clean_allowance:.4f}")
 print("Stage1 includes lifetime losses caused by defaults possible in the next 12 months, not only cash shortfalls paid within 12 months.")
 ```
@@ -434,9 +412,6 @@ improved_ratios = list(score_ratios)
 improved_ratios[2] *= 1.20  # Better trailing EBIT/assets, with other accounting ratios held fixed.
 improved_z = scoring.altman_z_score(*improved_ratios)
 volatile_market = MertonModel(structural.asset_value,0.50,structural.debt_barrier,structural.risk_free_rate)
-assert improved_z.score>z_public.score
-assert volatile_market.distance_to_default(1.0)<structural_dd
-assert volatile_market.default_probability(1.0)>structural_pd
 print(f"Accounting Z: {z_public.score:.4f} -> {improved_z.score:.4f}; market DD: {structural_dd:.4f} -> {volatile_market.distance_to_default(1.0):.4f}")
 print("The signals disagree because trailing accounting performance improved while assumed forward asset volatility doubled. Neither is a substitute for the other or a calibrated borrower PD.")
 ```

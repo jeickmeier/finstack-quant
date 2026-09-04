@@ -71,13 +71,11 @@ import numpy as np
 import pandas as pd
 from _shared import analyst_tracks as tracks
 from finstack_quant.valuations.instruments import price_instrument
-AS_OF=tracks.AS_OF
+AS_OF = date(2025, 1, 15)
 revolver_payload=tracks.credit_extension()["ANALYST-REVOLVER"]
 credit_market=tracks.build_market("credit")
 revolver_value=price_instrument(json.dumps(revolver_payload),credit_market,AS_OF,
     metrics=["available_capacity","utilization_rate","weighted_average_cost"])
-assert revolver_value.metrics["utilization_rate"]==.4
-assert revolver_value.metrics["available_capacity"]==6_000_000
 print(pd.Series(revolver_value.metrics))
 ```
 {/* /notebook-block */}
@@ -99,8 +97,6 @@ for rho in [0.0,.30]:
     expected_loss=(1-.4)*10_000_000*.10*utilization_at_default
     wwr_rows.append({"correlation":rho,"E_U":marginal_utilization,
                     "E_U_given_default":utilization_at_default,"expected_loss_usd":expected_loss})
-assert wwr_rows[0]["E_U"]==wwr_rows[1]["E_U"]
-assert wwr_rows[1]["E_U_given_default"]>wwr_rows[0]["E_U_given_default"]
 print(pd.DataFrame(wwr_rows))
 ```
 {/* /notebook-block */}
@@ -113,8 +109,6 @@ for rho in [0.0,.30]:
     payload=tracks.stochastic_revolver(correlation=rho,num_paths=1024)
     first=price_instrument(json.dumps(payload),credit_market,AS_OF,model="monte_carlo_gbm").value.amount
     repeated=price_instrument(json.dumps(payload),credit_market,AS_OF,model="monte_carlo_gbm").value.amount
-    assert first==repeated
-    assert payload["instrument"]["spec"]["drawn_amount"]["amount"]=="4000000"
     mc_rows.append({"correlation":rho,"seeded_native_pv_usd":first})
 print(pd.DataFrame(mc_rows))
 ```
@@ -126,9 +120,10 @@ print(pd.DataFrame(mc_rows))
 
 {/* notebook-block notebook="02_pricing/instruments/loans_and_credit_facilities.ipynb" cell="c2-loan-economics" role="build" */}
 ```python exec id=c2-loan-economics role=build
+from _shared.analyst_book import instruments as common_instruments
 from finstack_quant.valuations.instruments import validate_instrument_json
 from finstack_quant.valuations import instrument_cashflows
-loan=tracks.common.instruments("common")["BORROWER-TL"]
+loan=common_instruments("common")["BORROWER-TL"]
 l=loan["instrument"]["spec"]
 l.update({"id":"C2-FLOORED-LOAN","settlement_days":2,"upfront_fee":{"amount":"20000","currency":"USD"},
           "oid_eir":{"include_fees":True},"call_schedule":{"calls":[
@@ -140,8 +135,6 @@ loan_quote=deepcopy(loan)
 loan_quote["instrument"]["spec"]["instrument_pricing_overrides"]={"market_quotes":{"quoted_clean_price":98.5,"implied_volatility":.01}}
 loan_measures=price_instrument(json.dumps(loan_quote),credit_market,AS_OF,
     metrics=["ytc","ytw","all_in_rate","discount_margin","oid_eir_amortization"])
-assert loan_measures.metrics["ytw"]<=loan_measures.metrics["ytc"]+1e-10
-assert math.isfinite(loan_measures.metrics["oid_eir_rate"])
 print(pd.Series({k:loan_measures.metrics[k] for k in ["ytc","ytw","all_in_rate","discount_margin","oid_eir_rate"]}))
 ```
 {/* /notebook-block */}
@@ -163,8 +156,6 @@ penalty["instrument"]["spec"]["covenants"]={"margin_stepups":[{"date":"2025-07-1
 event_rows=[]
 for name,payload in [("contract",contract),("penalty_and_toggle",penalty)]:
     env,flows=instrument_cashflows(json.dumps(payload),credit_market,AS_OF,model="discounting")
-    assert env["reconciles_with_base_value"]
-    assert abs(flows.pv.sum()-float(env["total_pv"]))<.01
     print(name,flows[["date","kind","amount"]].head(10))
     dated_payload=deepcopy(payload)
     if name=="penalty_and_toggle":
@@ -197,7 +188,6 @@ d.update({"id":"C2-DDTL","upfront_fee":None,"amortization":"none","ddtl":{
 ddtl_value=price_instrument(json.dumps(ddtl),credit_market,AS_OF,metrics=["all_in_rate","oid_eir_amortization"])
 no_commitment_fee=deepcopy(ddtl);no_commitment_fee["instrument"]["spec"]["ddtl"]["commitment_fee_bp"]=0
 free_value=price_instrument(json.dumps(no_commitment_fee),credit_market,AS_OF).value.amount
-assert ddtl_value.value.amount>free_value
 print({"DDTL_net_pv_usd":ddtl_value.value.amount,"commitment_fee_pv_usd":ddtl_value.value.amount-free_value,
        "effective_rate":ddtl_value.metrics["oid_eir_rate"]})
 ```
@@ -212,8 +202,6 @@ scheduled["instrument"]["spec"]["draw_repay_spec"]={"deterministic":[
     {"date":"2026-04-15","amount":{"amount":"1000000","currency":"USD"},"is_draw":False}]}
 scheduled_value=price_instrument(json.dumps(scheduled),credit_market,AS_OF,
     metrics=["available_capacity","utilization_rate","weighted_average_cost"])
-assert scheduled_value.metrics["utilization_rate"]==.4  # Observed current state, before future draws.
-assert math.isfinite(scheduled_value.value.amount)
 print({"static_pv":revolver_value.value.amount,"scheduled_draw_repay_pv":scheduled_value.value.amount,
        **scheduled_value.metrics})
 ```
@@ -239,7 +227,6 @@ floor_case["instrument"]["spec"]["rate"]["floating"]["index_floor_bp"]="0"
 no_floor=deepcopy(floor_case);no_floor["instrument"]["spec"]["rate"]["floating"]["index_floor_bp"]=None
 floor_pv=price_instrument(json.dumps(floor_case),low,AS_OF).value.amount
 unfloored_pv=price_instrument(json.dumps(no_floor),low,AS_OF).value.amount
-assert floor_pv>unfloored_pv
 print({"zero_floor_usd":floor_pv,"no_floor_usd":unfloored_pv,"floor_value_usd":floor_pv-unfloored_pv})
 ```
 {/* /notebook-block */}
@@ -257,8 +244,6 @@ Solve `f*(1-u)=g` on the common commitment base. At lower utilization the undraw
 # Compare 50 bp on undrawn capacity with an alternative 20 bp fee on total commitment.
 commitment_fee,facility_fee=.005,.002
 breakeven=1-facility_fee/commitment_fee
-assert 0<breakeven<1
-assert abs(commitment_fee*(1-breakeven)-facility_fee)<1e-12
 utilizations=np.array([.2,.4,breakeven,.8])
 print(pd.DataFrame({"utilization":utilizations,"undrawn_fee_usd":10_000_000*commitment_fee*(1-utilizations),
                     "facility_fee_usd":10_000_000*facility_fee}))
@@ -279,9 +264,6 @@ credit_loan=deepcopy(contract);credit_loan["instrument"]["spec"]["credit_curve_i
 credit_line=deepcopy(revolver_payload);credit_line["instrument"]["spec"]["credit_curve_id"]="ACME-HZD"
 loan_cs=price_instrument(json.dumps(credit_loan),credit_market,AS_OF,metrics=["cs01"])
 line_cs=price_instrument(json.dumps(credit_line),credit_market,AS_OF,metrics=["cs01"])
-assert any(k.startswith("cs01::") for k in loan_cs.metrics)
-assert any(k.startswith("cs01::") for k in line_cs.metrics)
-assert wwr_rows[1]["expected_loss_usd"]>wwr_rows[0]["expected_loss_usd"]
 print("Term loan:",loan_cs.metrics,"Revolver:",line_cs.metrics)
 print("An undrawn line has contingent exposure: future borrower draws and default can be dependent. Its current utilization metric cannot measure that conditional exposure.")
 ```

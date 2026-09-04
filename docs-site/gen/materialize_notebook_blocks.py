@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import json
 from pathlib import Path
 import re
 import shlex
 import sys
 
-from common import CONTENT, NOTEBOOKS, contained, curriculum
+from common import CONTENT, NOTEBOOKS, contained, curriculum, lesson_notebook_names
+from publication_source import assertion_count, without_assertions
 from run_lesson_snippets import extract_blocks
 
 MARKER = re.compile(r"^[ \t]*(?:<!--\s*(/?notebook-block\b.*?)\s*-->|\{/\*\s*(/?notebook-block\b.*?)\s*\*/\})[ \t]*$")
@@ -24,7 +24,7 @@ def cell_source(record: dict, fields: dict[str, str], notebook_root: Path) -> st
         raise ValueError("Notebook block requires exactly notebook, cell and role attributes")
     relative, identifier, role = fields["notebook"], fields["cell"], fields["role"]
     path = contained(notebook_root, relative)
-    if path.suffix != ".ipynb" or relative not in [*record.get("labs", []), *record.get("examples", [])]:
+    if path.suffix != ".ipynb" or relative not in lesson_notebook_names(record):
         raise ValueError(f"{record['id']}: notebook is not mapped in labs/examples: {relative}")
     if not CELL_ID.fullmatch(identifier) or role not in {"build", "exercise"}:
         raise ValueError(f"{record['id']}: invalid notebook cell ID or role")
@@ -52,8 +52,7 @@ def cell_source(record: dict, fields: dict[str, str], notebook_root: Path) -> st
         source = "".join(source)
     if not isinstance(source, str):
         raise TypeError(f"{relative}:{identifier}: cell source must be text")
-    parsed = ast.parse(source, filename=f"{relative}:{identifier}")
-    if role == "exercise" and not any(isinstance(node, ast.Assert) for node in ast.walk(parsed)):
+    if role == "exercise" and not assertion_count(source, f"{relative}:{identifier}"):
         raise ValueError(f"{relative}:{identifier}: exercise source requires an explicit assertion")
     return source
 
@@ -73,12 +72,34 @@ def _marker_fields(value: str, lesson_id: str) -> dict[str, str]:
     return fields
 
 
+def _render_cell(record: dict, fields: dict[str, str], notebook_root: Path) -> tuple[str, bool]:
+    """Render one sanitized notebook cell and report its canonical build gate."""
+    source = cell_source(record, fields, notebook_root)
+    cell_name = f"{fields['notebook']}:{fields['cell']}"
+    has_build_assertion = fields["role"] == "build" and bool(assertion_count(source, cell_name))
+    published_source = without_assertions(source, cell_name)
+    ticks = max([2, *(len(match[0]) for match in re.finditer(r"`+", published_source))]) + 1
+    delimiter = "`" * ticks
+    attributes = " ".join(
+        f"{key}={json.dumps(fields[key], ensure_ascii=False)}" for key in ("notebook", "cell", "role")
+    )
+    rendered = (
+        f"{{/* notebook-block {attributes} */}}\n"
+        f"{delimiter}python exec id={fields['cell']} role={fields['role']}\n"
+        + published_source
+        + ("" if published_source.endswith("\n") else "\n")
+        + f"{delimiter}\n{{/* /notebook-block */}}"
+    )
+    return rendered, has_build_assertion
+
+
 def render_notebook_blocks(text: str, record: dict, notebook_root: Path = NOTEBOOKS) -> str:
     """Replace marked regions only; reject malformed, nested or duplicate blocks."""
     output = []
     opening = None
     seen = set()
     fence = None
+    canonical_build_has_assertion = False
     for line in text.splitlines(keepends=True):
         stripped = line.rstrip("\r\n")
         marker = MARKER.fullmatch(stripped)
@@ -103,21 +124,10 @@ def render_notebook_blocks(text: str, record: dict, notebook_root: Path = NOTEBO
             if value != "/notebook-block" or opening is None:
                 raise ValueError(f"{record['id']}: unexpected notebook-block closing marker")
             fields = opening
-            source = cell_source(record, fields, notebook_root)
-            # A longer fence preserves literal backticks inside Python strings.
-            ticks = max([2, *(len(match[0]) for match in re.finditer(r"`+", source))]) + 1
-            delimiter = "`" * ticks
-            attributes = " ".join(
-                f"{key}={json.dumps(fields[key], ensure_ascii=False)}" for key in ("notebook", "cell", "role")
-            )
-            output.append(
-                f"{{/* notebook-block {attributes} */}}\n"
-                f"{delimiter}python exec id={fields['cell']} role={fields['role']}\n"
-                + source
-                + ("" if source.endswith("\n") else "\n")
-                + f"{delimiter}\n{{/* /notebook-block */}}"
-                + ("\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else "")
-            )
+            rendered, has_build_assertion = _render_cell(record, fields, notebook_root)
+            canonical_build_has_assertion |= has_build_assertion
+            ending = "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else ""
+            output.append(rendered + ending)
             opening = None
             continue
         if opening is not None:
@@ -131,8 +141,10 @@ def render_notebook_blocks(text: str, record: dict, notebook_root: Path = NOTEBO
         raise ValueError(f"{record['id']}: unclosed notebook-block marker")
     result = "".join(output)
     # This also rejects collisions with hand-authored executable block IDs and
-    # enforces one checked build sequence plus a check in every exercise.
-    extract_blocks(result, f"lesson:{record['id']}")
+    # any assertion that did not originate from a canonical notebook cell.
+    blocks = extract_blocks(result, f"lesson:{record['id']}")
+    if blocks and not canonical_build_has_assertion:
+        raise ValueError(f"lesson:{record['id']}: canonical build sequence requires an explicit assertion")
     return result
 
 

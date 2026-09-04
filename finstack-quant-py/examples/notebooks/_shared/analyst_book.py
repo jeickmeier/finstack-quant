@@ -248,6 +248,25 @@ def calibration_envelope(stage: str = "base", as_of: date = AS_OF) -> dict[str, 
     return envelope
 
 
+def single_name_calibration_envelope(as_of: date = AS_OF) -> dict[str, Any]:
+    """Return the quote-backed single-name hazard inputs introduced in 1.5.
+
+    Args:
+        as_of: Base date for the discount and hazard calibration curves.
+
+    Returns:
+        Fresh OIS and ACME CDS quote inputs with the lossless hazard replay
+        recipe. This market-data fixture does not add a CDS holding to a book.
+
+    Raises:
+        OSError: If the repository calibration example cannot be read.
+
+    >>> single_name_calibration_envelope()["plan"]["steps"][-1]["curve_id"]
+    'ACME-HZD'
+    """
+    return calibration_envelope("base", as_of)
+
+
 def build_market(stage: str = "base", as_of: date = AS_OF) -> MarketContext:
     """Build a fresh market containing all inputs for ``stage``.
 

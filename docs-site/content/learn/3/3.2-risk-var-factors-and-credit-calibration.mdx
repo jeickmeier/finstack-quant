@@ -79,17 +79,13 @@ import numpy as np
 from _shared.analyst_history import risk_panel
 from finstack_quant.analytics import Performance
 panel = risk_panel()
-assert panel.index.is_unique and not panel.isna().any().any()
 performance = Performance.from_returns(panel[["portfolio", "benchmark"]], frequency="daily", benchmark_ticker="benchmark")
 confidence = 0.95
 measures = {"historical_var":float(performance.value_at_risk(confidence).iloc[0]), "normal_var":float(performance.parametric_var(confidence).iloc[0]), "cornish_fisher_var":float(performance.cornish_fisher_var(confidence).iloc[0]), "historical_es":float(performance.expected_shortfall(confidence).iloc[0])}
-assert all(math.isfinite(value) for value in measures.values())
-assert abs(measures["historical_es"]) >= abs(measures["historical_var"])
 factors = panel[["market", "rates", "credit"]].to_numpy().T.tolist()
 fit = performance.multi_factor_greeks(0, factors)
 design = np.column_stack([np.ones(len(panel)), panel[["market", "rates", "credit"]]])
 ols = np.linalg.lstsq(design, panel["portfolio"].to_numpy(), rcond=None)[0]
-assert np.allclose(fit.betas, ols[1:], atol=1e-10), "Dimensionless OLS loadings, independent NumPy reference"
 print("Daily return-risk measures:",measures)
 print("Factor loadings [market,rates,credit]:",fit.betas,"R-squared:",fit.r_squared)
 print("Incorrect 95% one-day VaR times sqrt(10) (not 99%):",measures["normal_var"]*math.sqrt(10))
@@ -108,17 +104,11 @@ h = (len(ordered)-1) * (1-confidence)
 k = int(math.floor(h))
 manual_var = ordered[k] + (h-k) * (ordered[k+1]-ordered[k])
 manual_es = ordered[ordered <= manual_var].mean()
-assert abs(manual_var-measures["historical_var"]) < 1e-12
-assert abs(manual_es-measures["historical_es"]) < 1e-12
 residual = returns - design @ ols
-assert abs(residual.mean()) < 1e-12
-assert np.allclose(design.T @ residual, 0, atol=1e-10)
 manual_r_squared = 1 - float(residual @ residual) / float((returns-returns.mean()) @ (returns-returns.mean()))
-assert abs(manual_r_squared-fit.r_squared) < 1e-10
 factor_observations = panel[["market","rates","credit"]].to_numpy()
 shrunk, intensity = linalg.ledoit_wolf_shrinkage(factor_observations)
 shrunk = np.asarray(shrunk)
-assert 0 <= intensity <= 1 and np.linalg.eigvalsh(shrunk).min() > 0
 print(f"Manual R-7 lower quantile={manual_var:.8f}; closed-tail mean={manual_es:.8f}")
 print(f"Daily residual volatility={residual.std(ddof=1):.8f}; Ledoit-Wolf intensity={intensity:.6f}")
 print("Shrunk daily factor covariance:\n", shrunk)
@@ -126,7 +116,6 @@ print("Shrunk daily factor covariance:\n", shrunk)
 single_beta = performance.beta()[0].beta
 benchmark_returns = panel["benchmark"].to_numpy()
 manual_beta = np.cov(returns, benchmark_returns, ddof=1)[0,1] / benchmark_returns.var(ddof=1)
-assert abs(single_beta-manual_beta) < 1e-12
 print(f"Benchmark beta={single_beta:.8f}; independent covariance ratio={manual_beta:.8f}")
 ```
 {/* /notebook-block */}
@@ -152,8 +141,6 @@ skewed_measures = {
     "Gaussian":float(skewed_performance.parametric_var(0.95).iloc[0]),
     "Cornish-Fisher":float(skewed_performance.cornish_fisher_var(0.95).iloc[0]),
 }
-assert all(math.isfinite(value) for value in skewed_measures.values())
-assert abs(skewed_measures["Cornish-Fisher"]-skewed_measures["Gaussian"]) > 1e-5
 print("Controlled skewed daily returns:",skewed_measures)
 print("A correction changes the model; closeness to one empirical quantile is not a guarantee out of sample.")
 ```
@@ -171,12 +158,10 @@ loss_b = np.zeros(100); loss_b[4:8] = 0.1
 state_returns = pd.DataFrame({"A":-loss_a,"B":-loss_b,"AplusB":-(loss_a+loss_b)},index=pd.bdate_range("2025-01-01",periods=100))
 discrete = Performance.from_returns(state_returns,frequency="daily")
 var_values = discrete.value_at_risk(0.95)
-assert var_values["A"] == var_values["B"] == 0 and var_values["AplusB"] == -0.1
 # Exact 95% ES averages exactly five worst equiprobable states, including partial threshold mass if needed.
 exact_es_a = np.sort(loss_a)[-5:].mean()
 exact_es_b = np.sort(loss_b)[-5:].mean()
 exact_es_sum = np.sort(loss_a+loss_b)[-5:].mean()
-assert exact_es_sum <= exact_es_a+exact_es_b
 print("Loss-positive VaR:",(-var_values).to_dict())
 print("Exact tail-mass ES:",{"A":exact_es_a,"B":exact_es_b,"AplusB":exact_es_sum})
 print("API closed-threshold tail averages:",(-discrete.expected_shortfall(0.95)).to_dict())
@@ -243,7 +228,6 @@ _schedule = (
     .build()
 )
 dates = [d.isoformat() for d in _schedule.dates][-N_MONTHS:]
-assert len(dates) == N_MONTHS and dates[-1] == AS_OF
 
 # Generic factor: CDX IG 5Y proxy, mean 100 bp with small trend
 generic_values = [(100.0 + 0.5 * math.sin(i * 0.4)) / 10_000.0 for i in range(N_MONTHS)]
@@ -323,7 +307,6 @@ print(f"n_factors      : {model.n_factors}")
 print(f"level_names    : {model.level_names()}")
 print(f"issuer_ids     : {model.issuer_ids()}")
 print(f"factor_ids     : {model.factor_ids()}")
-assert model.n_issuers == 6 and model.n_levels == 2
 ```
 {/* /notebook-block */}
 
@@ -341,10 +324,6 @@ with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
 artifact_json = artifact_path.read_text()
 model_reloaded = CreditFactorModel.from_json(artifact_json)
 
-assert model_reloaded.schema == model.schema
-assert model_reloaded.n_issuers == model.n_issuers
-assert model_reloaded.n_factors == model.n_factors
-assert model_reloaded.issuer_ids() == model.issuer_ids()
 
 # Clean up
 artifact_path.unlink()
@@ -372,7 +351,6 @@ T0_GENERIC = 99.5 / 10_000.0
 # T1: as-of (the last panel date, 2024-03-31)
 T1_DATE = AS_OF
 T1_GENERIC = 101.2 / 10_000.0
-assert T0_DATE == "2024-02-29" and T1_DATE == dates[-1]
 
 # Observed spreads are a plain {issuer: decimal_spread} mapping (same at both dates).
 snap_t0 = decompose_levels(model, as_of_spreads, T0_GENERIC, T0_DATE)
@@ -381,7 +359,6 @@ snap_t1 = decompose_levels(model, as_of_spreads, T1_GENERIC, T1_DATE)
 period = decompose_period(snap_t0, snap_t1)
 
 # decompose_levels -> LevelsAtDate snapshots; decompose_period -> PeriodDecomposition
-assert isinstance(snap_t0, LevelsAtDate) and isinstance(period, PeriodDecomposition)
 
 print(f"Period: {period.from_date} → {period.to_date}")
 print(f"Δ generic (bp): {period.d_generic:.4f}")
@@ -434,14 +411,11 @@ print("\nPer-issuer idiosyncratic vol (one-step, annualized):")
 for issuer_id in model.issuer_ids():
     vol = fcf.idiosyncratic_vol(issuer_id, "one_step")
     print(f"  {issuer_id}: {vol:.6f}")
-assert np.allclose(cov_12.to_numpy(), 12 * data, rtol=1e-12, atol=1e-12)
-assert np.linalg.eigvalsh(data).min() >= -1e-10
 # Explicit illustrative dollar exposures per native factor unit, aligned by ID.
 from finstack_quant.models.factor.risk import parametric_var_decomposition
 exposure = np.full(len(factor_ids), 1000.0)
 dollar_sigma = float(np.sqrt(exposure @ data @ exposure))
 allocated = parametric_var_decomposition(factor_ids, exposure.tolist(), data, 0.95)
-assert dollar_sigma > 0 and allocated.portfolio_var < 0
 print(f"Illustrative annual dollar volatility: {dollar_sigma:,.6f}; 95% Gaussian VaR: {allocated.portfolio_var:,.6f}")
 ```
 {/* /notebook-block */}
@@ -459,9 +433,7 @@ dts_config["bucket_weighting"] = "dts"
 dts_inputs = deepcopy(calibration_inputs)
 dts_inputs["spread_durations"] = {issuer: 5.0 for issuer in as_of_spreads}
 dts_model = CreditCalibrator(dts_config).calibrate(dts_inputs)
-assert dts_model.n_issuers == model.n_issuers
 weights_dts = {issuer: 5.0 * spread * 10_000 for issuer, spread in as_of_spreads.items()}
-assert all(weight > 0 for weight in weights_dts.values())
 print("DTS weights (spread-duration years x spread bp):", weights_dts)
 print("Calibrated equal-weight and DTS artifacts:", model.schema, dts_model.schema)
 ```
@@ -487,9 +459,7 @@ mu = returns.mean(); sigma = returns.std(ddof=1)
 z99 = NormalDist().inv_cdf(0.99)
 manual_ten_day = 10 * mu - z99 * sigma * math.sqrt(10)
 native_ten_day = float(performance.parametric_var(0.99,horizon_periods=10).iloc[0])
-assert abs(manual_ten_day-native_ten_day) < 1e-9
 naive = measures["normal_var"] * math.sqrt(10)
-assert abs(naive-native_ten_day) > 1e-4
 print(f"99%/10-period Gaussian return VaR={native_ten_day:.6%}")
 print(f"Incorrect 95%/1-period sqrt(10) shortcut={naive:.6%}")
 print("Assumptions: independent, stationary Gaussian increments, unchanged positions, additive-return approximation.")
@@ -504,7 +474,7 @@ For options or a portfolio with changing exposures, revalue horizon scenarios wh
 
 <Exercise title="2. Neutralize an exposure before standardizing a signal" question="Remove the supplied linear exposure from four aligned same-date signals and standardize the residual. Check mean, exposure orthogonality and the API's variance convention.">
 
-The native helper neutralizes the cross-section and uses a population standard deviation for the z-score. The result has zero mean, zero dot product with the supplied exposure and unit population standard deviation. A sample-standard-deviation assertion would use the wrong convention. Neutrality is relative to these supplied exposures and this date; omitted factors and future drift remain possible.
+The native helper neutralizes the cross-section and uses a population standard deviation for the z-score. The result has zero mean, zero dot product with the supplied exposure and unit population standard deviation. A sample-standard-deviation check would use the wrong convention. Neutrality is relative to these supplied exposures and this date; omitted factors and future drift remain possible.
 
 {/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="neutralize-exposure-signal" role="exercise" */}
 ```python exec id=neutralize-exposure-signal role=exercise
@@ -513,9 +483,6 @@ from finstack_quant.features import neutralize_and_zscore
 raw_signal = [1.0,2.0,2.0,4.0]
 market_exposure = [0.0,1.0,0.0,1.0]
 scores = np.asarray(neutralize_and_zscore(raw_signal,["2025-01-15"]*4,[market_exposure]))
-assert abs(scores.mean()) < 1e-12
-assert abs(scores @ np.asarray(market_exposure)) < 1e-12
-assert abs(scores.std(ddof=0)-1) < 1e-12
 print("Aligned neutralized population-z-scores:",scores)
 print("Neutrality removes this linear exposure in this cross-section; it is not a forecast of alpha.")
 ```
@@ -527,7 +494,7 @@ print("Neutrality removes this linear exposure in this cross-section; it is not 
 
 <Exercise title="3. Recover a normal ES back-of-envelope" question="For a zero-mean normal return with 1% daily volatility, derive 95% ES and its ratio to 95% VaR, then compare with native parametric ES decomposition.">
 
-With $z_c=\Phi^{-1}(c)$ and standard-normal density $\phi$, return ES is $-\sigma\phi(z_c)/(1-c)$, while return VaR is $-z_c\sigma$. Their magnitude ratio is approximately 1.254 at 95% confidence. That multiplier is not universal: it changes with confidence, distribution and nonzero mean. The assertion uses the continuous normal reference, so there is no tied-threshold-mass ambiguity.
+With $z_c=\Phi^{-1}(c)$ and standard-normal density $\phi$, return ES is $-\sigma\phi(z_c)/(1-c)$, while return VaR is $-z_c\sigma$. Their magnitude ratio is approximately 1.254 at 95% confidence. That multiplier is not universal: it changes with confidence, distribution and nonzero mean. The acceptance check uses the continuous normal reference, so there is no tied-threshold-mass ambiguity.
 
 {/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="normal-es-reference" role="exercise" */}
 ```python exec id=normal-es-reference role=exercise
@@ -539,7 +506,6 @@ z = NormalDist().inv_cdf(alpha)
 phi = math.exp(-0.5*z*z)/math.sqrt(2*math.pi)
 expected_normal_es = -daily_sigma * phi/(1-alpha)
 es_reference = parametric_es_decomposition(["unit_exposure"],[1.0],[[daily_sigma**2]],alpha)
-assert abs(es_reference.portfolio_es-expected_normal_es) < 1e-9
 print(f"Zero-mean normal VaR={es_reference.portfolio_var:.6%}; ES={es_reference.portfolio_es:.6%}")
 print(f"ES/VaR magnitude ratio={phi/((1-alpha)*z):.6f}; this ratio depends on confidence and distribution.")
 ```

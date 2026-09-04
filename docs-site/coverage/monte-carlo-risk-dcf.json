@@ -252,19 +252,19 @@
     ],
     "build_workflows": [
       {
-        "notebook": "07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb",
+        "notebook": "02_pricing/instruments/structured_products_foundations.ipynb",
         "cell_id": "structured-note-redemption",
         "role": "build",
         "status": "proven"
       },
       {
-        "notebook": "02_pricing/instruments/exotic_rates.ipynb",
+        "notebook": "02_pricing/instruments/structured_products_foundations.ipynb",
         "cell_id": "structured-rate-coupon-arithmetic",
         "role": "build",
         "status": "proven"
       },
       {
-        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "notebook": "02_pricing/instruments/structured_products_foundations.ipynb",
         "cell_id": "two-asset-waterfall",
         "role": "build",
         "status": "proven"
@@ -295,7 +295,7 @@
       {
         "original_group": "b",
         "original_requirement": "Read breakeven CDR from the scenario table.",
-        "notebook": "02_pricing/instruments/structured_credit.ipynb",
+        "notebook": "02_pricing/instruments/structured_products_foundations.ipynb",
         "cell_id": "tranche-loss-threshold",
         "role": "exercise",
         "status": "proven",
@@ -317,7 +317,7 @@
       "The note holder is short the knock-in put: principal is reduced by the put loss after breach. A breach followed by full spot recovery returns principal.",
       "This proof is a payoff-contract identity, not an issuer-credit or new-issue valuation model.",
       "StructuredCredit requires actual positive PoolAssets for pricing; metadata-only rep lines are not a substitute. The separate track fixture tests supply the pool, waterfall and base-correlation evidence.",
-      "The mapped exotic_rates notebook hand-reconciles the TARN target and truncated final coupon, snowball recursion, inverse-floater gearing, and an inclusive range-accrual observation fraction. These are coupon-profile arithmetic helpers, not complete callable-note or issuer-credit valuation models.",
+      "The focused structured-products notebook hand-reconciles the TARN target and truncated final coupon, snowball recursion, inverse-floater gearing, and an inclusive range-accrual observation fraction. These are coupon-profile arithmetic helpers, not complete callable-note or issuer-credit valuation models.",
       "The two-asset cashflow waterfall now directly reconciles all three native tranche PVs to one-period receipts, with real positive PoolAssets.",
       "Finite-pool Gaussian exposures use sqrt(asset correlation) loadings. Expected pool loss is PD times LGD times notional; exact pathwise loss tranches reconcile to native tranche statistics.",
       "The native breakeven CDR is the first-writedown threshold, not a par-price target. OAS reprices model price to approximately zero spread; fixed-coupon discount margin is explicitly rejected.",

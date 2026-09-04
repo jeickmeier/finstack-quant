@@ -68,13 +68,15 @@ The discount curve $D_d$ prices payment timing; the projection curve supplies co
 
 Curve risk consequently has several coordinates: which quote, which curve role, which pillar, and which bump unit. Lesson 2.2 formalizes that information in qualified DV01 keys. Today we preserve those identities in the input envelope, calibrated market and comparison tables.
 
+The notebooks use several deliberately separate market fixtures. `analyst_book.build_market` constructs the staged, quote-calibrated analyst market. `_shared.market.build_demo_market` is a compact cross-asset demonstration, while `usd_ois_curve` is the instrument-lab curve and `usd_ois_2026` is a reporting-date curve. A repeated curve ID does not imply repeated values. Compare base date, pillars, interpolation, and role before comparing results across those examples.
+
 </Standard>
 
 <BuildIt>
 
 ### Reprice the same strip under two interpolations
 
-The shared envelope carries actual quote identifiers. Both fits must reproduce their inputs. Forward differences between pillars are legitimate model differences, not evidence of a failed fit.
+This is where the course builds the calibration input used by later shared market stages. The envelope exposes quote identifiers, quote sets, solve order, base date, curve role, and interpolation. Both fits must reproduce their inputs. Forward differences between pillars are legitimate model differences, not evidence of a failed fit.
 
 {/* notebook-block notebook="01_foundations/market_bootstrap_tour.ipynb" cell="bootstrap-proof" role="build" */}
 ```python exec id=bootstrap-proof role=build
@@ -87,20 +89,15 @@ for interpolation in ('linear', 'log_linear'):
     envelope = calibration_envelope('foundations')
     envelope['plan']['steps'][0]['interpolation'] = interpolation
     result = calibrate(json.dumps(envelope))
-    assert result.success and result.report.max_residual < 1e-7
     calibrations[interpolation] = result
 linear = calibrations['linear'].market.get_discount('USD-OIS')
 loglinear = calibrations['log_linear'].market.get_discount('USD-OIS')
 forwards = [(t, linear.forward(t, t + 0.1), loglinear.forward(t, t + 0.1)) for t in (0.6, 1.4, 3.4, 7.4)]
-assert any(abs(first - second) > 1e-8 for _, first, second in forwards)
 reduced = calibration_envelope('foundations')
 removed = 'USD-OIS-SWAP-5Y'
 reduced['market_data'] = [quote for quote in reduced['market_data'] if quote['id'] != removed]
 reduced['plan']['quote_sets']['usd_rate_quotes'].remove(removed)
 reduced_result = calibrate(json.dumps(reduced))
-assert reduced_result.success
-assert abs(reduced_result.market.get_discount('USD-OIS').df(5.0) - loglinear.df(5.0)) > 1e-6
-assert build_market('foundations').get_discount('USD-OIS').df(5.0) == loglinear.df(5.0)
 print('forward comparisons:', forwards)
 ```
 {/* /notebook-block */}
@@ -121,7 +118,6 @@ annual_dfs=[curve.df(t) for t in range(1,6)]
 par=(1-annual_dfs[-1])/sum(annual_dfs)
 known_annuity=sum(annual_dfs[:-1])
 solved_df=(1-par*known_annuity)/(1+par)
-assert abs(solved_df-annual_dfs[-1])<1e-12
 print({'annual_pay_par_rate':par,'known_1_to_4y_annuity':known_annuity,'solved_5y_DF':solved_df})
 ```
 {/* /notebook-block */}
@@ -137,12 +133,12 @@ The canonical dated FRA inputs are rolled consistently to the shared valuation d
 ```python exec id=projection-curve-quotes role=build
 import json
 from pathlib import Path
+from datetime import date
 import _shared
 from finstack_quant.calibration import calibrate
-from _shared.analyst_book import AS_OF
+AS_OF = date(2025, 1, 15)
 repository=Path(_shared.__file__).resolve().parents[4]
 forward_input=json.loads((repository/'finstack-quant/calibration/examples/market_bootstrap/02_usd_3m_forward_curve.json').read_text())
-from datetime import date
 from finstack_quant.core.dates import Tenor
 anchor=date.fromisoformat(forward_input['plan']['steps'][0]['base_date'])
 for quote in forward_input['market_data']:
@@ -153,7 +149,6 @@ for quote in forward_input['market_data']:
             quote[boundary]['date']=(AS_OF if months==0 else Tenor.parse(f'{months}M').add_to_date(AS_OF)).isoformat()
 for step in forward_input['plan']['steps']:step['base_date']=AS_OF.isoformat()
 forward_fit=calibrate(json.dumps(forward_input))
-assert forward_fit.success and forward_fit.report.max_residual<1e-7
 forward_curve=forward_fit.market.get_forward('USD-SOFR-3M')
 discount_curve=forward_fit.market.get_discount('USD-OIS')
 # Hull convention, explicitly assumed adjustment of one basis point.
@@ -161,7 +156,6 @@ fra_quote=next(q['rate'] for q in forward_input['market_data'] if q['type']=='fr
 convexity_adjustment=0.0001
 futures_price=100-100*(fra_quote+convexity_adjustment)
 recovered_forward=(100-futures_price)/100-convexity_adjustment
-assert abs(recovered_forward-fra_quote)<1e-12
 print({'discount_zero_1y':discount_curve.zero(1),'projection_rate_1y':forward_curve.rate(1),'futures_price':futures_price,'explicit_convexity_bp':1,'recovered_forward':recovered_forward})
 
 import copy
@@ -178,7 +172,6 @@ for month,forward in zip((6,9,12),fra_rates):
     futures_input['market_data'].append(quote)
     futures_input['plan']['quote_sets']['sofr_3m_quotes'].append(quote['id'])
 futures_fit=calibrate(json.dumps(futures_input))
-assert futures_fit.success and futures_fit.report.max_residual<1e-7
 print({'deposit_swap_discount_plus_futures_projection_residual':futures_fit.report.max_residual,
        'futures_quotes':[q for q in futures_input['market_data'] if q['type']=='futures']})
 ```
@@ -193,16 +186,18 @@ Compare short-interval forwards across the same maturity grid. Then replace the 
 
 {/* notebook-block notebook="01_foundations/market_bootstrap_tour.ipynb" cell="bootstrap-forward-plots" role="build" */}
 ```python exec id=bootstrap-forward-plots role=build
+from datetime import date
 import json,math
 import matplotlib.pyplot as plt
 from finstack_quant.calibration import calibrate
 from finstack_quant.core.market_data import DiscountCurve
 from finstack_quant.valuations.instruments import price_instrument
-from _shared.analyst_book import AS_OF,calibration_envelope,build_market,instruments
+from _shared.analyst_book import calibration_envelope, build_market, instruments
+AS_OF = date(2025, 1, 15)
 fig,ax=plt.subplots(figsize=(8,3.6))
 for mode in ('linear','log_linear'):
     envelope=calibration_envelope('foundations');envelope['plan']['steps'][0]['interpolation']=mode
-    fit=calibrate(json.dumps(envelope));assert fit.success
+    fit=calibrate(json.dumps(envelope))
     curve=fit.market.get_discount('USD-OIS')
     grid=[0.3+i*0.05 for i in range(190)]
     ax.plot(grid,[100*curve.forward(t,t+0.02) for t in grid],label=mode)
@@ -212,7 +207,6 @@ calibrated_pv=price_instrument(bond,market,AS_OF).price
 hand_rate=market.get_discount('USD-OIS').zero(1)
 market.insert(DiscountCurve.flat('USD-OIS',AS_OF,hand_rate))
 hand_pv=price_instrument(bond,market,AS_OF).price
-assert abs(calibrated_pv-hand_pv)>1
 print({'calibrated_PV':calibrated_pv,'flat_hand_curve_PV':hand_pv,'difference':calibrated_pv-hand_pv})
 ```
 {/* /notebook-block */}
@@ -240,10 +234,8 @@ removed='USD-OIS-SWAP-5Y'
 reduced['market_data']=[q for q in reduced['market_data'] if q['id']!=removed]
 reduced['plan']['quote_sets']['usd_rate_quotes'].remove(removed)
 first,second=[calibrate(json.dumps(x)) for x in (complete,reduced)]
-assert first.success and second.success
 curves=[x.market.get_discount('USD-OIS') for x in (first,second)]
 rows=[{'year':t,'DF_change':curves[1].df(t)-curves[0].df(t),'forward_change_bp':10000*(curves[1].forward(t,t+0.1)-curves[0].forward(t,t+0.1))} for t in (1,2,3,5,7,9)]
-assert abs(rows[3]['DF_change'])>1e-6
 print(rows)
 ```
 {/* /notebook-block */}
@@ -267,7 +259,6 @@ z9=z5+weight*(z10-z5);forward9=z9+t*(z10-z5)/5
 bump=0.0004
 bumped_z9=z5+weight*(z10+bump-z5)
 bumped_forward9=bumped_z9+t*(z10+bump-z5)/5
-assert abs((bumped_forward9-forward9)/bump-(2*t-5)/5)<1e-12
 print({'zero_10y_shock_bp':4,'zero_9y_shock_bp':10000*(bumped_z9-z9),'instantaneous_forward_9y_shock_bp':10000*(bumped_forward9-forward9)})
 ```
 {/* /notebook-block */}

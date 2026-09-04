@@ -1,9 +1,12 @@
 """Independent credit and volatility teaching fixtures.
 
-The two tracks extend fresh copies of the common book. A CLO BBB holding is a
-separate tranche reporting sleeve because a native StructuredCredit instrument
-prices the entire deal. These factories contain inputs only; pricing, cashflow
-allocation, simulation and reconciliation belong in visible lesson cells.
+The credit track extends a fresh copy of the common book. Volatility lessons
+extend the base book so they do not depend on the borrower loan introduced in
+Part IV; the volatility capstone explicitly opts into the common book. A CLO
+BBB holding is a separate tranche reporting sleeve because a native
+StructuredCredit instrument prices the entire deal. These factories contain
+inputs only; pricing, cashflow allocation, simulation and reconciliation belong
+in visible lesson cells.
 
 All market observations are deterministic teaching inputs, not market quotes.
 Rates and volatilities are decimals; tranche attachment points are percentages.
@@ -45,6 +48,19 @@ from .instrument_fixtures import cds_index, fixed_bond, instrument_envelope, rev
 
 AS_OF = common.AS_OF
 TRACKS = ("credit", "vol")
+_CORE_STAGES = ("base", "common")
+
+
+def _resolve_core_stage(stage: str, core_stage: str | None) -> str:
+    """Return the underlying common-book stage for a track workflow."""
+    if stage not in TRACKS:
+        raise ValueError(f"stage must be one of {TRACKS}; got {stage!r}")
+    resolved = ("common" if stage == "credit" else "base") if core_stage is None else core_stage
+    if resolved not in _CORE_STAGES:
+        raise ValueError(f"core_stage must be one of {_CORE_STAGES}; got {resolved!r}")
+    if stage == "credit" and resolved != "common":
+        raise ValueError("credit track requires core_stage='common'")
+    return resolved
 
 
 def credit_extension() -> dict[str, dict[str, Any]]:
@@ -156,46 +172,21 @@ def complex_bond() -> dict[str, Any]:
     return instrument_envelope(bond)
 
 
-def credit_index_inputs() -> dict[str, dict[str, Any]]:
-    """Return an index and payer option with explicit index default semantics.
+def structured_index_inputs() -> dict[str, dict[str, Any]]:
+    """Return the index and tranche inputs introduced in lesson 2.8.
 
     Returns:
-        Canonical envelopes for a 125-name index and a non-knockout payer
-        option. Option spread strike and coupon are decimal rates.
+        Canonical envelopes for a 125-name index and its 0--3 percent tranche.
 
     Raises:
         ValueError: If the underlying canonical fixture is invalid.
 
-    >>> credit_index_inputs()["CDX-PAYER"]["instrument"]["spec"]["underlying_is_index"]
-    True
+    >>> structured_index_inputs()["CDX-0-3"]["instrument"]["spec"]["detach_pct"]
+    3.0
     """
     _, index = cds_index(0)
     index["spec"].update({"id": "ANALYST-CDX", "series": 43, "notional": {"amount": "1000000", "currency": "USD"}})
     index["spec"]["premium"].update({"start": "2024-12-20", "end": "2029-12-20", "spread_bp": "100"})
-    option = {
-        "type": "cds_option",
-        "spec": {
-            "id": "CDX-PAYER",
-            "attributes": {},
-            "cds_maturity": "2029-12-20",
-            "credit_curve_id": "CDX-HAZ",
-            "discount_curve_id": "USD-OIS",
-            "exercise_style": "european",
-            "expiry": "2025-06-20",
-            "index_factor": 1.0,
-            "knockout": False,
-            "notional": {"amount": "1000000", "currency": "USD"},
-            "option_type": "call",
-            "protection_start_convention": "spot",
-            "recovery_rate": 0.4,
-            "settlement": "cash",
-            "strike": {"spread": "0.01"},
-            "underlying_cds_coupon": "0.01",
-            "underlying_convention": "isda_na",
-            "underlying_is_index": True,
-            "vol_surface_id": "CDX-OPTION-VOL",
-        },
-    }
     tranche = {
         "type": "cds_tranche",
         "spec": {
@@ -223,9 +214,50 @@ def credit_index_inputs() -> dict[str, dict[str, Any]]:
     }
     return {
         "ANALYST-CDX": instrument_envelope(index),
-        "CDX-PAYER": instrument_envelope(option),
         "CDX-0-3": instrument_envelope(tranche),
     }
+
+
+def credit_index_inputs() -> dict[str, dict[str, Any]]:
+    """Extend the structured index inputs with the credit-track payer option.
+
+    Returns:
+        Fresh index and tranche envelopes plus a non-knockout payer option.
+        Option spread strike and coupon are decimal rates.
+
+    Raises:
+        ValueError: If an underlying canonical fixture is invalid.
+
+    >>> credit_index_inputs()["CDX-PAYER"]["instrument"]["spec"]["underlying_is_index"]
+    True
+    """
+    inputs = structured_index_inputs()
+    option = {
+        "type": "cds_option",
+        "spec": {
+            "id": "CDX-PAYER",
+            "attributes": {},
+            "cds_maturity": "2029-12-20",
+            "credit_curve_id": "CDX-HAZ",
+            "discount_curve_id": "USD-OIS",
+            "exercise_style": "european",
+            "expiry": "2025-06-20",
+            "index_factor": 1.0,
+            "knockout": False,
+            "notional": {"amount": "1000000", "currency": "USD"},
+            "option_type": "call",
+            "protection_start_convention": "spot",
+            "recovery_rate": 0.4,
+            "settlement": "cash",
+            "strike": {"spread": "0.01"},
+            "underlying_cds_coupon": "0.01",
+            "underlying_convention": "isda_na",
+            "underlying_is_index": True,
+            "vol_surface_id": "CDX-OPTION-VOL",
+        },
+    }
+    inputs["CDX-PAYER"] = instrument_envelope(option)
+    return inputs
 
 
 def credit_calibration_envelope(as_of: date = AS_OF) -> dict[str, Any]:
@@ -756,11 +788,14 @@ def vol_extension() -> dict[str, dict[str, Any]]:
     }
 
 
-def book_spec(stage: str) -> dict[str, Any]:
-    """Extend a fresh common native portfolio with one independent track.
+def book_spec(stage: str, *, core_stage: str | None = None) -> dict[str, Any]:
+    """Extend a fresh base or common native portfolio with one track.
 
     Args:
         stage: Exactly ``credit`` or ``vol``.
+        core_stage: Underlying stage from :mod:`analyst_book`. Credit always
+            uses ``common``. Volatility defaults to ``base``; pass ``common``
+            explicitly for the capstone after the borrower loan is introduced.
 
     Returns:
         Native PortfolioSpec dictionary; ``tags.stage`` identifies the track.
@@ -769,12 +804,13 @@ def book_spec(stage: str) -> dict[str, Any]:
     Raises:
         ValueError: If ``stage`` is unknown or native fixture creation fails.
 
-    >>> book_spec("vol")["tags"]["stage"]
-    'vol'
+    >>> "BORROWER-TL" in {row["instrument_id"] for row in book_spec("vol")["positions"]}
+    False
+    >>> "BORROWER-TL" in {row["instrument_id"] for row in book_spec("vol", core_stage="common")["positions"]}
+    True
     """
-    if stage not in TRACKS:
-        raise ValueError(f"stage must be one of {TRACKS}; got {stage!r}")
-    spec = common.book_spec("common")
+    resolved_core_stage = _resolve_core_stage(stage, core_stage)
+    spec = common.book_spec(resolved_core_stage)
     extension = credit_extension() if stage == "credit" else vol_extension()
     spec.update({"id": f"ANALYST-{stage.upper()}", "tags": {"stage": stage}})
     spec["positions"].extend(
@@ -791,11 +827,14 @@ def book_spec(stage: str) -> dict[str, Any]:
     return spec
 
 
-def build_book(stage: str) -> Portfolio:
+def build_book(stage: str, *, core_stage: str | None = None) -> Portfolio:
     """Build a fresh native credit or volatility portfolio.
 
     Args:
         stage: Exactly ``credit`` or ``vol``.
+        core_stage: Underlying stage from :mod:`analyst_book`. Credit always
+            uses ``common``. Volatility defaults to ``base``; pass ``common``
+            explicitly for the capstone.
 
     Returns:
         Native Portfolio; credit has a separately reported BBB sleeve.
@@ -806,7 +845,7 @@ def build_book(stage: str) -> Portfolio:
     >>> len(build_book("credit").position_ids)
     12
     """
-    return Portfolio.from_spec(json.dumps(book_spec(stage)))
+    return Portfolio.from_spec(json.dumps(book_spec(stage, core_stage=core_stage)))
 
 
 def ohlc_observations() -> dict[str, list[tuple[date, float]]]:
@@ -840,13 +879,50 @@ def ohlc_observations() -> dict[str, list[tuple[date, float]]]:
     return rows
 
 
-def build_market(stage: str, as_of: date = AS_OF) -> MarketContext:
+def build_structured_market(as_of: date = AS_OF, *, core_stage: str = "base") -> MarketContext:
+    """Build the structured-products market introduced in lesson 2.8.
+
+    Args:
+        as_of: Discount and hazard curve base date.
+        core_stage: Underlying stage from :mod:`analyst_book`; use ``base`` in
+            lesson 2.8 and ``common`` only after the term loan is introduced.
+
+    Returns:
+        Fresh base or common market with calibrated index hazard, base
+        correlation and index state.
+
+    Raises:
+        ValueError: If ``core_stage`` is not ``base`` or ``common``.
+        RuntimeError: If the shared market calibration fails.
+        OSError: If the shared calibration fixture cannot be read.
+
+    >>> build_structured_market().get_credit_index("CDX-INDEX-DATA").num_constituents
+    125
+    """
+    if core_stage not in _CORE_STAGES:
+        raise ValueError(f"core_stage must be one of {_CORE_STAGES}; got {core_stage!r}")
+    market = common.build_market(core_stage, as_of)
+    hazard = calibrate(credit_calibration_envelope(as_of)).market.get_hazard("CDX-HAZ")
+    market.insert(hazard)
+    correlation = BaseCorrelationCurve(
+        "CDX-BASE-CORR",
+        [(3.0, 0.25), (7.0, 0.25), (15.0, 0.25), (100.0, 0.25)],
+    )
+    market.insert(correlation)
+    market.insert_credit_index("CDX-INDEX-DATA", CreditIndexData(125, 0.4, hazard, correlation))
+    return market
+
+
+def build_market(stage: str, as_of: date = AS_OF, *, core_stage: str | None = None) -> MarketContext:
     """Build a fresh market sufficient for a track and its proof exercises.
 
     Args:
-        stage: Exactly ``credit`` or ``vol``; each starts from common inputs.
+        stage: Exactly ``credit`` or ``vol``.
         as_of: Discount, forward and hazard curve base date. Historical OHLC
             observations remain the explicitly dated teaching dataset.
+        core_stage: Underlying stage from :mod:`analyst_book`. Credit always
+            uses ``common``. Volatility defaults to ``base``; pass ``common``
+            explicitly for the capstone.
 
     Returns:
         Native MarketContext with track-specific identifiers. No track market
@@ -860,16 +936,17 @@ def build_market(stage: str, as_of: date = AS_OF) -> MarketContext:
     >>> build_market("vol").get_price_curve("WTI-FORWARD").id
     'WTI-FORWARD'
     """
-    if stage not in TRACKS:
-        raise ValueError(f"stage must be one of {TRACKS}; got {stage!r}")
-    market = common.build_market("common", as_of)
+    resolved_core_stage = _resolve_core_stage(stage, core_stage)
     if stage == "credit":
-        hazard = calibrate(credit_calibration_envelope(as_of)).market.get_hazard("CDX-HAZ")
-        market.insert(hazard)
-        correlation = BaseCorrelationCurve("CDX-BASE-CORR", [(3.0, 0.25), (7.0, 0.25), (15.0, 0.25), (100.0, 0.25)])
-        market.insert(correlation)
-        market.insert_credit_index("CDX-INDEX-DATA", CreditIndexData(125, 0.4, hazard, correlation))
-        market.insert(VolSurface("CDX-OPTION-VOL", [0.25, 0.5, 1.0, 2.0], [0.0025, 0.01, 0.03], [[0.40] * 3] * 4))
+        market = build_structured_market(as_of, core_stage=resolved_core_stage)
+        market.insert(
+            VolSurface(
+                "CDX-OPTION-VOL",
+                [0.25, 0.5, 1.0, 2.0],
+                [0.0025, 0.01, 0.03],
+                [[0.40] * 3] * 4,
+            )
+        )
         for iid, rate in (("CONVERT-RISKY", 0.065), ("CONVERT-LIMIT-DF", 0.04)):
             market.insert(
                 DiscountCurve(
@@ -881,6 +958,7 @@ def build_market(stage: str, as_of: date = AS_OF) -> MarketContext:
             market.insert_price(f"{underlying}-VOL", 0.25)
             market.insert_price(f"{underlying}-DIVYIELD", 0.0)
     else:
+        market = common.build_market(resolved_core_stage, as_of)
         for iid, rate in (("USD-TREASURY", 0.04), ("USD-REPO", 0.042)):
             market.insert(
                 DiscountCurve(

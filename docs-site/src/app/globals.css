@@ -186,6 +186,11 @@ button, summary { cursor: pointer; }
 .desk-context > div p { margin: 0; }
 .desk-context .desk-question { font-size: 19px; line-height: 1.55; margin: 0 0 13px; letter-spacing: -.3px; }
 .lesson-section { margin: 34px 0; scroll-margin-top: 60px; }
+.fixture-build { background: color-mix(in srgb, var(--accent) 6%, var(--paper)); border: 1px solid var(--rule); border-left: 3px solid var(--accent); border-radius: 3px; padding: 17px 19px; margin: 20px 0 25px; }
+.fixture-build h3 { margin: 3px 0 5px; }
+.fixture-build .section-eyebrow { color: var(--accent); font: 9px var(--font-mono); letter-spacing: 1px; margin: 0; text-transform: uppercase; }
+.fixture-build .fixture-sources { color: var(--quiet); font-size: 12px; margin: 0 0 10px; }
+.fixture-build > div > p:last-child { margin-bottom: 0; }
 .lab-card { display: flex; gap: 16px; align-items: center; padding: 20px; border: 1px solid var(--rule); border-radius: 3px; margin: 25px 0; text-decoration: none !important; }
 .lab-card > svg { flex: 0 0 20px; color: var(--accent); }
 .lab-card > span { flex: 1; display: flex; flex-direction: column; gap: 5px; color: var(--quiet); font-size: 12px; }

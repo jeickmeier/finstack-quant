@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 from types import ModuleType
 
@@ -48,15 +49,38 @@ def test_find_notebooks_skips_checkpoints(module: ModuleType, tmp_path: Path) ->
     assert [path.name for path in notebooks] == ["01_ok.ipynb"]
 
 
+def test_configure_pythonpath_promotes_selected_root(
+    module: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A selected copy must outrank every previously configured notebook tree."""
+    selected = (tmp_path / "selected").resolve()
+    selected.mkdir()
+    package = module.NOTEBOOKS_DIR.parents[2] / "finstack-quant-py"
+    repository = module.NOTEBOOKS_DIR.parents[2]
+    monkeypatch.setenv(
+        "PYTHONPATH",
+        os.pathsep.join([str(module.NOTEBOOKS_DIR), str(selected), str(package), "/other"]),
+    )
+
+    module._configure_pythonpath(selected)
+
+    paths = os.environ["PYTHONPATH"].split(os.pathsep)
+    assert paths[:3] == [str(selected), str(package), str(repository)]
+    assert paths.count(str(selected)) == 1
+
+
 def test_cli_executes_copy_outside_original_root(
     module: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """The original runner accepts a copied tree while retaining package discovery."""
+    """A copied tree supplies its own shared inputs while retaining package discovery."""
     source = tmp_path / "authored.ipynb"
-    _write_notebook(source, "from _shared import DEMO_AS_OF\nassert DEMO_AS_OF.year == 2025\nprint('copied tree')")
+    _write_notebook(source, "from _shared import DEMO_AS_OF\nassert DEMO_AS_OF.year == 2031\nprint('copied tree')")
     before = source.read_bytes()
     copy_root = tmp_path / "build"
     copy_root.mkdir()
+    shared = copy_root / "_shared"
+    shared.mkdir()
+    (shared / "__init__.py").write_text("from datetime import date\nDEMO_AS_OF = date(2031, 1, 15)\n")
     copy = copy_root / source.name
     copy.write_bytes(before)
     monkeypatch.setattr("sys.argv", [str(RUNNER_PATH), "--notebook-root", str(copy_root), "--save-outputs"])
@@ -87,6 +111,52 @@ def test_run_notebook_reports_success(module: ModuleType, tmp_path: Path) -> Non
     assert ok is True
     assert "Executed 1 code cells" in message
     assert elapsed >= 0
+
+
+def test_run_notebook_records_reachable_assertion_coverage(module: ModuleType, tmp_path: Path) -> None:
+    """Saved build copies record every assertion location reached by the kernel."""
+    notebook = tmp_path / "covered.ipynb"
+    _write_notebook(notebook, "value = 42\nassert value == 42\nprint(value)")
+
+    ok, message, _elapsed = module.run_notebook(notebook, timeout=30, save_outputs=True)
+
+    assert ok is True, message
+    executed = nbformat.read(notebook, as_version=4)
+    assert executed.metadata["finstack_execution"] == {
+        "assertions_total": 1,
+        "assertions_executed": 1,
+        "assertion_locations": ["1:2:0"],
+    }
+    assert executed.cells[0].source == "value = 42\nassert value == 42\nprint(value)"
+
+
+def test_run_notebook_rejects_unreachable_assertion(module: ModuleType, tmp_path: Path) -> None:
+    """An assertion that never runs cannot support notebook publication."""
+    notebook = tmp_path / "unreachable.ipynb"
+    _write_notebook(notebook, "if False:\n    assert False\nprint('no validation')")
+    before = notebook.read_bytes()
+
+    ok, message, _elapsed = module.run_notebook(notebook, timeout=30, save_outputs=True)
+
+    assert ok is False
+    assert "did not execute every assertion statement" in message
+    assert notebook.read_bytes() == before
+
+
+def test_run_notebook_rejects_swallowed_assertion_failure(module: ModuleType, tmp_path: Path) -> None:
+    """A caught AssertionError cannot be reported as a successful validation check."""
+    notebook = tmp_path / "swallowed.ipynb"
+    _write_notebook(
+        notebook,
+        "try:\n    assert False, 'failed check'\nexcept AssertionError:\n    pass\nprint('continued')",
+    )
+    before = notebook.read_bytes()
+
+    ok, message, _elapsed = module.run_notebook(notebook, timeout=30, save_outputs=True)
+
+    assert ok is False
+    assert "did not execute every assertion statement" in message
+    assert notebook.read_bytes() == before
 
 
 def test_run_notebook_uses_ipc_transport(module: ModuleType, tmp_path: Path) -> None:

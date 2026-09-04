@@ -16,12 +16,30 @@ mise run python-build
 ```
 
 The development build is appropriate for lesson work. A release build is only necessary when measuring performance or validating release behavior.
+The full publication entrypoint, `mise run docs-site-build`, repeats the dependency
+sync and extension build before it accepts any snippet, notebook, or site evidence.
 
 ## Open the companion labs
 
 Each lesson links its companion notebook. Read the rendered lab in the browser, or download the `.ipynb` file and open it in your notebook editor using the repository's Python environment.
 
-The canonical notebooks live in `finstack-quant-py/examples/notebooks/`. Their `_shared/` directory contains the deterministic market, book, and history inputs reused throughout the course. Run notebooks from the checkout so those imports resolve.
+The canonical notebooks live in `finstack-quant-py/examples/notebooks/`. Their `_shared/` directory contains inspectable course input factories, not public `finstack_quant` APIs or hidden pricing logic. Each family is introduced before a lesson can consume it:
+
+| Shared input family | First owning lesson |
+| --- | --- |
+| foundation instruments, markets, and book stages | 1.1 |
+| calibrated rates, options, and base priced-book extensions | 2.3, 2.4, and 2.5 |
+| waterfall inputs | 2.8 |
+| dated account history | 3.1 |
+| borrower model | 4.1 |
+| common term-loan book and liquidity panels | 4.3 and 4.4 |
+| credit and volatility extensions | C1 and V1 |
+
+The fixture card in each owning lesson links the source family to the first calculation that projects its raw IDs, terms, units, or dates. Short assumptions such as `AS_OF = date(2025, 1, 15)` stay inline in notebook code. Run notebooks from the checkout so the substantive factory imports resolve.
+
+The curriculum validates every `_shared/` Python source and recursively declared
+notebook dependency against this order. Publication runs see only their declared
+notebook closure, including when code tries to open a notebook by absolute path.
 
 ```sh
 cd finstack-quant-py
@@ -30,7 +48,11 @@ uv run --no-sync python examples/notebooks/run_all_notebooks.py --help
 
 ## Read code and captured results together
 
-Python examples marked for execution are run by the documentation build harness. A captured-result panel shows the output from that run; it does not calculate a price in your browser. The result belongs to the exact lesson source and shared fixture used by that build.
+Python examples marked for execution are run by the documentation build harness. A captured-result panel shows the output from that run; it does not calculate a price in your browser. The result belongs to the exact lesson source and shared fixture used by that build. Published lesson code and downloadable lab copies omit raw `assert` statements. Reconciliations remain visible in the result tables, while the release runner applies the corresponding acceptance checks privately and fails the build on a bad result.
+
+The runner records each private check only after it succeeds. Unreachable checks
+and caught assertion failures therefore fail publication. It also treats runtime
+warnings, exceptions, error outputs, skipped cells, and non-empty `stderr` as errors.
 
 Every exercise is required. Open its solution after attempting the problem, compare your reasoning and outputs, and investigate differences in dates, units, conventions, or inputs before changing a tolerance.
 

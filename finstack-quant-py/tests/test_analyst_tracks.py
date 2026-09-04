@@ -9,11 +9,12 @@ import json
 import math
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import numpy as np
 import pytest
 
-from finstack_quant.core.market_data import DiscountCurve
+from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.models import bs_price
 from finstack_quant.models.correlation import CorrelatedBernoulli, LatentMultiFactor
 from finstack_quant.portfolio import value_portfolio
@@ -27,25 +28,92 @@ def tracks() -> ModuleType:
         return importlib.import_module("_shared.analyst_tracks")
 
 
-def test_tracks_are_independent_fresh_native_books(tracks: ModuleType) -> None:
+def test_tracks_are_independent_fresh_native_books(tracks: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    base_ids = ("USD-CORP", "EUR-GOVT", "USD-CASH", "EUR-CASH", "USD-PAYER-IRS", "SPX-CALL", "ACME-CDS")
+    common_ids = (*base_ids, "BORROWER-TL")
+    credit_ids = (*common_ids, "ANALYST-PIK-CALLABLE", "ANALYST-REVOLVER", "CDX-PAYER", "ANALYST-CONVERT")
+    vol_ids = (*base_ids, "UST-FUTURE", "SPX-VARIANCE", "WTI-BRENT-SPREAD")
+    vol_capstone_ids = (*common_ids, "UST-FUTURE", "SPX-VARIANCE", "WTI-BRENT-SPREAD")
+
+    base = tracks.common.book_spec("base")
     common = tracks.common.book_spec("common")
     before = deepcopy(common)
-    credit, vol = tracks.book_spec("credit"), tracks.book_spec("vol")
-    assert credit["positions"][:8] == vol["positions"][:8] == common["positions"]
-    assert {p["instrument_id"] for p in credit["positions"][8:]} == set(tracks.credit_extension())
-    assert {p["instrument_id"] for p in vol["positions"][8:]} == set(tracks.vol_extension())
+    credit = tracks.book_spec("credit")
+    vol = tracks.book_spec("vol")
+    vol_capstone = tracks.book_spec("vol", core_stage="common")
+
+    def position_ids(spec: dict[str, Any]) -> tuple[str, ...]:
+        return tuple(position["instrument_id"] for position in spec["positions"])
+
+    assert position_ids(base) == base_ids
+    assert position_ids(common) == common_ids
+    assert position_ids(credit) == credit_ids
+    assert position_ids(vol) == vol_ids
+    assert position_ids(vol_capstone) == vol_capstone_ids
+    assert vol["positions"][: len(base_ids)] == base["positions"]
+    assert credit["positions"][: len(common_ids)] == vol_capstone["positions"][: len(common_ids)] == common["positions"]
+    assert "BORROWER-TL" not in position_ids(vol)
+    assert not set(tracks.credit_extension()).intersection(position_ids(vol))
+    assert not set(tracks.vol_extension()).intersection(position_ids(credit))
     assert all(p["instrument_spec"]["type"] != "structured_credit" for p in credit["positions"])
     credit["positions"][0]["instrument_spec"]["spec"]["notional"]["amount"] = "1"
     assert tracks.common.book_spec("common") == before
     assert tracks.book_spec("credit")["positions"][0] == before["positions"][0]
+
+    market_core_stages: list[str] = []
+    original_build_market = tracks.common.build_market
+
+    def recording_build_market(core_stage: str, as_of: date) -> MarketContext:
+        market_core_stages.append(core_stage)
+        return original_build_market(core_stage, as_of)
+
+    monkeypatch.setattr(tracks.common, "build_market", recording_build_market)
     for stage in tracks.TRACKS:
         book, market = tracks.build_book(stage), tracks.build_market(stage)
         value = value_portfolio(book, market, metrics=[])
-        assert len(book.position_ids) == (12 if stage == "credit" else 11)
+        assert tuple(book.position_ids) == (credit_ids if stage == "credit" else vol_ids)
         assert math.isfinite(value.total_value)
         assert value.total_value > 0
         rows = json.loads(value.to_json())["position_values"].values()
         assert sum(float(row["value_base"]["amount"]) for row in rows) == pytest.approx(value.total_value, abs=0.01)
+    capstone_book = tracks.build_book("vol", core_stage="common")
+    capstone_market = tracks.build_market("vol", core_stage="common")
+    assert tuple(capstone_book.position_ids) == vol_capstone_ids
+    assert capstone_market.get_price_curve("WTI-FORWARD").id == "WTI-FORWARD"
+    assert market_core_stages == ["common", "base", "common"]
+
+
+def test_track_core_stage_rejects_inconsistent_inputs(tracks: ModuleType) -> None:
+    with pytest.raises(ValueError, match="credit track requires core_stage='common'"):
+        tracks.book_spec("credit", core_stage="base")
+    with pytest.raises(ValueError, match="core_stage must be one of"):
+        tracks.book_spec("vol", core_stage="foundations")
+
+
+def test_structured_helpers_are_fresh_and_use_the_base_stage(
+    tracks: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stages: list[str] = []
+    original_build_market = tracks.common.build_market
+
+    def recording_build_market(core_stage: str, as_of: date) -> MarketContext:
+        stages.append(core_stage)
+        return original_build_market(core_stage, as_of)
+
+    monkeypatch.setattr(tracks.common, "build_market", recording_build_market)
+    first = tracks.structured_index_inputs()
+    second = tracks.structured_index_inputs()
+    first["CDX-0-3"]["instrument"]["spec"]["detach_pct"] = 7.0
+    market = tracks.build_structured_market()
+    tranche = price_instrument(json.dumps(second["CDX-0-3"]), market, tracks.AS_OF, model="hazard_rate")
+
+    assert sorted(second) == ["ANALYST-CDX", "CDX-0-3"]
+    assert "CDX-PAYER" not in second
+    assert second["CDX-0-3"]["instrument"]["spec"]["detach_pct"] == 3.0
+    assert stages == ["base"]
+    assert market.get_credit_index("CDX-INDEX-DATA").num_constituents == 125
+    assert market.get_base_correlation("CDX-BASE-CORR").correlation(3.0) == pytest.approx(0.25)
+    assert math.isfinite(tranche.value.amount)
 
 
 def test_real_clo_one_payment_cash_conservation_and_separate_bbb(tracks: ModuleType) -> None:

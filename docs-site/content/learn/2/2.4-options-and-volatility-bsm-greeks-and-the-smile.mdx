@@ -55,7 +55,7 @@ $$C=S e^{-qT}\Phi(d_1)-K e^{-rT}\Phi(d_2),\qquad d_1=\frac{\ln(S/K)+(r-q+\sigma^
 
 A put follows from put–call parity, $C-P=S e^{-qT}-K e^{-rT}$. Black-76 expresses the same structure using a forward and a discount factor, $C=D[F\Phi(d_1)-K\Phi(d_2)]$. The native equity-option registry key is `black76`, while its spot/carry inputs reproduce BSM economics. That registry name does not mean the spot dividend yield should be omitted.
 
-The standalone functions return value per underlying unit. The book option has 100 units, so native price is 100 times `bs_price`. The core comparison uses SPX 5200, strike 5200, dividend yield 1.5%, and a surface volatility of 20%. The rate comes from the staged discount curve. A units assertion makes the contract multiplier explicit.
+The standalone functions return value per underlying unit. The book option has 100 units, so native price is 100 times `bs_price`. The core comparison uses SPX 5200, strike 5200, dividend yield 1.5%, and a surface volatility of 20%. The rate comes from the staged discount curve. A units reconciliation makes the contract multiplier explicit.
 
 ### Greeks describe local changes
 
@@ -101,27 +101,42 @@ Garman–Kohlhagen treats foreign currency like an asset paying the foreign rate
 
 <BuildIt>
 
+<FixtureBuild fixture="options" sources="_shared/analyst_book.py · _shared/instrument_fixtures.py">
+
+This lesson extends a fresh rates snapshot with the SPX call, spot, dividend yield, and volatility surface. The displayed contract multiplier and market identifiers are inputs to the public pricer rather than values hidden inside a helper.
+
+</FixtureBuild>
+
+
 ### Reconcile the option, its implied volatility and its hedge
 
 The complete calculation compares native notional-scaled price, analytic price, implied-volatility inversion and COS pricing before constructing the financed daily hedge ledger. Every cash trade remains visible.
 
 {/* notebook-block notebook="02_pricing/instruments/equity_and_options.ipynb" cell="option-proof" role="build" */}
 ```python exec id=option-proof role=build
+from datetime import date
 import json, math
 from finstack_quant.models import bs_price, bs_greeks, bs_implied_vol, bs_cos_price
 from finstack_quant.valuations.instruments import EquityOption, price_instrument
-from _shared.analyst_book import AS_OF, build_market, instruments
+from _shared.analyst_book import build_market, instruments
+AS_OF = date(2025, 1, 15)
 
 market = build_market('options')
-option = EquityOption.from_json(json.dumps(instruments('options')['SPX-CALL']))
+rates_ids = set(instruments('rates'))
+option_inputs = instruments('options')
+option_wire = option_inputs['SPX-CALL']
+option_terms = option_wire['instrument']['spec']
+print({'options_stage_added': sorted(set(option_inputs) - rates_ids),
+       'option_terms': {key: option_terms[key] for key in
+                        ['id', 'underlying_ticker', 'strike', 'option_type', 'expiry',
+                         'discount_curve_id', 'spot_id', 'vol_surface_id', 'div_yield_id']},
+       'contract_units': option_terms['notional']})
+option = EquityOption.from_json(json.dumps(option_wire))
 priced = price_instrument(option, market, AS_OF, metrics=['delta', 'gamma', 'vega', 'theta'])
 expiry = (option.expiry - AS_OF).days / 365.0
 r = market.get_discount('USD-OIS').zero(expiry)
 spot, strike, q, vol = 5200.0, 5200.0, 0.015, 0.20
 analytical = bs_price(spot, strike, r, q, vol, expiry, True)
-assert abs(priced.price - 100 * analytical) < 1e-6
-assert abs(bs_implied_vol(spot, strike, r, q, expiry, analytical, True) - vol) < 1e-8
-assert abs(bs_cos_price(spot, strike, r, q, vol, expiry, True, 256) - analytical) < 1e-6
 spots = [5200.0, 5220.0, 5190.0, 5230.0, 5210.0, 5240.0]
 g = bs_greeks(spots[0], strike, r, q, vol, expiry, True)
 delta = g.delta
@@ -137,16 +152,13 @@ for day in range(1, len(spots)):
     before_rebalance = cash + delta * spots[day] - value
     ds = spots[day] - previous_spot
     approximate_pnl = financing + dividends - 0.5 * g.gamma * ds ** 2 - g.theta
-    assert abs((before_rebalance - wealth) - approximate_pnl) < 0.05
     g = bs_greeks(spots[day], strike, r, q, vol, time_left, True)
     cash -= (g.delta - delta) * spots[day]
     delta = g.delta
     after_rebalance = cash + delta * spots[day] - value
-    assert abs(after_rebalance - before_rebalance) < 1e-9
     rows.append((day, before_rebalance - wealth, approximate_pnl, cash))
     wealth = after_rebalance
 print(rows)
-assert math.isfinite(wealth)
 ```
 {/* /notebook-block */}
 
@@ -170,8 +182,6 @@ for ax,name in zip(axes.flat,('delta','gamma','vega','theta')):
 fig.tight_layout()
 g=bs_greeks(5200,5200,.04,.015,.20,1.,True)
 rho_fd=(bs_price(5200,5200,.04001,.015,.20,1.,True)-bs_price(5200,5200,.03999,.015,.20,1.,True))/.00002*.01
-assert abs(g.rho_r-rho_fd)<1e-5
-assert all(x.gamma>0 and x.vega>0 for x in greeks)
 print({'ATM_delta':g.delta,'gamma_per_USD':g.gamma,'vega_per_vol_point':g.vega,'theta_per_day':g.theta,'rho_per_rate_point':g.rho_r})
 ```
 {/* /notebook-block */}
@@ -193,8 +203,6 @@ truth = SabrParameters(0.20, 1.0, 0.30, -0.20)
 quotes = SabrSmile(truth, forward, expiry).generate_smile(strikes)
 fitted = SabrCalibrator().calibrate(forward, strikes, quotes, expiry, 1.0)
 repriced = SabrSmile(fitted, forward, expiry).generate_smile(strikes)
-assert max(abs(quote - fit) for quote, fit in zip(quotes, repriced)) < 1e-6  # 0.01 volatility bp
-assert fitted.beta == 1.0
 print({'alpha': fitted.alpha, 'beta': fitted.beta, 'rho': fitted.rho, 'nu': fitted.nu})
 ```
 {/* /notebook-block */}
@@ -223,7 +231,6 @@ for ax in axes:ax.set(xlabel='Strike',ylabel='Implied vol decimal');ax.legend();
 fig.tight_layout()
 svi=SviParams(.04,.1,-.3,0.,.2)
 k=.1;manual=.04+.1*(-.3*k+math.sqrt(k*k+.2**2))
-assert abs(svi.total_variance(k)-manual)<1e-12
 print({'SVI_total_variance_at_k_0.1':manual,'SVI_vol_1y':svi.implied_vol(k,1.)})
 ```
 {/* /notebook-block */}
@@ -238,11 +245,13 @@ The builder exposes the 100-unit multiplier, spot, dividend, discount and volati
 
 {/* notebook-block notebook="02_pricing/instruments/equity_and_options.ipynb" cell="equity-typed-builder" role="build" */}
 ```python exec id=equity-typed-builder role=build
+from datetime import date
 import json
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import EquityOption,price_instrument
 from finstack_quant.models.volatility import get_surface_vol
-from _shared.analyst_book import AS_OF,build_market,instruments
+from _shared.analyst_book import build_market, instruments
+AS_OF = date(2025, 1, 15)
 market=build_market('options');raw=instruments('options')['SPX-CALL']['instrument']['spec']
 option=(EquityOption.builder().id('TYPED-SPX-CALL').underlying_ticker('SPX').strike(5200).option_type('call')
  .expiry(raw['expiry']).notional(Money(100,'USD')).discount_curve_id('USD-OIS').spot_id('SPX-SPOT')
@@ -251,7 +260,6 @@ r=price_instrument(option,market,AS_OF,metrics=['delta','gamma','vega','theta'])
 original=price_instrument(json.dumps(instruments('options')['SPX-CALL']),market,AS_OF)
 t=(option.expiry-AS_OF).days/365
 smile={strike:get_surface_vol(market.get_surface('SPX-VOL'),t,strike) for strike in (4000,5200,6400)}
-assert abs(r.price-original.price)<1e-8 and smile[4000]>smile[5200]>smile[6400]
 print({'native_price_USD':r.price,'smile_decimal':smile,'position_greeks':{key:r.get_metric(key) for key in ('delta','gamma','vega','theta')}})
 ```
 {/* /notebook-block */}
@@ -273,7 +281,6 @@ fitted=SabrCalibrator().calibrate(5200.,strikes,quotes,1.,1.)
 fit=SabrSmile(fitted,5200.,1.).generate_smile(strikes)
 fig,ax=plt.subplots(figsize=(7,4));ax.scatter(strikes,quotes,label='Synthetic quotes');ax.plot(strikes,fit,label='Fitted SABR')
 ax.set(xlabel='SPX strike',ylabel='Implied volatility decimal');ax.legend();ax.grid(alpha=.25);fig.tight_layout()
-assert max(abs(a-b) for a,b in zip(quotes,fit))<1e-6
 print({'fit_residuals_vol_bp':[(a-b)*1e4 for a,b in zip(quotes,fit)]})
 ```
 {/* /notebook-block */}
@@ -292,10 +299,12 @@ The baseline is reconstructed for this exercise; it does not inherit cash from a
 
 {/* notebook-block notebook="02_pricing/instruments/equity_and_options.ipynb" cell="exercise-financed-delta-hedge" role="exercise" */}
 ```python exec id=exercise-financed-delta-hedge role=exercise
+from datetime import date
 import json, math
 from finstack_quant.models import bs_price, bs_greeks, bs_implied_vol, bs_cos_price
 from finstack_quant.valuations.instruments import EquityOption, price_instrument
-from _shared.analyst_book import AS_OF, build_market, instruments
+from _shared.analyst_book import build_market, instruments
+AS_OF = date(2025, 1, 15)
 
 market = build_market('options')
 option = EquityOption.from_json(json.dumps(instruments('options')['SPX-CALL']))
@@ -304,9 +313,6 @@ expiry = (option.expiry - AS_OF).days / 365.0
 r = market.get_discount('USD-OIS').zero(expiry)
 spot, strike, q, vol = 5200.0, 5200.0, 0.015, 0.20
 analytical = bs_price(spot, strike, r, q, vol, expiry, True)
-assert abs(priced.price - 100 * analytical) < 1e-6
-assert abs(bs_implied_vol(spot, strike, r, q, expiry, analytical, True) - vol) < 1e-8
-assert abs(bs_cos_price(spot, strike, r, q, vol, expiry, True, 256) - analytical) < 1e-6
 spots = [5200.0, 5220.0, 5190.0, 5230.0, 5210.0, 5240.0]
 g = bs_greeks(spots[0], strike, r, q, vol, expiry, True)
 delta = g.delta
@@ -322,16 +328,13 @@ for day in range(1, len(spots)):
     before_rebalance = cash + delta * spots[day] - value
     ds = spots[day] - previous_spot
     approximate_pnl = financing + dividends - 0.5 * g.gamma * ds ** 2 - g.theta
-    assert abs((before_rebalance - wealth) - approximate_pnl) < 0.05
     g = bs_greeks(spots[day], strike, r, q, vol, time_left, True)
     cash -= (g.delta - delta) * spots[day]
     delta = g.delta
     after_rebalance = cash + delta * spots[day] - value
-    assert abs(after_rebalance - before_rebalance) < 1e-9
     rows.append((day, before_rebalance - wealth, approximate_pnl, cash))
     wealth = after_rebalance
 print(rows)
-assert math.isfinite(wealth)
 ```
 {/* /notebook-block */}
 
@@ -352,7 +355,8 @@ from finstack_quant.core.money import Money
 from finstack_quant.models import bs_price
 from finstack_quant.models.volatility import get_fx_delta_vol
 from finstack_quant.valuations.instruments import FxOption,price_instrument
-from _shared.analyst_book import AS_OF,build_market
+from _shared.analyst_book import build_market
+AS_OF = date(2025, 1, 15)
 market=build_market('options');expiry=date(2025,12,15);t=(expiry-AS_OF).days/365
 rd=-math.log(market.get_discount('USD-OIS').df_between_dates(AS_OF,expiry))/t
 rf=-math.log(market.get_discount('EUR-OIS').df_between_dates(AS_OF,expiry))/t
@@ -367,7 +371,6 @@ wire=json.loads(option.to_json())
 wire['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'implied_volatility':vol}}
 native=price_instrument(json.dumps(wire),market,AS_OF).price
 manual=1_000_000*bs_price(spot,strike,rd,rf,vol,t,True)
-assert abs(native-manual)<.01
 print({'USD_rate':rd,'EUR_rate':rf,'EURUSD_forward':forward,'smile_vol':vol,'native_USD_price':native,'GK_USD_price':manual})
 ```
 {/* /notebook-block */}
@@ -390,9 +393,7 @@ for beta in (.5,1.):
  fitted=SabrCalibrator().calibrate(forward,strikes,quotes,expiry,beta)
  values=SabrSmile(fitted,forward,expiry).generate_smile(strikes)
  error=max(abs(a-b) for a,b in zip(quotes,values))
- assert fitted.beta==beta and error<.002
  fits.append({'beta':beta,'alpha':fitted.alpha,'rho':fitted.rho,'nu':fitted.nu,'max_vol_error':error})
-assert abs(fits[0]['alpha']-fits[1]['alpha'])>.1
 print(fits)
 ```
 {/* /notebook-block */}

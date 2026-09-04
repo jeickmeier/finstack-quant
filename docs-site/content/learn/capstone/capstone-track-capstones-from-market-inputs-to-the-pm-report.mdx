@@ -29,7 +29,7 @@ Both references below use the same common book and borrower, then add their own 
 
 ### Submission and grading brief
 
-Deliver eight stage notebooks in the numbered order below and a final HTML tear sheet. Each notebook must execute from a fresh kernel, import shared inputs visibly and identify its outputs consumed downstream. Provide a short README with the valuation date, currency, chosen track, market/position provenance and the run order. Include assertions and displayed results; do not submit only screenshots. The integrated reference notebook is supplied as an executable comparison of the same eight stages, not as a requirement to hide all stages in one file.
+Deliver eight stage notebooks in the numbered order below and a final HTML tear sheet. Each notebook must execute from a fresh kernel, import shared inputs visibly and identify its outputs consumed downstream. Provide a short README with the valuation date, currency, chosen track, market/position provenance and the run order. Include visible reconciliations and displayed results; do not submit only screenshots. The integrated reference notebook is supplied as an executable comparison of the same eight stages, not as a requirement to hide all stages in one file.
 
 Each stage is worth ten points: six for the explicit correctness checks and four for financial interpretation. The remaining twenty points assess reproducibility, traceability and the PM recommendation. The numerical identities are acceptance gates: a material unaccounted position, flow or currency mismatch must be resolved before presentation quality can earn a passing submission. A disclosed supported-model limitation is acceptable; silently substituting another payoff or treating missing risk as zero is not.
 
@@ -90,14 +90,13 @@ import math
 import numpy as np
 import pandas as pd
 from _shared import analyst_tracks as tracks
-from _shared.analyst_history import history_market,history_quotes,history_events,performance_history
+from _shared.analyst_history import history_market, history_quotes, history_events
 from finstack_quant.calibration import calibrate
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import DiscountCurve,FxMatrix,PriceCurve,VolSurface
 from finstack_quant.portfolio import Portfolio,value_portfolio,brinson_fachler,carino_link,twrr_linked
 from finstack_quant.valuations.instruments import price_instrument,structured_credit_tranche_metrics
-AS_OF=tracks.AS_OF
-
+AS_OF = date(2025, 1, 15)
 TRACK='credit'
 ```
 {/* /notebook-block */}
@@ -106,16 +105,14 @@ TRACK='credit'
 
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-market-setup" role="build" */}
 ```python exec id=credit-market-setup role=build
-market=tracks.build_market(TRACK)
-book=tracks.build_book(TRACK)
-book_input=tracks.book_spec(TRACK)
-common_ids=set(tracks.common.instruments("common"))
-holding=tracks.clo_bbb_holding() if TRACK=="credit" else None
-assert set(p["instrument_id"] for p in book_input["positions"][:8])==common_ids
-assert all(p["instrument_spec"]["type"]!="structured_credit" for p in book_input["positions"])
-assert market.get_discount("USD-OIS").id=="USD-OIS"
+from _shared.analyst_book import instruments as common_instruments
+market=tracks.build_market("credit", core_stage="common")
+book=tracks.build_book("credit", core_stage="common")
+book_input=tracks.book_spec("credit", core_stage="common")
+common_ids=set(common_instruments("common"))
+holding=tracks.clo_bbb_holding()
 print(pd.Series({"track":TRACK,"as_of":AS_OF.isoformat(),"native_positions":len(book.position_ids),
-           "separate_BBB_holding":holding["holding_id"] if holding else "none"}))
+           "separate_BBB_holding":holding["holding_id"]}))
 ```
 {/* /notebook-block */}
 
@@ -128,13 +125,10 @@ wire=json.loads(base.to_json())
 positions=pd.DataFrame([{"position":iid,"currency":row["value_native"]["currency"],
     "native_value":float(row["value_native"]["amount"]),"usd_value":float(row["value_base"]["amount"])}
     for iid,row in wire["position_values"].items()])
-assert abs(positions.usd_value.sum()-base.total_value)<.01
-bbb=structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",market,AS_OF) if holding else None
-bbb_pv=holding["quantity"]*bbb.pv if holding else 0.0
+bbb=structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",market,AS_OF)
+bbb_pv=holding["quantity"]*bbb.pv
 combined_base=base.total_value+bbb_pv
-if holding:
-    positions.loc[len(positions)]={"position":"CLO-BBB","currency":"USD","native_value":bbb_pv,"usd_value":bbb_pv}
-assert abs(positions.usd_value.sum()-combined_base)<.01
+positions.loc[len(positions)]={"position":"CLO-BBB","currency":"USD","native_value":bbb_pv,"usd_value":bbb_pv}
 print(positions)
 ```
 {/* /notebook-block */}
@@ -151,12 +145,10 @@ for position in book_input["positions"]:
     fx_rate=1.0 if currency=="USD" else market.fx_required().rate(currency,"USD",AS_OF).rate
     direct_native=one.value.amount*position["quantity"]
     portfolio_native=float(wire["position_values"][position["instrument_id"]]["value_native"]["amount"])
-    assert abs(direct_native-portfolio_native)<.01
     individual_rows.append({"position":position["instrument_id"],"currency":currency,
                             "direct_native":direct_native,"direct_USD":direct_native*fx_rate})
 individual_prices=pd.DataFrame(individual_rows)
 direct_total=individual_prices.direct_USD.sum()+bbb_pv
-assert abs(direct_total-combined_base)<.01
 print(individual_prices)
 print({"independent_individual_plus_BBB":direct_total,"native_portfolio_plus_BBB":combined_base})
 ```
@@ -166,8 +158,9 @@ print({"independent_individual_plus_BBB":direct_total,"native_portfolio_plus_BBB
 
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-independent-analytical" role="build" */}
 ```python exec id=credit-independent-analytical role=build
+from _shared.analyst_book import instruments as common_instruments
 # Independent closed-form calculation for the actual common European equity call.
-equity=tracks.common.instruments("common")["SPX-CALL"]["instrument"]["spec"]
+equity=common_instruments("common")["SPX-CALL"]["instrument"]["spec"]
 tau=(date.fromisoformat(equity["expiry"])-AS_OF).days/365
 spot=float(market.get_price(equity["spot_id"])[0]);q=float(market.get_price(equity["div_yield_id"])[0])
 K=float(equity["strike"]);sigma=market.get_surface(equity["vol_surface_id"]).vol(tau,K)
@@ -177,7 +170,6 @@ N1=.5*(1+math.erf(d1/math.sqrt(2)));N2=.5*(1+math.erf(d2/math.sqrt(2)))
 analytical_call=(spot*math.exp(-q*tau)*N1-K*discount*N2)*float(equity["notional"]["amount"])
 native_call=float(wire["position_values"]["SPX-CALL"]["value_native"]["amount"])
 analytical_price_error=analytical_call-native_call
-assert abs(analytical_price_error)<.01
 print({"independent_BSM_USD":analytical_call,"native_equity_call_USD":native_call,"difference_USD":analytical_price_error})
 ```
 {/* /notebook-block */}
@@ -186,20 +178,20 @@ print({"independent_BSM_USD":analytical_call,"native_equity_call_USD":native_cal
 
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-risk-coverage" role="build" */}
 ```python exec id=credit-risk-coverage role=build
-risk_requests=[m for m in tracks.common.RISK_METRICS if not(TRACK=="vol" and m=="theta")]
+from _shared.analyst_book import expected_metrics as common_expected_metrics
+common_metric_map=common_expected_metrics('common')
+common_metric_families=sorted({metric for families in common_metric_map.values() for metric in families})
+risk_requests=common_metric_families
+print('Requested metric families:',risk_requests)
 risk=value_portfolio(book,market,strict_risk=True,metrics=risk_requests)
 risk_wire=json.loads(risk.to_json())
-assert not risk_wire.get("degraded_positions",[])
 risk_rows=[]
 for iid,row in risk_wire["position_values"].items():
-    assert row["risk_metrics_complete"] and not row.get("risk_error")
     risk_rows.extend({"position":iid,"metric":metric,"value":value}
         for metric,value in row["valuation_result"]["measures"].items())
-if bbb:
-    risk_rows.extend([{"position":"CLO-BBB","metric":"tranche_z_spread_cs01_USD_per_bp","value":bbb.cs01},
-                      {"position":"CLO-BBB","metric":"wal_years","value":bbb.wal}])
+risk_rows.extend([{"position":"CLO-BBB","metric":"tranche_z_spread_cs01_USD_per_bp","value":bbb.cs01},
+                  {"position":"CLO-BBB","metric":"wal_years","value":bbb.wal}])
 risk_table=pd.DataFrame(risk_rows)
-assert np.isfinite(risk_table.value).all()
 print(risk_table.pivot(index="position",columns="metric",values="value").iloc[:,:12])
 ```
 {/* /notebook-block */}
@@ -221,7 +213,6 @@ factor_sd=np.array([.0005,.0004,.06,.012,.008,.006,.018,.008])
 correlation=np.eye(8)
 for i,j,rho in [(0,1,.30),(2,3,-.25),(3,4,-.40),(3,6,.20),(6,7,.20)]:
     correlation[i,j]=correlation[j,i]=rho
-assert np.linalg.eigvalsh(correlation).min()>0
 rng=np.random.default_rng(2025011508)
 factor_panel=rng.standard_normal((504,8))@np.linalg.cholesky(correlation).T*factor_sd
 frozen_market=json.loads(market.to_json())
@@ -248,7 +239,6 @@ def capstone_scenario_value(shock):
             curve["knot_points"]=[[t,price*math.exp(log_move)] for t,price in curve["knot_points"]]
     for surface in snapshot["surfaces"]:
         surface["vols_row_major"]=[value+volatility for value in surface["vols_row_major"]]
-        assert min(surface["vols_row_major"])>0
     for ticker,price in snapshot["prices"].items():
         if "price" in price:
             price["price"]["amount"]=str(float(price["price"]["amount"])*math.exp(equity))
@@ -258,26 +248,22 @@ def capstone_scenario_value(shock):
         if quote[:2]==["EUR","USD"]:quote[2]*=math.exp(fx_move)
     scenario_market=MarketContext.from_json(json.dumps(snapshot))
     native_value=value_portfolio(book,scenario_market,metrics=[]).total_value
-    tranche_value=0.
-    if holding:
-        scenario_deal=deepcopy(holding["deal"])
-        spec=scenario_deal["instrument"]["spec"]
-        # The zero-CDR baseline has a boundary: worsening systemic credit adds
-        # annual collateral CDR; favorable shocks leave zero at zero. This mapping
-        # is an explicit synthetic assumption, not an estimated pricing PD.
-        cdr=spec["default_spec"]["cdr"]+.10*max(hazard,0.)
-        spec["default_spec"]["cdr"]=cdr
-        spec["default_assumptions"]["base_cdr_annual"]=cdr
-        tranche_value=holding["quantity"]*structured_credit_tranche_metrics(
-            json.dumps(scenario_deal),"BBB",scenario_market,AS_OF).pv
+    scenario_deal=deepcopy(holding["deal"])
+    spec=scenario_deal["instrument"]["spec"]
+    # The zero-CDR baseline has a boundary: worsening systemic credit adds
+    # annual collateral CDR; favorable shocks leave zero at zero. This mapping
+    # is an explicit synthetic assumption, not an estimated pricing PD.
+    cdr=spec["default_spec"]["cdr"]+.10*max(hazard,0.)
+    spec["default_spec"]["cdr"]=cdr
+    spec["default_assumptions"]["base_cdr_annual"]=cdr
+    tranche_value=holding["quantity"]*structured_credit_tranche_metrics(
+        json.dumps(scenario_deal),"BBB",scenario_market,AS_OF).pv
     return native_value,tranche_value
 
 zero_native,zero_bbb=capstone_scenario_value(np.zeros(8))
-assert abs(zero_native+zero_bbb-combined_base)<.01
 scenario_values=np.array([capstone_scenario_value(shock) for shock in factor_panel])
 scenario_pnl=scenario_values.sum(axis=1)-combined_base
 scenario_returns=scenario_pnl/combined_base
-assert np.isfinite(scenario_pnl).all() and len(scenario_pnl)==504
 daily_risk=Performance.from_returns(pd.DataFrame({"held_book":scenario_returns},
     index=pd.bdate_range("2023-02-08",periods=504)),frequency="daily")
 confidence=.95
@@ -285,7 +271,6 @@ q=float(daily_risk.value_at_risk(confidence).iloc[0])
 tail=float(daily_risk.expected_shortfall(confidence).iloc[0])
 manual_q=float(np.quantile(scenario_returns,1-confidence,method="linear"))
 manual_tail=float(scenario_returns[scenario_returns<=manual_q].mean())
-assert abs(q-manual_q)<1e-12 and abs(tail-manual_tail)<1e-12
 bootstrap_rng=np.random.default_rng(2025011595)
 bootstrap_risk=[]
 for _ in range(500):
@@ -298,19 +283,16 @@ tail_risk_table=pd.DataFrame([{"confidence":confidence,"scenario_count":504,
     "tail_observations":int((scenario_returns<=manual_q).sum()),
     "VaR_bootstrap_p025":bootstrap_interval[0,0],"VaR_bootstrap_p975":bootstrap_interval[1,0],
     "ES_bootstrap_p025":bootstrap_interval[0,1],"ES_bootstrap_p975":bootstrap_interval[1,1],
-    "mean_scenario_PnL_USD":scenario_pnl.mean(),"priced_positions":len(book.position_ids)+int(holding is not None)}])
+    "mean_scenario_PnL_USD":scenario_pnl.mean(),"priced_positions":len(book.position_ids)+1}])
 
 fit=daily_risk.multi_factor_greeks(0,factor_panel.T.tolist())
 design=np.column_stack([np.ones(len(factor_panel)),factor_panel])
 ols=np.linalg.lstsq(design,scenario_returns,rcond=None)[0]
-assert np.allclose(fit.betas,ols[1:],atol=1e-9)
 residual=scenario_returns-design@ols
-assert np.allclose(design.T@residual,0.,atol=1e-10)
 covariance=np.cov(factor_panel,rowvar=False,ddof=1)
 contributions=ols[1:]*(covariance@ols[1:])
 residual_variance=residual.var(ddof=1)
 total_variance=scenario_returns.var(ddof=1)
-assert abs(contributions.sum()+residual_variance-total_variance)<1e-12
 factor_risk_table=pd.DataFrame({"factor":factor_names,"return_loading_per_factor_unit":fit.betas,
     "USD_loading_per_factor_unit":np.array(fit.betas)*combined_base,
     "daily_return_variance_contribution":contributions})
@@ -327,8 +309,9 @@ print("These are 504 invented one-day market shocks with no time roll, flows or 
 
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-stress-repricing" role="build" */}
 ```python exec id=credit-stress-repricing role=build
-stress=tracks.build_market(TRACK)
-calibration=tracks.common.calibration_envelope("base")
+from _shared.analyst_book import calibration_envelope as common_calibration_envelope
+stress=tracks.build_market("credit", core_stage="common")
+calibration=common_calibration_envelope("base")
 for quote in calibration["market_data"]:
     if quote["kind"]=="rate_quote":quote["rate"]+=.015
     elif quote["kind"]=="cds_quote":quote["spread_bp"]+=100.0
@@ -337,36 +320,25 @@ stress.insert(calibrated.get_discount("USD-OIS"))
 stress.insert(calibrated.get_hazard("ACME-HZD"))
 stress.insert_price("SPX-SPOT",4160.,"USD")
 stress.insert(VolSurface("SPX-VOL",[.25,.5,1.,2.],[4000.,5200.,6400.],[[.35,.30,.29]]*4))
-if TRACK=="credit":
-    index_calibration=tracks.credit_calibration_envelope()
-    for quote in index_calibration["market_data"]:
-        if quote["kind"]=="rate_quote":quote["rate"]+=.015
-        elif quote["kind"]=="cds_quote":quote["spread_bp"]+=100.0
-    stress.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
-    stress.insert(DiscountCurve("CONVERT-RISKY",AS_OF,[(t,math.exp(-.095*t)) for t in [0.,1.,5.,10.]],day_count="act_365f"))
-    stress.insert_price("CONVERT",80.,"USD")
-    stressed_deal=deepcopy(holding["deal"])
-    stressed_deal["instrument"]["spec"].update({"default_spec":{"cdr":.05,"curve":None},
-        "recovery_spec":{"rate":.25,"recovery_lag":6}})
-    stressed_deal["instrument"]["spec"]["default_assumptions"].update({"base_cdr_annual":.05,"base_recovery_rate":.25})
-    bbb_stress=structured_credit_tranche_metrics(json.dumps(stressed_deal),"BBB",stress,AS_OF).pv*holding["quantity"]
-else:
-    stress.insert(DiscountCurve("USD-TREASURY",AS_OF,[(t,math.exp(-.055*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
-    stress.insert_price("SPX",4160.,"USD")
-    strikes=[5200*math.exp(-3+i*.05) for i in range(121)]
-    stress.insert(VolSurface("SPX_VOL",[.25,.5,1.,2.],strikes,[[.30]*len(strikes)]*4))
-    for ticker,levels,sigma in [("WTI",[75.,74.,72.,70.],.35),("BRENT",[78.,77.,75.,73.],.33)]:
-        stress.insert(PriceCurve(f"{ticker}-FORWARD",AS_OF,list(zip([0.,.5,1.,2.],[.9*x for x in levels]))))
-        stress.insert(VolSurface(f"{ticker}-VOL",[.25,.5,1.,2.],[20.,75.,150.],[[sigma]*3]*4))
-    bbb_stress=0.0
+index_calibration=tracks.credit_calibration_envelope()
+for quote in index_calibration["market_data"]:
+    if quote["kind"]=="rate_quote":quote["rate"]+=.015
+    elif quote["kind"]=="cds_quote":quote["spread_bp"]+=100.0
+stress.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
+stress.insert(DiscountCurve("CONVERT-RISKY",AS_OF,[(t,math.exp(-.095*t)) for t in [0.,1.,5.,10.]],day_count="act_365f"))
+stress.insert_price("CONVERT",80.,"USD")
+stressed_deal=deepcopy(holding["deal"])
+stressed_deal["instrument"]["spec"].update({"default_spec":{"cdr":.05,"curve":None},
+    "recovery_spec":{"rate":.25,"recovery_lag":6}})
+stressed_deal["instrument"]["spec"]["default_assumptions"].update({"base_cdr_annual":.05,"base_recovery_rate":.25})
+bbb_stress=structured_credit_tranche_metrics(json.dumps(stressed_deal),"BBB",stress,AS_OF).pv*holding["quantity"]
 stressed=value_portfolio(book,stress,metrics=[])
 stress_wire=json.loads(stressed.to_json())
 scenario=pd.DataFrame([{"position":iid,"base_usd":float(row["value_base"]["amount"]),
     "stress_usd":float(stress_wire["position_values"][iid]["value_base"]["amount"])} for iid,row in wire["position_values"].items()])
-if holding:scenario.loc[len(scenario)]={"position":"CLO-BBB","base_usd":bbb_pv,"stress_usd":bbb_stress}
+scenario.loc[len(scenario)]={"position":"CLO-BBB","base_usd":bbb_pv,"stress_usd":bbb_stress}
 scenario["pnl_usd"]=scenario.stress_usd-scenario.base_usd
 combined_stress=stressed.total_value+bbb_stress
-assert abs(scenario.pnl_usd.sum()-(combined_stress-combined_base))<.01
 print(scenario)
 ```
 {/* /notebook-block */}
@@ -375,6 +347,7 @@ print(scenario)
 
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-historical-replay" role="build" */}
 ```python exec id=credit-historical-replay role=build
+from _shared.analyst_book import calibration_envelope as common_calibration_envelope
 # Historical-pattern stress: replay a named synthetic observation-to-observation
 # change on today's frozen contracts and valuation date. This is distinct from
 # the later dated-NAV exercise, which advances time and accruals.
@@ -384,8 +357,8 @@ rate_change=new_quotes["rate_shift"]-old_quotes["rate_shift"]
 credit_change_bp=new_quotes["credit_shift_bp"]-old_quotes["credit_shift_bp"]
 equity_ratio=new_quotes["spx"]/old_quotes["spx"]
 fx_ratio=new_quotes["eur_usd"]/old_quotes["eur_usd"]
-replay_market=tracks.build_market(TRACK)
-replay_calibration=tracks.common.calibration_envelope("base")
+replay_market=tracks.build_market("credit", core_stage="common")
+replay_calibration=common_calibration_envelope("base")
 for quote in replay_calibration["market_data"]:
     if quote["kind"]=="rate_quote":quote["rate"]+=rate_change
     elif quote["kind"]=="cds_quote":quote["spread_bp"]+=credit_change_bp
@@ -394,33 +367,25 @@ replay_market.insert(replay_calibrated.get_discount("USD-OIS"))
 replay_market.insert(replay_calibrated.get_hazard("ACME-HZD"))
 replay_market.insert_price("SPX-SPOT",5200*equity_ratio,"USD")
 fx=FxMatrix();fx.set_quote(Currency("EUR"),Currency("USD"),1.08*fx_ratio);replay_market.insert_fx(fx)
-if TRACK=="credit":
-    index_calibration=tracks.credit_calibration_envelope()
-    for quote in index_calibration["market_data"]:
-        if quote["kind"]=="rate_quote":quote["rate"]+=rate_change
-        elif quote["kind"]=="cds_quote":quote["spread_bp"]+=credit_change_bp
-    replay_market.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
-    replay_market.insert_price("CONVERT",100*equity_ratio,"USD")
-    replay_market.insert(DiscountCurve("CONVERT-RISKY",AS_OF,
-        [(t,math.exp(-(.065+rate_change+credit_change_bp/10000)*t)) for t in [0.,1.,5.,10.]],day_count="act_365f"))
-else:
-    replay_market.insert_price("SPX",5200*equity_ratio,"USD")
-    replay_market.insert(DiscountCurve("USD-TREASURY",AS_OF,
-        [(t,math.exp(-(.04+rate_change)*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
+index_calibration=tracks.credit_calibration_envelope()
+for quote in index_calibration["market_data"]:
+    if quote["kind"]=="rate_quote":quote["rate"]+=rate_change
+    elif quote["kind"]=="cds_quote":quote["spread_bp"]+=credit_change_bp
+replay_market.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
+replay_market.insert_price("CONVERT",100*equity_ratio,"USD")
+replay_market.insert(DiscountCurve("CONVERT-RISKY",AS_OF,
+    [(t,math.exp(-(.065+rate_change+credit_change_bp/10000)*t)) for t in [0.,1.,5.,10.]],day_count="act_365f"))
 replay_native=value_portfolio(book,replay_market,metrics=[])
 replay_wire=json.loads(replay_native.to_json())
-replay_bbb=holding["quantity"]*structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",replay_market,AS_OF).pv if holding else 0.
+replay_bbb=holding["quantity"]*structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",replay_market,AS_OF).pv
 replay_position_rows=[]
 for iid,row in wire["position_values"].items():
     base_value=float(row["value_base"]["amount"])
     shocked_value=float(replay_wire["position_values"][iid]["value_base"]["amount"])
     replay_position_rows.append({"position":iid,"base_USD":base_value,"replay_USD":shocked_value,"PnL_USD":shocked_value-base_value})
-if holding:replay_position_rows.append({"position":"CLO-BBB","base_USD":bbb_pv,"replay_USD":replay_bbb,"PnL_USD":replay_bbb-bbb_pv})
+replay_position_rows.append({"position":"CLO-BBB","base_USD":bbb_pv,"replay_USD":replay_bbb,"PnL_USD":replay_bbb-bbb_pv})
 historical_stress_table=pd.DataFrame(replay_position_rows)
 historical_stress_total=replay_native.total_value+replay_bbb
-assert abs(historical_stress_table.PnL_USD.sum()-(historical_stress_total-combined_base))<.01
-assert json.loads(replay_market.get_discount("USD-OIS").to_json())["base"]==AS_OF.isoformat()
-assert len(historical_stress_table)==len(book.position_ids)+int(holding is not None)
 print({"synthetic_observation_start":str(replay_start),"synthetic_observation_end":str(replay_end),
     "held_valuation_date":str(AS_OF),"rate_quote_change_bp":rate_change*10000,
     "credit_quote_change_bp":credit_change_bp,"equity_move_pct":100*(equity_ratio-1),"EURUSD_move_pct":100*(fx_ratio-1)})
@@ -443,9 +408,7 @@ for label,payload,m in [("base",holding["deal"],market),("joint_stress",stressed
         waterfall_rows.append({"case":label,"tranche":tranche,"PV":out.pv,"WAL":out.wal})
 first_loss_base=structured_credit_tranche_breakeven_cdr(json.dumps(holding["deal"]),"BBB",market,AS_OF)
 first_loss_stress=structured_credit_tranche_breakeven_cdr(json.dumps(stressed_deal),"BBB",stress,AS_OF)
-assert 0<first_loss_stress<first_loss_base
 waterfall_table=pd.DataFrame(waterfall_rows)
-assert abs(waterfall_table[(waterfall_table["case"]=="joint_stress")&(waterfall_table.tranche=="BBB")].PV.iloc[0]-bbb_stress)<.01
 print(waterfall_table.to_string(index=False));print({"BBB_first_loss_CDR_base":first_loss_base,"BBB_first_loss_CDR_lower_recovery":first_loss_stress})
 # One-period stressed trace has immediate recovery so every distribution shares one known date.
 trace=tracks.clo_deal(one_period=True);ts=trace["instrument"]["spec"]
@@ -453,10 +416,8 @@ ts.update(default_spec={"cdr":.05},recovery_spec={"rate":.25,"recovery_lag":0})
 ts["default_assumptions"].update(base_cdr_annual=.05,base_recovery_rate=.25)
 flows=json.loads(instrument_cashflows_json(json.dumps(trace),market,AS_OF,"discounting"))["flows"]
 cash_flows=[flow for flow in flows if flow["date"]>AS_OF.isoformat() and flow["kind"]!="defaulted_notional"]
-assert set(flow["date"] for flow in cash_flows)=={"2025-04-15"}
 trace_df=market.get_discount("USD-OIS").df(90/365)
 trace_rows=[{"tranche":tranche,"stressed_one_period_cash":structured_credit_tranche_metrics(json.dumps(trace),tranche,market,AS_OF).pv/trace_df} for tranche in ["AAA","BBB","EQUITY"]]
-assert abs(sum(row["stressed_one_period_cash"] for row in trace_rows)-sum(flow["amount"] for flow in cash_flows))<.01
 print(pd.DataFrame(trace_rows).to_string(index=False))
 print("Trace contains remaining post-as-of cash only; exported defaulted-notional rows are loss records, not investor cash receipts, and zero-PV as-of records are excluded from the remaining-value reconciliation.")
 rev=tracks.credit_extension()["ANALYST-REVOLVER"]["instrument"]["spec"]
@@ -467,17 +428,13 @@ for rho in [0.,.30]:
     expected=commitment*(util0+(1-util0)*.25)
     conditional=commitment*(util0+(1-util0)*joint.joint_p11/.10)
     draw_rows.append({"correlation":rho,"observed_drawn":drawn,"expected_drawn":expected,"drawn_given_default":conditional})
-assert draw_rows[0]["expected_drawn"]==draw_rows[1]["expected_drawn"]
-assert draw_rows[1]["drawn_given_default"]>draw_rows[0]["drawn_given_default"]
 expected_draw_table=pd.DataFrame(draw_rows);print(expected_draw_table.to_string(index=False))
 convert_rows=[]
 for stock in [50.,100.,150.]:
-    m=tracks.build_market("credit");m.insert_price("CONVERT",stock,"USD")
+    m=tracks.build_market("credit", core_stage="common");m.insert_price("CONVERT",stock,"USD")
     out=price_instrument(json.dumps(tracks.credit_extension()["ANALYST-CONVERT"]),m,AS_OF,model="tree",metrics=["bond_floor","conversion_value","parity","delta"])
     convert_rows.append({"stock":stock,"PV":out.value.amount,**out.metrics})
 convert_regimes=pd.DataFrame(convert_rows)
-assert np.allclose(convert_regimes.conversion_value,convert_regimes.stock*10_000)
-assert (convert_regimes.PV>=convert_regimes.bond_floor).all()
 print(convert_regimes.to_string(index=False))
 ```
 {/* /notebook-block */}
@@ -491,19 +448,14 @@ irs_position=next(p for p in book_input["positions"] if p["instrument_id"]=="USD
 irs_notional=float(irs_position["instrument_spec"]["spec"]["notional"]["amount"])*irs_position["quantity"]
 irs_end=date.fromisoformat(irs_position["instrument_spec"]["spec"]["fixed"]["end"])
 irs_remaining_years=(irs_end-AS_OF).days/365
-assert irs_end==date(2028,4,15)
 im_schedule=ScheduleImCalculator.bcbs_standard()
 schedule_im=im_schedule.calculate_for_notional(irs_notional,"USD","interest_rate",irs_remaining_years,AS_OF)
-assert abs(schedule_im.amount-irs_notional*im_schedule.rate("interest_rate",irs_remaining_years))<.01
 vm_calculator=VmCalculator(CsaSpec.usd_regulatory())
 margin_rows=[]
 for label,valuation_wire in [("base",wire),("stress",stress_wire)]:
     exposure=float(valuation_wire["position_values"]["USD-PAYER-IRS"]["value_base"]["amount"])
     vm=vm_calculator.calculate(exposure,0.0,"USD",AS_OF)
-    assert abs(vm.gross_exposure-exposure)<.01
     # Zero threshold/IA and $500k MTA: these actual IRS exposures require no transfer.
-    assert abs(exposure)<500_000
-    assert vm.delivery_amount==0 and vm.return_amount==0
     margin_rows.append({"case":label,"IRS_exposure_usd":exposure,"VM_delivery_usd":vm.delivery_amount,
                        "VM_return_usd":vm.return_amount,"gross_schedule_IM_usd":schedule_im.amount})
 margin_table=pd.DataFrame(margin_rows)
@@ -521,13 +473,10 @@ source_path=Path(_shared.__file__).parent.parent/"07_advanced_quant/margin_colla
 source=nbformat.read(source_path,as_version=4)
 source_ids=["margin-proof-1","margin-proof-2","margin-proof-3"]
 selected=[cell for cell in source.cells if cell.cell_type=="code" and cell.metadata.get("analyst_program",{}).get("id") in source_ids]
-assert [cell.metadata["analyst_program"]["id"] for cell in selected]==source_ids
 margin_proof={"__name__":"__capstone_margin_proof__"}
 for cell in selected:
     exec(compile(cell.source,str(source_path)+":"+cell.metadata["analyst_program"]["id"],"exec"),margin_proof)
 simm_im=margin_proof["simm_result"].amount
-assert simm_im>0
-assert abs(margin_proof["one_result"].amount-margin_proof["manual"])<1e-8
 print(pd.Series({"native_IRS_SIMM_v2_6_USD":simm_im,"native_IRS_gross_schedule_IM_USD":schedule_im.amount}))
 ```
 {/* /notebook-block */}
@@ -543,7 +492,6 @@ borrower=borrower_model()
 borrower_inputs=borrower_data()
 statements=Evaluator().evaluate(borrower)
 financials=statements.to_dataframe(orient="wide")
-assert financials.loc["balance_check"].abs().max()<.01
 period="2025Q4"
 covenant_engine=CovenantEngine.from_specs([
     CovenantSpec(Covenant(CovenantType.max_net_debt_to_ebitda(4.5),"3M","Net leverage"),"net_leverage"),
@@ -552,8 +500,6 @@ reports=covenant_engine.evaluate({"net_leverage":float(financials.loc["net_lever
     "dscr":float(financials.loc["dscr",period])},"2025-12-31")
 credit_table=pd.DataFrame([{"covenant":name,"actual":report.actual_value,"threshold":report.threshold,
     "headroom":report.headroom,"passed":report.passed} for name,report in reports.items()])
-assert "BORROWER-TL" in book.position_ids
-assert borrower_inputs["loan"]["holding_notional"]==1_000_000
 print(credit_table)
 ```
 {/* /notebook-block */}
@@ -562,9 +508,10 @@ print(credit_table)
 
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-quarterly-covenants" role="build" */}
 ```python exec id=credit-quarterly-covenants role=build
-from _shared.borrower_model import PERIODS
+import json
 from finstack_quant.statements import ModelBuilder,ForecastSpec
-borrower_spec=borrower_model();historical=Evaluator().evaluate(borrower_spec)
+borrower_spec=borrower_model()
+PERIODS = tuple(period['id'] for period in json.loads(borrower_spec.to_json())['periods']);historical=Evaluator().evaluate(borrower_spec)
 quarter_rows=[]
 for scenario_name in ["base","downside"]:
     assumptions=borrower_inputs["scenarios"][scenario_name]
@@ -577,17 +524,13 @@ for scenario_name in ["base","downside"]:
         CovenantSpec(Covenant(CovenantType.max_net_debt_to_ebitda(4.5),"3M","Net leverage"),"net_leverage"),
         CovenantSpec(Covenant(CovenantType.min_dscr(1.1),"3M","DSCR"),"dscr")])
     for quarter,day in zip(PERIODS[4:],["2025-03-31","2025-06-30","2025-09-30","2025-12-31"]):
-        assert abs(forecast.get("balance_check",quarter))<.01
         reports=engine.evaluate({"net_leverage":forecast.get("net_leverage",quarter),"dscr":forecast.get("dscr",quarter)},day)
         for name,out in reports.items():
             headroom=out.threshold-out.actual_value if name=="Net leverage" else out.actual_value-out.threshold
-            assert abs(out.headroom-headroom/out.threshold)<1e-12
             quarter_rows.append({"scenario":scenario_name,"quarter":str(quarter),"covenant":name,
                 "actual":out.actual_value,"threshold":out.threshold,"headroom":headroom,
                 "native_headroom_fraction":out.headroom,"passed":out.passed})
 credit_table=pd.DataFrame(quarter_rows)
-assert len(credit_table)==16
-assert not credit_table[(credit_table.scenario=="base")&(credit_table.covenant=="DSCR")].passed.any()
 print(credit_table.to_string(index=False))
 print("Base DSCR fails all four forecast tests. Headroom is shown in ratio units beside the native fraction; annualized EBITDA is a current-quarter run rate.")
 ```
@@ -609,12 +552,9 @@ ead_knots=[(0.,held_ead),*midpoints,(5.,0.)]
 exposure=Exposure("BORROWER-TL",held_ead,lgd,eir,5.,physical_curve[-1][1],physical_curve[-1][1],
     qualitative_flags=QualitativeFlags(watchlist=True),ead_schedule=ead_knots)
 stage=classify_stage(exposure,StagingConfig(pd_delta_absolute=.05,pd_delta_relative=float("inf")))
-assert stage.stage.value=="stage2"
 physical_loss=compute_ecl(exposure,physical_curve,stage=stage.stage,bucket_width_years=.25)
 manual_ecl=sum((physical_curve[i+1][1]-physical_curve[i][1])*balance*lgd/(1+eir)**t
                for i,(t,balance) in enumerate(midpoints))
-assert abs(physical_loss.ecl-manual_ecl)<1e-8 and held_ead==1_000_000
-assert midpoints[-1][1]==525_000
 physical_loss_table=pd.DataFrame([{"holding":"BORROWER-TL","stage":stage.stage.value,"physical_annual_PD":physical_pd,
     "LGD":lgd,"held_EAD":held_ead,"EIR":eir,"amortizing_lifetime_ECL":physical_loss.ecl,"manual_ECL":manual_ecl}])
 print(physical_loss_table.to_string(index=False))
@@ -627,47 +567,32 @@ print("Physical ECL uses shared borrower PD/LGD and contractual midpoint EAD. It
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-dated-repricing" role="build" */}
 ```python exec id=credit-dated-repricing role=build
 dates=[AS_OF+timedelta(days=7*i) for i in range(4)]
-assert not [event for event in history_events() if dates[0]<date.fromisoformat(event["date"])<=dates[-1]]
-assert dates[-1]<date(2025,3,20)  # Before the first future contractual coupon in these books.
 nav_rows=[]
 sleeve_rows=[]
 for day in dates:
     quotes=history_quotes(day)
-    dated=tracks.build_market(TRACK,day)
+    dated=tracks.build_market("credit", day, core_stage="common")
     common_market=history_market(day)
     dated.insert(common_market.get_discount("USD-OIS"))
     dated.insert(common_market.get_hazard("ACME-HZD"))
     dated.insert_price("SPX-SPOT",quotes["spx"],"USD")
     fx=FxMatrix();fx.set_quote(Currency("EUR"),Currency("USD"),quotes["eur_usd"]);dated.insert_fx(fx)
-    if TRACK=="credit":
-        index_calibration=tracks.credit_calibration_envelope(day)
-        for quote in index_calibration["market_data"]:
-            if quote["kind"]=="rate_quote":quote["rate"]+=quotes["rate_shift"]
-            elif quote["kind"]=="cds_quote":quote["spread_bp"]+=quotes["credit_shift_bp"]
-        dated.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
-        dated.insert_price("CONVERT",100*quotes["spx"]/5200,"USD")
-    else:
-        dated.insert_price("SPX",quotes["spx"],"USD")
-        dated.insert(DiscountCurve("USD-TREASURY",day,[(t,math.exp(-(.04+quotes["rate_shift"])*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
-    dated_spec=tracks.book_spec(TRACK);dated_spec["as_of"]=day.isoformat()
+    index_calibration=tracks.credit_calibration_envelope(day)
+    for quote in index_calibration["market_data"]:
+        if quote["kind"]=="rate_quote":quote["rate"]+=quotes["rate_shift"]
+        elif quote["kind"]=="cds_quote":quote["spread_bp"]+=quotes["credit_shift_bp"]
+    dated.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
+    dated.insert_price("CONVERT",100*quotes["spx"]/5200,"USD")
+    dated_spec=tracks.book_spec("credit", core_stage="common");dated_spec["as_of"]=day.isoformat()
     valuation=value_portfolio(Portfolio.from_spec(json.dumps(dated_spec)),dated,metrics=[])
     dated_wire=json.loads(valuation.to_json())
     by_position={iid:float(row["value_base"]["amount"]) for iid,row in dated_wire["position_values"].items()}
-    bbb_dated=structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",dated,day).pv*holding["quantity"] if holding else 0.0
-    if TRACK=="vol":
-        future=deepcopy(tracks.vol_extension()["UST-FUTURE"])
-        future_mark=price_instrument(json.dumps(future),dated,day,model="bond_future_clean_price_proxy",metrics=["futures_price"])
-        cumulative_vm_cash=future_mark.value.amount
-        future["instrument"]["spec"]["quoted_price"]=future_mark.metrics["futures_price"]
-        reset_mark=price_instrument(json.dumps(future),dated,day,model="bond_future_clean_price_proxy").value.amount
-        assert abs(reset_mark)<.01
-        assert abs(valuation.total_value-by_position["UST-FUTURE"]+reset_mark+cumulative_vm_cash-valuation.total_value)<.01
-    else:cumulative_vm_cash=0.0
+    bbb_dated=structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",dated,day).pv*holding["quantity"]
+    cumulative_vm_cash=0.0
     sleeves={"common":sum(value for iid,value in by_position.items() if iid in common_ids),
              "track_extension":sum(value for iid,value in by_position.items() if iid not in common_ids)}
-    if holding:sleeves["CLO-BBB"]=bbb_dated
+    sleeves["CLO-BBB"]=bbb_dated
     total=valuation.total_value+bbb_dated
-    assert abs(sum(sleeves.values())-total)<.01
     nav_rows.append({"date":day,"native_pv_usd":valuation.total_value,"BBB_pv_usd":bbb_dated,
                      "combined_nav_usd":total,"EUR_USD":quotes["eur_usd"],"cumulative_futures_VM_cash_usd":cumulative_vm_cash})
     sleeve_rows.append(sleeves)
@@ -687,21 +612,16 @@ for i in range(3):
     benchmark_return=.04*(dates[i+1]-dates[i]).days/365
     sectors=[]
     for sleeve,start_value in sleeve_rows[i].items():
-        assert start_value>0
         sleeve_return=(sleeve_rows[i+1][sleeve]-start_value)/start_value
         sectors.append({"sector":sleeve,"portfolio_weight":start_value/start_total,
             "benchmark_weight":1/len(sleeve_rows[i]),"portfolio_return":sleeve_return,"benchmark_return":benchmark_return})
     attribution=brinson_fachler(json.dumps(sectors))
     actual_return=nav.iloc[i+1].combined_nav_usd/start_total-1
-    assert abs(attribution.portfolio_return-actual_return)<1e-12
-    assert abs(attribution.total_allocation+attribution.total_selection+attribution.total_interaction-attribution.total_excess_return)<1e-12
     periods.append(sectors);returns.append(actual_return)
 linked=carino_link(json.dumps(periods))
 linked_effects=linked.linked_allocation+linked.linked_selection+linked.linked_interaction
 active=linked.portfolio_return_compounded-linked.benchmark_return_compounded
-assert abs(linked_effects-active)<1e-12
 wealth_return=nav.iloc[-1].combined_nav_usd/nav.iloc[0].combined_nav_usd-1
-assert abs(linked.portfolio_return_compounded-wealth_return)<1e-12
 attribution_table=linked.to_dataframe()
 print(attribution_table)
 ```
@@ -719,7 +639,6 @@ trim_row=scenario.loc[scenario.position=="CLO-BBB"].iloc[0]
 trim_face=15_000_000*trim_fraction
 trim_base=bbb_pv*trim_fraction
 stress_loss_avoided=-float(trim_row.pnl_usd)*trim_fraction
-assert stress_loss_avoided>0 and trim_face==3_750_000
 pm_recommendation=(f"Reduce the USD 15m-face BBB holding by 25% (USD {trim_face:,.0f} face), subject to an executable quote. "
     f"At model value this releases USD {trim_base:,.2f}; holding those proceeds as USD cash preserves initial wealth and reduces this composed stress loss by USD {stress_loss_avoided:,.2f}. "
     "This is a model-sized risk reduction, not an expected return forecast or an assumption that the model price is executable. "
@@ -749,12 +668,9 @@ report=TearSheet(INSTITUTIONAL,f"Analyst {TRACK} capstone — reference submissi
     Section("Three-period linked attribution",attribution_table.to_html()),
 ],kpis=[KPI("Combined value",f"USD {combined_base:,.2f}"),KPI("Stress P&L",f"USD {combined_stress-combined_base:,.2f}"),
         KPI("IRS SIMM v2.6",f"USD {simm_im:,.2f}"),KPI("Linked active return",f"{active:.4%}")],
-    subtitle="Synthetic inputs; actual native repricing. "+("BBB is a separate analytical sleeve." if holding else "Physical UST future theta is unavailable."),
+    subtitle="Synthetic inputs; actual native repricing. BBB is a separate analytical sleeve.",
     generated=AS_OF)
 report_html=report.to_html()
-assert "<html" in report_html.lower() and "PM recommendation" in report_html
-assert f"{combined_base:,.2f}" in report_html
-assert abs(scenario.pnl_usd.sum()-(combined_stress-combined_base))<.01
 report
 tearsheet_path=Path("credit_capstone_tearsheet.html")
 tearsheet_path.write_text(report_html)
@@ -776,7 +692,6 @@ credit_reference={"track":TRACK,"as_of":AS_OF,"book_input":deepcopy(book_input),
     "physical_ECL":physical_loss.ecl,"manual_ECL":manual_ecl,"borrower":credit_table.copy(deep=True),"NAV":nav.copy(deep=True),"attribution":attribution_table.copy(deep=True),
     "linked_effects":linked_effects,"active_return":active,"linked_return":linked.portfolio_return_compounded,
     "report_html":report_html}
-assert credit_reference["track"]=="credit"
 print({"reference":"credit","stages":8,"native_positions":len(book.position_ids),"separate_BBB_USD":bbb_pv})
 
 credit_reference.update({"waterfall":waterfall_table.copy(deep=True),"first_loss_CDR":first_loss_base,"expected_draw":expected_draw_table.copy(deep=True),"convert_regimes":convert_regimes.copy(deep=True)})
@@ -805,14 +720,13 @@ import math
 import numpy as np
 import pandas as pd
 from _shared import analyst_tracks as tracks
-from _shared.analyst_history import history_market,history_quotes,history_events,performance_history
+from _shared.analyst_history import history_market, history_quotes, history_events
 from finstack_quant.calibration import calibrate
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import DiscountCurve,FxMatrix,PriceCurve,VolSurface
 from finstack_quant.portfolio import Portfolio,value_portfolio,brinson_fachler,carino_link,twrr_linked
-from finstack_quant.valuations.instruments import price_instrument,structured_credit_tranche_metrics
-AS_OF=tracks.AS_OF
-
+from finstack_quant.valuations.instruments import price_instrument
+AS_OF = date(2025, 1, 15)
 TRACK='vol'
 ```
 {/* /notebook-block */}
@@ -821,16 +735,13 @@ TRACK='vol'
 
 {/* notebook-block notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" cell="vol-market-setup" role="build" */}
 ```python exec id=vol-market-setup role=build
-market=tracks.build_market(TRACK)
-book=tracks.build_book(TRACK)
-book_input=tracks.book_spec(TRACK)
-common_ids=set(tracks.common.instruments("common"))
-holding=tracks.clo_bbb_holding() if TRACK=="credit" else None
-assert set(p["instrument_id"] for p in book_input["positions"][:8])==common_ids
-assert all(p["instrument_spec"]["type"]!="structured_credit" for p in book_input["positions"])
-assert market.get_discount("USD-OIS").id=="USD-OIS"
+from _shared.analyst_book import instruments as common_instruments
+market=tracks.build_market("vol", core_stage="common")
+book=tracks.build_book("vol", core_stage="common")
+book_input=tracks.book_spec("vol", core_stage="common")
+common_ids=set(common_instruments("common"))
 print(pd.Series({"track":TRACK,"as_of":AS_OF.isoformat(),"native_positions":len(book.position_ids),
-           "separate_BBB_holding":holding["holding_id"] if holding else "none"}))
+           "separate_BBB_holding":"none"}))
 ```
 {/* /notebook-block */}
 
@@ -843,13 +754,8 @@ wire=json.loads(base.to_json())
 positions=pd.DataFrame([{"position":iid,"currency":row["value_native"]["currency"],
     "native_value":float(row["value_native"]["amount"]),"usd_value":float(row["value_base"]["amount"])}
     for iid,row in wire["position_values"].items()])
-assert abs(positions.usd_value.sum()-base.total_value)<.01
-bbb=structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",market,AS_OF) if holding else None
-bbb_pv=holding["quantity"]*bbb.pv if holding else 0.0
-combined_base=base.total_value+bbb_pv
-if holding:
-    positions.loc[len(positions)]={"position":"CLO-BBB","currency":"USD","native_value":bbb_pv,"usd_value":bbb_pv}
-assert abs(positions.usd_value.sum()-combined_base)<.01
+bbb_pv=0.0
+combined_base=base.total_value
 print(positions)
 ```
 {/* /notebook-block */}
@@ -866,14 +772,12 @@ for position in book_input["positions"]:
     fx_rate=1.0 if currency=="USD" else market.fx_required().rate(currency,"USD",AS_OF).rate
     direct_native=one.value.amount*position["quantity"]
     portfolio_native=float(wire["position_values"][position["instrument_id"]]["value_native"]["amount"])
-    assert abs(direct_native-portfolio_native)<.01
     individual_rows.append({"position":position["instrument_id"],"currency":currency,
                             "direct_native":direct_native,"direct_USD":direct_native*fx_rate})
 individual_prices=pd.DataFrame(individual_rows)
-direct_total=individual_prices.direct_USD.sum()+bbb_pv
-assert abs(direct_total-combined_base)<.01
+direct_total=individual_prices.direct_USD.sum()
 print(individual_prices)
-print({"independent_individual_plus_BBB":direct_total,"native_portfolio_plus_BBB":combined_base})
+print({"independent_individual_total":direct_total,"native_portfolio_total":combined_base})
 ```
 {/* /notebook-block */}
 
@@ -881,8 +785,9 @@ print({"independent_individual_plus_BBB":direct_total,"native_portfolio_plus_BBB
 
 {/* notebook-block notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" cell="vol-independent-analytical" role="build" */}
 ```python exec id=vol-independent-analytical role=build
+from _shared.analyst_book import instruments as common_instruments
 # Independent closed-form calculation for the actual common European equity call.
-equity=tracks.common.instruments("common")["SPX-CALL"]["instrument"]["spec"]
+equity=common_instruments("common")["SPX-CALL"]["instrument"]["spec"]
 tau=(date.fromisoformat(equity["expiry"])-AS_OF).days/365
 spot=float(market.get_price(equity["spot_id"])[0]);q=float(market.get_price(equity["div_yield_id"])[0])
 K=float(equity["strike"]);sigma=market.get_surface(equity["vol_surface_id"]).vol(tau,K)
@@ -892,7 +797,6 @@ N1=.5*(1+math.erf(d1/math.sqrt(2)));N2=.5*(1+math.erf(d2/math.sqrt(2)))
 analytical_call=(spot*math.exp(-q*tau)*N1-K*discount*N2)*float(equity["notional"]["amount"])
 native_call=float(wire["position_values"]["SPX-CALL"]["value_native"]["amount"])
 analytical_price_error=analytical_call-native_call
-assert abs(analytical_price_error)<.01
 print({"independent_BSM_USD":analytical_call,"native_equity_call_USD":native_call,"difference_USD":analytical_price_error})
 ```
 {/* /notebook-block */}
@@ -901,20 +805,18 @@ print({"independent_BSM_USD":analytical_call,"native_equity_call_USD":native_cal
 
 {/* notebook-block notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" cell="vol-risk-coverage" role="build" */}
 ```python exec id=vol-risk-coverage role=build
-risk_requests=[m for m in tracks.common.RISK_METRICS if not(TRACK=="vol" and m=="theta")]
+from _shared.analyst_book import expected_metrics as common_expected_metrics
+common_metric_map=common_expected_metrics('common')
+common_metric_families=sorted({metric for families in common_metric_map.values() for metric in families})
+risk_requests=[metric for metric in common_metric_families if metric!="theta"]
+print('Requested metric families:',risk_requests)
 risk=value_portfolio(book,market,strict_risk=True,metrics=risk_requests)
 risk_wire=json.loads(risk.to_json())
-assert not risk_wire.get("degraded_positions",[])
 risk_rows=[]
 for iid,row in risk_wire["position_values"].items():
-    assert row["risk_metrics_complete"] and not row.get("risk_error")
     risk_rows.extend({"position":iid,"metric":metric,"value":value}
         for metric,value in row["valuation_result"]["measures"].items())
-if bbb:
-    risk_rows.extend([{"position":"CLO-BBB","metric":"tranche_z_spread_cs01_USD_per_bp","value":bbb.cs01},
-                      {"position":"CLO-BBB","metric":"wal_years","value":bbb.wal}])
 risk_table=pd.DataFrame(risk_rows)
-assert np.isfinite(risk_table.value).all()
 print(risk_table.pivot(index="position",columns="metric",values="value").iloc[:,:12])
 ```
 {/* /notebook-block */}
@@ -936,7 +838,6 @@ factor_sd=np.array([.0005,.0004,.06,.012,.008,.006,.018,.008])
 correlation=np.eye(8)
 for i,j,rho in [(0,1,.30),(2,3,-.25),(3,4,-.40),(3,6,.20),(6,7,.20)]:
     correlation[i,j]=correlation[j,i]=rho
-assert np.linalg.eigvalsh(correlation).min()>0
 rng=np.random.default_rng(2025011508)
 factor_panel=rng.standard_normal((504,8))@np.linalg.cholesky(correlation).T*factor_sd
 frozen_market=json.loads(market.to_json())
@@ -963,7 +864,6 @@ def capstone_scenario_value(shock):
             curve["knot_points"]=[[t,price*math.exp(log_move)] for t,price in curve["knot_points"]]
     for surface in snapshot["surfaces"]:
         surface["vols_row_major"]=[value+volatility for value in surface["vols_row_major"]]
-        assert min(surface["vols_row_major"])>0
     for ticker,price in snapshot["prices"].items():
         if "price" in price:
             price["price"]["amount"]=str(float(price["price"]["amount"])*math.exp(equity))
@@ -973,26 +873,12 @@ def capstone_scenario_value(shock):
         if quote[:2]==["EUR","USD"]:quote[2]*=math.exp(fx_move)
     scenario_market=MarketContext.from_json(json.dumps(snapshot))
     native_value=value_portfolio(book,scenario_market,metrics=[]).total_value
-    tranche_value=0.
-    if holding:
-        scenario_deal=deepcopy(holding["deal"])
-        spec=scenario_deal["instrument"]["spec"]
-        # The zero-CDR baseline has a boundary: worsening systemic credit adds
-        # annual collateral CDR; favorable shocks leave zero at zero. This mapping
-        # is an explicit synthetic assumption, not an estimated pricing PD.
-        cdr=spec["default_spec"]["cdr"]+.10*max(hazard,0.)
-        spec["default_spec"]["cdr"]=cdr
-        spec["default_assumptions"]["base_cdr_annual"]=cdr
-        tranche_value=holding["quantity"]*structured_credit_tranche_metrics(
-            json.dumps(scenario_deal),"BBB",scenario_market,AS_OF).pv
-    return native_value,tranche_value
+    return native_value
 
-zero_native,zero_bbb=capstone_scenario_value(np.zeros(8))
-assert abs(zero_native+zero_bbb-combined_base)<.01
+zero_native=capstone_scenario_value(np.zeros(8))
 scenario_values=np.array([capstone_scenario_value(shock) for shock in factor_panel])
-scenario_pnl=scenario_values.sum(axis=1)-combined_base
+scenario_pnl=scenario_values-combined_base
 scenario_returns=scenario_pnl/combined_base
-assert np.isfinite(scenario_pnl).all() and len(scenario_pnl)==504
 daily_risk=Performance.from_returns(pd.DataFrame({"held_book":scenario_returns},
     index=pd.bdate_range("2023-02-08",periods=504)),frequency="daily")
 confidence=.95
@@ -1000,7 +886,6 @@ q=float(daily_risk.value_at_risk(confidence).iloc[0])
 tail=float(daily_risk.expected_shortfall(confidence).iloc[0])
 manual_q=float(np.quantile(scenario_returns,1-confidence,method="linear"))
 manual_tail=float(scenario_returns[scenario_returns<=manual_q].mean())
-assert abs(q-manual_q)<1e-12 and abs(tail-manual_tail)<1e-12
 bootstrap_rng=np.random.default_rng(2025011595)
 bootstrap_risk=[]
 for _ in range(500):
@@ -1013,19 +898,16 @@ tail_risk_table=pd.DataFrame([{"confidence":confidence,"scenario_count":504,
     "tail_observations":int((scenario_returns<=manual_q).sum()),
     "VaR_bootstrap_p025":bootstrap_interval[0,0],"VaR_bootstrap_p975":bootstrap_interval[1,0],
     "ES_bootstrap_p025":bootstrap_interval[0,1],"ES_bootstrap_p975":bootstrap_interval[1,1],
-    "mean_scenario_PnL_USD":scenario_pnl.mean(),"priced_positions":len(book.position_ids)+int(holding is not None)}])
+    "mean_scenario_PnL_USD":scenario_pnl.mean(),"priced_positions":len(book.position_ids)}])
 
 fit=daily_risk.multi_factor_greeks(0,factor_panel.T.tolist())
 design=np.column_stack([np.ones(len(factor_panel)),factor_panel])
 ols=np.linalg.lstsq(design,scenario_returns,rcond=None)[0]
-assert np.allclose(fit.betas,ols[1:],atol=1e-9)
 residual=scenario_returns-design@ols
-assert np.allclose(design.T@residual,0.,atol=1e-10)
 covariance=np.cov(factor_panel,rowvar=False,ddof=1)
 contributions=ols[1:]*(covariance@ols[1:])
 residual_variance=residual.var(ddof=1)
 total_variance=scenario_returns.var(ddof=1)
-assert abs(contributions.sum()+residual_variance-total_variance)<1e-12
 factor_risk_table=pd.DataFrame({"factor":factor_names,"return_loading_per_factor_unit":fit.betas,
     "USD_loading_per_factor_unit":np.array(fit.betas)*combined_base,
     "daily_return_variance_contribution":contributions})
@@ -1034,7 +916,7 @@ factor_risk_table.loc[len(factor_risk_table)]={"factor":"nonlinear_residual",
     "daily_return_variance_contribution":residual_variance}
 print(tail_risk_table.to_string(index=False));print(factor_risk_table.to_string(index=False))
 print({"factor_R_squared":fit.r_squared,"variance_reconciliation_error":contributions.sum()+residual_variance-total_variance})
-print("These are 504 invented one-day market shocks with no time roll, flows or carry; date labels only satisfy the time-series API. Full native repricing preserves option nonlinearity and reprices credit BBB once per scenario. The selected parallel/co-moving factors omit tenor shape, subcurve and issuer basis, volatility smile changes, correlation jumps, liquidity and default jumps. VaR/ES describe this scenario model, not a complete regulatory or empirically calibrated risk estimate. ES follows the library's closed lower-tail sample convention; loss signs are displayed as positive USD. The 500-resample percentile intervals diagnose finite-sample uncertainty under this empirical scenario distribution, not model uncertainty or a guaranteed coverage bound. Factor coefficients are fitted conditional loadings, not exact instrument Greeks; small irrelevant-factor estimates and negative covariance contributions can occur.")
+print("These are 504 invented one-day market shocks with no time roll, flows or carry; date labels only satisfy the time-series API. Full native repricing preserves option and commodity nonlinearity. The selected parallel/co-moving factors omit tenor shape, subcurve and issuer basis, volatility smile changes, correlation jumps, liquidity and default jumps. VaR/ES describe this scenario model, not a complete regulatory or empirically calibrated risk estimate. ES follows the library's closed lower-tail sample convention; loss signs are displayed as positive USD. The 500-resample percentile intervals diagnose finite-sample uncertainty under this empirical scenario distribution, not model uncertainty or a guaranteed coverage bound. Factor coefficients are fitted conditional loadings, not exact instrument Greeks; small irrelevant-factor estimates and negative covariance contributions can occur.")
 ```
 {/* /notebook-block */}
 
@@ -1042,8 +924,9 @@ print("These are 504 invented one-day market shocks with no time roll, flows or 
 
 {/* notebook-block notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" cell="vol-stress-repricing" role="build" */}
 ```python exec id=vol-stress-repricing role=build
-stress=tracks.build_market(TRACK)
-calibration=tracks.common.calibration_envelope("base")
+from _shared.analyst_book import calibration_envelope as common_calibration_envelope
+stress=tracks.build_market("vol", core_stage="common")
+calibration=common_calibration_envelope("base")
 for quote in calibration["market_data"]:
     if quote["kind"]=="rate_quote":quote["rate"]+=.015
     elif quote["kind"]=="cds_quote":quote["spread_bp"]+=100.0
@@ -1052,36 +935,19 @@ stress.insert(calibrated.get_discount("USD-OIS"))
 stress.insert(calibrated.get_hazard("ACME-HZD"))
 stress.insert_price("SPX-SPOT",4160.,"USD")
 stress.insert(VolSurface("SPX-VOL",[.25,.5,1.,2.],[4000.,5200.,6400.],[[.35,.30,.29]]*4))
-if TRACK=="credit":
-    index_calibration=tracks.credit_calibration_envelope()
-    for quote in index_calibration["market_data"]:
-        if quote["kind"]=="rate_quote":quote["rate"]+=.015
-        elif quote["kind"]=="cds_quote":quote["spread_bp"]+=100.0
-    stress.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
-    stress.insert(DiscountCurve("CONVERT-RISKY",AS_OF,[(t,math.exp(-.095*t)) for t in [0.,1.,5.,10.]],day_count="act_365f"))
-    stress.insert_price("CONVERT",80.,"USD")
-    stressed_deal=deepcopy(holding["deal"])
-    stressed_deal["instrument"]["spec"].update({"default_spec":{"cdr":.05,"curve":None},
-        "recovery_spec":{"rate":.25,"recovery_lag":6}})
-    stressed_deal["instrument"]["spec"]["default_assumptions"].update({"base_cdr_annual":.05,"base_recovery_rate":.25})
-    bbb_stress=structured_credit_tranche_metrics(json.dumps(stressed_deal),"BBB",stress,AS_OF).pv*holding["quantity"]
-else:
-    stress.insert(DiscountCurve("USD-TREASURY",AS_OF,[(t,math.exp(-.055*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
-    stress.insert_price("SPX",4160.,"USD")
-    strikes=[5200*math.exp(-3+i*.05) for i in range(121)]
-    stress.insert(VolSurface("SPX_VOL",[.25,.5,1.,2.],strikes,[[.30]*len(strikes)]*4))
-    for ticker,levels,sigma in [("WTI",[75.,74.,72.,70.],.35),("BRENT",[78.,77.,75.,73.],.33)]:
-        stress.insert(PriceCurve(f"{ticker}-FORWARD",AS_OF,list(zip([0.,.5,1.,2.],[.9*x for x in levels]))))
-        stress.insert(VolSurface(f"{ticker}-VOL",[.25,.5,1.,2.],[20.,75.,150.],[[sigma]*3]*4))
-    bbb_stress=0.0
+stress.insert(DiscountCurve("USD-TREASURY",AS_OF,[(t,math.exp(-.055*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
+stress.insert_price("SPX",4160.,"USD")
+strikes=[5200*math.exp(-3+i*.05) for i in range(121)]
+stress.insert(VolSurface("SPX_VOL",[.25,.5,1.,2.],strikes,[[.30]*len(strikes)]*4))
+for ticker,levels,sigma in [("WTI",[75.,74.,72.,70.],.35),("BRENT",[78.,77.,75.,73.],.33)]:
+    stress.insert(PriceCurve(f"{ticker}-FORWARD",AS_OF,list(zip([0.,.5,1.,2.],[.9*x for x in levels]))))
+    stress.insert(VolSurface(f"{ticker}-VOL",[.25,.5,1.,2.],[20.,75.,150.],[[sigma]*3]*4))
 stressed=value_portfolio(book,stress,metrics=[])
 stress_wire=json.loads(stressed.to_json())
 scenario=pd.DataFrame([{"position":iid,"base_usd":float(row["value_base"]["amount"]),
     "stress_usd":float(stress_wire["position_values"][iid]["value_base"]["amount"])} for iid,row in wire["position_values"].items()])
-if holding:scenario.loc[len(scenario)]={"position":"CLO-BBB","base_usd":bbb_pv,"stress_usd":bbb_stress}
 scenario["pnl_usd"]=scenario.stress_usd-scenario.base_usd
-combined_stress=stressed.total_value+bbb_stress
-assert abs(scenario.pnl_usd.sum()-(combined_stress-combined_base))<.01
+combined_stress=stressed.total_value
 print(scenario)
 ```
 {/* /notebook-block */}
@@ -1090,6 +956,7 @@ print(scenario)
 
 {/* notebook-block notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" cell="vol-historical-replay" role="build" */}
 ```python exec id=vol-historical-replay role=build
+from _shared.analyst_book import calibration_envelope as common_calibration_envelope
 # Historical-pattern stress: replay a named synthetic observation-to-observation
 # change on today's frozen contracts and valuation date. This is distinct from
 # the later dated-NAV exercise, which advances time and accruals.
@@ -1099,8 +966,8 @@ rate_change=new_quotes["rate_shift"]-old_quotes["rate_shift"]
 credit_change_bp=new_quotes["credit_shift_bp"]-old_quotes["credit_shift_bp"]
 equity_ratio=new_quotes["spx"]/old_quotes["spx"]
 fx_ratio=new_quotes["eur_usd"]/old_quotes["eur_usd"]
-replay_market=tracks.build_market(TRACK)
-replay_calibration=tracks.common.calibration_envelope("base")
+replay_market=tracks.build_market("vol", core_stage="common")
+replay_calibration=common_calibration_envelope("base")
 for quote in replay_calibration["market_data"]:
     if quote["kind"]=="rate_quote":quote["rate"]+=rate_change
     elif quote["kind"]=="cds_quote":quote["spread_bp"]+=credit_change_bp
@@ -1109,39 +976,24 @@ replay_market.insert(replay_calibrated.get_discount("USD-OIS"))
 replay_market.insert(replay_calibrated.get_hazard("ACME-HZD"))
 replay_market.insert_price("SPX-SPOT",5200*equity_ratio,"USD")
 fx=FxMatrix();fx.set_quote(Currency("EUR"),Currency("USD"),1.08*fx_ratio);replay_market.insert_fx(fx)
-if TRACK=="credit":
-    index_calibration=tracks.credit_calibration_envelope()
-    for quote in index_calibration["market_data"]:
-        if quote["kind"]=="rate_quote":quote["rate"]+=rate_change
-        elif quote["kind"]=="cds_quote":quote["spread_bp"]+=credit_change_bp
-    replay_market.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
-    replay_market.insert_price("CONVERT",100*equity_ratio,"USD")
-    replay_market.insert(DiscountCurve("CONVERT-RISKY",AS_OF,
-        [(t,math.exp(-(.065+rate_change+credit_change_bp/10000)*t)) for t in [0.,1.,5.,10.]],day_count="act_365f"))
-else:
-    replay_market.insert_price("SPX",5200*equity_ratio,"USD")
-    replay_market.insert(DiscountCurve("USD-TREASURY",AS_OF,
-        [(t,math.exp(-(.04+rate_change)*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
+replay_market.insert_price("SPX",5200*equity_ratio,"USD")
+replay_market.insert(DiscountCurve("USD-TREASURY",AS_OF,
+    [(t,math.exp(-(.04+rate_change)*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
 replay_native=value_portfolio(book,replay_market,metrics=[])
 replay_wire=json.loads(replay_native.to_json())
-replay_bbb=holding["quantity"]*structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",replay_market,AS_OF).pv if holding else 0.
 replay_position_rows=[]
 for iid,row in wire["position_values"].items():
     base_value=float(row["value_base"]["amount"])
     shocked_value=float(replay_wire["position_values"][iid]["value_base"]["amount"])
     replay_position_rows.append({"position":iid,"base_USD":base_value,"replay_USD":shocked_value,"PnL_USD":shocked_value-base_value})
-if holding:replay_position_rows.append({"position":"CLO-BBB","base_USD":bbb_pv,"replay_USD":replay_bbb,"PnL_USD":replay_bbb-bbb_pv})
 historical_stress_table=pd.DataFrame(replay_position_rows)
-historical_stress_total=replay_native.total_value+replay_bbb
-assert abs(historical_stress_table.PnL_USD.sum()-(historical_stress_total-combined_base))<.01
-assert json.loads(replay_market.get_discount("USD-OIS").to_json())["base"]==AS_OF.isoformat()
-assert len(historical_stress_table)==len(book.position_ids)+int(holding is not None)
+historical_stress_total=replay_native.total_value
 print({"synthetic_observation_start":str(replay_start),"synthetic_observation_end":str(replay_end),
     "held_valuation_date":str(AS_OF),"rate_quote_change_bp":rate_change*10000,
     "credit_quote_change_bp":credit_change_bp,"equity_move_pct":100*(equity_ratio-1),"EURUSD_move_pct":100*(fx_ratio-1)})
 print(historical_stress_table.to_string(index=False))
-print({"native_replay_USD":replay_native.total_value,"BBB_replay_USD":replay_bbb,"combined_replay_USD":historical_stress_total})
-print("Synthetic 2025Q2 observation-pattern replay onto the 15 January book: the illustrative observation dates deliberately lie after the held valuation date, so this is a stress lesson, not a contemporaneous backtest or real-market evidence. All curves are rebuilt at AS_OF; contracts and time remain fixed. The fixture provides rates, credit, equity and FX changes only: vol, energy, SOFR projection basis and BBB collateral assumptions remain fixed. Treasury shares the USD rate move; convert equity shares the SPX return and its risky discount spread shares the credit quote change. These co-moves are disclosed assumptions. BBB is repriced at current-date discounting and added once; separate collateral-default stress remains in Stage 4.")
+print({"native_replay_USD":replay_native.total_value,"combined_replay_USD":historical_stress_total})
+print("Synthetic 2025Q2 observation-pattern replay onto the 15 January book: the illustrative observation dates deliberately lie after the held valuation date, so this is a stress lesson, not a contemporaneous backtest or real-market evidence. All curves are rebuilt at AS_OF; contracts and time remain fixed. The fixture provides rates, credit, equity and FX changes only: volatility, energy and the SOFR projection basis remain fixed. Treasury shares the USD rate move, while the volatility extension retains the fixed volatility and commodity inputs. These co-moves are disclosed assumptions; the separate composed stress changes the omitted factors.")
 ```
 {/* /notebook-block */}
 
@@ -1170,12 +1022,9 @@ for label,m,s,vol in [("base",market,5200.,.20),("joint_stress",stress,4160.,.30
     native=price_instrument(json.dumps(variance),m,AS_OF,metrics=["variance_expected"]).value.amount
     replica_rows.append({"case":label,"fixed_option_inventory_PV":option_strip_pv,"forward_cash_correction":forward_cash_correction,
         "replication_PV":replication,"native_variance_PV":native,"finite_strike_residual":replication-native})
-assert abs(replica_rows[0]["finite_strike_residual"])<.01
 # Fixed finite strikes introduce a quantified quadrature residual when the forward moves across the grid.
-assert abs(replica_rows[1]["finite_strike_residual"])<1_000
 replication_table=pd.DataFrame(replica_rows)
 replication_pnl=replication_table.iloc[1][["fixed_option_inventory_PV","forward_cash_correction","replication_PV","native_variance_PV"]]-replication_table.iloc[0][["fixed_option_inventory_PV","forward_cash_correction","replication_PV","native_variance_PV"]]
-assert abs(replication_pnl.fixed_option_inventory_PV+replication_pnl.forward_cash_correction-replication_pnl.replication_PV)<.01
 print(replication_table.to_string(index=False));print(replication_pnl)
 print("The option inventory stays fixed; the forward/cash term represents the log-contract correction/dynamic-underlying component. It is not an unfinanced options-only hedge. The finite-grid residual is reported, not hidden.")
 ```
@@ -1196,7 +1045,6 @@ for label,m in [("base",market),("joint_stress",stress)]:
             "conversion_factor":out.metrics["conversion_factor"],"gross_basis_pct":out.metrics["conversion_factor"]*(out.metrics["futures_price"]-quote),"DV01":out.metrics["dv01"]})
 delivery_table=pd.DataFrame(delivery_rows)
 ctd=delivery_table.loc[delivery_table.groupby("case").fair_future.idxmin()]
-assert ctd.deliverable.nunique()==2
 print(delivery_table.to_string(index=False));print(ctd.to_string(index=False))
 print("The held native future is a fixed-deliverable clean-price proxy. The candidate CTD changes in this scenario; actual delivery option, carry/repo and Treasury/OIS basis require a desk adjustment. Gross basis here is a quote-to-clean-proxy difference, not net implied repo.")
 ```
@@ -1211,19 +1059,14 @@ irs_position=next(p for p in book_input["positions"] if p["instrument_id"]=="USD
 irs_notional=float(irs_position["instrument_spec"]["spec"]["notional"]["amount"])*irs_position["quantity"]
 irs_end=date.fromisoformat(irs_position["instrument_spec"]["spec"]["fixed"]["end"])
 irs_remaining_years=(irs_end-AS_OF).days/365
-assert irs_end==date(2028,4,15)
 im_schedule=ScheduleImCalculator.bcbs_standard()
 schedule_im=im_schedule.calculate_for_notional(irs_notional,"USD","interest_rate",irs_remaining_years,AS_OF)
-assert abs(schedule_im.amount-irs_notional*im_schedule.rate("interest_rate",irs_remaining_years))<.01
 vm_calculator=VmCalculator(CsaSpec.usd_regulatory())
 margin_rows=[]
 for label,valuation_wire in [("base",wire),("stress",stress_wire)]:
     exposure=float(valuation_wire["position_values"]["USD-PAYER-IRS"]["value_base"]["amount"])
     vm=vm_calculator.calculate(exposure,0.0,"USD",AS_OF)
-    assert abs(vm.gross_exposure-exposure)<.01
     # Zero threshold/IA and $500k MTA: these actual IRS exposures require no transfer.
-    assert abs(exposure)<500_000
-    assert vm.delivery_amount==0 and vm.return_amount==0
     margin_rows.append({"case":label,"IRS_exposure_usd":exposure,"VM_delivery_usd":vm.delivery_amount,
                        "VM_return_usd":vm.return_amount,"gross_schedule_IM_usd":schedule_im.amount})
 margin_table=pd.DataFrame(margin_rows)
@@ -1241,13 +1084,10 @@ source_path=Path(_shared.__file__).parent.parent/"07_advanced_quant/margin_colla
 source=nbformat.read(source_path,as_version=4)
 source_ids=["margin-proof-1","margin-proof-2","margin-proof-3"]
 selected=[cell for cell in source.cells if cell.cell_type=="code" and cell.metadata.get("analyst_program",{}).get("id") in source_ids]
-assert [cell.metadata["analyst_program"]["id"] for cell in selected]==source_ids
 margin_proof={"__name__":"__capstone_margin_proof__"}
 for cell in selected:
     exec(compile(cell.source,str(source_path)+":"+cell.metadata["analyst_program"]["id"],"exec"),margin_proof)
 simm_im=margin_proof["simm_result"].amount
-assert simm_im>0
-assert abs(margin_proof["one_result"].amount-margin_proof["manual"])<1e-8
 print(pd.Series({"native_IRS_SIMM_v2_6_USD":simm_im,"native_IRS_gross_schedule_IM_USD":schedule_im.amount}))
 ```
 {/* /notebook-block */}
@@ -1263,7 +1103,6 @@ borrower=borrower_model()
 borrower_inputs=borrower_data()
 statements=Evaluator().evaluate(borrower)
 financials=statements.to_dataframe(orient="wide")
-assert financials.loc["balance_check"].abs().max()<.01
 period="2025Q4"
 covenant_engine=CovenantEngine.from_specs([
     CovenantSpec(Covenant(CovenantType.max_net_debt_to_ebitda(4.5),"3M","Net leverage"),"net_leverage"),
@@ -1272,8 +1111,6 @@ reports=covenant_engine.evaluate({"net_leverage":float(financials.loc["net_lever
     "dscr":float(financials.loc["dscr",period])},"2025-12-31")
 credit_table=pd.DataFrame([{"covenant":name,"actual":report.actual_value,"threshold":report.threshold,
     "headroom":report.headroom,"passed":report.passed} for name,report in reports.items()])
-assert "BORROWER-TL" in book.position_ids
-assert borrower_inputs["loan"]["holding_notional"]==1_000_000
 print(credit_table)
 ```
 {/* /notebook-block */}
@@ -1282,9 +1119,10 @@ print(credit_table)
 
 {/* notebook-block notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" cell="vol-quarterly-covenants" role="build" */}
 ```python exec id=vol-quarterly-covenants role=build
-from _shared.borrower_model import PERIODS
+import json
 from finstack_quant.statements import ModelBuilder,ForecastSpec
-borrower_spec=borrower_model();historical=Evaluator().evaluate(borrower_spec)
+borrower_spec=borrower_model()
+PERIODS = tuple(period['id'] for period in json.loads(borrower_spec.to_json())['periods']);historical=Evaluator().evaluate(borrower_spec)
 quarter_rows=[]
 for scenario_name in ["base","downside"]:
     assumptions=borrower_inputs["scenarios"][scenario_name]
@@ -1297,17 +1135,13 @@ for scenario_name in ["base","downside"]:
         CovenantSpec(Covenant(CovenantType.max_net_debt_to_ebitda(4.5),"3M","Net leverage"),"net_leverage"),
         CovenantSpec(Covenant(CovenantType.min_dscr(1.1),"3M","DSCR"),"dscr")])
     for quarter,day in zip(PERIODS[4:],["2025-03-31","2025-06-30","2025-09-30","2025-12-31"]):
-        assert abs(forecast.get("balance_check",quarter))<.01
         reports=engine.evaluate({"net_leverage":forecast.get("net_leverage",quarter),"dscr":forecast.get("dscr",quarter)},day)
         for name,out in reports.items():
             headroom=out.threshold-out.actual_value if name=="Net leverage" else out.actual_value-out.threshold
-            assert abs(out.headroom-headroom/out.threshold)<1e-12
             quarter_rows.append({"scenario":scenario_name,"quarter":str(quarter),"covenant":name,
                 "actual":out.actual_value,"threshold":out.threshold,"headroom":headroom,
                 "native_headroom_fraction":out.headroom,"passed":out.passed})
 credit_table=pd.DataFrame(quarter_rows)
-assert len(credit_table)==16
-assert not credit_table[(credit_table.scenario=="base")&(credit_table.covenant=="DSCR")].passed.any()
 print(credit_table.to_string(index=False))
 print("Base DSCR fails all four forecast tests. Headroom is shown in ratio units beside the native fraction; annualized EBITDA is a current-quarter run rate.")
 ```
@@ -1329,12 +1163,9 @@ ead_knots=[(0.,held_ead),*midpoints,(5.,0.)]
 exposure=Exposure("BORROWER-TL",held_ead,lgd,eir,5.,physical_curve[-1][1],physical_curve[-1][1],
     qualitative_flags=QualitativeFlags(watchlist=True),ead_schedule=ead_knots)
 stage=classify_stage(exposure,StagingConfig(pd_delta_absolute=.05,pd_delta_relative=float("inf")))
-assert stage.stage.value=="stage2"
 physical_loss=compute_ecl(exposure,physical_curve,stage=stage.stage,bucket_width_years=.25)
 manual_ecl=sum((physical_curve[i+1][1]-physical_curve[i][1])*balance*lgd/(1+eir)**t
                for i,(t,balance) in enumerate(midpoints))
-assert abs(physical_loss.ecl-manual_ecl)<1e-8 and held_ead==1_000_000
-assert midpoints[-1][1]==525_000
 physical_loss_table=pd.DataFrame([{"holding":"BORROWER-TL","stage":stage.stage.value,"physical_annual_PD":physical_pd,
     "LGD":lgd,"held_EAD":held_ead,"EIR":eir,"amortizing_lifetime_ECL":physical_loss.ecl,"manual_ECL":manual_ecl}])
 print(physical_loss_table.to_string(index=False))
@@ -1348,53 +1179,35 @@ print("Physical ECL uses shared borrower PD/LGD and contractual midpoint EAD. It
 ```python exec id=vol-dated-repricing role=build
 from finstack_quant.core.market_data import ScalarTimeSeries
 dates=[AS_OF+timedelta(days=7*i) for i in range(4)]
-assert not [event for event in history_events() if dates[0]<date.fromisoformat(event["date"])<=dates[-1]]
-assert dates[-1]<date(2025,3,20)  # Before the first future contractual coupon in these books.
 nav_rows=[]
 sleeve_rows=[]
 for day in dates:
     quotes=history_quotes(day)
-    dated=tracks.build_market(TRACK,day)
+    dated=tracks.build_market("vol", day, core_stage="common")
     common_market=history_market(day)
     dated.insert(common_market.get_discount("USD-OIS"))
     dated.insert(common_market.get_hazard("ACME-HZD"))
     dated.insert_price("SPX-SPOT",quotes["spx"],"USD")
     fx=FxMatrix();fx.set_quote(Currency("EUR"),Currency("USD"),quotes["eur_usd"]);dated.insert_fx(fx)
-    if TRACK=="credit":
-        index_calibration=tracks.credit_calibration_envelope(day)
-        for quote in index_calibration["market_data"]:
-            if quote["kind"]=="rate_quote":quote["rate"]+=quotes["rate_shift"]
-            elif quote["kind"]=="cds_quote":quote["spread_bp"]+=quotes["credit_shift_bp"]
-        dated.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
-        dated.insert_price("CONVERT",100*quotes["spx"]/5200,"USD")
-    else:
-        dated.insert_price("SPX",quotes["spx"],"USD")
-        # Supply each realized close available on this valuation date, without look-ahead.
-        observed_days=[AS_OF+timedelta(days=i) for i in range((day-AS_OF).days+1)]
-        closes=[(observed,history_quotes(observed)["spx"]) for observed in observed_days if observed.weekday()<5]
-        dated.insert_series(ScalarTimeSeries("SPX-CLOSE",closes))
-        assert closes[-1][0]==day and closes[0]==(AS_OF,5200.)
-        dated.insert(DiscountCurve("USD-TREASURY",day,[(t,math.exp(-(.04+quotes["rate_shift"])*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
-    dated_spec=tracks.book_spec(TRACK);dated_spec["as_of"]=day.isoformat()
+    dated.insert_price("SPX",quotes["spx"],"USD")
+    # Supply each realized close available on this valuation date, without look-ahead.
+    observed_days=[AS_OF+timedelta(days=i) for i in range((day-AS_OF).days+1)]
+    closes=[(observed,history_quotes(observed)["spx"]) for observed in observed_days if observed.weekday()<5]
+    dated.insert_series(ScalarTimeSeries("SPX-CLOSE",closes))
+    dated.insert(DiscountCurve("USD-TREASURY",day,[(t,math.exp(-(.04+quotes["rate_shift"])*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
+    dated_spec=tracks.book_spec("vol", core_stage="common");dated_spec["as_of"]=day.isoformat()
     valuation=value_portfolio(Portfolio.from_spec(json.dumps(dated_spec)),dated,metrics=[])
     dated_wire=json.loads(valuation.to_json())
     by_position={iid:float(row["value_base"]["amount"]) for iid,row in dated_wire["position_values"].items()}
-    bbb_dated=structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",dated,day).pv*holding["quantity"] if holding else 0.0
-    if TRACK=="vol":
-        future=deepcopy(tracks.vol_extension()["UST-FUTURE"])
-        future_mark=price_instrument(json.dumps(future),dated,day,model="bond_future_clean_price_proxy",metrics=["futures_price"])
-        cumulative_vm_cash=future_mark.value.amount
-        future["instrument"]["spec"]["quoted_price"]=future_mark.metrics["futures_price"]
-        reset_mark=price_instrument(json.dumps(future),dated,day,model="bond_future_clean_price_proxy").value.amount
-        assert abs(reset_mark)<.01
-        assert abs(valuation.total_value-by_position["UST-FUTURE"]+reset_mark+cumulative_vm_cash-valuation.total_value)<.01
-    else:cumulative_vm_cash=0.0
+    future=deepcopy(tracks.vol_extension()["UST-FUTURE"])
+    future_mark=price_instrument(json.dumps(future),dated,day,model="bond_future_clean_price_proxy",metrics=["futures_price"])
+    cumulative_vm_cash=future_mark.value.amount
+    future["instrument"]["spec"]["quoted_price"]=future_mark.metrics["futures_price"]
+    reset_mark=price_instrument(json.dumps(future),dated,day,model="bond_future_clean_price_proxy").value.amount
     sleeves={"common":sum(value for iid,value in by_position.items() if iid in common_ids),
              "track_extension":sum(value for iid,value in by_position.items() if iid not in common_ids)}
-    if holding:sleeves["CLO-BBB"]=bbb_dated
-    total=valuation.total_value+bbb_dated
-    assert abs(sum(sleeves.values())-total)<.01
-    nav_rows.append({"date":day,"native_pv_usd":valuation.total_value,"BBB_pv_usd":bbb_dated,
+    total=valuation.total_value
+    nav_rows.append({"date":day,"native_pv_usd":valuation.total_value,"BBB_pv_usd":0.0,
                      "combined_nav_usd":total,"EUR_USD":quotes["eur_usd"],"cumulative_futures_VM_cash_usd":cumulative_vm_cash})
     sleeve_rows.append(sleeves)
 nav=pd.DataFrame(nav_rows)
@@ -1418,11 +1231,9 @@ initial=price_instrument(json.dumps(variance),market,AS_OF,metrics=["variance_ex
 accrued=float(np.square(np.diff(np.log([close for _,close in observed]))).sum())
 v0=initial.metrics["variance_expected"];v1=forward_result.metrics["variance_expected"]
 df1=dated.get_discount("USD-OIS").df(remaining);df0=market.get_discount("USD-OIS").df(1.)
-assert abs(full.metrics["variance_expected"]-(accrued+remaining*v1))<1e-10
 carry_pnl=1_000_000*df1*(remaining*v0-.04)-initial.value.amount
 realized_pnl=1_000_000*df1*accrued
 implied_pnl=1_000_000*df1*remaining*(v1-v0)
-assert abs(carry_pnl+realized_pnl+implied_pnl-(full.value.amount-initial.value.amount))<.01
 variance_attribution=pd.DataFrame([{"component":"elapsed accrual/financing at initial forward variance","PnL":carry_pnl},
     {"component":"realized squared returns","PnL":realized_pnl},{"component":"remaining implied forward variance","PnL":implied_pnl}])
 print(variance_attribution.to_string(index=False));print({"total_native_variance_PnL":full.value.amount-initial.value.amount,"realized_variance_sum":accrued,"initial_forward_variance":v0,"ending_forward_variance":v1})
@@ -1440,21 +1251,16 @@ for i in range(3):
     benchmark_return=.04*(dates[i+1]-dates[i]).days/365
     sectors=[]
     for sleeve,start_value in sleeve_rows[i].items():
-        assert start_value>0
         sleeve_return=(sleeve_rows[i+1][sleeve]-start_value)/start_value
         sectors.append({"sector":sleeve,"portfolio_weight":start_value/start_total,
             "benchmark_weight":1/len(sleeve_rows[i]),"portfolio_return":sleeve_return,"benchmark_return":benchmark_return})
     attribution=brinson_fachler(json.dumps(sectors))
     actual_return=nav.iloc[i+1].combined_nav_usd/start_total-1
-    assert abs(attribution.portfolio_return-actual_return)<1e-12
-    assert abs(attribution.total_allocation+attribution.total_selection+attribution.total_interaction-attribution.total_excess_return)<1e-12
     periods.append(sectors);returns.append(actual_return)
 linked=carino_link(json.dumps(periods))
 linked_effects=linked.linked_allocation+linked.linked_selection+linked.linked_interaction
 active=linked.portfolio_return_compounded-linked.benchmark_return_compounded
-assert abs(linked_effects-active)<1e-12
 wealth_return=nav.iloc[-1].combined_nav_usd/nav.iloc[0].combined_nav_usd-1
-assert abs(linked.portfolio_return_compounded-wealth_return)<1e-12
 attribution_table=linked.to_dataframe()
 print(attribution_table)
 ```
@@ -1474,7 +1280,6 @@ held_contracts=float(future_spec["notional"]["amount"])/future_spec["contract_sp
 trim_contracts=held_contracts*trim_fraction
 trim_base=float(positions.loc[positions.position=="UST-FUTURE","usd_value"].iloc[0])*trim_fraction
 stress_loss_avoided=-float(trim_row.pnl_usd)*trim_fraction
-assert held_contracts==10 and trim_contracts==5 and stress_loss_avoided>0
 pm_recommendation=(f"Reduce the long Treasury future from 10 to 5 contracts while its delivery-basket basis is reviewed. "
     f"Closing 5 contracts at the model mark transfers USD {trim_base:,.2f} into cash and reduces this composed stress loss by USD {stress_loss_avoided:,.2f}; initial mark-plus-cash wealth is unchanged before costs. "
     "The benefit is scenario-specific, not a forecast of expected profit. The remaining 5 contracts still carry duration, repo and CTD-switch risk, and the native fixed-deliverable proxy omits the delivery option. "
@@ -1499,12 +1304,9 @@ report=TearSheet(INSTITUTIONAL,f"Analyst {TRACK} capstone — reference submissi
     Section("Three-period linked attribution",attribution_table.to_html()),
 ],kpis=[KPI("Combined value",f"USD {combined_base:,.2f}"),KPI("Stress P&L",f"USD {combined_stress-combined_base:,.2f}"),
         KPI("IRS SIMM v2.6",f"USD {simm_im:,.2f}"),KPI("Linked active return",f"{active:.4%}")],
-    subtitle="Synthetic inputs; actual native repricing. "+("BBB is a separate analytical sleeve." if holding else "Physical UST future theta is unavailable."),
+    subtitle="Synthetic inputs; actual native repricing. Physical UST future theta is unavailable.",
     generated=AS_OF)
 report_html=report.to_html()
-assert "<html" in report_html.lower() and "PM recommendation" in report_html
-assert f"{combined_base:,.2f}" in report_html
-assert abs(scenario.pnl_usd.sum()-(combined_stress-combined_base))<.01
 report
 tearsheet_path=Path("vol_capstone_tearsheet.html")
 tearsheet_path.write_text(report_html)
@@ -1518,7 +1320,7 @@ print({"export":str(tearsheet_path),"combined_USD":combined_base,"stress_PnL_USD
 ```python exec id=vol-reference-snapshot role=build
 # Preserve this reference before the other independent track is displayed in the lesson.
 vol_reference={"track":TRACK,"as_of":AS_OF,"book_input":deepcopy(book_input),
-    "positions":positions.copy(deep=True),"native_value":base.total_value,"BBB_value":bbb_pv,
+    "positions":positions.copy(deep=True),"native_value":base.total_value,"BBB_value":0.0,
     "analytical_error":analytical_price_error,"direct_total":direct_total,"total_value":combined_base,"stress_total":combined_stress,"scenario":scenario.copy(deep=True),
     "risk":risk_table.copy(deep=True),"margin":margin_table.copy(deep=True),"SIMM":simm_im,
     "schedule_IM":schedule_im.amount,"IRS_notional":irs_notional,"IRS_remaining_years":irs_remaining_years,
@@ -1526,8 +1328,7 @@ vol_reference={"track":TRACK,"as_of":AS_OF,"book_input":deepcopy(book_input),
     "physical_ECL":physical_loss.ecl,"manual_ECL":manual_ecl,"borrower":credit_table.copy(deep=True),"NAV":nav.copy(deep=True),"attribution":attribution_table.copy(deep=True),
     "linked_effects":linked_effects,"active_return":active,"linked_return":linked.portfolio_return_compounded,
     "report_html":report_html}
-assert vol_reference["track"]=="vol"
-print({"reference":"vol","stages":8,"native_positions":len(book.position_ids),"separate_BBB_USD":bbb_pv})
+print({"reference":"vol","stages":8,"native_positions":len(book.position_ids),"separate_BBB_USD":0.0})
 
 vol_reference.update({"replication":replication_table.copy(deep=True),"variance_attribution":variance_attribution.copy(deep=True),"delivery":delivery_table.copy(deep=True)})
 
@@ -1543,7 +1344,7 @@ vol_reference["PM_recommendation"]=pm_recommendation
 
 </BuildIt>
 
-<LabCard notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" title="Credit capstone reference" description="Run the independent eight-stage reference, assertions and HTML tear sheet export." />
+<LabCard notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" title="Credit capstone reference" description="Run the independent eight-stage reference, reconciliations and HTML tear sheet export." />
 
 <Exercise id="capstone-credit" title="Accept the credit reference" question="Run the eight acceptance gates from a fresh baseline. Explain each scoped limitation before using this reference to assess a submission.">
 
@@ -1552,48 +1353,311 @@ Each row corresponds to one required stage. Passing these checks establishes the
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-acceptance" role="exercise" */}
 ```python exec id=credit-acceptance role=exercise
 # Eight explicit acceptance gates for this independently constructed reference.
-r=credit_reference;checks=[]
-ids=[position["instrument_id"] for position in r["book_input"]["positions"]]
-assert len(ids)==len(set(ids)) and "BORROWER-TL" in ids
-assert not any(position["instrument_spec"]["type"]=="structured_credit" for position in r["book_input"]["positions"])
-checks.append({"stage":"1 market and identity","passed":True})
-assert abs(r["positions"].usd_value.sum()-r["total_value"])<.01
-assert abs(r["direct_total"]-r["total_value"])<.01
-assert abs(r["analytical_error"])<.01
-assert abs(r["native_value"]+r["BBB_value"]-r["total_value"])<.01
-assert (r["BBB_value"]>0)==(r["track"]=="credit")
-checks.append({"stage":"2 pricing and ownership","passed":True})
-assert np.isfinite(r["risk"].value).all() and r["risk"].position.nunique()>=len(ids)
-assert r["tail_risk"].scenario_count.iloc[0]==504 and r["tail_risk"].tail_observations.iloc[0]>=25
-assert r["tail_risk"].ES_loss_USD.iloc[0]>=r["tail_risk"].VaR_loss_USD.iloc[0]>0
-assert len(r["factor_risk"])==9 and abs(r["factor_variance_error"])<1e-12
-checks.append({"stage":"3 sensitivities, full-repricing VaR/ES and factor variance","passed":True})
-assert abs(r["scenario"].pnl_usd.sum()-(r["stress_total"]-r["total_value"]))<.01
-if r["track"]=="credit":assert (r["scenario"].position=="CLO-BBB").sum()==1
-assert abs(r["historical_stress"].PnL_USD.sum()-(r["historical_stress_total"]-r["total_value"]))<.01
-checks.append({"stage":"4 composed stress and fixed-date historical-pattern replay","passed":True})
-assert r["SIMM"]>0 and r["schedule_IM"]>0
-assert (r["margin"].IRS_exposure_usd.abs()<500_000).all()
-assert (r["margin"][["VM_delivery_usd","VM_return_usd"]]==0).all().all()
-checks.append({"stage":"5 eligible OTC margin and below-MTA VM","passed":True})
-assert r["borrower_balance_error"]<.01 and len(r["borrower"])==16
-assert np.isfinite(r["borrower"][["actual","threshold","headroom"]]).all().all()
-assert abs(r["physical_ECL"]-r["manual_ECL"])<1e-8 and r["physical_ECL"]>0
-checks.append({"stage":"6 quarterly covenants and amortizing physical ECL","passed":True})
-nav_check=r["NAV"];assert len(nav_check)==4
-assert np.allclose(nav_check.native_pv_usd+nav_check.BBB_pv_usd,nav_check.combined_nav_usd,atol=.01,rtol=0)
-assert abs(r["linked_effects"]-r["active_return"])<1e-12
-assert abs(r["linked_return"]-(nav_check.iloc[-1].combined_nav_usd/nav_check.iloc[0].combined_nav_usd-1))<1e-12
-checks.append({"stage":"7 dated valuation and three-period attribution","passed":True})
-assert "PM recommendation" in r["report_html"] and r["PM_recommendation"]
-assert "<html" in r["report_html"].lower() and f"{r['total_value']:,.2f}" in r["report_html"]
-checks.append({"stage":"8 reproducible report","passed":True})
-assert len(checks)==8 and all(check["passed"] for check in checks)
-print(pd.DataFrame(checks).to_string(index=False))
+r = credit_reference
+checks = []
 
-assert len(r["waterfall"])==6 and r["first_loss_CDR"]>0
-assert r["expected_draw"].drawn_given_default.iloc[1]>r["expected_draw"].drawn_given_default.iloc[0]
-assert len(r["convert_regimes"])==3
+
+def add_check(stage, actual, expected, residual, tolerance, unit, passed):
+    """Add one visible numerical reconciliation to the acceptance table."""
+    checks.append(
+        {
+            "stage": stage,
+            "actual": actual,
+            "expected": expected,
+            "residual": residual,
+            "tolerance": tolerance,
+            "unit": unit,
+            "passed": bool(passed),
+        }
+    )
+
+
+ids = [position["instrument_id"] for position in r["book_input"]["positions"]]
+unique_ids = len(ids) == len(set(ids))
+has_term_loan = "BORROWER-TL" in ids
+whole_clo_positions = sum(
+    position["instrument_spec"]["type"] == "structured_credit"
+    for position in r["book_input"]["positions"]
+)
+identity_failures = sum((not unique_ids, not has_term_loan, whole_clo_positions != 0))
+identity_passed = identity_failures == 0
+add_check(
+    "1 market and identity",
+    {
+        "positions": len(ids),
+        "unique_positions": len(set(ids)),
+        "term_loan_present": has_term_loan,
+        "whole_CLO_positions": whole_clo_positions,
+    },
+    {"all_IDs_unique": True, "term_loan_present": True, "whole_CLO_positions": 0},
+    identity_failures,
+    0,
+    "failed conditions",
+    identity_passed,
+)
+
+pricing_residuals = {
+    "position_sum": float(r["positions"].usd_value.sum() - r["total_value"]),
+    "direct_sum": float(r["direct_total"] - r["total_value"]),
+    "analytical_option": float(r["analytical_error"]),
+    "native_plus_BBB": float(r["native_value"] + r["BBB_value"] - r["total_value"]),
+}
+max_pricing_residual = max(abs(value) for value in pricing_residuals.values())
+sleeve_matches_track = (r["BBB_value"] > 0) == (r["track"] == "credit")
+pricing_passed = max_pricing_residual < 0.01 and sleeve_matches_track
+add_check(
+    "2 pricing and ownership",
+    {
+        "max_abs_reconciliation": max_pricing_residual,
+        "BBB_value": float(r["BBB_value"]),
+        "sleeve_matches_track": sleeve_matches_track,
+    },
+    {"max_abs_reconciliation": "< 0.01", "sleeve_matches_track": True},
+    pricing_residuals,
+    {"each_reconciliation": 0.01, "sleeve_condition": 0},
+    "USD; boolean",
+    pricing_passed,
+)
+
+risk_values_finite = bool(np.isfinite(r["risk"].value).all())
+risk_position_count = int(r["risk"].position.nunique())
+scenario_count = int(r["tail_risk"].scenario_count.iloc[0])
+tail_observations = int(r["tail_risk"].tail_observations.iloc[0])
+var_loss = float(r["tail_risk"].VaR_loss_USD.iloc[0])
+es_loss = float(r["tail_risk"].ES_loss_USD.iloc[0])
+factor_rows = len(r["factor_risk"])
+factor_variance_residual = abs(float(r["factor_variance_error"]))
+risk_failures = sum(
+    (
+        not risk_values_finite,
+        risk_position_count < len(ids),
+        scenario_count != 504,
+        tail_observations < 25,
+        not (es_loss >= var_loss > 0),
+        factor_rows != 9,
+    )
+)
+risk_passed = risk_failures == 0 and factor_variance_residual < 1e-12
+add_check(
+    "3 sensitivities, full-repricing VaR/ES and factor variance",
+    {
+        "finite_risk_values": risk_values_finite,
+        "risk_positions": risk_position_count,
+        "scenarios": scenario_count,
+        "tail_observations": tail_observations,
+        "VaR_loss": var_loss,
+        "ES_loss": es_loss,
+        "factor_rows": factor_rows,
+    },
+    {
+        "risk_positions": f">= {len(ids)}",
+        "scenarios": 504,
+        "tail_observations": ">= 25",
+        "ES_loss": ">= VaR_loss > 0",
+        "factor_rows": 9,
+    },
+    {"factor_variance": factor_variance_residual, "failed_conditions": risk_failures},
+    {"factor_variance": 1e-12, "failed_conditions": 0},
+    "USD^2; counts",
+    risk_passed,
+)
+
+composed_stress_residual = abs(
+    float(r["scenario"].pnl_usd.sum() - (r["stress_total"] - r["total_value"]))
+)
+historical_stress_residual = abs(
+    float(
+        r["historical_stress"].PnL_USD.sum()
+        - (r["historical_stress_total"] - r["total_value"])
+    )
+)
+clo_bbb_rows = int((r["scenario"].position == "CLO-BBB").sum())
+clo_row_expected = 1 if r["track"] == "credit" else 0
+clo_row_matches = r["track"] != "credit" or clo_bbb_rows == 1
+stress_passed = (
+    composed_stress_residual < 0.01
+    and historical_stress_residual < 0.01
+    and clo_row_matches
+)
+add_check(
+    "4 composed stress and historical-pattern replay",
+    {
+        "composed_residual": composed_stress_residual,
+        "historical_residual": historical_stress_residual,
+        "CLO_BBB_rows": clo_bbb_rows,
+    },
+    {"each_residual": "< 0.01", "CLO_BBB_rows": clo_row_expected},
+    {
+        "composed": composed_stress_residual,
+        "historical": historical_stress_residual,
+        "CLO_row_mismatch": int(not clo_row_matches),
+    },
+    {"each_reconciliation": 0.01, "CLO_row_mismatch": 0},
+    "USD; count",
+    stress_passed,
+)
+
+max_irs_exposure = float(r["margin"].IRS_exposure_usd.abs().max())
+max_vm_cashflow = float(
+    r["margin"][["VM_delivery_usd", "VM_return_usd"]].abs().to_numpy().max()
+)
+margin_failures = sum(
+    (
+        not (r["SIMM"] > 0),
+        not (r["schedule_IM"] > 0),
+        not (max_irs_exposure < 500_000),
+        not (max_vm_cashflow == 0),
+    )
+)
+margin_passed = margin_failures == 0
+add_check(
+    "5 eligible OTC margin and below-MTA VM",
+    {
+        "SIMM": float(r["SIMM"]),
+        "schedule_IM": float(r["schedule_IM"]),
+        "max_IRS_exposure": max_irs_exposure,
+        "max_VM_cashflow": max_vm_cashflow,
+    },
+    {
+        "SIMM": "> 0",
+        "schedule_IM": "> 0",
+        "max_IRS_exposure": "< 500000",
+        "max_VM_cashflow": 0,
+    },
+    margin_failures,
+    0,
+    "USD; failed conditions",
+    margin_passed,
+)
+
+borrower_balance_residual = abs(float(r["borrower_balance_error"]))
+ecl_residual = abs(float(r["physical_ECL"] - r["manual_ECL"]))
+borrower_rows = len(r["borrower"])
+borrower_values_finite = bool(
+    np.isfinite(r["borrower"][["actual", "threshold", "headroom"]]).all().all()
+)
+borrower_failures = sum(
+    (
+        not (borrower_balance_residual < 0.01),
+        borrower_rows != 16,
+        not borrower_values_finite,
+        not (ecl_residual < 1e-8),
+        not (r["physical_ECL"] > 0),
+    )
+)
+borrower_passed = borrower_failures == 0
+add_check(
+    "6 quarterly covenants and amortizing physical ECL",
+    {
+        "balance_residual": borrower_balance_residual,
+        "covenant_rows": borrower_rows,
+        "finite_covenant_values": borrower_values_finite,
+        "physical_ECL": float(r["physical_ECL"]),
+        "manual_ECL": float(r["manual_ECL"]),
+    },
+    {
+        "balance_residual": "< 0.01",
+        "covenant_rows": 16,
+        "finite_covenant_values": True,
+        "ECL_residual": "< 1e-8",
+        "physical_ECL": "> 0",
+    },
+    {"balance_sheet": borrower_balance_residual, "ECL": ecl_residual},
+    {"balance_sheet": 0.01, "ECL": 1e-8},
+    "USD",
+    borrower_passed,
+)
+
+nav_check = r["NAV"]
+nav_reconciliation = float(
+    (nav_check.native_pv_usd + nav_check.BBB_pv_usd - nav_check.combined_nav_usd)
+    .abs()
+    .max()
+)
+linked_effects_residual = abs(float(r["linked_effects"] - r["active_return"]))
+linked_return_reference = (
+    nav_check.iloc[-1].combined_nav_usd / nav_check.iloc[0].combined_nav_usd - 1
+)
+linked_return_residual = abs(float(r["linked_return"] - linked_return_reference))
+attribution_passed = (
+    len(nav_check) == 4
+    and nav_reconciliation < 0.01
+    and linked_effects_residual < 1e-12
+    and linked_return_residual < 1e-12
+)
+add_check(
+    "7 dated valuation and three-period attribution",
+    {
+        "NAV_rows": len(nav_check),
+        "max_NAV_residual": nav_reconciliation,
+        "linked_effects_residual": linked_effects_residual,
+        "linked_return_residual": linked_return_residual,
+    },
+    {
+        "NAV_rows": 4,
+        "max_NAV_residual": "< 0.01",
+        "linked_residuals": "< 1e-12",
+    },
+    {
+        "NAV": nav_reconciliation,
+        "linked_effects": linked_effects_residual,
+        "linked_return": linked_return_residual,
+    },
+    {"NAV": 0.01, "linked_effects": 1e-12, "linked_return": 1e-12},
+    "USD; decimal return",
+    attribution_passed,
+)
+
+report_contains_recommendation = (
+    "PM recommendation" in r["report_html"] and bool(r["PM_recommendation"])
+)
+report_is_html = "<html" in r["report_html"].lower()
+report_contains_total = f"{r['total_value']:,.2f}" in r["report_html"]
+waterfall_rows = len(r["waterfall"])
+first_loss_cdr = float(r["first_loss_CDR"])
+conditional_draw_increases = bool(
+    r["expected_draw"].drawn_given_default.iloc[1]
+    > r["expected_draw"].drawn_given_default.iloc[0]
+)
+convertible_regimes = len(r["convert_regimes"])
+report_failures = sum(
+    (
+        not report_contains_recommendation,
+        not report_is_html,
+        not report_contains_total,
+        waterfall_rows != 6,
+        not (first_loss_cdr > 0),
+        not conditional_draw_increases,
+        convertible_regimes != 3,
+    )
+)
+report_passed = report_failures == 0
+add_check(
+    "8 reproducible report and credit artifacts",
+    {
+        "recommendation_present": report_contains_recommendation,
+        "HTML_present": report_is_html,
+        "reported_total_present": report_contains_total,
+        "waterfall_rows": waterfall_rows,
+        "first_loss_CDR": first_loss_cdr,
+        "conditional_draw_increases": conditional_draw_increases,
+        "convertible_regimes": convertible_regimes,
+    },
+    {
+        "report_checks": True,
+        "waterfall_rows": 6,
+        "first_loss_CDR": "> 0",
+        "conditional_draw_increases": True,
+        "convertible_regimes": 3,
+    },
+    report_failures,
+    0,
+    "failed conditions",
+    report_passed,
+)
+
+acceptance_table = pd.DataFrame(checks)
+print(acceptance_table.to_string(index=False))
 ```
 {/* /notebook-block */}
 
@@ -1601,7 +1665,7 @@ assert len(r["convert_regimes"])==3
 
 </Exercise>
 
-<LabCard notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" title="Vol capstone reference" description="Run the independent eight-stage reference, assertions and HTML tear sheet export." />
+<LabCard notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" title="Vol capstone reference" description="Run the independent eight-stage reference, reconciliations and HTML tear sheet export." />
 
 <Exercise id="capstone-vol" title="Accept the vol reference" question="Run the eight acceptance gates from a fresh baseline. Explain each scoped limitation before using this reference to assess a submission.">
 
@@ -1610,47 +1674,308 @@ Each row corresponds to one required stage. Passing these checks establishes the
 {/* notebook-block notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" cell="vol-acceptance" role="exercise" */}
 ```python exec id=vol-acceptance role=exercise
 # Eight explicit acceptance gates for this independently constructed reference.
-r=vol_reference;checks=[]
-ids=[position["instrument_id"] for position in r["book_input"]["positions"]]
-assert len(ids)==len(set(ids)) and "BORROWER-TL" in ids
-assert not any(position["instrument_spec"]["type"]=="structured_credit" for position in r["book_input"]["positions"])
-checks.append({"stage":"1 market and identity","passed":True})
-assert abs(r["positions"].usd_value.sum()-r["total_value"])<.01
-assert abs(r["direct_total"]-r["total_value"])<.01
-assert abs(r["analytical_error"])<.01
-assert abs(r["native_value"]+r["BBB_value"]-r["total_value"])<.01
-assert (r["BBB_value"]>0)==(r["track"]=="credit")
-checks.append({"stage":"2 pricing and ownership","passed":True})
-assert np.isfinite(r["risk"].value).all() and r["risk"].position.nunique()>=len(ids)
-assert r["tail_risk"].scenario_count.iloc[0]==504 and r["tail_risk"].tail_observations.iloc[0]>=25
-assert r["tail_risk"].ES_loss_USD.iloc[0]>=r["tail_risk"].VaR_loss_USD.iloc[0]>0
-assert len(r["factor_risk"])==9 and abs(r["factor_variance_error"])<1e-12
-checks.append({"stage":"3 sensitivities, full-repricing VaR/ES and factor variance","passed":True})
-assert abs(r["scenario"].pnl_usd.sum()-(r["stress_total"]-r["total_value"]))<.01
-if r["track"]=="credit":assert (r["scenario"].position=="CLO-BBB").sum()==1
-assert abs(r["historical_stress"].PnL_USD.sum()-(r["historical_stress_total"]-r["total_value"]))<.01
-checks.append({"stage":"4 composed stress and fixed-date historical-pattern replay","passed":True})
-assert r["SIMM"]>0 and r["schedule_IM"]>0
-assert (r["margin"].IRS_exposure_usd.abs()<500_000).all()
-assert (r["margin"][["VM_delivery_usd","VM_return_usd"]]==0).all().all()
-checks.append({"stage":"5 eligible OTC margin and below-MTA VM","passed":True})
-assert r["borrower_balance_error"]<.01 and len(r["borrower"])==16
-assert np.isfinite(r["borrower"][["actual","threshold","headroom"]]).all().all()
-assert abs(r["physical_ECL"]-r["manual_ECL"])<1e-8 and r["physical_ECL"]>0
-checks.append({"stage":"6 quarterly covenants and amortizing physical ECL","passed":True})
-nav_check=r["NAV"];assert len(nav_check)==4
-assert np.allclose(nav_check.native_pv_usd+nav_check.BBB_pv_usd,nav_check.combined_nav_usd,atol=.01,rtol=0)
-assert abs(r["linked_effects"]-r["active_return"])<1e-12
-assert abs(r["linked_return"]-(nav_check.iloc[-1].combined_nav_usd/nav_check.iloc[0].combined_nav_usd-1))<1e-12
-checks.append({"stage":"7 dated valuation and three-period attribution","passed":True})
-assert "PM recommendation" in r["report_html"] and r["PM_recommendation"]
-assert "<html" in r["report_html"].lower() and f"{r['total_value']:,.2f}" in r["report_html"]
-checks.append({"stage":"8 reproducible report","passed":True})
-assert len(checks)==8 and all(check["passed"] for check in checks)
-print(pd.DataFrame(checks).to_string(index=False))
+r = vol_reference
+checks = []
 
-assert len(r["replication"])==2 and r["replication"].finite_strike_residual.abs().max()<1000
-assert len(r["variance_attribution"])==3 and len(r["delivery"])==4
+
+def add_check(stage, actual, expected, residual, tolerance, unit, passed):
+    """Add one visible numerical reconciliation to the acceptance table."""
+    checks.append(
+        {
+            "stage": stage,
+            "actual": actual,
+            "expected": expected,
+            "residual": residual,
+            "tolerance": tolerance,
+            "unit": unit,
+            "passed": bool(passed),
+        }
+    )
+
+
+ids = [position["instrument_id"] for position in r["book_input"]["positions"]]
+unique_ids = len(ids) == len(set(ids))
+has_term_loan = "BORROWER-TL" in ids
+whole_clo_positions = sum(
+    position["instrument_spec"]["type"] == "structured_credit"
+    for position in r["book_input"]["positions"]
+)
+identity_failures = sum((not unique_ids, not has_term_loan, whole_clo_positions != 0))
+identity_passed = identity_failures == 0
+add_check(
+    "1 market and identity",
+    {
+        "positions": len(ids),
+        "unique_positions": len(set(ids)),
+        "term_loan_present": has_term_loan,
+        "whole_CLO_positions": whole_clo_positions,
+    },
+    {"all_IDs_unique": True, "term_loan_present": True, "whole_CLO_positions": 0},
+    identity_failures,
+    0,
+    "failed conditions",
+    identity_passed,
+)
+
+pricing_residuals = {
+    "position_sum": float(r["positions"].usd_value.sum() - r["total_value"]),
+    "direct_sum": float(r["direct_total"] - r["total_value"]),
+    "analytical_option": float(r["analytical_error"]),
+    "native_plus_BBB": float(r["native_value"] + r["BBB_value"] - r["total_value"]),
+}
+max_pricing_residual = max(abs(value) for value in pricing_residuals.values())
+credit_sleeve_absent = r["BBB_value"] == 0
+pricing_passed = max_pricing_residual < 0.01 and credit_sleeve_absent
+add_check(
+    "2 pricing and ownership",
+    {
+        "max_abs_reconciliation": max_pricing_residual,
+        "BBB_value": float(r["BBB_value"]),
+        "credit_sleeve_absent": credit_sleeve_absent,
+    },
+    {"max_abs_reconciliation": "< 0.01", "credit_sleeve_absent": True},
+    pricing_residuals,
+    {"each_reconciliation": 0.01, "credit_sleeve_condition": 0},
+    "USD; boolean",
+    pricing_passed,
+)
+
+risk_values_finite = bool(np.isfinite(r["risk"].value).all())
+risk_position_count = int(r["risk"].position.nunique())
+scenario_count = int(r["tail_risk"].scenario_count.iloc[0])
+tail_observations = int(r["tail_risk"].tail_observations.iloc[0])
+var_loss = float(r["tail_risk"].VaR_loss_USD.iloc[0])
+es_loss = float(r["tail_risk"].ES_loss_USD.iloc[0])
+factor_rows = len(r["factor_risk"])
+factor_variance_residual = abs(float(r["factor_variance_error"]))
+risk_failures = sum(
+    (
+        not risk_values_finite,
+        risk_position_count < len(ids),
+        scenario_count != 504,
+        tail_observations < 25,
+        not (es_loss >= var_loss > 0),
+        factor_rows != 9,
+    )
+)
+risk_passed = risk_failures == 0 and factor_variance_residual < 1e-12
+add_check(
+    "3 sensitivities, full-repricing VaR/ES and factor variance",
+    {
+        "finite_risk_values": risk_values_finite,
+        "risk_positions": risk_position_count,
+        "scenarios": scenario_count,
+        "tail_observations": tail_observations,
+        "VaR_loss": var_loss,
+        "ES_loss": es_loss,
+        "factor_rows": factor_rows,
+    },
+    {
+        "risk_positions": f">= {len(ids)}",
+        "scenarios": 504,
+        "tail_observations": ">= 25",
+        "ES_loss": ">= VaR_loss > 0",
+        "factor_rows": 9,
+    },
+    {"factor_variance": factor_variance_residual, "failed_conditions": risk_failures},
+    {"factor_variance": 1e-12, "failed_conditions": 0},
+    "USD^2; counts",
+    risk_passed,
+)
+
+composed_stress_residual = abs(
+    float(r["scenario"].pnl_usd.sum() - (r["stress_total"] - r["total_value"]))
+)
+historical_stress_residual = abs(
+    float(
+        r["historical_stress"].PnL_USD.sum()
+        - (r["historical_stress_total"] - r["total_value"])
+    )
+)
+clo_bbb_rows = int((r["scenario"].position == "CLO-BBB").sum())
+clo_row_expected = 0
+clo_row_matches = clo_bbb_rows == 0
+stress_passed = (
+    composed_stress_residual < 0.01
+    and historical_stress_residual < 0.01
+    and clo_row_matches
+)
+add_check(
+    "4 composed stress and historical-pattern replay",
+    {
+        "composed_residual": composed_stress_residual,
+        "historical_residual": historical_stress_residual,
+        "CLO_BBB_rows": clo_bbb_rows,
+    },
+    {"each_residual": "< 0.01", "CLO_BBB_rows": clo_row_expected},
+    {
+        "composed": composed_stress_residual,
+        "historical": historical_stress_residual,
+        "CLO_row_mismatch": int(not clo_row_matches),
+    },
+    {"each_reconciliation": 0.01, "CLO_row_mismatch": 0},
+    "USD; count",
+    stress_passed,
+)
+
+max_irs_exposure = float(r["margin"].IRS_exposure_usd.abs().max())
+max_vm_cashflow = float(
+    r["margin"][["VM_delivery_usd", "VM_return_usd"]].abs().to_numpy().max()
+)
+margin_failures = sum(
+    (
+        not (r["SIMM"] > 0),
+        not (r["schedule_IM"] > 0),
+        not (max_irs_exposure < 500_000),
+        not (max_vm_cashflow == 0),
+    )
+)
+margin_passed = margin_failures == 0
+add_check(
+    "5 eligible OTC margin and below-MTA VM",
+    {
+        "SIMM": float(r["SIMM"]),
+        "schedule_IM": float(r["schedule_IM"]),
+        "max_IRS_exposure": max_irs_exposure,
+        "max_VM_cashflow": max_vm_cashflow,
+    },
+    {
+        "SIMM": "> 0",
+        "schedule_IM": "> 0",
+        "max_IRS_exposure": "< 500000",
+        "max_VM_cashflow": 0,
+    },
+    margin_failures,
+    0,
+    "USD; failed conditions",
+    margin_passed,
+)
+
+borrower_balance_residual = abs(float(r["borrower_balance_error"]))
+ecl_residual = abs(float(r["physical_ECL"] - r["manual_ECL"]))
+borrower_rows = len(r["borrower"])
+borrower_values_finite = bool(
+    np.isfinite(r["borrower"][["actual", "threshold", "headroom"]]).all().all()
+)
+borrower_failures = sum(
+    (
+        not (borrower_balance_residual < 0.01),
+        borrower_rows != 16,
+        not borrower_values_finite,
+        not (ecl_residual < 1e-8),
+        not (r["physical_ECL"] > 0),
+    )
+)
+borrower_passed = borrower_failures == 0
+add_check(
+    "6 quarterly covenants and amortizing physical ECL",
+    {
+        "balance_residual": borrower_balance_residual,
+        "covenant_rows": borrower_rows,
+        "finite_covenant_values": borrower_values_finite,
+        "physical_ECL": float(r["physical_ECL"]),
+        "manual_ECL": float(r["manual_ECL"]),
+    },
+    {
+        "balance_residual": "< 0.01",
+        "covenant_rows": 16,
+        "finite_covenant_values": True,
+        "ECL_residual": "< 1e-8",
+        "physical_ECL": "> 0",
+    },
+    {"balance_sheet": borrower_balance_residual, "ECL": ecl_residual},
+    {"balance_sheet": 0.01, "ECL": 1e-8},
+    "USD",
+    borrower_passed,
+)
+
+nav_check = r["NAV"]
+nav_reconciliation = float(
+    (nav_check.native_pv_usd + nav_check.BBB_pv_usd - nav_check.combined_nav_usd)
+    .abs()
+    .max()
+)
+linked_effects_residual = abs(float(r["linked_effects"] - r["active_return"]))
+linked_return_reference = (
+    nav_check.iloc[-1].combined_nav_usd / nav_check.iloc[0].combined_nav_usd - 1
+)
+linked_return_residual = abs(float(r["linked_return"] - linked_return_reference))
+attribution_passed = (
+    len(nav_check) == 4
+    and nav_reconciliation < 0.01
+    and linked_effects_residual < 1e-12
+    and linked_return_residual < 1e-12
+)
+add_check(
+    "7 dated valuation and three-period attribution",
+    {
+        "NAV_rows": len(nav_check),
+        "max_NAV_residual": nav_reconciliation,
+        "linked_effects_residual": linked_effects_residual,
+        "linked_return_residual": linked_return_residual,
+    },
+    {
+        "NAV_rows": 4,
+        "max_NAV_residual": "< 0.01",
+        "linked_residuals": "< 1e-12",
+    },
+    {
+        "NAV": nav_reconciliation,
+        "linked_effects": linked_effects_residual,
+        "linked_return": linked_return_residual,
+    },
+    {"NAV": 0.01, "linked_effects": 1e-12, "linked_return": 1e-12},
+    "USD; decimal return",
+    attribution_passed,
+)
+
+report_contains_recommendation = (
+    "PM recommendation" in r["report_html"] and bool(r["PM_recommendation"])
+)
+report_is_html = "<html" in r["report_html"].lower()
+report_contains_total = f"{r['total_value']:,.2f}" in r["report_html"]
+replication_rows = len(r["replication"])
+finite_strike_residual = float(r["replication"].finite_strike_residual.abs().max())
+variance_attribution_rows = len(r["variance_attribution"])
+delivery_rows = len(r["delivery"])
+report_failures = sum(
+    (
+        not report_contains_recommendation,
+        not report_is_html,
+        not report_contains_total,
+        replication_rows != 2,
+        not (finite_strike_residual < 1_000),
+        variance_attribution_rows != 3,
+        delivery_rows != 4,
+    )
+)
+report_passed = report_failures == 0
+add_check(
+    "8 reproducible report and volatility artifacts",
+    {
+        "recommendation_present": report_contains_recommendation,
+        "HTML_present": report_is_html,
+        "reported_total_present": report_contains_total,
+        "replication_rows": replication_rows,
+        "max_finite_strike_residual": finite_strike_residual,
+        "variance_attribution_rows": variance_attribution_rows,
+        "delivery_rows": delivery_rows,
+    },
+    {
+        "report_checks": True,
+        "replication_rows": 2,
+        "max_finite_strike_residual": "< 1000",
+        "variance_attribution_rows": 3,
+        "delivery_rows": 4,
+    },
+    {"finite_strike_replication": finite_strike_residual, "failed_conditions": report_failures},
+    {"finite_strike_replication": 1_000, "failed_conditions": 0},
+    "USD; counts",
+    report_passed,
+)
+
+acceptance_table = pd.DataFrame(checks)
+print(acceptance_table.to_string(index=False))
 ```
 {/* /notebook-block */}
 

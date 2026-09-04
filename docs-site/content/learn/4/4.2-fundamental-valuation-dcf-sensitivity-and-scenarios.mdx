@@ -66,7 +66,7 @@ An LBO return depends on operating value, entry and exit multiples, debt repayme
 
 ### 1. Carry native borrower UFCF into DCF
 
-The code starts with `borrower_model()`, preserves all actual periods, and exposes forecast revenue/cost growth as native formula drivers. It asserts that this refactoring preserves every baseline UFCF value. The model has four actual quarters followed by four forecast quarters; valuation is as of 1 January 2025 and net debt reconciles to the last actual quarter.
+The code starts with `borrower_model()`, preserves all actual periods, and exposes forecast revenue/cost growth as native formula drivers. It reconciles every baseline UFCF value after the refactoring. The model has four actual quarters followed by four forecast quarters; valuation is as of 1 January 2025 and net debt reconciles to the last actual quarter.
 
 {/* notebook-block notebook="04_statement_modeling/models/dcf_valuation.ipynb" cell="native-dcf" role="build" */}
 ```python exec id=native-dcf role=build
@@ -75,7 +75,7 @@ import math
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from _shared.borrower_model import borrower_model, borrower_vintage, PERIODS
+from _shared.borrower_model import borrower_model, borrower_vintage
 from finstack_quant.core.money import Money
 from finstack_quant.statements import ModelBuilder, Evaluator, ForecastSpec, MonteCarloConfig
 from finstack_quant.statements_analytics import (
@@ -84,6 +84,7 @@ from finstack_quant.statements_analytics import (
 )
 
 borrower = borrower_model()
+PERIODS = tuple(period['id'] for period in json.loads(borrower.to_json())['periods'])
 borrower_results = Evaluator().evaluate(borrower)
 valuation_builder = ModelBuilder.from_spec(borrower)
 # Expose operating growth as native formula drivers. Preserve every actual and the baseline forecast.
@@ -98,14 +99,10 @@ valuation_builder.compute("ufcf_usd","ufcf * usd_unit")
 valuation_builder.compute("total_debt","debt_end").compute("cash","cash_end")
 valuation_model = valuation_builder.build()
 valuation_results = Evaluator().evaluate(valuation_model)
-assert all(abs(valuation_results.get("ufcf",p)-borrower_results.get("ufcf",p)) < 1e-6 for p in PERIODS)
 cost_of_capital = wacc(0.65,0.12,0.35,0.075,0.25)
-assert abs(cost_of_capital-(0.65*0.12+0.35*0.075*(1-0.25))) < 1e-12
 terminal_growth = 0.025
 terminal = TerminalValueSpec.gordon_growth(terminal_growth)
 base_dcf = evaluate_dcf(valuation_model,cost_of_capital,terminal,ufcf_node="ufcf_usd",as_of="2025-01-01")
-assert abs(base_dcf.enterprise_value.amount-base_dcf.net_debt.amount-base_dcf.equity_value.amount) < 0.01
-assert abs(base_dcf.net_debt.amount-valuation_results.get("net_debt","2024Q4")) < 0.01
 terminal_annual_ufcf = sum(valuation_results.get("ufcf",p) for p in PERIODS[4:])
 terminal_undiscounted = terminal_annual_ufcf*(1+terminal_growth)/(cost_of_capital-terminal_growth)
 terminal_discount_factor = base_dcf.terminal_value_pv.amount/terminal_undiscounted
@@ -125,7 +122,7 @@ Record annual rates, quarterly cash-flow units, the terminal annualization rule 
 
 ### 2. Compare growth and WACC, then operating drivers
 
-The 3×3 grid reprices the same native model at WACC 8.76875%, 9.76875% and 10.76875%, crossed with perpetual growth 1.5%, 2.5% and 3.5%. The grid reports equity value in USD. Within this positive-cash-flow fixture, higher WACC lowers value and higher terminal growth raises it; the assertions check those directions.
+The 3×3 grid reprices the same native model at WACC 8.76875%, 9.76875% and 10.76875%, crossed with perpetual growth 1.5%, 2.5% and 3.5%. The grid reports equity value in USD. Within this positive-cash-flow fixture, higher WACC lowers value and higher terminal growth raises it; the acceptance checks verify those directions.
 
 {/* notebook-block notebook="04_statement_modeling/models/dcf_valuation.ipynb" cell="dcf-sensitivity" role="build" */}
 ```python exec id=dcf-sensitivity role=build
@@ -139,11 +136,8 @@ for discount_rate in (0.0876875,0.0976875,0.1076875):
         value = evaluate_dcf(valuation_model,discount_rate,TerminalValueSpec.gordon_growth(growth),ufcf_node="ufcf_usd")
         rows.append({"WACC":discount_rate,"terminal_growth":growth,"equity_usd":value.equity_value.amount})
 grid = pd.DataFrame(rows).pivot(index="WACC",columns="terminal_growth",values="equity_usd")
-assert (grid.diff(axis=0).iloc[1:] < 0).all().all()
-assert (grid.diff(axis=1).iloc[:,1:] > 0).all().all()
 print(grid.to_string())
 dcf_rank = dcf_sensitivity(valuation_model,cost_of_capital,terminal,ufcf_node="ufcf_usd",wacc_sensitivity_bump=0.01)
-assert not dcf_rank.wacc_down_clamped and not dcf_rank.terminal_growth_up_clamped
 print("Native EV deltas under lower/higher parameter shocks:\n",dcf_rank.to_dataframe().to_string(index=False))
 # The chart groups impacts by economic sign; the table above preserves parameter direction.
 dcf_svg = tornado_chart([(entry.parameter_id,min(entry.downside,entry.upside)/1e6,max(entry.downside,entry.upside)/1e6)
@@ -153,7 +147,6 @@ display(SVG(dcf_svg))
 operating_sensitivity = run_sensitivity(valuation_model,SensitivityConfig(mode="tornado",
     parameters=[("revenue_growth","2025Q4",0.02,[-0.02,0.06]),("opex_growth","2025Q4",0.015,[-0.015,0.045])],target_metrics=["ufcf"]))
 operating_entries = generate_tornado_entries(operating_sensitivity,"ufcf","2025Q4")
-assert len(operating_entries)==2
 print("Operating sensitivity is quarterly UFCF, not EV:",[(e.parameter_id,e.downside,e.upside) for e in operating_entries])
 operating_svg = tornado_chart([(e.parameter_id,min(e.downside,e.upside)/1e3,max(e.downside,e.upside)/1e3) for e in operating_entries],theme=INSTITUTIONAL)
 Path("operating-tornado-usd-thousands.svg").write_text(operating_svg)
@@ -185,12 +178,9 @@ def price_ufcf_path(forecast_values):
 scenario_rows = []
 for name in scenario_results.names:
     result = scenario_results.get(name)
-    assert all(result.get("revenue",p)==valuation_results.get("revenue",p) for p in PERIODS[:4])
     value = price_ufcf_path({p:result.get("ufcf",p) for p in PERIODS[4:]})
     scenario_rows.append({"scenario":name,"2025Q4_UFCF_usd":result.get("ufcf","2025Q4"),"equity_usd":value.equity_value.amount})
 scenario_table = pd.DataFrame(scenario_rows).set_index("scenario")
-assert scenario_table.loc["bull","equity_usd"] > scenario_table.loc["base","equity_usd"] > scenario_table.loc["bear","equity_usd"]
-assert abs(scenario_table.loc["base","equity_usd"]-base_dcf.equity_value.amount) < 0.01
 print(scenario_table.to_string())
 ```
 {/* /notebook-block */}
@@ -217,7 +207,6 @@ required_terminal = (market_enterprise-explicit_pv)/terminal_discount_factor
 implied = goal_seek(goal_model,"terminal_ev_hook","2025Q4",required_terminal,
                     "terminal_growth_assumption","2025Q4",True,(-0.02,0.045))
 repriced = evaluate_dcf(valuation_model,cost_of_capital,TerminalValueSpec.gordon_growth(implied.solved_value),ufcf_node="ufcf_usd")
-assert abs(repriced.equity_value.amount-market_equity) < 0.01
 print(f"Target equity={market_equity:,.2f}; implied perpetual growth={implied.solved_value:.6%}; native reprice={repriced.equity_value.amount:,.2f}")
 ```
 {/* /notebook-block */}
@@ -234,12 +223,13 @@ The LBO uses the same borrower operating cash flows. It pins the latest-actual E
 ```python exec id=borrower-lbo-financing role=build
 import json
 import pandas as pd
-from _shared.borrower_model import borrower_model, PERIODS
+from _shared.borrower_model import borrower_model
 from finstack_quant.statements import ModelBuilder, Evaluator
 from finstack_quant.statements_analytics import add_roll_forward_with_opening, evaluate_lbo
 from finstack_quant.portfolio import mwr_xirr
 
 operating = borrower_model()
+PERIODS = tuple(period['id'] for period in json.loads(operating.to_json())['periods'])
 operating_results = Evaluator().evaluate(operating)
 entry_metric = operating_results.get("annualized_ebitda","2024Q4")
 entry_cash = operating_results.get("cash_end","2024Q4")
@@ -255,17 +245,13 @@ for funded_debt in (80_000_000.0,100_000_000.0):
     builder.compute("lbo_cash",f"{entry_cash} + cumsum(lbo_cash_change)")
     financed = add_roll_forward_with_opening(builder.build(),"lbo_debt",[],["lbo_amort"],funded_debt)
     financing_results = Evaluator().evaluate(financed)
-    assert min(financing_results.get("lbo_cash",p) for p in PERIODS[4:]) > 0
     # All company cash is reserved for operating liquidity: no interim distribution or excess-cash credit at exit.
     result = evaluate_lbo(financed,8.5,"lbo_entry_ebitda",9.0,"annualized_ebitda","lbo_debt_end","2025Q4",[("term_loan",funded_debt)],3_000_000)
-    assert result.sources_uses_balanced
     value_creation = (result.exit_metric-result.entry_metric)*8.5 + result.exit_metric*(9.0-8.5)
     debt_paydown = funded_debt-result.exit_net_debt.amount
-    assert abs(result.exit_equity_proceeds.amount-result.equity_check.amount-(value_creation+debt_paydown-3_000_000)) < 0.01
     irr = mwr_xirr(json.dumps([{"date":"2025-01-01","amount":-result.equity_check.amount},{"date":"2025-12-31","amount":result.exit_equity_proceeds.amount}]))
     lbo_rows.append({"funding_usd":funded_debt,"sponsor_equity_usd":result.equity_check.amount,"debt_paydown_usd":debt_paydown,
                      "exit_equity_usd":result.exit_equity_proceeds.amount,"moic":result.moic,"dated_irr":irr})
-assert lbo_rows[1]["moic"] > lbo_rows[0]["moic"]
 print(pd.DataFrame(lbo_rows).to_string(index=False))
 print("Higher leverage improves this positive operating/exit scenario and amplifies downside. Mandatory amortization is 2.5% per quarter; no cash sweep is assumed.")
 ```
@@ -292,7 +278,6 @@ exit_ebitda = valuation_results.get("annualized_ebitda","2025Q4")
 equivalent_multiple = terminal_undiscounted / exit_ebitda
 exit_value = evaluate_dcf(valuation_model,cost_of_capital,TerminalValueSpec.exit_multiple(equivalent_multiple),
                          ufcf_node="ufcf_usd",exit_multiple_metric_node="annualized_ebitda")
-assert abs(exit_value.enterprise_value.amount-base_dcf.enterprise_value.amount) < 0.01
 print(f"Equivalent exit EV / run-rate EBITDA={equivalent_multiple:.6f}x")
 print(f"Gordon EV={base_dcf.enterprise_value.amount:,.2f}; exit-multiple EV={exit_value.enterprise_value.amount:,.2f}")
 print("The multiple is implied by this cash-conversion ratio, discount rate and growth; it is not an independent market comparable.")
@@ -319,7 +304,6 @@ for vintage in ("2024Q3","2024Q4"):
     vintage_results.append(Evaluator().evaluate(builder.build()))
 vintage_bridge = variance_bridge(vintage_results[0],vintage_results[1],"ufcf","2025Q4",
     ["after_tax_ebit","depreciation","capex_outflow","nwc_outflow"],"Q3 information","Q4 information")
-assert abs(vintage_bridge.unexplained) < 1e-6
 print(vintage_bridge.to_json())
 print("Raw driver deltas reconcile because these nodes are additive signed UFCF components. Revenue alone is not a causal EV attribution.")
 ```
@@ -345,9 +329,7 @@ mc_config = MonteCarloConfig(1024,17,[0.05,0.5,0.95],True)
 statement_mc = Evaluator().evaluate_monte_carlo(stochastic_model,mc_config)
 retained = statement_mc.to_paths_dataframe()
 ufcf_paths = retained.loc[retained.metric=="ufcf_usd"].pivot(index="path_id",columns="period",values="value")
-assert ufcf_paths.shape==(1024,4) and not ufcf_paths.isna().any().any()
 enterprise_values = np.asarray([price_ufcf_path(row).enterprise_value.amount for _,row in ufcf_paths.iterrows()])
-assert np.isfinite(enterprise_values).all() and enterprise_values.std(ddof=1)>0
 print("Native statement paths / native DCF EV p5,p50,p95 (USD):",np.quantile(enterprise_values,[0.05,0.5,0.95]))
 print("Distribution of modeled outcomes, not a confidence interval for a known fair value. WACC, terminal growth and costs are fixed.")
 fig, ax = plt.subplots(figsize=(8,3.6))

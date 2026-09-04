@@ -13,6 +13,7 @@ from common import BUILD, SITE, write_json
 def main() -> int:
     """Execute lessons and labs before checking their publication evidence."""
     commands = [
+        [sys.executable, str(SITE / "gen" / "build_labs.py"), "--check-sources"],
         [sys.executable, str(SITE / "gen" / "build_references.py")],
         [sys.executable, str(SITE / "gen" / "run_lesson_snippets.py"), "--require-all"],
         [sys.executable, str(SITE / "gen" / "build_labs.py")],

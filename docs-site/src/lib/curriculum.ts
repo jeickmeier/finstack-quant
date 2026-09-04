@@ -11,11 +11,13 @@ export type Lesson = {
   fixtures: string[];
   labs: string[];
   examples: string[];
+  introduces?: string[];
   status: 'draft' | 'published';
   desk_question: string;
   references: string[];
   api: string[];
   variants?: Record<string, string[]>;
+  variant_labs?: Record<string, string[]>;
 };
 
 export const groups = [
@@ -36,6 +38,10 @@ export const getLessons = cache((): Lesson[] => {
 
 export function getLesson(id: string) {
   return getLessons().find((lesson) => lesson.id === id);
+}
+
+export function getLessonLabs(lesson: Lesson) {
+  return [...lesson.labs, ...Object.values(lesson.variant_labs ?? {}).flat()];
 }
 
 export function getProgression(lesson: Lesson) {
