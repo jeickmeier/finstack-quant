@@ -5,8 +5,6 @@ use crate::dates::{Date, DayCount};
 use crate::market_data::traits::Discounting;
 use crate::types::CurveId;
 
-// Minimal trait implementation for polymorphism where needed
-
 impl Discounting for DiscountCurve {
     #[inline]
     fn id(&self) -> &CurveId {

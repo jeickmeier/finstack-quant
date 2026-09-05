@@ -355,7 +355,6 @@ fn year_fraction_act_act_isma(start: Date, end: Date, frequency: Tenor) -> crate
         let period_start = window[0];
         let period_end = window[1];
 
-        // Check if this period overlaps with our target interval
         let overlap_start = start.max(period_start);
         let overlap_end = end.min(period_end);
 

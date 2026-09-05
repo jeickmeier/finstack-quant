@@ -1,8 +1,6 @@
 //! Rolling risk metrics: Sharpe, Sortino, and volatility over a sliding window.
 //!
 //! Crate-internal except for [`DatedSeries`] (re-exported at the crate root).
-//! `///` doc examples target crate developers and are marked `ignore`.
-//!
 //! All rolling functions share O(n) sliding-window kernels and return a
 //! [`DatedSeries`] aligned to window-end dates.
 

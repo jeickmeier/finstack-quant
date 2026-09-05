@@ -618,7 +618,6 @@ pub fn next_sifma_settlement(date: Date) -> Option<Date> {
     let mut current_month = date.month();
     let mut current_year = date.year();
 
-    // Check current month and up to 13 months forward
     for _ in 0..14 {
         let settle =
             sifma_settlement_date_for_class(current_month, current_year, SifmaSettlementClass::A)?;

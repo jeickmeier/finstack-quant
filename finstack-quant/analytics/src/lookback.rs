@@ -1,12 +1,8 @@
 //! Lookback period selectors: MTD, QTD, YTD, FYTD.
 //!
-//! Crate-internal: callers use these through [`crate::Performance`]. `///`
-//! doc examples target crate developers and are marked `ignore`.
-//!
+//! Crate-internal: callers use these through [`crate::Performance`].
 //! Each function returns a `Range<usize>` into the dates/returns arrays rather
 //! than sliced data, so callers slice their own arrays.
-//!
-//! Delegates to `dates::DateExt` for calendar math.
 
 use crate::dates::{Date, DateExt, Duration, FiscalConfig, Month};
 use core::ops::Range;

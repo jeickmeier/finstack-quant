@@ -1,7 +1,6 @@
 //! Tail-risk and distribution-shape metrics: VaR, ES, skewness, kurtosis.
 //!
-//! Crate-internal: callers use these through [`crate::Performance`]. `///`
-//! doc examples target crate developers and are marked `ignore`.
+//! Crate-internal: callers use these through [`crate::Performance`].
 //!
 //! All functions operate on `&[f64]` return slices and return scalar `f64`.
 //!
@@ -42,11 +41,11 @@ fn finite_returns_copy(returns: &[f64]) -> Option<Vec<f64>> {
     Some(data)
 }
 
-fn historical_var_data(
+fn historical_sample(
     returns: &[f64],
     confidence: f64,
     invalid_confidence_message: Option<&str>,
-) -> Option<(Vec<f64>, f64)> {
+) -> Option<Vec<f64>> {
     if returns.is_empty() {
         return None;
     }
@@ -56,7 +55,15 @@ fn historical_var_data(
         }
         return None;
     }
-    let mut data = finite_returns_copy(returns)?;
+    finite_returns_copy(returns)
+}
+
+fn historical_var_data(
+    returns: &[f64],
+    confidence: f64,
+    invalid_confidence_message: Option<&str>,
+) -> Option<(Vec<f64>, f64)> {
+    let mut data = historical_sample(returns, confidence, invalid_confidence_message)?;
     let var_threshold = quantile(&mut data, 1.0 - confidence);
     Some((data, var_threshold))
 }
@@ -69,9 +76,6 @@ fn expected_shortfall_from_data(data: &mut [f64], confidence: f64) -> f64 {
     if whole == 0 {
         return data[0];
     }
-    // Normalize before summing so finite, same-sign tail values cannot
-    // overflow an intermediate unnormalized sum. Only the required fraction
-    // of the boundary observation belongs to the empirical tail.
     let mut mean = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     for &value in &data[..whole] {
         mean.add(value / mass);
@@ -157,7 +161,7 @@ pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> f64 {
 /// - Artzner et al. (1999): `docs/REFERENCES.md#artzner1999CoherentRisk`
 #[must_use]
 pub(crate) fn expected_shortfall(returns: &[f64], confidence: f64) -> f64 {
-    let Some((mut data, _)) = historical_var_data(
+    let Some(mut data) = historical_sample(
         returns,
         confidence,
         Some("expected_shortfall returning NaN"),

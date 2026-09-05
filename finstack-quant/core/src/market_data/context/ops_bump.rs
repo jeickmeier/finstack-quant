@@ -212,7 +212,6 @@ impl MarketContext {
         use crate::collections::HashMap;
         use crate::error::InputError;
 
-        // First pass: classify bumps to determine which maps need cloning.
         let mut curve_bumps: HashMap<CurveId, BumpSpec> = HashMap::default();
         let mut fx_bumps = Vec::new();
         let mut vol_bumps = Vec::new();
@@ -221,9 +220,7 @@ impl MarketContext {
         let mut processed_bumps = 0usize;
 
         for bump in bumps {
-            {
-                processed_bumps += 1;
-            }
+            processed_bumps += 1;
             match bump {
                 MarketBump::Curve { id, spec } => {
                     spec.validate_finite()?;
@@ -246,7 +243,7 @@ impl MarketContext {
                     // `None` filters mean "all buckets"; route through the same
                     // multiplicative `apply_bucket_bump` path as filtered bumps so
                     // semantics (vol × (1 + pct/100)) are identical with or without
-                    // filters .
+                    // filters.
                     vol_bumps.push((vol_surface_id, expiries, strikes, pct));
                 }
                 MarketBump::BaseCorrBucketPts {
@@ -258,11 +255,6 @@ impl MarketContext {
                 }
             }
         }
-
-        // This helper returns a bumped copy of the whole context. The map clone is
-        // shallow (Arc bumps, not deep data copies), but callers doing many bump /
-        // revert cycles in tight loops should prefer the in-place scratch workflow
-        // exposed by `bump_observed_in_place` to avoid repeated context cloning.
 
         let mut ctx = self.clone();
 

@@ -123,7 +123,7 @@ impl CashFlowBuilder {
     /// ```rust
     /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams};
     /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+    /// use finstack_quant_core::dates::Date;
     /// use finstack_quant_core::money::Money;
     /// use rust_decimal_macros::dec;
     /// use time::Month;
@@ -181,7 +181,7 @@ impl CashFlowBuilder {
     ///     FloatingRateSpec, OvernightIndexConstraintApplication, ScheduleParams,
     /// };
     /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+    /// use finstack_quant_core::dates::{Date, Tenor};
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::CurveId;
     /// use rust_decimal_macros::dec;
@@ -437,7 +437,7 @@ impl CashFlowBuilder {
     /// ```rust
     /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, ScheduleParams, StepUpCouponSpec};
     /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+    /// use finstack_quant_core::dates::Date;
     /// use finstack_quant_core::money::Money;
     /// use rust_decimal_macros::dec;
     /// use time::Month;

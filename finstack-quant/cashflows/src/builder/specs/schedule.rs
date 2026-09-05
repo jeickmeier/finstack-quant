@@ -162,13 +162,7 @@ impl ScheduleParams {
         }
     }
 
-    // ── Generic presets (calendar-agnostic) ──────────────────────────────────
-
     /// Quarterly payments with Act/360 day count and Modified Following BDC.
-    ///
-    /// # Arguments
-    ///
-    /// None.
     ///
     /// # Returns
     ///
@@ -201,10 +195,6 @@ impl ScheduleParams {
     }
 
     /// Semi-annual payments with 30/360 day count and Modified Following BDC.
-    ///
-    /// # Arguments
-    ///
-    /// None.
     ///
     /// # Returns
     ///
@@ -241,10 +231,6 @@ impl ScheduleParams {
     /// ICMA Act/Act. Government-bond schedules use [`Self::eur_gov_bond`] or
     /// [`Self::usd_treasury`].
     ///
-    /// # Arguments
-    ///
-    /// None.
-    ///
     /// # Returns
     ///
     /// Schedule parameters using a weekends-only calendar, short-front stubs,
@@ -274,15 +260,9 @@ impl ScheduleParams {
         )
     }
 
-    // ── USD ──────────────────────────────────────────────────────────────────
-
     /// USD SOFR swap (quarterly, Act/360, Modified Following, USNY, T+2 payment lag).
     ///
     /// Follows ARRC SOFR conventions and ISDA 2021 definitions.
-    ///
-    /// # Arguments
-    ///
-    /// None.
     ///
     /// # Returns
     ///
@@ -320,10 +300,6 @@ impl ScheduleParams {
 
     /// USD corporate bond (semi-annual, 30/360, Following, USNY).
     ///
-    /// # Arguments
-    ///
-    /// None.
-    ///
     /// # Returns
     ///
     /// Schedule parameters for a plain USD corporate bond coupon schedule.
@@ -356,10 +332,6 @@ impl ScheduleParams {
 
     /// USD Treasury bond (semi-annual, Act/Act, Following, USNY).
     ///
-    /// # Arguments
-    ///
-    /// None.
-    ///
     /// # Returns
     ///
     /// Schedule parameters for a USD Treasury-style coupon schedule.
@@ -390,16 +362,10 @@ impl ScheduleParams {
         )
     }
 
-    // ── EUR ──────────────────────────────────────────────────────────────────
-
     /// EUR ESTR swap (annual, Act/360, Modified Following, TARGET2, T+2 payment lag).
     ///
     /// Payment lag is the **LCH** €STR OIS template (T+2), not a universal CCP
     /// default. Follows ECB €STR compounding conventions for the day count.
-    ///
-    /// # Arguments
-    ///
-    /// None.
     ///
     /// # Returns
     ///
@@ -436,10 +402,6 @@ impl ScheduleParams {
 
     /// EUR government bond (annual, Act/Act, Following, TARGET2).
     ///
-    /// # Arguments
-    ///
-    /// None.
-    ///
     /// # Returns
     ///
     /// Schedule parameters for an annual EUR government bond coupon schedule.
@@ -470,15 +432,9 @@ impl ScheduleParams {
         )
     }
 
-    // ── GBP ──────────────────────────────────────────────────────────────────
-
     /// GBP SONIA swap (annual, Act/365F, Modified Following, GBLO, no payment lag).
     ///
     /// Follows BoE SONIA conventions.
-    ///
-    /// # Arguments
-    ///
-    /// None.
     ///
     /// # Returns
     ///
@@ -513,15 +469,9 @@ impl ScheduleParams {
         )
     }
 
-    // ── JPY ──────────────────────────────────────────────────────────────────
-
     /// JPY TONA swap (annual, Act/365F, Modified Following, JPTO, T+2 payment lag).
     ///
     /// Follows BoJ TONA conventions.
-    ///
-    /// # Arguments
-    ///
-    /// None.
     ///
     /// # Returns
     ///

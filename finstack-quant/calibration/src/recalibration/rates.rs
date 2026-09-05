@@ -122,9 +122,10 @@ pub(crate) fn bump_discount_curve(
     let market_quotes: Vec<MarketQuote> =
         bumped_quotes.into_iter().map(MarketQuote::Rates).collect();
     let step = StepParams::Discount(params.clone());
-    let (ctx, _report) =
+    let (ctx, report) =
         step_runtime::execute_params_and_apply(&step, &market_quotes, base_context, config)?;
 
+    super::ensure_replay_fit_accepted(params.curve_id.as_str(), config, &report)?;
     Ok(ctx.get_discount(params.curve_id.as_str())?.as_ref().clone())
 }
 
@@ -218,6 +219,10 @@ fn bump_discount_curve_from_rate_calibration_with_projection(
 
     let cfg = CalibrationConfig {
         calibration_method: params.method.clone(),
+        validation: crate::validation::ValidationConfig {
+            allow_negative_rates: curve.allows_non_monotonic(),
+            ..crate::validation::ValidationConfig::default()
+        },
         discount_curve: crate::DiscountCurveSolveConfig {
             allow_non_monotonic_final: Some(curve.allows_non_monotonic()),
             ..crate::DiscountCurveSolveConfig::default()
@@ -409,8 +414,9 @@ fn rebootstrap_forward_curve(
         calibration_method: params.method.clone(),
         ..CalibrationConfig::default()
     };
-    let (ctx, _report) =
+    let (ctx, report) =
         step_runtime::execute_params_and_apply(&step, &market_quotes, context, &cfg)?;
+    super::ensure_replay_fit_accepted(params.curve_id.as_str(), &cfg, &report)?;
     Ok(ctx.get_forward(params.curve_id.as_str())?.as_ref().clone())
 }
 
@@ -1848,6 +1854,59 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn discount_replay_rejects_a_failed_fit_before_returning_curve() {
+        let params: DiscountCurveParams = serde_json::from_value(serde_json::json!({
+            "curve_id": "USD-DISC", "currency": "USD", "base_date": "2025-01-02",
+            "method": {"global_solve": {"use_analytical_jacobian": false}},
+            "interpolation": "log_linear"
+        }))
+        .expect("params");
+        let quotes = vec![RateQuote::Deposit {
+            id: QuoteId::new("DEP"),
+            index: IndexId::new("USD-Deposit"),
+            pillar: Pillar::Tenor("5Y".parse().expect("tenor")),
+            rate: 0.20,
+        }];
+        let mut config = CalibrationConfig::default();
+        config.solver = config.solver.with_max_iterations(1);
+        config.discount_curve.bootstrap_seed_global_solve = false;
+        let market_quotes = quotes
+            .iter()
+            .cloned()
+            .map(MarketQuote::Rates)
+            .collect::<Vec<_>>();
+        let (_, report) = step_runtime::execute_params_and_apply(
+            &StepParams::Discount(params.clone()),
+            &market_quotes,
+            &MarketContext::new(),
+            &config,
+        )
+        .expect("optimizer returns diagnostics");
+        assert!(
+            !report.success,
+            "fixture must fail the fit gate: {report:?}"
+        );
+        let error = bump_discount_curve(
+            &quotes,
+            &params,
+            &MarketContext::new(),
+            &QuoteBump::ParallelBp(0.0),
+            &config,
+        )
+        .expect_err("strict replay");
+        assert!(error.to_string().contains("failed fit acceptance"));
+        config.fail_on_bad_fit = false;
+        bump_discount_curve(
+            &quotes,
+            &params,
+            &MarketContext::new(),
+            &QuoteBump::ParallelBp(0.0),
+            &config,
+        )
+        .expect("explicit diagnostic policy");
     }
 
     #[test]

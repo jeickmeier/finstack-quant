@@ -276,11 +276,9 @@ impl TryFrom<&crate::builder::specs::FloatingRateSpec> for ResolvedFloatingRateS
     }
 }
 
-/// Calculate the all-in floating rate from an index rate and parameters.
+/// All-in floating rate after index/all-in floors and caps, gearing, and spread.
 ///
-/// This is the core rate calculation logic that applies floors, caps, gearing,
-/// and spread to an index rate. Used by both market-based projection (with real
-/// forward rates) and fallback scenarios (with index=0).
+/// Used for both curve-projected index rates and fallback scenarios (`index_rate = 0`).
 ///
 /// # Arguments
 ///
@@ -301,7 +299,6 @@ impl TryFrom<&crate::builder::specs::FloatingRateSpec> for ResolvedFloatingRateS
 /// assert!((rate - 0.05).abs() < 0.0001);
 /// ```
 pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> f64 {
-    // Apply index floor/cap
     let mut eff_index = index_rate;
     if let Some(floor) = params.index_floor_bp {
         eff_index = eff_index.max(floor * 1e-4);
@@ -310,16 +307,12 @@ pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> 
         eff_index = eff_index.min(cap * 1e-4);
     }
 
-    // Calculate rate based on gearing style
     let mut rate = if params.gearing_includes_spread {
-        // (Index + Spread) * Gearing
         (eff_index + params.spread_bp * 1e-4) * params.gearing
     } else {
-        // (Index * Gearing) + Spread
         (eff_index * params.gearing) + params.spread_bp * 1e-4
     };
 
-    // Apply all-in floor/cap
     if let Some(floor) = params.all_in_floor_bp {
         rate = rate.max(floor * 1e-4);
     }
@@ -330,14 +323,10 @@ pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> 
     rate
 }
 
-/// Project floating rate using a resolved forward curve and full parameter set.
+/// Project the all-in floating rate from a resolved forward curve and coupon parameters.
 ///
-/// This is the primary rate projection function. It computes the all-in floating
-/// rate by:
-/// 1. Looking up the fixed-tenor index rate from the curve at the reset date
-/// 2. Applying index floor/cap to the forward rate
-/// 3. Adding spread and applying gearing
-/// 4. Applying all-in floor/cap to the final rate
+/// Looks up the term-index rate at `reset_date`, then applies
+/// [`calculate_floating_rate`].
 ///
 /// # Arguments
 ///
@@ -410,16 +399,8 @@ pub(crate) fn project_index_rate(reset_date: Date, fwd: &ForwardCurve) -> Result
     let fwd_day_count = fwd.day_count();
     let fwd_base = fwd.base_date();
 
-    // Compute the reset time on the forward curve's day-count basis.
-    //
-    // Curves are defined from their base date forward. A reset exactly on the
-    // base date (T+0) is projected from t = 0; a reset strictly before the
-    // base date is a realized historical fixing that the curve cannot supply,
-    // so it errors instead of being silently clamped to today's short end
-    // . The emission layer resolves
-    // seasoned resets from the `FIXING:{index_id}` series before projecting;
-    // callers with a fallback policy (e.g. `FloatingRateFallback::FixedRate`)
-    // handle this error upstream.
+    // Strictly-past resets are realized fixings; the curve must not clamp them
+    // to today's short end. Emission resolves `FIXING:{index_id}` first.
     if reset_date < fwd_base {
         return Err(finstack_quant_core::Error::Validation(format!(
             "floating-rate observation date {} is before the '{}' curve base date {}; the \
@@ -437,8 +418,7 @@ pub(crate) fn project_index_rate(reset_date: Date, fwd: &ForwardCurve) -> Result
     } else {
         fwd_day_count.year_fraction(fwd_base, reset_date, DayCountContext::default())?
     };
-    // A term-index coupon fixes the curve's quoted tenor at the actual reset
-    // date. It is not an average of the curve over the coupon accrual window.
+    // Term coupons fix the curve tenor at the reset date, not an average over the accrual window.
     let index_rate = fwd.rate(t0);
 
     Ok(index_rate)
@@ -481,7 +461,6 @@ mod tests {
         let rate = project_floating_rate_from_market(reset, "USD-SOFR-3M", &params, &market)
             .expect("Rate projection should succeed in test");
 
-        // Should be ~3% index + 2% spread = ~5%
         assert!(rate > 0.04 && rate < 0.06, "Rate should be ~5%: {}", rate);
     }
 
@@ -489,7 +468,6 @@ mod tests {
     fn test_project_floating_rate_with_floor() {
         let reset = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
 
-        // Create market with very low rates (below floor)
         let fwd_curve = ForwardCurve::builder("USD-LIBOR-3M", 0.25)
             .base_date(reset)
             .day_count(DayCount::Act360)
@@ -518,7 +496,6 @@ mod tests {
     fn test_project_floating_rate_with_cap() {
         let reset = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
 
-        // Create market with high rates
         let fwd_curve = ForwardCurve::builder("USD-LIBOR-3M", 0.25)
             .base_date(reset)
             .day_count(DayCount::Act360)
@@ -547,7 +524,6 @@ mod tests {
     fn test_floor_applied_before_spread() {
         let reset = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
 
-        // Use very low rate (0.01% = 1 bp) which is below the floor
         let fwd_curve = ForwardCurve::builder("TEST-INDEX", 0.25)
             .base_date(reset)
             .day_count(DayCount::Act360)
@@ -644,7 +620,6 @@ mod tests {
         let rate = project_floating_rate(reset, &fwd_curve, &params)
             .expect("Rate projection should succeed in test");
 
-        // Should project forward rate + spread
         assert!(
             rate > 0.03 && rate < 0.06,
             "Rate should be reasonable: {}",
@@ -681,8 +656,6 @@ mod tests {
         assert!((reset_fixing - integrated_average).abs() > 1e-6);
         assert!((projected - reset_fixing).abs() < 1e-14);
     }
-
-    // Validation tests
 
     #[test]
     fn test_params_validate_default_succeeds() {
@@ -831,7 +804,6 @@ mod tests {
             .build()
             .expect("ForwardCurve builder should succeed");
 
-        // Invalid params: cap < floor
         let params = FloatingRateParams {
             all_in_floor_bp: Some(500.0),
             all_in_cap_bp: Some(300.0),
@@ -841,8 +813,6 @@ mod tests {
         let result = project_floating_rate(reset, &fwd_curve, &params);
         assert!(result.is_err(), "Should fail with contradictory floor/cap");
     }
-
-    // FloatingRateSpec → FloatingRateParams conversion
 
     #[test]
     fn try_from_floating_rate_spec_round_trips_all_fields() {

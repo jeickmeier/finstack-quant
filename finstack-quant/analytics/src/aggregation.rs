@@ -1,8 +1,6 @@
 //! Period aggregation: group returns by period and compute period-level stats.
 //!
 //! Crate-internal except for [`PeriodStats`] (re-exported at the crate root).
-//! `///` doc examples target crate developers and are marked `ignore`.
-//!
 //! Uses `dates::periods::PeriodId` as grouping keys and `DateExt` for
 //! date-to-period mapping.
 
@@ -165,11 +163,8 @@ fn group_period_buckets(
     result
 }
 
-/// Compute period-level statistics from grouped returns.
-///
-/// Derives period-level trading statistics from a sequence of
-/// per-period compounded returns, including win rate, payoff ratio, Kelly
-/// criterion, and consecutive streak lengths.
+/// Period-level trading statistics from per-period compounded returns:
+/// win rate, payoff ratio, Kelly criterion, and consecutive streak lengths.
 ///
 /// # Arguments
 ///
@@ -181,15 +176,10 @@ fn group_period_buckets(
 ///
 /// A [`PeriodStats`] struct. If `grouped` is empty, all fields are `0.0` / `0`.
 pub(crate) fn period_stats_from_grouped(grouped: &[(PeriodId, f64)]) -> PeriodStats {
-    // The period-id label is discarded; the stats depend only on the return
-    // series. Feeding the kernel an iterator over the compounded returns keeps
-    // the two public entry points trivially equivalent without materializing an
-    // intermediate `Vec<f64>`.
     period_stats_inner(grouped.iter().map(|&(_, r)| r))
 }
 
 fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodStats {
-    // Single pass: compute all stats without intermediate allocations.
     let mut total = 0usize;
     let mut best = f64::NEG_INFINITY;
     let mut worst = f64::INFINITY;
@@ -198,7 +188,6 @@ fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodStats {
     let mut loss_acc = NeumaierAccumulator::new();
     let mut win_count = 0usize;
     let mut loss_count = 0usize;
-    // Consecutive streak tracking — computed inline to avoid a second pass.
     let mut cur_win_streak = 0usize;
     let mut cur_loss_streak = 0usize;
     let mut consecutive_wins = 0usize;
@@ -358,41 +347,27 @@ mod tests {
             .expect("valid date")
     }
 
+    fn month(year: i32, month: u8) -> PeriodId {
+        PeriodId::month(year, month).expect("valid period fixture")
+    }
+
     #[test]
     fn group_by_monthly() {
         let dates = vec![d(2025, 1, 2), d(2025, 1, 3), d(2025, 2, 3), d(2025, 2, 4)];
         let returns = vec![0.01, 0.02, -0.01, 0.03];
         let grouped = group_by_period(&dates, &returns, PeriodKind::Monthly, None);
         assert_eq!(grouped.len(), 2);
-        assert_eq!(
-            grouped[0].0,
-            PeriodId::month(2025, 1).expect("valid period fixture")
-        );
-        assert_eq!(
-            grouped[1].0,
-            PeriodId::month(2025, 2).expect("valid period fixture")
-        );
+        assert_eq!(grouped[0].0, month(2025, 1));
+        assert_eq!(grouped[1].0, month(2025, 2));
     }
 
     #[test]
     fn period_stats_from_grouped_basic() {
         let grouped = vec![
-            (
-                PeriodId::month(2025, 1).expect("valid period fixture"),
-                0.05,
-            ),
-            (
-                PeriodId::month(2025, 2).expect("valid period fixture"),
-                -0.02,
-            ),
-            (
-                PeriodId::month(2025, 3).expect("valid period fixture"),
-                0.03,
-            ),
-            (
-                PeriodId::month(2025, 4).expect("valid period fixture"),
-                0.01,
-            ),
+            (month(2025, 1), 0.05),
+            (month(2025, 2), -0.02),
+            (month(2025, 3), 0.03),
+            (month(2025, 4), 0.01),
         ];
         let stats = period_stats_from_grouped(&grouped);
         assert!((stats.best - 0.05).abs() < 1e-12);
@@ -409,18 +384,9 @@ mod tests {
     #[test]
     fn period_stats_from_grouped_all_winning_reports_full_kelly() {
         let grouped = vec![
-            (
-                PeriodId::month(2025, 1).expect("valid period fixture"),
-                0.02,
-            ),
-            (
-                PeriodId::month(2025, 2).expect("valid period fixture"),
-                0.01,
-            ),
-            (
-                PeriodId::month(2025, 3).expect("valid period fixture"),
-                0.03,
-            ),
+            (month(2025, 1), 0.02),
+            (month(2025, 2), 0.01),
+            (month(2025, 3), 0.03),
         ];
         let stats = period_stats_from_grouped(&grouped);
         assert!(stats.payoff_ratio.is_infinite());

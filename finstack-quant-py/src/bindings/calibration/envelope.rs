@@ -1373,7 +1373,8 @@ impl PyCalibrationStep {
     /// base_date : datetime.date | str
     ///     Valuation date.
     /// quotes, quote_set
-    ///     As in ``discount``.
+    ///     ATM swaption quotes; calibration rejects strikes differing from the
+    ///     contractual forward by more than 1e-8 in decimal rate units.
     /// **params
     ///     Optional wire fields: ``initial_kappa``, ``initial_sigma``.
     ///
@@ -1573,7 +1574,9 @@ impl PyCalibrationStep {
     /// quotes, quote_set, curve_id
     ///     As in ``discount``.
     /// **params
-    ///     Optional wire fields: ``discount_curve_id``, ``initial_params``.
+    ///     Optional wire field: ``initial_params``. Only single-curve discount
+    ///     fitting is supported. Acceptance uses the configured
+    ///     discount-curve validation tolerance without a least-squares floor.
     ///
     /// Raises
     /// ------
@@ -1773,7 +1776,9 @@ impl PyCalibrationPlan {
     /// ------
     /// ValueError
     ///     If ``settings`` is invalid or two steps attach quotes under the
-    ///     same set name with different ids.
+    ///     same set name with different ids, or reuse a quote id with a
+    ///     different payload. Identical attached quotes are collected once,
+    ///     including when their set is supplied explicitly.
     #[new]
     #[pyo3(signature = (steps, id = "plan", description = None, settings = None, quote_sets = None))]
     #[pyo3(text_signature = "(steps, id='plan', description=None, settings=None, quote_sets=None)")]
@@ -1801,6 +1806,7 @@ impl PyCalibrationPlan {
             }
         }
         let mut market_data = Vec::new();
+        let mut payloads = IndexMap::new();
         let mut inner_steps = Vec::with_capacity(steps.len());
         for step in steps {
             if !step.quotes.is_empty() {
@@ -1819,7 +1825,23 @@ impl PyCalibrationPlan {
                     Some(_) => {}
                     None => {
                         sets.insert(step.inner.quote_set.clone(), ids);
-                        market_data.extend(step.quotes.iter().cloned());
+                    }
+                }
+                for quote in &step.quotes {
+                    let payload = serde_json::to_value(quote)
+                        .map_err(|error| value_error(error.to_string()))?;
+                    match payloads.get(quote.id()) {
+                        Some(existing) if existing != &payload => {
+                            return Err(value_error(format!(
+                                "quote id '{}' has conflicting attached payloads",
+                                quote.id()
+                            )));
+                        }
+                        Some(_) => {}
+                        None => {
+                            payloads.insert(quote.id().to_string(), payload);
+                            market_data.push(quote.clone());
+                        }
                     }
                 }
             }

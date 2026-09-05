@@ -146,7 +146,7 @@ impl TaylorAttributionConfig {
 /// every factor routed through here is backed by a curve/surface that appears
 /// in the instrument's market dependencies, so a failure means part of the
 /// declared risk decomposition is silently missing and the result cannot be
-/// trusted (previously the failure only reached the tracing log).
+/// trusted.
 #[allow(clippy::too_many_arguments)]
 fn record_taylor_factor_result(
     factor_kind: &str,
@@ -256,14 +256,14 @@ pub(crate) struct TaylorAttributionResult {
     pub factors: Vec<TaylorFactorResult>,
     /// Number of repricings performed (bump-and-reprice calls).
     pub num_repricings: usize,
-    /// Present value at T0 (cached to avoid redundant repricing in compat layer).
+    /// Present value at T0.
     pub pv_t0: Money,
-    /// Present value at T1 (cached to avoid redundant repricing in compat layer).
+    /// Present value at T1.
     pub pv_t1: Money,
     /// Coupon income for the theta period, captured by `compute_theta_factor`.
     /// `None` when theta computation failed; otherwise lets `attribute_pnl_taylor`
     /// split theta into PV-only and coupon components without re-collecting
-    /// cashflows (fix).
+    /// cashflows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theta_coupon_income: Option<f64>,
     /// Diagnostic notes accumulated during factor computation (failed factors,
@@ -316,9 +316,6 @@ fn compute_taylor_result(
     config.validate()?;
     validate_attribution_period(as_of_t0, as_of_t1)?;
     let execution_policy = execution.policy;
-    // Match parallel/waterfall: T₀ value uses the opening model-parameter
-    // snapshot when the caller supplied one, so a param move is inside
-    // `actual_pnl` rather than only the isolated factor.
     let instrument_t0 = if let Some(params) = model_params_t0 {
         model_params::with_model_params(instrument, params)?
     } else {
@@ -481,10 +478,7 @@ fn compute_taylor_result(
         );
     }
 
-    // Volatility sensitivities (vega) — one factor per vol-surface dependency,
-    // iterated exactly like rates/credit (previously only the FIRST dependency
-    // was priced and every other surface's move fell silently into residual).
-    //
+    // Volatility sensitivities (vega) — one factor per vol-surface dependency.
     // The realized vol move is measured at the instrument's own reference
     // point (expiry from `Instrument::expiry`, strike from the dependency)
     // when available; otherwise it falls back to the surface average and the
@@ -853,10 +847,6 @@ pub(crate) fn attribute_pnl_taylor(
                 attribution.model_params_pnl.checked_add(factor_money)?;
         } else if factor.factor_name == "Theta" {
             // Taylor theta already includes cashflows from compute_theta_factor.
-            // Re-use the coupon income that was captured during that compute
-            // (previously we re-called collect_cashflows_in_period
-            // here, which doubled cashflow traversal cost and risked silent
-            // desync against the value `compute_theta_factor` consumed).
             let ci_val = taylor.theta_coupon_income.unwrap_or(0.0);
             let ci = factor_money_or_invalid(
                 ci_val,
@@ -878,8 +868,6 @@ pub(crate) fn attribute_pnl_taylor(
         }
     }
 
-    // Propagate the non-finite flag before `finalize_attribution` so the
-    // residual / tolerance machinery treats the result as invalid.
     if non_finite_detected {
         attribution.result_invalid = true;
     }
@@ -892,12 +880,6 @@ pub(crate) fn attribute_pnl_taylor(
         10.0,
         5.0,
     );
-    // Report the residual consistent with the `PnlAttribution` total-return
-    // total (coupon income + FX translation included), computed by
-    // `finalize_attribution` above. The internal Taylor factor result keeps a
-    // price-only `unexplained_pct` (PV₁−PV₀ basis); quoting that here would
-    // disagree with `attribution.residual`, so we use the residual stats that
-    // `compute_residual` just populated instead.
     attribution.meta.notes.push(format!(
         "Taylor attribution: {:.2}% residual ({} factors, {} repricings)",
         attribution.meta.residual_pct,
@@ -914,13 +896,6 @@ pub(crate) fn attribute_pnl_taylor(
 
     Ok(attribution)
 }
-
-// NOTE: the former `measure_forward_curve_shift` /
-// `measure_average_rate_shift` helpers — an unweighted mean of per-tenor shifts
-// — were removed. An unweighted average mis-attributes non-parallel curve
-// moves (a steepener averages toward zero), so `compute_curve_factor`
-// now measures the per-tenor move and pair it with a
-// per-bucket (key-rate) DV01 instead.
 
 /// Standard key-rate bucket grid (years) used for key-rate-aware rate / forward
 /// curve attribution. Matches the DV01 calculator's standard bucket grid.
@@ -1077,7 +1052,6 @@ fn compute_curve_factor(
         }])?;
         let pv_down = reprice_instrument(instrument, &down, as_of_t0)?;
 
-        // Central difference per bucket: O(h²) accuracy.
         let dv01 = (pv_up.amount() - pv_down.amount()) / (2.0 * config.rate_bump_bp);
         buckets.push(KeyRateBucket { dv01, move_bp });
     }
@@ -1967,9 +1941,6 @@ mod tests {
 
     /// Malformed config bumps (≤ 0 or > sane max) must be rejected at
     /// validation rather than producing a `result_invalid` flagged result.
-    /// Previously the central-difference DV01 was a 0/0 NaN
-    /// and the attribution flagged itself invalid; with the strengthened
-    /// validation the caller now gets an immediate `Error::Validation`.
     #[test]
     fn taylor_rejects_non_positive_bump_at_validation() {
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -3131,9 +3102,7 @@ mod tests {
         }
     }
 
-    /// The FX-exposure factor must run when either side carries an FX matrix;
-    /// previously a missing T0 matrix silently skipped it even though T1 had
-    /// FX-driven P&L.
+    /// The FX-exposure factor must run when either side carries an FX matrix.
     #[test]
     fn fx_factor_runs_when_only_t1_has_fx() {
         use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};

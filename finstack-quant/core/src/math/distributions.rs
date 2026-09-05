@@ -145,7 +145,6 @@ pub fn binomial_distribution(n: usize, p: f64) -> crate::Result<Vec<f64>> {
         ));
     }
 
-    // Handle edge cases that would require special treatment
     if p <= 0.0 {
         // All probability on k=0
         let mut dist = vec![0.0; n + 1];
@@ -159,8 +158,6 @@ pub fn binomial_distribution(n: usize, p: f64) -> crate::Result<Vec<f64>> {
         return Ok(dist);
     }
 
-    // Create the Binomial distribution once and reuse for all k values
-    // This avoids n+1 allocations of the distribution object
     let mut dist = Binomial::new(p, n as u64)
         .map(|binom| (0..=n as u64).map(|k| binom.pmf(k)).collect::<Vec<_>>())
         .map_err(|e| {
@@ -169,7 +166,7 @@ pub fn binomial_distribution(n: usize, p: f64) -> crate::Result<Vec<f64>> {
             ))
         })?;
 
-    // Normalize (should already sum to ~1, but defensive for numerical edge cases)
+    // Renormalize when floating-point PMF mass drifts off 1.
     let sum: f64 = dist.iter().sum();
     if sum > 0.0 && (sum - 1.0).abs() > 1e-10 {
         for prob in &mut dist {
@@ -228,7 +225,6 @@ pub fn binomial_distribution(n: usize, p: f64) -> crate::Result<Vec<f64>> {
 pub fn binomial_probability(n: usize, k: usize, p: f64) -> f64 {
     use statrs::distribution::{Binomial, Discrete};
 
-    // Handle edge cases that statrs may not accept
     if k > n {
         return 0.0;
     }
@@ -242,7 +238,7 @@ pub fn binomial_probability(n: usize, k: usize, p: f64) -> f64 {
     // statrs::distribution::Binomial::new(p, n) where p is success probability and n is trials
     match Binomial::new(p, n as u64) {
         Ok(binom) => binom.pmf(k as u64),
-        Err(_) => 0.0, // Invalid parameters (should not happen after edge case checks)
+        Err(_) => 0.0,
     }
 }
 
@@ -478,7 +474,6 @@ pub fn sample_beta(
     }
 
     // Use gamma ratio method: X/(X+Y) ~ Beta(α, β) where X ~ Gamma(α), Y ~ Gamma(β)
-    // We use the unchecked version since we've already validated α, β > 0
     let x = sample_gamma_unchecked(rng, alpha)?;
     let y = sample_gamma_unchecked(rng, beta)?;
 

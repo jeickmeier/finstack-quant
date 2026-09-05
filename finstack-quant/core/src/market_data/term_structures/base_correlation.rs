@@ -436,14 +436,12 @@ impl BaseCorrelationCurve {
         let mut violations = Vec::new();
         let mut warnings = Vec::new();
 
-        // Check correlation bounds
         for (i, (&det, &corr)) in self
             .detachment_points
             .iter()
             .zip(&self.correlations)
             .enumerate()
         {
-            // Check valid range
             if !(0.0..=1.0).contains(&corr) {
                 violations.push(ArbitrageViolation::InvalidCorrelationBounds {
                     detachment: det,
@@ -451,7 +449,6 @@ impl BaseCorrelationCurve {
                 });
             }
 
-            // Check boundary proximity (warning only)
             if corr < 0.02 {
                 warnings.push(format!(
                     "Low correlation {:.4} at K={:.1}% may cause numerical issues",
@@ -464,7 +461,6 @@ impl BaseCorrelationCurve {
                 ));
             }
 
-            // Check monotonicity
             if i > 0 {
                 let prev_corr = self.correlations[i - 1];
                 if corr < prev_corr - 1e-9 {
@@ -555,11 +551,10 @@ impl BaseCorrelationCurveBuilder {
 
         let allow_non_monotonic = self.allow_non_monotonic;
 
-        // Sort by detachment point deterministically (panic-free even with NaNs).
+        // Sort by detachment using total_cmp so NaNs cannot panic.
         let mut sorted_points = self.points;
         sorted_points.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-        // Validate points
         for (detachment, corr) in &sorted_points {
             if !detachment.is_finite() || *detachment < 0.0 {
                 return Err(InputError::Invalid.into());

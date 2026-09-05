@@ -50,32 +50,8 @@ impl<'a> AttributionInputs<'a> {
     ) -> Result<Self> {
         let market_deps = instrument.market_dependencies()?;
 
-        // ─── Preamble: compute market-shift averages ONCE ──────────────────────
-        //
-        // Each `measure_*_shift` helper is pure: same inputs → same output, so
-        // computing the per-factor averages once up-front and threading them
-        // through the per-factor blocks keeps the computation deterministic and
-        // avoids the former pattern of redundant second loops over the same
-        // curves.
-        //
-        // Iteration order is identical to the previous per-block loops:
-        //   - discount_curves / credit_curves / market_scalar_ids in the order returned
-        //     by `market_deps.curves` / `market_deps.market_scalar_ids`
-        //     (preserve the existing HashMap/Vec iteration order — do NOT sort).
-        //   - FX exposure / vol surface: single-valued, no ordering concern.
-        //
-        // A failed (Err) shift measurement skips that curve from the average,
-        // matching the prior behavior.
-
-        // All rates curves the instrument depends on: discount AND
-        // forward/projection (multi-curve swaps carry a joint
-        // discount+forward DV01, and basis moves require measuring both
-        // families). Order: discount first, then forward — deterministic.
-        //
-        // Deduped preserving order (first occurrence wins): a curve that is
-        // both the discount and the projection curve (standard single-curve
-        // OIS/SOFR IRS, FRNs) must contribute to rates P&L — and to
-        // `average_rates` below — exactly once, not twice.
+        // Discount first, then forward; first occurrence wins so a curve that
+        // is both discount and projection is measured once.
         let mut rates_curve_ids: Vec<CurveId> = Vec::with_capacity(
             market_deps.curves.discount_curves.len() + market_deps.curves.forward_curves.len(),
         );

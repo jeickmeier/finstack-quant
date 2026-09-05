@@ -127,3 +127,37 @@ test('solver fit failure exposes present solver diagnostics', () => {
   assert.equal(typeof error.solver_diagnostics.worst_quote_residual, 'number');
   assert.deepEqual(error.solver_diagnostics, error.cause.solver_diagnostics);
 });
+
+test('surface acceptance uses the published grid rather than fitted SABR slices', () => {
+  const envelope = JSON.parse(readFileSync(EQUITY_VOL_EXAMPLE, 'utf8'));
+  envelope.plan.steps[1].target_strikes = [140, 180, 220];
+  envelope.plan.settings.fail_on_bad_fit = true;
+  envelope.plan.settings.vol_surface = { validation_tolerance: 0.001 };
+  const error = captureError(() => calibration.calibrate(envelope));
+  assertStructuredError(error);
+  assert.equal(error.stage, 'solver');
+  assert.equal(error.kind, 'solver_not_converged');
+  assert.ok(error.solver_diagnostics.max_residual > 0.001);
+  assert.equal(error.solver_diagnostics.tolerance, 0.001);
+});
+
+test('parametric calibration rejects a separate discount curve', () => {
+  const envelope = JSON.parse(readFileSync(EQUITY_VOL_EXAMPLE, 'utf8'));
+  const discount = envelope.plan.steps[0];
+  envelope.plan.steps = [
+    discount,
+    {
+      id: 'NS',
+      kind: 'parametric',
+      curve_id: 'NS',
+      model: 'ns',
+      base_date: discount.base_date,
+      discount_curve_id: discount.curve_id,
+      quote_set: discount.quote_set,
+    },
+  ];
+  const error = captureError(() => calibration.calibrate(envelope));
+  assertStructuredError(error);
+  assert.equal(error.stage, 'ingestion');
+  assert.match(error.message, /discount_curve_id/);
+});

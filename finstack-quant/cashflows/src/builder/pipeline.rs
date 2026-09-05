@@ -147,16 +147,13 @@ impl<'a> DateProcessor<'a> {
         d: Date,
         state: &mut BuildState,
     ) -> finstack_quant_core::Result<()> {
-        // Events are date-sorted; take the contiguous run for `d`.
         let first = self.ctx.principal_events.partition_point(|ev| ev.date < d);
         for ev in self.ctx.principal_events[first..]
             .iter()
             .take_while(|ev| ev.date == d)
         {
             if ev.delta.amount() != 0.0 || ev.cash.amount() != 0.0 {
-                // Sign convention depends on flow kind:
-                // - Notional (draws): cash is inflow to borrower, flow is negative (funding outflow)
-                // - Amortization: cash is repayment, flow is positive (inflow to lender)
+                // Draws are negative (lender outflow); amortization is positive (lender inflow).
                 let flow_amount = match ev.kind {
                     CFKind::Amortization => ev.cash.amount(),
                     _ => -ev.cash.amount(),
@@ -220,7 +217,6 @@ impl<'a> DateProcessor<'a> {
 
         self.emit_amortization(d, &mut state)?;
 
-        // PIK capitalizes after amortization for this date.
         if pik_to_add > 0.0 {
             state.outstanding += f64_to_decimal(pik_to_add)?;
         }
@@ -230,7 +226,6 @@ impl<'a> DateProcessor<'a> {
         self.handle_maturity(d, &mut state)?;
 
         state.outstanding_after.insert(d, state.outstanding);
-        // Keep history sorted/unique; dates arrive ascending.
         debug_assert!(
             state
                 .outstanding_history

@@ -4,11 +4,11 @@ use super::spec::{default_attribution_metrics, AttributionResult, AttributionSpe
 use super::{attribute_pnl_metrics_based, AttributionMethod};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::Result;
-use finstack_quant_core::{currency::Currency, dates::Date, money::Money};
+use finstack_quant_core::{currency::Currency, dates::Date, money::Money, Error, Result};
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+use std::sync::Arc;
 
 #[derive(Debug)]
 struct RoundingCurrencyProbe {
@@ -28,26 +28,24 @@ fn probe_rounding_currency(
     market_t0: &MarketContext,
     as_of_t0: Date,
     rounding_scale: Option<u32>,
-) -> finstack_quant_core::Result<RoundingCurrencyProbe> {
-    Ok({
-        if rounding_scale.is_none() {
-            return Ok(RoundingCurrencyProbe {
-                currency: None,
-                value: None,
-            });
-        }
+) -> Result<RoundingCurrencyProbe> {
+    if rounding_scale.is_none() {
+        return Ok(RoundingCurrencyProbe {
+            currency: None,
+            value: None,
+        });
+    }
 
-        match instrument.value(market_t0, as_of_t0) {
-            Ok(value) => RoundingCurrencyProbe {
-                currency: Some(value.currency()),
-                value: Some(value),
-            },
-            Err(_) => RoundingCurrencyProbe {
-                currency: instrument.notional()?.map(|notional| notional.currency()),
-                value: None,
-            },
-        }
-    })
+    match instrument.value(market_t0, as_of_t0) {
+        Ok(value) => Ok(RoundingCurrencyProbe {
+            currency: Some(value.currency()),
+            value: Some(value),
+        }),
+        Err(_) => Ok(RoundingCurrencyProbe {
+            currency: instrument.notional()?.map(|notional| notional.currency()),
+            value: None,
+        }),
+    }
 }
 
 /// Returns the configured target only when the completed attribution needs translation.
@@ -60,7 +58,7 @@ fn target_currency_requiring_translation(
 
 /// Resolves the opening value used by target-currency translation.
 fn translation_t0_value(
-    instrument: &std::sync::Arc<dyn Instrument>,
+    instrument: &Arc<dyn Instrument>,
     market_t0: &MarketContext,
     as_of_t0: Date,
     model_params_t0: Option<&ModelParamsSnapshot>,
@@ -75,7 +73,7 @@ fn translation_t0_value(
 
     let t0_instrument = match model_params_t0 {
         Some(params) => crate::model_params::with_model_params(instrument, params)?,
-        None => std::sync::Arc::clone(instrument),
+        None => Arc::clone(instrument),
     };
     let value = t0_instrument.value(market_t0, as_of_t0)?;
     *num_repricings += 1;
@@ -131,7 +129,7 @@ impl AttributionSpec {
     pub fn execute(&self) -> Result<AttributionResult> {
         crate::helpers::validate_attribution_period(self.as_of_t0, self.as_of_t1)?;
         let instrument = self.instrument.clone().into_boxed()?;
-        let instrument_arc: std::sync::Arc<dyn Instrument> = std::sync::Arc::from(instrument);
+        let instrument_arc: Arc<dyn Instrument> = Arc::from(instrument);
 
         let market_t0 = MarketContext::try_from(self.market_t0.clone())?;
         let market_t1 = MarketContext::try_from(self.market_t1.clone())?;
@@ -159,19 +157,12 @@ impl AttributionSpec {
             .and_then(|c| c.execution_policy)
             .unwrap_or_default();
 
-        // Resolve optional credit-factor model for waterfall/parallel cascade.
-        // Borrow the boxed model directly — the cascade entry points take
-        // `Option<&CreditFactorModel>`, so deref-borrowing avoids deep-cloning
-        // the entire model (issuer betas, covariance, hierarchy, diagnostics)
-        // on every spec execution.
-        let resolved_credit_model = self.credit_factor_model.as_deref();
-
         let request = crate::AttributionRequest {
             execution_policy,
             strict_validation,
             full_cross_attribution: self.full_cross_attribution,
             model_params_t0: self.model_params_t0.as_ref(),
-            credit_factor_model: resolved_credit_model,
+            credit_factor_model: self.credit_factor_model.as_deref(),
             credit_factor_detail_options: &self.credit_factor_detail_options,
             ..crate::AttributionRequest::new(
                 &instrument_arc,
@@ -193,54 +184,41 @@ impl AttributionSpec {
                     Some(params) => {
                         crate::model_params::with_model_params(&instrument_arc, params)?
                     }
-                    None => std::sync::Arc::clone(&instrument_arc),
+                    None => Arc::clone(&instrument_arc),
                 };
                 let mut metrics_instrument = instrument_t0.clone_box();
                 if let Some(overrides) = metrics_instrument.get_metric_pricing_overrides_mut() {
                     overrides.theta_period =
                         Some(format!("{}D", (self.as_of_t1 - self.as_of_t0).whole_days()));
                 }
-                let metrics_instrument: std::sync::Arc<dyn Instrument> =
-                    std::sync::Arc::from(metrics_instrument);
-                let metrics = if let Some(ref cfg) = self.config {
-                    if let Some(ref metric_names) = cfg.metrics {
+                let metrics_instrument: Arc<dyn Instrument> = Arc::from(metrics_instrument);
+                let metrics = match self.config.as_ref().and_then(|cfg| cfg.metrics.as_ref()) {
+                    Some(metric_names) => {
                         let mut parsed = Vec::new();
                         let mut unknown = Vec::new();
-
                         for name in metric_names {
                             match MetricId::parse_strict(name) {
                                 Ok(id) => parsed.push(id),
                                 Err(_) => unknown.push(name.clone()),
                             }
                         }
-
                         if !unknown.is_empty() {
-                            return Err(finstack_quant_core::Error::Validation(format!(
+                            return Err(Error::Validation(format!(
                                 "Unknown metric names: {}",
                                 unknown.join(", ")
                             )));
                         }
-
                         parsed
-                    } else {
-                        default_attribution_metrics()
                     }
-                } else {
-                    default_attribution_metrics()
+                    None => default_attribution_metrics(),
                 };
 
-                // Compute valuations with metrics. The FinstackConfig built
-                // above carries the `valuations.sensitivities.v1` extension
-                // (e.g. `rate_bump_bp` from `AttributionConfig`) — it must be
-                // attached to the pricing request or the sensitivity
-                // calculators fall back to defaults and the config knob is
-                // silently inert.
+                // Attach FinstackConfig so sensitivity bump knobs (e.g. rate_bump_bp)
+                // reach the producer instead of silently falling back to defaults.
                 let pricing_options =
                     finstack_quant_valuations::instruments::PricingOptions::default()
                         .with_config(&config)
-                        .with_recalibration_provider(std::sync::Arc::new(
-                            CachedRecalibrationProvider::new(),
-                        ));
+                        .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()));
                 let val_t0 = metrics_instrument.price_with_metrics(
                     &market_t0,
                     self.as_of_t0,
@@ -287,10 +265,8 @@ impl AttributionSpec {
             }
         }
 
-        // Optional credit-factor hierarchy detail. Parallel and waterfall
-        // populate `credit_factor_detail` inside the method via the reprice
-        // cascade. Metrics-based and Taylor back-solve it here. Either way
-        // `credit_curves_pnl` is unchanged — this is additive detail.
+        // Linear methods back-solve credit-factor detail here; reprice methods
+        // populate it inside the cascade. Additive: `credit_curves_pnl` is unchanged.
         if let Some(model_ref) = &self.credit_factor_model {
             let linear_path = matches!(
                 self.method,
@@ -308,7 +284,6 @@ impl AttributionSpec {
                 ) {
                     Ok(Some(detail)) => {
                         attribution.credit_factor_detail = Some(detail);
-                        // The detail back-solve performs 2 CS01 repricings.
                         attribution.meta.num_repricings += 2;
                     }
                     Ok(None) => {
@@ -329,34 +304,19 @@ impl AttributionSpec {
                 }
                 attribution.meta.notes.extend(detail_notes);
             }
-            // For Parallel / Waterfall methods, the detail (if any) is already
-            // populated inside the method itself.
 
-            // Split coupon_income / roll_down into rates / credit parts and
-            // emit `credit_carry_decomposition`. Best-effort: failures leave
-            // the existing scalar CarryDetail untouched and append a note.
-            //
-            // All four methods populate `carry_detail` (parallel / waterfall /
-            // Taylor via `apply_total_return_carry`; metrics-based from the
-            // carry decomposition metrics), so the split is attempted on every
-            // path — the decomposition logic is method-agnostic.
-            match self.compute_carry_credit_split_and_decomposition(
+            if let Err(e) = self.compute_carry_credit_split_and_decomposition(
                 model_ref,
                 &instrument_arc,
                 &market_t0,
                 &mut attribution,
             ) {
-                Ok(()) => {}
-                Err(e) => attribution.meta.notes.push(format!(
+                attribution.meta.notes.push(format!(
                     "credit_carry_decomposition computation failed: {e}"
-                )),
+                ));
             }
         }
 
-        // Optional target-currency translation. Runs as a final
-        // post-processing step so direct callers of the per-method functions
-        // keep their existing native-currency behavior; only the JSON-spec
-        // pipeline (used by the bindings) picks up `target_currency`.
         let configured_target = self
             .config
             .as_ref()

@@ -115,12 +115,10 @@ impl<S: InterpolationStrategy> Interpolator<S> {
         validate_knots(&knots)?;
         validate_finite_series(&values)?;
 
-        // Apply validation policy
         if validation == ValidationPolicy::Strict {
             validate_positive_series(&values)?;
         }
 
-        // Build strategy-specific state
         let strategy = S::from_raw(&knots, &values, extrapolation)?;
 
         Ok(Self {

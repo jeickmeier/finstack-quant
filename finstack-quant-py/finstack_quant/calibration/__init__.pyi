@@ -1830,7 +1830,9 @@ class CalibrationStep:
         base_date : str
             Model base date as an ISO date string.
         quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Swaption volatility quotes attached inline.
+            ATM swaption volatility quotes attached inline. Calibration rejects
+            strikes differing from the contractual forward by more than 1e-8
+            in decimal rate units (0.0001 bp).
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         params : Any
@@ -2027,7 +2029,7 @@ class CalibrationStep:
     def parametric(
         id: str,
         base_date: str,
-        model: str = "nelson_siegel",
+        model: str = "ns",
         quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         curve_id: str | None = None,
@@ -2042,8 +2044,8 @@ class CalibrationStep:
         base_date : str
             Curve base date as an ISO date string.
         model : str, default "ns"
-            Parametric family key, for example ``"nelson_siegel"`` or
-            ``"svensson"``.
+            Parametric family key: ``"ns"`` for Nelson-Siegel or ``"nss"``
+            for Nelson-Siegel-Svensson.
         quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
             Rate quotes attached inline.
         quote_set : str | None, default None
@@ -2051,7 +2053,10 @@ class CalibrationStep:
         curve_id : str | None, default None
             Identifier of the produced curve; defaults to ``id``.
         params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
+            Optional ``initial_params`` following the Rust step schema. Only
+            single-curve discount fitting is supported; ``discount_curve_id``
+            is not an accepted parameter. Fit acceptance honors the discount-curve
+            tolerance in per-notional PV units without an implicit floor.
 
         Returns
         -------
@@ -2217,7 +2222,7 @@ class CalibrationPlan:
         id: str = "plan",
         description: str | None = None,
         settings: CalibrationConfig | dict[str, Any] | None = None,
-        quote_sets: dict[str, list[Quote]] | None = None,
+        quote_sets: dict[str, list[str]] | None = None,
     ) -> None:
         """Build a calibration plan.
 
@@ -2231,14 +2236,17 @@ class CalibrationPlan:
             Free-text description recorded in the result metadata.
         settings : CalibrationConfig | dict | None, default None
             Plan-level solver and acceptance settings; Rust defaults when None.
-        quote_sets : dict[str, list[RateQuote | CdsQuote | VolQuote]] | None, default None
-            Named quote sets referenced by steps through ``quote_set``.
+        quote_sets : dict[str, list[str]] | None, default None
+            Quote IDs grouped by set name. Attached quote payloads are retained
+            even when their set is supplied explicitly. Identical payloads
+            sharing an ID are collected once.
 
         Raises
         ------
         ValueError
-            If step identifiers collide, a referenced quote set is missing, or
-            ``settings`` cannot be read as a calibration configuration.
+            If attached sets disagree on quote IDs, an ID has conflicting
+            payloads, or ``settings`` is invalid. Missing referenced quote IDs
+            and duplicate step IDs are rejected when the envelope is validated.
 
         """
 

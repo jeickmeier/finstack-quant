@@ -4,7 +4,9 @@
  * Parameters for Hull-White 1-factor model calibration step.
  *
  * Calibrates κ (mean reversion) and σ (short rate volatility) by fitting
- * European swaption market prices using Jamshidian decomposition.
+ * ATM European swaption market prices using Jamshidian decomposition.
+ * Supplied strikes must match the contractual forward swap rate within
+ * `1e-8` in decimal rate units (0.0001 bp); off-ATM quotes are rejected.
  */
 export type HullWhiteStepParams = {
 /**

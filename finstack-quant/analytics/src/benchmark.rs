@@ -1117,7 +1117,6 @@ pub(crate) fn multi_factor_greeks(
     let alpha_per_period = beta[0];
     let factor_betas: Vec<f64> = beta[1..].to_vec();
 
-    // Compute residuals and R²
     let mut response_stats = OnlineStats::new();
     let mut ss_res = 0.0_f64;
     for (t, &r) in y.iter().enumerate().take(n) {

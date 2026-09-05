@@ -318,12 +318,8 @@ mod tests {
 
         bridge.construct_path(&z, &mut w, dt).unwrap();
 
-        println!("Brownian path: {:?}", w);
-
-        // Check initial condition
         assert_eq!(w[0], 0.0);
 
-        // Check all points are finite
         for &val in &w {
             assert!(val.is_finite());
         }

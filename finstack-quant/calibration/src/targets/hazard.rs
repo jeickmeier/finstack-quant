@@ -327,17 +327,6 @@ impl HazardCurveTarget {
         }
 
         let mut config = global_config.clone();
-        if cds_quotes.iter().any(|quote| match quote {
-            crate::quotes::cds::CdsQuote::CdsParSpread { spread_bp, .. }
-            | crate::quotes::cds::CdsQuote::CdsUpfront {
-                running_spread_bp: spread_bp,
-                ..
-            } => *spread_bp >= 1_000.0,
-        }) {
-            config.hazard_curve.hazard_hard_max = config.hazard_curve.hazard_hard_max.max(100.0);
-            config.hazard_curve.validation_tolerance =
-                config.hazard_curve.validation_tolerance.max(1e-6);
-        }
         config.calibration_method = params.method.clone();
         let target =
             HazardCurveTarget::new(params.clone(), context.clone(), config.clone(), &cds_quotes)?;

@@ -247,69 +247,67 @@ pub(crate) fn total_return_carry_inputs(
     as_of_t0: Date,
     as_of_t1: Date,
     currency: Currency,
-) -> finstack_quant_core::Result<TotalReturnCarryInputs> {
-    Ok({
-        let mut warnings = Vec::new();
+) -> Result<TotalReturnCarryInputs> {
+    let mut warnings = Vec::new();
 
-        let cash_paid = Money::new(
-            collect_cashflows_in_period(instrument, market, as_of_t0, as_of_t1, currency)?,
-            currency,
-        )?;
+    let cash_paid = Money::new(
+        collect_cashflows_in_period(instrument, market, as_of_t0, as_of_t1, currency)?,
+        currency,
+    )?;
 
-        let t0_metrics = instrument
-            .price_with_metrics(
-                market,
-                as_of_t0,
-                &[MetricId::Accrued, MetricId::Ytm],
-                PricingOptions::default(),
-            )
-            .ok();
-        let metric = |result: Option<&finstack_quant_valuations::results::ValuationResult>,
-                      id: MetricId|
-         -> Option<f64> {
-            result
-                .and_then(|r| r.measures.get(id.as_str()).copied())
-                .filter(|v| v.is_finite())
-        };
-        let accrued_t0 = metric(t0_metrics.as_ref(), MetricId::Accrued);
-        let ytm = metric(t0_metrics.as_ref(), MetricId::Ytm);
-        let accrued_t1 = instrument
-            .price_with_metrics(
-                market,
-                as_of_t1,
-                &[MetricId::Accrued],
-                PricingOptions::default(),
-            )
-            .ok()
-            .and_then(|r| r.measures.get(MetricId::Accrued.as_str()).copied())
-            .filter(|v| v.is_finite());
-        let delta_accrued = match (accrued_t0, accrued_t1) {
-            (Some(a0), Some(a1)) => Some(Money::new(a1 - a0, currency)?),
-            _ => None,
-        };
-
-        let flat_window_diff = match ytm {
-            Some(ytm) => {
-                flat_window_diff_from_ytm(instrument, market, as_of_t0, as_of_t1, currency, ytm)?
-            }
-            None => None,
-        };
-        let funding_cost = reprice_funding_cost(
-            instrument,
+    let t0_metrics = instrument
+        .price_with_metrics(
             market,
             as_of_t0,
+            &[MetricId::Accrued, MetricId::Ytm],
+            PricingOptions::default(),
+        )
+        .ok();
+    let metric = |result: Option<&finstack_quant_valuations::results::ValuationResult>,
+                  id: MetricId|
+     -> Option<f64> {
+        result
+            .and_then(|r| r.measures.get(id.as_str()).copied())
+            .filter(|v| v.is_finite())
+    };
+    let accrued_t0 = metric(t0_metrics.as_ref(), MetricId::Accrued);
+    let ytm = metric(t0_metrics.as_ref(), MetricId::Ytm);
+    let accrued_t1 = instrument
+        .price_with_metrics(
+            market,
             as_of_t1,
-            currency,
-            &mut warnings,
-        );
+            &[MetricId::Accrued],
+            PricingOptions::default(),
+        )
+        .ok()
+        .and_then(|r| r.measures.get(MetricId::Accrued.as_str()).copied())
+        .filter(|v| v.is_finite());
+    let delta_accrued = match (accrued_t0, accrued_t1) {
+        (Some(a0), Some(a1)) => Some(Money::new(a1 - a0, currency)?),
+        _ => None,
+    };
 
-        TotalReturnCarryInputs {
-            cash_paid,
-            delta_accrued,
-            flat_window_diff,
-            funding_cost,
-            warnings,
+    let flat_window_diff = match ytm {
+        Some(ytm) => {
+            flat_window_diff_from_ytm(instrument, market, as_of_t0, as_of_t1, currency, ytm)?
         }
+        None => None,
+    };
+    let funding_cost = reprice_funding_cost(
+        instrument,
+        market,
+        as_of_t0,
+        as_of_t1,
+        currency,
+        &mut warnings,
+    );
+
+    Ok(TotalReturnCarryInputs {
+        cash_paid,
+        delta_accrued,
+        flat_window_diff,
+        funding_cost,
+        warnings,
     })
 }
 

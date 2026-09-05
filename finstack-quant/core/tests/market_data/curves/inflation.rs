@@ -15,8 +15,6 @@ fn _test_date() -> Date {
     Date::from_calendar_date(2025, Month::January, 1).unwrap()
 }
 
-// Clone Safety Tests
-
 /// Verifies that cloning an InflationCurve is infallible and produces identical results.
 #[test]
 fn clone_is_panic_free_and_equivalent() {
@@ -34,16 +32,13 @@ fn clone_is_panic_free_and_equivalent() {
         .build()
         .unwrap();
 
-    // Clone should not panic
     let cloned = original.clone();
 
-    // Verify structural equality
     assert_eq!(original.id(), cloned.id());
     assert_eq!(original.base_cpi(), cloned.base_cpi());
     assert_eq!(original.knots(), cloned.knots());
     assert_eq!(original.cpi_levels(), cloned.cpi_levels());
 
-    // Verify interpolation produces identical results
     for t in [0.0, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0] {
         let orig_cpi = original.cpi(t);
         let cloned_cpi = cloned.cpi(t);
@@ -75,10 +70,8 @@ fn clone_works_for_all_interp_styles() {
             .build()
             .unwrap();
 
-        // Clone should not panic for any interpolation style
         let cloned = curve.clone();
 
-        // Verify CPI values match
         for t in [0.0, 0.5, 1.0, 3.0, 5.0] {
             let orig_cpi = curve.cpi(t);
             let cloned_cpi = cloned.cpi(t);
@@ -107,10 +100,8 @@ fn clone_works_with_extrapolation() {
         .build()
         .unwrap();
 
-    // Clone should not panic
     let cloned = curve.clone();
 
-    // Verify extrapolated CPI values match beyond the knot range
     for t in [0.0, 2.5, 5.0, 10.0, 20.0] {
         let orig_cpi = curve.cpi(t);
         let cloned_cpi = cloned.cpi(t);
@@ -167,7 +158,6 @@ mod serde_tests {
         assert_eq!(original.cpi_levels(), deserialized.cpi_levels());
         assert_eq!(original.extrapolation(), deserialized.extrapolation());
 
-        // Test CPI interpolation
         for t in [0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.5, 10.0] {
             let original_cpi = original.cpi(t);
             let deserialized_cpi = deserialized.cpi(t);
@@ -180,7 +170,6 @@ mod serde_tests {
             );
         }
 
-        // Test inflation rate calculation
         for (t1, t2) in [(0.0, 1.0), (1.0, 2.0), (2.0, 5.0), (5.0, 10.0)] {
             let original_rate = original.inflation_rate(t1, t2).unwrap();
             let deserialized_rate = deserialized.inflation_rate(t1, t2).unwrap();
@@ -247,7 +236,6 @@ mod serde_tests {
             let json = serde_json::to_string(&original).unwrap();
             let deserialized: InflationCurve = serde_json::from_str(&json).unwrap();
 
-            // Test CPI accuracy for each style
             for t in [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0] {
                 let original_cpi = original.cpi(t);
                 let deserialized_cpi = deserialized.cpi(t);

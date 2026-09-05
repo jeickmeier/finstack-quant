@@ -307,12 +307,23 @@ fn conversion_change_spec(
     closing.conversion.ratio = Some(30.0);
     let state = finstack_quant_core::market_data::context::MarketContextState::from(&market(150.0));
     finstack_quant_attribution::AttributionSpec {
-        instrument: finstack_quant_valuations::instruments::InstrumentJson::ConvertibleBond(closing),
-        market_t0: state.clone(), market_t1: state,
-        as_of_t0: t0(), as_of_t1: t0(), method,
-        model_params_t0: Some(finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot::Convertible { conversion_spec: opening_conversion }),
-        config: None, credit_factor_model: None,
-        credit_factor_detail_options: Default::default(), full_cross_attribution: false,
+        instrument: finstack_quant_valuations::instruments::InstrumentJson::ConvertibleBond(
+            closing,
+        ),
+        market_t0: state.clone(),
+        market_t1: state,
+        as_of_t0: t0(),
+        as_of_t1: t0(),
+        method,
+        model_params_t0: Some(
+            finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot::Convertible {
+                conversion_spec: opening_conversion,
+            },
+        ),
+        config: None,
+        credit_factor_model: None,
+        credit_factor_detail_options: Default::default(),
+        full_cross_attribution: false,
     }
 }
 

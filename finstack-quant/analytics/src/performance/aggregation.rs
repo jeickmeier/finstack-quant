@@ -58,8 +58,8 @@ impl Performance {
     ///
     /// # Arguments
     ///
-    /// * `ticker_idx` - Zero-based column index of the ticker in the loaded performance panel
-    /// * `n` - Count of elements, paths, or periods requested by the caller
+    /// * `ticker_idx` - Zero-based column index of the ticker in the loaded performance panel.
+    /// * `n` - Maximum number of episodes to return, most severe first.
     pub fn drawdown_details(
         &self,
         ticker_idx: usize,
@@ -404,9 +404,6 @@ mod periodic_returns_tests {
     /// Build a single-ticker `Performance` with daily returns spanning
     /// January and February 2021 (2021-01-04 through 2021-02-26).
     fn sample_two_month_daily_performance() -> Performance {
-        // Build dates: weekdays in January (4..=29) and February (1..=26) 2021.
-        // We use calendar days for simplicity — just enough to guarantee
-        // observations in two distinct calendar months.
         let jan_dates: Vec<Date> = (4u8..=29)
             .filter_map(|d| Date::from_calendar_date(2021, Month::January, d).ok())
             .collect();
@@ -418,7 +415,6 @@ mod periodic_returns_tests {
         dates.extend(feb_dates);
 
         let n = dates.len();
-        // Simple positive daily returns — no NaN spans.
         let returns = vec![vec![0.001_f64; n]];
 
         Performance::from_returns(
@@ -436,14 +432,9 @@ mod periodic_returns_tests {
         let perf = sample_two_month_daily_performance();
         let periodic = perf.periodic_returns(PeriodKind::Monthly);
         assert_eq!(periodic.len(), perf.ticker_names().len());
-        // Single-ticker fixture spanning Jan+Feb -> 2 buckets.
         assert_eq!(periodic[0].len(), 2);
-
-        // Period-end dates fall in the expected calendar months.
         assert_eq!(periodic[0][0].0.month(), Month::January);
         assert_eq!(periodic[0][1].0.month(), Month::February);
-
-        // Buckets chain to the full-period cumulative return (exact reconciliation).
         let cum = perf.cumulative_returns();
         let total = *cum[0].last().unwrap();
         let chained = (1.0 + periodic[0][0].1) * (1.0 + periodic[0][1].1) - 1.0;

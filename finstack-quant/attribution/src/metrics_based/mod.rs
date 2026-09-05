@@ -4,7 +4,7 @@
 //! to estimate factor contributions without full repricing. Supports both first-order
 //! (linear) and second-order (convexity) terms for improved accuracy.
 //!
-//! # Algorithm (Enhanced with Second-Order and Bucketed Metrics)
+//! # Algorithm
 //!
 //! 1. **Carry**: Total-return Theta over the matching attribution horizon
 //! 2. **RatesCurves**:
@@ -37,13 +37,12 @@
 //! supplied; the spec executor requests that horizon from the producer. Cashflow
 //! collection and payment-date FX conversion failures are returned to the caller.
 //!
-//! # Advantages (Enhanced)
+//! # Advantages
 //!
-//! - Fast: Still no additional repricing required
-//! - More accurate: Per-curve bucketed DV01 eliminates basis risk errors
-//! - Second-order terms reduce residual from ~18% to <5%
-//! - Graceful degradation: Works with or without bucketed/second-order metrics
-//! - Convenient: Works with already-computed ValuationResults
+//! - No additional repricing
+//! - Per-curve bucketed DV01 when available
+//! - Second-order terms when the producer supplies them
+//! - Works with already-computed ValuationResults
 //!
 //! # Disadvantages
 //!

@@ -91,12 +91,10 @@ pub fn translate_to_target_currency(
 ) -> Result<()> {
     let native_currency = attribution.total_pnl.currency();
     if native_currency == target_currency {
-        return Ok(()); // No-op: report stays in native currency.
+        return Ok(());
     }
-    // Commit only a complete translation, including every detail amount.
-    let destination = attribution;
-    let mut translated = destination.clone();
-    let attribution = &mut translated;
+    // Mutate a clone so a failed conversion leaves the original unchanged.
+    let mut translated = attribution.clone();
 
     // Convert val_t0 with BOTH the T0 and T1 FX matrices so we can extract the
     // FX move applied to the opening position.
@@ -108,7 +106,7 @@ pub fn translate_to_target_currency(
     let translate =
         |m: Money| -> Result<Money> { market_t1.convert_money(m, target_currency, as_of_t1) };
 
-    attribution.fx_translation_pnl = fx_translation;
+    translated.fx_translation_pnl = fx_translation;
 
     // Total in target_currency = MTM translation + the total-return add-back.
     //
@@ -120,26 +118,20 @@ pub fn translate_to_target_currency(
     // `carry` still contains it — or the recomputed residual is polluted by
     // the full coupon and `total_pnl` silently flips to MTM-only (quant
     // review M6).
-    let native_total_pnl = attribution.total_pnl;
-    let native_mtm = attribution.mark_to_market_pnl.unwrap_or(native_total_pnl);
+    let native_total_pnl = translated.total_pnl;
+    let native_mtm = translated.mark_to_market_pnl.unwrap_or(native_total_pnl);
     let coupon_addback_native = native_total_pnl.checked_sub(native_mtm)?;
 
     let val_t1_native = val_t0.checked_add(native_mtm)?;
     let val_t1_at_t1 = market_t1.convert_money(val_t1_native, target_currency, as_of_t1)?;
     let translated_mtm = val_t1_at_t1.checked_sub(val_t0_at_t0)?;
-    attribution.total_pnl = translated_mtm.checked_add(translate(coupon_addback_native)?)?;
+    translated.total_pnl = translated_mtm.checked_add(translate(coupon_addback_native)?)?;
 
-    // mark_to_market_pnl in target_currency retains the raw price change interpretation.
-    if let Some(_mtm) = attribution.mark_to_market_pnl {
-        attribution.mark_to_market_pnl = Some(translated_mtm);
+    if translated.mark_to_market_pnl.is_some() {
+        translated.mark_to_market_pnl = Some(translated_mtm);
     }
 
-    // Residual is recomputed against the translated sum by the
-    // `compute_residual` call below.
-
-    // Stamp the FX policy so downstream consumers know the report currency is
-    // a translation, not native.
-    attribution.meta.fx_policy = Some(FxPolicyMeta {
+    translated.meta.fx_policy = Some(FxPolicyMeta {
         strategy: FxConversionPolicy::CashflowDate,
         target_currency: Some(target_currency),
         notes: format!(
@@ -153,11 +145,11 @@ pub fn translate_to_target_currency(
     // translation runs) moves to the target currency at the same T1 FX as the
     // factor fields — otherwise `generic + Σ levels + adder + curve_shape ≡
     // credit_curves_pnl` and the carry partition break by the FX rate.
-    attribution.for_each_money_mut(|m| {
+    translated.for_each_money_mut(|m| {
         *m = translate(*m)?;
         Ok(())
     })?;
-    if let Some(m) = attribution
+    if let Some(m) = translated
         .credit_factor_detail
         .as_mut()
         .and_then(|d| d.adder_magnitude.as_mut())
@@ -165,8 +157,8 @@ pub fn translate_to_target_currency(
         *m = translate(*m)?;
     }
 
-    attribution.compute_residual()?;
-    *destination = translated;
+    translated.compute_residual()?;
+    *attribution = translated;
     Ok(())
 }
 

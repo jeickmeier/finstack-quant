@@ -937,7 +937,6 @@ mod computation {
         let schedule = builder.build(None).unwrap();
         let outstanding = schedule.outstanding_by_date().unwrap();
 
-        // Verify outstanding at each step date
         let expected_remaining = [
             (q1_date, 800_000.0),
             (q2_date, 500_000.0),

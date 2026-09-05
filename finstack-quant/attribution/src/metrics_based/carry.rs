@@ -13,7 +13,6 @@ pub(super) fn apply(
 ) -> Result<()> {
     let time_period_days = inputs.time_period_days;
 
-    // Same-day window: no elapsed carry.
     if time_period_days <= 0.0 {
         attribution.carry = Money::from((0_i64, inputs.ccy));
         return Ok(());

@@ -1,31 +1,4 @@
-//! Tests for parametric (Nelson-Siegel) curve calibration.
-//!
-//! ## What these tests guard
-//!
-//! ### Task-12 bug: raw PV residuals (original fix)
-//!
-//! `ParametricCurveTarget::calculate_residuals` previously returned raw PV
-//! values without dividing by the instrument notional (1_000_000). Even a
-//! perfectly-converged NS curve produced residuals on the order of tens of
-//! currency units, so `success` was always `false`.
-//!
-//! Sibling targets (`discount.rs`, `hazard.rs`, `inflation.rs`) all divide by
-//! `residual_notional`. After the fix, `ParametricCurveTarget` does the same.
-//!
-//! ### Task-12 follow-up: least-squares success tolerance
-//!
-//! A parametric (NS/NSS) curve is a LEAST-SQUARES fit: with N > 4 quotes it
-//! cannot reprice every instrument exactly. The irreducible residual floor is
-//! ~1e-4 per-notional for a well-specified NS fit, which exceeds the default
-//! `validation_tolerance = 1e-8` (designed for exact bootstrap root-finding).
-//!
-//! Production `ParametricCurveTarget::solve` now applies a least-squares floor
-//! of `1e-3` to the success tolerance (via `.max(1e-3)`), so a fully-converged
-//! NS fit reports `success = true` even with the **default** `CalibrationConfig`.
-//!
-//! `parametric_ns_calibration_succeeds_with_default_config` is the primary
-//! regression guard: it runs with a completely default config (no overrides)
-//! and asserts `success == true`.
+//! Parametric calibration residual normalization and explicit fit acceptance.
 
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::market_datum::MarketDatum;
@@ -97,7 +70,7 @@ fn build_ns_derived_quotes(_base_date: Date) -> Vec<MarketQuote> {
 /// Alternating extreme rates (0% and 20%) across the tenor grid create a
 /// quote set that violates the smooth monotone shape assumption of the
 /// Nelson-Siegel model. LM will converge to some minimum, but the residuals
-/// should far exceed 1e-3 (the parametric LS tolerance floor).
+/// should far exceed 1e-3 per unit notional.
 fn build_inconsistent_quotes(_base_date: Date) -> Vec<MarketQuote> {
     let tenors: &[(&str, f64)] = &[
         ("3M", 0.0_f64),
@@ -154,7 +127,6 @@ fn run_parametric_ns_with_config(
                 curve_id: curve_id.into(),
                 base_date,
                 model: NsVariant::Ns,
-                discount_curve_id: None,
                 initial_params: None,
             }),
         }],
@@ -182,54 +154,21 @@ fn run_parametric_ns_with_config(
     )
 }
 
-// ─── Primary regression test: default production config must succeed ────────
-
-/// Primary regression guard for the least-squares tolerance fix.
-///
-/// This test runs with a **completely default `CalibrationConfig`** (no overrides)
-/// and asserts `success == true`.
-///
-/// | Scenario              | `max_residual`   | `success` |
-/// |-----------------------|------------------|-----------|
-/// | Before fix (bug)      | `~110` (raw PV)  | `false`   |  ← original Task-12 bug
-/// | After fix, default tol| `~1e-4` (per-NL) | `false`   |  ← tol=1e-8, floor missing
-/// | After floor fix       | `~1e-4` (per-NL) | `true`    |  ← this test must pass
-///
-/// The default `validation_tolerance = 1e-8` is designed for exact bootstrap
-/// root-finding. A least-squares parametric fit has an irreducible residual
-/// floor of ~1e-4; `ParametricCurveTarget::solve` now applies `.max(1e-3)` so
-/// the success criterion is appropriate for a LS fit, not a bootstrap.
 #[test]
-fn parametric_ns_calibration_succeeds_with_default_config() {
+fn parametric_ns_honors_explicit_acceptance_tolerance() {
     let base_date = Date::from_calendar_date(2025, Month::January, 2).expect("base_date");
     let quotes = build_ns_derived_quotes(base_date);
-
-    // Use a completely default CalibrationConfig — no tolerance overrides.
-    let (success, max_residual, _residuals) = run_parametric_ns_with_config(
-        base_date,
-        "USD-NS-DEFAULT",
-        quotes,
-        CalibrationConfig::default(),
-    );
-
-    println!("NS calibration (default config): success={success}, max_residual={max_residual:.4e}");
-
-    // This is the key assertion: a well-converged NS fit must report success
-    // even with the production-default CalibrationConfig.
-    assert!(
-        success,
-        "Parametric NS calibration must succeed with default config. \
-         max_residual={max_residual:.4e}. \
-         If success=false with max_residual≈1e-4, the LS tolerance floor (1e-3) is not applied. \
-         If max_residual≈100, PV is not divided by notional (the original Task-12 bug)."
-    );
-
-    // Residuals must be in per-notional units (~1e-4), not raw-PV units (~110).
-    assert!(
-        max_residual < 1e-2,
-        "max_residual={max_residual:.4e} must be in per-notional units (<1e-2). \
-         A value near 100 indicates un-normalized raw PV residuals (original Task-12 bug)."
-    );
+    let mut settings = CalibrationConfig::default();
+    settings.discount_curve.validation_tolerance = 1e-8;
+    let (strict_success, strict_residual, _) =
+        run_parametric_ns_with_config(base_date, "USD-NS", quotes.clone(), settings.clone());
+    assert!(!strict_success);
+    assert!(strict_residual > 1e-8);
+    settings.discount_curve.validation_tolerance = 1e-3;
+    let (accepted, residual, _) =
+        run_parametric_ns_with_config(base_date, "USD-NS", quotes, settings);
+    assert!(accepted);
+    assert!((residual - strict_residual).abs() < 1e-12);
 }
 
 // ─── Per-quote normalization test ──────────────────────────────────────────
@@ -299,6 +238,6 @@ fn parametric_ns_calibration_fails_for_inconsistent_quotes() {
 
     assert!(
         max_residual > 1e-3,
-        "Inconsistent-quote residual {max_residual:.4e} must exceed the 1e-3 LS tolerance floor."
+        "Inconsistent-quote residual {max_residual:.4e} must exceed the 1e-3 per-notional threshold."
     );
 }

@@ -117,7 +117,6 @@ fn validate_core_inputs(
         )));
     }
 
-    // Validate notional and amortization spec (e.g., total amortization <= notional)
     notional.validate()?;
 
     let out_of_range = match &notional.amort {
@@ -147,8 +146,7 @@ fn derive_amortization_setup(
     fixed_schedules: &[FixedSchedule],
     float_schedules: &[FloatSchedule],
 ) -> finstack_quant_core::Result<AmortizationSetup> {
-    // The compiler selects one coupon program per window. Rate groups and
-    // fixed/floating switches partition that program, not its amortization life.
+    // Rate groups and fixed/float switches partition coupon windows, not amortization cadence.
     let mut amort_base: Vec<Date> = fixed_schedules
         .iter()
         .flat_map(|s| s.dates.iter())
@@ -166,7 +164,6 @@ fn derive_amortization_setup(
         return Err(InputError::Invalid.into());
     }
 
-    // Precompute helpers depending on amort spec
     let step_remaining_map: Option<finstack_quant_core::HashMap<Date, Money>> =
         match &notional.amort {
             AmortizationSpec::StepRemaining { schedule } => {
@@ -203,27 +200,13 @@ fn derive_amortization_setup(
             let initial = f64_to_decimal(notional.initial.amount())?;
             let final_notional = f64_to_decimal(final_notional.amount())?;
             let delta = (initial - final_notional) / steps;
-            (
-                Some(if delta > Decimal::ZERO {
-                    delta
-                } else {
-                    Decimal::ZERO
-                }),
-                None,
-            )
+            (Some(delta.max(Decimal::ZERO)), None)
         }
         AmortizationSpec::PercentOfOriginalPerPeriod { pct } => {
             let initial = f64_to_decimal(notional.initial.amount())?;
             let pct = f64_to_decimal(*pct)?;
             let per = initial * pct;
-            (
-                None,
-                Some(if per > Decimal::ZERO {
-                    per
-                } else {
-                    Decimal::ZERO
-                }),
-            )
+            (None, Some(per.max(Decimal::ZERO)))
         }
         _ => (None, None),
     };
@@ -265,9 +248,7 @@ fn initialize_build_state(
 
     for ev in principal_events.iter().filter(|ev| ev.date <= issue) {
         if ev.delta.amount() != 0.0 || ev.cash.amount() != 0.0 {
-            // Sign convention depends on flow kind:
-            // - Notional (draws): cash is inflow to borrower, flow is negative (funding outflow from lender)
-            // - Amortization: cash is repayment, flow is positive (inflow to lender)
+            // Draws are negative (lender outflow); amortization is positive (lender inflow).
             let flow_amount = match ev.kind {
                 CFKind::Amortization => ev.cash.amount(),
                 _ => -ev.cash.amount(),
@@ -391,12 +372,10 @@ pub struct CashFlowBuilder {
     /// with ≤4 fee specs (commitment fee, facility fee, usage fee, admin fee).
     pub(super) fees: SmallVec<[FeeSpec; 4]>,
     pub(super) principal_events: Vec<PrincipalEvent>,
-    // Segmented programs (optional): coupon program and payment/PIK program
     pub(super) coupon_program: Vec<CouponProgramPiece>,
     pub(super) payment_program: Vec<PaymentProgramPiece>,
     /// Whether to emit issue funding and maturity redemption notionals.
     pub(super) principal_exchange: PrincipalExchange,
-    // Sticky builder error for fluent APIs that cannot return Result.
     pub(super) pending_error: Option<finstack_quant_core::Error>,
 }
 
@@ -506,7 +485,6 @@ impl CashFlowBuilder {
     /// failure. In particular, a floating spec with the default error fallback
     /// fails when its required market data is unavailable.
     ///
-    ///
     /// # Arguments
     ///
     /// * `curves` - Optional market context used to project floating legs.
@@ -541,7 +519,6 @@ impl CashFlowBuilder {
         let mut principal_events = self.principal_events.clone();
         principal_events.sort_by_key(|ev| ev.date);
 
-        // Reject principal events with currency different from notional.
         let expected_currency = notional.initial.currency();
         if let Some(ev) = principal_events
             .iter()
@@ -615,11 +592,7 @@ impl CompiledCashFlowPlan {
             self.principal_exchange,
         )?;
         let ccy = self.notional.initial.currency();
-        // Fixed fees dated at or before issue are emitted during initialization.
-        // The date loop below only processes dates strictly after issue, so this
-        // is the single emission point for such fees: at-issue fees are not
-        // duplicated and pre-issue fees (e.g., upfront/commitment fees on
-        // delayed-funding structures) are not dropped.
+        // Pre- and at-issue fees emit here; the date loop only covers dates after issue.
         for (fee_date, amount) in &self.fixed_fees {
             if *fee_date <= self.issue && amount.amount() != 0.0 {
                 state.flows.push(CashFlow::new(
@@ -645,11 +618,6 @@ impl CompiledCashFlowPlan {
             principal_events: &self.principal_events,
         };
 
-        // Resolve curves and historical-fixing series upfront and reuse across
-        // all payment dates. Fixings follow the canonical core convention: a
-        // `ScalarTimeSeries` stored under `FIXING:{index_id}` carries realized
-        // index observations for dates before the curve base (seasoned
-        // instruments).
         let (resolved_curves, resolved_fixings): (
             Vec<Option<Arc<ForwardCurve>>>,
             Vec<Option<ScalarTimeSeries>>,
@@ -671,9 +639,6 @@ impl CompiledCashFlowPlan {
             )
         };
 
-        // The named curve is authoritative for the term-index tenor; an
-        // explicit `index_tenor` is diagnostic. Warn once per leg when the
-        // two disagree materially so a miswired curve id surfaces early.
         for (schedule, resolved_curve) in self.float_schedules.iter().zip(&resolved_curves) {
             let (Some(spec_tenor), Some(curve)) = (
                 schedule.spec.rate_spec.index_tenor,
@@ -700,11 +665,6 @@ impl CompiledCashFlowPlan {
             }
         }
 
-        // Initialization above consumes everything dated at or before issue
-        // (initial funding, pre-/at-issue principal events, pre-/at-issue fixed
-        // fees); the loop processes only dates strictly after issue. The two
-        // emission paths are mutually exclusive so pre-issue dates in
-        // `self.dates` can never cause issue-dated flows to be emitted twice.
         let processor =
             DateProcessor::new(&ctx, &self.amort_setup, &resolved_curves, &resolved_fixings);
         processor.process_issue_amortization(&mut state)?;
@@ -712,7 +672,6 @@ impl CompiledCashFlowPlan {
             state = processor.process(d, state)?;
         }
 
-        // Warn on material residual principal without rejecting flexible structures.
         let threshold = Decimal::new(1, 4); // 1e-4 = 1 bp relative
         let initial_amount = self.notional.initial.amount();
         if initial_amount.abs() > 0.0 {

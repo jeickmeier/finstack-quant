@@ -325,7 +325,6 @@ pub(crate) fn attribute_pnl_waterfall(
     };
 
     for factor in factor_order {
-        // Intercept CreditCurves with the cascade when a model is supplied.
         if matches!(factor, AttributionFactor::CreditCurves) {
             if let Some(c) = &cascade {
                 let total = ctx.apply_credit_cascade(c, &mut credit_step_pnls)?;
@@ -346,12 +345,10 @@ pub(crate) fn attribute_pnl_waterfall(
                     ctx.as_of_t1,
                     factor_pnl.currency(),
                 )?;
-                // Merge diagnostics BEFORE moving carry_inputs into apply_total_return_carry.
                 for w in &carry_inputs.warnings {
                     attribution.meta.notes.push(w.clone());
                 }
-                // `total_return_carry_inputs` performed extra `price_with_metrics`
-                // repricings (Accrued×2, YTM, flat-curve value×2) — count one.
+                // Carry inputs reprice Accrued/YTM/flat-curve; count one extra.
                 ctx.count_extra_repricing();
 
                 apply_total_return_carry(&mut attribution, theta, carry_inputs)?;
@@ -362,7 +359,6 @@ pub(crate) fn attribute_pnl_waterfall(
             AttributionFactor::Correlations => attribution.correlations_pnl = factor_pnl,
             AttributionFactor::Fx => {
                 attribution.fx_pnl = factor_pnl;
-                // Stamp FX policy when FX factor is applied
                 let target_currency = attribution.fx_pnl.currency();
                 stamp_fx_policy(
                     &mut attribution,
@@ -373,7 +369,6 @@ pub(crate) fn attribute_pnl_waterfall(
             AttributionFactor::Volatility => attribution.vol_pnl = factor_pnl,
             AttributionFactor::ModelParameters => {
                 attribution.model_params_pnl = factor_pnl;
-                // Add note if factor P&L is zero (likely skipped)
                 if factor_pnl.amount().abs() < 1e-10 {
                     attribution
                         .meta

@@ -470,17 +470,14 @@ mod tests {
             "GBP_GILT".to_string(),
         ];
 
-        // Test exact fuzzy match
         let err = Error::missing_curve_with_suggestions("USD_OS", &available);
         let msg = format!("{}", err);
         assert!(msg.contains("USD_OIS") || msg.contains("Did you mean"));
 
-        // Test prefix match
         let err2 = Error::missing_curve_with_suggestions("USD", &available);
         let msg2 = format!("{}", err2);
         assert!(msg2.contains("USD_OIS") || msg2.contains("USD_GOVT"));
 
-        // Test no match
         let err3 = Error::missing_curve_with_suggestions("JPY_UNKNOWN", &available);
         let msg3 = format!("{}", err3);
         assert!(msg3.contains("Curve not found"));

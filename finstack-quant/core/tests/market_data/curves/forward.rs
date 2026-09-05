@@ -27,8 +27,6 @@ fn test_date() -> Date {
     Date::from_calendar_date(2025, Month::January, 1).unwrap()
 }
 
-// Clone Safety Tests
-
 /// Verifies that cloning a ForwardCurve is infallible and produces identical results.
 #[test]
 fn clone_is_panic_free_and_equivalent() {
@@ -48,10 +46,8 @@ fn clone_is_panic_free_and_equivalent() {
         .build()
         .unwrap();
 
-    // Clone should not panic
     let cloned = original.clone();
 
-    // Verify structural equality
     assert_eq!(original.id(), cloned.id());
     assert_eq!(original.base_date(), cloned.base_date());
     assert_eq!(original.reset_lag(), cloned.reset_lag());
@@ -60,7 +56,6 @@ fn clone_is_panic_free_and_equivalent() {
     assert_eq!(original.knots(), cloned.knots());
     assert_eq!(original.forwards(), cloned.forwards());
 
-    // Verify interpolation produces identical results
     for t in [0.0, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0] {
         let orig_rate = original.rate(t);
         let cloned_rate = cloned.rate(t);
@@ -92,7 +87,6 @@ fn clone_works_for_all_interp_styles() {
             .build()
             .unwrap();
 
-        // Clone should not panic for any interpolation style
         let cloned = curve.clone();
 
         // Verify rates match
@@ -127,10 +121,8 @@ fn clone_works_for_all_extrapolation_policies() {
             .build()
             .unwrap();
 
-        // Clone should not panic for any extrapolation policy
         let cloned = curve.clone();
 
-        // Verify extrapolated rates match beyond the knot range
         for t in [0.0, 2.5, 5.0, 10.0, 20.0] {
             let orig_rate = curve.rate(t);
             let cloned_rate = cloned.rate(t);
@@ -300,7 +292,6 @@ mod serde_tests {
         assert_eq!(original.knots(), deserialized.knots());
         assert_eq!(original.forwards(), deserialized.forwards());
 
-        // Test rate interpolation
         for t in [0.0, 0.1, 0.25, 0.4, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0] {
             let original_rate = original.rate(t);
             let deserialized_rate = deserialized.rate(t);
@@ -337,7 +328,6 @@ mod serde_tests {
             let json = serde_json::to_string(&original).unwrap();
             let deserialized: ForwardCurve = serde_json::from_str(&json).unwrap();
 
-            // Test interpolation accuracy for each style
             for t in [0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0] {
                 let original_rate = original.rate(t);
                 let deserialized_rate = deserialized.rate(t);
@@ -354,11 +344,8 @@ mod serde_tests {
     }
 }
 
-// Additional forward curve behavior
-
 #[test]
 fn test_forward_curve_spread_based_construction() {
-    // Test spread over base curve
     let _disc_curve =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("DISC")
             .base_date(test_date())
@@ -373,19 +360,16 @@ fn test_forward_curve_spread_based_construction() {
         .build()
         .unwrap();
 
-    // Verify exact knot values
     assert!((fwd_curve.rate(0.0) - 0.01).abs() < 1e-15);
     assert!((fwd_curve.rate(1.0) - 0.015).abs() < 1e-15);
     assert!((fwd_curve.rate(2.0) - 0.02).abs() < 1e-15);
 
-    // Verify linear interpolation between knots
     assert!((fwd_curve.rate(0.5) - 0.0125).abs() < 1e-15);
     assert!((fwd_curve.rate(1.5) - 0.0175).abs() < 1e-15);
 }
 
 #[test]
 fn test_forward_curve_tenor_mismatch() {
-    // Test with different tenor than knots
     let curve = ForwardCurve::builder("TEST", 0.5) // 6-month tenor
         .base_date(test_date())
         .knots([(0.0, 0.03), (0.25, 0.032), (1.0, 0.04)])
@@ -399,7 +383,6 @@ fn test_forward_curve_tenor_mismatch() {
 
 #[test]
 fn test_forward_curve_rate_conversion_continuous() {
-    // Test continuous compounding
     let curve = ForwardCurve::builder("TEST", 0.25)
         .base_date(test_date())
         .day_count(DayCount::Act360)
@@ -464,7 +447,6 @@ fn test_forward_curve_short_tenors() {
 
 #[test]
 fn test_forward_curve_reset_lag() {
-    // Test with various reset lags
     for lag in [0, 1, 2, 5] {
         let curve = ForwardCurve::builder("TEST", 0.25)
             .base_date(test_date())
@@ -479,7 +461,6 @@ fn test_forward_curve_reset_lag() {
 
 #[test]
 fn test_forward_curve_day_count_variations() {
-    // Test with different day count conventions
     let day_counts = [DayCount::Act360, DayCount::Act365F, DayCount::Thirty360];
 
     for day_count in day_counts {
@@ -496,7 +477,6 @@ fn test_forward_curve_day_count_variations() {
 
 #[test]
 fn test_forward_curve_single_knot() {
-    // Test that single knot is rejected (need at least 2 points)
     let result = ForwardCurve::builder("FLAT", 0.25)
         .base_date(test_date())
         .knots([(0.0, 0.05)])
@@ -518,7 +498,6 @@ fn test_forward_curve_many_knots() {
         .build()
         .unwrap();
 
-    // Should interpolate smoothly
     for t in [0.25, 0.75, 1.5, 5.5] {
         let rate = curve.rate(t);
         assert!(rate > 0.03 && rate < 0.05);
@@ -527,7 +506,6 @@ fn test_forward_curve_many_knots() {
 
 #[test]
 fn test_forward_curve_serde_all_fields() {
-    // Test full serde round-trip with all fields
     let original = ForwardCurve::builder("FULL-TEST", 0.25)
         .base_date(test_date())
         .reset_lag(2)
@@ -547,7 +525,6 @@ fn test_forward_curve_serde_all_fields() {
     assert_eq!(original.day_count(), deserialized.day_count());
     assert_eq!(original.knots(), deserialized.knots());
 
-    // Verify rates match
     for t in [0.0, 0.5, 1.0, 1.5, 2.0] {
         assert!((original.rate(t) - deserialized.rate(t)).abs() < 1e-12);
     }

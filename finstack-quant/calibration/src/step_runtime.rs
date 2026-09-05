@@ -83,6 +83,7 @@ fn prepare_hw_swaption_input(
     let VolQuote::SwaptionVol {
         expiry,
         maturity,
+        strike,
         vol,
         quote_type,
         ..
@@ -128,10 +129,24 @@ fn prepare_hw_swaption_input(
         .iter()
         .map(|period| time_from_base(period.payment_date))
         .collect::<Result<Vec<_>>>()?;
-    let accruals = periods
+    let accruals: Vec<f64> = periods
         .iter()
         .map(|period| period.accrual_year_fraction)
         .collect();
+
+    let annuity: f64 = payment_times
+        .iter()
+        .zip(&accruals)
+        .map(|(time, accrual)| disc_curve.df(*time) * accrual)
+        .sum();
+    let forward = (disc_curve.df(swap_start_time) - disc_curve.df(maturity_time)) / annuity;
+    // SwaptionQuote is an ATM-only contract. Never reinterpret an explicit
+    // off-ATM strike as the forward rate. Tolerance is 0.0001 basis points.
+    if !forward.is_finite() || (*strike - forward).abs() > 1e-8 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Hull-White calibration requires ATM swaption quotes: strike {strike:.12} differs from contractual forward {forward:.12} (tolerance 1e-8 in decimal rate units)"
+        )));
+    }
 
     Ok((
         SwaptionQuote {
@@ -711,6 +726,29 @@ mod tests {
         }
     }
 
+    fn set_atm_strike(quote: &mut VolQuote, discount: &DiscountCurve) {
+        let conventions =
+            SwaptionVolTarget::resolve_quote_leg_conventions(quote).expect("conventions");
+        let (start, end) =
+            SwaptionVolTarget::resolve_underlying_dates(quote, &conventions).expect("dates");
+        let periods =
+            SwaptionVolTarget::build_fixed_leg_periods(start, end, &conventions).expect("schedule");
+        let annuity: f64 = periods
+            .iter()
+            .map(|period| {
+                period.accrual_year_fraction
+                    * discount
+                        .df_on_date_curve(period.payment_date)
+                        .expect("payment DF")
+            })
+            .sum();
+        if let VolQuote::SwaptionVol { strike, .. } = quote {
+            *strike = (discount.df_on_date_curve(start).expect("start DF")
+                - discount.df_on_date_curve(end).expect("end DF"))
+                / annuity;
+        }
+    }
+
     #[test]
     fn student_t_step_calibrates_and_returns_scalar_output() {
         let base_date = Date::from_calendar_date(2025, Month::March, 20).expect("valid date");
@@ -753,7 +791,7 @@ mod tests {
         let maturity = Date::from_calendar_date(2027, Month::January, 5).expect("maturity");
         let payment = Date::from_calendar_date(2027, Month::January, 7).expect("payment");
         let discount = build_flat_discount_curve(0.03, base_date, "USD-OIS");
-        let quote = VolQuote::SwaptionVol {
+        let mut quote = VolQuote::SwaptionVol {
             id: QuoteId::new("USD-SWPTN-T2-LAG2"),
             expiry,
             maturity,
@@ -763,6 +801,15 @@ mod tests {
             convention: SwaptionConventionId::new("USD"),
         };
 
+        for strike in [0.01, 0.10] {
+            if let VolQuote::SwaptionVol { strike: value, .. } = &mut quote {
+                *value = strike;
+            }
+            let error = prepare_hw_swaption_input(&quote, &discount, Currency::USD)
+                .expect_err("off-ATM quote");
+            assert!(error.to_string().contains("requires ATM"));
+        }
+        set_atm_strike(&mut quote, &discount);
         let (prepared_quote, schedule) =
             prepare_hw_swaption_input(&quote, &discount, Currency::USD)
                 .expect("convention-driven HW input");
@@ -819,7 +866,7 @@ mod tests {
             (price / (annuity * (expiry_y / (2.0 * std::f64::consts::PI)).sqrt())).max(1e-6)
         };
 
-        let quotes = vec![
+        let mut quotes = vec![
             MarketQuote::Vol(VolQuote::SwaptionVol {
                 id: QuoteId::new("USD-SWPTN-VOL-1Yx5Y-ATM"),
                 expiry: Date::from_calendar_date(2026, Month::January, 1).expect("expiry"),
@@ -850,6 +897,15 @@ mod tests {
         ];
         let context =
             MarketContext::new().insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"));
+
+        for quote in &mut quotes {
+            if let MarketQuote::Vol(vol) = quote {
+                set_atm_strike(
+                    vol,
+                    context.get_discount("USD-OIS").expect("curve").as_ref(),
+                );
+            }
+        }
 
         let outcome = execute_params(&params, &quotes, &context, &CalibrationConfig::default())
             .expect("Hull-White step should calibrate");

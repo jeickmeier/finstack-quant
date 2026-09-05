@@ -926,13 +926,11 @@ impl OnlineCovariance {
         self.count += 1;
         let n = self.count as f64;
 
-        // Update means (Welford's algorithm)
         let dx = x - self.mean_x;
         let dy = y - self.mean_y;
         self.mean_x += dx / n;
         self.mean_y += dy / n;
 
-        // Update variance and covariance sums
         self.m2_x += dx * (x - self.mean_x);
         self.m2_y += dy * (y - self.mean_y);
         self.c += dx * (y - self.mean_y);

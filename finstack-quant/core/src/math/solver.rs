@@ -821,10 +821,8 @@ impl BrentSolver {
     {
         use crate::error::InputError;
 
-        // Use configurable bounds
         let max_bracket_width = self.bracket_max - self.bracket_min;
 
-        // Calculate adaptive initial bracket size
         let initial_size = self.initial_bracket_size.unwrap_or_else(|| {
             // Use 1% of the initial guess magnitude, with a minimum of 0.01
             let adaptive_size = initial_guess.abs() * 0.01;
@@ -845,7 +843,6 @@ impl BrentSolver {
             let fa = f(a);
             let fb = f(b);
 
-            // Check for non-finite function values
             if !fa.is_finite() || !fb.is_finite() {
                 return Err(InputError::SolverConvergenceFailed {
                     iterations: expansion_iterations,
@@ -880,11 +877,9 @@ impl BrentSolver {
             }
         }
 
-        // Compute final values - check for sign change one more time
         let fa = f(a);
         let fb = f(b);
 
-        // Check for non-finite values at final bounds
         if !fa.is_finite() || !fb.is_finite() {
             return Err(InputError::SolverConvergenceFailed {
                 iterations: expansion_iterations,
@@ -1433,18 +1428,13 @@ mod tests {
 
     #[test]
     fn test_brent_max_iterations_returns_error() {
-        // Test that Brent solver returns an error when max iterations is reached
-        // without convergence, rather than silently returning a non-root value.
-
-        // Create a solver with very few iterations so it won't converge
-        let solver = BrentSolver::new().max_iterations(2).tolerance(1e-15); // Extremely tight tolerance
+        let solver = BrentSolver::new().max_iterations(2).tolerance(1e-15);
 
         // A function that converges slowly (root at x ≈ 1.3247)
         let f = |x: f64| x * x * x - x - 1.0;
 
         let result = solver.solve(f, 1.0);
 
-        // Should return an error, not a potentially incorrect result
         assert!(
             result.is_err(),
             "Should return error when max iterations reached without convergence"

@@ -155,9 +155,7 @@ pub(crate) fn index_period_schedule(
     frequency: Tenor,
 ) -> finstack_quant_core::Result<IndexedPeriods> {
     let dates = periods.iter().map(|period| period.payment_date).collect();
-    // Regularity is a property of the unadjusted scheduled dates (ISDA 2006
-    // §4.16(c)); business-day adjustment must not reclassify regular periods
-    // as stubs.
+    // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)).
     let first_or_last = periods
         .iter()
         .filter(|period| {
@@ -243,10 +241,8 @@ pub(crate) fn generate_periods(
 
 /// Generate skeletal periods and apply the optional accrual-boundary policy.
 ///
-/// This is the shared date-generation stage used by both the public period API
-/// and the cashflow compiler. Enrichment (day counts and reset dates) remains
-/// the responsibility of the caller because the compiler needs its raw
-/// periods for coupon-specific metadata.
+/// Enrichment (day counts and reset dates) remains the caller's job because the
+/// compiler needs raw periods for coupon-specific metadata.
 ///
 /// `roll_rule` selects the core `ScheduleBuilder` anchor mode: the IMM modes
 /// force a quarterly grid (overriding `frequency`/`stub` with quarterly /
@@ -289,10 +285,7 @@ pub(crate) fn generate_periods_with_adjustment(
         return Ok(Vec::new());
     }
 
-    // Contiguous anchors: adjust each once and share across adjacent periods.
-    // Skip adjusting `dates[0]` unless accrual dates are adjusted — it is never
-    // a payment date, and unconditional adjustment can fail schedules that
-    // otherwise succeed.
+    // Share each BDC-adjusted anchor across adjacent periods; `dates[0]` is not a payment date.
     let mut adjusted: Vec<Date> = Vec::with_capacity(dates.len());
     for (index, &anchor) in dates.iter().enumerate() {
         if index == 0 && !adjust_accrual_dates {
@@ -302,8 +295,6 @@ pub(crate) fn generate_periods_with_adjustment(
         }
     }
 
-    // Resolve payment dates first when adjusting accruals so lag failures
-    // surface before accrual-collapse errors.
     let payment_dates: Option<Vec<Date>> = if adjust_accrual_dates {
         let mut resolved = Vec::with_capacity(dates.len() - 1);
         for window in adjusted.windows(2) {
@@ -491,9 +482,7 @@ mod tests {
 
     #[test]
     fn adjusted_accrual_regular_periods_are_not_stubs() {
-        // Regularity is judged on the UNADJUSTED scheduled dates: business-day
-        // adjustment of the accrual boundaries must not turn genuinely regular
-        // periods into stubs (ISDA 2006 §4.16(c); QuantLib Schedule::isRegular).
+        // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)).
         let periods = generate_periods_with_adjustment(
             d(2025, 1, 4), // Saturday anchor
             d(2026, 1, 4), // Sunday anchor

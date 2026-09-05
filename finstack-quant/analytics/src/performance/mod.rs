@@ -4,6 +4,8 @@
 //! `benchmark`, `aggregation`); each adds `impl Performance` methods.
 //! Public re-exports happen from `lib.rs`.
 
+use std::collections::HashSet;
+
 use crate::dates::{Date, PeriodKind};
 
 use super::drawdown::to_drawdown_series;
@@ -630,7 +632,7 @@ impl Performance {
             .into());
         }
 
-        let mut names = std::collections::HashSet::with_capacity(ticker_names.len());
+        let mut names = HashSet::with_capacity(ticker_names.len());
         for (index, name) in ticker_names.iter().enumerate() {
             if !names.insert(name) {
                 return Err(invalid_return_series(name, index, "duplicate ticker name").into());
@@ -929,7 +931,7 @@ impl Performance {
     ///
     /// # Arguments
     ///
-    /// * `ticker_idx` - Zero-based column index of the ticker in the loaded performance panel
+    /// * `ticker_idx` - Zero-based column index of the ticker in the loaded performance panel.
     pub fn active_dates_for_ticker(&self, ticker_idx: usize) -> crate::Result<&[Date]> {
         self.ensure_ticker_idx(ticker_idx)?;
         Ok(self.active_dates_for_ticker_unchecked(ticker_idx))

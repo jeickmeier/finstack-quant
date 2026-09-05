@@ -1,4 +1,4 @@
-//! Numerical and boundary regressions from the analytics stepwise audit.
+//! Numerical and boundary regressions for analytics kernels.
 use finstack_quant_analytics::correlation::{nearest_correlation_matrix, NearestCorrelationOpts};
 use finstack_quant_analytics::{max_drawdown, sharpe, sortino, Performance, ReturnKind};
 use finstack_quant_core::dates::{Date, Duration, Month, PeriodKind};

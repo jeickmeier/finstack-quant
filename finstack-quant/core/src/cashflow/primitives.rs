@@ -497,26 +497,22 @@ impl CashFlow {
     /// - Rate (if present) must be finite (not NaN or Infinity)
     /// - Reset date (if present) must not be after the payment date
     pub fn validate(&self) -> crate::Result<()> {
-        // Check for non-finite amount (NaN or Infinity)
         if !self.amount.amount().is_finite() {
             let kind = NonFiniteKind::classify(self.amount.amount());
             return Err(InputError::NonFiniteValue { kind }.into());
         }
 
-        // Check for non-finite accrual factor
         if !self.accrual_factor.is_finite() {
             let kind = NonFiniteKind::classify(self.accrual_factor);
             return Err(InputError::NonFiniteValue { kind }.into());
         }
 
-        // Check for negative accrual factor
         if self.accrual_factor < 0.0 {
             return Err(crate::Error::Validation(
                 "CashFlow: accrual_factor must be non-negative".into(),
             ));
         }
 
-        // Check for non-finite rate (if present)
         if let Some(rate) = self.rate {
             if !rate.is_finite() {
                 let kind = NonFiniteKind::classify(rate);
@@ -524,7 +520,6 @@ impl CashFlow {
             }
         }
 
-        // Check that reset date is not after payment date
         if let Some(reset) = self.reset_date {
             if reset > self.date {
                 return Err(crate::Error::Validation(
@@ -684,8 +679,7 @@ mod tests {
         assert_eq!(amort.kind, CFKind::Amortization);
         assert!(amort.validate().is_ok());
 
-        // Zero amounts validate (floored coupons are legitimate;
-        // ).
+        // Zero amounts validate (floored coupons are legitimate).
         let zero = Money::from((0_i64, Currency::EUR));
         let zero_cf = CashFlow {
             date,

@@ -416,8 +416,7 @@ impl OvernightObservationSchedule {
             let continuing = accumulator
                 .active_slice
                 .filter(|active| active.index == index);
-            // One fixing contributes one simple-interest factor, even when
-            // a checkpoint falls inside its weekend/holiday weight interval.
+            // One fixing contributes one simple-interest factor, including weekend carry.
             if let Some(active) = continuing {
                 accumulator.remove(active);
             }

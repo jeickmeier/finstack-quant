@@ -37,17 +37,14 @@ impl TimeSeriesStorage {
             ));
         }
 
-        // Sort by date ascending
         observations.sort_by_key(|(date, _)| *date);
 
-        // Check for duplicates
         for window in observations.windows(2) {
             if window[0].0 == window[1].0 {
                 return Err(crate::Error::Input(InputError::NonMonotonicKnots));
             }
         }
 
-        // Split into parallel arrays
         let (dates, values): (Vec<_>, Vec<_>) = observations.into_iter().unzip();
 
         Ok(Self {

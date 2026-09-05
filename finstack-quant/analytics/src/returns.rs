@@ -2,9 +2,7 @@
 //! compounded returns. Delegates to `math::stats::log_returns` for log variants
 //! and `math::summation` for numerically stable accumulation.
 //!
-//! Crate-internal: callers use these through [`crate::Performance`]; the
-//! `///` doc examples target crate developers and are marked `ignore` because
-//! the functions are not part of the public API.
+//! Crate-internal: callers use these through [`crate::Performance`].
 
 use crate::math::summation::NeumaierAccumulator;
 

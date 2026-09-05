@@ -155,7 +155,6 @@ fn sda_mdr_golden_values() {
 
 #[test]
 fn cpr_smm_conversion_roundtrip_precision() {
-    // Test that CPR ↔ SMM conversion maintains precision across range
     // Formula: SMM = 1 - (1 - CPR)^(1/12)
     //          CPR = 1 - (1 - SMM)^12
     use finstack_quant_cashflows::builder::{cpr_to_smm, smm_to_cpr};
@@ -256,7 +255,6 @@ fn psa_matches_industry_standard_ramp() {
 
 #[test]
 fn psa_multiplier_scales_correctly() {
-    // Test that PSA multipliers scale linearly
     use finstack_quant_cashflows::builder::smm_to_cpr;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
@@ -381,7 +379,6 @@ fn sda_matches_industry_standard_curve() {
 
 #[test]
 fn sda_multiplier_scales_correctly() {
-    // Test that SDA multipliers scale linearly
     use finstack_quant_cashflows::builder::smm_to_cpr;
     use finstack_quant_cashflows::builder::DefaultModelSpec;
 

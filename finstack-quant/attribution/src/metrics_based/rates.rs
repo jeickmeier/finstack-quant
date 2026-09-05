@@ -63,14 +63,11 @@ pub(super) fn apply(
     let mut convexity_avg_shift_bp: Option<f64> = None;
 
     if has_keyrate {
-        // KEY-RATE AWARE: pair per-tenor DV01 with the per-tenor curve shift.
-        // A steepener (+bp short / −bp long) is now attributed correctly
-        // instead of collapsing to an average-shift × parallel-DV01 product.
+        // KEY-RATE AWARE: pair per-tenor DV01 with the per-tenor curve shift
+        // so a steepener is not collapsed to average-shift × parallel-DV01.
         //
-        // Note: curves WITHOUT per-tenor data fall down the ladder to their
-        // per-curve bucketed DV01 (when present) instead of being silently
-        // dropped — mixed-coverage books previously sent those curves' P&L to
-        // residual with no note.
+        // Curves without per-tenor data fall through to per-curve bucketed DV01
+        // when present, rather than being dropped into residual with no note.
         let mut rates_acc = NeumaierAccumulator::new();
         let mut shift_acc = NeumaierAccumulator::new();
         // DV01-weighted shift for the convexity block: Σ|DV01_i|·Δr_i and

@@ -35,6 +35,94 @@ pub(crate) fn execute(envelope: &CalibrationEnvelope) -> MarketContext {
 }
 
 #[test]
+fn sparse_surface_report_matches_published_grid_and_enforces_tolerance() {
+    use finstack_quant_calibration::api::market_datum::MarketDatum;
+    use finstack_quant_calibration::api::schema::StepParams;
+    use finstack_quant_calibration::quotes::vol::VolQuote;
+    let mut envelope = load_envelope("08_equity_vol_surface.json");
+    envelope.plan.settings.vol_surface.validation_tolerance = 0.001;
+    envelope.plan.settings.fail_on_bad_fit = false;
+    let base_date = match &mut envelope.plan.steps[1].params {
+        StepParams::VolSurface(params) => {
+            params.target_strikes = vec![140.0, 180.0, 220.0];
+            params.base_date
+        }
+        _ => unreachable!("equity surface example"),
+    };
+    let result = engine::execute(&envelope).expect("diagnostic calibration");
+    let report = &result.result.step_reports[&envelope.plan.steps[1].id];
+    let market = MarketContext::try_from(result.result.final_market).expect("market");
+    let surface = market.get_surface("AAPL-EQUITY-VOL").expect("surface");
+    let mut worst = 0.0_f64;
+    for datum in &envelope.market_data {
+        if let MarketDatum::VolQuote(VolQuote::OptionVol {
+            id,
+            expiry,
+            strike,
+            vol,
+            ..
+        }) = datum
+        {
+            let t = (*expiry - base_date).whole_days() as f64 / 365.0;
+            let residual = finstack_quant_models::volatility::get_surface_vol(&surface, t, *strike)
+                .expect("published lookup")
+                - vol;
+            assert!((report.residuals[id.as_str()] - residual).abs() < 1e-12);
+            worst = worst.max(residual.abs());
+        }
+    }
+    assert!((report.max_residual - worst).abs() < 1e-12);
+    assert!(worst > 0.001);
+    assert!(!report.success);
+    envelope.plan.settings.fail_on_bad_fit = true;
+    assert!(engine::execute(&envelope).is_err());
+}
+
+#[test]
+fn parametric_calibration_rejects_disconnected_discount_curve() {
+    let mut envelope =
+        serde_json::to_value(load_envelope("01_usd_discount.json")).expect("envelope");
+    let discount = envelope["plan"]["steps"][0].clone();
+    let step = serde_json::json!({
+        "id": "NS", "quote_set": discount["quote_set"], "kind": "parametric",
+        "curve_id": "NS", "base_date": discount["base_date"], "model": "ns",
+        "discount_curve_id": discount["curve_id"]
+    });
+    envelope["plan"]["steps"]
+        .as_array_mut()
+        .expect("steps")
+        .push(step);
+    let error = serde_json::from_value::<CalibrationEnvelope>(envelope)
+        .expect_err("separate discount option must not be accepted");
+    assert!(error.to_string().contains("discount_curve_id"));
+}
+
+#[test]
+fn distressed_hazard_quotes_do_not_expand_explicit_bounds() {
+    use finstack_quant_calibration::api::market_datum::MarketDatum;
+    use finstack_quant_calibration::quotes::cds::CdsQuote;
+    let mut envelope = load_envelope("03_single_name_hazard.json");
+    for datum in &mut envelope.market_data {
+        if let MarketDatum::CdsQuote(CdsQuote::CdsParSpread { spread_bp, .. }) = datum {
+            *spread_bp = 2000.0;
+        }
+    }
+    envelope.plan.settings.hazard_curve.hazard_hard_max = 0.1;
+    envelope.plan.settings.fail_on_bad_fit = true;
+    assert!(
+        engine::execute(&envelope).is_err(),
+        "20% spread cannot fit a hazard bounded at 10% with 40% recovery"
+    );
+    envelope.plan.settings.hazard_curve.hazard_hard_max = 1.0;
+    let result = engine::execute(&envelope).expect("explicitly adequate bounds");
+    let report = &result.result.step_reports[&envelope.plan.steps[1].id];
+    assert_eq!(
+        report.success_tolerance,
+        Some(envelope.plan.settings.hazard_curve.validation_tolerance)
+    );
+}
+
+#[test]
 fn example_01_usd_discount_builds_queryable_curve() {
     let envelope = load_envelope("01_usd_discount.json");
     let market = execute(&envelope);
@@ -226,8 +314,9 @@ fn example_06_cdx_index_vol_builds_queryable_surface() {
     // expiry (June 2026 from base 2026-05-08 ≈ 0.10959y on Act365F). With
     // fail_on_bad_fit relaxed the fit is approximate, but the queried vol
     // must still be a positive number in a sane lognormal range.
-    let vol = finstack_quant_models::volatility::get_surface_vol(&surface, 0.10958904, 0.00552848)
-        .expect("vol query at ATM forward should succeed");
+    let vol =
+        finstack_quant_models::volatility::get_surface_vol(&surface, 40.0 / 365.0, 0.00552848)
+            .expect("vol query at ATM forward should succeed");
     assert!(
         vol > 0.0 && vol < 5.0,
         "ATM vol should be in (0, 5), got {vol}"

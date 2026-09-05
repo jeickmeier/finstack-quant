@@ -242,12 +242,10 @@ impl Notional {
                             amount.amount()
                         )));
                     }
-                    // Track total amortization (positive amounts reduce outstanding)
                     if amount.amount() > 0.0 {
                         total_amort += amount.amount();
                     }
                 }
-                // Validate total amortization doesn't exceed initial notional
                 if total_amort > self.initial.amount() {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "CustomPrincipal total amortization ({:.2}) exceeds initial notional ({:.2})",

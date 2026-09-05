@@ -9,9 +9,6 @@ pub(crate) mod coupons;
 mod fees;
 mod helpers;
 
-// Shared f64 ↔ Decimal conversion helpers live in `finstack_quant_core::decimal`
-// and are re-exported here so submodules (coupons, fees, etc.) can use them
-// via `super::`.
 use finstack_quant_core::decimal::{decimal_to_f64, f64_to_decimal};
 
 pub(crate) use coupons::{emit_fixed_coupons_on, emit_float_coupons_on, ResolvedFloatMarket};

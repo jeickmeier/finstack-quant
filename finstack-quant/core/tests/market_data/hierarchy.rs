@@ -34,18 +34,15 @@ fn builder_creates_hierarchy_with_slash_paths() {
         .build()
         .unwrap();
 
-    // Check structure
-    assert_eq!(h.roots().len(), 2); // Rates, Credit
+    assert_eq!(h.roots().len(), 2);
     assert!(h.roots().contains_key("Rates"));
     assert!(h.roots().contains_key("Credit"));
 
-    // Check deep path
     let path: Vec<String> = vec!["Rates".into(), "USD".into(), "OIS".into()];
     let node = h.get_node(&path).unwrap();
     assert_eq!(node.curve_ids().len(), 1);
     assert_eq!(node.curve_ids()[0], CurveId::from("USD-OIS"));
 
-    // Check tags
     let credit_path: Vec<String> = vec![
         "Credit".into(),
         "US".into(),
@@ -140,7 +137,6 @@ fn serde_round_trip() {
     let json = serde_json::to_string_pretty(&h).unwrap();
     let deserialized: MarketDataHierarchy = serde_json::from_str(&json).unwrap();
 
-    // Verify structure preserved
     assert_eq!(deserialized.roots().len(), h.roots().len());
     assert_eq!(deserialized.all_curve_ids().len(), h.all_curve_ids().len());
 

@@ -48,7 +48,6 @@ impl HierarchyBuilder {
             }
         };
 
-        // Ensure the root exists
         let root_name = segments[0].clone();
         if !self.hierarchy.roots.contains_key(root_name.as_str()) {
             self.hierarchy
@@ -56,8 +55,6 @@ impl HierarchyBuilder {
                 .insert(root_name.clone(), HierarchyNode::new(root_name.as_str()));
         }
 
-        // Navigate down creating children as needed — we avoid unwrap by using
-        // `get_or_create_child` which always returns a valid mutable reference.
         if let Some(root) = self.hierarchy.roots.get_mut(root_name.as_str()) {
             let mut current = root;
             for segment in &segments[1..] {

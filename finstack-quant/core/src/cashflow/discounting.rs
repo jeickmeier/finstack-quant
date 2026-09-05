@@ -326,7 +326,6 @@ pub(crate) fn npv_with_ctx<D: Discounting + ?Sized>(
     }
     let ccy = flows[0].1.currency();
 
-    // Validate all cashflows have the same currency
     for (_, amt) in flows.iter().skip(1) {
         if amt.currency() != ccy {
             return Err(crate::Error::CurrencyMismatch {
@@ -697,8 +696,6 @@ mod tests {
             id: CurveId::new("USD-OIS"),
         };
         let base = curve.base_date();
-        // Flows must be strictly after the valuation date to be included
-        // ().
         let pay = base + time::Duration::days(1);
         let flows = vec![
             (pay, Money::from((10_i64, crate::currency::Currency::USD))),

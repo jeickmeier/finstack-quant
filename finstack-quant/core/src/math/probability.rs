@@ -90,13 +90,11 @@ pub fn joint_probabilities(
 ) -> crate::Result<(f64, f64, f64, f64)> {
     validate_inputs(p1, p2, Some(correlation))?;
 
-    // Handle degenerate cases (zero variance)
     let var1 = p1 * (1.0 - p1);
     let var2 = p2 * (1.0 - p2);
 
     if var1 < DEGENERATE_VARIANCE_THRESHOLD || var2 < DEGENERATE_VARIANCE_THRESHOLD {
-        // Degenerate case: at least one probability is 0 or 1
-        // Return independent joint probabilities (correlation is meaningless)
+        // Degenerate Bernoulli: correlation is unidentified, so use independence.
         return Ok((
             p1 * p2,
             p1 * (1.0 - p2),
@@ -109,7 +107,6 @@ pub fn joint_probabilities(
     let (rho_min, rho_max) = correlation_bounds(p1, p2)?;
     let rho = correlation.clamp(rho_min, rho_max);
 
-    // Compute covariance from clamped correlation
     let cov = rho * (var1 * var2).sqrt();
 
     // Joint probabilities via Bernoulli coupling

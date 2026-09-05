@@ -702,11 +702,7 @@ impl StepParams {
             }
             StepParams::Parametric(p) => StepIo {
                 kind: "parametric",
-                reads: p
-                    .discount_curve_id
-                    .as_ref()
-                    .map(|id| vec![id.to_string()])
-                    .unwrap_or_default(),
+                reads: Vec::new(),
                 writes: vec![p.curve_id.to_string()],
                 primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
             },
@@ -1250,7 +1246,9 @@ fn default_student_t_correlation() -> f64 {
 /// Parameters for Hull-White 1-factor model calibration step.
 ///
 /// Calibrates κ (mean reversion) and σ (short rate volatility) by fitting
-/// European swaption market prices using Jamshidian decomposition.
+/// ATM European swaption market prices using Jamshidian decomposition.
+/// Supplied strikes must match the contractual forward swap rate within
+/// `1e-8` in decimal rate units (0.0001 bp); off-ATM quotes are rejected.
 #[cfg_attr(feature = "ts_export", derive(TS))]
 #[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1516,7 +1514,8 @@ pub struct XccyBasisParams {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ParametricCurveParams {
-    /// Identifier for the parametric curve being built.
+    /// Identifier for the single discount curve being fitted. All calibration
+    /// instruments use this curve for discounting and implied projection.
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub curve_id: CurveId,
     /// Base date for the curve.
@@ -1530,10 +1529,6 @@ pub struct ParametricCurveParams {
     /// Nelson-Siegel variant (NS or NSS).
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub model: NsVariant,
-    /// Optional separate discount curve ID for multi-curve instrument pricing.
-    #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
-    pub discount_curve_id: Option<CurveId>,
     /// Optional initial parameter guesses.
     #[serde(default)]
     #[cfg_attr(feature = "ts_export", ts(type = "unknown | null"))]

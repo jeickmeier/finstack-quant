@@ -75,9 +75,6 @@
 //! - Expected shortfall: `docs/REFERENCES.md#artzner1999CoherentRisk`
 //! - Active-portfolio context: `docs/REFERENCES.md#grinoldKahn1999ActivePortfolio`
 
-// Internal re-exports of frequently used `finstack-quant-core` modules.
-// Kept `pub(crate)` so they don't leak into the public API; downstream callers
-// should import from `finstack_quant_core` directly.
 pub(crate) use finstack_quant_core::{dates, error, math};
 
 pub(crate) type Result<T> = finstack_quant_core::Result<T>;

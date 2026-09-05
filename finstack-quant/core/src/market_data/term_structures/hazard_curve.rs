@@ -464,7 +464,6 @@ impl HazardCurve {
             "HazardCurve invariant violated: empty lambdas"
         );
         if t <= 0.0 {
-            // Return first hazard rate for t<=0
             return self.lambdas[0];
         }
 
@@ -895,8 +894,6 @@ impl HazardCurve {
     /// base date backward rather than rejecting the request.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
         let new_base = self.base + time::Duration::days(days);
-        // Use consistent day count logic (same as DiscountCurve/ForwardCurve)
-        // This is a behavior change from "days/365.0" to actual day count, which is more correct.
         let dt_years =
             self.day_count
                 .year_fraction(self.base, new_base, DayCountContext::default())?;
@@ -917,20 +914,14 @@ impl HazardCurve {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
 
-        // Also roll par spread points
-        // Note: par_spreads also use "t" as years from base, so we can reuse roll_knots logic
-        // even though they aren't "knots" for the curve itself.
         let rolled_par_points =
             super::common::roll_knots(&self.par_tenors, &self.par_spreads_bp, dt_years);
 
-        // Thread the full metadata (issuer, seniority, currency, day-count,
-        // par/survival interpolation styles, fx_policy) and override the base.
         let mut builder = self
             .metadata_builder(self.id.clone())
             .base_date(new_base)
             .knots(rolled_points);
 
-        // Add rolled par spread points if any
         if !rolled_par_points.is_empty() {
             builder = builder.par_spreads(rolled_par_points);
         }
@@ -953,19 +944,11 @@ impl HazardCurve {
     /// * `method` - Named algorithm or interpolation method applied by the operation
     #[must_use]
     pub fn cds_quote_bp(&self, t: f64, method: ParInterp) -> f64 {
-        // If the curve was constructed without explicit par-spread quotes, fall back to a
-        // simple hazard-based approximation instead of panicking inside interpolators.
-        //
-        // This function is used in some pricing paths (e.g., options) to obtain a
-        // representative spread at a horizon, so "no quotes" must be handled gracefully.
         if self.par_tenors.len() < 2 || self.par_tenors.len() != self.par_spreads_bp.len() {
             let lambda = self.hazard_rate(t.max(0.0));
             return (lambda * (1.0 - self.recovery_rate) * 10_000.0).max(0.0);
         }
 
-        // Use shared interpolation strategies from math::interp
-        // Note: For LogLinear, we rebuild the strategy on the fly since we don't store log-values for par spreads.
-        // This involves allocation but is acceptable for a reporting method.
         match method {
             ParInterp::Linear => {
                 let strat = LinearStrategy;
@@ -977,8 +960,6 @@ impl HazardCurve {
                 )
             }
             ParInterp::LogLinear => {
-                // If construction fails (e.g. non-positive values), fallback to linear to match previous behavior
-                // which just did linear if y1 <= 0 || y2 <= 0.
                 if let Ok(strat) = LogLinearStrategy::from_raw(
                     &self.par_tenors,
                     &self.par_spreads_bp,
@@ -991,7 +972,6 @@ impl HazardCurve {
                         ExtrapolationPolicy::FlatForward,
                     )
                 } else {
-                    // Fallback to linear if log-linear fails construction (e.g. 0 or negative spreads)
                     let strat = LinearStrategy;
                     strat.interp(
                         t,
@@ -1004,8 +984,6 @@ impl HazardCurve {
         }
     }
 }
-
-// Minimal trait implementations for polymorphism where needed
 
 impl Survival for HazardCurve {
     #[inline]
@@ -1275,7 +1253,6 @@ impl HazardCurveBuilder {
             }
         }
 
-        // Validate recovery rate bounds
         super::common::validate_unit_range(recovery_rate, "recovery_rate")?;
 
         let mut points = self.points;
@@ -1562,17 +1539,6 @@ mod tests {
             .build()
             .expect("Builder works");
 
-        // Roll forward 182.5 days (0.5 years)
-        // 0.5 year point should expire (become 0.0) -> filtered out?
-        // Wait, roll_knots filters if t <= 0.0.
-        // 0.5 - 0.5 = 0.0. So it should be filtered out.
-        // Resulting curve needs at least 1 point (builder requires it).
-        // Actually builder requires "At least one knot point" (line 622).
-        // roll_forward returns error if < 2 points?
-        // Let's check roll_forward implementation again.
-        // "if rolled_points.len() < 2 { return Err(...) }"
-        // So we need enough points surviving.
-
         let hc = HazardCurve::builder("TEST-ROLL")
             .base_date(base)
             .day_count(DayCount::Act365F)
@@ -1583,10 +1549,8 @@ mod tests {
 
         let rolled = hc.roll_forward(183).expect("Roll should succeed"); // > 0.5 years
 
-        // Base date should be shifted
         assert_eq!(rolled.base_date(), base + time::Duration::days(183));
 
-        // Knots should be shifted
         let knots: Vec<f64> = rolled.knot_points().map(|(t, _)| t).collect();
         assert_eq!(knots.len(), 3);
         assert!(

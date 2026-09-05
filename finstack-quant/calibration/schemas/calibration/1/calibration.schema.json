@@ -1352,19 +1352,7 @@
             },
             "curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Identifier for the parametric curve being built."
-            },
-            "discount_curve_id": {
-              "anyOf": [
-                {
-                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Optional separate discount curve ID for multi-curve instrument pricing."
+              "description": "Identifier for the single discount curve being fitted. All calibration\ninstruments use this curve for discounting and implied projection."
             },
             "initial_params": {
               "anyOf": [

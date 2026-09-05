@@ -807,8 +807,6 @@ fn build_periods_with_calendar<C: PeriodCalendar>(
     Ok(PeriodPlan { periods })
 }
 
-// (old local variants of make_period were replaced by calendar-based helper)
-
 fn make_period_with_calendar<C: PeriodCalendar>(
     pid: PeriodId,
     calendar: &C,
@@ -950,14 +948,11 @@ fn fiscal_quarter_bounds(
     q: u8,
     config: FiscalConfig,
 ) -> crate::Result<(Date, Date)> {
-    // Calculate the start of the fiscal year
     let fy_start = fiscal_year_start(fiscal_year, config)?;
 
-    // Each quarter is 3 months
     let quarter_start_month_offset = (q - 1) * 3;
     let quarter_end_month_offset = q * 3;
 
-    // Calculate start and end dates for the quarter
     let start = fy_start.add_months(quarter_start_month_offset as i32);
     let end = fy_start.add_months(quarter_end_month_offset as i32);
 
@@ -969,10 +964,8 @@ fn fiscal_month_bounds(
     m: u8,
     config: FiscalConfig,
 ) -> crate::Result<(Date, Date)> {
-    // Calculate the start of the fiscal year
     let fy_start = fiscal_year_start(fiscal_year, config)?;
 
-    // Calculate start and end dates for the month
     let start = fy_start.add_months((m - 1) as i32);
     let end = fy_start.add_months(m as i32);
 
@@ -990,11 +983,9 @@ fn fiscal_week_bounds(
 ) -> crate::Result<(Date, Date)> {
     use time::Duration;
 
-    // Calculate the start of the fiscal year
     let fy_start = fiscal_year_start(fiscal_year, config)?;
     let fy_end = fiscal_year_start(fiscal_year + 1, config)?;
 
-    // Calculate start and end dates for the week
     let start = fy_start + Duration::days(((w - 1) as i64) * 7);
     if start >= fy_end {
         return Err(invalid_period(
@@ -1012,10 +1003,8 @@ fn fiscal_half_bounds(
     h: u8,
     config: FiscalConfig,
 ) -> crate::Result<(Date, Date)> {
-    // Calculate the start of the fiscal year
     let fy_start = fiscal_year_start(fiscal_year, config)?;
 
-    // Each half is 6 months
     let half_start_month_offset = (h - 1) * 6;
     let half_end_month_offset = h * 6;
 
@@ -1033,14 +1022,11 @@ fn fiscal_annual_bounds(fiscal_year: i32, config: FiscalConfig) -> crate::Result
 
 /// Calculate the start date of a fiscal year
 fn fiscal_year_start(fiscal_year: i32, config: FiscalConfig) -> crate::Result<Date> {
-    // For fiscal years that start in months other than January,
-    // we need to determine the correct calendar year
     let calendar_year = if config.start_month == 1 {
         fiscal_year
     } else {
-        // Fiscal year starts in the previous calendar year
-        // E.g., FY2025 starting Oct 1 begins on Oct 1, 2024
-        // E.g., FY2025 starting Apr 1 begins on Apr 1, 2024
+        // Non-January fiscal years start in the previous calendar year
+        // (FY2025 starting Oct 1 begins 2024-10-01).
         fiscal_year - 1
     };
 
@@ -1100,7 +1086,6 @@ fn parse_range_with_calendar<C: PeriodCalendar>(
             start.kind.build_id(start.year, index)
         }
     };
-    // Validate period kind consistency and non-inverted ranges
     if start.kind != end.kind {
         return Err(invalid_period(
             s,

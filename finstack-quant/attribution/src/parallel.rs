@@ -282,10 +282,6 @@ fn extract_if_used(
 
 fn restored_factor_has_data(factor: ParallelRestoredFactor, snapshot: &MarketSnapshot) -> bool {
     match factor {
-        // Fix: gate Rates on the underlying snapshot so we don't burn a
-        // reprice — or, worse, *drop* T1 rate curves when T0 has none — when
-        // neither market has rates. Aligns with the other restored-factor
-        // variants' semantics.
         ParallelRestoredFactor::Rates => {
             !snapshot.discount_curves.is_empty()
                 || !snapshot.forward_curves.is_empty()
@@ -328,9 +324,8 @@ fn restored_factor_has_data(factor: ParallelRestoredFactor, snapshot: &MarketSna
 ///
 /// Returns `None` if the snapshot contains no data for the factor (so the
 /// attribution field stays at its zero default). Returns
-/// `Some((factor_pnl, val_with_t0, market_with_t0))` when the factor was
-/// populated — the caller uses `val_with_t0` for cross-factor repricings and
-/// can reuse `market_with_t0` as the base for compound markets.
+/// `Some((factor_pnl, val_with_t0))` when the factor was populated — the
+/// caller uses `val_with_t0` for cross-factor repricings.
 #[allow(clippy::too_many_arguments)]
 fn reprice_factor_restored_once(
     instrument: &Arc<dyn Instrument>,
@@ -355,11 +350,9 @@ fn reprice_factor_restored_once(
 ///
 /// The helper extracts a combined snapshot with the requested flags from
 /// `market_t0`, restores it onto `market_t1`, reprices, and feeds the result
-/// into `cross_interaction_pnl`. This is equivalent (and bit-identical) to the
-/// explicit per-family snapshot-and-restore chaining used previously:
-/// `restore_market` only touches flagged families, so a single combined
-/// `(A | B)` restore from `market_t0` produces the same market as stacking an
-/// `A` restore followed by a `B` restore.
+/// into `cross_interaction_pnl`. A combined `(A | B)` restore from `market_t0`
+/// produces the same market as stacking an `A` restore followed by a `B`
+/// restore, because `restore_market` only touches flagged families.
 ///
 /// Each call performs exactly one repricing; the caller is responsible for
 /// adding to its repricing counter in a deterministic order (this function is
@@ -594,7 +587,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
     // unchanged T₀ market context, so the T₀ context is used directly rather
     // than deep-cloned (the reprice and carry-input helpers only borrow it).
     //
-    // FIXINGS UNDER CARRY (prior fix): the frozen T₀ market has no
+    // FIXINGS UNDER CARRY: the frozen T₀ market has no
     // fixing for the T₁ date, so seasoned floating-rate pricing falls back to
     // last-observation-carried-forward (`ScalarTimeSeries::value_on` LOCF) —
     // i.e. carry assumes the latest known fixing persists, the "unchanged

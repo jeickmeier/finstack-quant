@@ -32,8 +32,6 @@ use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use time::Month;
 
-// Amortization Scheme Tests
-
 #[test]
 fn linear_vs_step_parity() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
@@ -44,19 +42,12 @@ fn linear_vs_step_parity() {
         rate: Decimal::try_from(0.05).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::quarterly(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "weekends_only".to_string(),
-
             stub: StubKind::None,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
@@ -64,7 +55,6 @@ fn linear_vs_step_parity() {
 
     let init = Money::new(1_000.0, Currency::USD).expect("valid money fixture");
 
-    // Linear
     let mut b1 = CashFlowSchedule::builder();
     let _ = b1
         .principal(init, issue, maturity)
@@ -74,7 +64,6 @@ fn linear_vs_step_parity() {
         .fixed_cf(fixed.clone());
     let s1 = b1.build(None).unwrap();
 
-    // Step schedule equivalent
     let sched = finstack_quant_cashflows::builder::periods::build_periods(
         finstack_quant_cashflows::builder::periods::BuildPeriodsParams {
             start: issue,
@@ -135,19 +124,12 @@ fn pik_capitalization_increases_outstanding() {
         rate: Decimal::try_from(0.10).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::semi_annual(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "weekends_only".to_string(),
-
             stub: StubKind::None,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
@@ -157,7 +139,6 @@ fn pik_capitalization_increases_outstanding() {
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let s = b.build(None).unwrap();
     let path = s.outstanding_by_date().unwrap();
-    // Find last outstanding before redemption
     let last_before = path
         .iter()
         .rev()
@@ -330,8 +311,6 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
     );
 }
 
-// Flow Ordering Tests
-
 #[test]
 fn ordering_invariants_within_date() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
@@ -345,25 +324,17 @@ fn ordering_invariants_within_date() {
         rate: Decimal::try_from(0.10).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::quarterly(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "weekends_only".to_string(),
-
             stub: StubKind::None,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
     };
 
-    // Percent-per-period amortization to force amort on coupon dates
     let mut b = CashFlowSchedule::builder();
     let _ = b
         .principal(init, issue, maturity)
@@ -371,7 +342,7 @@ fn ordering_invariants_within_date() {
         .fixed_cf(fixed);
     let s = b.build(None).unwrap();
 
-    // On coupon dates where multiple flows exist, enforce order: Fixed/Stub -> Amortization -> PIK -> Notional
+    // Same-date order: Fixed/Stub -> Amortization -> PIK -> Notional
     let mut by_date: finstack_quant_core::HashMap<Date, Vec<CFKind>> =
         finstack_quant_core::HashMap::default();
     for cf in s.get_flows() {
@@ -392,8 +363,6 @@ fn ordering_invariants_within_date() {
     }
 }
 
-// PV/NPV Calculation Tests
-
 #[test]
 fn fixed_schedule_npv_equals_sum_cashflows() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
@@ -404,19 +373,12 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
         rate: Decimal::try_from(0.05).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::semi_annual(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "weekends_only".to_string(),
-
             stub: StubKind::None,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
@@ -428,8 +390,8 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = b.build(None).unwrap();
 
-    // Use a flat DF=1.0 curve for this test (testing NPV = sum when no discounting)
-    // NOTE: Flat curves are not monotonically decreasing, so must allow_non_monotonic()
+    // Flat DF=1.0: NPV equals strictly-future cash; issue funding is already settled.
+    // Flat knots are not monotonically decreasing, so allow_non_monotonic is required.
     let curve = CoreDiscCurve::builder("USD-OIS")
         .base_date(issue)
         .knots([(0.0, 1.0), (5.0, 1.0)])
@@ -439,14 +401,12 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
                 allow_non_monotonic: true,
                 forward_floor: None,
             },
-        ) // Flat curve for testing NPV = sum of cashflows
+        )
         .build()
         .unwrap();
 
     let pv = schedule.npv(&curve, curve.base_date()).unwrap();
 
-    // PV with flat curve DF=1.0 should equal only strictly-future cashflows;
-    // the issue-date funding exchange is already settled at the valuation date.
     let expected = schedule
         .get_flows()
         .iter()
@@ -460,8 +420,6 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
     );
 }
 
-// Stub Period Detection Tests
-
 #[test]
 fn detects_stub_periods() {
     let issue = Date::from_calendar_date(2025, Month::January, 10).unwrap(); // irregular
@@ -472,19 +430,12 @@ fn detects_stub_periods() {
         rate: Decimal::try_from(0.04).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::semi_annual(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "weekends_only".to_string(),
-
             stub: StubKind::ShortFront,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
@@ -496,14 +447,12 @@ fn detects_stub_periods() {
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = b.build(None).unwrap();
 
-    // Find coupon flows (not notional)
     let coupon_flows: Vec<&CashFlow> = schedule
         .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Fixed || cf.kind == CFKind::Stub)
         .collect();
 
-    // At least one should be a stub due to irregular start date
     let has_stub = coupon_flows.iter().any(|cf| cf.kind == CFKind::Stub);
     assert!(
         has_stub,
@@ -578,8 +527,6 @@ fn negative_rate_fixed_coupons_are_emitted() {
     }
 }
 
-// Strict serde on builder specs
-
 /// Unknown (typo'd) fields in nested specs must be rejected, not silently
 /// defaulted.
 #[test]
@@ -616,15 +563,12 @@ fn floating_rate_spec_rejects_floor_bp_alias() {
     assert!(error.to_string().contains("floor_bp"));
 }
 
-// Outstanding Balance Tracking Tests
-
 #[test]
 fn outstanding_by_date_dedup_and_values() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::July, 15).unwrap();
     let init = Money::new(10_000.0, Currency::USD).expect("valid money fixture");
 
-    // Force multiple flows per date: split coupon (cash + PIK) and amortization on coupon dates
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Split {
             cash_pct: Decimal::try_from(0.5).expect("valid"),
@@ -633,19 +577,12 @@ fn outstanding_by_date_dedup_and_values() {
         rate: Decimal::try_from(0.12).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::quarterly(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "weekends_only".to_string(),
-
             stub: StubKind::None,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
@@ -660,17 +597,13 @@ fn outstanding_by_date_dedup_and_values() {
 
     let end_by_date = s.outstanding_by_date().unwrap();
 
-    // 1) One entry per unique date
     let unique_dates: std::collections::BTreeSet<Date> =
         s.get_flows().iter().map(|cf| cf.date).collect();
     assert_eq!(end_by_date.len(), unique_dates.len());
-    // Dates are ordered
     for ((d1, _), d2) in end_by_date.iter().zip(unique_dates.iter()) {
         assert_eq!(d1, d2);
     }
 
-    // 2) Verify outstanding values are non-negative before maturity
-    //    and zero at maturity (after redemption)
     for (i, (d, m)) in end_by_date.iter().enumerate() {
         assert!(
             m.amount() >= -0.01,
@@ -689,7 +622,6 @@ fn outstanding_by_date_dedup_and_values() {
         }
     }
 
-    // 3) At issue date, outstanding should be initial notional
     if let Some((d, m)) = end_by_date.first() {
         assert_eq!(*d, issue);
         assert!(
@@ -700,8 +632,6 @@ fn outstanding_by_date_dedup_and_values() {
         );
     }
 
-    // 4) Outstanding should decrease over time (due to amortization, despite PIK)
-    //    with net decrease until maturity
     let first_outstanding = end_by_date.first().map(|(_, m)| m.amount()).unwrap_or(0.0);
     let last_outstanding = end_by_date.last().map(|(_, m)| m.amount()).unwrap_or(0.0);
     assert!(
@@ -798,19 +728,12 @@ fn builder_created_schedule_sets_issue_date_for_outstanding_by_date() {
         rate: Decimal::try_from(0.05).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::quarterly(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "weekends_only".to_string(),
-
             stub: StubKind::None,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
@@ -880,11 +803,8 @@ fn fixed_fee_on_issue_date_is_emitted() {
     );
 }
 
-// Error Handling Tests
-
 #[test]
 fn schedule_errors_on_unknown_calendar() {
-    // Test that schedule generation propagates calendar lookup errors
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
 
@@ -893,19 +813,12 @@ fn schedule_errors_on_unknown_calendar() {
         rate: Decimal::try_from(0.05).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::semi_annual(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "UNKNOWN_CALENDAR_XYZ".to_string(),
-
             stub: StubKind::None,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
@@ -927,11 +840,8 @@ fn schedule_errors_on_unknown_calendar() {
     );
 }
 
-// Day Count Convention in Schedule Context Tests
-
 #[test]
 fn stub_period_thirty360_produces_proportional_accrual() {
-    // Test that stub periods with 30/360 day count produce proportionally smaller accrued amounts
     // Market convention: 30/360 treats each month as 30 days and each year as 360 days
     let issue = Date::from_calendar_date(2025, Month::February, 10).unwrap(); // Irregular start (10th)
     let maturity = Date::from_calendar_date(2026, Month::February, 15).unwrap(); // Regular end (15th)
@@ -940,10 +850,8 @@ fn stub_period_thirty360_produces_proportional_accrual() {
         coupon_type: CouponType::Cash,
         rate: Decimal::try_from(0.06).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
-            // 6% annual rate
             frequency: Tenor::semi_annual(),
             day_count: DayCount::Thirty360,
-            // Market standard for corporate bonds
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: "weekends_only".to_string(),
             stub: StubKind::ShortFront,
@@ -960,14 +868,12 @@ fn stub_period_thirty360_produces_proportional_accrual() {
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed.clone());
     let schedule = b.build(None).unwrap();
 
-    // Find coupon flows only
     let coupon_flows: Vec<&CashFlow> = schedule
         .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Fixed || cf.kind == CFKind::Stub)
         .collect();
 
-    // Should have at least one stub period
     let stubs: Vec<&&CashFlow> = coupon_flows
         .iter()
         .filter(|cf| cf.kind == CFKind::Stub)
@@ -1052,7 +958,6 @@ fn coupon_amount_golden_values() {
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = b.build(None).unwrap();
 
-    // Find coupon flows
     let coupons: Vec<&CashFlow> = schedule
         .get_flows()
         .iter()
@@ -1086,7 +991,6 @@ fn coupon_amount_golden_values() {
             coupon.amount.amount()
         );
 
-        // Verify accrual factor is approximately 0.5 for semi-annual
         assert!(
             (coupon.accrual_factor - 0.5).abs() < 0.01,
             "Accrual factor should be ~0.5 for semi-annual, got {}",
@@ -1094,7 +998,6 @@ fn coupon_amount_golden_values() {
         );
     }
 
-    // Verify principal redemption amount
     let redemption: Vec<&CashFlow> = schedule
         .get_flows()
         .iter()
@@ -1114,8 +1017,6 @@ fn coupon_amount_golden_values() {
     );
 }
 
-// Conservation Invariant Tests
-
 /// Invariant test: cashflow conservation for a par bullet bond.
 ///
 /// For a fixed-rate bullet bond, the undiscounted sum of all principal
@@ -1134,19 +1035,12 @@ fn cashflow_conservation_bond_principal() {
         rate: Decimal::try_from(0.05).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::quarterly(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "weekends_only".to_string(),
-
             stub: StubKind::None,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
@@ -1158,7 +1052,6 @@ fn cashflow_conservation_bond_principal() {
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = b.build(None).unwrap();
 
-    // Sum principal-related flows (Notional + Amortization)
     let principal_sum: f64 = schedule
         .get_flows()
         .iter()
@@ -1189,19 +1082,12 @@ fn cashflow_conservation_amortizing_bond_principal() {
         rate: Decimal::try_from(0.04).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::quarterly(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "weekends_only".to_string(),
-
             stub: StubKind::None,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
@@ -1217,7 +1103,6 @@ fn cashflow_conservation_amortizing_bond_principal() {
         .amortization(AmortizationSpec::LinearTo { final_notional });
     let schedule = b.build(None).unwrap();
 
-    // Sum principal-related flows
     let principal_sum: f64 = schedule
         .get_flows()
         .iter()
@@ -1245,19 +1130,12 @@ fn outstanding_never_negative() {
         rate: Decimal::try_from(0.04).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::quarterly(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "weekends_only".to_string(),
-
             stub: StubKind::None,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
@@ -1273,7 +1151,6 @@ fn outstanding_never_negative() {
         .amortization(AmortizationSpec::LinearTo { final_notional });
     let schedule = b.build(None).unwrap();
 
-    // Get outstanding path (returns Vec<(Date, Money)>)
     let outstanding_path = schedule
         .outstanding_by_date()
         .expect("outstanding path should succeed");
@@ -1298,19 +1175,12 @@ fn npv_decreases_with_higher_discount_rate() {
         rate: Decimal::try_from(0.05).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::semi_annual(),
-
             day_count: DayCount::Act365F,
-
             business_day_convention: BusinessDayConvention::Following,
-
             calendar_id: "weekends_only".to_string(),
-
             stub: StubKind::None,
-
             end_of_month: false,
-
             payment_lag_days: 0,
-
             adjust_accrual_dates: false,
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         },
@@ -1322,7 +1192,6 @@ fn npv_decreases_with_higher_discount_rate() {
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = b.build(None).unwrap();
 
-    // Build curves at different rates
     let build_curve = |rate: f64| {
         CoreDiscCurve::builder("USD-OIS")
             .base_date(issue)
@@ -1358,8 +1227,6 @@ fn npv_decreases_with_higher_discount_rate() {
         npv_7pct.amount()
     );
 }
-
-// Weighted Average Life (WAL) Tests
 
 #[test]
 fn test_weighted_average_life_two_amort() {

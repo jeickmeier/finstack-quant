@@ -24,17 +24,12 @@
 //! clone of `current_market`, then each FLAGGED family is dropped and
 //! replaced from the snapshot. Families the snapshot does not model — credit
 //! indices, collateral CSA mappings, hierarchy — always survive the restore
-//! unchanged (the previous from-scratch rebuild silently dropped them,
-//! breaking every instrument that depends on them).
+//! unchanged.
 //!
 //! Every curve is owned by exactly one flag family. Attribution execution uses
 //! the instrument's declared credit roles to assign risky discount curves to
 //! `CREDIT`; the generic snapshot API uses the storage defaults below. Each
-//! [`CurveStorage`] variant otherwise has one default family (price
-//! / vol-index / basis-spread / parametric curves previously
-//! survived every restore at their pre-restore state, so a waterfall /
-//! parallel attribution never moved them to T1 and their P&L fell into the
-//! residual):
+//! [`CurveStorage`] variant otherwise has one default family:
 //!
 //! | `CurveStorage` variant | Flag family | Attribution factor |
 //! |------------------------|-------------|--------------------|
@@ -566,8 +561,7 @@ impl MarketSnapshot {
         // absent from `snapshot` must NOT appear in the result. This keeps factor
         // isolation correct for the attribution call paths.
         //
-        // `FIXING:`-prefixed series are EXCLUDED from the scalars family: they
-        // belong to the rates (FORWARD) family below (prior fix).
+        // `FIXING:`-prefixed series belong to the rates (FORWARD) family below.
         if restore_flags.contains(MarketRestoreFlags::SCALARS) {
             let preserved_fixings: Vec<ScalarTimeSeries> = new_market
                 .series_iter()

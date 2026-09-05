@@ -288,7 +288,6 @@ impl TimeGrid {
             return Err(crate::error::InputError::Invalid.into());
         }
 
-        // Validate monotonicity and check for duplicate/near-duplicate times
         const MIN_DT_THRESHOLD: f64 = 1e-12;
         for i in 1..times.len() {
             if !times[i].is_finite() {
@@ -317,7 +316,6 @@ impl TimeGrid {
             dts.push(dt);
         }
 
-        // Check for minimum dt to prevent numerical issues
         const MIN_DT: f64 = 1e-10;
         if let Some(&min_dt) = dts.iter().min_by(|a, b| a.total_cmp(b)) {
             if min_dt < MIN_DT {
@@ -325,7 +323,6 @@ impl TimeGrid {
             }
         }
 
-        // Store t_max from the last time point (guaranteed to exist after validation)
         let t_max = times.last().copied().unwrap_or(0.0);
         Ok(Self { times, dts, t_max })
     }

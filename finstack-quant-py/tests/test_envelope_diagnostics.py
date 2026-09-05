@@ -10,10 +10,42 @@ import pytest
 
 from finstack_quant.calibration import (
     CalibrationEnvelopeError,
+    CalibrationPlan,
+    CalibrationStep,
+    RateQuote,
     calibrate,
     dry_run,
     validate_calibration_json,
 )
+
+
+@pytest.mark.parametrize("same_set", [True, False])
+def test_attached_quote_id_rejects_conflicting_payloads(same_set: bool) -> None:
+    steps = [
+        CalibrationStep.discount(
+            "A", "USD", "2026-05-08", quote_set="shared", quotes=[RateQuote.deposit("D", "USD-Deposit", "1Y", 0.03)]
+        ),
+        CalibrationStep.discount(
+            "B",
+            "USD",
+            "2026-05-08",
+            quote_set="shared" if same_set else "other",
+            quotes=[RateQuote.deposit("D", "USD-Deposit", "1Y", 0.08)],
+        ),
+    ]
+    with pytest.raises(ValueError, match="conflicting attached payloads"):
+        CalibrationPlan(steps)
+
+
+@pytest.mark.parametrize("explicit", [True, False])
+def test_attached_quotes_survive_set_registration_and_deduplicate(explicit: bool) -> None:
+    quote = RateQuote.deposit("D", "USD-Deposit", "1Y", 0.03)
+    steps = [
+        CalibrationStep.discount(curve, "USD", "2026-05-08", quotes=[quote], quote_set="shared") for curve in ["A", "B"]
+    ]
+    plan = CalibrationPlan(steps, quote_sets={"shared": ["D"]} if explicit else None)
+    assert len(plan.market_data) == 1
+    assert calibrate(plan).success
 
 
 def _empty_envelope() -> dict:
@@ -27,6 +59,11 @@ def _empty_envelope() -> dict:
             "settings": {},
         },
     }
+
+
+def test_parametric_step_rejects_removed_separate_discount_option() -> None:
+    with pytest.raises(ValueError, match="discount_curve_id"):
+        CalibrationStep.parametric("NS", "2026-05-08", quote_set="rates", discount_curve_id="USD-OIS")
 
 
 def test_dry_run_returns_json_report() -> None:

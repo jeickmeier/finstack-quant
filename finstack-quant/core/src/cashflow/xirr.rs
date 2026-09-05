@@ -263,21 +263,16 @@ pub fn xirr_with_daycount_ctx(
         ));
     }
 
-    // Find the earliest date (anchor) to compute year fractions from.
-    // This avoids sorting by date first; we sort once by year fraction.
     let first_date = flows.iter().map(|(d, _)| *d).min().ok_or_else(|| {
         crate::Error::Validation("Cashflows must contain at least one flow".to_string())
     })?;
 
-    // Compute (year_fraction, amount) for all flows in a single pass.
-    // Sorting by year fraction happens below after collection.
     let mut years_and_amounts: Vec<(f64, f64)> = Vec::with_capacity(flows.len());
     for (date, amount) in flows.iter().copied() {
         let years = day_count.signed_year_fraction(first_date, date, ctx)?;
         years_and_amounts.push((years, amount));
     }
 
-    // Sort once by year fraction (f64 total ordering).
     years_and_amounts.sort_by(|a, b| a.0.total_cmp(&b.0));
 
     // Aggregate entries with identical year-fractions by summing amounts.
@@ -313,18 +308,12 @@ fn solve_rate_of_return<I>(flows: I, guess: Option<f64>) -> crate::Result<f64>
 where
     I: IntoIterator<Item = (f64, f64)> + Clone,
 {
-    // We need to iterate multiple times:
-    // 1. Validation (sign change)
-    // 2. Solving (NPV / dNPV evaluation)
-    // So we collect into a vector.
     let mut data: Vec<(f64, f64)> = flows.into_iter().collect();
 
-    // Validate inputs
     if data.len() < 2 {
         return Err(InputError::TooFewPoints.into());
     }
 
-    // Check for sign change
     if !has_sign_change(data.iter().map(|&(_, amt)| amt)) {
         return Err(InputError::Invalid.into());
     }
@@ -386,15 +375,12 @@ where
         acc.total()
     };
 
-    // Newton solver with default configuration
     let newton = NewtonSolver::new()
         .tolerance(DEFAULT_TOLERANCE)
         .max_iterations(DEFAULT_MAX_ITERATIONS);
 
-    // Initial guess strategy: user-provided guess or default
     let initial_guess = guess.unwrap_or(DEFAULT_GUESS);
 
-    // Candidates: User guess + Combined list from legacy irr_periodic and xirr
     let seeds: &[f64] = &[
         initial_guess,
         0.1,   // 10% (common default)

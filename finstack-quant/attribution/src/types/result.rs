@@ -754,7 +754,6 @@ impl PnlAttribution {
             return Err(e);
         }
 
-        // Sum all attributed factors (safe now that currencies are validated)
         let mut attributed_sum = self.carry;
         attributed_sum = add_factor(
             attributed_sum,
@@ -1286,8 +1285,6 @@ mod tests {
         };
         apply_total_return_carry(&mut attr, theta, carry_inputs).expect("carry add");
 
-        // total_pnl is now total-return (1000 + 50 = 1050); mark-to-market
-        // must still report the raw pre-coupon price change (1000).
         assert_eq!(attr.total_pnl.amount(), 1050.0);
         assert_eq!(
             attr.mark_to_market_pnl.map(|m| m.amount()),

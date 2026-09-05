@@ -1,7 +1,6 @@
 //! Drawdown computation: series, episode detection, averaging, and CDaR.
 //!
-//! Crate-internal except for [`DrawdownEpisode`] (re-exported at the crate
-//! root). `///` doc examples target crate developers and are marked `ignore`.
+//! Crate-internal except for [`DrawdownEpisode`] (re-exported at the crate root).
 //!
 //! Drawdown measures the peak-to-trough decline in cumulative wealth.
 //! This module provides five levels of granularity:
@@ -130,14 +129,11 @@ pub(crate) fn drawdown_details(drawdown: &[f64], dates: &[Date], n: usize) -> Ve
     episodes
 }
 
-/// Shared drawdown-episode state machine.
-///
-/// Scans `drawdown` for episodes (contiguous runs where `d < -1e-15`) and
-/// invokes `emit(start_idx, valley_idx, end_idx, valley_val)` for each
-/// detected episode. `start_idx` is the index of the peak that preceded
-/// the episode (or `0` if the series begins in drawdown); `end_idx` is
-/// `Some(i)` when the episode recovers at index `i`, or `None` when the
-/// episode extends to the end of the series.
+/// Scan `drawdown` for episodes (contiguous runs where `d < -1e-15`) and
+/// invoke `emit(start_idx, valley_idx, end_idx, valley_val, truncated_at_start)`
+/// for each. `start_idx` is the peak that preceded the episode (or `0` if the
+/// series begins in drawdown); `end_idx` is `Some(i)` on recovery or `None`
+/// when the episode runs to the end of the series.
 fn for_each_episode<F>(drawdown: &[f64], mut emit: F)
 where
     F: FnMut(usize, usize, Option<usize>, f64, bool),
@@ -284,14 +280,8 @@ pub(crate) fn max_drawdown_duration(drawdown: &[f64], dates: &[Date]) -> i64 {
 
 /// Conditional Drawdown at Risk (CDaR) at the given confidence level.
 ///
-/// The mean signed drawdown in the worst `(1 - confidence)` empirical tail,
-/// fractionally weighting the boundary observation without expanding ties:
-///
-/// ```text
-/// CDaR_c = mean of exactly the worst (1-c) drawdown probability mass
-/// ```
-///
-/// CDaR is the drawdown analogue of Expected Shortfall (CVaR).
+/// Mean signed drawdown over the worst `(1 - confidence)` empirical tail,
+/// using the same fractional-mass convention as expected shortfall.
 ///
 /// # Arguments
 ///
@@ -424,20 +414,12 @@ mod tests {
     #[test]
     fn mean_episode_drawdown_deterministic() {
         let drawdown = [0.0, -0.10, -0.20, 0.0, -0.15, 0.0];
-        // Two episodes: depths −0.20 and −0.15; average of worst 2 = (−0.20 + −0.15)/2
         let avg = mean_episode_drawdown(&drawdown, 2);
         assert!((avg - (-0.175)).abs() < 1e-12);
     }
 
     #[test]
     fn cdar_hand_calc() {
-        // dd = [−0.10, −0.20, −0.05, −0.15, −0.25, −0.30, −0.02, −0.08, −0.12, −0.18]
-        // abs = [0.10, 0.20, 0.05, 0.15, 0.25, 0.30, 0.02, 0.08, 0.12, 0.18]
-        // sorted: [0.02, 0.05, 0.08, 0.10, 0.12, 0.15, 0.18, 0.20, 0.25, 0.30]
-        // quantile(0.80): h = 9*0.8 = 7.2, lo=7 (0.20), hi=8 (0.25), frac=0.2
-        // threshold = 0.20 + 0.2*(0.25−0.20) = 0.21
-        // Tail (abs_dd ≥ 0.21): [0.25, 0.30]
-        // CDaR = (0.25 + 0.30) / 2 = 0.275
         let dd = [
             -0.10, -0.20, -0.05, -0.15, -0.25, -0.30, -0.02, -0.08, -0.12, -0.18,
         ];
@@ -447,15 +429,11 @@ mod tests {
 
     #[test]
     fn cdar_worse_than_max_drawdown_var() {
-        // CDaR at any confidence ≥ the quantile threshold (it's a tail average,
-        // returned with non-positive sign).
         let dd = [
             -0.01, -0.05, -0.10, -0.15, -0.20, 0.0, -0.03, -0.08, -0.12, -0.18,
         ];
         let c95 = cdar(&dd, 0.95);
         let c80 = cdar(&dd, 0.80);
-        // Higher confidence → fewer, more extreme tail observations → more
-        // negative CDaR (larger in magnitude).
         assert!(c95 <= c80);
     }
 
@@ -472,7 +450,6 @@ mod tests {
 
     #[test]
     fn cdar_uniform_drawdown() {
-        // All drawdowns identical at −5% → CDaR = −5% regardless of confidence
         let dd = [-0.05; 20];
         let c = cdar(&dd, 0.95);
         assert!((c - (-0.05)).abs() < 1e-12);

@@ -171,7 +171,6 @@ impl HolidayCalendar for Calendar {
     }
 }
 
-// Also implement HolidayCalendar for &Calendar for convenience
 impl HolidayCalendar for &Calendar {
     fn is_holiday(&self, date: Date) -> bool {
         (*self).is_holiday(date)
@@ -190,8 +189,6 @@ impl HolidayCalendar for &Calendar {
 mod tests {
     use super::*;
     use time::Month;
-
-    // WeekendRule::is_weekend unit tests
 
     #[test]
     fn saturday_sunday_rule() {

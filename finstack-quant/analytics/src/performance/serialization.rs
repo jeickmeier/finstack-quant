@@ -1,4 +1,4 @@
-//! Validated persistence of authoritative panel inputs; caches are rebuilt.
+//! Serde wire type for [`super::Performance`]; caches are rebuilt on load.
 
 use super::{invalid_return_series, Performance, TickerSpan};
 use crate::dates::{Date, PeriodKind};

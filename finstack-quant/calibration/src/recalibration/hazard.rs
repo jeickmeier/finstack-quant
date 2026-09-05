@@ -1,6 +1,7 @@
 //! Shared hazard curve bumping logic.
 
 use super::cache::KeyedOnceCache;
+use super::ensure_replay_fit_accepted;
 use crate::api::schema::{HazardCurveParams, StepParams};
 use crate::quotes::cds::CdsQuote;
 use crate::quotes::ids::Pillar;
@@ -463,32 +464,6 @@ fn bump_for_pillar(tenor_years: f64, bump: Option<&QuoteBump>) -> f64 {
             .sum(),
         None => 0.0,
     }
-}
-
-fn ensure_replay_fit_accepted(
-    hazard_id: &str,
-    config: &CalibrationConfig,
-    report: &crate::CalibrationReport,
-) -> finstack_quant_core::Result<()> {
-    if !config.fail_on_bad_fit || report.success {
-        return Ok(());
-    }
-
-    let tolerance = config.hazard_curve.validation_tolerance;
-    let worst = match (&report.worst_quote_id, report.worst_quote_residual) {
-        (Some(id), Some(residual)) => {
-            format!(", worst quote '{id}' residual {residual:.3e}")
-        }
-        _ => String::new(),
-    };
-    Err(finstack_quant_core::Error::Calibration {
-        message: format!(
-            "hazard replay for '{hazard_id}' failed fit acceptance: max residual {:.3e} \
-             exceeds tolerance {tolerance:.3e}{worst}",
-            report.max_residual
-        ),
-        category: "hazard_replay_bad_fit".to_string(),
-    })
 }
 
 fn with_quote_recovery(quote: &CdsQuote, recovery_rate: f64) -> CdsQuote {
@@ -1083,6 +1058,7 @@ mod tests {
             false,
             "residual tolerance exceeded",
         )
+        .with_success_tolerance(1e-8)
     }
 
     #[test]

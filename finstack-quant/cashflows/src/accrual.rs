@@ -296,9 +296,6 @@ impl AccrualIndex {
             return Ok(0.0);
         }
 
-        // Multiple legs may share a payment date while retaining distinct
-        // accrual periods or day counts. Accrue each active identity
-        // independently.
         let active = find_active_periods_and_elapsed(&self.period_inputs, as_of, &self.cfg)?;
         let mut accrued = finstack_quant_core::math::summation::NeumaierAccumulator::default();
         for (inputs, elapsed_yf) in active {
@@ -362,9 +359,6 @@ fn derive_horizon_start(
     schedule: &CashFlowSchedule,
     first_bucket: &CouponBucket,
 ) -> finstack_quant_core::Result<Date> {
-    // The issue date is required unconditionally. Falling back to the earliest
-    // flow date is unsafe: a pre-issue flow (e.g. an upfront fee) would
-    // silently become the accrual start and lengthen the first coupon period.
     schedule.meta.issue_date.ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
             "accrual: schedule.meta.issue_date is unset; the start of the first coupon \
@@ -381,7 +375,6 @@ fn build_coupon_periods(
     schedule: &CashFlowSchedule,
     cfg: &AccrualConfig,
 ) -> finstack_quant_core::Result<Vec<CouponPeriod>> {
-    // Same-date coupon merging depends on date-ordered input.
     let mut coupon_idx: Vec<usize> = schedule
         .flows
         .iter()
@@ -404,9 +397,6 @@ fn build_coupon_periods(
 
     let mut buckets: Vec<CouponBucket> = Vec::with_capacity(coupon_idx.len());
 
-    // Cash and PIK legs combine only when their payment date and contractual
-    // accrual identity match. Same-date legs with different periods or day
-    // counts remain separate contributions.
     for &i in &coupon_idx {
         let cf = &schedule.flows[i];
         let true_period = cf
@@ -434,8 +424,6 @@ fn build_coupon_periods(
             None
         };
 
-        // Buckets are date-ordered; a match can only be in the trailing run for
-        // `cf.date`, so scan backwards and stop at the date boundary.
         let matching_bucket = buckets
             .iter_mut()
             .rev()
@@ -486,9 +474,6 @@ fn build_coupon_periods(
         return Ok(Vec::new());
     }
 
-    // Derive the start of the first coupon period: `meta.issue_date` is
-    // required. Inferring it from flow dates or via the legacy inverse
-    // day-count approximation is intentionally not supported.
     let first_bucket = &buckets[0];
     let horizon_start = derive_horizon_start(schedule, first_bucket)?;
 
@@ -505,11 +490,8 @@ fn build_coupon_periods(
                 day_count: bucket.accrual_day_count.unwrap_or(schedule.day_count),
                 bucket,
             });
-            prev = end;
-        } else {
-            // Skip degenerate periods (e.g., duplicated dates).
-            prev = end;
         }
+        prev = end;
     }
 
     Ok(periods)
@@ -520,9 +502,7 @@ fn build_coupon_periods(
 ///
 /// # Notional Lookup
 ///
-/// For each period, we find the outstanding balance at the period start date.
-/// This is the correct base for compounded accrual calculations since it
-/// represents the principal on which interest accrues during the period.
+/// For each period, outstanding is the latest balance on or before the period start.
 fn build_period_inputs(
     schedule: &CashFlowSchedule,
     periods: &[CouponPeriod],
@@ -532,12 +512,6 @@ fn build_period_inputs(
     let mut result = Vec::with_capacity(periods.len());
 
     for p in periods {
-        // Find the outstanding at period start: the latest entry on or before p.start.
-        // outstanding_path is sorted by date (guaranteed by CashFlowSchedule construction),
-        // so partition_point gives us O(log n) binary search instead of O(n) linear scan.
-        //
-        //   partition_point(|d| d <= p.start)  →  first index where d > p.start
-        //   idx - 1                            →  last index where d <= p.start
         let idx = outstanding_path.partition_point(|(d, _)| *d <= p.start);
         let notional_start = if idx > 0 {
             outstanding_path[idx - 1].1.amount()
@@ -555,11 +529,9 @@ fn build_period_inputs(
         }
 
         if coupon_total == 0.0 {
-            // No coupon in this period; skip.
             continue;
         }
 
-        // Prefer accrual_factor from builder when present; otherwise derive via day count.
         let total_yf = match p.bucket.accrual_factor {
             Some(af) if af.is_finite() && af > 0.0 => af,
             Some(af) => {
@@ -577,10 +549,7 @@ fn build_period_inputs(
                         .map(finstack_quant_core::dates::calendar_by_id_strict)
                         .transpose()?,
                     frequency,
-                    // ACT/ACT ICMA: pass the actual coupon period so irregular
-                    // (stub) periods use core's reference-period subdivision
-                    // instead of re-anchoring a quasi-coupon grid from `p.start`.
-                    // Other conventions ignore this field.
+                    // ACT/ACT ICMA stubs use the actual coupon period as the reference.
                     coupon_period: Some((p.start, p.end)),
                     ..Default::default()
                 };
@@ -639,8 +608,6 @@ fn find_active_periods_and_elapsed<'a>(
                     .map(finstack_quant_core::dates::calendar_by_id_strict)
                     .transpose()?,
                 frequency: cfg.frequency,
-                // ACT/ACT ICMA: anchor on the actual coupon period (see
-                // `build_period_inputs`). Other conventions ignore this field.
                 coupon_period: Some((inputs.start, inputs.end)),
                 ..Default::default()
             };
@@ -649,9 +616,6 @@ fn find_active_periods_and_elapsed<'a>(
                 .year_fraction(inputs.start, as_of.min(inputs.end), day_count_context)?
                 .max(0.0);
 
-            // Rescale onto the `total_yf` basis under a single day-count
-            // context so stub reference-period choices cancel instead of
-            // mixing builder and elapsed bases.
             let dc_total =
                 inputs
                     .day_count
@@ -663,10 +627,6 @@ fn find_active_periods_and_elapsed<'a>(
             };
             let elapsed = elapsed.clamp(0.0, inputs.total_yf);
 
-            // Apply ex-coupon convention if present: inside the ex-window the
-            // accrual flips to a negative stub from `as_of` to the period end.
-            // The clamp to `≤ 0` guarantees the stub can never flip positive
-            // even under residual basis mismatch.
             if let Some(ref ex) = cfg.ex_coupon {
                 let ex_date = ex.ex_date(inputs.payment_date)?;
                 if ex_date <= inputs.start {
@@ -739,23 +699,16 @@ fn accrue_in_period(
 
             let period_rate = inputs.coupon_total / notional;
             if period_rate.abs() < 1e-12 {
-                // Zero-coupon or near-zero rate: fall back to linear.
                 return Ok(inputs.coupon_total * (elapsed_yf / inputs.total_yf));
             }
 
             let fraction = elapsed_yf / inputs.total_yf;
 
             if fraction < 0.0 {
-                // Ex-coupon window: `elapsed_yf = elapsed − period`, so
-                // `−fraction = 1 − f` where `f = elapsed/period`. The accrued
-                // is the negative rebate of the remaining stub, compounded:
-                // `−N × [(1 + r)^(1−f) − 1]` (see function docs).
                 let stub_growth = (-fraction * period_rate.ln_1p()).exp_m1();
                 return Ok(-(notional * stub_growth));
             }
 
-            // Numerically stable computation: (1+r)^f - 1 = expm1(f * ln1p(r))
-            // This avoids precision loss for both small rates and small fractions.
             let compound_growth = (fraction * period_rate.ln_1p()).exp_m1();
 
             Ok(notional * compound_growth)
@@ -801,8 +754,6 @@ mod tests {
             meta: Default::default(),
         }
     }
-
-    // Issue date requirement tests
 
     #[test]
     fn test_missing_issue_date_errors() {
@@ -1184,8 +1135,6 @@ mod tests {
         assert!(accrued < 0.0);
     }
 
-    // Validation tests
-
     #[test]
     fn act_act_isma_without_frequency_errors() {
         let mut schedule = make_test_schedule(
@@ -1194,13 +1143,11 @@ mod tests {
         );
         schedule.meta.issue_date = Some(make_date(2025, 1, 1));
 
-        // No frequency configured → core errors (no ISDA fallback).
         let err =
             accrued_interest_amount(&schedule, make_date(2025, 4, 1), &AccrualConfig::default())
                 .expect_err("ICMA without frequency must error");
         assert!(err.to_string().to_lowercase().contains("frequency"));
 
-        // With the frequency set, the calculation succeeds.
         let cfg = AccrualConfig {
             frequency: Some(Tenor::semi_annual()),
             ..Default::default()

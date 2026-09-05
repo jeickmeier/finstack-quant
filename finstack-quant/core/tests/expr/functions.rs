@@ -839,8 +839,7 @@ mod ewm_operations {
     fn ewm_std_leading_nan_does_not_poison_state() {
         // Regression: ema/ema_sq previously seeded from base[0] unconditionally,
         // so a leading NaN poisoned the recursion and `.max(0.0)` converted the
-        // NaN variance to 0.0 — ewm_std([NaN,1,5,9,2]) returned all zeros
-        // ().
+        // NaN variance to 0.0 — ewm_std([NaN,1,5,9,2]) returned all zeros.
         let ctx = SimpleContext::new(["x"]).expect("unique columns");
         let x = vec![f64::NAN, 1.0, 5.0, 9.0, 2.0];
         let cols: Vec<&[f64]> = vec![x.as_slice()];
@@ -909,11 +908,10 @@ mod ewm_operations {
     #[test]
     fn ewm_mean_leading_nan_does_not_poison_state() {
         // Regression: prev/weighted_sum previously seeded from base[0]
-        // unconditionally, so a leading NaN made every subsequent output NaN
-        // (). The seeding now
-        // matches eval_ewm_variance_core: leading NaNs emit NaN, the first
-        // non-NaN observation seeds the state and emits the input value, and
-        // interior NaNs emit NaN without updating the state.
+        // unconditionally, so a leading NaN made every subsequent output NaN.
+        // Seeding now matches eval_ewm_variance_core: leading NaNs emit NaN, the
+        // first non-NaN observation seeds the state and emits the input value,
+        // and interior NaNs emit NaN without updating the state.
         let ctx = SimpleContext::new(["x"]).expect("unique columns");
         let x = vec![f64::NAN, 1.0, 5.0, 9.0, 2.0];
         let cols: Vec<&[f64]> = vec![x.as_slice()];

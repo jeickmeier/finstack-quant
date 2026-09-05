@@ -18,9 +18,7 @@ use super::specs::{RollRule, ScheduleParams};
 
 /// Accrual period with payment timing.
 ///
-/// This is the canonical period type used across the cashflow builder and
-/// rates instruments. Fields not relevant in a given context remain at their
-/// defaults (`None` / `0.0`).
+/// Fields not relevant in a given context remain at their defaults (`None` / `0.0`).
 #[derive(Debug, Clone, Copy)]
 pub struct SchedulePeriod {
     /// Accrual start date (inclusive).
@@ -111,13 +109,7 @@ fn enrich_period(
     params: &BuildPeriodsParams<'_>,
     cal: &dyn finstack_quant_core::dates::HolidayCalendar,
 ) -> finstack_quant_core::Result<SchedulePeriod> {
-    // Regularity is judged on the unadjusted scheduled dates (ISDA 2006
-    // §4.16(c)): business-day adjustment of the accrual boundaries must not
-    // reclassify a regular period as an ICMA stub. The accrual year fraction
-    // itself still spans the (possibly adjusted) accrual boundaries.
-    // ACT/ACT ICMA reference period: regular periods use the unadjusted
-    // scheduled span; short and long stubs use the adjacent regular coupon
-    // so ICMA Rule 251 can subdivide from a known denominator.
+    // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)); ICMA stubs use the adjacent regular coupon.
     let day_count_context = DayCountContext {
         calendar: Some(cal),
         frequency: Some(params.frequency),

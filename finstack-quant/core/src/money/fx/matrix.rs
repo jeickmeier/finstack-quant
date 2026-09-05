@@ -407,7 +407,6 @@ impl FxMatrix {
         let on = query.on;
         let policy = query.policy;
 
-        // Handle identity case
         if from == to {
             return Ok(FxRateResult {
                 rate: 1.0,
@@ -852,7 +851,6 @@ impl FxMatrix {
         *lock(&source.quotes) = lock(&self.quotes).clone();
         *lock(&source.pinned_quotes) = lock(&self.pinned_quotes).clone();
 
-        // Create bumped provider applying the relative bump per resolved query.
         use super::providers::BumpedFxProvider;
         let bumped_provider = Arc::new(BumpedFxProvider::new(
             Arc::new(ResolvedPairProvider {
@@ -865,9 +863,6 @@ impl FxMatrix {
         )?);
         let multiplier = 1.0 + bump_pct;
 
-        // Create new FX matrix with same config and carry over cached quotes so lookups that
-        // rely on seeded values keep working after the bump. Quotes on the
-        // bumped pair are scaled so they stay consistent with the bumped provider.
         let bumped = Self::try_with_config(bumped_provider, self.config)?;
         {
             let src = lock(&self.quotes);

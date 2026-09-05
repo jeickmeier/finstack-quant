@@ -8,7 +8,8 @@
  */
 export type ParametricCurveParams = {
 /**
- * Identifier for the parametric curve being built.
+ * Identifier for the single discount curve being fitted. All calibration
+ * instruments use this curve for discounting and implied projection.
  */
 curve_id: string,
 /**
@@ -19,10 +20,6 @@ base_date: string,
  * Nelson-Siegel variant (NS or NSS).
  */
 model: string,
-/**
- * Optional separate discount curve ID for multi-curve instrument pricing.
- */
-discount_curve_id: string | null,
 /**
  * Optional initial parameter guesses.
  */

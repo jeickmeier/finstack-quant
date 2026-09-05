@@ -444,12 +444,8 @@ impl InflationIndex {
     /// available observations). Seasonal multiplication itself does not add
     /// validation errors.
     pub fn value_on(&self, date: Date) -> Result<f64> {
-        // Apply lag to get the effective date
         let effective_date = self.apply_lag(date)?;
-        // Use the pre-built series (interpolation applied at construction/configuration time)
         let base_value = self.series_interp.value_on(effective_date)?;
-
-        // Apply seasonality if present
         let adjusted_value = self.apply_seasonality(base_value, effective_date)?;
 
         Ok(adjusted_value)

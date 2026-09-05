@@ -10,13 +10,10 @@ use rust_decimal::Decimal;
 
 use super::super::compiler::PeriodicFee;
 use super::super::specs::{FeeAccrualBasis, FeeBase};
+use super::{decimal_to_f64, f64_to_decimal};
 
 /// Conversion factor from basis points to rate (1 bp = 0.0001).
-const BP_TO_RATE: Decimal = Decimal::from_parts(1, 0, 0, false, 4); // 0.0001
-
-// Shared f64 ↔ Decimal conversion helpers from the parent `emission` module.
-// These propagate errors on NaN/Inf instead of silently collapsing to zero.
-use super::{decimal_to_f64, f64_to_decimal};
+const BP_TO_RATE: Decimal = Decimal::from_parts(1, 0, 0, false, 4);
 
 /// Emit a single revolving-credit fee cashflow.
 ///
@@ -34,7 +31,6 @@ fn emit_revolving_fee_on(
     ccy: Currency,
     kind: CFKind,
 ) -> finstack_quant_core::Result<Option<CashFlow>> {
-    // Use Decimal for consistent precision with emit_fees_on
     let base_dec = f64_to_decimal(base_amount)?;
     let fee_bp_dec = f64_to_decimal(fee_bp)?;
     let yf_dec = f64_to_decimal(year_fraction)?;
@@ -77,7 +73,6 @@ fn compute_time_weighted_average(
     fallback: Decimal,
     entries_buf: &mut Vec<(Date, Decimal)>,
 ) -> Decimal {
-    // History is ascending; window with two binary searches.
     debug_assert!(
         outstanding_history.windows(2).all(|w| w[0].0 <= w[1].0),
         "compute_time_weighted_average requires ascending history"
@@ -90,7 +85,6 @@ fn compute_time_weighted_average(
     let lo = outstanding_history.partition_point(|(date, _)| *date < accrual_start);
 
     entries_buf.clear();
-    // Carry the prior balance forward when `accrual_start` has no exact entry.
     if !(lo < hi && outstanding_history[lo].0 == accrual_start) {
         let carry_in = if lo == 0 {
             fallback
@@ -102,7 +96,6 @@ fn compute_time_weighted_average(
     entries_buf.extend_from_slice(&outstanding_history[lo..hi]);
     let entries = entries_buf;
 
-    // Compute TWA over [accrual_start, accrual_end)
     let mut weighted_sum = Decimal::ZERO;
     let mut total_days = 0i64;
 
@@ -111,7 +104,6 @@ fn compute_time_weighted_average(
         if date_i >= accrual_end {
             break;
         }
-        // Next boundary: either the next entry's date or accrual_end
         let next_date = if i + 1 < entries.len() {
             entries[i + 1].0.min(accrual_end)
         } else {
@@ -157,89 +149,75 @@ pub(in crate::builder) fn emit_fees_on(
     ccy: Currency,
     new_flows: &mut Vec<CashFlow>,
 ) -> finstack_quant_core::Result<()> {
-    // Allocated only if a TWA fee needs it.
     let mut twa_buf: Vec<(Date, Decimal)> = Vec::new();
 
     for pf in periodic_fees {
-        if let Some(period) = pf.prev.get(&d) {
-            // Use proper DayCountContext with calendar and frequency so that
-            // conventions like Bus/252 and Act/Act ISMA compute correctly.
-            let is_termination_date = pf.terminal_accrual_end == Some(period.accrual_end);
-            let yf = pf.day_count.year_fraction(
+        let Some(period) = pf.prev.get(&d) else {
+            continue;
+        };
+        let is_termination_date = pf.terminal_accrual_end == Some(period.accrual_end);
+        let yf = pf.day_count.year_fraction(
+            period.accrual_start,
+            period.accrual_end,
+            finstack_quant_core::dates::DayCountContext {
+                calendar: Some(pf.calendar),
+                frequency: Some(pf.frequency),
+                bus_basis: None,
+                coupon_period: None,
+                end_is_termination_date: is_termination_date,
+            },
+        )?;
+
+        // PointInTime samples outstanding at accrual start, not the live payment-date balance.
+        let effective_outstanding = match pf.accrual_basis {
+            FeeAccrualBasis::PointInTime => outstanding_history
+                .binary_search_by_key(&period.accrual_start, |(date, _)| *date)
+                .map_or(outstanding, |idx| outstanding_history[idx].1),
+            FeeAccrualBasis::TimeWeightedAverage => compute_time_weighted_average(
+                outstanding_history,
                 period.accrual_start,
                 period.accrual_end,
-                finstack_quant_core::dates::DayCountContext {
-                    calendar: Some(pf.calendar),
-                    frequency: Some(pf.frequency),
-                    bus_basis: None,
-                    coupon_period: None,
-                    end_is_termination_date: is_termination_date,
-                },
-            )?;
+                outstanding,
+                &mut twa_buf,
+            ),
+        };
 
-            // Determine the outstanding to use based on accrual basis.
-            // `PointInTime` samples the balance at the period's accrual start
-            // (matching the coupon convention and the `FeeAccrualBasis` docs),
-            // not the live post-amortization balance on the payment date. The
-            // live balance is only a fallback when no history entry exists for
-            // the accrual start (e.g., synthetic unit-test periods).
-            let effective_outstanding = match pf.accrual_basis {
-                FeeAccrualBasis::PointInTime => outstanding_history
-                    .binary_search_by_key(&period.accrual_start, |(date, _)| *date)
-                    .map_or(outstanding, |idx| outstanding_history[idx].1),
-                FeeAccrualBasis::TimeWeightedAverage => compute_time_weighted_average(
-                    outstanding_history,
-                    period.accrual_start,
-                    period.accrual_end,
-                    outstanding,
-                    &mut twa_buf,
-                ),
-            };
-
-            let base_amt = match &pf.base {
-                FeeBase::Drawn => effective_outstanding,
-                FeeBase::Undrawn { facility_limit } => {
-                    if facility_limit.currency() != ccy {
-                        return Err(InputError::Invalid.into());
-                    }
-                    let facility_limit_dec = f64_to_decimal(facility_limit.amount())?;
-                    let undrawn = facility_limit_dec - effective_outstanding;
-                    if undrawn > Decimal::ZERO {
-                        undrawn
-                    } else {
-                        Decimal::ZERO
-                    }
+        let base_amt = match &pf.base {
+            FeeBase::Drawn => effective_outstanding,
+            FeeBase::Undrawn { facility_limit } => {
+                if facility_limit.currency() != ccy {
+                    return Err(InputError::Invalid.into());
                 }
-            };
-
-            let yf_dec = f64_to_decimal(yf)?;
-            let fee_amt_dec = base_amt * pf.bp * BP_TO_RATE * yf_dec;
-            let fee_amt = decimal_to_f64(fee_amt_dec)?;
-
-            let rate_dec = pf.bp * BP_TO_RATE;
-            let rate = decimal_to_f64(rate_dec)?;
-
-            // Any non-zero fee amount is emitted: negative-bp fees (rebates)
-            // flow through as negative cashflows, matching fixed-fee behavior.
-            if fee_amt != 0.0 {
-                new_flows.push(
-                    CashFlow::new(
-                        d,
-                        None,
-                        Money::new(fee_amt, ccy)?,
-                        CFKind::Fee,
-                        yf,
-                        Some(rate),
-                    )
-                    .with_accrual(CashFlowAccrual {
-                        calendar_id: Some(pf.calendar_id.clone()),
-                        start: period.accrual_start,
-                        end: period.accrual_end,
-                        day_count: pf.day_count,
-                        projected_index_rate: None,
-                    }),
-                );
+                let facility_limit_dec = f64_to_decimal(facility_limit.amount())?;
+                (facility_limit_dec - effective_outstanding).max(Decimal::ZERO)
             }
+        };
+
+        let yf_dec = f64_to_decimal(yf)?;
+        let fee_amt_dec = base_amt * pf.bp * BP_TO_RATE * yf_dec;
+        let fee_amt = decimal_to_f64(fee_amt_dec)?;
+
+        let rate_dec = pf.bp * BP_TO_RATE;
+        let rate = decimal_to_f64(rate_dec)?;
+
+        if fee_amt != 0.0 {
+            new_flows.push(
+                CashFlow::new(
+                    d,
+                    None,
+                    Money::new(fee_amt, ccy)?,
+                    CFKind::Fee,
+                    yf,
+                    Some(rate),
+                )
+                .with_accrual(CashFlowAccrual {
+                    calendar_id: Some(pf.calendar_id.clone()),
+                    start: period.accrual_start,
+                    end: period.accrual_end,
+                    day_count: pf.day_count,
+                    projected_index_rate: None,
+                }),
+            );
         }
     }
 

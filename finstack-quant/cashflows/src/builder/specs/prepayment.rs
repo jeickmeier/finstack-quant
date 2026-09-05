@@ -185,10 +185,6 @@ impl PrepaymentModelSpec {
 
     /// 100% PSA (standard prepayment assumption).
     ///
-    /// # Arguments
-    ///
-    /// None.
-    ///
     /// # Returns
     ///
     /// Prepayment model equivalent to [`Self::psa`] with `speed_multiplier = 1.0`.

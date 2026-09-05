@@ -92,10 +92,8 @@ impl ParametricCurveTarget {
     /// curve's interpolation, and that interpolation error contaminates every
     /// residual. To keep this error well below `validation_tolerance`, the
     /// grid is densified to **monthly** (1/12-year) knots out to the longest
-    /// instrument maturity. Monthly spacing drives the cubic/log-linear
-    /// interpolation error far below the `1e-3` parametric least-squares
-    /// tolerance floor, so the reported fit reflects the true NS/NSS model
-    /// rather than the interpolant.
+    /// instrument maturity. The caller supplies the acceptable per-notional
+    /// fit tolerance; no implicit least-squares tolerance floor is applied.
     fn build_sample_times(quotes: &[CalibrationQuote]) -> Vec<f64> {
         let mut times = vec![0.0];
         for q in quotes {
@@ -107,8 +105,7 @@ impl ParametricCurveTarget {
         times.sort_by(|a, b| a.total_cmp(b));
         times.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
         let max_t = times.last().copied().unwrap_or(30.0);
-        // Monthly knots: dense enough that knot-interpolation error is
-        // negligible relative to the parametric least-squares tolerance floor.
+        // Include monthly knots in addition to the quoted pillars.
         const KNOT_STEP_YEARS: f64 = 1.0 / 12.0;
         let mut t = KNOT_STEP_YEARS;
         while t < max_t {
@@ -157,15 +154,11 @@ impl ParametricCurveTarget {
         context: &MarketContext,
         global_config: &CalibrationConfig,
     ) -> Result<(MarketContext, CalibrationReport)> {
-        let discount_id = schema_params
-            .discount_curve_id
-            .as_ref()
-            .unwrap_or(&schema_params.curve_id);
         let residual_notional: f64 = 1_000_000.0;
         let prepared = prepare_rate_calibration_quotes(
             quotes,
             schema_params.base_date,
-            discount_only_curve_ids(discount_id.as_ref()),
+            discount_only_curve_ids(schema_params.curve_id.as_ref()),
             None,
             residual_notional,
         )?;
@@ -202,27 +195,7 @@ impl ParametricCurveTarget {
             },
             Self::build_sample_times(&prepared_quotes),
         );
-        // A parametric (Nelson-Siegel / NSS) curve is a LEAST-SQUARES fit: with N > 4 (or
-        // N > 6 for NSS) market quotes, the optimizer minimises ‖residuals‖² but cannot
-        // drive every residual to zero.  The irreducible least-squares floor — the gap
-        // between the best-achievable parametric fit and exact repricing — is typically
-        // ~1e-4 per-notional for a well-specified NS curve on deposit/swap quotes.
-        //
-        // The bootstrap `validation_tolerance` default (1e-8) is designed for exact
-        // root-finding where every quote IS repriced to machine precision; applying it to a
-        // least-squares fit would cause every realistic NS/NSS calibration to report
-        // `success = false` even after full LM convergence.
-        //
-        // Mirror the precedent in `hazard.rs:139-140` (distressed CDS tolerance relaxation):
-        // take the maximum of the configured tolerance and a parametric-fit floor of 1e-3.
-        // The floor is ~10× the observed least-squares residual floor (~1e-4), providing
-        // headroom for a well-converged fit while still flagging a genuinely poor NS fit
-        // (e.g. badly mis-specified initial parameters or an inconsistent quote set).
-        const PARAMETRIC_LS_TOLERANCE_FLOOR: f64 = 1e-3;
-        let success_tolerance = config
-            .discount_curve
-            .validation_tolerance
-            .max(PARAMETRIC_LS_TOLERANCE_FLOOR);
+        let success_tolerance = config.discount_curve.validation_tolerance;
         let (curve, report) =
             GlobalFitOptimizer::optimize(&target, &prepared_quotes, &config, success_tolerance)?;
 

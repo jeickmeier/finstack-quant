@@ -910,7 +910,6 @@ impl ForwardCurve {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
 
-        // Thread the full metadata and override the base date.
         let projection_grid = self.projection_grid.as_ref().map(|grid| {
             let mut rolled = Vec::with_capacity(grid.len());
             rolled.push(0.0);
@@ -1153,7 +1152,6 @@ impl ForwardCurveBuilder {
     }
 }
 
-// Minimal trait implementations for polymorphism where needed
 #[cfg(test)]
 mod tests {
     use super::*;

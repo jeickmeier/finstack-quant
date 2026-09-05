@@ -27,17 +27,11 @@ pub(super) fn apply_spot(
     let gamma_opt = inputs.val_t0.measures.get(MetricId::Gamma.as_str());
 
     if let Some(&delta) = delta_opt {
-        // Guard against a non-finite Delta silently corrupting attributed
-        // P&L. `MetricId::Delta` is contractually dPV/dS (currency per unit
-        // underlying move) — see the unit note above.
         debug_assert!(
             delta.is_finite(),
             "Delta metric must be finite for P&L attribution, got {delta}"
         );
 
-        // Match the canonical Delta/Gamma and spot cross-gamma producers:
-        // their bump target is the first declared market scalar. Other scalar
-        // dependencies can be dividend yields or volatility, not spot prices.
         let primary_shift = market_scalar_ids.first().and_then(|spot_id| {
             measure_scalar_absolute_shift(spot_id, inputs.market_t0, inputs.market_t1).ok()
         });
@@ -61,8 +55,7 @@ pub(super) fn apply_spot(
                 &mut attribution.meta.notes,
                 non_finite_detected,
             );
-        }
-        if primary_shift.is_none() {
+        } else {
             *non_finite_detected = true;
             attribution.meta.notes.push(
                 "Spot Delta/Gamma has no measurable declared primary spot; attribution flagged invalid".into()
@@ -84,8 +77,7 @@ pub(super) fn apply_dividend(
             // rescaled by `DIVIDEND_BUMP_BP`, see equity_option/convertible
             // `dividend_risk.rs`). `measure_scalar_absolute_shift` returns the
             // DECIMAL Δq, so the move must be converted to bp before
-            // multiplying — the former per-unit pairing understated dividend
-            // P&L by 10,000×.
+            // multiplying.
             if let Ok(div_abs_shift) = measure_scalar_absolute_shift(
                 scalar_id.as_str(),
                 inputs.market_t0,
@@ -113,8 +105,6 @@ pub(super) fn apply_inflation(
     // 9. Inflation sensitivity
     if let Some(inflation01) = inputs.val_t0.measures.get(MetricId::Inflation01.as_str()) {
         // Restrict the shift to the instrument's declared inflation sources.
-        // This keeps unrelated curves in a shared market context from
-        // contaminating the instrument-level attribution.
         let curve_ids = &inputs.market_deps.curves.inflation_curves;
 
         let mut total_shift = 0.0;
@@ -156,7 +146,6 @@ pub(super) fn apply_inflation(
         } else {
             0.0
         };
-        // First-order: Inflation01 × Δi (Δi in basis points)
         let inflation_amount = inflation01 * avg_shift;
         attribution.inflation_curves_pnl = factor_money_or_invalid(
             inflation_amount,
@@ -166,22 +155,15 @@ pub(super) fn apply_inflation(
             non_finite_detected,
         );
 
-        // Second-order: Inflation convexity (if available).
-        //
-        // UNIT CONTRACT: `InflationConvexity` is ∂²V/∂i² in $ per decimal² of
-        // inflation rate (the `CsGamma`-style convention, NOT the dimensionless
-        // `Convexity` convention). The debug assertion guards against a
-        // non-finite metric silently corrupting the attributed P&L (it cannot
-        // enforce units — see the unit-contract table at the top of this file).
         if let Some(inflation_convexity) = inputs
             .val_t0
             .measures
             .get(MetricId::InflationConvexity.as_str())
         {
             debug_assert!(
-                    inflation_convexity.is_finite(),
-                    "InflationConvexity metric must be finite for P&L attribution, got {inflation_convexity}"
-                );
+                inflation_convexity.is_finite(),
+                "InflationConvexity metric must be finite for P&L attribution, got {inflation_convexity}"
+            );
             let shift_decimal = avg_shift / 10_000.0;
             let convexity_pnl = 0.5 * inflation_convexity * shift_decimal * shift_decimal;
             attribution.inflation_curves_pnl = factor_money_or_invalid(
@@ -192,9 +174,6 @@ pub(super) fn apply_inflation(
                 non_finite_detected,
             );
 
-            // TWIST GUARD: emit a diagnostic note when the inflation curve is
-            // twisted (signed mean shift collapses toward 0 but L1 mean is
-            // non-trivial). Same shape as the rates / credit twist guards.
             let abs_avg = average_over(curve_ids, |curve_id| {
                 let v = inflation_source_abs_shift_bp(
                     curve_id.as_str(),

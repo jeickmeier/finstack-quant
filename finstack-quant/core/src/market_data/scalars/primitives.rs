@@ -243,13 +243,11 @@ impl ScalarTimeSeries {
             return Err(crate::Error::Input(InputError::TooFewPoints));
         }
 
-        // Convert dates to days since epoch
         let observations_i32: Vec<(i32, f64)> = observations
             .into_iter()
             .map(|(d, v)| (to_days(d), v))
             .collect();
 
-        // Create storage (handles sorting and duplicate detection)
         let data = TimeSeriesStorage::new(observations_i32)?;
 
         Ok(Self {

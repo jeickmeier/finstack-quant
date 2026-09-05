@@ -100,10 +100,7 @@ impl std::ops::Deref for PeriodAggregation {
     }
 }
 
-/// Trait for types that have an associated date.
-///
-/// This allows generic iteration over different flow types (DatedFlow, CashFlow)
-/// without code duplication.
+/// Date used to bucket a flow into a reporting period.
 trait HasDate {
     fn flow_date(&self) -> Date;
 }
@@ -120,20 +117,7 @@ impl HasDate for CashFlow {
     }
 }
 
-/// Helper to iterate over periods and yield the slice of flows belonging to each period.
-///
-/// Assumes flows are sorted by date. Implements O(n + m) behavior by maintaining
-/// a cursor position across the sorted flows array.
-///
-/// # Arguments
-///
-/// * `flows` - Sorted flows by date (any type implementing `HasDate`)
-/// * `periods` - Period definitions with start/end boundaries
-///
-/// # Returns
-///
-/// Iterator yielding `(Period, &[T])` pairs where the flow slice contains
-/// all flows with `period.start <= date < period.end`.
+/// Yield each period with the date-sorted flow slice in `[start, end)`.
 fn iter_by_period<'a, T: HasDate>(
     flows: &'a [T],
     periods: &'a [Period],
@@ -149,14 +133,12 @@ fn iter_by_period<'a, T: HasDate>(
     let n = flows.len();
 
     periods.iter().map(move |p| {
-        // Skip flows before this period
         while flow_idx < n && flows[flow_idx].flow_date() < p.start {
             flow_idx += 1;
         }
 
         let start_idx = flow_idx;
 
-        // Find end of flows for this period
         while flow_idx < n && flows[flow_idx].flow_date() < p.end {
             flow_idx += 1;
         }
@@ -217,8 +199,6 @@ pub(crate) fn validate_periods(periods: &[Period]) -> finstack_quant_core::Resul
 /// Groups cashflows by time period while preserving currency separation.
 /// Returns a map: `PeriodId -> (Currency -> Money)`. Per-currency sums use
 /// Neumaier-compensated f64 accumulation (see module docs).
-///
-/// See unit tests and `examples/` for usage.
 fn aggregate_by_period_sorted(
     sorted: &[crate::DatedFlow],
     periods: &[Period],
@@ -238,8 +218,6 @@ fn aggregate_by_period_sorted(
         }
         let mut result: IndexMap<Currency, Money> = IndexMap::with_capacity(per_currency.len());
         for (&ccy, acc) in &per_currency {
-            // try_new errors loudly on non-finite or Decimal-overflow totals
-            // instead of panicking inside Money::new (same policy as PV paths).
             result.insert(ccy, Money::new(acc.total(), ccy)?);
         }
         out.insert(p.id, result);
@@ -273,12 +251,6 @@ fn aggregate_by_period_sorted(
 /// Returns [`finstack_quant_core::Error::Validation`] if periods are unsorted,
 /// overlapping, or contain duplicate `PeriodId`s, and a conversion error when a
 /// per-currency total is non-finite or exceeds the `Decimal` range.
-///
-/// # Performance
-///
-/// - Uses `sort_unstable_by_key` for ~5-10% faster sorting vs stable sort
-/// - The `#[inline(never)]` attribute was removed to allow compiler optimization
-/// - Benchmarks show 2-5% improvement on hot paths overall
 ///
 /// # Examples
 ///
@@ -392,19 +364,12 @@ fn pv_by_period_generic<T, F>(
 ) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>>
 where
     T: HasDate,
-    // Returns `(currency, pv_amount)` as plain scalars. Returning `f64` rather
-    // than `Money` avoids a `Decimal::from_f64`/`to_f64` round-trip per flow
-    // (`Money` is `Decimal`-backed); the compensated `f64` sum is materialized
-    // into `Money` once per `(period, currency)` below.
     F: FnMut(&T, f64, f64) -> (Currency, f64),
 {
     validate_periods(periods)?;
-    // Pre-size the outer map to avoid reallocations during insertion.
     let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> =
         IndexMap::with_capacity(periods.len());
-    // Reusable buffer for per-currency accumulation across periods.
     let mut per_currency: IndexMap<Currency, NeumaierAccumulator> = IndexMap::with_capacity(4);
-    // Reusable buffer for building the inner result map.
     let mut result_buf: IndexMap<Currency, Money> = IndexMap::with_capacity(4);
 
     for (p, flows_in_period) in iter_by_period(sorted, periods) {
@@ -419,7 +384,6 @@ where
             per_currency.entry(ccy).or_default().add(pv);
         }
 
-        // Skip periods with no value (all flows filtered to zero)
         if per_currency.is_empty() {
             continue;
         }
@@ -441,10 +405,8 @@ fn pv_by_period_precomputed(
 ) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
     debug_assert_eq!(sorted.len(), pv_per_flow.len());
     validate_periods(periods)?;
-    // Pre-size the outer map to avoid reallocations.
     let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> =
         IndexMap::with_capacity(periods.len());
-    // Reusable buffers for per-currency accumulation and result building.
     let mut per_currency: IndexMap<Currency, NeumaierAccumulator> = IndexMap::with_capacity(4);
     let mut result_buf: IndexMap<Currency, Money> = IndexMap::with_capacity(4);
     let mut flow_idx = 0usize;
@@ -494,7 +456,6 @@ pub(crate) fn pv_by_period_cashflows_sorted_checked(
     let date_ctx = DateContext::new(base, day_count, day_count_context);
     pv_by_period_generic(sorted, periods, disc, hazard, &date_ctx, |cf, df, sp| {
         let ccy = cf.amount.currency();
-        // Historical flows (date <= base) carry zero PV by convention.
         if !is_cash_settlement_kind(cf.kind) || cf.date <= base {
             return (ccy, 0.0);
         }
@@ -502,12 +463,7 @@ pub(crate) fn pv_by_period_cashflows_sorted_checked(
     })
 }
 
-/// Parameters for date and day-count calculations.
-///
-/// This is primarily an internal helper type used by PV aggregation functions.
-/// Most users should use the higher-level aggregation functions which
-/// construct this internally. Exposed for advanced use cases requiring
-/// direct control over day-count context.
+/// Valuation date and day-count inputs for PV aggregation.
 pub struct DateContext<'a> {
     /// Base date for time calculations.
     pub base: Date,
@@ -518,7 +474,7 @@ pub struct DateContext<'a> {
 }
 
 impl<'a> DateContext<'a> {
-    /// Create a new date context.
+    /// Construct a date context from a valuation date, day-count convention, and context.
     ///
     /// # Arguments
     ///
@@ -528,7 +484,7 @@ impl<'a> DateContext<'a> {
     ///
     /// # Returns
     ///
-    /// New [`DateContext`] instance carrying the provided inputs.
+    /// Constructed [`DateContext`] holding `base`, `day_count`, and `day_count_context`.
     ///
     /// # Examples
     ///
@@ -698,16 +654,11 @@ pub(crate) fn credit_adjusted_period_pv(
     recovery_rate: Option<f64>,
     base: Date,
 ) -> f64 {
-    // Historical flows (date <= valuation base) carry zero PV by convention,
-    // matching the DataFrame export and the plain PV path.
     if !is_cash_settlement_kind(cf.kind) || cf.date <= base {
         return 0.0;
     }
 
-    // Recovery and AccruedOnDefault are realized post-default cash flows
-    // from the already-defaulted portion of the notional. They are
-    // discounted at their scheduled dates without survival adjustment
-    // because default has already occurred for this portion.
+    // Recovery / AccruedOnDefault are already post-default; discount without survival.
     if matches!(cf.kind, CFKind::Recovery | CFKind::AccruedOnDefault) {
         return cf.amount.amount() * df;
     }
@@ -842,9 +793,6 @@ fn time_discount_survival(
     hazard: Option<&dyn Survival>,
     ctx: &DateContext<'_>,
 ) -> finstack_quant_core::Result<(f64, f64, f64)> {
-    // Curve lookup times are measured from each curve's own base. Relative
-    // discounting and conditional survival are then taken from the valuation
-    // date, so changing `as_of` does not silently change the curve origin.
     let t =
         disc.day_count()
             .signed_year_fraction(disc.base_date(), d, DayCountContext::default())?;
@@ -854,29 +802,35 @@ fn time_discount_survival(
         ))
     })?;
 
-    let sp = if let Some(h) = hazard {
-        if let Some(h_base) = h.base_date() {
-            let h_day_count = h.day_count();
-            let t_d = h_day_count.signed_year_fraction(h_base, d, DayCountContext::default())?;
-            let t_asof =
-                h_day_count.signed_year_fraction(h_base, ctx.base, DayCountContext::default())?;
-            let sp_d = h.sp(t_d);
-            let sp_asof = h.sp(t_asof);
-            if !sp_asof.is_finite() || sp_asof <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "survival curve returned invalid base survival ({sp_asof}) at {}",
-                    ctx.base
-                )));
+    let sp = match hazard {
+        Some(h) => match h.base_date() {
+            Some(h_base) => {
+                let h_day_count = h.day_count();
+                let t_d =
+                    h_day_count.signed_year_fraction(h_base, d, DayCountContext::default())?;
+                let t_asof = h_day_count.signed_year_fraction(
+                    h_base,
+                    ctx.base,
+                    DayCountContext::default(),
+                )?;
+                let sp_d = h.sp(t_d);
+                let sp_asof = h.sp(t_asof);
+                if !sp_asof.is_finite() || sp_asof <= 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "survival curve returned invalid base survival ({sp_asof}) at {}",
+                        ctx.base
+                    )));
+                }
+                sp_d / sp_asof
             }
-            sp_d / sp_asof
-        } else {
-            let t_h =
-                ctx.day_count
-                    .signed_year_fraction(ctx.base, d, DayCountContext::default())?;
-            h.sp(t_h)
-        }
-    } else {
-        1.0
+            None => {
+                let t_h =
+                    ctx.day_count
+                        .signed_year_fraction(ctx.base, d, DayCountContext::default())?;
+                h.sp(t_h)
+            }
+        },
+        None => 1.0,
     };
     if !df.is_finite() {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -972,7 +926,6 @@ pub(crate) fn pv_by_period_credit_adjusted_detailed_with_timing(
     timing: RecoveryTiming,
     date_ctx: DateContext<'_>,
 ) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
-    // Validate recovery rate is in [0, 1] if provided
     if let Some(r) = recovery_rate {
         if !(0.0..=1.0).contains(&r) {
             return Err(finstack_quant_core::Error::Input(
@@ -981,11 +934,7 @@ pub(crate) fn pv_by_period_credit_adjusted_detailed_with_timing(
         }
     }
 
-    // Guard against double-counting recovery: when the schedule contains
-    // explicit DefaultedNotional flows AND a non-zero recovery_rate is
-    // supplied, the surviving principal would get recovery applied twice
-    // (once via the explicit Recovery cashflow, once via R*(1-SP) on the
-    // remaining amortization stream). Reject this combination.
+    // Explicit DefaultedNotional plus recovery_rate would double-count recovery.
     if recovery_rate.is_some() && flows.iter().any(|cf| cf.kind == CFKind::DefaultedNotional) {
         return Err(finstack_quant_core::Error::Validation(
             "pv_by_period_credit_adjusted_detailed: schedule contains explicit \
@@ -1022,10 +971,6 @@ pub(crate) fn pv_by_period_credit_adjusted_detailed_with_timing(
             pv_by_period_generic(&sorted, periods, disc, Some(hazard), &date_ctx, pv_fn)
         }
         RecoveryTiming::AtDefaultIntegrated => {
-            // Pre-compute per-flow PVs carrying the integrated recovery leg,
-            // then reduce to the standard (cf, df, sp) closure form by looking
-            // up the pre-computed value. State (previous principal-like date)
-            // must be threaded across the full sorted sequence.
             let owned: Vec<CashFlow>;
             let sorted: &[CashFlow] = if is_sorted {
                 flows
@@ -1054,15 +999,8 @@ fn precompute_integrated_pv(
     recovery_rate: Option<f64>,
     date_ctx: &DateContext<'_>,
 ) -> finstack_quant_core::Result<Vec<(Currency, f64)>> {
-    // Per-flow PV is carried as `(currency, amount)` scalars; `Money` (Decimal)
-    // is materialized once per `(period, currency)` in `pv_by_period_precomputed`.
     let mut out: Vec<(Currency, f64)> = Vec::with_capacity(sorted.len());
-    // Boundary T_prev for the principal date group currently being processed.
     let mut prev_principal: Date = date_ctx.base;
-    // Date of the principal group currently being processed. Principal flows
-    // sharing a date all receive the same (T_prev, T] default mass; T_prev
-    // advances once per distinct principal date, never within a date group
-    // (a same-date second principal flow must not see a zero-width interval).
     let mut current_principal_date: Option<Date> = None;
     let mut principal_by_date: std::collections::BTreeMap<Date, f64> =
         std::collections::BTreeMap::new();
@@ -1088,8 +1026,6 @@ fn precompute_integrated_pv(
     for cf in sorted {
         let ccy = cf.amount.currency();
 
-        // Historical flows (date <= valuation base) carry zero PV by
-        // convention, matching the DataFrame export and the plain PV path.
         if cf.date <= date_ctx.base {
             out.push((ccy, 0.0));
             continue;
@@ -1097,22 +1033,16 @@ fn precompute_integrated_pv(
 
         let (t_next, df_t, sp_t) = time_discount_survival(cf.date, disc, Some(hazard), date_ctx)?;
 
-        // Non-cash flows (PIK capitalization, DefaultedNotional write-downs)
-        // carry zero PV — identical to the AtPaymentDate path.
         if !is_cash_settlement_kind(cf.kind) {
             out.push((ccy, 0.0));
             continue;
         }
-        // Realised post-default: discounted at scheduled date, no SP
         if matches!(cf.kind, CFKind::Recovery | CFKind::AccruedOnDefault) {
             out.push((ccy, cf.amount.amount() * df_t));
             continue;
         }
 
-        // Only positive principal flows carry default-recovery exposure; a
-        // negative flow (a future draw) keeps its survival-weighted cash PV
-        // but must not enter the exposure ladder (whose accumulation filter
-        // above is positive-amount-only) nor advance the interval boundary.
+        // Negative draws keep survival-weighted PV but must not enter the exposure ladder.
         let is_principal = matches!(
             cf.kind,
             CFKind::Amortization
@@ -1122,8 +1052,7 @@ fn precompute_integrated_pv(
         ) && cf.amount.amount() > 0.0;
 
         if is_principal && current_principal_date != Some(cf.date) {
-            // Entering a new principal date group: the boundary becomes the
-            // previous group's date (or the valuation base for the first group).
+            // Same-date principal shares (T_prev, T]; advance T_prev only between date groups.
             if let Some(d) = current_principal_date {
                 prev_principal = d;
             }
@@ -1134,7 +1063,6 @@ fn precompute_integrated_pv(
 
         if let Some(r) = recovery_rate {
             if is_principal {
-                // Integrate recovery leg over (T_prev, T] using midpoint default timing.
                 let (t_prev, _df_prev, sp_prev) =
                     time_discount_survival(prev_principal, disc, Some(hazard), date_ctx)?;
                 let t_mid = 0.5 * (t_prev + t_next);
@@ -1150,8 +1078,7 @@ fn precompute_integrated_pv(
                     )));
                 }
                 let d_sp = sp_prev - sp_t;
-                // d_sp can go slightly negative from curve noise; clamp to avoid
-                // sign inversion (recovery is a non-negative cashflow expectation).
+                // Clamp noise-negative default mass so recovery cannot change sign.
                 let d_sp_pos = d_sp.max(0.0);
                 let group_total = principal_by_date
                     .get(&cf.date)

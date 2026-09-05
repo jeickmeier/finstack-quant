@@ -391,7 +391,6 @@ impl VolSurface {
         if !expiry.is_finite() || !strike.is_finite() || !bump_pct.is_finite() {
             return Err(InputError::Invalid.into());
         }
-        // Get bounds safely using first/last
         let (Some(&exp_min), Some(&exp_max)) = (self.expiries.first(), self.expiries.last()) else {
             return Err(crate::error::InputError::TooFewPoints.into());
         };
@@ -399,26 +398,21 @@ impl VolSurface {
             return Err(crate::error::InputError::TooFewPoints.into());
         };
 
-        // Clamp to grid bounds
         let clamped_expiry = expiry.clamp(exp_min, exp_max);
         let clamped_strike = strike.clamp(str_min, str_max);
 
-        // Find the closest grid indices
         let expiry_idx = find_closest_grid_index(self.expiries.as_ref(), clamped_expiry);
         let strike_idx = find_closest_grid_index(self.strikes.as_ref(), clamped_strike);
 
         let n_strikes = self.strikes.len();
         let idx = expiry_idx * n_strikes + strike_idx;
 
-        // Get current vol at that grid point
         let current_vol = self.vols[idx];
         let bumped_vol = current_vol * (1.0 + bump_pct).max(0.0);
 
-        // Clone the vols vec and update the bumped point
         let mut bumped_vols = self.vols.clone();
         bumped_vols[idx] = bumped_vol;
 
-        // Rebuild surface with same ID, grid, and metadata contracts.
         Self::from_grid_opts(
             self.id.as_str(),
             &self.expiries,
@@ -573,7 +567,6 @@ impl Bumpable for VolSurface {
         use crate::error::InputError;
 
         spec.validate_finite()?;
-        // Only parallel bumps are supported for now
         if !matches!(
             spec.bump_type,
             crate::market_data::bumps::BumpType::Parallel

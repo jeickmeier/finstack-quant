@@ -1,10 +1,8 @@
 //! Return-based risk metrics: mean, volatility, Sharpe, Sortino, CAGR, and more.
 //!
-//! This module contains crate-internal building blocks for [`crate::Performance`].
-//!
-//! Most functions operate on `&[f64]` return slices and return scalar `f64`.
-//! Annualization uses the caller-supplied factor (typically from
-//! `PeriodKind::annualization_factor()`).
+//! Crate-internal building blocks for [`crate::Performance`]. Functions take
+//! `&[f64]` return slices. Annualization uses the caller-supplied factor
+//! (typically from `PeriodKind::annualization_factor()`).
 
 use crate::dates::{Date, DayCount, DayCountContext, HolidayCalendar};
 use crate::math::stats::{mean, mean_var, variance};
@@ -14,9 +12,6 @@ use super::tail_risk::cornish_fisher_var;
 
 /// True when annualization is requested but `ann_factor` is not a positive finite
 /// periods-per-year count (e.g. zero, negative, NaN, or infinity).
-///
-/// Shared analytics-wide guard; re-exported via [`crate::risk_metrics`] and used
-/// from benchmark-relative metrics to avoid redefining the same check.
 #[inline]
 pub(crate) fn invalid_annualization_factor(annualize: bool, ann_factor: f64) -> bool {
     annualize && (!ann_factor.is_finite() || ann_factor <= 0.0)

@@ -7,11 +7,14 @@ use crate::constants::{OrderedF64, TOLERANCE_DUP_KNOTS};
 use crate::prepared::CalibrationQuote;
 use crate::quotes::market_quote::{ExtractQuotes, MarketQuote};
 use crate::quotes::rates::RateQuote;
+use crate::quotes::vol::VolQuote;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::dividends::DividendKind;
 use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
@@ -20,6 +23,7 @@ use std::collections::BTreeMap;
 
 #[derive(Debug)]
 pub(crate) struct EquityForwardInputs {
+    base_date: Date,
     spot: f64,
     continuous_yield: Option<f64>,
     cash_dividends: Vec<(f64, f64)>,
@@ -27,7 +31,34 @@ pub(crate) struct EquityForwardInputs {
 
 impl EquityForwardInputs {
     pub(crate) fn forward(&self, discount: &DiscountCurve, expiry: f64) -> Result<f64> {
-        let discount_factor = discount.df(expiry);
+        // Surface coordinates are ACT/365F from the surface base date. Map
+        // them to the curve's own clock, preserving fractional grid days.
+        let days = expiry * 365.0;
+        if !days.is_finite()
+            || days < 0.0
+            || days > (Date::MAX - self.base_date).whole_days() as f64
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "equity forward expiry must be finite, non-negative and within the date range"
+                    .to_string(),
+            ));
+        }
+        let date = self.base_date + time::Duration::days(days.floor() as i64);
+        let dc = discount.day_count();
+        let curve_time =
+            |date| dc.signed_year_fraction(discount.base_date(), date, DayCountContext::default());
+        let mut expiry_time = curve_time(date)?;
+        let fraction = days.fract();
+        if fraction > 0.0 {
+            let next = date.next_day().ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "equity forward expiry exceeds date range".to_string(),
+                )
+            })?;
+            expiry_time += fraction * (curve_time(next)? - expiry_time);
+        }
+        let discount_factor =
+            discount.df_between_times(curve_time(self.base_date)?, expiry_time)?;
         if !discount_factor.is_finite() || discount_factor <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "equity forward discount factor must be finite and positive at T={expiry}, got {discount_factor}"
@@ -88,6 +119,7 @@ pub(crate) fn resolve_equity_forward_inputs(
             )));
         }
         return Ok(EquityForwardInputs {
+            base_date,
             spot,
             continuous_yield: Some(value),
             cash_dividends: Vec::new(),
@@ -124,12 +156,7 @@ pub(crate) fn resolve_equity_forward_inputs(
                     event.date,
                     DayCountContext::default(),
                 )?;
-                let discount_time = discount.day_count().year_fraction(
-                    discount.base_date(),
-                    event.date,
-                    DayCountContext::default(),
-                )?;
-                cash_dividends.push((surface_time, amount.amount() * discount.df(discount_time)));
+                cash_dividends.push((surface_time, amount.amount() * discount.df_between_dates(base_date, event.date)?));
             }
             DividendKind::Yield(_) | DividendKind::Stock { .. } => {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -140,10 +167,41 @@ pub(crate) fn resolve_equity_forward_inputs(
     }
 
     Ok(EquityForwardInputs {
+        base_date,
         spot,
         continuous_yield: None,
         cash_dividends,
     })
+}
+
+/// Reprice the original option quotes through the published surface evaluator.
+pub(crate) fn surface_quote_residuals(
+    surface: &VolSurface,
+    quotes: &[MarketQuote],
+    underlying: &str,
+    base_date: Date,
+) -> Result<BTreeMap<String, f64>> {
+    let mut residuals = BTreeMap::new();
+    for quote in quotes {
+        if let MarketQuote::Vol(VolQuote::OptionVol {
+            id,
+            underlying: ticker,
+            expiry,
+            strike,
+            vol,
+            ..
+        }) = quote
+        {
+            if ticker.as_str() != underlying || *expiry <= base_date {
+                continue;
+            }
+            let t =
+                DayCount::Act365F.year_fraction(base_date, *expiry, DayCountContext::default())?;
+            let fitted = finstack_quant_models::volatility::get_surface_vol(surface, t, *strike)?;
+            residuals.insert(id.to_string(), fitted - vol);
+        }
+    }
+    Ok(residuals)
 }
 
 /// Resolve the day count convention for a discount or forward curve from market conventions.
@@ -543,6 +601,62 @@ mod tests {
         )
         .expect_err("missing carry");
         assert!(error.to_string().contains("dividend"));
+    }
+
+    #[test]
+    fn equity_forward_is_invariant_to_curve_clock_and_base() {
+        let base = date!(2025 - 01 - 01);
+        let surface_base = date!(2025 - 04 - 01);
+        let expiry = date!(2026 - 04 - 01);
+        let ex_date = date!(2025 - 07 - 01);
+        let schedule = DividendSchedule::builder("SPX-DIVS")
+            .underlying("SPX")
+            .currency(Currency::USD)
+            .cash(ex_date, Money::from((5_i64, Currency::USD)))
+            .build()
+            .expect("dividends");
+        let context = MarketContext::new().insert_dividends(schedule);
+        let expected = (100.0
+            - 5.0 * (-0.05 * (ex_date - surface_base).whole_days() as f64 / 365.0).exp())
+            * (0.05_f64).exp();
+        for (dc, denominator) in [(DayCount::Act365F, 365.0), (DayCount::Act360, 360.0)] {
+            for curve_base in [base, surface_base] {
+                let days = (expiry - curve_base).whole_days() as f64;
+                let curve = DiscountCurve::builder("USD")
+                    .base_date(curve_base)
+                    .day_count(dc)
+                    .knots([
+                        (0.0, 1.0),
+                        (days / denominator, (-0.05 * days / 365.0).exp()),
+                    ])
+                    .build()
+                    .expect("curve");
+                let inputs = resolve_equity_forward_inputs(
+                    "SPX",
+                    surface_base,
+                    100.0,
+                    None,
+                    &curve,
+                    &context,
+                )
+                .expect("carry");
+                assert!((inputs.forward(&curve, 1.0).expect("forward") - expected).abs() < 1e-10);
+                let continuous = resolve_equity_forward_inputs(
+                    "SPX",
+                    surface_base,
+                    100.0,
+                    Some(0.02),
+                    &curve,
+                    &context,
+                )
+                .expect("yield");
+                assert!(
+                    (continuous.forward(&curve, 1.0).expect("forward") - 100.0 * (0.03_f64).exp())
+                        .abs()
+                        < 1e-10
+                );
+            }
+        }
     }
 
     #[test]

@@ -411,15 +411,12 @@ impl CashFlowSchedule {
         sort_flows(&mut self.flows);
     }
 
-    /// Create a new cashflow builder.
-    ///
-    /// This is the recommended entry point for building cashflow schedules.
-    /// Returns a `CashFlowBuilder` that can be configured and built.
+    /// Start a cashflow builder.
     ///
     /// # Example
     /// ```
     /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+    /// use finstack_quant_core::dates::Date;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams};
     /// use rust_decimal_macros::dec;
@@ -465,9 +462,6 @@ impl CashFlowSchedule {
 
     /// Scale every cashflow amount while preserving classification and metadata.
     ///
-    /// This is primarily used to apply leg direction before schedules are
-    /// composed. A non-finite scale is rejected.
-    ///
     /// `scale` multiplies every `Money` amount, including principal, interest,
     /// fees, and recoveries, but leaves the representative notional and all
     /// flow classification/date metadata unchanged. A negative scale reverses
@@ -489,7 +483,6 @@ impl CashFlowSchedule {
                 *delta *= scale;
             }
         }
-        // Amount is a `compare_flows` key; re-sort after scaling.
         sort_flows(&mut self.flows);
         Ok(self)
     }
@@ -527,8 +520,6 @@ impl CashFlowSchedule {
 
     fn validate_economic_invariants(&self) -> finstack_quant_core::Result<()> {
         let initial = self.notional.initial;
-        // Validate dated balances, including capitalized interest and explicit
-        // principal deltas. Same-day cash/PIK splits are one accounting date.
         if let Some(anchor) = self
             .meta
             .issue_date
@@ -592,8 +583,6 @@ impl CashFlowSchedule {
             let mut balance = initial;
             let mut funding_skipped = false;
             for flow in self.flows.iter().take_while(|flow| flow.date < as_of) {
-                // A composed multi-currency schedule has one representative
-                // notional; flows in other currencies do not change that balance.
                 if flow.amount.currency() != initial.currency() {
                     continue;
                 }
@@ -608,11 +597,9 @@ impl CashFlowSchedule {
         Ok(self)
     }
 
-    /// Internal PIK-omission step for composed schedule normalization.
+    /// Replace PIK capitalization with zero-cash notional rows that keep the principal delta.
     #[must_use]
     pub(crate) fn omit_pure_pik(mut self) -> Self {
-        // Capitalization is not settlement cash, but its dated principal
-        // movement must survive in the canonical balance-replay surface.
         for flow in &mut self.flows {
             if flow.kind == CFKind::Pik {
                 flow.principal_delta = Some(flow.principal_delta.unwrap_or(flow.amount));
@@ -628,7 +615,7 @@ impl CashFlowSchedule {
     /// Applies, in order:
     /// 1. Future-flow filtering (`date >= as_of`)
     /// 2. Replace PIK capitalization with zero-cash principal movements
-    /// 3. Re-sort (defensive, in case instrument code appended unsorted flows)
+    /// 3. Restore canonical flow order
     /// 4. Preserve the representation attached by the raw schedule source
     pub(crate) fn normalize_public(self, as_of: Date) -> finstack_quant_core::Result<Self> {
         let mut normalized = self.filter_future(as_of)?.omit_pure_pik();
@@ -715,15 +702,7 @@ impl CashFlowSchedule {
         )
     }
 
-    /// Full outstanding path including Amortization, PIK, and Notional draws/repays.
-    ///
-    /// Returns one entry per unique date after applying all balance-affecting flows
-    /// on that date. This is the **canonical method** for tracking outstanding balance
-    /// in instruments with dynamic draws/repays (RCFs, delayed-draw term loans).
-    ///
-    /// # When to Use Each Method
-    ///
-    /// This is the canonical balance view for all principal event kinds.
+    /// Outstanding balance after each unique date, including amortization, PIK, and draws/repays.
     ///
     /// # Balance Changes
     ///
@@ -776,8 +755,6 @@ impl CashFlowSchedule {
             return Ok(Vec::new());
         }
         let mut order: Vec<usize> = (0..self.flows.len()).collect();
-        // Skip the sort when already canonical; keep it as a repair path for
-        // partially updated schedules (`try_update_flows`).
         let already_ordered = self
             .flows
             .windows(2)
@@ -1029,9 +1006,6 @@ fn apply_flow_to_outstanding(
     }
     match cf.kind {
         CFKind::Amortization | CFKind::PrePayment | CFKind::DefaultedNotional => {
-            // Amortization amounts are stored as positive in the builder
-            // but economically represent principal reductions.
-            // PrePayment and DefaultedNotional likewise reduce outstanding.
             *outstanding = outstanding.checked_sub(cf.amount)?;
         }
         CFKind::Pik => {
@@ -1040,7 +1014,6 @@ fn apply_flow_to_outstanding(
         CFKind::Notional | CFKind::RevolvingDraw | CFKind::RevolvingRepayment
             if include_notional && !is_initial_funding =>
         {
-            // Draws negative, repays positive -> subtract to apply sign
             *outstanding = outstanding.checked_sub(cf.amount)?;
         }
         _ => {}
@@ -1723,10 +1696,6 @@ mod tests {
 
         let wal = schedule.weighted_average_life(as_of).expect("WAL succeeds");
 
-        // Compute expected WAL with Act/365F:
-        // d1: 365 days / 365 = 1.0 years
-        // d2: 731 days / 365 ≈ 2.0027 years (2026 is not a leap year, 2×365+1 ≈ 731)
-        // WAL = (500k * 1.0 + 500k * t2) / 1M
         let t1 = DayCount::Act365F
             .year_fraction(as_of, d1, DayCountContext::default())
             .unwrap();
@@ -1742,7 +1711,6 @@ mod tests {
             wal
         );
 
-        // Also verify it differs from 30/360 (which would give 1.0 and 2.0 exactly)
         let t30_360_1 = DayCount::Thirty360
             .year_fraction(as_of, d1, DayCountContext::default())
             .unwrap();
@@ -1751,11 +1719,6 @@ mod tests {
             .unwrap();
         let wal_30360 = (500_000.0 * t30_360_1 + 500_000.0 * t30_360_2) / 1_000_000.0;
 
-        // The values should differ (Act/365F vs 30/360 give different year fractions
-        // for multi-year spans). If they match, the WAL is accidentally using the
-        // schedule day count instead of Act/365F.
-        // Note: for these specific dates they may be very close, so we just verify
-        // our function returns the Act/365F-based value.
         assert!(
             (wal - expected).abs() < (wal - wal_30360).abs() || (wal - expected).abs() < 1e-10,
             "WAL should be closer to Act/365F value than 30/360 value"

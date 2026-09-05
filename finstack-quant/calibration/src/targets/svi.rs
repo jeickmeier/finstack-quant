@@ -27,7 +27,9 @@ use crate::config::CalibrationConfig;
 use crate::constants::OrderedF64;
 use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::vol::VolQuote;
-use crate::targets::util::{interpolate_total_variance, resolve_equity_forward_inputs};
+use crate::targets::util::{
+    interpolate_total_variance, resolve_equity_forward_inputs, surface_quote_residuals,
+};
 use crate::validation::ValidationConfig;
 use crate::CalibrationReport;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
@@ -198,7 +200,6 @@ impl SviSurfaceTarget {
         }
 
         let mut params_by_expiry = BTreeMap::new();
-        let mut residuals = BTreeMap::new();
 
         for (&expiry_key, expiry_quotes) in &quotes_by_expiry {
             if expiry_quotes.len() < 5 {
@@ -218,14 +219,6 @@ impl SviSurfaceTarget {
             let svi_params = finstack_quant_models::volatility::svi::calibrate_svi(
                 &strikes, &vols, forward, expiry,
             )?;
-
-            for (idx, (strike, market_vol)) in expiry_quotes.iter().enumerate() {
-                let model_vol = evaluate_svi_model_vol(&svi_params, expiry, *strike, forward)?;
-                residuals.insert(
-                    format!("svi_t{expiry:.6}_k{strike:.6}_i{idx}"),
-                    model_vol - *market_vol,
-                );
-            }
 
             params_by_expiry.insert(expiry_key, svi_params);
         }
@@ -256,6 +249,13 @@ impl SviSurfaceTarget {
             &params.target_expiries,
             &params.target_strikes,
             &grid,
+        )?;
+
+        let residuals = surface_quote_residuals(
+            &surface,
+            quotes,
+            &params.underlying_ticker,
+            params.base_date,
         )?;
 
         // Calendar and per-slice butterfly checks are strict; interpolated
@@ -374,14 +374,8 @@ fn interpolate_svi_vol(
                     "SVI interpolation: non-positive forward {forward} at T={slice_expiry:.6}"
                 )));
             }
-            let k = (target_strike / forward).ln();
-            let w = slice.total_variance(k);
-            if w < 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "SVI negative total variance at K={target_strike:.4}, T={slice_expiry:.6} (k={k:.4}): w={w:.6}"
-                )));
-            }
-            Ok(w)
+            let vol = evaluate_svi_model_vol(slice, slice_expiry, target_strike, forward)?;
+            Ok(vol * vol * slice_expiry)
         },
         SurfaceExtrapolationPolicy::Clamp,
     )
@@ -737,7 +731,7 @@ mod tests {
         }
 
         let mut p = base_params();
-        p.target_expiries = vec![0.25, 0.75];
+        p.target_expiries = vec![90.0 / 365.0, 1.0];
 
         let (_surface, report) = SviSurfaceTarget::solve(
             &p,

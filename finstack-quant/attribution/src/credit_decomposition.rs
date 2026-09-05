@@ -51,7 +51,6 @@ impl AttributionSpec {
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::IssuerId;
 
-        // 1. Resolve issuer id from instrument attributes.
         let issuer_id_str = match instrument
             .attributes()
             .get_meta(finstack_quant_models::factor::matching::ISSUER_ID_META_KEY)
@@ -61,12 +60,8 @@ impl AttributionSpec {
         };
         let issuer_id = IssuerId::new(issuer_id_str);
 
-        // 2. Find issuer in model.
         let issuer_row = model.issuer_betas.iter().find(|r| r.issuer_id == issuer_id);
 
-        // 3. Look up tags for this issuer; if the issuer is not in the model
-        //    return Ok(None) with a diagnostic note rather than silently routing
-        //    the entire credit move into adder_pnl_total.
         if issuer_row.is_none() {
             notes.push(format!(
                 "credit_factor_detail unavailable: issuer {} not present in \
@@ -76,29 +71,11 @@ impl AttributionSpec {
             return Ok(None);
         }
 
-        // 4. Plan the credit-factor cascade. It resolves the issuer, its hazard
-        //    curves and the per-factor par-spread moves (`β·ΔF` / `Δadder`).
-        //    Returns None when no cascade can be planned (unmapped issuer, no
-        //    hazard exposure, …).
         let Some(cascade) = plan_credit_cascade(model, instrument, market_t0, market_t1)? else {
             return Ok(None);
         };
-        // Surface planner diagnostics (e.g. the factor-series unit
-        // guard) into the attribution's notes.
         notes.extend(cascade.warnings.iter().cloned());
 
-        // 5. Real aggregate **par-spread** CS01 measured against the same
-        //    baseline as `credit_curves_pnl`: `market_t1` with the issuer's
-        //    hazard curves restored to T0, priced at `as_of_t1`. The same
-        //    `shift_credit_curves_par_spread` bump the cascade applies is used
-        //    here so `cs01_amt` and the cascade's per-step `delta_bp` share
-        //    units exactly (par CDS spread bp).
-        //
-        //    The prior implementation measured CS01 at
-        //    (market_t0, as_of_t0). That baseline drifts from the credit_pnl
-        //    baseline whenever forwards / discounting / recovery move between
-        //    T0 and T1, distorting generic / level / adder attributions for
-        //    multi-day periods.
         let credit_snapshot = MarketSnapshot::extract(market_t0, MarketRestoreFlags::CREDIT);
         let cs01_base_market =
             MarketSnapshot::restore_market(market_t1, &credit_snapshot, MarketRestoreFlags::CREDIT);
@@ -129,25 +106,18 @@ impl AttributionSpec {
         )?;
         let cs01_amt = (pv_up.amount() - pv_down.amount()) / (2.0 * cs01_bump_bp);
 
-        // 6. Each parallel factor step's P&L is its own contribution
-        //    `−CS01 × Δs_factor`; the `CurveShape` step absorbs the non-parallel
-        //    residual so `generic + Σ levels + adder + curve_shape ≡
-        //    credit_curves_pnl` closes exactly. A twisted credit curve simply
-        //    lands in `curve_shape` — no twist guard needed.
         let ccy = attribution.credit_curves_pnl.currency();
         let mut step_pnls: Vec<Money> = cascade
             .steps
             .iter()
             .map(|step| {
-                Ok(if matches!(step.kind, CreditStepKind::CurveShape) {
-                    Money::from((0_i64, ccy))
+                if matches!(step.kind, CreditStepKind::CurveShape) {
+                    Ok(Money::from((0_i64, ccy)))
                 } else {
-                    // P&L = ∂PV/∂s × Δs_factor. `cs01_amt` is already the signed
-                    // PV sensitivity to an up-bump, so no extra negation.
-                    Money::new(cs01_amt * step.delta_bp, ccy)?
-                })
+                    Money::new(cs01_amt * step.delta_bp, ccy)
+                }
             })
-            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>()?;
         apply_curve_shape_residual(
             &mut step_pnls,
             &cascade.steps,
@@ -183,26 +153,24 @@ impl AttributionSpec {
     ///   credit share is well-defined by the same ratio. The wire field stays
     ///   a single `Money` (v1 schema); the split enters the two carry totals
     ///   so that `rates_carry_total + credit_carry_total ≡ carry_detail.total`
-    ///   holds exactly (previously pull_to_par entered neither leg).
+    ///   holds exactly.
     /// - `roll.credit_part   = 0` (v1: scalar level factors, no term-structure
     ///   adder → all credit roll-down lands in adder, which is 0 here)
     /// - `roll.rates_part    = roll.total`
     ///
     /// **Negative total yield**: when `r + s ≤ 0` with `s > 0`
-    /// (negative-rate books where the base rate overwhelms the spread), the
-    /// naive `s / (r + s)` is negative and previously clamped to 0, routing
-    /// the entire coupon to rates despite a genuine positive spread. Since
-    /// curve builders enforce `hazard ≥ 0` and `recovery ∈ [0, 1]`, the
-    /// spread is the only non-negative yield component — the credit share is
-    /// set to `1` and a diagnostic note is pushed.
+    /// (negative-rate books where the base rate overwhelms the spread),
+    /// `s / (r + s)` is negative. Curve builders enforce `hazard ≥ 0` and
+    /// `recovery ∈ [0, 1]`, so the spread is the only non-negative yield
+    /// component — the credit share is set to `1` and a diagnostic note is
+    /// pushed.
     ///
     /// The per-factor allocation of the total credit carry uses the issuer's
     /// spread decomposition at `as_of_t0`:
     /// `S_i = β_i^PC·g + Σ_k β_i^k·L_k(g_i^k) + adder_i`.
     /// Each factor's credit-carry share is its contribution to `S_i` scaled
     /// by `credit_carry_total / S_i`, so
-    /// `generic + Σ levels + adder ≡ credit_carry_total` by construction
-    /// (previously the scale used only the coupon credit part).
+    /// `generic + Σ levels + adder ≡ credit_carry_total` by construction.
     ///
     /// Best-effort: returns `Ok(())` and leaves the existing CarryDetail
     /// alone if the inputs are missing (no carry detail, no issuer in model,
@@ -219,13 +187,11 @@ impl AttributionSpec {
         use finstack_quant_core::math::Compounding;
         use finstack_quant_core::money::Money;
 
-        // 0. Need a populated carry_detail to split.
         let Some(carry_detail) = attribution.carry_detail.as_mut() else {
             return Ok(());
         };
         let ccy = carry_detail.total.currency();
 
-        // 1. Resolve issuer.
         let issuer_id_str = match instrument
             .attributes()
             .get_meta(finstack_quant_models::factor::matching::ISSUER_ID_META_KEY)
@@ -238,7 +204,6 @@ impl AttributionSpec {
             return Ok(());
         };
 
-        // 2. Find a credit (hazard) curve and discount curve on the instrument.
         let market_deps = instrument.market_dependencies()?;
         let credit_curves = &market_deps.curves.credit_curves;
         let discount_curves = &market_deps.curves.discount_curves;
@@ -254,8 +219,6 @@ impl AttributionSpec {
         let haz = market_t0.get_hazard(credit_curve_id.as_str())?;
         let disc = market_t0.get_discount(discount_curve_id.as_str())?;
 
-        // 3. Sample base rate r and spread s at the bond's tenor (or 5y
-        //    fallback). Use the instrument's expiry when available.
         let fallback_tenor = finstack_quant_core::dates::Tenor::new(
             5,
             finstack_quant_core::dates::TenorUnit::Years,
@@ -268,16 +231,6 @@ impl AttributionSpec {
                 .unwrap_or("usny");
             let calendar = finstack_quant_core::dates::calendar_by_id(cal_code)
                 .or_else(|| finstack_quant_core::dates::calendar_by_id("usny"));
-            let _day_count = instrument
-                .attributes()
-                .get_meta("day_count")
-                .or_else(|| instrument.attributes().get_meta("daycount"))
-                .and_then(|day_count| {
-                    day_count
-                        .parse::<finstack_quant_core::dates::DayCount>()
-                        .ok()
-                })
-                .unwrap_or(finstack_quant_core::dates::DayCount::Act365F);
             let tenor = fallback_tenor;
             tenor
                 .add_to_date(
@@ -292,9 +245,6 @@ impl AttributionSpec {
                         .unwrap_or(self.as_of_t0)
                 })
         });
-        // a failed curve lookup must be distinguishable
-        // from a genuinely zero-rate/zero-spread issuer — silently defaulting
-        // to 0.0 mislabels the whole coupon as the other leg's carry.
         let mut lookup_warnings: Vec<String> = Vec::new();
         let r = match disc.zero_rate_on_date(tenor_date, Compounding::Continuous) {
             Ok(v) => v,
@@ -322,28 +272,10 @@ impl AttributionSpec {
         };
         let s = hazard * (1.0 - haz.recovery_rate());
 
-        // 4. Split coupon_income proportionally to r and s.
-        // coupon_income must be present; if not, skip the decomposition entirely.
-        // Emitting zeros would be indistinguishable from a genuinely zero-spread
-        // issuer, so we return Ok(()) to match the existing early-return pattern
-        // used above for missing issuer_id, credit curve, etc.
-        // Note: "credit_carry_decomposition skipped: coupon_income not present".
         let coupon = match carry_detail.coupon_income.as_ref() {
             Some(line) => line.total,
             None => return Ok(()),
         };
-        // with negative rates (EUR/JPY books) `r + s` can be
-        // arbitrarily close to zero while `s` is material, making the naive
-        // share `s / (r + s)` explode (±10²–10⁶ × coupon into the two legs
-        // with opposite signs, while still reconciling). Since the curve
-        // builders enforce hazard ≥ 0 and recovery ∈ [0, 1], `s ≥ 0` always —
-        // so the economically meaningful credit share is clamped to [0, 1].
-        //
-        // When the total risky yield is non-positive (or the
-        // denominator degenerately cancels) while `s > 0`, the spread is the
-        // only positive-yield component: the naive share is negative and a
-        // clamp-to-zero would mislabel a genuinely spread-carrying bond as
-        // pure rates carry. The credit share is 1 there, with a note.
         let total_yield = r + s;
         let denominator_is_stable = total_yield.abs() > 1e-12 * r.abs().max(s).max(1e-3);
         let credit_share = if s > 0.0 && (total_yield <= 0.0 || !denominator_is_stable) {
@@ -356,8 +288,6 @@ impl AttributionSpec {
         } else if denominator_is_stable {
             (s / total_yield).clamp(0.0, 1.0)
         } else {
-            // Degenerate: total yield ≈ 0 with s == 0 (zero curves). Push
-            // everything to rates.
             0.0
         };
         let coupon_credit_amt = coupon.amount() * credit_share;
@@ -366,29 +296,16 @@ impl AttributionSpec {
             Money::new(coupon_credit_amt, ccy)?,
         );
 
-        // 5. Split roll_down. v1: scalar level factors → all credit roll
-        //    flows to adder, and the model carries no adder term structure
-        //    (only a scalar `adder_at_anchor`), so credit roll = 0 over the
-        //    period. All roll_down lands in rates_part.
         let roll = carry_detail.roll_down.as_ref().map(|l| l.total);
         let (roll_rates, roll_credit) = match roll {
             Some(r) => (r, Money::from((0_i64, ccy))),
             None => (Money::from((0_i64, ccy)), Money::from((0_i64, ccy))),
         };
 
-        // 5b. Split pull_to_par on the same credit share. It is
-        //     discount-driven convergence toward par under the total risky
-        //     yield `r + s`, so the s/(r + s) ratio applies exactly as it does
-        //     to the coupon. The wire field stays a single `Money` (v1
-        //     schema); the split enters the two carry totals so the partition
-        //     `rates_carry_total + credit_carry_total ≡ carry_detail.total`
-        //     closes exactly instead of leaking the whole pull_to_par.
         let ptp_amount = carry_detail.pull_to_par.map(|m| m.amount()).unwrap_or(0.0);
         let ptp_credit_amt = ptp_amount * credit_share;
         let ptp_rates_amt = ptp_amount - ptp_credit_amt;
 
-        // 6. Update CarryDetail's source lines with the split. If the field
-        //    was None we don't synthesize (keeps no-model behavior tight).
         if carry_detail.coupon_income.is_some() {
             carry_detail.coupon_income =
                 Some(SourceLine::split(coupon, coupon_rates, coupon_credit));
@@ -397,28 +314,12 @@ impl AttributionSpec {
             carry_detail.roll_down = Some(SourceLine::split(roll_total, roll_rates, roll_credit));
         }
 
-        // 7. Per-factor allocation of credit_carry_total. Use the issuer's
-        //    spread decomposition at as_of_t0 to partition `coupon_credit`
-        //    across generic / each level / adder. The issuer's spread
-        //    satisfies the linear identity
-        //    `S = β_PC·g + Σ_k β_k · L_k(g_i^k) + adder_i`.
-        //    We compute each piece, then scale by `coupon_credit / S` so
-        //    pieces sum to `coupon_credit`. (When `coupon_credit` is zero we
-        //    short-circuit and emit zeros.)
         let credit_total = Money::new(
             coupon_credit.amount() + roll_credit.amount() + ptp_credit_amt,
             ccy,
         )?;
 
         let num_levels = model.hierarchy.levels.len();
-
-        // Compute each piece of the model-implied spread:
-        //   S_model = β_PC·g_anchor + Σ_k β_k · L_k(g_i^k, anchor) + adder_at_anchor.
-        // We allocate `coupon_credit` proportionally to these pieces so that
-        // generic + Σ levels + adder == credit_carry_total exactly (§7.4 inv 4).
-        // Using the model-implied S (rather than the observed hazard rate)
-        // keeps the reconciliation tight by construction even when the
-        // calibrated decomposition does not exactly match the market curve.
         let g_anchor = model.anchor_state.pc;
         let beta_pc = issuer_row.betas.pc;
         let pc_share_of_s = beta_pc * g_anchor;

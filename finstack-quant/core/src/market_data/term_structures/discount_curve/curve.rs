@@ -659,11 +659,8 @@ impl DiscountCurve {
         // Monotone-convex is a discount-factor interpolation strategy and must
         // not be applied to already-derived forward-rate ordinates.
         let style = interp_style.unwrap_or(InterpStyle::Linear);
-
-        // Calculate forward rates at each knot point
         let mut forward_rates = Vec::with_capacity(self.knots.len());
 
-        // Ensure we have enough points
         if self.knots.len() < 2 {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
@@ -686,7 +683,6 @@ impl DiscountCurve {
             forward_rates.push((t, forward_rate));
         }
 
-        // Build forward curve with the specified interpolation style
         ForwardCurve::builder(forward_id, tenor_years)
             .base_date(self.base)
             .day_count(self.day_count)

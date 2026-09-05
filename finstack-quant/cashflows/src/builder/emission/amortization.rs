@@ -8,10 +8,7 @@ use finstack_quant_core::decimal::{decimal_to_f64, f64_to_decimal};
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
-/// Amortization parameters for emission.
-///
-/// Contains precomputed values and maps needed by `emit_amortization_on` to
-/// process various amortization specifications efficiently.
+/// Precomputed maps and deltas used by [`emit_amortization_on`].
 #[derive(Debug, Clone)]
 pub(in crate::builder) struct AmortizationParams<'a> {
     pub(in crate::builder) ccy: Currency,
@@ -35,12 +32,7 @@ fn emit_principal_repayment(
         return Ok(());
     }
 
-    // Clamp to outstanding to guard against any numerical drift
-    let pay = if pay < *outstanding {
-        pay
-    } else {
-        *outstanding
-    };
+    let pay = pay.min(*outstanding);
     if pay <= Decimal::ZERO {
         return Ok(());
     }
@@ -57,23 +49,9 @@ fn emit_principal_repayment(
     Ok(())
 }
 
-/// Emit amortization cashflows on a specific date.
+/// Emit scheduled amortization on `d` and reduce `outstanding`.
 ///
-/// Processes the notional's amortization specification to generate principal
-/// repayment flows. Mutates the `outstanding` balance in-place to reflect
-/// the reduction from amortization.
-///
-/// Supports:
-/// - LinearTo: Equal installments over schedule
-/// - StepRemaining: Specific remaining balance targets
-/// - PercentOfOriginalPerPeriod: Percentage of original notional (capped by remaining)
-/// - CustomPrincipal: Explicit payment amounts by date
-///
-/// All variants emit only the scheduled/configured amount as
-/// `CFKind::Amortization` — including on the maturity date. Any residual
-/// outstanding at maturity is redeemed downstream by the pipeline's
-/// maturity handling as `CFKind::Notional`, so total principal cash is
-/// unchanged by classification.
+/// Residual outstanding at maturity is redeemed later as [`CFKind::Notional`].
 pub(in crate::builder) fn emit_amortization_on(
     d: Date,
     notional: &Notional,
@@ -85,83 +63,58 @@ pub(in crate::builder) fn emit_amortization_on(
     match &notional.amort {
         AmortizationSpec::None => {}
         AmortizationSpec::LinearTo { final_notional } => {
-            if params.amort_dates.contains(&d) {
-                if let Some(delta) = params.linear_delta {
-                    let final_notional = f64_to_decimal(final_notional.amount())?;
-                    let pay = if is_maturity {
-                        let excess = *outstanding - final_notional;
-                        if excess > Decimal::ZERO {
-                            excess
-                        } else {
-                            Decimal::ZERO
-                        }
-                    } else if delta < *outstanding {
-                        delta
-                    } else {
-                        *outstanding
-                    };
-                    emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
-                }
+            if let Some(delta) = params
+                .linear_delta
+                .filter(|_| params.amort_dates.contains(&d))
+            {
+                let final_notional = f64_to_decimal(final_notional.amount())?;
+                let pay = if is_maturity {
+                    (*outstanding - final_notional).max(Decimal::ZERO)
+                } else {
+                    delta.min(*outstanding)
+                };
+                emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
             }
         }
         AmortizationSpec::StepRemaining { .. } => {
-            if let Some(map) = params.step_remaining_map {
-                if let Some(rem_after) = map.get(&d) {
-                    let target = f64_to_decimal(rem_after.amount())?;
-                    // Pay down to the scheduled target on every date,
-                    // including maturity. Any residual outstanding (a final
-                    // non-zero target) is redeemed by `handle_maturity` as
-                    // `CFKind::Notional`, consistent with the other variants.
-                    let excess = *outstanding - target;
-                    let positive_excess = if excess > Decimal::ZERO {
-                        excess
-                    } else {
-                        Decimal::ZERO
-                    };
-                    let pay = if positive_excess < *outstanding {
-                        positive_excess
-                    } else {
-                        *outstanding
-                    };
-                    emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
-                }
+            if let Some(rem_after) = params
+                .step_remaining_map
+                .as_ref()
+                .and_then(|map| map.get(&d))
+            {
+                let target = f64_to_decimal(rem_after.amount())?;
+                let pay = (*outstanding - target).max(Decimal::ZERO).min(*outstanding);
+                emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
             }
         }
         AmortizationSpec::PercentOfOriginalPerPeriod { .. } => {
-            if params.amort_dates.contains(&d) {
-                if let Some(per) = params.percent_per {
-                    // Pay the scheduled percentage on every date, including
-                    // maturity. Any residual outstanding at maturity is
-                    // redeemed by `handle_maturity` as `CFKind::Notional`,
-                    // consistent with the other variants.
-                    let pay = if per < *outstanding {
-                        per
-                    } else {
-                        *outstanding
-                    };
-                    emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
-                }
+            if let Some(per) = params
+                .percent_per
+                .filter(|_| params.amort_dates.contains(&d))
+            {
+                emit_principal_repayment(
+                    d,
+                    params.ccy,
+                    outstanding,
+                    per.min(*outstanding),
+                    new_flows,
+                )?;
             }
         }
         AmortizationSpec::CustomPrincipal { .. } => {
-            // Honor the configured `amt` on every date, including maturity.
-            // Any residual outstanding at maturity is redeemed by
-            // `handle_maturity` as `CFKind::Notional`.
-            if let Some(map) = params.custom_principal_map {
-                if let Some(amt) = map.get(&d) {
-                    let amount = f64_to_decimal(amt.amount())?;
-                    let positive_amount = if amount > Decimal::ZERO {
-                        amount
-                    } else {
-                        Decimal::ZERO
-                    };
-                    let pay = if positive_amount < *outstanding {
-                        positive_amount
-                    } else {
-                        *outstanding
-                    };
-                    emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
-                }
+            if let Some(amt) = params
+                .custom_principal_map
+                .as_ref()
+                .and_then(|map| map.get(&d))
+            {
+                let amount = f64_to_decimal(amt.amount())?.max(Decimal::ZERO);
+                emit_principal_repayment(
+                    d,
+                    params.ccy,
+                    outstanding,
+                    amount.min(*outstanding),
+                    new_flows,
+                )?;
             }
         }
     }

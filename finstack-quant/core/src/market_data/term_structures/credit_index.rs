@@ -277,10 +277,8 @@ impl CreditIndexDataBuilder {
             .base_correlation_curve
             .ok_or_else(|| crate::Error::from(crate::error::InputError::Invalid))?;
 
-        // Validate recovery rate
         super::common::validate_unit_range(recovery_rate, "recovery_rate")?;
 
-        // Validate number of constituents
         if num_constituents == 0 {
             return Err(crate::Error::from(crate::error::InputError::Invalid));
         }

@@ -599,7 +599,6 @@ impl Tenor {
         };
         let raw_date = raw_date?;
 
-        // Apply business day convention if calendar provided
         if let Some(cal) = calendar {
             adjust(raw_date, business_day_convention, cal)
         } else {
@@ -760,15 +759,10 @@ impl Tenor {
             .into());
         }
 
-        // Try to fit into months first
         if 12 % payments == 0 {
             let months = 12 / payments;
             Self::new(months, TenorUnit::Months)
         } else {
-            // If it doesn't fit into months, try roughly into weeks (52)
-            // But standard market convention usually implies months.
-            // Frequency::from_payments_per_year used to fail if not dividing 12.
-            // We'll stick to that behavior for now to match strictness.
             Err(InputError::InvalidTenor {
                 tenor: format!("payments={}", payments),
                 reason: "payments_per_year for Tenor currently requires even division of 12 months"

@@ -19,12 +19,12 @@ use super::schedule::ScheduleParams;
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "snake_case")]
 pub enum CouponType {
-    /// Cash variant.
+    /// Entire coupon paid in cash.
     #[default]
     Cash,
-    /// PIK variant.
+    /// Entire coupon capitalized into principal.
     Pik,
-    /// Split variant.
+    /// Coupon split between cash and PIK.
     Split {
         /// Fraction of the coupon paid in cash, expressed as a decimal share in
         /// `[0, 1]`.
@@ -52,7 +52,6 @@ impl CouponType {
             CouponType::Cash => Ok((Decimal::ONE, Decimal::ZERO)),
             CouponType::Pik => Ok((Decimal::ZERO, Decimal::ONE)),
             CouponType::Split { cash_pct, pik_pct } => {
-                // Validate within [0,1]
                 if cash_pct < Decimal::ZERO
                     || cash_pct > Decimal::ONE
                     || pik_pct < Decimal::ZERO

@@ -17,8 +17,8 @@ use std::sync::Arc;
 ///
 /// # Bucketed DV01 Support
 ///
-/// This function now prioritizes bucketed DV01 (per-curve sensitivities) over
-/// aggregate DV01 for rates attribution:
+/// Prefers bucketed DV01 (per-curve sensitivities) over aggregate DV01 for
+/// rates attribution:
 ///
 /// - **If BucketedDv01 is available**: Computes PnL = Σ(DV01_i × Δr_i) per curve,
 ///   eliminating basis risk approximation errors.
@@ -84,7 +84,7 @@ use std::sync::Arc;
 /// let metrics = vec![
 ///     MetricId::Theta,
 ///     MetricId::Dv01,
-///     MetricId::BucketedDv01,  // ← Include for per-curve rates attribution
+///     MetricId::BucketedDv01,
 ///     MetricId::Cs01,
 ///     MetricId::Vega
 /// ];
@@ -115,7 +115,6 @@ pub fn attribute_pnl_metrics_based(
 ) -> Result<PnlAttribution> {
     validate_attribution_period(as_of_t0, as_of_t1)?;
 
-    // Total P&L — use date-specific FX to stay consistent with factor decomposition
     let total_pnl = compute_pnl_with_fx(
         val_t0.value,
         val_t1.value,
@@ -194,33 +193,21 @@ pub fn attribute_pnl_metrics_based(
     super::volatility::apply(&inputs, &mut attribution, &mut non_finite_detected);
     super::equity::apply_spot(&inputs, &mut attribution, &mut non_finite_detected);
     super::cross_factor::apply(&inputs, &mut attribution, &mut non_finite_detected);
-
-    // 8. Model parameters attribution
-    // Requires measuring parameter shifts from instrument at T0 vs T1
-    // This needs instrument-specific parameter extraction (prepayment, default, recovery)
-    // (See model_params.rs for parameter extraction infrastructure)
-
     super::equity::apply_dividend(&inputs, &mut attribution, &mut non_finite_detected);
     super::equity::apply_inflation(&inputs, &mut attribution, &mut non_finite_detected);
 
-    // Propagate the flag before finalization so residual computation cannot
-    // turn a non-finite factor into an apparently clean result.
     if non_finite_detected {
         attribution.result_invalid = true;
     }
 
-    // Metadata - use reasonable tolerances for metrics-based attribution.
-    // Note: Metrics-based attribution is inherently approximate, so larger residuals are expected.
     finalize_attribution(
         &mut attribution,
         instrument.id(),
         "metrics_based",
-        0,    // Metrics-based doesn't reprice
-        10.0, // $10 absolute tolerance
-        1.0,  // 1% relative tolerance
+        0,
+        10.0,
+        1.0,
     );
-
-    // Note: For tighter tolerances, consider using waterfall or parallel attribution methods
 
     Ok(attribution)
 }

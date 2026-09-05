@@ -538,10 +538,8 @@ impl InflationCurve {
             self.day_count
                 .year_fraction(self.base_date, new_base, DayCountContext::default())?;
 
-        // Get the new base CPI by interpolating at the roll time
         let new_base_cpi = self.cpi(dt_years);
 
-        // Shift knots and filter expired points using shared helper
         let mut rolled_points = roll_knots(&self.knots, &self.cpi_levels, dt_years);
 
         if rolled_points.is_empty() {

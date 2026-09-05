@@ -155,7 +155,6 @@ impl DateExt for Date {
             return year;
         }
 
-        // Optimization: Direct tuple comparison avoids expensive Date construction and validation.
         let current_month = self.month() as u8;
 
         if current_month > config.start_month {
@@ -208,24 +207,18 @@ impl DateExt for Date {
         let step = if n > 0 { 1 } else { -1 };
         let mut date = self;
 
-        // Phase 1: Advance until we are on a weekday.
-        // This handles the "start on weekend" edge case and aligns us to the 5-day week grid.
-        // Max 2 iterations.
+        // Phase 1: land on a weekday (at most two steps from a weekend start).
         while date.is_weekend() {
             date += Duration::days(step as i64);
-            // If we landed on a weekday, we consumed one unit of 'n'.
             if !date.is_weekend() {
                 n -= step;
             }
-            // If n reached 0 during this adjustment (e.g. start Sat, add 1 weekday -> Mon), return.
             if n == 0 {
                 return date;
             }
         }
 
-        // Phase 2: Jump full weeks.
-        // Now 'date' is guaranteed to be a weekday.
-        // 5 weekdays = 1 calendar week (7 days).
+        // Phase 2: jump whole weeks (5 weekdays = 7 calendar days).
         let weeks = n / 5;
         let remainder = n % 5;
 
@@ -233,8 +226,7 @@ impl DateExt for Date {
             date += Duration::days(weeks as i64 * 7);
         }
 
-        // Phase 3: Handle remaining days (max 4).
-        // Since we started on a weekday (from Phase 1 or 2), simple iteration is fine and safe.
+        // Phase 3: remaining weekdays (at most 4).
         let mut rem = remainder;
         while rem != 0 {
             date += Duration::days(step as i64);

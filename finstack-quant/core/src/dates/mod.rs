@@ -66,11 +66,8 @@ pub const AVERAGE_DAYS_PER_YEAR: f64 = 365.25;
 
 pub use time::{Date, Duration, Month, OffsetDateTime, PrimitiveDateTime};
 
-// Build-time bitsets removed the last runtime use of DateBuf; keep only if needed elsewhere.
-
 mod date_extensions;
 
-// Publicly re-export the extension traits so downstream crates can `use finstack_quant_core::dates::DateExt`.
 pub use date_extensions::DateExt;
 
 mod daycount;
@@ -84,7 +81,6 @@ pub use calendar::business_days::{
     adjust, BusinessDayConvention, CalendarMetadata, HolidayCalendar,
 };
 
-// The canonical public discovery helper
 pub use calendar::business_days::available_calendars;
 pub use calendar::{calendar_by_id, calendar_by_id_strict, calendars_by_ids, WEEKENDS_ONLY};
 
@@ -112,10 +108,7 @@ pub use imm::{
 };
 
 pub mod calendar;
-// Calendar rule system is intentionally public, but only via the `dates` facade.
 pub use calendar::rule::{Direction, Observed, Rule};
-
-// Concrete calendar type (used by generated calendars and optional custom calendars).
 pub use calendar::types::{Calendar, WeekendRule};
 
 mod periods;

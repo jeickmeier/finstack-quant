@@ -367,7 +367,6 @@ fn principal_event_draw_increases_outstanding() {
 
 #[test]
 fn principal_event_repay_effect_on_outstanding() {
-    // Test that principal events are included in the outstanding path
     //
     // Note: The sign convention and exact semantics depend on implementation.
     // This test verifies events are processed, not specific values.
@@ -393,7 +392,6 @@ fn principal_event_repay_effect_on_outstanding() {
 
     let schedule = builder.build(None).unwrap();
 
-    // Verify the event was added to flows
     let notional_flows: Vec<_> = schedule
         .get_flows()
         .iter()

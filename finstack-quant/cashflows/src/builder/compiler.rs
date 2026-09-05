@@ -167,19 +167,7 @@ pub(crate) struct FloatSchedule {
     pub(crate) terminal_accrual_end: Option<Date>,
 }
 
-/// Periodic fee schedule prepared from fee specs.
-///
-/// Represents a normalized, per‑period fee defined by a base, annualized bp,
-/// a day‑count, and the concrete schedule over which it accrues.
-///
-/// Fields:
-/// - `base` (`FeeBase`): Notional/cash‑based fee base.
-/// - `bp` (`Decimal`): Annualized basis points applied to the base. Uses Decimal for exact representation.
-/// - `day_count` (`DayCount`): Day‑count convention for accrual.
-/// - `frequency` (`Tenor`): Payment frequency (needed for Act/Act ISMA day count context).
-/// - `calendar` (`HolidayCalendar`): Resolved calendar used for Bus/252 and Act/Act ISMA contexts.
-/// - `dates` (`Vec<Date>`): Inclusive/exclusive boundary dates for accrual periods.
-/// - `prev` (`HashMap<Date, SchedulePeriod>`): Period details keyed by payment date.
+/// Periodic fee schedule compiled from a fee spec.
 #[derive(Clone)]
 pub(super) struct PeriodicFee {
     pub(super) calendar_id: String,
@@ -205,57 +193,11 @@ pub(super) fn build_fee_schedules(
     maturity: Date,
     fees: &[FeeSpec],
 ) -> finstack_quant_core::Result<(PeriodicFees, FixedFees)> {
-    //! Build periodic and fixed fee schedules from input `FeeSpec`s.
-    //!
-    //! Arguments:
-    //! - `issue` (`Date`): Instrument start date (inclusive).
-    //! - `maturity` (`Date`): Instrument end date (inclusive horizon endpoint).
-    //! - `fees` (`&[FeeSpec]`): Collection of fee specifications to compile.
-    //!
-    //! Returns:
-    //! - `Ok((PeriodicFees, FixedFees))` where `PeriodicFees` contains
-    //!   normalized periodic fee programs (bp/day‑count/schedule), and
-    //!   `FixedFees` contains explicit (`Date`, `Money`) pairs.
-    //!
-    //! Errors:
-    //! - `Error::Validation` if a fixed fee is dated after maturity (it could
-    //!   never be emitted) or a periodic fee produces an empty schedule (the
-    //!   message names the offending fee). Pre-issue fixed fees are allowed
-    //!   (delayed-funding structures).
-    //!
-    //! Example:
-    //! ```rust
-    //! use finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention};
-    //! use finstack_quant_cashflows::builder::{FeeSpec, FeeBase};
-    //! use finstack_quant_core::dates::StubKind;
-    //! use rust_decimal_macros::dec;
-    //! use time::Month;
-    //!
-    //! let issue = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
-    //! let maturity = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    //! let fees = vec![
-    //!     FeeSpec::PeriodicBp {
-    //!         base: FeeBase::Drawn,
-    //!         bp: dec!(50),
-    //!         frequency: Tenor::quarterly(),
-    //!         day_count: DayCount::Act360,
-    //!         business_day_convention: BusinessDayConvention::Following,
-    //!         calendar_id: "weekends_only".to_string(),
-    //!         stub: StubKind::None,
-    //!         accrual_basis: Default::default(),
-    //!     }
-    //! ];
-    //! // Note: build_fee_schedules would be called here
-    //! ```
     let mut periodic_fees: PeriodicFees = Vec::new();
     let mut fixed_fees: FixedFees = Vec::new();
     for fee in fees {
         match fee {
             FeeSpec::Fixed { date, amount } => {
-                // Pre-issue fixed fees are supported (delayed-funding /
-                // commitment structures emit them at their stated date), but a
-                // fee dated after maturity can never be reached by the
-                // emission loop and would be silently dropped.
                 if *date > maturity {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "fixed fee dated {} is after maturity {}; fees must be dated on or \
@@ -350,9 +292,6 @@ pub(super) struct CompiledSchedules {
 }
 
 /// Collect all relevant dates for cashflow schedule building.
-///
-/// Uses Vec with sort_unstable + dedup instead of BTreeSet for better
-/// performance with typical schedule sizes (<10k dates).
 pub(super) fn collect_dates(
     issue: Date,
     maturity: Date,
@@ -362,7 +301,6 @@ pub(super) fn collect_dates(
     fixed_fees: &[(Date, Money)],
     notional: &Notional,
 ) -> Vec<Date> {
-    // Estimate capacity: issue/maturity + 3 dates per schedule period + fees + amort dates
     let estimated_periods: usize = fixed_schedules
         .iter()
         .map(|s| s.dates.len())
@@ -374,7 +312,6 @@ pub(super) fn collect_dates(
     dates.push(issue);
     dates.push(maturity);
 
-    // Collect all fixed coupon dates (accrual boundaries + payment dates)
     for schedule in fixed_schedules {
         for period in schedule.prev.values() {
             dates.push(period.accrual_start);
@@ -383,7 +320,6 @@ pub(super) fn collect_dates(
         }
     }
 
-    // Collect all floating coupon dates (accrual boundaries + payment dates)
     for schedule in float_schedules {
         for period in schedule.prev.values() {
             dates.push(period.accrual_start);
@@ -392,7 +328,6 @@ pub(super) fn collect_dates(
         }
     }
 
-    // Collect all periodic fee dates (accrual boundaries + payment dates)
     for dates_slice in periodic_fee_date_slices {
         dates.extend_from_slice(dates_slice);
     }
@@ -471,7 +406,6 @@ fn compile_step_up_schedules(input: StepUpCompileInput<'_>) -> Vec<FixedSchedule
         }
 
         fn into_fixed_schedule(self, input: &StepUpCompileInput<'_>) -> FixedSchedule {
-            // Terminal end for this rate group, not the parent schedule.
             let terminal = terminal_accrual_end(&self.prev);
             FixedSchedule {
                 spec: FixedCouponSpec {
@@ -502,26 +436,27 @@ fn compile_step_up_schedules(input: StepUpCompileInput<'_>) -> Vec<FixedSchedule
 
     let mut rate_groups: Vec<RateGroup> = Vec::new();
     for &payment_date in input.dates {
-        if let Some(period) = input.prev.get(&payment_date) {
-            let period_rate = rate_for(period.accrual_start);
-            let extend_last = rate_groups
-                .last()
-                .map(|group| group.rate == period_rate)
-                .unwrap_or(false);
-            let is_first_or_last = input.first_last.contains(&payment_date);
+        let Some(period) = input.prev.get(&payment_date) else {
+            continue;
+        };
+        let period_rate = rate_for(period.accrual_start);
+        let extend_last = rate_groups
+            .last()
+            .map(|group| group.rate == period_rate)
+            .unwrap_or(false);
+        let is_first_or_last = input.first_last.contains(&payment_date);
 
-            if extend_last {
-                if let Some(last) = rate_groups.last_mut() {
-                    last.push(payment_date, *period, is_first_or_last);
-                }
-            } else {
-                rate_groups.push(RateGroup::new(
-                    period_rate,
-                    payment_date,
-                    *period,
-                    is_first_or_last,
-                ));
+        if extend_last {
+            if let Some(last) = rate_groups.last_mut() {
+                last.push(payment_date, *period, is_first_or_last);
             }
+        } else {
+            rate_groups.push(RateGroup::new(
+                period_rate,
+                payment_date,
+                *period,
+                is_first_or_last,
+            ));
         }
     }
 
@@ -604,45 +539,6 @@ pub(super) fn compute_coupon_schedules(
     issue: Date,
     maturity: Date,
 ) -> finstack_quant_core::Result<CompiledSchedules> {
-    //! Compile coupon and payment programs into concrete date schedules.
-    //!
-    //! This function processes the programmatic windowing model to generate
-    //! concrete schedules. Payment windows can sparsely override the split policy;
-    //! missing windows default to `Cash`.
-    //!
-    //! Arguments:
-    //! - `builder` (`&CashFlowBuilder`): Source of coupon/payment programs.
-    //! - `issue` (`Date`): Start date (inclusive).
-    //! - `maturity` (`Date`): End date (inclusive horizon endpoint).
-    //!
-    //! Returns:
-    //! - `Ok(CompiledSchedules)` with per‑window fixed and floating schedules
-    //!   and the exact specs used for each schedule.
-    //!
-    //! Errors:
-    //! - `Error::Validation` (naming the offending window) for out‑of‑range
-    //!   windows, overlapping windows without containment, or ambiguous
-    //!   coverage selection.
-    //! - `InputError::TooFewPoints` if any derived schedule has no dates.
-    //!
-    //! Example:
-    //! ```rust
-    //! use finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention};
-    //! use finstack_quant_cashflows::builder::{FixedCouponSpec, CouponType, ScheduleParams};
-    //! use finstack_quant_core::dates::StubKind;
-    //! use rust_decimal_macros::dec;
-    //! use time::Month;
-    //!
-    //! let issue = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
-    //! let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
-    //! // Note: CashFlowBuilder would be created here
-    //! let fixed_spec = FixedCouponSpec {
-    //!     coupon_type: CouponType::Cash,
-    //!     rate: dec!(0.05),
-    //!     schedule: ScheduleParams::semiannual_30360(),
-    //! };
-    //! // Note: compute_coupon_schedules would be called here
-    //! ```
     let coupon_pieces: Vec<_> = builder
         .coupon_program
         .iter()
@@ -654,7 +550,6 @@ pub(super) fn compute_coupon_schedules(
         })
         .collect();
 
-    // If there are no coupon pieces at all and no payment windows, return empty schedules
     if coupon_pieces.is_empty() && builder.payment_program.is_empty() {
         return Ok(CompiledSchedules {
             fixed_schedules: Vec::new(),
@@ -662,7 +557,6 @@ pub(super) fn compute_coupon_schedules(
         });
     }
 
-    // Payment pieces (PIK toggles) — may be sparse; missing windows default to Cash
     let payment_pieces: Vec<_> = builder
         .payment_program
         .iter()
@@ -674,8 +568,6 @@ pub(super) fn compute_coupon_schedules(
         })
         .collect();
 
-    // Validate windows are within [issue, maturity] and build boundary grid
-    // Use Vec + sort_unstable for better performance than BTreeSet for small N
     let mut bounds: Vec<Date> =
         Vec::with_capacity(2 + coupon_pieces.len() * 2 + payment_pieces.len() * 2);
     bounds.push(issue);
@@ -863,7 +755,6 @@ mod tests {
 
     #[test]
     fn nested_payment_window_override_wins() {
-        // Inner PIK window nested inside the implicit full-horizon Cash default.
         let issue = d(2025, 1, 1);
         let maturity = d(2029, 1, 1);
         let mut builder = builder_with_full_horizon_fixed(issue, maturity);
@@ -872,8 +763,6 @@ mod tests {
         let compiled =
             compute_coupon_schedules(&builder, issue, maturity).expect("nested window compiles");
 
-        // Grid {2025,2026,2028,2029} -> three fixed schedules; the middle one
-        // (the nested window) takes the PIK split, the outer two default Cash.
         assert_eq!(compiled.fixed_schedules.len(), 3);
         let splits: Vec<CouponType> = compiled
             .fixed_schedules
@@ -888,8 +777,6 @@ mod tests {
 
     #[test]
     fn non_nested_overlapping_payment_windows_rejected() {
-        // Windows [2025,2027) and [2026,2029) overlap on [2026,2027) but
-        // neither contains the other -> ambiguous coverage.
         let issue = d(2025, 1, 1);
         let maturity = d(2029, 1, 1);
         let mut builder = builder_with_full_horizon_fixed(issue, maturity);
@@ -910,7 +797,6 @@ mod tests {
         let issue = d(2025, 1, 1);
         let maturity = d(2029, 1, 1);
         let mut builder = builder_with_full_horizon_fixed(issue, maturity);
-        // Window extends one year past maturity.
         let _ = builder.add_payment_window(issue, d(2030, 1, 1), CouponType::Pik);
 
         let Err(err) = compute_coupon_schedules(&builder, issue, maturity) else {

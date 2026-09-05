@@ -29,8 +29,6 @@
 //! * [`market_data`] – curves, surfaces, scalars, and [`market_data::MarketContext`]
 //! * [`math`] – interpolation, solvers, integration, statistics, and random numbers
 //!
-//! This crate uses the Rust standard library.
-//!
 //! # Quick start
 //! ```
 //! use finstack_quant_core::currency::Currency;
@@ -93,11 +91,7 @@
 //! - Discounting and curve construction: `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
 //! - Interpolation: `docs/REFERENCES.md#hagan-west-monotone-convex`
 
-// Core modules
-//
-// API note: `collections` is intentionally kept as an internal module to avoid
-// committing to a public submodule layout. Downstream crates should import the
-// aliases directly from the crate root (`finstack_quant_core::HashMap`).
+// `collections` stays crate-private; import `HashMap`/`HashSet` from the crate root.
 /// Deterministic JSON canonicalization and content hashing.
 pub mod canonical;
 /// Foundational cashflow primitives and discounting helpers.
@@ -115,22 +109,12 @@ pub mod dates;
 pub mod decimal;
 
 /// Shared loader for embedded JSON registries with config override support.
-///
-/// Provides cached parsing and validation for versioned compile-time JSON assets.
 pub mod embedded_registry;
 /// Error types for finstack-quant-core.
-///
-/// The crate uses a unified `Error` enum with specific variants for
-/// different error categories (validation, market data, computation, etc.).
 pub mod error;
 /// Explainability infrastructure for computation tracing.
-///
-/// Provides opt-in tracing for debugging and auditing financial computations.
 pub mod explain;
 /// Expression engine (AST, planning, and evaluation).
-///
-/// Internal expression engine used by statements for formula evaluation and
-/// time-series operations.
 pub mod expr;
 /// Market data curves, surfaces, scalars, and context storage.
 pub mod market_data;

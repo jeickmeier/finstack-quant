@@ -185,10 +185,6 @@ impl DefaultModelSpec {
 
     /// 2% CDR (common baseline).
     ///
-    /// # Arguments
-    ///
-    /// None.
-    ///
     /// # Returns
     ///
     /// Default model equivalent to [`Self::constant_cdr`] with `cdr = 0.02`.

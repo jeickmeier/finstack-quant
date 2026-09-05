@@ -114,10 +114,7 @@ pub use composite::CompositeCalendar;
 pub use rule::{Direction, Observed, Rule};
 pub use types::{Calendar, WeekendRule};
 
-// Include generated calendar implementations.
-//
-// Important: wrap the include so its internal `use ...` imports don't collide
-// with our public re-export facade above.
+// Isolate generated `use` imports from this module's public re-exports.
 mod calendars_generated {
     include!(concat!(env!("OUT_DIR"), "/calendars.rs"));
 }

@@ -5,7 +5,9 @@ use crate::api::schema::VolSurfaceParams;
 use crate::config::CalibrationConfig;
 use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::vol::VolQuote;
-use crate::targets::util::{interpolate_total_variance, resolve_equity_forward_inputs};
+use crate::targets::util::{
+    interpolate_total_variance, resolve_equity_forward_inputs, surface_quote_residuals,
+};
 use crate::validation::ValidationConfig;
 use crate::CalibrationReport;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -157,7 +159,6 @@ impl VolSurfaceTarget {
         let mut sabr_winning_iterations = Vec::new();
         let mut sabr_residual_evaluations = Vec::new();
         let mut sabr_bound_hits = Vec::new();
-        let mut residuals = BTreeMap::new();
         let mut total_iterations = 0;
 
         for (t_key, expiry_quotes) in &quotes_by_expiry {
@@ -204,16 +205,6 @@ impl VolSurfaceTarget {
                 ));
             }
             let p = outcome.parameters;
-            let model = SabrModel::new(p.clone());
-            for (i, k) in strikes.iter().enumerate() {
-                let model_vol = model.implied_volatility(f, *k, t).map_err(|e| {
-                    finstack_quant_core::Error::Calibration {
-                        message: format!("SABR implied vol failed at t={t:.6}, strike={k:.6}: {e}"),
-                        category: "vol_surface".to_string(),
-                    }
-                })?;
-                residuals.insert(format!("opt_vol_t{t:.2}_k{k:.2}_i{i}"), model_vol - vols[i]);
-            }
             sabr_params_by_expiry.insert(*t_key, p);
         }
 
@@ -244,6 +235,13 @@ impl VolSurfaceTarget {
             &params.target_expiries,
             &params.target_strikes,
             &grid,
+        )?;
+
+        let residuals = surface_quote_residuals(
+            &surface,
+            quotes,
+            &params.underlying_ticker,
+            params.base_date,
         )?;
 
         // Forward-aware arbitrage violations fail the calibration.

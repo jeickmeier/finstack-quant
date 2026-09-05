@@ -47,8 +47,6 @@ impl InterpolationStrategy for LinearStrategy {
             return f64::NAN;
         }
 
-        // Handle extrapolation based on policy
-        // Safe access with NaN fallback for empty slices (shouldn't happen by construction)
         if let Some(val) = check_extrapolation(
             x,
             knots,
@@ -74,12 +72,8 @@ impl InterpolationStrategy for LinearStrategy {
             return val;
         }
 
-        // Interior linear interpolation.
-        // Exact knot hits are handled correctly: locate_segment returns idx where
-        // knots[idx] <= x, so w = 0.0 when x == knots[idx] and w = 1.0 when
-        // x == knots[idx+1] — both produce the exact knot value without a
-        // separate binary search.
-        // Safe: check_extrapolation returning None guarantees x is in [knots[0], knots[last]].
+        // Exact knot hits: locate_segment returns idx where knots[idx] <= x,
+        // so w = 0 at the left knot and w = 1 at the right knot.
         let idx = locate_segment_unchecked(knots, x);
         let x0 = knots[idx];
         let x1 = knots[idx + 1];
@@ -102,7 +96,6 @@ impl InterpolationStrategy for LinearStrategy {
             return f64::NAN;
         }
 
-        // Handle extrapolation based on policy
         if let Some(val) = check_extrapolation(
             x,
             knots,
@@ -124,7 +117,6 @@ impl InterpolationStrategy for LinearStrategy {
             return val;
         }
 
-        // Interior: safe after check_extrapolation returned None
         let idx = locate_segment_unchecked(knots, x);
         segment_slope(knots, values, idx, idx + 1)
     }
@@ -160,7 +152,6 @@ impl InterpolationStrategy for LogLinearStrategy {
     ) -> crate::Result<Self> {
         validate_knot_spacing(knots, MIN_RELATIVE_KNOT_GAP)?;
         validate_positive_series(values)?;
-        // Precompute log(values) for efficiency
         let log_values: Vec<f64> = values.iter().map(|v| v.ln()).collect();
         Ok(Self {
             log_values: log_values.into_boxed_slice(),
@@ -180,8 +171,6 @@ impl InterpolationStrategy for LogLinearStrategy {
             return f64::NAN;
         }
 
-        // Handle extrapolation based on policy
-        // Safe access with NaN fallback for empty slices (shouldn't happen by construction)
         if let Some(val) = check_extrapolation(
             x,
             knots,
@@ -215,9 +204,6 @@ impl InterpolationStrategy for LogLinearStrategy {
             return val;
         }
 
-        // Interior interpolation (exact knot hits produce w=0 or w=1,
-        // yielding the exact knot value without a separate search).
-        // Safe: check_extrapolation returning None guarantees x is in bounds.
         let idx = locate_segment_unchecked(knots, x);
         let x0 = knots[idx];
         let x1 = knots[idx + 1];
@@ -243,7 +229,6 @@ impl InterpolationStrategy for LogLinearStrategy {
             return f64::NAN;
         }
 
-        // At boundaries, handle based on extrapolation policy
         if let Some(val) = check_extrapolation(
             x,
             knots,
@@ -271,8 +256,6 @@ impl InterpolationStrategy for LogLinearStrategy {
             return val;
         }
 
-        // Compute interpolated value and slope in a single binary search.
-        // Safe: check_extrapolation returning None guarantees x is in bounds.
         let idx = locate_segment_unchecked(knots, x);
         let x0 = knots[idx];
         let x1 = knots[idx + 1];
@@ -382,7 +365,6 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
             m[j] = z[j] - mu[j] * m[j + 1];
         }
 
-        // Build cubic coefficients for each segment
         let mut a_coeff = Vec::with_capacity(n - 1);
         let mut b_coeff = Vec::with_capacity(n - 1);
         let mut c_coeff = Vec::with_capacity(n - 1);
@@ -440,7 +422,6 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
             return val;
         }
 
-        // Safe: check_extrapolation returning None guarantees x is in bounds.
         let idx = locate_segment_unchecked(knots, x);
         let s = x - knots[idx];
         let y = self.a[idx] + self.b[idx] * s + self.c[idx] * s * s + self.d[idx] * s * s * s;
@@ -478,7 +459,6 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
             return val;
         }
 
-        // Safe: check_extrapolation returning None guarantees x is in bounds.
         let idx = locate_segment_unchecked(knots, x);
         let s = x - knots[idx];
 
@@ -575,8 +555,6 @@ impl InterpolationStrategy for CubicHermiteStrategy {
             return f64::NAN;
         }
 
-        // Handle extrapolation based on policy
-        // Safe access with NaN fallback for empty slices (shouldn't happen by construction)
         if let Some(val) = check_extrapolation(
             x,
             knots,
@@ -605,32 +583,24 @@ impl InterpolationStrategy for CubicHermiteStrategy {
             return val;
         }
 
-        // Interior interpolation using cubic Hermite.
-        // Exact knot hits produce t=0 or t=1, giving the exact knot value
-        // through the basis functions without a separate binary search.
-        // Safe: check_extrapolation returning None guarantees x is in bounds.
         let i = locate_segment_unchecked(knots, x);
         let x0 = knots[i];
         let x1 = knots[i + 1];
         let h = x1 - x0;
-        // Normalised coordinate t ∈ (0,1)
         let t = (x - x0) / h;
         let t2 = t * t;
         let t3 = t2 * t;
 
-        // Basis functions
         let h00 = 2.0 * t3 - 3.0 * t2 + 1.0;
         let h10 = t3 - 2.0 * t2 + t;
         let h01 = -2.0 * t3 + 3.0 * t2;
         let h11 = t3 - t2;
 
-        // Values and slopes
         let f0 = values[i];
         let f1 = values[i + 1];
         let m0 = self.ms[i];
         let m1 = self.ms[i + 1];
 
-        // Cubic Hermite formula
         h00 * f0 + h10 * h * m0 + h01 * f1 + h11 * h * m1
     }
 
@@ -647,7 +617,6 @@ impl InterpolationStrategy for CubicHermiteStrategy {
             return f64::NAN;
         }
 
-        // Handle extrapolation based on policy
         if let Some(val) = check_extrapolation(
             x,
             knots,
@@ -666,7 +635,6 @@ impl InterpolationStrategy for CubicHermiteStrategy {
             return val;
         }
 
-        // Safe: check_extrapolation returning None guarantees x is in bounds.
         // Exact knot hits produce t=0 or t=1, giving the exact slope
         // through the derivative basis functions.
         let i = locate_segment_unchecked(knots, x);
@@ -719,7 +687,6 @@ fn compute_monotone_slopes(xs: &[f64], ys: &[f64]) -> Box<[f64]> {
 
     let mut ms = vec![0.0; n];
 
-    // Compute intervals in a single iterator pass
     let (h, delta): (Vec<f64>, Vec<f64>) = xs
         .windows(2)
         .zip(ys.windows(2))
@@ -825,10 +792,7 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         // curves (EUR/CHF/JPY).
         validate_positive_series(values)?;
         validate_knot_spacing(knots, MIN_RELATIVE_KNOT_GAP)?;
-
-        // Build using default epsilon
-        let epsilon = DEFAULT_MONOTONE_CONVEX_EPSILON;
-        Self::build_hagan_west(knots, values, epsilon)
+        Self::build_hagan_west(knots, values, DEFAULT_MONOTONE_CONVEX_EPSILON)
     }
 
     fn interp(
@@ -844,8 +808,6 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
             return f64::NAN;
         }
 
-        // Handle extrapolation based on policy
-        // Safe access with NaN fallback for empty slices (shouldn't happen by construction)
         if let Some(val) = check_extrapolation(
             x,
             knots,
@@ -879,10 +841,6 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
             return val;
         }
 
-        // Interior interpolation using Hagan-West formula.
-        // Exact knot hits produce x=0 in interpolate_segment, giving the
-        // exact knot value without a separate binary search.
-        // Safe: check_extrapolation returning None guarantees x is in bounds.
         let i = locate_segment_unchecked(knots, x);
         self.interpolate_segment(i, x, knots)
     }
@@ -900,7 +858,6 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
             return f64::NAN;
         }
 
-        // Handle extrapolation based on policy
         if let Some(val) = check_extrapolation(
             x,
             knots,
@@ -932,7 +889,6 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         }
 
         // Interior: d/dx[DF(t)] = -f(t) * DF(t)
-        // Safe: check_extrapolation returning None guarantees x is in bounds.
         let i = locate_segment_unchecked(knots, x);
         let (df, fwd) = self.segment_df_and_forward(i, x, knots);
         -fwd * df
@@ -962,7 +918,6 @@ impl MonotoneConvexStrategy {
     pub fn with_epsilon(knots: &[f64], values: &[f64], epsilon: f64) -> crate::Result<Self> {
         use crate::error::InputError;
 
-        // Validate epsilon is reasonable
         if epsilon <= 0.0 || epsilon > 1e-6 {
             return Err(InputError::Invalid.into());
         }
@@ -1010,31 +965,19 @@ impl MonotoneConvexStrategy {
         } else {
             // Interior knots
             for i in 1..n - 1 {
-                let lambda_l = dt[i - 1]; // width of left segment
-                let lambda_r = dt[i]; // width of right segment
-                                      // fd[i-1] is discrete fwd for segment to the left
-                                      // fd[i] is discrete fwd for segment to the right
+                let lambda_l = dt[i - 1];
+                let lambda_r = dt[i];
                 f[i] = (lambda_l * fd[i] + lambda_r * fd[i - 1]) / (lambda_l + lambda_r);
             }
 
             // Boundary conditions from Hagan-West (2006):
             //
-            // Extrapolate the *instantaneous* forward at the first/last knot from the
-            // adjacent *discrete* forwards:
+            // Extrapolate the instantaneous forward at the first/last knot from the
+            // adjacent discrete forwards:
             //   f_0     = f^d_0 - 0.5 * (f^d_1     - f^d_0)
             //   f_{n-1} = f^d_{n-2} + 0.5 * (f^d_{n-2} - f^d_{n-3})
-            //
-            // This matches the standard "linear" extrapolation of discrete forwards at
-            // the ends and avoids coupling the boundary forwards to the interior knot
-            // estimates (which can otherwise amplify endpoint sensitivity for long tenors).
-            //
-            // Note: n >= 3 here (n == 2 handled above), so fd has at least 2 elements.
-            // For n == 3: fd[n-2] = fd[1], fd[n-3] = fd[0] are both valid.
-            // For n >= 4: all indices are well within bounds.
-            // We use defensive indexing to guard against future code changes.
-            f[0] = 1.5 * fd[0] - 0.5 * fd.get(1).copied().unwrap_or(fd[0]);
-            let last_idx = (n.saturating_sub(3)).min(fd.len().saturating_sub(1));
-            f[n - 1] = 1.5 * fd[n - 2] - 0.5 * fd[last_idx];
+            f[0] = 1.5 * fd[0] - 0.5 * fd[1];
+            f[n - 1] = 1.5 * fd[n - 2] - 0.5 * fd[n - 3];
 
             // Apply the Hagan-West forward-positivity amelioration only when
             // every discrete forward is non-negative. Per Hagan & West (2006),

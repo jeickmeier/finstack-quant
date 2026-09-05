@@ -492,7 +492,6 @@ impl FxProvider for SnapshotFxProvider {
 
 impl From<&MarketContext> for MarketContextState {
     fn from(ctx: &MarketContext) -> Self {
-        // Convert all curves (sort deterministically by id for stable snapshots).
         let mut curves: Vec<CurveState> = ctx
             .curves
             .values()
@@ -500,10 +499,8 @@ impl From<&MarketContext> for MarketContextState {
             .collect();
         curves.sort_by(|a, b| a.id().cmp(b.id()));
 
-        // Convert FX (if present)
         let fx = ctx.fx.as_ref().map(|fx| fx.get_serializable_state());
 
-        // Convert all surfaces (sort deterministically by key id).
         let mut surfaces_pairs: Vec<(CurveId, VolSurface)> = ctx
             .surfaces
             .iter()
@@ -512,14 +509,12 @@ impl From<&MarketContext> for MarketContextState {
         surfaces_pairs.sort_by(|a, b| a.0.cmp(&b.0));
         let surfaces: Vec<_> = surfaces_pairs.into_iter().map(|(_, surf)| surf).collect();
 
-        // Convert prices (CurveId → String)
         let prices: std::collections::BTreeMap<String, _> = ctx
             .prices
             .iter()
             .map(|(id, scalar)| (id.to_string(), scalar.clone()))
             .collect();
 
-        // Convert series (sort deterministically by key id).
         let mut series_pairs: Vec<(CurveId, ScalarTimeSeries)> = ctx
             .series
             .iter()
@@ -528,7 +523,6 @@ impl From<&MarketContext> for MarketContextState {
         series_pairs.sort_by(|a, b| a.0.cmp(&b.0));
         let series: Vec<_> = series_pairs.into_iter().map(|(_, series)| series).collect();
 
-        // Convert inflation indices (sort deterministically by key id).
         let mut inflation_pairs: Vec<(CurveId, InflationIndex)> = ctx
             .inflation_indices
             .iter()
@@ -537,7 +531,6 @@ impl From<&MarketContext> for MarketContextState {
         inflation_pairs.sort_by(|a, b| a.0.cmp(&b.0));
         let inflation_indices: Vec<_> = inflation_pairs.into_iter().map(|(_, idx)| idx).collect();
 
-        // Convert credit indices (extract IDs from Arc references; sort deterministically by id).
         let mut credit_pairs: Vec<(CurveId, CreditIndexState)> = ctx
             .credit_indices
             .iter()
@@ -576,7 +569,6 @@ impl From<&MarketContext> for MarketContextState {
         let credit_indices: Vec<CreditIndexState> =
             credit_pairs.into_iter().map(|(_, s)| s).collect();
 
-        // Convert dividends (sort deterministically by id).
         let mut dividend_pairs: Vec<(CurveId, DividendSchedule)> = ctx
             .dividends
             .iter()
@@ -585,7 +577,6 @@ impl From<&MarketContext> for MarketContextState {
         dividend_pairs.sort_by(|a, b| a.0.cmp(&b.0));
         let dividends: Vec<_> = dividend_pairs.into_iter().map(|(_, d)| d).collect();
 
-        // Convert FX delta vol surfaces (sort deterministically by key id).
         let mut fx_delta_pairs: Vec<(CurveId, FxDeltaVolSurface)> = ctx
             .fx_delta_vol_surfaces
             .iter()
@@ -595,7 +586,6 @@ impl From<&MarketContext> for MarketContextState {
         let fx_delta_vol_surfaces: Vec<_> =
             fx_delta_pairs.into_iter().map(|(_, surf)| surf).collect();
 
-        // Convert vol cubes (sort deterministically by key id).
         let mut vol_cube_pairs: Vec<(CurveId, VolCube)> = ctx
             .vol_cubes
             .iter()
@@ -604,7 +594,6 @@ impl From<&MarketContext> for MarketContextState {
         vol_cube_pairs.sort_by(|a, b| a.0.cmp(&b.0));
         let vol_cubes: Vec<_> = vol_cube_pairs.into_iter().map(|(_, cube)| cube).collect();
 
-        // Convert collateral mappings
         let collateral: std::collections::BTreeMap<String, String> = ctx
             .collateral
             .iter()
@@ -639,19 +628,17 @@ fn restore_market_context(
     }
     let mut ctx = MarketContext::new();
 
-    // Reconstruct all curves
     for curve_state in state.curves {
         let storage = CurveStorage::from_state(curve_state);
         Arc::make_mut(&mut ctx.curves).insert(storage.id().clone(), storage);
     }
 
-    // Reconstruct all surfaces
     for surface in state.surfaces {
         Arc::make_mut(&mut ctx.surfaces).insert(surface.id().clone(), Arc::new(surface));
     }
 
-    // Reconstruct FX matrix as a quote-only snapshot. Persisted state does not
-    // encode the original live provider, only the captured explicit quotes.
+    // Persisted state does not encode the original live FX provider, only the
+    // captured explicit quotes.
     if let Some(fx_state) = state.fx {
         tracing::info!(
             explicit_quote_count = fx_state.quotes.len(),
@@ -663,37 +650,27 @@ fn restore_market_context(
         ctx.fx = Some(Arc::new(matrix));
     }
 
-    // Reconstruct prices
     for (id_str, scalar) in state.prices {
         Arc::make_mut(&mut ctx.prices).insert(CurveId::from(id_str), scalar);
     }
 
-    // Reconstruct series
     for series in state.series {
         Arc::make_mut(&mut ctx.series).insert(series.id().clone(), series);
     }
 
-    // Reconstruct inflation indices
     for idx in state.inflation_indices {
         let id = MarketContext::inflation_index_key_for_insert(idx.id.clone(), &idx);
         Arc::make_mut(&mut ctx.inflation_indices).insert(id, Arc::new(idx));
     }
 
-    // Reconstruct dividends
     for schedule in state.dividends {
         let id = schedule.get_id().clone();
         Arc::make_mut(&mut ctx.dividends).insert(id, Arc::new(schedule));
     }
 
-    // Reconstruct credit indices (resolve curve references)
     for credit_state in state.credit_indices {
-        // Resolve hazard curve
         let index_curve = ctx.get_hazard(&credit_state.index_credit_curve_id)?;
-
-        // Resolve base correlation curve
         let base_corr = ctx.get_base_correlation(&credit_state.base_correlation_curve_id)?;
-
-        // Resolve issuer curves if present
         let issuer_curves = if let Some(issuer_ids) = credit_state.issuer_credit_curve_ids {
             let mut map = BTreeMap::new();
             for (issuer, curve_id) in issuer_ids {
@@ -742,19 +719,16 @@ fn restore_market_context(
             );
     }
 
-    // Reconstruct FX delta vol surfaces
     for surface in state.fx_delta_vol_surfaces {
         let id = surface.id().to_owned();
         Arc::make_mut(&mut ctx.fx_delta_vol_surfaces).insert(id, Arc::new(surface));
     }
 
-    // Reconstruct vol cubes
     for cube in state.vol_cubes {
         let id = cube.id().to_owned();
         Arc::make_mut(&mut ctx.vol_cubes).insert(id, Arc::new(cube));
     }
 
-    // Reconstruct collateral mappings
     for (csa, curve_id_str) in state.collateral {
         Arc::make_mut(&mut ctx.collateral).insert(csa, CurveId::from(curve_id_str));
     }

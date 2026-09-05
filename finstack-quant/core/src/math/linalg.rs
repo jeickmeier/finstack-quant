@@ -760,7 +760,6 @@ pub fn cholesky_decomposition(
                     return Err(CholeskyError::NotPositiveDefinite { diag, row: i });
                 }
                 l[i * n + j] = diag.sqrt();
-                // Check if diagonal is too small (singular)
                 if l[i * n + j].abs() < SINGULAR_THRESHOLD {
                     return Err(CholeskyError::Singular {
                         value: l[i * n + j],

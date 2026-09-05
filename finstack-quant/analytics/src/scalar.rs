@@ -1,12 +1,10 @@
 //! Freestanding scalar metrics over a single simple-return series.
 //!
-//! These are the four numbers a desk reaches for first — Sharpe, Sortino,
-//! annualized volatility and maximum drawdown — exposed without building a
-//! [`crate::Performance`] panel. Each takes a slice of per-period simple
-//! decimal returns (`0.01` for +1%) and the number of periods per year used
-//! for annualization (`252.0` daily, `12.0` monthly, ...). They share the
-//! kernels the panel methods use, so `sharpe(&r, rf, 252.0)` equals
-//! `Performance::sharpe(rf)[i]` for ticker `i` built at daily frequency.
+//! Sharpe, Sortino, annualized volatility, and maximum drawdown without a
+//! [`crate::Performance`] panel. Each takes per-period simple decimal returns
+//! (`0.01` for +1%) and periods per year (`252.0` daily, `12.0` monthly).
+//! They share the kernels the panel methods use, so `sharpe(&r, rf, 252.0)`
+//! equals `Performance::sharpe(rf)[i]` for ticker `i` at daily frequency.
 
 use crate::drawdown::to_drawdown_series;
 use crate::risk_metrics;
