@@ -31,19 +31,37 @@ fn parse_frequency(frequency: &str) -> Result<PeriodKind, JsValue> {
     frequency.parse::<PeriodKind>().map_err(to_js_err)
 }
 
+/// Validate JavaScript numbers before the WASM ABI can truncate or wrap them.
+fn parse_usize(value: f64, name: &str) -> Result<usize, JsValue> {
+    if !value.is_finite() || value < 0.0 || value.fract() != 0.0 || value > f64::from(u32::MAX) {
+        return Err(to_js_err(format!(
+            "{name} must be a finite non-negative integer no greater than 4294967295"
+        )));
+    }
+    Ok(value as usize)
+}
+
 /// `None` when both parts are omitted so the Rust default (calendar year)
 /// applies; a partial start fills the other half with `1`.
-fn make_fiscal_config(month: Option<u8>, day: Option<u8>) -> Result<Option<FiscalConfig>, JsValue> {
+fn make_fiscal_config(
+    month: Option<f64>,
+    day: Option<f64>,
+) -> Result<Option<FiscalConfig>, JsValue> {
     if month.is_none() && day.is_none() {
         return Ok(None);
     }
-    FiscalConfig::new(month.unwrap_or(1), day.unwrap_or(1))
-        .map(Some)
-        .map_err(to_js_err)
+    let month = parse_usize(month.unwrap_or(1.0), "fiscalYearStartMonth")?;
+    let day = parse_usize(day.unwrap_or(1.0), "fiscalYearStartDay")?;
+    FiscalConfig::new(
+        u8::try_from(month).map_err(|_| to_js_err("fiscalYearStartMonth exceeds 255"))?,
+        u8::try_from(day).map_err(|_| to_js_err("fiscalYearStartDay exceeds 255"))?,
+    )
+    .map(Some)
+    .map_err(to_js_err)
 }
 
 /// Lookback returns always need a fiscal config: default January 1.
-fn lookback_fiscal_config(month: Option<u8>, day: Option<u8>) -> Result<FiscalConfig, JsValue> {
+fn lookback_fiscal_config(month: Option<f64>, day: Option<f64>) -> Result<FiscalConfig, JsValue> {
     match make_fiscal_config(month, day)? {
         Some(config) => Ok(config),
         None => FiscalConfig::new(1, 1).map_err(to_js_err),
@@ -374,10 +392,11 @@ impl JsPerformance {
     /// # Errors
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns.
-    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @returns ISO-8601 dates for that ticker's active return series, in chronological order.
     #[wasm_bindgen(js_name = activeDatesForTicker)]
-    pub fn active_dates_for_ticker(&self, ticker_idx: usize) -> Result<Vec<String>, JsValue> {
+    pub fn active_dates_for_ticker(&self, ticker_idx: f64) -> Result<Vec<String>, JsValue> {
+        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
         Ok(self
             .inner
             .active_dates_for_ticker(ticker_idx)
@@ -478,7 +497,8 @@ impl JsPerformance {
         )
     }
 
-    /// Expected shortfall (CVaR) per asset at the given confidence level.
+    /// Expected shortfall per asset: mean of exactly the worst `1-confidence`
+    /// empirical probability mass, including a fractional boundary observation.
     /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
@@ -698,7 +718,8 @@ impl JsPerformance {
         )
     }
 
-    /// Conditional drawdown-at-risk per asset at the given confidence level.
+    /// Conditional drawdown-at-risk per asset: mean of exactly the worst
+    /// `1-confidence` drawdown mass, including fractional boundary weighting.
     /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
@@ -706,7 +727,8 @@ impl JsPerformance {
         result_vec_f64_to_js(self.inner.cdar(confidence.unwrap_or(DEFAULT_CONFIDENCE)))
     }
 
-    /// M-squared (Modigliani) risk-adjusted return per asset.
+    /// Linearly annualized M-squared per asset. Cash subtraction and addition
+    /// both use the decompounded period cash rate multiplied by periods per year.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = mSquared)]
@@ -746,14 +768,15 @@ impl JsPerformance {
     /// Rejects when any ticker's active range has no positive holding period
     /// and therefore cannot produce CAGR.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
-    /// @param n - Number of largest drawdowns to include; defaults to 5.
+    /// @param n - Finite non-negative integer count of largest drawdowns; defaults to 5. Invalid numeric values are rejected.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = sterlingRatio)]
     pub fn sterling_ratio(
         &self,
         risk_free_rate: Option<f64>,
-        n: Option<usize>,
+        n: Option<f64>,
     ) -> Result<JsValue, JsValue> {
+        let n = n.map(|value| parse_usize(value, "n")).transpose()?;
         result_vec_f64_to_js(
             self.inner
                 .sterling_ratio(risk_free_rate.unwrap_or(0.0), n.unwrap_or(5)),
@@ -767,14 +790,15 @@ impl JsPerformance {
     /// Rejects when any ticker's active range has no positive holding period
     /// and therefore cannot produce CAGR.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
-    /// @param n - Number of largest drawdowns to include; defaults to 5.
+    /// @param n - Finite non-negative integer count of largest drawdowns; defaults to 5. Invalid numeric values are rejected.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = burkeRatio)]
     pub fn burke_ratio(
         &self,
         risk_free_rate: Option<f64>,
-        n: Option<usize>,
+        n: Option<f64>,
     ) -> Result<JsValue, JsValue> {
+        let n = n.map(|value| parse_usize(value, "n")).transpose()?;
         result_vec_f64_to_js(
             self.inner
                 .burke_ratio(risk_free_rate.unwrap_or(0.0), n.unwrap_or(5)),
@@ -798,10 +822,11 @@ impl JsPerformance {
     /// # Errors
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns.
-    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @returns Simple decimal returns for the selected ticker, in date order.
     #[wasm_bindgen(js_name = returnsForTicker)]
-    pub fn returns_for_ticker(&self, ticker_idx: usize) -> Result<JsValue, JsValue> {
+    pub fn returns_for_ticker(&self, ticker_idx: f64) -> Result<JsValue, JsValue> {
+        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
         let series = self
             .inner
             .returns_for_ticker(ticker_idx)
@@ -979,17 +1004,21 @@ impl JsPerformance {
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
     /// JavaScript result object's properties cannot be created.
-    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
-    /// @param window - Observation window length; defaults to 63 periods.
+    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns `{ dates, alphas, betas }` series for the selected ticker.
     #[wasm_bindgen(js_name = rollingGreeks)]
     pub fn rolling_greeks(
         &self,
-        ticker_idx: usize,
-        window: Option<usize>,
+        ticker_idx: f64,
+        window: Option<f64>,
         risk_free_rate: Option<f64>,
     ) -> Result<JsValue, JsValue> {
+        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
+        let window = window
+            .map(|value| parse_usize(value, "window"))
+            .transpose()?;
         let rg = self
             .inner
             .rolling_greeks(
@@ -1007,15 +1036,19 @@ impl JsPerformance {
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
     /// JavaScript result object's properties cannot be created.
-    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
-    /// @param window - Observation window length; defaults to 63 periods.
+    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
     /// @returns `{ dates, volatility }` series for the selected ticker.
     #[wasm_bindgen(js_name = rollingVolatility)]
     pub fn rolling_volatility(
         &self,
-        ticker_idx: usize,
-        window: Option<usize>,
+        ticker_idx: f64,
+        window: Option<f64>,
     ) -> Result<JsValue, JsValue> {
+        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
+        let window = window
+            .map(|value| parse_usize(value, "window"))
+            .transpose()?;
         let series = self
             .inner
             .rolling_volatility(ticker_idx, window.unwrap_or(DEFAULT_ROLLING_WINDOW))
@@ -1029,17 +1062,21 @@ impl JsPerformance {
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
     /// JavaScript result object's properties cannot be created.
-    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
-    /// @param window - Observation window length; defaults to 63 periods.
+    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
     /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
     /// @returns `{ dates, sortino }` series for the selected ticker.
     #[wasm_bindgen(js_name = rollingSortino)]
     pub fn rolling_sortino(
         &self,
-        ticker_idx: usize,
-        window: Option<usize>,
+        ticker_idx: f64,
+        window: Option<f64>,
         mar: Option<f64>,
     ) -> Result<JsValue, JsValue> {
+        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
+        let window = window
+            .map(|value| parse_usize(value, "window"))
+            .transpose()?;
         let series = self
             .inner
             .rolling_sortino(
@@ -1057,17 +1094,21 @@ impl JsPerformance {
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
     /// JavaScript result object's properties cannot be created.
-    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
-    /// @param window - Observation window length; defaults to 63 periods.
+    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns `{ dates, sharpe }` series for the selected ticker.
     #[wasm_bindgen(js_name = rollingSharpe)]
     pub fn rolling_sharpe(
         &self,
-        ticker_idx: usize,
-        window: Option<usize>,
+        ticker_idx: f64,
+        window: Option<f64>,
         risk_free_rate: Option<f64>,
     ) -> Result<JsValue, JsValue> {
+        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
+        let window = window
+            .map(|value| parse_usize(value, "window"))
+            .transpose()?;
         let series = self
             .inner
             .rolling_sharpe(
@@ -1084,13 +1125,15 @@ impl JsPerformance {
     /// # Errors
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
-    /// JavaScript result object's properties cannot be created. A zero or
-    /// overlong `window` returns an empty series rather than rejecting.
-    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
-    /// @param window - Positive number of observations to compound in each window.
+    /// JavaScript result object's properties cannot be created. An
+    /// overlong `window` returns an empty series; a zero window is rejected.
+    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param window - Finite positive integer observation count. Zero, fractional, non-finite, and out-of-range values are rejected.
     /// @returns `{ dates, return }` series for the selected ticker.
     #[wasm_bindgen(js_name = rollingReturns)]
-    pub fn rolling_returns(&self, ticker_idx: usize, window: usize) -> Result<JsValue, JsValue> {
+    pub fn rolling_returns(&self, ticker_idx: f64, window: f64) -> Result<JsValue, JsValue> {
+        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
+        let window = parse_usize(window, "window")?;
         let series = self
             .inner
             .rolling_returns(ticker_idx, window)
@@ -1104,15 +1147,13 @@ impl JsPerformance {
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
     /// drawdown details cannot be serialized to JavaScript.
-    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
-    /// @param n - Number of largest drawdown episodes to return; defaults to 5.
+    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param n - Finite non-negative integer count of episodes; defaults to 5. Invalid numeric values are rejected.
     /// @returns Drawdown episode objects for the selected ticker, largest first.
     #[wasm_bindgen(js_name = drawdownDetails)]
-    pub fn drawdown_details(
-        &self,
-        ticker_idx: usize,
-        n: Option<usize>,
-    ) -> Result<JsValue, JsValue> {
+    pub fn drawdown_details(&self, ticker_idx: f64, n: Option<f64>) -> Result<JsValue, JsValue> {
+        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
+        let n = n.map(|value| parse_usize(value, "n")).transpose()?;
         to_js(
             &self
                 .inner
@@ -1133,7 +1174,7 @@ impl JsPerformance {
     /// `returnKind`, an out-of-range `ticker_idx`, no factors, too few
     /// observations, non-finite or length-mismatched inputs, a singular
     /// factor design, or a result that cannot be serialized to JavaScript.
-    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param factor_returns - Matrix of aligned already-excess decimal factor-return series, one row per factor.
     /// @param return_kind - `"excess"` or `"total"`; defaults to `"excess"`.
     /// @param risk_free_rate - Annualized decimal risk-free rate used when `returnKind` is `"total"`; defaults to 0.0.
@@ -1141,20 +1182,32 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = multiFactorGreeks)]
     pub fn multi_factor_greeks(
         &self,
-        ticker_idx: usize,
+        ticker_idx: f64,
         factor_returns: JsValue,
         return_kind: Option<String>,
         risk_free_rate: Option<f64>,
     ) -> Result<JsValue, JsValue> {
+        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
         let factors = parse_f64_matrix(factor_returns)?;
         let refs: Vec<&[f64]> = factors.iter().map(|v| v.as_slice()).collect();
         let kind = parse_return_kind(return_kind.as_deref(), risk_free_rate)?;
-        to_js(
-            &self
-                .inner
-                .multi_factor_greeks(ticker_idx, &refs, kind)
-                .map_err(to_js_err)?,
-        )
+        let result = self
+            .inner
+            .multi_factor_greeks(ticker_idx, &refs, kind)
+            .map_err(to_js_err)?;
+        let js = to_js(&result)?;
+        // JSON uses explicit non-finite sentinels; the JS API stays numeric.
+        Reflect::set(
+            &js,
+            &"r_squared".into(),
+            &JsValue::from_f64(result.r_squared),
+        )?;
+        Reflect::set(
+            &js,
+            &"adjusted_r_squared".into(),
+            &JsValue::from_f64(result.adjusted_r_squared),
+        )?;
+        Ok(js)
     }
 
     /// Standard lookback-window returns (MTD, QTD, YTD, ...) per asset.
@@ -1185,8 +1238,8 @@ impl JsPerformance {
     pub fn lookback_returns(
         &self,
         ref_date: &str,
-        fiscal_year_start_month: Option<u8>,
-        fiscal_year_start_day: Option<u8>,
+        fiscal_year_start_month: Option<f64>,
+        fiscal_year_start_day: Option<f64>,
     ) -> Result<JsValue, JsValue> {
         let d = parse_iso_date(ref_date)?;
         let fc = lookback_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
@@ -1200,7 +1253,7 @@ impl JsPerformance {
     /// Rejects an unsupported `aggregation_frequency`, a fiscal month outside
     /// `1..=12`, a fiscal day outside `1..=31`, an out-of-range `ticker_idx`,
     /// or period statistics that cannot be serialized to JavaScript.
-    /// @param ticker_idx - Zero-based ticker column index in tickerNames order.
+    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param aggregation_frequency - Optional aggregation frequency token; defaults to monthly.
     /// @param fiscal_year_start_month - Optional fiscal-year start month from 1 through 12.
     /// @param fiscal_year_start_day - Optional fiscal-year start day within the selected month.
@@ -1208,11 +1261,12 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = periodStats)]
     pub fn period_stats(
         &self,
-        ticker_idx: usize,
+        ticker_idx: f64,
         aggregation_frequency: Option<String>,
-        fiscal_year_start_month: Option<u8>,
-        fiscal_year_start_day: Option<u8>,
+        fiscal_year_start_month: Option<f64>,
+        fiscal_year_start_day: Option<f64>,
     ) -> Result<JsValue, JsValue> {
+        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
         let pk = parse_frequency(aggregation_frequency.as_deref().unwrap_or("monthly"))?;
         let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
         let stats = self

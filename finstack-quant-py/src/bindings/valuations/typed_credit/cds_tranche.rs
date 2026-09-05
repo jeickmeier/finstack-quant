@@ -922,13 +922,13 @@ impl PyCDSTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let bdc = bdc_from_py(value, "business_day_convention")?;
-        let shown = enum_to_py_string(&bdc).map(|s| format!("{s:?}"))?;
+        let convention = bdc_from_py(value, "business_day_convention")?;
+        let shown = enum_to_py_string(&convention).map(|s| format!("{s:?}"))?;
         tranche_set!(
             slf,
             business_day_convention,
             shown,
-            |b: CdsTrancheBuilderInner| b.business_day_convention(bdc)
+            |b: CdsTrancheBuilderInner| b.business_day_convention(convention)
         )
     }
 

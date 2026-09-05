@@ -240,7 +240,7 @@ class Rate:
         ...
 
     @property
-    def as_bps(self) -> Bps:
+    def as_basis_points(self) -> Bps:
         """
         Rate as a ``Bps`` value, rounded to the nearest whole basis point.
 
@@ -789,7 +789,7 @@ class Percentage:
         ...
 
     @property
-    def as_bps(self) -> Bps:
+    def as_basis_points(self) -> Bps:
         """
         Value as a ``Bps`` value, rounded to the nearest whole basis point.
 

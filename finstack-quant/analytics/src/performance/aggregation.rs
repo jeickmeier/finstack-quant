@@ -66,9 +66,8 @@ impl Performance {
         n: usize,
     ) -> crate::Result<Vec<DrawdownEpisode>> {
         self.ensure_ticker_idx(ticker_idx)?;
-        let dd = self.active_drawdown_values(ticker_idx);
-        let dates = self.active_dates_for_ticker_unchecked(ticker_idx);
-        Ok(drawdown_details(dd, dates, n))
+        let (dd, dates) = self.active_drawdown_path(ticker_idx);
+        Ok(drawdown_details(&dd, dates, n))
     }
 
     /// Pearson correlation matrix of all tickers, repaired to a valid

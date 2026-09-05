@@ -61,18 +61,25 @@ fn historical_var_data(
     Some((data, var_threshold))
 }
 
-fn expected_shortfall_from_data(data: &[f64], var_threshold: f64) -> f64 {
-    let (tail_sum, tail_count) = data
-        .iter()
-        .filter(|&&value| value <= var_threshold)
-        .fold((0.0_f64, 0usize), |(sum, count), &value| {
-            (sum + value, count + 1)
-        });
-    if tail_count == 0 {
-        var_threshold
-    } else {
-        tail_sum / tail_count as f64
+fn expected_shortfall_from_data(data: &mut [f64], confidence: f64) -> f64 {
+    let mass = (1.0 - confidence) * data.len() as f64;
+    let whole = (mass.floor() as usize).min(data.len());
+    let boundary = whole.min(data.len() - 1);
+    data.select_nth_unstable_by(boundary, f64::total_cmp);
+    if whole == 0 {
+        return data[0];
     }
+    // Normalize before summing so finite, same-sign tail values cannot
+    // overflow an intermediate unnormalized sum. Only the required fraction
+    // of the boundary observation belongs to the empirical tail.
+    let mut mean = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+    for &value in &data[..whole] {
+        mean.add(value / mass);
+    }
+    if whole < data.len() {
+        mean.add(data[whole] * ((mass - whole as f64) / mass));
+    }
+    mean.total()
 }
 
 /// Historical Value-at-Risk at the given confidence level.
@@ -114,26 +121,26 @@ pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> f64 {
 }
 /// Expected Shortfall (CVaR / ES) at the given confidence level.
 ///
-/// The mean of all returns that fall at or below the VaR threshold,
-/// providing a coherent measure of tail risk:
+/// The mean of exactly the worst `(1 - confidence)` empirical probability
+/// mass, providing a coherent measure of tail risk:
 ///
 /// ```text
-/// ES_α = E[r | r ≤ VaR_α]
+/// ES_c = integral_0^{1-c} empirical_quantile(u) du / (1-c)
 /// ```
 ///
 /// ES is always at least as bad (negative) as VaR at the same confidence
-/// level, and satisfies the sub-additivity axiom of coherent risk measures.
+/// level. Negating this return-space value gives a sub-additive coherent
+/// loss measure.
 /// Reported in the native period of the input return series; sqrt-T scaling
 /// is invalid for non-parametric tail means.
 ///
 /// # Tail-set convention
 ///
-/// The tail set is taken as the **closed** interval `{r : r ≤ VaR_α}`. With
-/// ties at the threshold this is the conservative (more-negative) choice and
-/// matches Rockafellar & Uryasev (2002). For continuous distributions there
-/// are no ties almost surely; for empirical samples with duplicates at the
-/// threshold this convention may include slightly more than `⌈(1−α)·n⌉`
-/// observations.
+/// Each observation has mass `1/n`. Include the worst `floor((1-c)*n)`
+/// observations and the required fraction of the next observation. Ties do
+/// not expand the tail. This is the discrete CVaR definition of Rockafellar
+/// & Uryasev (2002); historical VaR retains its documented interpolated
+/// quantile convention.
 ///
 /// # Arguments
 ///
@@ -142,7 +149,7 @@ pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> f64 {
 ///
 /// # Returns
 ///
-/// The Expected Shortfall as a non-positive scalar. Returns [`f64::NAN`]
+/// The signed mean tail return (negative for losses). Returns [`f64::NAN`]
 /// for an empty slice or an invalid confidence level.
 ///
 /// # References
@@ -150,14 +157,14 @@ pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> f64 {
 /// - Artzner et al. (1999): `docs/REFERENCES.md#artzner1999CoherentRisk`
 #[must_use]
 pub(crate) fn expected_shortfall(returns: &[f64], confidence: f64) -> f64 {
-    let Some((data, var_threshold)) = historical_var_data(
+    let Some((mut data, _)) = historical_var_data(
         returns,
         confidence,
         Some("expected_shortfall returning NaN"),
     ) else {
         return f64::NAN;
     };
-    expected_shortfall_from_data(&data, var_threshold)
+    expected_shortfall_from_data(&mut data, confidence)
 }
 
 /// Compute historical VaR and Expected Shortfall together.
@@ -172,10 +179,10 @@ pub(crate) fn expected_shortfall(returns: &[f64], confidence: f64) -> f64 {
 /// `confidence`.
 #[must_use]
 pub(crate) fn value_at_risk_and_es(returns: &[f64], confidence: f64) -> (f64, f64) {
-    let Some((data, var_threshold)) = historical_var_data(returns, confidence, None) else {
+    let Some((mut data, var_threshold)) = historical_var_data(returns, confidence, None) else {
         return (f64::NAN, f64::NAN);
     };
-    let es = expected_shortfall_from_data(&data, var_threshold);
+    let es = expected_shortfall_from_data(&mut data, confidence);
     (var_threshold, es)
 }
 /// Tail ratio = |upper tail| / |lower tail|.
@@ -524,10 +531,10 @@ mod tests {
     }
 
     #[test]
-    fn expected_shortfall_includes_all_values_at_var_threshold() {
+    fn expected_shortfall_weights_only_the_requested_tail_mass() {
         let data = [-3.0, -1.0, -1.0, 10.0];
         let es = expected_shortfall(&data, 0.5);
-        let expected = (-3.0 - 1.0 - 1.0) / 3.0;
+        let expected = (-3.0 - 1.0) / 2.0;
         assert!((es - expected).abs() < 1e-12);
     }
 

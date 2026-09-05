@@ -2809,7 +2809,7 @@ export declare class Performance {
   activeDates(): string[];
   /**
    * Dates for one ticker's active return series as ISO date strings.
-   * @param tickerIdx - Zero-based ticker column index in tickerNames order.
+   * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @returns ISO-8601 dates for that ticker's active return series, in chronological order.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns.
    */
@@ -3043,7 +3043,7 @@ export declare class Performance {
   /**
    * Sterling ratio over the `n` largest drawdowns per asset.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
-   * @param n - Number of largest drawdowns to include; defaults to 5.
+   * @param n - Finite non-negative integer count of largest drawdowns; defaults to 5. Invalid numeric values are rejected.
    * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
    * @throws Error - Rejects when any ticker's active range has no positive holding period and therefore cannot produce CAGR.
    */
@@ -3051,7 +3051,7 @@ export declare class Performance {
   /**
    * Burke ratio over the `n` largest drawdowns per asset.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
-   * @param n - Number of largest drawdowns to include; defaults to 5.
+   * @param n - Finite non-negative integer count of largest drawdowns; defaults to 5. Invalid numeric values are rejected.
    * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
    * @throws Error - Rejects when any ticker's active range has no positive holding period and therefore cannot produce CAGR.
    */
@@ -3068,7 +3068,7 @@ export declare class Performance {
   returns(): Float64Array[];
   /**
    * Per-period simple returns for one asset, as decimal fractions (0.01 = +1%).
-   * @param tickerIdx - Zero-based ticker column index in tickerNames order.
+   * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @returns Simple decimal returns for the selected ticker, in date order.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns.
    */
@@ -3129,6 +3129,7 @@ export declare class Performance {
   /**
    * `true` when `correlationMatrix()` had to be Higham-repaired to the nearest valid correlation matrix (ragged panels can yield a raw pairwise estimate that is not positive semi-definite).
    * @returns `true` when the estimate was projected to the nearest correlation matrix.
+   * @throws Error - Rejects the same degenerate-pair conditions as `correlationMatrix`.
    * @throws Error - Rejects when a ticker pair is degenerate or Higham repair fails.
    */
   correlationMatrixRepaired(): boolean;
@@ -3169,8 +3170,8 @@ export declare class Performance {
   greeks(riskFreeRate?: number): GreeksResult[];
   /**
    * Rolling benchmark annualized Jensen alpha/beta for one asset over a window.
-   * @param tickerIdx - Zero-based ticker column index in tickerNames order.
-   * @param window - Observation window length; defaults to 63 periods.
+   * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+   * @param window - Finite non-negative integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
    * @returns `{ dates, alphas, betas }` series for the selected ticker.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
@@ -3178,16 +3179,16 @@ export declare class Performance {
   rollingGreeks(tickerIdx: number, window?: number, riskFreeRate?: number): RollingGreeksResult;
   /**
    * Rolling volatility series for one asset over a window.
-   * @param tickerIdx - Zero-based ticker column index in tickerNames order.
-   * @param window - Observation window length; defaults to 63 periods.
+   * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+   * @param window - Finite non-negative integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
    * @returns `{ dates, volatility }` series for the selected ticker.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
    */
   rollingVolatility(tickerIdx: number, window?: number): DatedSeries;
   /**
    * Rolling Sortino ratio series for one asset over a window.
-   * @param tickerIdx - Zero-based ticker column index in tickerNames order.
-   * @param window - Observation window length; defaults to 63 periods.
+   * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+   * @param window - Finite non-negative integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
    * @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
    * @returns `{ dates, sortino }` series for the selected ticker.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
@@ -3195,8 +3196,8 @@ export declare class Performance {
   rollingSortino(tickerIdx: number, window?: number, mar?: number): DatedSeries;
   /**
    * Rolling Sharpe ratio series for one asset over a window.
-   * @param tickerIdx - Zero-based ticker column index in tickerNames order.
-   * @param window - Observation window length; defaults to 63 periods.
+   * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+   * @param window - Finite non-negative integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
    * @returns `{ dates, sharpe }` series for the selected ticker.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
@@ -3204,16 +3205,16 @@ export declare class Performance {
   rollingSharpe(tickerIdx: number, window?: number, riskFreeRate?: number): DatedSeries;
   /**
    * Rolling compounded return series for one asset over a window.
-   * @param tickerIdx - Zero-based ticker column index in tickerNames order.
-   * @param window - Positive number of observations to compound in each window.
+   * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+   * @param window - Finite non-negative integer observation count. Invalid numeric values are rejected; zero yields an empty series.
    * @returns `{ dates, return }` series for the selected ticker.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created. A zero or overlong `window` returns an empty series rather than rejecting.
    */
   rollingReturns(tickerIdx: number, window: number): DatedSeries;
   /**
    * Details of the `n` largest drawdown episodes for one asset.
-   * @param tickerIdx - Zero-based ticker column index in tickerNames order.
-   * @param n - Number of largest drawdown episodes to return; defaults to 5.
+   * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+   * @param n - Finite non-negative integer count of episodes; defaults to 5. Invalid numeric values are rejected.
    * @returns Drawdown episode objects for the selected ticker, largest first.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the drawdown details cannot be serialized to JavaScript.
    */
@@ -3224,7 +3225,7 @@ export declare class Performance {
    * Factor series are already-excess. `returnKind` `"excess"` leaves the
    * ticker series unchanged; `"total"` subtracts the geometrically
    * decompounded period risk-free rate from the ticker series only.
-   * @param tickerIdx - Zero-based ticker column index in tickerNames order.
+   * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @param factorReturns - Matrix of aligned already-excess decimal factor-return series, one row per factor.
    * @param returnKind - `"excess"` or `"total"`; defaults to `"excess"`.
    * @param riskFreeRate - Annualized decimal risk-free rate used when `returnKind` is `"total"`; defaults to 0.0.
@@ -3259,7 +3260,7 @@ export declare class Performance {
   ): LookbackReturns;
   /**
    * Aggregated period statistics for one asset at the given frequency.
-   * @param tickerIdx - Zero-based ticker column index in tickerNames order.
+   * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @param aggregationFrequency - Optional aggregation frequency token; defaults to monthly.
    * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12.
    * @param fiscalYearStartDay - Optional fiscal-year start day within the selected month.
@@ -3329,18 +3330,26 @@ export interface AnalyticsNamespace {
    * Sharpe ratio of one return series (annualized excess mean over
    * annualized sample volatility; the same kernel as `Performance.sharpe`).
    * @param returns - Per-period simple decimal returns in date order.
+   * @param rf - Annualized risk-free rate as a decimal (`0.02` for 2%); defaults to `0`.
+   * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
+   * @param returns - Per-period simple decimal returns in date order.
    * @param rf - Annualized risk-free rate as a decimal; defaults to `0`.
    * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
-   * @returns The Sharpe ratio; `±Infinity` when volatility is zero with a non-zero excess return, `NaN` for an invalid `periodsPerYear`.
+   * @returns The Sharpe ratio; `±Infinity` when volatility is zero with a non-zero excess return, `NaN` for fewer than two observations, non-finite inputs, or an invalid `periodsPerYear`.
+   * @throws Error - Rejects a `returns` value that is not a numeric array.
    * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
   sharpe(returns: NumericArray, rf?: number, periodsPerYear?: number): number;
   /**
    * Annualized Sortino ratio of one return series.
    * @param returns - Per-period simple decimal returns in date order.
+   * @param mar - Minimum acceptable return per period as a decimal (not annualized); defaults to `0`.
+   * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
+   * @param returns - Per-period simple decimal returns in date order.
    * @param mar - Minimum acceptable return per period as a decimal; defaults to `0`.
    * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
-   * @returns The Sortino ratio; `±Infinity` with no downside deviation but a non-zero excess mean, `NaN` for an invalid `periodsPerYear`.
+   * @returns The Sortino ratio; `±Infinity` with no downside deviation but a non-zero excess mean, `NaN` for fewer than two observations, non-finite inputs, or an invalid `periodsPerYear`.
+   * @throws Error - Rejects a `returns` value that is not a numeric array.
    * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
   sortino(returns: NumericArray, mar?: number, periodsPerYear?: number): number;
@@ -3348,14 +3357,19 @@ export interface AnalyticsNamespace {
    * Annualized sample volatility (n−1 denominator) of one return series.
    * @param returns - Per-period simple decimal returns in date order.
    * @param periodsPerYear - Observations per year; the per-period standard deviation is scaled by its square root. Defaults to `252`.
-   * @returns Annualized volatility as a decimal; `0` for an empty array, `NaN` for an invalid `periodsPerYear`.
+   * @param returns - Per-period simple decimal returns in date order.
+   * @param periodsPerYear - Observations per year; the per-period standard deviation is scaled by its square root. Defaults to `252`.
+   * @returns Annualized volatility as a decimal; `0` for an empty array, `NaN` for non-finite inputs or an invalid `periodsPerYear`.
+   * @throws Error - Rejects a `returns` value that is not a numeric array.
    * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
   volatility(returns: NumericArray, periodsPerYear?: number): number;
   /**
    * Maximum peak-to-trough drawdown of one return series.
+   * @param returns - Per-period simple decimal returns in date order; they are compounded into a wealth path before the running-peak decline is measured.
    * @param returns - Per-period simple decimal returns in date order.
-   * @returns Non-positive fraction (`-0.25` is a 25% loss); `0` when the series never falls below its running peak or is empty.
+   * @returns Non-positive fraction (`-0.25` is a 25% loss); `0` when the series never falls below its running peak or is empty. Non-finite returns or reconstructed drawdowns yield `NaN`.
+   * @throws Error - Rejects a `returns` value that is not a numeric array.
    * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
   maxDrawdown(returns: NumericArray): number;
@@ -6728,10 +6742,10 @@ export interface ModelCreditNamespace {
    * @param recovery - Recovery rate at default expressed as a fraction from 0 through 1.
    * @param totalDebt - Total debt face value in the firm's monetary units.
    * @param riskFreeRate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
+   * @param maturity - Calibration horizon in years; must be positive and finite.
    * @param assetValue - Assumed initial firm asset value in monetary units.
    * @param payoutRate - Continuous payout rate on assets, expressed as a decimal.
    * @throws Error - Throws a JavaScript exception if spread, recovery, debt, rate, maturity, asset value, or payout inputs are invalid, if the quote is unattainable or ambiguous, or if the model cannot be serialized to JSON.
-   * @param maturity - Calibration horizon in years; must be positive and finite.
    */
   mertonFromCdsSpreadJson(
     cdsSpreadBp: number,
@@ -7690,6 +7704,9 @@ export interface ModelsNamespace {
   rates: RatesNamespace;
   /**
    * Product-independent volatility models and evaluators.
+   * @returns Annualized volatility as a decimal; `0` for an empty array, `NaN` for non-finite inputs or an invalid `periodsPerYear`.
+   * @throws Error - Rejects a `returns` value that is not a numeric array.
+   * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
   volatility: VolatilityNamespace;
   /**
@@ -7773,7 +7790,7 @@ export interface ModelsNamespace {
    * @param isCall - `true` for a call, `false` for a put.
    * @param thetaDays - Day-count denominator for theta. Default `365`. Pass `252` for trading-day theta.
    * @returns Object `{ delta, gamma, vega, theta, rho_r, rho_q }` (snake_case keys matching the Rust/Python canonical `BsGreeks` fields). `vega` and both rho values are **per 1% move**; `theta` is **per day** under `thetaDays`.
-   * @throws If an input is non-finite or `vol` / `expiry` / `thetaDays` is not positive.
+   * @throws If serialization to JS fails (should not happen on valid inputs).
    */
   bsGreeks(
     spot: number,

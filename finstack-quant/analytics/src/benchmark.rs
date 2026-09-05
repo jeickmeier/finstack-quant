@@ -9,7 +9,7 @@
 //! variance, OnlineCovariance).
 
 use crate::dates::Date;
-use crate::math::stats::{mean, OnlineCovariance, OnlineStats};
+use crate::math::stats::{OnlineCovariance, OnlineStats};
 use crate::regression::normalized_svd_least_squares;
 use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
 use nalgebra::DMatrix;
@@ -909,13 +909,15 @@ pub struct MultiFactorResult {
     pub alpha: f64,
     /// Regression coefficients, one per factor.
     pub betas: Vec<f64>,
-    /// R-squared: fraction of variance explained by the factors.
+    /// Fraction of variance explained; NaN for a constant dependent series.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub r_squared: f64,
-    /// Adjusted R-squared: penalizes additional regressors.
+    /// Adjusted R-squared; NaN when R-squared or residual degrees of freedom are undefined.
     ///
     /// ```text
     /// adj_R² = 1 − (1 − R²) × (n − 1) / (n − k − 1)
     /// ```
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub adjusted_r_squared: f64,
     /// Annualized residual volatility.
     pub residual_vol: f64,
@@ -1116,9 +1118,8 @@ pub(crate) fn multi_factor_greeks(
     let factor_betas: Vec<f64> = beta[1..].to_vec();
 
     // Compute residuals and R²
-    let y_mean = mean(y);
+    let mut response_stats = OnlineStats::new();
     let mut ss_res = 0.0_f64;
-    let mut ss_tot = 0.0_f64;
     for (t, &r) in y.iter().enumerate().take(n) {
         let mut y_hat = alpha_per_period;
         for j in 0..k {
@@ -1127,23 +1128,26 @@ pub(crate) fn multi_factor_greeks(
         }
         let residual = r - y_hat;
         ss_res += residual * residual;
-        ss_tot += (r - y_mean) * (r - y_mean);
+        response_stats.update(r);
     }
 
+    // Online variance preserves exact zero for constant observations, even
+    // when summing and dividing their level would round the mean.
+    let ss_tot = response_stats.variance() * (n - 1) as f64;
     let r_sq = if ss_tot > 0.0 {
         1.0 - ss_res / ss_tot
     } else {
-        0.0
+        f64::NAN
     };
     let dof = n as f64 - k as f64 - 1.0;
     let residual_var = if dof > 0.0 { ss_res / dof } else { 0.0 };
     let residual_vol = residual_var.sqrt() * ann_factor.sqrt();
     let alpha = alpha_per_period * ann_factor;
 
-    let adjusted_r_squared = if dof > 0.0 {
+    let adjusted_r_squared = if dof > 0.0 && r_sq.is_finite() {
         1.0 - (1.0 - r_sq) * (n as f64 - 1.0) / dof
     } else {
-        0.0
+        f64::NAN
     };
 
     Ok(MultiFactorResult {
@@ -1861,7 +1865,7 @@ pub(crate) fn treynor(ann_return: f64, risk_free_rate: f64, beta: f64, ann_facto
 /// direct measure of value added at the same risk level.
 ///
 /// ```text
-/// M² = R_f + excess_ann × (σ_bench / σ_portfolio)
+/// M² = rf_period × N + excess_ann × (σ_bench / σ_portfolio)
 /// excess_ann = (μ − rf_period) × N
 /// ```
 ///
@@ -1877,7 +1881,8 @@ pub(crate) fn treynor(ann_return: f64, risk_free_rate: f64, beta: f64, ann_facto
 ///
 /// # Returns
 ///
-/// The M-squared return. Returns the risk-free rate if portfolio volatility is zero.
+/// The linearly annualized M-squared return. For zero portfolio volatility,
+/// returns the decompounded periodic cash rate multiplied by `ann_factor`.
 ///
 /// # References
 ///
@@ -1890,11 +1895,18 @@ pub(crate) fn m_squared(
     risk_free_rate: f64,
     ann_factor: f64,
 ) -> f64 {
-    if ann_vol.abs() < 1e-10 {
-        return risk_free_rate;
+    let cash = crate::returns::periodic_risk_free_rate(risk_free_rate, ann_factor) * ann_factor;
+    if !cash.is_finite()
+        || !ann_return.is_finite()
+        || !ann_vol.is_finite()
+        || !bench_vol.is_finite()
+    {
+        return f64::NAN;
     }
-    let excess = crate::returns::annualized_excess_return(ann_return, risk_free_rate, ann_factor);
-    risk_free_rate + excess * (bench_vol / ann_vol)
+    if ann_vol.abs() < 1e-10 {
+        return cash;
+    }
+    cash + (ann_return - cash) * (bench_vol / ann_vol)
 }
 
 #[cfg(test)]

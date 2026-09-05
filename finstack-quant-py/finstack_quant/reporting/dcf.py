@@ -179,9 +179,9 @@ def dcf_tearsheet(
         secs.append(s)
 
     ev, ccy = _money_parts(val.get("enterprise_value"))
-    eq, eq_ccy = _money_parts(val.get("equity_value"))
+    eq, equity_currency = _money_parts(val.get("equity_value"))
     nd, _ = _money_parts(val.get("net_debt"))
-    ccy = ccy or eq_ccy
+    ccy = ccy or equity_currency
     per_share = val.get("equity_value_per_share")
     kpis = [
         KPI("Enterprise Value", fmt.money(ev, ccy), ""),

@@ -305,7 +305,8 @@ class PeriodStats:
         Returns
         -------
         float
-            Optimal bet fraction for maximizing long-run growth.
+            Binary win/loss payoff approximation, using probabilities conditional
+            on nonzero returns; neutral periods do not affect the fraction.
 
         Notes
         -----
@@ -993,7 +994,7 @@ class MultiFactorResult:
         Returns
         -------
         float
-            Coefficient of determination.
+            Coefficient of determination; ``nan`` for a constant dependent series.
 
         Notes
         -----
@@ -1008,7 +1009,7 @@ class MultiFactorResult:
         Returns
         -------
         float
-            Degrees-of-freedom-adjusted R².
+            Adjusted R²; ``nan`` when R² or residual degrees of freedom are undefined.
 
         Notes
         -----
@@ -2173,7 +2174,8 @@ class Performance:
         Returns
         -------
         pd.Series
-            Expected shortfall (negative decimal), indexed by ticker name.
+            Mean of exactly the worst ``1-confidence`` empirical probability mass,
+            with fractional boundary weighting; negative for losses, indexed by ticker.
 
         Raises
         ------
@@ -2665,7 +2667,9 @@ class Performance:
         Returns
         -------
         pd.Series
-            M-squared measure indexed by ticker name.
+            Linearly annualized M-squared indexed by ticker name. Both cash
+            subtraction and addition use the decompounded period cash rate
+            multiplied by periods per year.
 
         Raises
         ------
@@ -3632,7 +3636,7 @@ class Performance:
 
     def to_json(self) -> str:
         """
-        Serialize the full engine state to compact JSON.
+        Serialize validated inputs and window selection to compact JSON.
 
         Returns
         -------
@@ -3661,12 +3665,14 @@ class Performance:
         Returns
         -------
         Performance
-            Engine with identical state, including the active date window.
+            Engine with validated inputs and the same active date window;
+            drawdown caches are rebuilt from returns.
 
         Raises
         ------
         ValueError
-            If ``json`` does not match the engine schema.
+            If ``json`` has unknown fields or invalid dates, returns, spans,
+            ticker identities, benchmark index, or active window.
 
         Examples
         --------
@@ -3704,8 +3710,8 @@ def sharpe(
     -------
     float
         Sharpe ratio; ``inf`` / ``-inf`` when volatility is zero with a
-        non-zero excess return, ``nan`` when ``periods_per_year`` is not
-        positive.
+        non-zero excess return, ``nan`` for fewer than two observations,
+        non-finite inputs, or a non-positive ``periods_per_year``.
 
     Raises
     ------
@@ -3742,7 +3748,8 @@ def sortino(
     -------
     float
         Sortino ratio; ``±inf`` when there is no downside deviation but a
-        non-zero excess mean, ``nan`` for an invalid ``periods_per_year``.
+        non-zero excess mean, ``nan`` for fewer than two observations,
+        non-finite inputs, or an invalid ``periods_per_year``.
 
     Raises
     ------
@@ -3807,7 +3814,8 @@ def max_drawdown(
     -------
     float
         Non-positive fraction (``-0.25`` is a 25% loss); ``0.0`` when the
-        series never falls below its running peak or is empty.
+        series never falls below its running peak or is empty. Returns ``nan``
+        for a non-finite return or reconstructed drawdown path.
 
     Raises
     ------

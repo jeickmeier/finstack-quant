@@ -138,7 +138,7 @@ impl PyRate {
 
     /// Rate as a ``Bps`` value (rounded to the nearest whole basis point).
     #[getter]
-    fn as_bps(&self) -> PyBps {
+    fn as_basis_points(&self) -> PyBps {
         PyBps::from_inner(Bps::from(self.inner))
     }
 
@@ -184,7 +184,7 @@ impl PyRate {
 
     /// Add a ``Rate`` or a ``Bps`` spread: ``Rate(0.05) + Bps(25) == Rate(0.0525)``.
     fn __add__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let rhs = extract_rate_or_bps(other)?;
+        let rhs = extract_rate_or_basis_points(other)?;
         self.inner
             .checked_add(rhs)
             .map(Self::from_inner)
@@ -193,7 +193,7 @@ impl PyRate {
 
     /// Subtract a ``Rate`` or a ``Bps`` spread.
     fn __sub__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let rhs = extract_rate_or_bps(other)?;
+        let rhs = extract_rate_or_basis_points(other)?;
         self.inner
             .checked_sub(rhs)
             .map(Self::from_inner)
@@ -247,7 +247,7 @@ impl PyRate {
 }
 
 /// Accept a `Rate` or a `Bps` operand and return it as a `Rate`.
-fn extract_rate_or_bps(obj: &Bound<'_, PyAny>) -> PyResult<Rate> {
+fn extract_rate_or_basis_points(obj: &Bound<'_, PyAny>) -> PyResult<Rate> {
     if let Ok(rate) = obj.extract::<PyRef<'_, PyRate>>() {
         return Ok(rate.inner);
     }
@@ -545,7 +545,7 @@ impl PyPercentage {
 
     /// Value as a ``Bps`` value (rounded to the nearest whole basis point).
     #[getter]
-    fn as_bps(&self) -> PyBps {
+    fn as_basis_points(&self) -> PyBps {
         PyBps::from_inner(Bps::from(self.inner))
     }
 

@@ -110,8 +110,8 @@ impl PyMarketContext {
         mut slf: PyRefMut<'py, Self>,
         curve: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        if let Ok(dc) = curve.extract::<PyRef<'_, PyDiscountCurve>>() {
-            slf.inner.insert_mut(Arc::clone(&dc.inner));
+        if let Ok(discount_curve) = curve.extract::<PyRef<'_, PyDiscountCurve>>() {
+            slf.inner.insert_mut(Arc::clone(&discount_curve.inner));
             return Ok(slf);
         }
         if let Ok(fc) = curve.extract::<PyRef<'_, PyForwardCurve>>() {

@@ -27,12 +27,12 @@ class TestRateFamily:
             Rate("five")
 
     def test_cross_conversions(self) -> None:
-        assert Rate(0.05).as_bps == Bps(500)
+        assert Rate(0.05).as_basis_points == Bps(500)
         assert Rate(0.05).as_percentage == Percentage(5.0)
         assert Bps(250).as_rate == Rate(0.025)
         assert Bps(250).as_percentage == Percentage(2.5)
         assert Bps(250).as_percent == 2.5
-        assert Percentage(2.5).as_bps == Bps(250)
+        assert Percentage(2.5).as_basis_points == Bps(250)
         assert Percentage(2.5).as_rate == Rate(0.025)
 
     def test_predicates_and_abs(self) -> None:

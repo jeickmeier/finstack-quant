@@ -169,9 +169,10 @@ Higham failure.
 
 ## Serialization
 
-`Performance` derives `Serialize` only for its Python `repr`; its private
-cached state is not deserializable and must be built through the validated
-constructors. `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`,
+`Performance` serializes authoritative inputs: the initial valuation and return
+dates, compact return columns and spans, unique ticker names, benchmark, frequency,
+and active window. Deserialization validates all invariants and rebuilds drawdown
+caches. Unknown fields, including serialized caches, are rejected. `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`,
 `GreeksResult`, `MultiFactorResult`, `RollingGreeks`, and `DatedSeries` derive
 `Serialize`/`Deserialize`. The `PeriodStats` fields that can legitimately be
 `±∞` (`payoff_ratio`, `profit_factor`, `cpc_ratio`, `kelly_criterion`) go through

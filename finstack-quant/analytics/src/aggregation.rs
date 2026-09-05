@@ -45,8 +45,9 @@ pub struct PeriodStats {
     /// (`profit_factor × tail_ratio`), which is a different metric.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub cpc_ratio: f64,
-    /// Kelly criterion: `win_rate − (loss_rate / payoff_ratio)`. The division
-    /// binds tighter than the subtraction.
+    /// Binary Kelly fraction: `p_win − p_loss / payoff_ratio`, with both
+    /// probabilities conditional on nonzero returns. Zero-return periods
+    /// do not affect this payoff approximation; `win_rate` uses all periods.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
     pub kelly_criterion: f64,
 }
@@ -279,13 +280,19 @@ fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodStats {
 
     let cpc_ratio = profit_factor * win_rate * payoff_ratio;
 
-    let loss_rate = 1.0 - win_rate;
+    let decisive_count = win_count + loss_count;
+    let kelly_win_rate = if decisive_count == 0 {
+        0.0
+    } else {
+        win_count as f64 / decisive_count as f64
+    };
+    let loss_rate = 1.0 - kelly_win_rate;
     let kelly_criterion = if payoff_ratio.is_infinite() {
         1.0
     } else if payoff_ratio == 0.0 {
         0.0
     } else {
-        win_rate - loss_rate / payoff_ratio
+        kelly_win_rate - loss_rate / payoff_ratio
     };
 
     PeriodStats {

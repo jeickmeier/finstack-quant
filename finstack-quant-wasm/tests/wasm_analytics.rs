@@ -116,7 +116,7 @@ fn from_returns_exposes_ticker_specific_active_dates() {
     .unwrap();
 
     assert_eq!(
-        perf.active_dates_for_ticker(1).unwrap(),
+        perf.active_dates_for_ticker(1.0).unwrap(),
         vec!["2025-01-02".to_string(), "2025-01-03".to_string()]
     );
 }
@@ -376,7 +376,7 @@ fn greeks_optional_risk_free_rate_changes_alpha() {
 #[wasm_bindgen_test]
 fn rolling_greeks_emit_dates_alphas_betas() {
     let perf = build_perf();
-    let raw = perf.rolling_greeks(0, Some(5), None).unwrap();
+    let raw = perf.rolling_greeks(0.0, Some(5.0), None).unwrap();
     let date_array: Array = Reflect::get(&raw, &JsValue::from_str("dates"))
         .unwrap()
         .dyn_into()
@@ -391,7 +391,7 @@ fn rolling_greeks_emit_dates_alphas_betas() {
 #[wasm_bindgen_test]
 fn rolling_returns_match_dated_series_shape() {
     let perf = build_perf();
-    let raw = perf.rolling_returns(0, 3).unwrap();
+    let raw = perf.rolling_returns(0.0, 3.0).unwrap();
     let date_array: Array = Reflect::get(&raw, &JsValue::from_str("dates"))
         .unwrap()
         .dyn_into()
@@ -406,7 +406,7 @@ fn multi_factor_greeks_resolves_to_struct() {
     let perf = build_perf();
     let fx = fixture();
     let raw = perf
-        .multi_factor_greeks(0, to_f64_matrix(&fx.factors), None, None)
+        .multi_factor_greeks(0.0, to_f64_matrix(&fx.factors), None, None)
         .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert!(value["alpha"].is_number());
@@ -431,7 +431,7 @@ fn lookback_returns_emit_mtd_qtd_ytd_fytd_arrays() {
 fn period_stats_emit_win_rate() {
     let perf = build_perf();
     let raw = perf
-        .period_stats(0, Some("weekly".to_string()), None, None)
+        .period_stats(0.0, Some("weekly".to_string()), None, None)
         .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert!(value["win_rate"].as_f64().is_some());

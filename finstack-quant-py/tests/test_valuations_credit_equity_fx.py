@@ -415,7 +415,7 @@ class TestConvertibleBond:
 
     def test_invalid_conversion_raises_value_error(self) -> None:
         with pytest.raises(ValueError, match="invalid conversion"):
-            ConvertibleBond.builder().conversion({"ratio": 20.0, "policy": "Voluntary"})
+            ConvertibleBond.builder().conversion({"ratio": 20.0, "policy": "Voluntary"})  # schema-rejection-test
 
 
 class TestEquityOption:

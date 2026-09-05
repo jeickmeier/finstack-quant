@@ -621,7 +621,7 @@ class DiscountCurve:
         Returns
         -------
         str
-            Lower-case ISDA day-count label such as ``"act_365f"``, ``"act_360"`` or ``"thirty_360"``.
+            Lower-case ISDA day-count label such as ``"act_365f"``, ``"act_360"`` or ``"30_360"``.
 
         Notes
         -----

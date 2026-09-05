@@ -235,8 +235,8 @@ pub(crate) fn bdc_from_py(
     obj: &Bound<'_, PyAny>,
     what: &str,
 ) -> PyResult<finstack_quant_core::dates::BusinessDayConvention> {
-    if let Ok(bdc) = obj.cast::<crate::bindings::core::dates::calendar::PyBusinessDayConvention>() {
-        return Ok(bdc.borrow().inner);
+    if let Ok(convention) = obj.cast::<crate::bindings::core::dates::calendar::PyBusinessDayConvention>() {
+        return Ok(convention.borrow().inner);
     }
     if let Ok(text) = obj.extract::<std::borrow::Cow<'_, str>>() {
         return crate::bindings::valuations::instruments::enum_from_str(&text, what);
@@ -252,14 +252,14 @@ pub(crate) fn bdc_from_py(
 /// # Arguments
 ///
 /// * `obj` - A `finstack_quant.core.dates.DayCount` or its serde name
-///   (`"act_360"`, `"act_365f"`, `"thirty_360"`, …).
+///   (`"act_360"`, `"act_365f"`, `"30_360"`, …).
 /// * `what` - Parameter name used in the error message.
 pub(crate) fn day_count_from_py(
     obj: &Bound<'_, PyAny>,
     what: &str,
 ) -> PyResult<finstack_quant_core::dates::DayCount> {
-    if let Ok(dc) = obj.cast::<crate::bindings::core::dates::daycount::PyDayCount>() {
-        return Ok(dc.borrow().inner);
+    if let Ok(day_count) = obj.cast::<crate::bindings::core::dates::daycount::PyDayCount>() {
+        return Ok(day_count.borrow().inner);
     }
     if let Ok(text) = obj.extract::<std::borrow::Cow<'_, str>>() {
         return crate::bindings::valuations::instruments::enum_from_str(&text, what);

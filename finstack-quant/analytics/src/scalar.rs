@@ -28,9 +28,13 @@ use crate::risk_metrics;
 ///
 /// The Sharpe ratio; `±∞` when volatility is zero with a non-zero excess
 /// return, `0.0` when both are zero, and `NaN` when `periods_per_year` is
-/// not a positive finite number.
+/// not a positive finite number, an input is non-finite, or fewer than two
+/// observations are available.
 #[must_use]
 pub fn sharpe(returns: &[f64], risk_free_rate: f64, periods_per_year: f64) -> f64 {
+    if returns.len() < 2 {
+        return f64::NAN;
+    }
     let (ann_return, ann_vol) = risk_metrics::mean_vol_annualized(returns, periods_per_year);
     if !ann_return.is_finite() || !ann_vol.is_finite() {
         return f64::NAN;
@@ -50,7 +54,8 @@ pub fn sharpe(returns: &[f64], risk_free_rate: f64, periods_per_year: f64) -> f6
 /// # Returns
 ///
 /// The Sortino ratio; `±∞` when there is no downside deviation but a
-/// non-zero excess mean, and `NaN` when `periods_per_year` is invalid.
+/// non-zero excess mean, and `NaN` for non-finite inputs, invalid
+/// `periods_per_year`, or fewer than two observations.
 #[must_use]
 pub fn sortino(returns: &[f64], mar: f64, periods_per_year: f64) -> f64 {
     risk_metrics::sortino(returns, true, periods_per_year, mar)
@@ -85,7 +90,8 @@ pub fn volatility(returns: &[f64], periods_per_year: f64) -> f64 {
 /// # Returns
 ///
 /// A non-positive fraction (`-0.25` for a 25% loss); `0.0` when the series
-/// never falls below its running peak or is empty.
+/// never falls below its running peak or is empty. Returns `NaN` if the
+/// return or reconstructed drawdown path contains a non-finite value.
 #[must_use]
 pub fn max_drawdown(returns: &[f64]) -> f64 {
     crate::drawdown::max_drawdown(&to_drawdown_series(returns))

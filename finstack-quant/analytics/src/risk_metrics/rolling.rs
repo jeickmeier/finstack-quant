@@ -109,7 +109,7 @@ pub(crate) fn rolling_sharpe(
     if n < window || window == 0 {
         return DatedSeries::default();
     }
-    if invalid_annualization_factor(true, ann_factor) {
+    if window < 2 || invalid_annualization_factor(true, ann_factor) {
         return nan_series(dates, window - 1, n - window + 1);
     }
     let w = window as f64;
@@ -157,7 +157,7 @@ pub(crate) fn rolling_volatility(
     if n < window || window == 0 {
         return DatedSeries::default();
     }
-    if invalid_annualization_factor(true, ann_factor) {
+    if window < 2 || invalid_annualization_factor(true, ann_factor) {
         return nan_series(dates, window - 1, n - window + 1);
     }
     let w = window as f64;
@@ -205,7 +205,7 @@ pub(crate) fn rolling_sortino(
     if n < window || window == 0 {
         return DatedSeries::default();
     }
-    if invalid_annualization_factor(true, ann_factor) || !mar.is_finite() {
+    if window < 2 || invalid_annualization_factor(true, ann_factor) || !mar.is_finite() {
         return nan_series(dates, window - 1, n - window + 1);
     }
     let w = window as f64;

@@ -916,7 +916,7 @@ impl DayCount {
             "act_act_icma" | "act_act_isma" => "act_act_isma",
             "act_act_isda" | "act_act" | "actual_actual" => "act_act",
             "act_365" | "act_365_fixed" | "act_365f" | "actual_365" => "act_365f",
-            "act_360" | "actual_360" => "act_360",
+            "act_360" => "act_360",
             "30_360_us" | "30_360_bond" | "30u_360" | "30_360" => "30_360",
             "30e_360_isda" | "30_360_isda" => "30e_360_isda",
             "30e_360" | "30_360_eurobond" => "30e_360",

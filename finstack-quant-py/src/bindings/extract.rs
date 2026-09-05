@@ -377,7 +377,7 @@ pub fn extract_rate_decimal(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
 /// # Errors
 ///
 /// Returns `TypeError` when `obj` is neither numeric nor a `Bps`/`Rate`/`Percentage`.
-pub fn extract_bps(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
+pub fn extract_basis_points(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
     if let Ok(bps) = obj.cast::<crate::bindings::core::types::PyBps>() {
         return Ok(f64::from(bps.borrow().inner.as_bp()));
     }

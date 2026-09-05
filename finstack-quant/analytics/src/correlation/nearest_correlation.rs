@@ -140,22 +140,16 @@ pub fn nearest_correlation_matrix(
         }
     }
 
-    // Symmetrize to machine precision before starting the projection so that
-    // the eigensolver gets a perfectly symmetric iterate, then rescale to an
-    // exact unit diagonal (x_ij / sqrt(d_i * d_j)). The diagonal gate above
-    // only bounds the defect to 1e-3; the rescale repairs it so every return
-    // path — including the early exit below — satisfies the unit-diagonal
-    // postcondition and the strict 1e-10 tolerance used by
-    // `validate_correlation_matrix`.
-    let mut y = symmetrize(input, n);
-    rescale_to_unit_diagonal(&mut y, n);
-
-    // Early-exit on already-PSD inputs: a symmetric, unit-diagonal matrix
-    // that passes Cholesky is positive definite, so it is its own
-    // nearest-correlation projection. Common in daily recalibration where
-    // the input only drifts within tolerance.
-    if finstack_quant_core::math::linalg::cholesky_correlation(&y, n).is_ok() {
-        return Ok(y);
+    // Preserve the original off-diagonal objective. Projecting the diagonal
+    // to one is the exact solution whenever that matrix is already PSD;
+    // congruence rescaling would instead change the minimization target.
+    let y = symmetrize(input, n);
+    let mut unit_diagonal = y.clone();
+    for i in 0..n {
+        unit_diagonal[i * n + i] = 1.0;
+    }
+    if finstack_quant_core::math::linalg::cholesky_correlation(&unit_diagonal, n).is_ok() {
+        return Ok(unit_diagonal);
     }
 
     // Dykstra-projection iteration. Pre-allocate `prev`, `next`, `r`, `s`

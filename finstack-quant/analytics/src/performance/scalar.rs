@@ -134,14 +134,7 @@ impl Performance {
     /// a plausible-looking `±∞`).
     pub fn sharpe(&self, risk_free_rate: f64) -> Vec<f64> {
         let ann = self.ann();
-        self.map_tickers(|i| {
-            let r = self.active_returns(i);
-            if r.len() < 2 {
-                return f64::NAN;
-            }
-            let (m, v) = risk_metrics::mean_vol_annualized(r, ann);
-            risk_metrics::sharpe(m, v, risk_free_rate, ann)
-        })
+        self.map_tickers(|i| crate::sharpe(self.active_returns(i), risk_free_rate, ann))
     }
 
     /// Annualized Sortino ratio for each ticker.
@@ -254,13 +247,16 @@ impl Performance {
 
     /// Expected Shortfall (CVaR) for each ticker (not annualized).
     ///
+    /// Averages exactly the worst `1-confidence` empirical probability mass,
+    /// fractionally weighting the boundary observation; ties do not expand it.
+    ///
     /// # Arguments
     ///
     /// * `confidence` - Confidence level in `(0, 1)`, e.g. `0.95`.
     ///
     /// # Returns
     ///
-    /// One ES value per ticker (non-positive, always ≤ corresponding VaR).
+    /// One signed mean tail return per ticker (negative for losses, ≤ VaR).
     ///
     /// # Errors
     ///
@@ -394,10 +390,8 @@ impl Performance {
     /// One maximum drawdown duration per ticker in column order.
     pub fn max_drawdown_duration(&self) -> Vec<i64> {
         self.map_tickers(|i| {
-            dd_max_duration(
-                self.active_drawdown_values(i),
-                self.active_dates_for_ticker_unchecked(i),
-            )
+            let (path, dates) = self.active_drawdown_path(i);
+            dd_max_duration(&path, dates)
         })
     }
 

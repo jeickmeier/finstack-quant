@@ -12,7 +12,6 @@
 //! - [`cdar`]: Conditional Drawdown at Risk at a given confidence level.
 
 use crate::dates::Date;
-use crate::math::stats::quantile;
 
 /// Drawdown episode with start, valley, optional recovery, and max drawdown.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -285,11 +284,11 @@ pub(crate) fn max_drawdown_duration(drawdown: &[f64], dates: &[Date]) -> i64 {
 
 /// Conditional Drawdown at Risk (CDaR) at the given confidence level.
 ///
-/// The expected drawdown depth in the tail beyond the `(1 − α)` quantile
-/// of the drawdown distribution:
+/// The mean signed drawdown in the worst `(1 - confidence)` empirical tail,
+/// fractionally weighting the boundary observation without expanding ties:
 ///
 /// ```text
-/// CDaR_α = E[ |dd| | |dd| ≥ q_{1−α}(|dd|) ]
+/// CDaR_c = mean of exactly the worst (1-c) drawdown probability mass
 /// ```
 ///
 /// CDaR is the drawdown analogue of Expected Shortfall (CVaR).
@@ -316,20 +315,7 @@ pub(crate) fn cdar(drawdown: &[f64], confidence: f64) -> f64 {
     if drawdown.is_empty() {
         return 0.0;
     }
-    let mut abs_dd: Vec<f64> = drawdown.iter().map(|&d| d.abs()).collect();
-    let threshold = quantile(&mut abs_dd, confidence);
-    // Note: `abs_dd` is partially reordered by `quantile` (nth_element partition),
-    // not sorted. The fold below is order-independent so this is correct.
-    let (sum, count) = abs_dd
-        .iter()
-        .filter(|&&d| d >= threshold)
-        .fold((0.0_f64, 0usize), |(s, n), &d| (s + d, n + 1));
-    let tail_avg = if count == 0 {
-        threshold
-    } else {
-        sum / count as f64
-    };
-    -tail_avg
+    crate::risk_metrics::expected_shortfall(drawdown, confidence)
 }
 
 #[cfg(test)]
@@ -556,6 +542,9 @@ pub(crate) fn pain_index(drawdown: &[f64]) -> f64 {
 /// [`to_drawdown_series`]: `max_drawdown(&to_drawdown_series(&returns))`.
 #[must_use]
 pub(crate) fn max_drawdown(drawdown: &[f64]) -> f64 {
+    if drawdown.iter().any(|value| !value.is_finite()) {
+        return f64::NAN;
+    }
     drawdown.iter().copied().fold(0.0_f64, f64::min)
 }
 

@@ -272,6 +272,9 @@ pub(crate) fn volatility(returns: &[f64], annualize: bool, ann_factor: f64) -> f
 #[must_use]
 pub(crate) fn sharpe(ann_return: f64, ann_vol: f64, risk_free_rate: f64, ann_factor: f64) -> f64 {
     let excess = crate::returns::annualized_excess_return(ann_return, risk_free_rate, ann_factor);
+    if !excess.is_finite() || !ann_vol.is_finite() {
+        return f64::NAN;
+    }
     if ann_vol == 0.0 {
         return if excess > 0.0 {
             f64::INFINITY
@@ -324,6 +327,9 @@ pub(crate) fn downside_deviation(
     if invalid_annualization_factor(annualize, ann_factor) {
         return f64::NAN;
     }
+    if !mar.is_finite() || returns.iter().any(|r| !r.is_finite()) {
+        return f64::NAN;
+    }
     let downside_sq = kahan_sum(returns.iter().filter(|&&r| r < mar).map(|&r| {
         let d = r - mar;
         d * d
@@ -368,11 +374,14 @@ pub(crate) fn downside_deviation(
 /// - Sortino & van der Meer (1991): see docs/REFERENCES.md#sortinoVanDerMeer1991
 #[must_use]
 pub(crate) fn sortino(returns: &[f64], annualize: bool, ann_factor: f64, mar: f64) -> f64 {
-    if invalid_annualization_factor(annualize, ann_factor) {
+    if returns.len() < 2 || invalid_annualization_factor(annualize, ann_factor) {
         return f64::NAN;
     }
     let excess_mean = mean(returns) - mar;
     let dd = downside_deviation(returns, mar, false, ann_factor);
+    if !excess_mean.is_finite() || !dd.is_finite() {
+        return f64::NAN;
+    }
     if dd == 0.0 {
         return if excess_mean > 0.0 {
             f64::INFINITY

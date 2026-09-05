@@ -440,9 +440,9 @@ impl PyTenor {
             Some(c) => extract_business_day_convention(c)?,
             None => BusinessDayConvention::ModifiedFollowing,
         };
-        let dc = crate::bindings::core::dates::daycount::extract_day_count(day_count)?;
+        let day_count = crate::bindings::core::dates::daycount::extract_day_count(day_count)?;
         self.inner
-            .to_years_with_context(d, cal, conv, dc)
+            .to_years_with_context(d, cal, conv, day_count)
             .map_err(core_to_py)
     }
 

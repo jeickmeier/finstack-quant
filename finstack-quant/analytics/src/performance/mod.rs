@@ -13,6 +13,7 @@ mod aggregation;
 mod benchmark;
 mod rolling;
 mod scalar;
+mod serialization;
 mod table;
 
 /// Central performance analytics engine.
@@ -59,14 +60,18 @@ mod table;
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "serialization::PerformanceState")]
 pub struct Performance {
     price_dates: Vec<Date>,
+    #[serde(skip_serializing)]
     dates: Vec<Date>,
     returns: Vec<Vec<f64>>,
     return_spans: Vec<TickerSpan>,
     ticker_names: Vec<String>,
     benchmark_idx: usize,
+    #[serde(skip_serializing)]
     drawdowns: Vec<Vec<f64>>,
+    #[serde(skip_serializing)]
     active_window_drawdowns: Option<Vec<Vec<f64>>>,
     frequency: PeriodKind,
     start_idx: usize,
@@ -390,6 +395,19 @@ impl Performance {
             Some((self.price_dates[start_idx], self.price_dates[end_idx]))
         }
     }
+
+    /// Include the wealth baseline when locating episode peaks and durations.
+    fn active_drawdown_path(&self, ticker_idx: usize) -> (Vec<f64>, &[Date]) {
+        let dd = self.active_drawdown_values(ticker_idx);
+        if dd.is_empty() {
+            return (Vec::new(), &[]);
+        }
+        let span = self.active_span_for_ticker(ticker_idx);
+        let mut path = Vec::with_capacity(dd.len() + 1);
+        path.push(0.0);
+        path.extend_from_slice(dd);
+        (path, &self.price_dates[span.start..=span.end])
+    }
 }
 
 impl Performance {
@@ -408,7 +426,7 @@ impl Performance {
     /// * `prices` - Price matrix: `prices[i]` is the full price series for
     ///   ticker `i`. Each ticker may have leading/trailing `NaN` values, but
     ///   the finite price span must be contiguous and strictly positive.
-    /// * `ticker_names` - Names corresponding to each column of `prices`.
+    /// * `ticker_names` - Unique names corresponding to each column of `prices`.
     /// * `benchmark_ticker` - Name of the benchmark ticker. Uses column 0 if
     ///   `None`; returns an error if a non-`None` ticker name is not found.
     /// * `frequency` - Observation frequency, used to derive the annualization factor.
@@ -422,11 +440,11 @@ impl Performance {
     /// Returns [`crate::error::InputError::InvalidReturnSeries`] when:
     ///
     /// * `prices` or `dates` is empty.
-    /// * `ticker_names.len() != prices.len()`.
+    /// * `ticker_names.len() != prices.len()` or ticker names are duplicated.
     /// * any price column length differs from `dates.len()`.
     /// * any ticker has no contiguous finite positive price span.
     /// * `benchmark_ticker` is supplied but not found in `ticker_names`.
-    /// * derived returns are non-finite or below `-1.0`.
+    /// * derived returns are non-finite or at or below `-1.0`.
     ///
     /// # Tracing
     ///
@@ -520,7 +538,7 @@ impl Performance {
     ///   for ticker `i`, with one entry per `dates` row. Each ticker may have
     ///   leading/trailing `NaN` values, but the finite return span must be
     ///   contiguous.
-    /// * `ticker_names` - Names corresponding to each column of `returns`.
+    /// * `ticker_names` - Unique names corresponding to each column of `returns`.
     /// * `benchmark_ticker` - Name of the benchmark ticker. Uses column 0 if
     ///   `None`; returns an error if a non-`None` ticker name is not found.
     /// * `frequency` - Observation frequency, used to derive the annualization factor.
@@ -530,7 +548,7 @@ impl Performance {
     /// Returns [`crate::error::InputError::Invalid`] when inputs are empty,
     /// the column count does not match `ticker_names`, any return column has
     /// the wrong length, the benchmark name is unknown, any ticker lacks a
-    /// contiguous finite return span, or any active return value is `< -1.0`.
+    /// contiguous finite return span, ticker names are duplicated, or any active return value is `<= -1.0`.
     pub fn from_returns(
         dates: Vec<Date>,
         returns: Vec<Vec<f64>>,
@@ -587,6 +605,18 @@ impl Performance {
         benchmark_ticker: Option<&str>,
         frequency: PeriodKind,
     ) -> crate::Result<Self> {
+        if return_dates.is_empty() || returns.is_empty() {
+            return Err(invalid_return_series("<panel>", 0, "returns or dates is empty").into());
+        }
+        validate_strictly_ascending_dates(&price_dates)?;
+        if price_dates.len() != return_dates.len() + 1 || price_dates[1..] != return_dates {
+            return Err(invalid_return_series(
+                "<panel>",
+                0,
+                "price dates must include the initial valuation date followed by the return dates",
+            )
+            .into());
+        }
         if ticker_names.len() != returns.len() {
             return Err(invalid_return_series(
                 "<panel>",
@@ -598,6 +628,13 @@ impl Performance {
                 ),
             )
             .into());
+        }
+
+        let mut names = std::collections::HashSet::with_capacity(ticker_names.len());
+        for (index, name) in ticker_names.iter().enumerate() {
+            if !names.insert(name) {
+                return Err(invalid_return_series(name, index, "duplicate ticker name").into());
+            }
         }
 
         let benchmark_idx = match benchmark_ticker {
@@ -625,7 +662,25 @@ impl Performance {
         }
 
         let mut all_drawdowns: Vec<Vec<f64>> = Vec::with_capacity(returns.len());
-        for col in &returns {
+        for ((col, span), ticker) in returns.iter().zip(&return_spans).zip(&ticker_names) {
+            if span.start >= span.end || span.end > return_dates.len() || span.len() != col.len() {
+                return Err(invalid_return_series(
+                    ticker,
+                    span.start,
+                    "return span does not match its column or date grid",
+                )
+                .into());
+            }
+            for (index, &value) in col.iter().enumerate() {
+                if !value.is_finite() || value <= -1.0 {
+                    return Err(invalid_return_series(
+                        ticker,
+                        span.start + index,
+                        "returns must be finite and strictly greater than -1.0",
+                    )
+                    .into());
+                }
+            }
             let dd = to_drawdown_series(col);
             all_drawdowns.push(dd);
         }
@@ -656,8 +711,8 @@ impl Performance {
     /// # Drawdown semantics on a windowed range
     ///
     /// Drawdown caches are **rebuilt from scratch** within the new window:
-    /// the peak watermark is reset to the first observation of the active
-    /// range, so any drawdown that began before `start` is *not* carried
+    /// the peak watermark is reset to the valuation immediately before the
+    /// first included return, so any drawdown that began before `start` is *not* carried
     /// over. As a consequence:
     ///
     /// - [`Self::max_drawdown`], [`Self::mean_drawdown`],
@@ -667,7 +722,7 @@ impl Performance {
     ///   [`Self::burke_ratio`], [`Self::martin_ratio`],
     ///   [`Self::pain_ratio`], [`Self::calmar`], and
     ///   [`Self::max_drawdown_duration`] all reflect drawdowns measured
-    ///   *only* over `[start, end]`.
+    ///   from the baseline immediately before the first return in `[start, end]`.
     /// - To preserve a watermark from before `start`, call these methods on
     ///   the un-windowed `Performance` first or fork the instance.
     ///
@@ -677,7 +732,10 @@ impl Performance {
     /// * `end`   - Last date to include (inclusive).
     pub fn reset_date_range(&mut self, start: Date, end: Date) {
         self.start_idx = self.dates.partition_point(|&d| d < start);
-        self.end_idx = self.dates.partition_point(|&d| d <= end);
+        self.end_idx = self
+            .dates
+            .partition_point(|&d| d <= end)
+            .max(self.start_idx);
         self.refresh_active_drawdown_cache();
     }
 

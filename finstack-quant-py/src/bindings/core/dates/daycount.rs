@@ -49,8 +49,8 @@ impl PyDayCount {
 
 /// Extract a [`DayCount`] from a ``DayCount`` wrapper or a (lenient) name string.
 pub(crate) fn extract_day_count(obj: &Bound<'_, PyAny>) -> PyResult<DayCount> {
-    if let Ok(dc) = obj.extract::<PyRef<'_, PyDayCount>>() {
-        return Ok(dc.inner);
+    if let Ok(day_count) = obj.extract::<PyRef<'_, PyDayCount>>() {
+        return Ok(day_count.inner);
     }
     if let Ok(s) = obj.extract::<String>() {
         return DayCount::parse(&s).map_err(core_to_py);

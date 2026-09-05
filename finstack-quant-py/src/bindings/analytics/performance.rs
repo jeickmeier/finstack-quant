@@ -1675,7 +1675,7 @@ impl PyPerformance {
         })
     }
 
-    /// Serialize the full engine state (dates, returns, spans, benchmark,
+    /// Serialize authoritative engine inputs (dates, returns, spans, benchmark,
     /// frequency, active window) to compact JSON.
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
@@ -1683,7 +1683,9 @@ impl PyPerformance {
 
     /// Rebuild an engine from :meth:`to_json` output.
     ///
-    /// Raises ``ValueError`` when the JSON does not match the engine schema.
+    /// Revalidates dates, returns, spans, unique names, benchmark, and active
+    /// window, then rebuilds caches. Raises ``ValueError`` for invalid inputs
+    /// or unknown fields, including obsolete serialized caches.
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {

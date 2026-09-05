@@ -7,7 +7,7 @@
 use super::config::extract_config;
 use super::report::PyCalibrationValidationReport;
 use crate::bindings::date_utils::extract_date_iso;
-use crate::bindings::extract::{extract_bps, extract_rate_decimal};
+use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
 use crate::bindings::module_utils::{py_to_json_value, py_to_serde};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pickle_support::reduce_via_json;
@@ -436,7 +436,7 @@ impl PyCdsQuote {
             doc_clause,
             pillar,
             vec![
-                ("spread_bp", extract_bps(spread_bp)?),
+                ("spread_bp", extract_basis_points(spread_bp)?),
                 ("recovery_rate", recovery_rate),
             ],
         )
@@ -492,7 +492,7 @@ impl PyCdsQuote {
             doc_clause,
             pillar,
             vec![
-                ("running_spread_bp", extract_bps(running_spread_bp)?),
+                ("running_spread_bp", extract_basis_points(running_spread_bp)?),
                 ("upfront_pct", upfront_pct),
                 ("recovery_rate", recovery_rate),
             ],

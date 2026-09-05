@@ -2275,10 +2275,10 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyDayCount>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let dc = value.inner;
+        let day_count = value.inner;
         let b = take_cap_floor(&mut slf)?;
-        slf.inner = Some(b.day_count(dc));
-        slf.fields.push(("day_count", dc.to_string()));
+        slf.inner = Some(b.day_count(day_count));
+        slf.fields.push(("day_count", day_count.to_string()));
         Ok(slf)
     }
 
@@ -2334,9 +2334,9 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let bdc = enum_from_str(value, "business_day_convention")?;
+        let convention = enum_from_str(value, "business_day_convention")?;
         let b = take_cap_floor(&mut slf)?;
-        slf.inner = Some(b.business_day_convention(bdc));
+        slf.inner = Some(b.business_day_convention(convention));
         slf.fields
             .push(("business_day_convention", format!("{value:?}")));
         Ok(slf)

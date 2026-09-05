@@ -653,7 +653,7 @@ end_of_month=False)"
     ) -> PyResult<Self> {
         let base = currency_from_py(base_currency, "base_currency")?;
         let quote = currency_from_py(quote_currency, "quote_currency")?;
-        let bdc = match business_day_convention {
+        let convention = match business_day_convention {
             Some(value) if !value.is_none() => bdc_from_py(value, "business_day_convention")?,
             _ => finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
         };
@@ -676,7 +676,7 @@ end_of_month=False)"
             base_calendar_id,
             quote_calendar_id,
             spot_lag_days,
-            bdc,
+            convention,
             end_of_month,
         )
         .map_err(core_to_py)?;
