@@ -125,3 +125,28 @@ def test_attribution_tearsheet_matches_golden() -> None:
     golden = DATA / "attribution_tearsheet_golden.html"
     assert golden.exists(), "golden missing — regenerate (Task 3 Step 2)"
     assert _attribution_golden_html() == golden.read_text(encoding="utf-8")
+
+
+def test_material_residual_is_visible_when_total_pnl_is_zero() -> None:
+    import json
+
+    from finstack_quant.attribution import PnlAttribution
+    from finstack_quant.reporting import attribution_tearsheet
+
+    raw = json.loads((DATA / "attribution_bond.json").read_text())
+    raw["total_pnl"]["amount"] = "0"
+    raw["residual"]["amount"] = "1000"
+    raw["meta"]["residual_pct"] = 0.0
+    raw["result_invalid"] = False
+    result = PnlAttribution.from_json(json.dumps(raw))
+    sheet = attribution_tearsheet(result)
+    residual = next(k for k in sheet.kpis if k.label == "Residual")
+    assert "1,000" in residual.value
+    assert "%" not in residual.value
+    html = sheet.to_html()
+    assert "residual outside tolerance" in html
+    assert "calculation flagged invalid" not in html
+
+    raw["result_invalid"] = True
+    invalid = attribution_tearsheet(PnlAttribution.from_json(json.dumps(raw))).to_html()
+    assert "calculation flagged invalid" in invalid

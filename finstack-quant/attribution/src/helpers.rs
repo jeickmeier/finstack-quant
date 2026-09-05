@@ -233,9 +233,6 @@ pub(crate) struct TotalReturnCarryInputs {
     pub funding_cost: Option<Money>,
     /// Diagnostics for the caller to merge into `meta.notes`.
     pub warnings: Vec<String>,
-    /// True when a non-finite cashflow/metric value was zeroed; the caller
-    /// must set `result_invalid` so tolerance checks refuse a clean pass.
-    pub invalid: bool,
 }
 
 /// Gather the repricing-based pieces of the carry decomposition over `[as_of_t0, as_of_t1]`,
@@ -253,22 +250,11 @@ pub(crate) fn total_return_carry_inputs(
 ) -> finstack_quant_core::Result<TotalReturnCarryInputs> {
     Ok({
         let mut warnings = Vec::new();
-        let mut invalid = false;
 
-        let cash_paid =
-            match collect_cashflows_in_period(instrument, market, as_of_t0, as_of_t1, currency) {
-                Ok(value) => factor_money_or_invalid(
-                    value,
-                    currency,
-                    "carry cash income",
-                    &mut warnings,
-                    &mut invalid,
-                ),
-                Err(e) => {
-                    warnings.push(format!("carry cash income unavailable: {e}"));
-                    Money::from((0_i64, currency))
-                }
-            };
+        let cash_paid = Money::new(
+            collect_cashflows_in_period(instrument, market, as_of_t0, as_of_t1, currency)?,
+            currency,
+        )?;
 
         let t0_metrics = instrument
             .price_with_metrics(
@@ -323,7 +309,6 @@ pub(crate) fn total_return_carry_inputs(
             flat_window_diff,
             funding_cost,
             warnings,
-            invalid,
         }
     })
 }

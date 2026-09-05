@@ -258,3 +258,136 @@ fn metrics_based_explains_convertible_credit_spread_move() {
         "convertible Cs01 should be non-trivial, got {cs01}"
     );
 }
+
+#[test]
+fn repricing_methods_classify_risky_discount_curve_as_credit() {
+    let instrument = convertible_with_credit();
+    let opening = market(150.0);
+    let closing = market(300.0);
+    let expected = instrument
+        .value(&closing, t0())
+        .unwrap()
+        .checked_sub(instrument.value(&opening, t0()).unwrap())
+        .unwrap();
+    let config = finstack_quant_core::config::FinstackConfig::default();
+    for method in [
+        AttributionMethod::Parallel,
+        AttributionMethod::Waterfall(finstack_quant_attribution::default_waterfall_order()),
+    ] {
+        for full_cross_attribution in [false, true] {
+            let result = attribute_pnl(
+                &method,
+                &AttributionRequest {
+                    full_cross_attribution,
+                    strict_validation: false,
+                    ..AttributionRequest::new(&instrument, &opening, &closing, t0(), t0(), &config)
+                },
+            )
+            .unwrap();
+            assert!(
+                (result.credit_curves_pnl.amount() - expected.amount()).abs() < 1e-8,
+                "{method:?}: {result:?}"
+            );
+            assert!(result.rates_curves_pnl.amount().abs() < 1e-8);
+            assert!(result.residual.amount().abs() < 1e-8);
+        }
+    }
+}
+
+fn conversion_change_spec(
+    method: AttributionMethod,
+) -> finstack_quant_attribution::AttributionSpec {
+    let opening = convertible_with_credit();
+    let mut closing = opening
+        .as_any()
+        .downcast_ref::<ConvertibleBond>()
+        .unwrap()
+        .clone();
+    let opening_conversion = closing.conversion.clone();
+    closing.conversion.ratio = Some(30.0);
+    let state = finstack_quant_core::market_data::context::MarketContextState::from(&market(150.0));
+    finstack_quant_attribution::AttributionSpec {
+        instrument: finstack_quant_valuations::instruments::InstrumentJson::ConvertibleBond(closing),
+        market_t0: state.clone(), market_t1: state,
+        as_of_t0: t0(), as_of_t1: t0(), method,
+        model_params_t0: Some(finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot::Convertible { conversion_spec: opening_conversion }),
+        config: None, credit_factor_model: None,
+        credit_factor_detail_options: Default::default(), full_cross_attribution: false,
+    }
+}
+
+#[test]
+fn metrics_spec_restores_opening_conversion_and_rounding() {
+    let mut spec = conversion_change_spec(AttributionMethod::MetricsBased);
+    spec.config = Some(
+        serde_json::from_value(serde_json::json!({"rounding_scale": 4, "metrics": ["delta"]}))
+            .unwrap(),
+    );
+    let result = spec.execute().unwrap().attribution;
+    let opening = convertible_with_credit()
+        .value(&market(150.0), t0())
+        .unwrap();
+    let closing = spec
+        .instrument
+        .into_boxed()
+        .unwrap()
+        .value(&market(150.0), t0())
+        .unwrap();
+    let expected = closing.checked_sub(opening).unwrap().amount();
+    assert!(expected > 100.0);
+    assert!((result.total_pnl.amount() - expected).abs() < 1e-8);
+    assert!((result.model_params_pnl.amount() - expected).abs() < 1e-8);
+    assert!(result.residual.amount().abs() < 1e-8);
+    assert_eq!(
+        result
+            .meta
+            .rounding
+            .output_scale_by_currency
+            .get(&Currency::USD),
+        Some(&4)
+    );
+}
+
+#[test]
+fn taylor_market_gamma_uses_opening_conversion_state() {
+    let method = AttributionMethod::Taylor(TaylorAttributionConfig {
+        include_gamma: true,
+        ..Default::default()
+    });
+    let mut changed = conversion_change_spec(method);
+    changed.market_t1 =
+        finstack_quant_core::market_data::context::MarketContextState::from(&market(170.0));
+    let mut fixed = changed.clone();
+    fixed.instrument = finstack_quant_valuations::instruments::InstrumentJson::ConvertibleBond(
+        convertible_with_credit()
+            .as_any()
+            .downcast_ref::<ConvertibleBond>()
+            .unwrap()
+            .clone(),
+    );
+    fixed.model_params_t0 = None;
+    let changed_result = changed.execute().unwrap().attribution;
+    let fixed_result = fixed.execute().unwrap().attribution;
+    assert!(
+        !changed_result.result_invalid,
+        "{:?}",
+        changed_result.meta.notes
+    );
+    assert!(
+        (changed_result.credit_curves_pnl.amount() - fixed_result.credit_curves_pnl.amount()).abs()
+            < 1e-8
+    );
+    assert!(
+        (changed_result.rates_curves_pnl.amount() - fixed_result.rates_curves_pnl.amount()).abs()
+            < 1e-8
+    );
+}
+
+#[test]
+fn requested_reporting_currency_requires_fx() {
+    let mut spec = conversion_change_spec(AttributionMethod::Parallel);
+    spec.config =
+        Some(serde_json::from_value(serde_json::json!({"target_currency": "EUR"})).unwrap());
+    let error = spec.execute().unwrap_err();
+    assert!(error.to_string().contains("fx"), "{error}");
+}

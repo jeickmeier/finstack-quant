@@ -93,6 +93,10 @@ pub fn translate_to_target_currency(
     if native_currency == target_currency {
         return Ok(()); // No-op: report stays in native currency.
     }
+    // Commit only a complete translation, including every detail amount.
+    let destination = attribution;
+    let mut translated = destination.clone();
+    let attribution = &mut translated;
 
     // Convert val_t0 with BOTH the T0 and T1 FX matrices so we can extract the
     // FX move applied to the opening position.
@@ -162,6 +166,7 @@ pub fn translate_to_target_currency(
     }
 
     attribution.compute_residual()?;
+    *destination = translated;
     Ok(())
 }
 

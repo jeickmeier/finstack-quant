@@ -187,3 +187,42 @@ fn attribute_pnl_missing_market_data_yields_structured_error() {
         "attribution errors must carry a structured kind tag"
     );
 }
+
+#[wasm_bindgen_test]
+fn requested_reporting_currency_requires_fx() {
+    use time::macros::date;
+    let inputs = JsAttributionParams::new(
+        bond_json(),
+        market_json(date!(2025 - 01 - 15), 0.04),
+        market_json(date!(2025 - 01 - 16), 0.04),
+        "2025-01-15".into(),
+        "2025-01-16".into(),
+        "\"parallel\"".into(),
+        Some(r#"{"target_currency":"EUR"}"#.into()),
+        None,
+    );
+    assert!(attribute_pnl_json(&inputs).is_err());
+}
+
+#[wasm_bindgen_test]
+fn metrics_and_taylor_preserve_rounding() {
+    use time::macros::date;
+    for method in [r#""metrics_based""#, r#"{"taylor":{}}"#] {
+        let inputs = JsAttributionParams::new(
+            bond_json(),
+            market_json(date!(2025 - 01 - 15), 0.04),
+            market_json(date!(2025 - 01 - 16), 0.04),
+            "2025-01-15".into(),
+            "2025-01-16".into(),
+            method.into(),
+            Some(r#"{"rounding_scale":4,"metrics":["dv01"]}"#.into()),
+            None,
+        );
+        let result: serde_json::Value =
+            serde_json::from_str(&attribute_pnl_json(&inputs).unwrap()).unwrap();
+        assert_eq!(
+            result["meta"]["rounding"]["output_scale_by_currency"]["USD"],
+            4
+        );
+    }
+}

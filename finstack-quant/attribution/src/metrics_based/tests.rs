@@ -1516,13 +1516,10 @@ impl Instrument for MultiSpotTestInstrument {
     }
 }
 
-/// Audit Major (equity.rs): the primary spot driver must be the measurable
-/// spot with the LARGEST |ΔS| — not simply the first measurable one. Before
-/// the fix, a first-declared spot with a 0.0 move locked out the real driver
-/// (Delta × real move flowed to residual: market_scalars_pnl = 0 instead of
-/// 10,000).
+/// Aggregate Delta and cross-Gamma use the first declared scalar, matching the
+/// canonical sensitivity producer even when another scalar moves more.
 #[test]
-fn test_primary_spot_driver_is_largest_move_not_first_measurable() {
+fn test_primary_spot_driver_matches_sensitivity_producer() {
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
     let meta = finstack_quant_core::config::results_meta(&FinstackConfig::default());
@@ -1533,7 +1530,7 @@ fn test_primary_spot_driver_is_largest_move_not_first_measurable() {
     ));
 
     // FLAT-SPOT is declared FIRST and is measurable but unmoved (50 → 50);
-    // REAL-SPOT is the actual driver (100 → 110).
+    // REAL-SPOT is a different dependency (100 → 110).
     let market_t0 = MarketContext::new()
         .insert_price("FLAT-SPOT", MarketScalar::Unitless(50.0))
         .insert_price("REAL-SPOT", MarketScalar::Unitless(100.0));
@@ -1569,11 +1566,11 @@ fn test_primary_spot_driver_is_largest_move_not_first_measurable() {
     )
     .expect("metrics-based attribution should succeed");
 
-    // Delta (1000) × ΔS of the largest mover (+10) = 10,000.
+    // Delta (1000) × primary spot move (0) = 0.
     let spot_pnl = attribution.market_scalars_pnl.amount();
     assert!(
-        (spot_pnl - 10_000.0).abs() < 1e-9,
-        "primary spot shift must bind to the largest |ΔS|; expected 10000, got {spot_pnl}"
+        spot_pnl.abs() < 1e-9,
+        "primary spot shift must match the sensitivity producer; got {spot_pnl}"
     );
 }
 
@@ -2016,4 +2013,81 @@ fn inf_factor_sensitivity_sets_result_invalid_instead_of_panicking() {
         attribution.residual.amount().is_finite(),
         "residual must be finite sentinel when result_invalid"
     );
+}
+
+#[test]
+fn theta_with_coupon_cannot_be_scaled_to_another_horizon() {
+    let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
+        "THETA-HORIZON",
+        Money::from((1000_i64, Currency::USD)),
+    ));
+    let market = MarketContext::new();
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2025 - 01 - 11);
+    let opening = ValuationResult::stamped(
+        "THETA-HORIZON",
+        start,
+        Money::from((1000_i64, Currency::USD)),
+    )
+    .with_measures(IndexMap::from([
+        (MetricId::Theta, 100.0),
+        (MetricId::CouponIncome, 100.0),
+        (MetricId::ThetaPeriodDays, 1.0),
+    ]));
+    let closing = ValuationResult::stamped("THETA-HORIZON", end, opening.value);
+    let error = attribute_pnl_metrics_based(
+        &instrument,
+        &market,
+        &market,
+        &opening,
+        &closing,
+        start,
+        end,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("matching theta_period_days"));
+}
+
+#[test]
+fn aggregate_vega_rejects_twist_without_reference_point() {
+    let instrument: Arc<dyn Instrument> = Arc::new(SpotVolTestInstrument::new(
+        "VOL-TWIST",
+        Money::from((1000_i64, Currency::USD)),
+    ));
+    let surface = |front, back| {
+        VolSurface::builder("TEST-VOL")
+            .expiries(&[0.5, 5.0])
+            .strikes(&[90.0, 110.0])
+            .row(&[front, front])
+            .row(&[back, back])
+            .build()
+            .unwrap()
+    };
+    let opening_market = MarketContext::new().insert_surface(surface(0.2, 0.2));
+    // The new closing knot moves while all opening grid points stay flat.
+    let closing_surface = VolSurface::builder("TEST-VOL")
+        .expiries(&[0.5, 2.0, 5.0])
+        .strikes(&[90.0, 110.0])
+        .row(&[0.2, 0.2])
+        .row(&[0.3, 0.3])
+        .row(&[0.2, 0.2])
+        .build()
+        .unwrap();
+    let closing_market = MarketContext::new().insert_surface(closing_surface);
+    let start = date!(2025 - 01 - 01);
+    let opening =
+        ValuationResult::stamped("VOL-TWIST", start, Money::from((1000_i64, Currency::USD)))
+            .with_measures(IndexMap::from([(MetricId::Vega, 10.0)]));
+    let result = attribute_pnl_metrics_based(
+        &instrument,
+        &opening_market,
+        &closing_market,
+        &opening,
+        &opening,
+        start,
+        start,
+    )
+    .unwrap();
+    assert!(result.result_invalid, "{:?}", result.meta.notes);
+    assert_eq!(result.vol_pnl.amount(), 0.0);
 }

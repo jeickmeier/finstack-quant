@@ -66,6 +66,13 @@ pub(super) fn apply(
     };
     let scale_differs_from_horizon = (carry_scale - 1.0).abs() > 1e-9;
 
+    if scale_differs_from_horizon && has_theta && !has_carry_total {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "metrics-based Theta requires a matching theta_period_days horizon ({time_period_days} days); \
+             a total-return Theta cannot be scaled across discrete cashflows"
+        )));
+    }
+
     if let Some(horizon) = theta_horizon_days {
         if (horizon - time_period_days).abs() > 1e-9 {
             attribution.meta.notes.push(format!(

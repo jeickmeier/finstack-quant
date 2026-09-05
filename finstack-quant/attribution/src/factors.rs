@@ -27,7 +27,10 @@
 //! unchanged (the previous from-scratch rebuild silently dropped them,
 //! breaking every instrument that depends on them).
 //!
-//! Every [`CurveStorage`] variant is owned by exactly one flag family (price
+//! Every curve is owned by exactly one flag family. Attribution execution uses
+//! the instrument's declared credit roles to assign risky discount curves to
+//! `CREDIT`; the generic snapshot API uses the storage defaults below. Each
+//! [`CurveStorage`] variant otherwise has one default family (price
 //! / vol-index / basis-spread / parametric curves previously
 //! survived every restore at their pre-restore state, so a waterfall /
 //! parallel attribution never moved them to T1 and their P&L fell into the
@@ -218,6 +221,11 @@ impl std::ops::Not for MarketRestoreFlags {
 /// fields stay empty/`None`.
 #[derive(Clone, Default)]
 pub struct MarketSnapshot {
+    /// Discount curves serving a credit role for the attributed instrument.
+    pub credit_discount_curves: HashMap<CurveId, Arc<DiscountCurve>>,
+    /// Declared credit curve IDs, including those absent from this snapshot.
+    /// Used to preserve their economic role when dropping a restored family.
+    pub credit_curve_ids: Vec<CurveId>,
     /// Discount curves indexed by curve ID
     pub discount_curves: HashMap<CurveId, Arc<DiscountCurve>>,
     /// Forward curves indexed by curve ID
@@ -281,7 +289,19 @@ impl MarketSnapshot {
     /// * `market` - Market context providing curves, surfaces, and fixing data for pricing
     /// * `flags` - Feature flags controlling optional attribution components.
     pub fn extract(market: &MarketContext, flags: MarketRestoreFlags) -> Self {
-        let mut snapshot = Self::default();
+        Self::extract_with_credit_roles(market, flags, &[])
+    }
+
+    /// Extract economic factor families, separating risky discount curves from rates.
+    pub(crate) fn extract_with_credit_roles(
+        market: &MarketContext,
+        flags: MarketRestoreFlags,
+        credit_curve_ids: &[CurveId],
+    ) -> Self {
+        let mut snapshot = Self {
+            credit_curve_ids: credit_curve_ids.to_vec(),
+            ..Self::default()
+        };
 
         let extract_curves = flags.contains(MarketRestoreFlags::DISCOUNT)
             || flags.contains(MarketRestoreFlags::FORWARD)
@@ -293,6 +313,13 @@ impl MarketSnapshot {
         if extract_curves {
             for (curve_id, storage) in market.iter_curves() {
                 match storage {
+                    CurveStorage::Discount(curve) if credit_curve_ids.contains(curve_id) => {
+                        if flags.contains(MarketRestoreFlags::CREDIT) {
+                            snapshot
+                                .credit_discount_curves
+                                .insert(curve_id.clone(), Arc::clone(curve));
+                        }
+                    }
                     CurveStorage::Discount(curve)
                         if flags.contains(MarketRestoreFlags::DISCOUNT) =>
                     {
@@ -442,7 +469,10 @@ impl MarketSnapshot {
         // arm): every `CurveStorage` variant must be owned by exactly one
         // flag family, so adding a tenth variant is a compile error here
         // instead of a silent restore gap.
-        new_market.retain_curves_mut(|_, curve| match curve {
+        new_market.retain_curves_mut(|id, curve| match curve {
+            CurveStorage::Discount(_) if snapshot.credit_curve_ids.contains(id) => {
+                !restore_flags.contains(MarketRestoreFlags::CREDIT)
+            }
             CurveStorage::Discount(_) => !restore_flags.contains(MarketRestoreFlags::DISCOUNT),
             CurveStorage::Forward(_)
             | CurveStorage::BasisSpread(_)
@@ -456,6 +486,9 @@ impl MarketSnapshot {
             CurveStorage::Price(_) => !restore_flags.contains(MarketRestoreFlags::SCALARS),
         });
         for curve in snapshot.discount_curves.values() {
+            new_market.insert_mut(Arc::clone(curve));
+        }
+        for curve in snapshot.credit_discount_curves.values() {
             new_market.insert_mut(Arc::clone(curve));
         }
         for curve in snapshot.forward_curves.values() {

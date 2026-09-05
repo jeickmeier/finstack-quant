@@ -1010,6 +1010,13 @@ impl PnlAttribution {
             lines.push(format!("  ├─ FX: {}", fmt(&self.fx_pnl, &self.total_pnl)));
         }
 
+        if show(&self.fx_translation_pnl) {
+            lines.push(format!(
+                "  ├─ FX Translation: {}",
+                fmt(&self.fx_translation_pnl, &self.total_pnl)
+            ));
+        }
+
         if show(&self.vol_pnl) {
             lines.push(format!("  ├─ Vol: {}", fmt(&self.vol_pnl, &self.total_pnl)));
         }
@@ -1276,7 +1283,6 @@ mod tests {
             flat_window_diff: None,
             funding_cost: None,
             warnings: Vec::new(),
-            invalid: false,
         };
         apply_total_return_carry(&mut attr, theta, carry_inputs).expect("carry add");
 

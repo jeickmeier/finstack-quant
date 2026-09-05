@@ -84,11 +84,13 @@ fn explain_uses_stamped_rounding_context() {
 
     // Set non-zero components to exercise formatting paths
     attr.carry = Money::new(10.0, Currency::USD).expect("valid money fixture");
+    attr.fx_translation_pnl = Money::from((7_i64, Currency::USD));
     attr.fx_pnl = Money::new(5.0, Currency::USD).expect("valid money fixture");
     attr.compute_residual()
         .expect("Residual computation should succeed");
 
     let explanation = attr.explain();
+    assert!(explanation.contains("FX Translation"));
     assert!(
         explanation.contains("Total P&L"),
         "Explain output should be produced using the stamped rounding context"
@@ -155,30 +157,17 @@ fn all_methods_stamp_configured_rounding_context() {
     .expect("waterfall attribution should succeed");
     assert_stamp(&waterfall, "waterfall");
 
-    // Taylor and metrics-based take no FinstackConfig: they stamp the
-    // DEFAULT rounding context. Pin that a context is stamped (the default
-    // has no per-ccy overrides) so a dropped stamp regresses loudly.
     let taylor = attribute_pnl(
         &AttributionMethod::Taylor(TaylorAttributionConfig::default()),
         &AttributionRequest {
             execution_policy: ExecutionPolicy::Serial,
-            ..AttributionRequest::new(
-                &instrument,
-                &market,
-                &market,
-                as_of_t0,
-                as_of_t1,
-                &finstack_quant_core::config::FinstackConfig::default(),
-            )
+            ..AttributionRequest::new(&instrument, &market, &market, as_of_t0, as_of_t1, &config)
         },
     )
     .expect("taylor attribution should succeed");
     let default_rounding =
         finstack_quant_core::config::rounding_context_from(&FinstackConfig::default());
-    assert_eq!(
-        taylor.meta.rounding.output_scale_by_currency, default_rounding.output_scale_by_currency,
-        "taylor must stamp the default rounding context"
-    );
+    assert_stamp(&taylor, "taylor");
 
     let val_t0 = instrument
         .price_with_metrics(&market, as_of_t0, &[], PricingOptions::default())

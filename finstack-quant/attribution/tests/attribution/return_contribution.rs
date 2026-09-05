@@ -411,3 +411,27 @@ fn return_contribution_no_warning_for_ordinary_net_book() {
         result["warnings"]
     );
 }
+
+#[test]
+fn brinson_rejects_offsetting_group_with_nonzero_contribution() {
+    for side in ["portfolio", "benchmark"] {
+        let mut positions = json!([
+            {"id": "LONG", "weight": 0.5, "return": 0.1, "groups": {"sector": "tech"}, "benchmark_weight": 0.5, "benchmark_return": 0.0},
+            {"id": "SHORT", "weight": -0.5, "return": 0.0, "groups": {"sector": "tech"}, "benchmark_weight": 0.5, "benchmark_return": 0.0}
+        ]);
+        if side == "benchmark" {
+            positions[1]["weight"] = json!(0.5);
+            positions[1]["benchmark_weight"] = json!(-0.5);
+            positions[0]["benchmark_return"] = json!(0.1);
+        }
+        positions.as_array_mut().unwrap().push(json!({"id": "ANCHOR", "weight": if side == "portfolio" { 1.0 } else { 0.0 }, "return": 0.0, "groups": {"sector": "cash"}, "benchmark_weight": if side == "benchmark" { 1.0 } else { 0.0 }, "benchmark_return": 0.0}));
+        let spec = json!({"as_of": "2026-01-02", "positions": positions});
+        let error = attribute_return_contribution_json(&spec.to_string()).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("zero net {side} weight")),
+            "{error}"
+        );
+    }
+}

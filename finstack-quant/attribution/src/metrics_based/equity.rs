@@ -35,42 +35,12 @@ pub(super) fn apply_spot(
             "Delta metric must be finite for P&L attribution, got {delta}"
         );
 
-        // Note: `Delta` / `Gamma` are sensitivities to the
-        // instrument's PRIMARY spot driver, not a per-spot vector. The old
-        // code multiplied the single Delta by EVERY spot's move and summed
-        // (~N× overstatement for multi-spot instruments) while applying
-        // Gamma once to the average. Both orders are now applied once, to
-        // the measurable spot with the LARGEST |ΔS| (deterministic
-        // tie-break: first declared wins) — binding to the first measurable
-        // spot even when its move was 0.0 locked out the real driver.
-        // Additional spot moves are unattributed (they flow to the
-        // residual) and noted.
-        let measured: Vec<(&String, f64)> = market_scalar_ids
-            .iter()
-            .filter_map(|spot_id| {
-                measure_scalar_absolute_shift(spot_id, inputs.market_t0, inputs.market_t1)
-                    .ok()
-                    .map(|shift| (spot_id, shift))
-            })
-            .collect();
-        let mut primary: Option<(usize, f64)> = None;
-        for (idx, &(_, shift)) in measured.iter().enumerate() {
-            match primary {
-                Some((_, best)) if shift.abs() <= best.abs() => {}
-                _ => primary = Some((idx, shift)),
-            }
-        }
-        let primary_shift: Option<f64> = primary.map(|(_, shift)| shift);
-        let extra_spots: Vec<&String> = primary
-            .map(|(primary_idx, _)| {
-                measured
-                    .iter()
-                    .enumerate()
-                    .filter(|&(idx, _)| idx != primary_idx)
-                    .map(|(_, &(spot_id, _))| spot_id)
-                    .collect()
-            })
-            .unwrap_or_default();
+        // Match the canonical Delta/Gamma and spot cross-gamma producers:
+        // their bump target is the first declared market scalar. Other scalar
+        // dependencies can be dividend yields or volatility, not spot prices.
+        let primary_shift = market_scalar_ids.first().and_then(|spot_id| {
+            measure_scalar_absolute_shift(spot_id, inputs.market_t0, inputs.market_t1).ok()
+        });
 
         if let Some(spot_shift) = primary_shift {
             let mut total_spot_pnl = delta * spot_shift;
@@ -92,17 +62,11 @@ pub(super) fn apply_spot(
                 non_finite_detected,
             );
         }
-        if !extra_spots.is_empty() {
-            attribution.meta.notes.push(format!(
-                "Spot Delta/Gamma attribution applied to the primary spot driver only; \
-                         moves on additional spot ids ({}) are unattributed and flow to the \
-                         residual — provide per-spot sensitivities for multi-underlying books",
-                extra_spots
-                    .iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
+        if primary_shift.is_none() {
+            *non_finite_detected = true;
+            attribution.meta.notes.push(
+                "Spot Delta/Gamma has no measurable declared primary spot; attribution flagged invalid".into()
+            );
         }
     }
 }

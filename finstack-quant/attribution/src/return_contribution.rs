@@ -199,7 +199,9 @@ struct BrinsonGroup {
 /// # Errors
 ///
 /// Returns a validation error when the specification violates the
-/// weighting/benchmark invariants.
+/// weighting/benchmark invariants, including a Brinson group with zero net weight
+/// but nonzero contribution. Split offsetting long/short positions into distinct
+/// groups before requesting benchmark-relative attribution.
 pub fn attribute_return_contribution(
     spec: &ReturnContributionSpec,
 ) -> Result<ReturnContributionResult> {
@@ -218,7 +220,9 @@ pub fn attribute_return_contribution(
 /// # Errors
 ///
 /// Returns a validation error when the JSON is malformed or violates the
-/// weighting/benchmark invariants.
+/// weighting/benchmark invariants, including a Brinson group with zero net weight
+/// but nonzero contribution. Split offsetting long/short positions into distinct
+/// groups before requesting benchmark-relative attribution.
 pub fn attribute_return_contribution_json(spec_json: &str) -> Result<String> {
     let spec = parse_return_contribution_spec(spec_json)?;
     let result = attribute_return_contribution(&spec)?;
@@ -692,6 +696,25 @@ fn benchmark_relative(
     for (key, group) in &groups {
         let portfolio_weight = group.portfolio_weight.total();
         let benchmark_weight = group.benchmark_weight.total();
+        for (side, weight, contribution) in [
+            (
+                "portfolio",
+                portfolio_weight,
+                group.portfolio_contribution.total(),
+            ),
+            (
+                "benchmark",
+                benchmark_weight,
+                group.benchmark_contribution.total(),
+            ),
+        ] {
+            if weight.abs() <= WEIGHT_TOLERANCE && contribution.abs() > WEIGHT_TOLERANCE {
+                return Err(Error::Validation(format!(
+                    "Brinson group '{key}' has zero net {side} weight but nonzero return contribution; \
+                     separate long and short positions into distinct groups"
+                )));
+            }
+        }
         // Degenerate-group conventions (Bacon, Practical Portfolio Performance
         // Measurement and Attribution, 2e, Ch. 5): a group absent from the
         // benchmark takes the total benchmark return as its benchmark group

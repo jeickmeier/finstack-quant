@@ -65,7 +65,6 @@ fn translation_t0_value(
     as_of_t0: Date,
     model_params_t0: Option<&ModelParamsSnapshot>,
     rounding_probe_value: Option<Money>,
-    notes: &mut Vec<String>,
     num_repricings: &mut usize,
 ) -> Result<Money> {
     if model_params_t0.is_none() {
@@ -75,16 +74,7 @@ fn translation_t0_value(
     }
 
     let t0_instrument = match model_params_t0 {
-        Some(params) => match crate::model_params::with_model_params(instrument, params) {
-            Ok(instrument) => instrument,
-            Err(error) => {
-                notes.push(format!(
-                    "target_currency translation: T0 model-parameter application \
-                     failed ({error}); using T1-parameter instrument for val_t0"
-                ));
-                std::sync::Arc::clone(instrument)
-            }
-        },
+        Some(params) => crate::model_params::with_model_params(instrument, params)?,
         None => std::sync::Arc::clone(instrument),
     };
     let value = t0_instrument.value(market_t0, as_of_t0)?;
@@ -139,6 +129,7 @@ impl AttributionSpec {
     /// metrics-based method, unknown configured metric names are rejected
     /// before valuation.
     pub fn execute(&self) -> Result<AttributionResult> {
+        crate::helpers::validate_attribution_period(self.as_of_t0, self.as_of_t1)?;
         let instrument = self.instrument.clone().into_boxed()?;
         let instrument_arc: std::sync::Arc<dyn Instrument> = std::sync::Arc::from(instrument);
 
@@ -198,6 +189,19 @@ impl AttributionSpec {
             | AttributionMethod::Taylor(_) => crate::attribute_pnl(&self.method, &request)?,
 
             AttributionMethod::MetricsBased => {
+                let instrument_t0 = match &self.model_params_t0 {
+                    Some(params) => {
+                        crate::model_params::with_model_params(&instrument_arc, params)?
+                    }
+                    None => std::sync::Arc::clone(&instrument_arc),
+                };
+                let mut metrics_instrument = instrument_t0.clone_box();
+                if let Some(overrides) = metrics_instrument.get_metric_pricing_overrides_mut() {
+                    overrides.theta_period =
+                        Some(format!("{}D", (self.as_of_t1 - self.as_of_t0).whole_days()));
+                }
+                let metrics_instrument: std::sync::Arc<dyn Instrument> =
+                    std::sync::Arc::from(metrics_instrument);
                 let metrics = if let Some(ref cfg) = self.config {
                     if let Some(ref metric_names) = cfg.metrics {
                         let mut parsed = Vec::new();
@@ -237,7 +241,7 @@ impl AttributionSpec {
                         .with_recalibration_provider(std::sync::Arc::new(
                             CachedRecalibrationProvider::new(),
                         ));
-                let val_t0 = instrument_arc.price_with_metrics(
+                let val_t0 = metrics_instrument.price_with_metrics(
                     &market_t0,
                     self.as_of_t0,
                     &metrics,
@@ -246,21 +250,32 @@ impl AttributionSpec {
                 let val_t1 = instrument_arc.price_with_metrics(
                     &market_t1,
                     self.as_of_t1,
-                    &metrics,
+                    &[],
                     pricing_options,
                 )?;
 
-                attribute_pnl_metrics_based(
-                    &instrument_arc,
+                let mut result = attribute_pnl_metrics_based(
+                    &metrics_instrument,
                     &market_t0,
                     &market_t1,
                     &val_t0,
                     &val_t1,
                     self.as_of_t0,
                     self.as_of_t1,
-                )?
+                )?;
+                result.meta.num_repricings = 2;
+                if self.model_params_t0.is_some() {
+                    let closing_value_opening_params =
+                        instrument_t0.value(&market_t1, self.as_of_t1)?;
+                    result.model_params_pnl =
+                        val_t1.value.checked_sub(closing_value_opening_params)?;
+                    result.meta.num_repricings += 1;
+                }
+                result
             }
         };
+        attribution.meta.rounding = finstack_quant_core::config::rounding_context_from(&config);
+        attribution.compute_residual()?;
         attribution.meta.num_repricings += rounding_probe.successful_valuations();
 
         if let Some(ref cfg) = self.config {
@@ -349,36 +364,23 @@ impl AttributionSpec {
         if let Some(target_currency) =
             target_currency_requiring_translation(configured_target, &attribution)
         {
-            match translation_t0_value(
+            let val_t0_native = translation_t0_value(
                 &instrument_arc,
                 &market_t0,
                 self.as_of_t0,
                 self.model_params_t0.as_ref(),
                 rounding_probe.value,
-                &mut attribution.meta.notes,
                 &mut attribution.meta.num_repricings,
-            ) {
-                Ok(val_t0_native) => {
-                    match crate::translate_to_target_currency(
-                        &mut attribution,
-                        val_t0_native,
-                        target_currency,
-                        &market_t0,
-                        &market_t1,
-                        self.as_of_t0,
-                        self.as_of_t1,
-                    ) {
-                        Ok(()) => {}
-                        Err(e) => attribution
-                            .meta
-                            .notes
-                            .push(format!("target_currency translation failed: {e}")),
-                    }
-                }
-                Err(e) => attribution.meta.notes.push(format!(
-                    "target_currency translation skipped: T0 reprice failed - {e}"
-                )),
-            }
+            )?;
+            crate::translate_to_target_currency(
+                &mut attribution,
+                val_t0_native,
+                target_currency,
+                &market_t0,
+                &market_t1,
+                self.as_of_t0,
+                self.as_of_t1,
+            )?;
         }
 
         let results_meta = finstack_quant_core::config::results_meta(&config);
@@ -616,7 +618,6 @@ mod tests {
         let instrument_arc: Arc<dyn Instrument> = Arc::new(instrument.clone());
         let market = MarketContext::new();
         let probe = Money::from((100_i64, Currency::EUR));
-        let mut notes = Vec::new();
         let mut num_repricings = 1;
 
         let reused = translation_t0_value(
@@ -625,7 +626,6 @@ mod tests {
             date!(2025 - 01 - 01),
             None,
             Some(probe),
-            &mut notes,
             &mut num_repricings,
         )
         .expect("probe should be reusable");
@@ -640,7 +640,6 @@ mod tests {
             date!(2025 - 01 - 01),
             Some(&ModelParamsSnapshot::None),
             Some(probe),
-            &mut notes,
             &mut num_repricings,
         )
         .expect("model-parameter path should reprice");

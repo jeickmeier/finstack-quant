@@ -215,7 +215,8 @@ pub struct AttributionRequest<'a> {
     /// Closing valuation date.
     pub as_of_t1: Date,
     /// Finstack configuration (rounding context, sensitivity bump sizes).
-    /// The Taylor method reads its own [`TaylorAttributionConfig`] instead.
+    /// Taylor uses this rounding context and its own [`TaylorAttributionConfig`]
+    /// for numerical bump sizes.
     pub config: &'a FinstackConfig,
     /// Scheduling policy for independent factor repricings. Waterfall is
     /// always serial and stamps `Serial` regardless of this value.

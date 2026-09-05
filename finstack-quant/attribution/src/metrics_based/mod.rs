@@ -6,7 +6,7 @@
 //!
 //! # Algorithm (Enhanced with Second-Order and Bucketed Metrics)
 //!
-//! 1. **Carry**: Theta × time_period
+//! 1. **Carry**: Total-return Theta over the matching attribution horizon
 //! 2. **RatesCurves**:
 //!    - Per-curve (if BucketedDv01 available): Σ(DV01_i × Δr_i) for each curve i
 //!    - Fallback (aggregate DV01): DV01 × avg(Δr_i)
@@ -28,6 +28,14 @@
 //!    - Second-order: ½ × InflationConvexity × (Δi)²
 //!   8. **ModelParameters**: Param01 metrics × param_shift
 //!   9. **Residual**: Total P&L - sum(approximations)
+//!
+//! Aggregate Delta/Gamma and spot cross-Gamma use the first declared market scalar,
+//! matching the sensitivity producer. Vega uses the instrument expiry and declared
+//! reference strike; absent a reference point, only uniform surface moves are
+//! supported. Differing moves across multiple vol sources flag the result invalid.
+//! Precomputed Theta must match the attribution horizon, even when CouponIncome is
+//! supplied; the spec executor requests that horizon from the producer. Cashflow
+//! collection and payment-date FX conversion failures are returned to the caller.
 //!
 //! # Advantages (Enhanced)
 //!
@@ -56,7 +64,7 @@
 //! | CsGamma             | $ / decimal²    | Dollar second derivative ∂²V/∂s² (spread in decimal)      |
 //! | Vega                | $ / vol point   | Dollar change per 1% absolute vol shift                   |
 //! | Volga               | $ / vol point²  | Dollar second derivative per vol point²                   |
-//! | Theta               | $ / day         | Dollar time decay per calendar day                        |
+//! | Theta               | $ / period      | Total-return carry over `theta_period_days`               |
 //! | Inflation01         | $ / bp          | Dollar change per 1bp inflation-curve shift               |
 //! | InflationConvexity  | $ / decimal²    | Dollar second derivative ∂²V/∂i² (inflation in decimal)   |
 //!

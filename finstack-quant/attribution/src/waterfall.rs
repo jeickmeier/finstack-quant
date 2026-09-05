@@ -350,9 +350,6 @@ pub(crate) fn attribute_pnl_waterfall(
                 for w in &carry_inputs.warnings {
                     attribution.meta.notes.push(w.clone());
                 }
-                if carry_inputs.invalid {
-                    attribution.result_invalid = true;
-                }
                 // `total_return_carry_inputs` performed extra `price_with_metrics`
                 // repricings (Accrued×2, YTM, flat-curve value×2) — count one.
                 ctx.count_extra_repricing();
@@ -617,7 +614,12 @@ impl<'a> WaterfallContext<'a> {
                 ))
             }
         };
-        let family_t1 = MarketSnapshot::extract(self.market_t1, flags);
+        let dependencies = self.current_instrument.market_dependencies()?;
+        let family_t1 = MarketSnapshot::extract_with_credit_roles(
+            self.market_t1,
+            flags,
+            &dependencies.curves.credit_curves,
+        );
         Ok(MarketSnapshot::restore_market(
             &self.current_market,
             &family_t1,

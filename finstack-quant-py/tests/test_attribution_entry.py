@@ -268,3 +268,64 @@ def test_attribute_return_contribution_json_entrypoint() -> None:
     relative = result.benchmark_relative
     assert relative is not None
     assert relative["residual"] == pytest.approx(0.0, abs=1e-12)
+
+
+def test_requested_reporting_currency_requires_fx() -> None:
+    with pytest.raises(KeyError, match="fx"):
+        attribute_pnl(
+            _bond_json(),
+            _market_json(AS_OF_T0),
+            _market_json(AS_OF_T1),
+            AS_OF_T0,
+            AS_OF_T1,
+            "parallel",
+            config={"target_currency": "EUR"},
+        )
+
+
+@pytest.mark.parametrize("method", ["metrics_based", {"taylor": {}}])
+def test_spec_methods_preserve_configured_rounding(method: object) -> None:
+    attr = attribute_pnl(
+        _bond_json(),
+        _market_json(AS_OF_T0),
+        _market_json(AS_OF_T1),
+        AS_OF_T0,
+        AS_OF_T1,
+        method,
+        config={"rounding_scale": 4, "metrics": ["dv01"]},
+    )
+    assert json.loads(attr.to_json())["meta"]["rounding"]["output_scale_by_currency"]["USD"] == 4
+
+
+def test_brinson_rejects_offsetting_group() -> None:
+    spec = {
+        "as_of": AS_OF_T0,
+        "positions": [
+            {
+                "id": "L",
+                "weight": 0.5,
+                "return": 0.1,
+                "groups": {"sector": "tech"},
+                "benchmark_weight": 0.5,
+                "benchmark_return": 0.0,
+            },
+            {
+                "id": "S",
+                "weight": -0.5,
+                "return": 0.0,
+                "groups": {"sector": "tech"},
+                "benchmark_weight": 0.5,
+                "benchmark_return": 0.0,
+            },
+            {
+                "id": "C",
+                "weight": 1.0,
+                "return": 0.0,
+                "groups": {"sector": "cash"},
+                "benchmark_weight": 0.0,
+                "benchmark_return": 0.0,
+            },
+        ],
+    }
+    with pytest.raises(ValueError, match="zero net portfolio weight"):
+        attribute_return_contribution(spec)

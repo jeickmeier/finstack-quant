@@ -31,6 +31,7 @@ use super::model_params;
 use super::types::*;
 use crate::policy_map::map_policy;
 use crate::AttributionRequest;
+use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -44,6 +45,9 @@ use finstack_quant_models::volatility::measure_vol_surface_shift;
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::bump_surface_vol_absolute;
+use finstack_quant_valuations::recalibration::{
+    HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -342,13 +346,14 @@ fn compute_taylor_result(
     let gamma_repricings = if config.include_gamma { 2 } else { 0 };
 
     // Rate sensitivities (parallel DV01 per discount curve)
-    let market_deps = instrument.market_dependencies()?;
+    let market_deps = instrument_t0.market_dependencies()?;
+    let recalibration_provider = CachedRecalibrationProvider::new();
     let compute_rate = |curve_id: &CurveId| {
         (
             curve_id.clone(),
             compute_curve_factor(
                 CurveKind::Discount,
-                instrument,
+                &instrument_t0,
                 market_t0,
                 market_t1,
                 as_of_t0,
@@ -383,7 +388,7 @@ fn compute_taylor_result(
             curve_id.clone(),
             compute_curve_factor(
                 CurveKind::Forward,
-                instrument,
+                &instrument_t0,
                 market_t0,
                 market_t1,
                 as_of_t0,
@@ -423,15 +428,23 @@ fn compute_taylor_result(
     let credit_keyrate = if credit_curves.is_empty() {
         None
     } else {
-        instrument
+        instrument_t0
             .price_with_metrics(
                 market_t0,
                 as_of_t0,
                 &[finstack_quant_valuations::metrics::MetricId::BucketedCs01],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations::instruments::PricingOptions::default()
+                    .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new())),
             )
-            .ok()
             .map(|vr| extract_keyrate_per_curve(&vr.measures, credit_curves, "bucketed_cs01"))
+            .map_err(|error| {
+                result_invalid = true;
+                notes.push(format!(
+                    "Taylor bucketed credit sensitivities failed: {error}"
+                ));
+                error
+            })
+            .ok()
     };
     let compute_credit = |curve_id: &CurveId| {
         let keyrate = credit_keyrate
@@ -441,7 +454,7 @@ fn compute_taylor_result(
         (
             curve_id.clone(),
             compute_credit_factor(CreditFactorInputs {
-                instrument,
+                instrument: &instrument_t0,
                 market_t0,
                 market_t1,
                 as_of_t0,
@@ -449,6 +462,7 @@ fn compute_taylor_result(
                 curve_id,
                 config,
                 keyrate,
+                recalibration_provider: &recalibration_provider,
             }),
         )
     };
@@ -476,11 +490,20 @@ fn compute_taylor_result(
     // when available; otherwise it falls back to the surface average and the
     // fallback is recorded in the notes, because an averaged move nets a
     // term-structure twist toward zero.
-    let reference_expiry_years = instrument
+    let reference_expiry_years = instrument_t0
         .expiry()
         .map(|expiry| (expiry - as_of_t0).whole_days() as f64 / 365.0)
         .filter(|t| *t > 0.0);
-    for dependency in &market_deps.volatility_dependencies {
+    let surface_dependencies: Vec<_> = market_deps
+        .volatility_dependencies
+        .iter()
+        .filter(|dep| {
+            market_t0.get_surface(dep.vol_surface_id.as_str()).is_ok()
+                || market_t1.get_surface(dep.vol_surface_id.as_str()).is_ok()
+        })
+        .cloned()
+        .collect();
+    for dependency in &surface_dependencies {
         if reference_expiry_years.is_none() || dependency.reference_strike.is_none() {
             notes.push(format!(
                 "Taylor vol factor '{}': no reference expiry/strike available; \
@@ -494,7 +517,7 @@ fn compute_taylor_result(
             (
                 dependency.vol_surface_id.clone(),
                 compute_vol_factor(
-                    instrument,
+                    &instrument_t0,
                     market_t0,
                     market_t1,
                     as_of_t0,
@@ -505,11 +528,7 @@ fn compute_taylor_result(
                 ),
             )
         };
-    let vol_results = map_policy(
-        execution_policy,
-        &market_deps.volatility_dependencies,
-        compute_vol,
-    );
+    let vol_results = map_policy(execution_policy, &surface_dependencies, compute_vol);
     for (vol_surface_id, result) in vol_results {
         record_taylor_factor_result(
             "vol",
@@ -713,7 +732,7 @@ fn compute_taylor_result(
 ///
 /// * `request` - Instrument, market states, dates, execution policy,
 ///   optional opening model-parameter snapshot and prepared endpoints. The
-///   request's `FinstackConfig` is not read; rounding is not applied.
+///   request's `FinstackConfig` supplies the result rounding context.
 /// * `config` - Taylor attribution policy, including factor selection, bump
 ///   sizes, and optional gamma treatment.
 ///
@@ -770,7 +789,7 @@ pub(crate) fn attribute_pnl_taylor(
         as_of_t0,
         as_of_t1,
         AttributionMethod::Taylor(config.clone()),
-        None,
+        Some(request.config),
     );
     // Policy-visibility invariant: stamp the execution policy the
     // attribution ran under (workspace rule: results carry the parallel flag).
@@ -854,7 +873,6 @@ pub(crate) fn attribute_pnl_taylor(
                 flat_window_diff: None,
                 funding_cost: None,
                 warnings: Vec::new(),
-                invalid: false,
             };
             apply_total_return_carry(&mut attribution, theta_only, carry_inputs)?;
         }
@@ -918,71 +936,25 @@ struct KeyRateBucket {
     move_bp: f64,
 }
 
-/// Convexity (gamma) P&L from a single **parallel** up/down reprice of
-/// `curve_id`.
-///
-/// The key-rate decomposition is first-order only. Summing per-bucket second
-/// differences captures only the diagonal of the Hessian, and because
-/// triangular bucket weights form a partition of unity (`Σ wᵢ(t) = 1`), an
-/// exposure at a knot between two buckets picks up weight `w` from each bump
-/// so its diagonal terms scale by `Σ wᵢ² < 1` — a 2×
-/// convexity understatement for a knot midway between buckets (w = 0.5/0.5).
-/// Cross-bucket Hessian terms would need O(n²) repricings, so instead the
-/// second-order term comes from one parallel bump:
-///
-/// ```text
-///   γ_par     = (PV(+h) − 2·PV₀ + PV(−h)) / h²         (h = bump_bp)
-///   gamma_pnl = ½ · γ_par · Δ̄²
-/// ```
-///
-/// where `Δ̄` is the sensitivity-weighted average bucket move
-/// `Σ sᵢΔᵢ / Σ sᵢ` (the parallel-equivalent move for this exposure profile),
-/// falling back to the simple mean of the bucket moves when `Σ sᵢ ≈ 0`.
-///
-/// See Press, Teukolsky, Vetterling & Flannery, *Numerical Recipes* (3rd ed.),
-/// §5.7 for the finite-difference step-size / noise-floor considerations that
-/// motivate the bump bounds in [`TaylorAttributionConfig::validate`].
-#[allow(clippy::too_many_arguments)]
-fn parallel_gamma_pnl(
+/// Curvature along the observed factor move, including cross-bucket terms.
+/// The largest coordinate is bumped by at most `bump_bp`; normalization is
+/// independent of signed sensitivities and therefore stable for hedged books.
+fn directional_gamma_pnl(
     instrument: &Arc<dyn Instrument>,
-    market_t0: &MarketContext,
     as_of_t0: Date,
     pv_t0: Money,
-    curve_id: &CurveId,
     bump_bp: f64,
-    sensitivities: &[f64],
     moves_bp: &[f64],
+    bumped_market: impl Fn(f64) -> Result<MarketContext>,
 ) -> Result<f64> {
-    let up = market_t0.bump([MarketBump::Curve {
-        id: curve_id.clone(),
-        spec: BumpSpec::parallel_bp(bump_bp),
-    }])?;
-    let pv_up = reprice_instrument(instrument, &up, as_of_t0)?;
-
-    let down = market_t0.bump([MarketBump::Curve {
-        id: curve_id.clone(),
-        spec: BumpSpec::parallel_bp(-bump_bp),
-    }])?;
-    let pv_down = reprice_instrument(instrument, &down, as_of_t0)?;
-
-    let gamma_par =
-        (pv_up.amount() - 2.0 * pv_t0.amount() + pv_down.amount()) / (bump_bp * bump_bp);
-
-    let total_sens = finstack_quant_core::math::neumaier_sum(sensitivities.iter().copied());
-    let avg_move_bp = if total_sens.abs() > 1e-12 {
-        finstack_quant_core::math::neumaier_sum(
-            sensitivities
-                .iter()
-                .zip(moves_bp.iter())
-                .map(|(s, m)| s * m),
-        ) / total_sens
-    } else if moves_bp.is_empty() {
-        0.0
-    } else {
-        finstack_quant_core::math::neumaier_sum(moves_bp.iter().copied()) / moves_bp.len() as f64
-    };
-
-    Ok(0.5 * gamma_par * avg_move_bp * avg_move_bp)
+    let max_move = moves_bp.iter().map(|m| m.abs()).fold(0.0_f64, f64::max);
+    if max_move == 0.0 {
+        return Ok(0.0);
+    }
+    let scale = (bump_bp / max_move).min(1.0);
+    let up = reprice_instrument(instrument, &bumped_market(scale)?, as_of_t0)?;
+    let down = reprice_instrument(instrument, &bumped_market(-scale)?, as_of_t0)?;
+    Ok(0.5 * (up.amount() - 2.0 * pv_t0.amount() + down.amount()) / scale.powi(2))
 }
 
 /// Triangular key-rate bump spec for bucket `i` of `KEY_RATE_BUCKETS_YEARS`.
@@ -995,15 +967,41 @@ fn parallel_gamma_pnl(
 /// `next = ∞` instead produces a NaN weight for any knot past 30Y and aborts
 /// the whole factor).
 fn key_rate_bump_spec(i: usize, bump_bp: f64) -> BumpSpec {
-    let target = KEY_RATE_BUCKETS_YEARS[i];
-    if i == 0 {
-        return BumpSpec::triangular_key_rate_first_bp(target, KEY_RATE_BUCKETS_YEARS[1], bump_bp);
+    key_rate_bump_on_grid(&KEY_RATE_BUCKETS_YEARS, i, bump_bp)
+}
+
+fn key_rate_bump_on_grid(tenors: &[f64], i: usize, bump_bp: f64) -> BumpSpec {
+    if tenors.len() == 1 {
+        return BumpSpec::parallel_bp(bump_bp);
     }
-    let prev = KEY_RATE_BUCKETS_YEARS[i - 1];
-    if i + 1 == KEY_RATE_BUCKETS_YEARS.len() {
+    let target = tenors[i];
+    if i == 0 {
+        return BumpSpec::triangular_key_rate_first_bp(target, tenors[1], bump_bp);
+    }
+    let prev = tenors[i - 1];
+    if i + 1 == tenors.len() {
         return BumpSpec::triangular_key_rate_last_bp(prev, target, bump_bp);
     }
-    BumpSpec::triangular_key_rate_bp(prev, target, KEY_RATE_BUCKETS_YEARS[i + 1], bump_bp)
+    BumpSpec::triangular_key_rate_bp(prev, target, tenors[i + 1], bump_bp)
+}
+
+/// Compose the bucket bumps on one curve; a batch passed to `MarketContext::bump`
+/// retains only the last bump for each curve ID.
+fn bump_curve_direction(
+    market: &MarketContext,
+    curve_id: &CurveId,
+    tenors: &[f64],
+    moves: &[f64],
+    scale: f64,
+) -> Result<MarketContext> {
+    let mut bumped = market.clone();
+    for (i, movement) in moves.iter().enumerate() {
+        bumped.apply_curve_bump_in_place(
+            curve_id,
+            key_rate_bump_on_grid(tenors, i, movement * scale),
+        )?;
+    }
+    Ok(bumped)
 }
 
 /// Which rates curve family a key-rate factor is measured on.
@@ -1096,22 +1094,22 @@ fn compute_curve_factor(
             / buckets.len() as f64
     };
 
-    // Second-order term from a single parallel reprice (see
-    // `parallel_gamma_pnl`): the key-rate decomposition stays first-order
-    // only, because a per-bucket gamma sum captures just the Hessian diagonal
-    // and understates cross-bucket convexity.
     let gamma_pnl = if config.include_gamma {
-        let dv01s: Vec<f64> = buckets.iter().map(|b| b.dv01).collect();
-        let moves: Vec<f64> = buckets.iter().map(|b| b.move_bp).collect();
-        Some(parallel_gamma_pnl(
+        Some(directional_gamma_pnl(
             instrument,
-            market_t0,
             as_of_t0,
             pv_t0,
-            curve_id,
             config.rate_bump_bp,
-            &dv01s,
-            &moves,
+            &per_tenor_move_bp,
+            |scale| {
+                bump_curve_direction(
+                    market_t0,
+                    curve_id,
+                    &KEY_RATE_BUCKETS_YEARS,
+                    &per_tenor_move_bp,
+                    scale,
+                )
+            },
         )?)
     } else {
         None
@@ -1145,6 +1143,51 @@ fn compute_curve_factor(
 /// explained P&L is the key-rate sum `Σ_tenor CS01_t × Δs_t` — correct for
 /// non-parallel (steepener / twist) credit-curve moves. Otherwise it falls back
 /// to a parallel bump: an aggregate CS01 times the average credit-curve move.
+fn bump_credit_market(
+    market: &MarketContext,
+    curve_id: &CurveId,
+    bump: QuoteBump,
+    provider: &dyn RecalibrationProvider,
+) -> Result<MarketContext> {
+    if let Ok(hazard) = market.get_hazard(curve_id.as_str()) {
+        let recipe = hazard.hazard_calibration().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "Taylor quote-space credit risk requires a calibration recipe for '{curve_id}'"
+            ))
+        })?;
+        let params: finstack_quant_calibration::api::schema::HazardCurveParams =
+            serde_json::from_value(recipe.hazard_params.clone()).map_err(|error| {
+                finstack_quant_core::Error::Validation(format!(
+                    "invalid hazard replay parameters: {error}"
+                ))
+            })?;
+        let source = Arc::new(market.clone());
+        let bumped = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
+            hazard,
+            source_market: Arc::clone(&source),
+            target_market: source,
+            discount_curve_id: params.discount_curve_id,
+            doc_clause: None,
+            cds_valuation_convention: None,
+            deal_quote_override: None,
+            action: HazardRecalibrationAction::SpreadBump(bump),
+        })?;
+        return Ok(market.clone().insert(bumped.as_ref().clone()));
+    }
+    market.get_discount(curve_id.as_str())?;
+    match bump {
+        QuoteBump::ParallelBp(bp) => market.bump([MarketBump::Curve {
+            id: curve_id.clone(),
+            spec: BumpSpec::parallel_bp(bp),
+        }]),
+        QuoteBump::TenorsBp(targets) => {
+            let tenors: Vec<_> = targets.iter().map(|(tenor, _)| *tenor).collect();
+            let moves: Vec<_> = targets.iter().map(|(_, bp)| *bp).collect();
+            bump_curve_direction(market, curve_id, &tenors, &moves, 1.0)
+        }
+    }
+}
+
 struct CreditFactorInputs<'a> {
     instrument: &'a Arc<dyn Instrument>,
     market_t0: &'a MarketContext,
@@ -1154,6 +1197,7 @@ struct CreditFactorInputs<'a> {
     curve_id: &'a CurveId,
     config: &'a TaylorAttributionConfig,
     keyrate: Option<&'a [(f64, f64)]>,
+    recalibration_provider: &'a dyn RecalibrationProvider,
 }
 
 fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorResult> {
@@ -1166,6 +1210,7 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
         curve_id,
         config,
         keyrate,
+        recalibration_provider,
     } = inputs;
 
     // Key-rate path: per-tenor CS01 × per-tenor credit-curve move.
@@ -1185,21 +1230,27 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
         } else {
             finstack_quant_core::math::neumaier_sum(shifts.iter().copied()) / shifts.len() as f64
         };
-        // Credit convexity from a single parallel reprice (see
-        // `parallel_gamma_pnl`), so `include_gamma` yields a second-order term
-        // on the key-rate path just like the parallel-bump fallback below
-        // (previously this path silently dropped credit gamma).
         let gamma_pnl = if config.include_gamma {
-            let cs01s: Vec<f64> = buckets.iter().map(|(_, c)| *c).collect();
-            Some(parallel_gamma_pnl(
+            Some(directional_gamma_pnl(
                 instrument,
-                market_t0,
                 as_of_t0,
                 pv_t0,
-                curve_id,
                 config.credit_bump_bp,
-                &cs01s,
                 &shifts,
+                |scale| {
+                    bump_credit_market(
+                        market_t0,
+                        curve_id,
+                        QuoteBump::TenorsBp(
+                            tenors
+                                .iter()
+                                .zip(&shifts)
+                                .map(|(t, movement)| (*t, movement * scale))
+                                .collect(),
+                        ),
+                        recalibration_provider,
+                    )
+                },
             )?)
         } else {
             None
@@ -1213,20 +1264,21 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
         });
     }
 
-    // Fallback: parallel bump of the credit curve. A `parallel_bp` bump is a
-    // par-spread shock on a hazard curve and a zero-rate shock on a
-    // discount-style credit curve; either way `cs01` and the move below share
-    // that basis, so they pair unit-correctly.
-    let bumped_up = market_t0.bump([MarketBump::Curve {
-        id: curve_id.clone(),
-        spec: BumpSpec::parallel_bp(config.credit_bump_bp),
-    }])?;
+    // Aggregate approximation uses the same quote-space risk definition as
+    // bucketed CS01. A missing replay recipe is an error, never an intensity bump.
+    let bumped_up = bump_credit_market(
+        market_t0,
+        curve_id,
+        QuoteBump::ParallelBp(config.credit_bump_bp),
+        recalibration_provider,
+    )?;
     let pv_up = reprice_instrument(instrument, &bumped_up, as_of_t0)?;
-
-    let bumped_down = market_t0.bump([MarketBump::Curve {
-        id: curve_id.clone(),
-        spec: BumpSpec::parallel_bp(-config.credit_bump_bp),
-    }])?;
+    let bumped_down = bump_credit_market(
+        market_t0,
+        curve_id,
+        QuoteBump::ParallelBp(-config.credit_bump_bp),
+        recalibration_provider,
+    )?;
     let pv_down = reprice_instrument(instrument, &bumped_down, as_of_t0)?;
 
     // Central difference CS01: O(h²) accuracy, $ per bp of credit-curve move.
@@ -2003,6 +2055,8 @@ mod tests {
             tenor: f64,
             notional: f64,
         },
+        /// Long 1Y zero and duration-matched short 5Y zero.
+        HedgedZeros { short_notional: f64 },
         /// `scale × exp(−rate(tenor)·tenor)` read from a forward curve.
         ForwardConvex {
             curve: &'static str,
@@ -2208,6 +2262,13 @@ mod tests {
                     let df = market.get_discount(curve)?.df(*tenor);
                     Ok(Money::new(notional * df, Currency::USD).expect("valid money fixture"))
                 }
+                MockPayoff::HedgedZeros { short_notional } => {
+                    let curve = market.get_discount("HEDGE")?;
+                    Money::new(
+                        1_000_000.0 * curve.df(1.0) - short_notional * curve.df(5.0),
+                        Currency::USD,
+                    )
+                }
                 MockPayoff::ForwardConvex {
                     curve,
                     tenor,
@@ -2402,6 +2463,101 @@ mod tests {
         );
     }
 
+    #[test]
+    fn directional_gamma_is_stable_for_dv01_neutral_twist() {
+        let start = date!(2025 - 01 - 15);
+        let rate = 0.03_f64;
+        let short_notional = 1_000_000.0 * (-rate).exp() / (5.0 * (-5.0 * rate).exp());
+        let mut mock = MockInstrument::new("NEUTRAL", MockPayoff::HedgedZeros { short_notional });
+        mock.discount_curves = vec![CurveId::new("HEDGE")];
+        let instrument: Arc<dyn Instrument> = Arc::new(mock);
+        let opening = MarketContext::new().insert(flat_zero_curve("HEDGE", start, rate));
+        let mut moves = vec![0.0; KEY_RATE_BUCKETS_YEARS.len()];
+        for (tenor, movement) in [(1.0, 10.0), (5.0, -10.0)] {
+            let i = KEY_RATE_BUCKETS_YEARS
+                .iter()
+                .position(|t| *t == tenor)
+                .unwrap();
+            moves[i] = movement;
+        }
+        let closing = bump_curve_direction(
+            &opening,
+            &CurveId::new("HEDGE"),
+            &KEY_RATE_BUCKETS_YEARS,
+            &moves,
+            1.0,
+        )
+        .unwrap();
+        let factor = compute_curve_factor(
+            CurveKind::Discount,
+            &instrument,
+            &opening,
+            &closing,
+            start,
+            instrument.value(&opening, start).unwrap(),
+            &CurveId::new("HEDGE"),
+            &TaylorAttributionConfig {
+                include_gamma: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let expected = 0.5
+            * (1_000_000.0 * (-rate).exp() - 25.0 * short_notional * (-5.0 * rate).exp())
+            * 0.001_f64.powi(2);
+        assert!(
+            factor.sensitivity.abs() < 1e-4,
+            "duration hedge should have negligible net DV01"
+        );
+        assert!(
+            (factor.gamma_pnl.unwrap() - expected).abs() < 1e-3,
+            "{factor:?}, expected {expected}"
+        );
+    }
+
+    #[test]
+    fn total_return_methods_propagate_cashflow_failure() {
+        let start = date!(2025 - 01 - 15);
+        let end = date!(2025 - 02 - 15);
+        let mut mock = MockInstrument::new("BROKEN-CASH", MockPayoff::Constant(1000.0));
+        mock.cashflow_error = Some("cash schedule unavailable");
+        let instrument: Arc<dyn Instrument> = Arc::new(mock);
+        let market = MarketContext::new();
+        let config = finstack_quant_core::config::FinstackConfig::default();
+        for method in [
+            AttributionMethod::Parallel,
+            AttributionMethod::Waterfall(crate::default_waterfall_order()),
+        ] {
+            let error = crate::attribute_pnl(
+                &method,
+                &AttributionRequest::new(&instrument, &market, &market, start, end, &config),
+            )
+            .unwrap_err();
+            assert!(error.to_string().contains("cash schedule unavailable"));
+        }
+        let opening = finstack_quant_valuations::results::ValuationResult::stamped(
+            "BROKEN-CASH",
+            start,
+            Money::from((1000_i64, Currency::USD)),
+        );
+        let closing = finstack_quant_valuations::results::ValuationResult::stamped(
+            "BROKEN-CASH",
+            end,
+            opening.value,
+        );
+        let error = crate::attribute_pnl_metrics_based(
+            &instrument,
+            &market,
+            &market,
+            &opening,
+            &closing,
+            start,
+            end,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("cash schedule unavailable"));
+    }
+
     /// B7 (forward-curve copy): same cross-bucket convexity check for the
     /// forward-curve factor path.
     #[test]
@@ -2458,6 +2614,64 @@ mod tests {
             ((gamma - expected_gamma) / expected_gamma).abs() < 0.01,
             "forward gamma_pnl {gamma:.2} must be within 1% of analytic {expected_gamma:.2}"
         );
+    }
+
+    #[test]
+    fn hazard_credit_bumps_replay_quotes_and_require_recipe() {
+        use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+        let start = date!(2025 - 01 - 15);
+        let discount = flat_zero_curve("USD-OIS", start, 0.03);
+        let convention = CdsConventionKey {
+            currency: Currency::USD,
+            doc_clause: CdsDocClause::IsdaNa,
+        };
+        let hazard = test_utils::calibrated_hazard_curve(
+            &discount,
+            start,
+            "HAZ",
+            "ISSUER",
+            0.4,
+            convention.clone(),
+            &[(1, 100.0), (3, 120.0), (5, 150.0)],
+        )
+        .unwrap();
+        let expected = test_utils::calibrated_hazard_curve(
+            &discount,
+            start,
+            "HAZ",
+            "ISSUER",
+            0.4,
+            convention,
+            &[(1, 110.0), (3, 130.0), (5, 160.0)],
+        )
+        .unwrap();
+        let market = MarketContext::new().insert(discount).insert(hazard);
+        let bumped = bump_credit_market(
+            &market,
+            &CurveId::new("HAZ"),
+            QuoteBump::ParallelBp(10.0),
+            &CachedRecalibrationProvider::new(),
+        )
+        .unwrap();
+        let delivered = bumped.get_hazard("HAZ").unwrap();
+        for tenor in [0.5, 1.0, 2.0, 3.0, 4.0, 5.0] {
+            assert!((delivered.sp(tenor) - expected.sp(tenor)).abs() < 1e-9);
+        }
+        let bare = finstack_quant_core::market_data::term_structures::HazardCurve::builder("BARE")
+            .base_date(start)
+            .recovery_rate(0.4)
+            .knots([(0.0, 0.02), (5.0, 0.02)])
+            .build()
+            .unwrap();
+        let missing = market.insert(bare);
+        let error = bump_credit_market(
+            &missing,
+            &CurveId::new("BARE"),
+            QuoteBump::ParallelBp(10.0),
+            &CachedRecalibrationProvider::new(),
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("calibration recipe"));
     }
 
     /// Credit convexity must not vanish on the BucketedCs01 (key-rate) path:
@@ -2855,7 +3069,7 @@ mod tests {
                 Currency::USD,
                 "coupon schedule unavailable",
             ),
-            (None, Currency::EUR, "Theta cashflow currency mismatch"),
+            (None, Currency::EUR, "fx_matrix"),
         ] {
             let mut mock = MockInstrument::new("FAILED-COUPON", MockPayoff::Constant(1_000_000.0));
             mock.coupon = Some((

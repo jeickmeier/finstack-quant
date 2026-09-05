@@ -475,7 +475,8 @@ pub(crate) fn attribute_pnl_envelope_json(py: Python<'_>, spec_json: &str) -> Py
 /// ValueError
 ///     If the spec is malformed, ``as_of`` is missing for a DataFrame,
 ///     positions are empty, weighting modes are mixed, or benchmark inputs
-///     are incomplete.
+///     are incomplete, or a Brinson group has zero net weight but nonzero
+///     return contribution. Split offsetting long/short positions into distinct groups.
 /// TypeError
 ///     If ``spec`` is none of ``dict``, ``str``, ``pandas.DataFrame``.
 ///

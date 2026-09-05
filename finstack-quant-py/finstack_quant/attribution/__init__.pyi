@@ -1641,7 +1641,8 @@ def attribute_return_contribution(
         required identifiers or positions are empty; numeric inputs are
         non-finite; position weighting modes are mixed or incomplete; factor
         or benchmark inputs are incomplete; or benchmark-relative weights do
-        not sum to one.
+        not sum to one; or a Brinson group has zero net weight but nonzero
+        return contribution. Split offsetting long/short positions into distinct groups.
     TypeError
         If ``spec`` is none of ``dict``, ``str``, ``pandas.DataFrame``.
     RuntimeError

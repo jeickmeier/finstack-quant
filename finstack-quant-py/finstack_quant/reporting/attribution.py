@@ -221,7 +221,7 @@ def attribution_tearsheet(
             fmt.sign_class(attribution.mark_to_market_pnl),
         ),
         KPI("Carry", fmt.money(attribution.carry, cur, dp=0), fmt.sign_class(attribution.carry)),
-        KPI("Residual", fmt.pct(attribution.residual_pct, dp=2), ""),
+        KPI("Residual", fmt.money(attribution.residual, cur, dp=2), ""),
         KPI("Repricings", str(attribution.num_repricings), ""),
     ]
     meta_lines = [
@@ -231,8 +231,10 @@ def attribution_tearsheet(
         f"Currency {cur}",
     ]
     if attribution.result_invalid:
-        meta_lines.append("⚠ Attribution flagged invalid (residual outside tolerance)")
-    elif attribution.notes:
+        meta_lines.append("⚠ Attribution calculation flagged invalid")
+    elif not attribution.residual_within_tolerance():
+        meta_lines.append("⚠ Attribution residual outside tolerance")
+    if attribution.notes:
         meta_lines.append("⚠ " + "; ".join(str(n) for n in attribution.notes))
 
     return TearSheet(
