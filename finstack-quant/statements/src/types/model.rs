@@ -306,8 +306,15 @@ impl FinancialModelSpec {
         for node in self.nodes.values_mut() {
             if let Some(values) = &node.values {
                 let inferred = crate::types::infer_series_value_type(values.values())?;
-                if node.value_type.is_none() {
-                    node.value_type = inferred;
+                match (node.value_type, inferred) {
+                    (Some(declared), Some(actual)) if declared != actual => {
+                        return Err(Error::build(format!(
+                            "Node '{}' declares {declared:?} but its explicit values have type {actual:?}",
+                            node.node_id
+                        )));
+                    }
+                    (None, inferred) => node.value_type = inferred,
+                    _ => {}
                 }
             }
         }

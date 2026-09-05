@@ -51,11 +51,13 @@ pub struct StatementResult {
     /// Required wire-format schema version. Only numeric `1` is accepted.
     pub schema_version: SchemaVersion,
 
-    /// Map of node_id → (period_id → value) [f64 for scalar results]
+    /// Map of node_id → (period_id → value). Native values are f64; JSON uses
+    /// numbers for finite values and `"nan"`, `"inf"`, `"-inf"` for non-finite cells.
     #[cfg_attr(
         feature = "json-schema",
-        schemars(with = "IndexMap<String, IndexMap<String, f64>>")
+        schemars(with = "IndexMap<String, IndexMap<String, ResultNumber>>")
     )]
+    #[serde(with = "result_numbers")]
     pub nodes: IndexMap<String, IndexMap<PeriodId, f64>>,
 
     /// Map of node_id → (period_id → Money) for monetary nodes
@@ -468,7 +470,9 @@ pub enum EvalWarning {
         /// Period in which the warning occurred.
         #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
         period: PeriodId,
-        /// The actual non-finite value (NaN, Inf, or -Inf).
+        /// The actual non-finite value, encoded as `"nan"`, `"inf"`, or `"-inf"`.
+        #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+        #[cfg_attr(feature = "json-schema", schemars(with = "ResultNumber"))]
         value: f64,
     },
     /// Capital-structure extraction or waterfall processing required a guarded fallback.
@@ -496,4 +500,54 @@ pub enum EvalWarning {
         /// Number of non-finite inputs dropped.
         count: usize,
     },
+}
+
+// Adapt the scalar core wire contract to the nested period map without changing
+// the native f64 API used by calculations and host-language accessors.
+#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(transparent)]
+struct ResultNumber(
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "serde_json::Value", extend("oneOf" = [{"type": "number"}, {"enum": ["nan", "inf", "-inf"]}])))]
+    f64,
+);
+
+mod result_numbers {
+    use super::*;
+    pub fn serialize<S: serde::Serializer>(
+        values: &IndexMap<String, IndexMap<PeriodId, f64>>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        let wire: IndexMap<_, IndexMap<_, _>> = values
+            .iter()
+            .map(|(node, periods)| {
+                (
+                    node,
+                    periods
+                        .iter()
+                        .map(|(period, value)| (period, ResultNumber(*value)))
+                        .collect(),
+                )
+            })
+            .collect();
+        wire.serialize(serializer)
+    }
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<IndexMap<String, IndexMap<PeriodId, f64>>, D::Error> {
+        let wire = IndexMap::<String, IndexMap<PeriodId, ResultNumber>>::deserialize(deserializer)?;
+        Ok(wire
+            .into_iter()
+            .map(|(node, periods)| {
+                (
+                    node,
+                    periods
+                        .into_iter()
+                        .map(|(period, value)| (period, value.0))
+                        .collect(),
+                )
+            })
+            .collect())
+    }
 }

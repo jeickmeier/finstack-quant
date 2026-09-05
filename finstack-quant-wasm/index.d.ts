@@ -8725,9 +8725,10 @@ export declare const attribution: AttributionNamespace;
  */
 export interface StatementResultJson {
   /**
-   * Evaluated node values keyed by node id.
+   * Evaluated values keyed by node id and period. Missing/non-finite numeric
+   * results use canonical strings "nan", "inf", or "-inf" and survive JSON.stringify.
    */
-  nodes: Record<string, unknown>;
+  nodes: Record<string, Record<string, number | 'nan' | 'inf' | '-inf'>>;
   /**
    * Audit stamp: numeric mode, rounding context, and FX policy in force.
    */

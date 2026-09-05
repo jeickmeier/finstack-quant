@@ -321,6 +321,8 @@ mod period_flow_waterfall_integration {
             .insert("TL-PIK".to_string(), instrument.schedule.clone());
 
         let mut last_pik = 0.0;
+        let mut capitalizations: Vec<(Date, f64)> = Vec::new();
+        let mut expected_balance = notional;
         for i in 0..8u8 {
             let year = 2025 + i32::from(i / 4);
             let q = (i % 4) + 1;
@@ -364,6 +366,29 @@ mod period_flow_waterfall_integration {
             let result = execute_waterfall(&period.id, &ctx, &waterfall, &mut state, &contractual)
                 .expect("waterfall");
             last_pik = result.flows["TL-PIK"].interest_expense_pik.amount();
+            let coupon = &instrument.schedule.get_flows()[i as usize];
+            let start = if i == 0 {
+                issue
+            } else {
+                instrument.schedule.get_flows()[i as usize - 1].date
+            };
+            let days = (coupon.date - start).whole_days() as f64;
+            let expected = notional * rate_q
+                + capitalizations
+                    .iter()
+                    .map(|(date, amount)| {
+                        amount
+                            * rate_q
+                            * (coupon.date - (*date).max(start)).whole_days().max(0) as f64
+                            / days
+                    })
+                    .sum::<f64>();
+            assert!(
+                (last_pik - expected).abs() < 1e-6,
+                "quarter {i}: {last_pik} versus {expected}"
+            );
+            expected_balance += expected;
+            capitalizations.push((period.end, expected));
 
             let snapshot = period.end - time::Duration::days(1);
             state
@@ -372,12 +397,6 @@ mod period_flow_waterfall_integration {
             state.advance_period();
         }
 
-        // Quarter 8 PIK coupon = 2% of the balance compounded for 7 quarters.
-        let expected_q8 = notional * rate_q * (1.0 + rate_q).powi(7);
-        assert!(
-            (last_pik - expected_q8).abs() < 1e-6,
-            "Q8 PIK interest should compound to {expected_q8}, got {last_pik}"
-        );
         // The old clamp froze interest at 1.10 × the original coupon (22,000).
         assert!(
             last_pik > notional * rate_q * 1.10 + 1e-9,
@@ -389,15 +408,13 @@ mod period_flow_waterfall_integration {
             .get("TL-PIK")
             .expect("balance after 8 quarters")
             .amount();
-        let expected_balance = notional * (1.0 + rate_q).powi(8);
         assert!(
             (closing - expected_balance).abs() < 1e-6,
             "balance should compound to {expected_balance}, got {closing}"
         );
     }
 
-    /// Sweep 50% of a 1M term loan at 8% quarterly: next-period cash interest
-    /// is the rebuilt coupon `500k × 0.08 × 0.25`, not a scale of the original.
+    /// A mid-accrual sweep reduces only interest earned after the sweep date.
     #[test]
     fn sweep_rebuilds_next_period_coupon_on_new_outstanding() {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
@@ -488,20 +505,20 @@ mod period_flow_waterfall_integration {
             .rebuild_residuals(q1.end - time::Duration::days(1))
             .expect("rebuild after sweep");
 
-        let rebuilt_q2 = state
-            .residual_schedules
-            .get("TL-1")
-            .expect("residual")
+        let coupon_date = Date::from_calendar_date(2025, Month::May, 15).unwrap();
+        let prior_coupon = Date::from_calendar_date(2025, Month::February, 15).unwrap();
+        let remaining_fraction = (coupon_date - q1.end).whole_days() as f64
+            / (coupon_date - prior_coupon).whole_days() as f64;
+        let expected_coupon = 20_000.0 - 10_000.0 * remaining_fraction;
+        let rebuilt_q2: f64 = state.residual_schedules["TL-1"]
             .get_flows()
             .iter()
-            .find(|cf| {
-                cf.date == Date::from_calendar_date(2025, Month::May, 15).expect("valid date")
-            })
-            .expect("q2 coupon");
+            .filter(|flow| flow.date == coupon_date)
+            .map(|flow| flow.amount.amount().abs())
+            .sum();
         assert!(
-            (rebuilt_q2.amount.amount().abs() - 10_000.0).abs() < 1e-6,
-            "rebuilt coupon must be 500k × 0.08 × 0.25, got {}",
-            rebuilt_q2.amount.amount()
+            (rebuilt_q2 - expected_coupon).abs() < 1e-6,
+            "preserve interest earned before the sweep"
         );
 
         state.advance_period();
@@ -522,8 +539,8 @@ mod period_flow_waterfall_integration {
             "rebuilt residual must not emit a scale warning, got {q2_warnings:?}"
         );
         assert!(
-            (q2_flows.interest_expense_cash.amount() - 10_000.0).abs() < 1e-6,
-            "q2 cash interest must be the rebuilt 10k, got {}",
+            (q2_flows.interest_expense_cash.amount() - expected_coupon).abs() < 1e-6,
+            "q2 cash interest must preserve the pre-sweep accrual, got {}",
             q2_flows.interest_expense_cash.amount()
         );
     }

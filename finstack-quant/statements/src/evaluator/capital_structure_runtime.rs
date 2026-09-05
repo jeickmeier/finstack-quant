@@ -384,7 +384,7 @@ fn recompute_cs_totals(
         cashflows.totals_by_currency.insert(*currency, period_map);
     }
 
-    if totals_by_currency.len() == 1 {
+    if totals_by_currency.len() == 1 && fx_ctx.and_then(|ctx| ctx.reporting_currency).is_none() {
         if let Some((&currency, breakdown)) = totals_by_currency.iter().next() {
             cashflows.reporting_currency = Some(currency);
             cashflows.totals.insert(period_id, breakdown.clone());

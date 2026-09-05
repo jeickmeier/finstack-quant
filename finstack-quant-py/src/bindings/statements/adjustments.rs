@@ -365,6 +365,26 @@ impl PyNormalizationResult {
         self.inner.period.to_string()
     }
 
+    /// Unit classification of the base, adjustments, and final value.
+    #[getter]
+    fn value_type(&self) -> &'static str {
+        match self.inner.value_type {
+            finstack_quant_statements::types::NodeValueType::Monetary { .. } => "monetary",
+            finstack_quant_statements::types::NodeValueType::Scalar => "scalar",
+        }
+    }
+
+    /// ISO currency of every amount in this normalization result, or None for scalars.
+    #[getter]
+    fn currency(&self) -> Option<String> {
+        match self.inner.value_type {
+            finstack_quant_statements::types::NodeValueType::Monetary { currency } => {
+                Some(currency.to_string())
+            }
+            finstack_quant_statements::types::NodeValueType::Scalar => None,
+        }
+    }
+
     /// Reported value before normalization adjustments.
     #[getter]
     fn base_value(&self) -> f64 {

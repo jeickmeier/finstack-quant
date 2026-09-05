@@ -125,15 +125,15 @@ impl CapitalStructureState {
         self.opening_balances = std::mem::take(&mut self.closing_balances);
     }
 
-    /// Rebuild remaining interest on every residual schedule from the current
-    /// closing outstanding.
+    /// Reproject future interest only when closing outstanding differs from
+    /// the contractual schedule. Preserve all interest earned before the change.
     ///
     /// # Arguments
     ///
     /// * `from_date` - Inclusive period-end snapshot (`period.end - 1 day`).
-    ///   Interest flows dated after this date are rewritten onto each
-    ///   instrument's closing outstanding; scheduled amort, draws, and fees
-    ///   stay in place.
+    ///   Principal changes affect accrual from the following day. Past flows
+    ///   remain as accrual anchors; future coupons retain dated amortization,
+    ///   draw, and PIK effects. Repayments cannot exceed remaining principal.
     ///
     /// # Errors
     ///

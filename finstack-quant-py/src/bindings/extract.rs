@@ -170,8 +170,11 @@ pub fn extract_model_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ModelAccess<'
         return Ok(ModelAccess::Borrowed(spec.borrow()));
     }
     let json: String = obj.extract()?;
-    let inner: finstack_quant_statements::FinancialModelSpec =
+    let mut inner: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(&json).map_err(to_py)?;
+    inner
+        .validate_semantics()
+        .map_err(crate::errors::statements_to_py)?;
     Ok(ModelAccess::Owned(Box::new(inner)))
 }
 

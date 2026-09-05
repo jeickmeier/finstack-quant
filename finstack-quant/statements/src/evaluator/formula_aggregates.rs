@@ -344,9 +344,28 @@ fn evaluate_period_aggregate_function(
         Function::Ttm => {
             require_args("ttm", args, 1, node_id)?;
             let window = context.period_kind.periods_per_year() as usize;
-            let values = collect_window_values(&args[0], context, window, node_id)?;
-            if values.len() < window || !values.iter().all(|value| value.is_finite()) {
-                return Ok(f64::NAN);
+            // Evaluate precisely the calendar slots, excluding intervening
+            // observations at other frequencies and refusing missing periods.
+            let mut values = Vec::with_capacity(window);
+            for offset in (0..window).rev() {
+                let Some(period) =
+                    super::formula_timeseries::offset_period(context.period_id, -(offset as i32))
+                else {
+                    return Ok(f64::NAN);
+                };
+                let value = if offset == 0 {
+                    super::formula::evaluate_formula(&args[0], context, node_id)?
+                } else {
+                    if !context.history.contains_key(&period) {
+                        return Ok(f64::NAN);
+                    }
+                    let mut historical = super::formula::build_context_for_period(period, context)?;
+                    super::formula::evaluate_formula(&args[0], &mut historical, node_id)?
+                };
+                if !value.is_finite() {
+                    return Ok(f64::NAN);
+                }
+                values.push(value);
             }
             Ok(sum_finite_or_nan(&values))
         }

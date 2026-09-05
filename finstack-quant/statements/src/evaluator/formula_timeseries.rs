@@ -10,7 +10,7 @@ use crate::error::Result;
 use crate::evaluator::context::EvaluationContext;
 use crate::evaluator::formula::{
     build_context_for_period, eval_error, evaluate_formula, evaluate_integer_arg,
-    evaluate_non_negative_integer_arg, map_err_with_node, require_args,
+    evaluate_non_negative_integer_arg, require_args,
 };
 use crate::evaluator::formula_helpers::get_historical_column_value;
 use crate::evaluator::results::EvalWarning;
@@ -18,35 +18,45 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::expr::{Expr, ExprNode};
 use finstack_quant_core::math::ZERO_TOLERANCE;
 
-/// Offset a `PeriodId` by `offset` periods (positive = forward, negative = backward).
-///
-/// `max_steps` bounds the walk: stepping more than the available history can
-/// only reach a period with no data (which every caller maps to `NaN`), so the
-/// walk is clamped to `max_steps`. This prevents a pathological offset such as
-/// `lag(x, 2_000_000_000)` — capped only at `i32::MAX` upstream — from walking
-/// billions of `PeriodId::prev()` calls and effectively hanging evaluation.
-pub(crate) fn offset_period(
-    period: PeriodId,
-    offset: i32,
-    max_steps: usize,
-    node_id: Option<&str>,
-) -> Result<PeriodId> {
-    if offset == 0 {
-        return Ok(period);
+/// Offset exactly in calendar periods, independent of the number of stored observations.
+/// Out-of-range dates have no observation and return `None` without a linear walk.
+pub(crate) fn offset_period(mut period: PeriodId, offset: i32) -> Option<PeriodId> {
+    use finstack_quant_core::dates::PeriodKind;
+    use time::{Date, Duration, Weekday};
+    if period.is_fiscal() {
+        // Fiscal daily/week lengths require a fiscal calendar, unavailable here.
+        if matches!(period.kind(), PeriodKind::Daily | PeriodKind::Weekly) {
+            return None;
+        }
     }
-
-    let mut result = period;
-    let steps = (offset.unsigned_abs() as usize).min(max_steps);
-
-    for _ in 0..steps {
-        result = if offset > 0 {
-            map_err_with_node(result.next(), node_id)?
-        } else {
-            map_err_with_node(result.prev(), node_id)?
-        };
+    match period.kind() {
+        PeriodKind::Daily | PeriodKind::Weekly => {
+            let (date, days) = if period.kind() == PeriodKind::Daily {
+                (
+                    Date::from_ordinal_date(period.year, period.index).ok()?,
+                    i64::from(offset),
+                )
+            } else {
+                (
+                    Date::from_iso_week_date(period.year, period.index as u8, Weekday::Monday)
+                        .ok()?,
+                    i64::from(offset) * 7,
+                )
+            };
+            Some(PeriodId::from_date(
+                date.checked_add(Duration::days(days))?,
+                period.kind(),
+            ))
+        }
+        _ => {
+            let n = i64::from(period.periods_per_year());
+            let ordinal =
+                i64::from(period.year) * n + i64::from(period.index) - 1 + i64::from(offset);
+            period.year = i32::try_from(ordinal.div_euclid(n)).ok()?;
+            period.index = (ordinal.rem_euclid(n) + 1) as u16;
+            Some(period)
+        }
     }
-
-    Ok(result)
 }
 
 pub(crate) fn eval_lag(
@@ -62,12 +72,9 @@ pub(crate) fn eval_lag(
         return evaluate_formula(&args[0], context, node_id);
     }
 
-    let target_period = offset_period(
-        context.period_id,
-        -lag_periods,
-        context.history.len() + 1,
-        node_id,
-    )?;
+    let Some(target_period) = offset_period(context.period_id, -lag_periods) else {
+        return Ok(f64::NAN);
+    };
 
     if let ExprNode::Column(node_name) = &args[0].node {
         if let Some(value) = get_historical_column_value(context, node_name, &target_period) {
@@ -119,12 +126,9 @@ pub(crate) fn eval_diff(
         return Ok(if v.is_finite() { 0.0 } else { f64::NAN });
     }
 
-    let target_period = offset_period(
-        context.period_id,
-        -lag_periods,
-        context.history.len() + 1,
-        node_id,
-    )?;
+    let Some(target_period) = offset_period(context.period_id, -lag_periods) else {
+        return Ok(f64::NAN);
+    };
 
     if let ExprNode::Column(node_name) = &args[0].node {
         let current_value = context.get_value(node_name)?;
@@ -178,12 +182,9 @@ pub(crate) fn eval_pct_change(
         return Ok(if v.is_finite() { 0.0 } else { f64::NAN });
     }
 
-    let target_period = offset_period(
-        context.period_id,
-        -lag_periods,
-        context.history.len() + 1,
-        node_id,
-    )?;
+    let Some(target_period) = offset_period(context.period_id, -lag_periods) else {
+        return Ok(f64::NAN);
+    };
 
     let (current_value, lagged_value) = if let ExprNode::Column(node_name) = &args[0].node {
         let current = context.get_value(node_name)?;
@@ -269,12 +270,9 @@ pub(crate) fn eval_growth_rate(
             return Ok(f64::NAN);
         }
 
-        let target_period = offset_period(
-            context.period_id,
-            -periods,
-            context.history.len() + 1,
-            node_id,
-        )?;
+        let Some(target_period) = offset_period(context.period_id, -periods) else {
+            return Ok(f64::NAN);
+        };
         if let Some(start_value) = get_historical_column_value(context, node_name, &target_period) {
             if start_value.abs() < ZERO_TOLERANCE {
                 tracing::warn!(
@@ -336,12 +334,9 @@ pub(crate) fn eval_shift(
         return Ok(f64::NAN);
     }
 
-    let target_period = offset_period(
-        context.period_id,
-        -shift_periods,
-        context.history.len() + 1,
-        node_id,
-    )?;
+    let Some(target_period) = offset_period(context.period_id, -shift_periods) else {
+        return Ok(f64::NAN);
+    };
 
     if let ExprNode::Column(node_name) = &args[0].node {
         if let Some(value) = get_historical_column_value(context, node_name, &target_period) {

@@ -2604,6 +2604,10 @@ class StatementResult:
     """
     Per-node, per-period numeric results from evaluating a model.
 
+    JSON and pickle preserve non-finite values with ``"nan"``, ``"inf"``, and
+    ``"-inf"`` strings in node cells and non-finite warnings. Accessors return
+    Python floats, including NaN and infinities.
+
     Examples
     --------
     >>> from finstack_quant.statements import Evaluator, ModelBuilder
@@ -3303,7 +3307,7 @@ class AppliedAdjustment:
     Examples
     --------
     >>> from finstack_quant.statements import NormalizationResult
-    >>> payload = '{"period":"2025Q1","base_value":10.0,"adjustments":[{"adjustment_id":"a1","name":"Add-back","raw_amount":2.0,"capped_amount":1.5,"is_capped":true}],"final_value":11.5}'
+    >>> payload = '{"value_type":{"type":"scalar"},"period":"2025Q1","base_value":10.0,"adjustments":[{"adjustment_id":"a1","name":"Add-back","raw_amount":2.0,"capped_amount":1.5,"is_capped":true}],"final_value":11.5}'
     >>> NormalizationResult.from_json(payload).adjustments[0].capped_amount
     1.5
     """
@@ -3515,7 +3519,7 @@ class NormalizationResult:
     --------
     >>> from finstack_quant.statements import NormalizationResult
     >>> result = NormalizationResult.from_json(
-    ...     '{"period":"2025Q1","base_value":10.0,"adjustments":[],"final_value":10.0}'
+    ...     '{"value_type":{"type":"scalar"},"period":"2025Q1","base_value":10.0,"adjustments":[],"final_value":10.0}'
     ... )
     >>> (result.period, result.final_value)
     ('2025Q1', 10.0)
@@ -3543,7 +3547,7 @@ class NormalizationResult:
         Examples
         --------
         >>> NormalizationResult.from_json(
-        ...     '{"period":"2025Q1","base_value":10.0,"adjustments":[],"final_value":10.0}'
+        ...     '{"value_type":{"type":"scalar"},"period":"2025Q1","base_value":10.0,"adjustments":[],"final_value":10.0}'
         ... ).final_value
         10.0
         """
@@ -3576,6 +3580,34 @@ class NormalizationResult:
         Notes
         -----
         This accessor does not raise; it returns stored result data.
+        """
+        ...
+    @property
+    def value_type(self) -> str:
+        """Return the common unit classification of this result's amounts.
+
+        Returns
+        -------
+        str
+            ``"scalar"`` or ``"monetary"``; monetary amounts share ``currency``.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+    @property
+    def currency(self) -> str | None:
+        """Return the currency shared by the base, adjustments, and final value.
+
+        Returns
+        -------
+        str | None
+            ISO-4217 currency for monetary values, or ``None`` for scalars.
+
+        Notes
+        -----
+        This accessor does not raise.
         """
         ...
     @property

@@ -1435,7 +1435,10 @@ utils            = { python = "finstack_quant.statements.utils",             sta
 # capital-structure runtime surface (execute_waterfall, CapitalStructureState,
 # instrument cashflow plumbing), evaluator internals (DependencyGraph,
 # EvalWarning, forecast engine types), dsl AST types, registry metric-spec
-# types, and adjustments detail types are deliberately unbound in both hosts.
+# types are deliberately unbound in both hosts. NormalizationResult is typed
+# in Python and carries value_type/currency; normalization remains Python-only.
+# StatementResult JSON cells and NonFiniteValue warnings use the core
+# number-or-sentinel contract ("nan", "inf", "-inf") in Rust, Python, and WASM.
 # Hosts reach capital structure by embedding CapitalStructureSpec in the model
 # JSON and evaluating with a market context.
 

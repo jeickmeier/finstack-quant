@@ -713,12 +713,8 @@ mod tests {
 
     #[test]
     fn ewm_var_decays_across_nan_gaps() {
-        // pd.Series([1, nan, 2, 3]).ewm(alpha=0.5, adjust=False).var(bias=False):
-        // absolute-position weights w = [(1−α)³, α(1−α), α] = [1/8, 1/4, 1/2];
-        // ŵ = [1/7, 2/7, 4/7]; mean = 17/7; biased var = 26/49; Σŵ² = 3/7;
-        // correction = 7/4 ⇒ 26/49 · 7/4 = 13/14.
-        // (Two-observation cases cannot discriminate: unbiased var of two
-        // points is d²/2 under any weighting.)
+        // Recursive normalization gives weights [1/6, 1/3, 1/2] after
+        // the fourth slot. Unbiased variance is 10/11.
         let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let p3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
@@ -738,7 +734,7 @@ mod tests {
         )
         .expect("ewm_var");
 
-        assert!((value - 13.0 / 14.0).abs() < 1e-12, "got {value}");
+        assert!((value - 10.0 / 11.0).abs() < 1e-12, "got {value}");
     }
 
     #[test]

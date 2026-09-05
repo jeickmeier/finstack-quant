@@ -133,3 +133,22 @@ test('statements_analytics.creditAssessment returns a structured object', () => 
   assertStructured(assessment, 'creditAssessment result');
   assert.equal(assessment.period, '2025Q1', 'assessment period is directly readable');
 });
+
+test('statement missing values survive JSON.stringify with canonical sentinels', () => {
+  const model = JSON.parse(MODEL_JSON);
+  model.nodes.lagged = {
+    node_id: 'lagged',
+    node_type: 'calculated',
+    formula_text: 'lag(revenue, 1)',
+  };
+  const result = statements.evaluateModel(JSON.stringify(model));
+  assert.equal(result.nodes.lagged['2025Q1'], 'nan');
+  assert.equal(JSON.parse(JSON.stringify(result)).nodes.lagged['2025Q1'], 'nan');
+});
+
+test('statement declarations cannot relabel explicit foreign money', () => {
+  const model = JSON.parse(MODEL_JSON);
+  model.nodes.revenue.values['2025Q1'] = { amount: '100', currency: 'EUR' };
+  model.nodes.revenue.value_type = { type: 'monetary', currency: 'USD' };
+  assert.throws(() => statements.evaluateModel(JSON.stringify(model)), /declares.*explicit values/);
+});

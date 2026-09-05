@@ -23,8 +23,8 @@ use indexmap::IndexMap;
 /// * `context` - Evaluation context with historical data
 /// * `forecast_cache` - Cache reused across nodes/periods
 /// * `visibility_cutoff` - As-of date hiding explicit values of actual
-///   periods that start after it; hidden actuals are treated as forecast
-///   periods and excluded from base-value resolution
+///   observations released after it; hidden actuals are forecast from the
+///   latest preceding visible observation
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn evaluate_forecast(
     node_spec: &NodeSpec,
@@ -52,13 +52,13 @@ pub(crate) fn evaluate_forecast(
             node_spec.node_id
         )))?;
 
-    // Find all forecast periods. Actual periods whose explicit observation is
-    // unavailable at the as-of cutoff are forecast for this node, allowing
-    // different statement lines to carry their own filing/release dates.
+    // Cache only this uninterrupted forecast segment. A later visible actual
+    // starts a new segment and must never seed forecasts for earlier periods.
     let forecast_periods: Vec<PeriodId> = model
         .periods
         .iter()
-        .filter(|period| {
+        .skip_while(|period| period.id < *period_id)
+        .take_while(|period| {
             !period.is_actual || !node_spec.explicit_value_is_visible(period, visibility_cutoff)
         })
         .map(|period| period.id)
@@ -72,7 +72,7 @@ pub(crate) fn evaluate_forecast(
         ));
     }
 
-    // Determine base value (last visible actual or last historical)
+    // Anchor strictly before the segment's first forecast period.
     let base_value = determine_base_value(node_spec, period_id, model, context, visibility_cutoff)?;
 
     let forecast_results = if let Some(offset) = seed_offset {
@@ -191,7 +191,7 @@ pub(crate) fn evaluate_forecast(
 /// detect outliers, stale data, or unit mismatches.
 fn determine_base_value(
     node_spec: &NodeSpec,
-    _current_period_id: &PeriodId,
+    current_period_id: &PeriodId,
     model: &FinancialModelSpec,
     context: &EvaluationContext,
     visibility_cutoff: Option<Date>,
@@ -199,7 +199,9 @@ fn determine_base_value(
     // Try to get the last actual period whose observation is visible under
     // the as-of policy.
     let last_actual_period = model.periods.iter().rfind(|period| {
-        period.is_actual && node_spec.explicit_value_is_visible(period, visibility_cutoff)
+        period.id < *current_period_id
+            && period.is_actual
+            && node_spec.explicit_value_is_visible(period, visibility_cutoff)
     });
     if let Some(last_actual) = last_actual_period {
         // Check node's explicit values
@@ -221,6 +223,7 @@ fn determine_base_value(
         if let Some((_, value)) = context
             .history
             .iter()
+            .filter(|(period, _)| *period < *current_period_id)
             .filter_map(|(period, row)| {
                 row.get(column)
                     .copied()

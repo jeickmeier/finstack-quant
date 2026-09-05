@@ -467,7 +467,8 @@ pub fn calculate_period_flows(
     // here — it errors until `CashFlowMeta` carries the coupon frequency.
     let accrued_scalar =
         accrued_interest_amount(&full_schedule, snapshot_date, &AccrualConfig::default())?;
-    let accrued_interest = if opening_balance.amount() == 0.0 && !has_new_funding {
+    let accrued_interest = if !using_residual && opening_balance.amount() == 0.0 && !has_new_funding
+    {
         0.0
     } else {
         accrued_scalar * scale

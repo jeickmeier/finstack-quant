@@ -109,6 +109,9 @@ fn is_default_cap_base_mode(mode: &CapBaseMode) -> bool {
 /// Result of a normalization process for a single period.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NormalizationResult {
+    /// Unit and currency shared by the base, adjustments, and final value.
+    pub value_type: crate::types::NodeValueType,
+
     /// The period this result applies to
     pub period: PeriodId,
 

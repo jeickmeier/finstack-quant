@@ -47,58 +47,37 @@ fn collect_column_series(column_name: &str, context: &EvaluationContext) -> Vec<
     values
 }
 
-/// Weighted moments of a slot series under the pandas `adjust=False,
-/// ignore_na=False` weighting.
-///
-/// The slot at distance `d` from the end carries weight `α(1−α)^d`, except the
-/// earliest finite observation, which carries `(1−α)^d` (the recursion's
-/// initialization weight). NaN slots contribute no observation but still count
-/// toward `d`, so decay advances across gaps. Returns
-/// `(mean, biased_var, sum_normalized_weight_sq, n_obs)`, or `None` when the
-/// series has no finite observation.
-///
-/// Reference: pandas `ewm` documentation ("Exponentially weighted windows"),
-/// weights for `adjust=False, ignore_na=False`; RiskMetrics TD4 for the
-/// recursion this weighting unrolls.
+/// Recursive `adjust=False, ignore_na=False` moments. Missing slots decay the
+/// old weight; each observation normalizes the old distribution and new weight
+/// before the next update. Squared weights track the unbiased correction.
 fn ewm_weighted_moments(values: &[(PeriodId, f64)], alpha: f64) -> Option<(f64, f64, f64, usize)> {
-    let t_last = values.len().checked_sub(1)?;
-    let one_minus = 1.0 - alpha;
-
-    let mut weighted: Vec<(f64, f64)> = Vec::with_capacity(values.len());
-    let mut w_sum = 0.0_f64;
-    let mut wx_sum = 0.0_f64;
-    let mut first = true;
-    for (i, (_, x)) in values.iter().enumerate() {
-        if !x.is_finite() {
+    let mut mean = None;
+    let mut variance = 0.0;
+    let mut weight_sq = 1.0;
+    let mut old_weight = 1.0;
+    let mut count = 0;
+    for (_, value) in values {
+        let Some(previous) = mean else {
+            if value.is_finite() {
+                mean = Some(*value);
+                count = 1;
+            }
+            continue;
+        };
+        old_weight *= 1.0 - alpha;
+        if !value.is_finite() {
             continue;
         }
-        let d = (t_last - i) as i32;
-        let w = if first {
-            first = false;
-            one_minus.powi(d)
-        } else {
-            alpha * one_minus.powi(d)
-        };
-        weighted.push((w, *x));
-        w_sum += w;
-        wx_sum += w * x;
+        let retained = old_weight / (old_weight + alpha);
+        let added = alpha / (old_weight + alpha);
+        let delta = value - previous;
+        mean = Some(previous + added * delta);
+        variance = retained * variance + retained * added * delta * delta;
+        weight_sq = retained * retained * weight_sq + added * added;
+        old_weight = 1.0;
+        count += 1;
     }
-
-    if weighted.is_empty() || w_sum <= 0.0 {
-        return None;
-    }
-
-    let mean = wx_sum / w_sum;
-    let mut biased_var = 0.0_f64;
-    let mut sum_w2 = 0.0_f64;
-    for (w, x) in &weighted {
-        let w_norm = w / w_sum;
-        let diff = x - mean;
-        biased_var += w_norm * diff * diff;
-        sum_w2 += w_norm * w_norm;
-    }
-
-    Some((mean, biased_var, sum_w2, weighted.len()))
+    mean.map(|mean| (mean, variance, weight_sq, count))
 }
 
 /// Validate an EWM decay parameter: pandas requires `0 < alpha <= 1`.
@@ -199,7 +178,7 @@ pub(crate) fn eval_ewm_std_or_var(
     let Some((_, biased_var, sum_w2, n_obs)) = ewm_weighted_moments(&values, alpha) else {
         return Ok(f64::NAN);
     };
-    if n_obs < 2 {
+    if n_obs < 2 && unbiased {
         return Ok(f64::NAN);
     }
 
@@ -209,17 +188,7 @@ pub(crate) fn eval_ewm_std_or_var(
         if denom.abs() > ZERO_TOLERANCE {
             ewm_var /= denom;
         } else {
-            // Σŵ² ≈ 1 means effectively all weight sits on one observation
-            // (alpha ≈ 1), where the unbiased correction is undefined. Return
-            // the biased variance but say so rather than silently mislabeling
-            // the estimator.
-            tracing::warn!(
-                node = node_id,
-                sum_w2,
-                "{func}() unbiased correction skipped: 1 - sum of squared weights is \
-                 ~0 (weight concentrated on a single observation); returning the \
-                 biased estimate"
-            );
+            return Ok(f64::NAN);
         }
     }
 

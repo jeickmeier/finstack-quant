@@ -1510,9 +1510,8 @@
                   "type": "string"
                 },
                 "value": {
-                  "description": "The actual non-finite value (NaN, Inf, or -Inf).",
-                  "format": "double",
-                  "type": "number"
+                  "$ref": "#/$defs/ResultNumber",
+                  "description": "The actual non-finite value, encoded as `\"nan\"`, `\"inf\"`, or `\"-inf\"`."
                 }
               },
               "required": [
@@ -1686,6 +1685,20 @@
         }
       ]
     },
+    "ResultNumber": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "enum": [
+            "nan",
+            "inf",
+            "-inf"
+          ]
+        }
+      ]
+    },
     "SchemaVersion": {
       "description": "Numeric schema revision for contracts whose sole supported revision is v1.",
       "format": "uint32",
@@ -1811,12 +1824,11 @@
     "nodes": {
       "additionalProperties": {
         "additionalProperties": {
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/ResultNumber"
         },
         "type": "object"
       },
-      "description": "Map of node_id → (period_id → value) [f64 for scalar results]",
+      "description": "Map of node_id → (period_id → value). Native values are f64; JSON uses\nnumbers for finite values and `\"nan\"`, `\"inf\"`, `\"-inf\"` for non-finite cells.",
       "type": "object"
     },
     "schema_version": {

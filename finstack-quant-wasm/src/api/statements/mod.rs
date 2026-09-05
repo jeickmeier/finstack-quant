@@ -161,7 +161,9 @@ pub fn validate_pik_toggle_spec_json(json: &str) -> Result<String, JsValue> {
 /// Evaluate a `FinancialModelSpec` and return the `StatementResult`.
 ///
 /// Returns a structured JavaScript object (the Python binding returns a typed
-/// `StatementResult` from the same Rust evaluator).
+/// `StatementResult` from the same Rust evaluator). Non-finite node values and
+/// warning values use canonical strings `"nan"`, `"inf"`, and `"-inf"`, so a
+/// `JSON.stringify`/parse round trip preserves missing-data semantics.
 ///
 /// # Errors
 ///

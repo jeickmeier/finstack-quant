@@ -178,7 +178,12 @@ impl Check for CashReconciliation {
                     ],
                 });
             }
+        }
 
+        for period in periods {
+            let curr_pid = &period.id;
+            let total_cf =
+                get_finite_node_value(context.results, &self.total_cash_flow_node, curr_pid);
             // Component check: CFO + CFI + CFF = TotalCF
             if let (Some(cfo_node), Some(cfi_node), Some(cff_node)) =
                 (&self.cfo_node, &self.cfi_node, &self.cff_node)
@@ -189,8 +194,11 @@ impl Check for CashReconciliation {
 
                 // A missing or non-finite component would silently disable
                 // the identity exactly when it matters most; surface the skip.
-                if cfo.is_none() || cfi.is_none() || cff.is_none() {
+                if cfo.is_none() || cfi.is_none() || cff.is_none() || total_cf.is_none() {
                     let mut missing: Vec<String> = Vec::new();
+                    if total_cf.is_none() {
+                        missing.push(self.total_cash_flow_node.to_string());
+                    }
                     if cfo.is_none() {
                         missing.push(cfo_node.to_string());
                     }
@@ -215,7 +223,9 @@ impl Check for CashReconciliation {
                     });
                 }
 
-                if let (Some(cfo_val), Some(cfi_val), Some(cff_val)) = (cfo, cfi, cff) {
+                if let (Some(cfo_val), Some(cfi_val), Some(cff_val), Some(total_cf)) =
+                    (cfo, cfi, cff, total_cf)
+                {
                     let component_sum = cfo_val + cfi_val + cff_val;
                     let component_diff = total_cf - component_sum;
                     let reference = total_cf.abs().max(1.0);
