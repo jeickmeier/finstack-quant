@@ -687,6 +687,9 @@ fn infer_single_period_frequency(start_date: Date, maturity: Date) -> Tenor {
 
 impl crate::instruments::common_impl::traits::Instrument for CapFloor {
     impl_instrument_base!(crate::pricer::InstrumentType::CapFloor);
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         if self.start_date >= self.maturity {

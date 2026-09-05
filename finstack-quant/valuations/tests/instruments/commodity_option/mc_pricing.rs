@@ -117,11 +117,9 @@ fn test_schwartz_smith_gbm_limit_converges_to_black76() {
     );
 }
 
-/// Standard error should shrink as path count increases.
-/// With N paths, stderr ~ 1/sqrt(N), so 100k paths should have ~3x smaller
-/// stderr than 10k paths.
+/// Point estimates remain consistent when the path budget changes.
 #[test]
-fn test_standard_error_shrinks_with_more_paths() {
+fn test_mc_estimates_consistent_across_path_counts() {
     let as_of = date(2025, 1, 1);
     let market = build_market(as_of);
     let call = build_commodity_option(100.0, OptionType::Call);
@@ -318,4 +316,69 @@ fn test_mc_black76_fallback() {
         mc_pv.amount(),
         analytical_pv.amount(),
     );
+}
+
+#[test]
+fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
+    use finstack_quant_valuations::{
+        instruments::commodity::commodity_option::CommodityOptionMcPricer,
+        pricer::Pricer,
+        results::{MonteCarloValuationDetails, ValuationDetails},
+    };
+    let as_of = date(2025, 1, 1);
+    let market = build_market(as_of);
+    let mut call = build_commodity_option(100.0, OptionType::Call);
+    let params = CommodityMcParams {
+        model: CommodityPricingModel::SchwartzSmith {
+            kappa: 2.0,
+            sigma_x: 0.3,
+            sigma_y: 0.15,
+            rho_xy: -0.5,
+            mu_y: 0.0,
+            lambda_x: 0.0,
+        },
+        n_paths: 2000,
+        n_steps: 12,
+        seed: Some(123),
+    };
+    let pricer = CommodityOptionMcPricer::new(params);
+    let unit = pricer.price_dyn(&call, &market, as_of).unwrap();
+    let details = |result: &finstack_quant_valuations::results::ValuationResult| -> MonteCarloValuationDetails {
+        match &result.details {
+            Some(ValuationDetails::MonteCarlo(details)) => details.clone(),
+            _ => panic!("missing MC diagnostics"),
+        }
+    };
+    let base = details(&unit);
+    assert!(base.standard_error > 0.0);
+    assert_eq!(
+        (base.estimator_paths, base.simulated_paths, base.seed),
+        (2000, 2000, 123)
+    );
+    assert_eq!(base.time_grid.len(), 13);
+    assert_eq!(base.time_grid[0], 0.0);
+    assert_eq!(*base.time_grid.last().unwrap(), 1.0);
+    assert!(!base.antithetic && !base.sobol && !base.brownian_bridge);
+    let replay = pricer.price_dyn(&call, &market, as_of).unwrap();
+    assert_eq!(unit.value, replay.value);
+    assert_eq!(base.standard_error, details(&replay).standard_error);
+    call.quantity = 10.0;
+    call.multiplier = 100.0;
+    let scaled = pricer.price_dyn(&call, &market, as_of).unwrap();
+    assert!((scaled.value.amount() - 1000.0 * unit.value.amount()).abs() < 1e-8);
+    assert_eq!(
+        details(&scaled).standard_error,
+        1000.0 * base.standard_error
+    );
+    call.instrument_pricing_overrides.model_config.mc_paths = Some(8000);
+    let larger = pricer.price_dyn(&call, &market, as_of).unwrap();
+    assert_eq!(details(&larger).estimator_paths, 8000);
+    let ratio = details(&larger).standard_error / details(&scaled).standard_error;
+    assert!(
+        (0.4..0.6).contains(&ratio),
+        "SE scales with inverse sqrt(paths): {ratio}"
+    );
+    let wire = serde_json::to_value(&larger).unwrap();
+    assert_eq!(wire["details"]["type"], "monte_carlo");
+    assert_eq!(wire["details"]["data"]["estimator_paths"], 8000);
 }

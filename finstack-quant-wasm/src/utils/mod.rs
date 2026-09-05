@@ -46,6 +46,10 @@ impl IntoJsError for finstack_quant_valuations::Error {
     fn js_kind(&self) -> &'static str {
         match self {
             finstack_quant_valuations::Error::Core(e) => e.js_kind(),
+            finstack_quant_valuations::Error::Pricing(e) => {
+                let core: finstack_quant_core::Error = e.clone().into();
+                core.js_kind()
+            }
             _ => "computation",
         }
     }

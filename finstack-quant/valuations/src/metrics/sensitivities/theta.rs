@@ -165,7 +165,7 @@ pub(crate) fn calculate_theta_date(
 ///
 /// Uses the full `cashflow_schedule()` so that each flow's [`CFKind`] is
 /// available for filtering. A flow enters the sum when its **payment date**
-/// falls in the half-open interval `[start_date, end_date)` and
+/// falls in the receipt interval defined by the instrument valuation boundary and
 /// the period-cash policy below includes it. Amounts are signed: positive is cash
 /// to the long holder, negative is cash paid by the long holder.
 ///
@@ -192,20 +192,18 @@ pub(crate) fn calculate_theta_date(
 ///   purchase / funding cash, not in PV and not buy-and-hold period
 ///   income
 ///
-/// The half-open interval `[start_date, end_date)` aligns with the PV
-/// boundary convention: `value(as_of)` includes same-day flows
-/// (`date >= as_of`) with DF=1, so a flow at `start_date` is part of
-/// PV(start) but not PV(end), meaning it was "received" during the period.
-/// Conversely, a flow at `end_date` is still inside PV(end), so it has not
-/// yet been received.
+/// For start-of-day PV (same-day cash included), receipts fall in
+/// `[start_date, end_date)`. For PV excluding same-day settled cash, receipts
+/// fall in `(start_date, end_date]`. The instrument declares this convention
+/// through `Instrument::includes_valuation_date_cashflows`.
 ///
 /// # Arguments
 ///
 /// * `instrument` - Instrument whose full cashflow schedule is queried.
 /// * `curves` - Market context used to construct the schedule and convert
 ///   eligible receipts into `base_currency`.
-/// * `start_date` - Inclusive start of the half-open income interval.
-/// * `end_date` - Exclusive end of the half-open income interval.
+/// * `start_date` - Opening valuation date; receipt inclusion follows the instrument PV boundary.
+/// * `end_date` - Closing valuation date; receipt inclusion follows the instrument PV boundary.
 /// * `base_currency` - Reporting currency of the returned economic-income sum.
 ///
 /// # Returns
@@ -225,6 +223,7 @@ pub fn collect_cashflows_in_period(
         end_date,
         base_currency,
         opening_notional_draw_date(instrument),
+        instrument.includes_valuation_date_cashflows(),
     )
 }
 
@@ -236,6 +235,7 @@ pub(crate) fn collect_cashflows_in_period_cached(
 ) -> Result<f64> {
     let instrument_id = context.instrument.id().to_string();
     let skip_issue_draw_on = opening_notional_draw_date(context.instrument.as_ref());
+    let include_same_day = context.instrument.includes_valuation_date_cashflows();
     let flows = context.tagged_cashflows_cached()?;
     collect_cashflows_from_flows(
         flows,
@@ -244,6 +244,7 @@ pub(crate) fn collect_cashflows_in_period_cached(
         end_date,
         base_currency,
         skip_issue_draw_on,
+        include_same_day,
     )
 }
 
@@ -294,10 +295,16 @@ fn collect_cashflows_from_flows(
     end_date: Date,
     base_currency: Currency,
     skip_issue_draw_on: Option<Date>,
+    include_same_day: bool,
 ) -> Result<f64> {
     let mut sum = 0.0;
     for cf in flows {
-        if cf.date >= start_date && cf.date < end_date && is_period_economic_cash(cf.kind) {
+        let received = if include_same_day {
+            cf.date >= start_date && cf.date < end_date
+        } else {
+            cf.date > start_date && cf.date <= end_date
+        };
+        if received && is_period_economic_cash(cf.kind) {
             if cf.kind == CFKind::Notional
                 && cf.amount.amount() < 0.0
                 && skip_issue_draw_on == Some(cf.date)
@@ -318,10 +325,16 @@ fn collect_cashflows_from_flows(
     Ok(sum)
 }
 
-// Note: The `get_instrument_expiry` function has been replaced by the `Instrument::expiry()` trait method.
-// Instruments now implement `expiry()` directly, returning `Some(date)` for instruments with expiry/maturity
-// or `None` for instruments without a clear expiry concept (e.g., equity spot positions).
-// See the `Instrument` trait in `instruments/common/traits.rs`.
+/// Last economic payment or contractual expiry, whichever is later.
+/// Cashflow dates retain business-day adjustment and payment lag; option
+/// exercise expiry remains unchanged on the instrument itself.
+pub(crate) fn theta_termination_date(
+    context: &mut crate::metrics::MetricContext,
+) -> Result<Option<Date>> {
+    context
+        .instrument
+        .last_payment_date(&context.curves, context.as_of)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct ThetaBreakdown {
@@ -333,12 +346,12 @@ struct ThetaBreakdown {
 }
 
 fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Result<ThetaBreakdown> {
+    let expiry_date = theta_termination_date(context)?;
     let period_str = context
         .get_metric_overrides()
         .and_then(|po| po.theta_period.as_deref())
         .unwrap_or("1D");
 
-    let expiry_date = context.instrument.expiry();
     let rolled_date = calculate_theta_date(context.as_of, period_str, expiry_date)?;
 
     if rolled_date <= context.as_of {
@@ -555,8 +568,9 @@ mod tests {
             test_flow(10, 25_000.0, CFKind::Fixed), // exclusive end
         ];
 
-        let sum = collect_cashflows_from_flows(&flows, "TEST", start, end, Currency::USD, None)
-            .expect("collect");
+        let sum =
+            collect_cashflows_from_flows(&flows, "TEST", start, end, Currency::USD, None, true)
+                .expect("collect");
         // coupon 25k + signed notional -1mm + amort 50k; PIK/default/end-date excluded
         assert!(
             (sum - (25_000.0 - 1_000_000.0 + 50_000.0)).abs() < 1e-9,
@@ -573,9 +587,16 @@ mod tests {
             test_flow(2, -100.0, CFKind::Notional),
             test_flow(3, -50.0, CFKind::Notional),
         ];
-        let sum =
-            collect_cashflows_from_flows(&flows, "TEST", start, end, Currency::USD, Some(issue))
-                .expect("collect");
+        let sum = collect_cashflows_from_flows(
+            &flows,
+            "TEST",
+            start,
+            end,
+            Currency::USD,
+            Some(issue),
+            true,
+        )
+        .expect("collect");
         assert!(
             (sum + 50.0).abs() < 1e-12,
             "issue-date draw is excluded; later signed notional remains, got {sum}"
@@ -601,8 +622,9 @@ mod tests {
             test_flow(5, 10.0, CFKind::Fixed),
             test_flow(6, 20.0, CFKind::Fixed),
         ];
-        let sum = collect_cashflows_from_flows(&flows, "TEST", start, end, Currency::USD, None)
-            .expect("collect");
+        let sum =
+            collect_cashflows_from_flows(&flows, "TEST", start, end, Currency::USD, None, true)
+                .expect("collect");
         assert!(
             (sum - 10.0).abs() < 1e-12,
             "only the payment-date flow in [start, end) is income, got {sum}"

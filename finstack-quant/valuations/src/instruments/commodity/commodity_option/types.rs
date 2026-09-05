@@ -427,6 +427,16 @@ impl CommodityOption {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
+        self.price_mc(mc_params, market, as_of)
+            .map(|(value, _)| value)
+    }
+
+    pub(crate) fn price_mc(
+        &self,
+        mc_params: &CommodityMcParams,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<(Money, Option<crate::results::MonteCarloValuationDetails>)> {
         use finstack_quant_models::monte_carlo::discretization::ExactSchwartzSmith;
         use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
         use finstack_quant_models::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
@@ -437,7 +447,7 @@ impl CommodityOption {
         use finstack_quant_models::monte_carlo::TimeGrid;
 
         if as_of > self.expiry {
-            return Ok(Money::from((0_i64, self.underlying.currency)));
+            return Ok((Money::from((0_i64, self.underlying.currency)), None));
         }
         if !matches!(self.exercise_style, ExerciseStyle::European) {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -455,10 +465,13 @@ impl CommodityOption {
                 self.forward_price(market, as_of)?
             };
             let intrinsic = self.intrinsic_value(underlying);
-            return Money::new(
-                intrinsic * self.quantity * self.multiplier,
-                self.underlying.currency,
-            );
+            return Ok((
+                Money::new(
+                    intrinsic * self.quantity * self.multiplier,
+                    self.underlying.currency,
+                )?,
+                None,
+            ));
         }
 
         match &mc_params.model {
@@ -473,10 +486,13 @@ impl CommodityOption {
                     inputs.df,
                     self.option_type,
                 );
-                Ok(Money::new(
-                    unit_price * self.quantity * self.multiplier,
-                    self.underlying.currency,
-                )?)
+                Ok((
+                    Money::new(
+                        unit_price * self.quantity * self.multiplier,
+                        self.underlying.currency,
+                    )?,
+                    None,
+                ))
             }
             CommodityPricingModel::SchwartzSmith {
                 kappa,
@@ -534,6 +550,7 @@ impl CommodityOption {
 
                 let seed = mc_params.seed.unwrap_or(42);
                 let time_grid = TimeGrid::uniform(t, mc_params.n_steps)?;
+                let time_grid_values = time_grid.times().to_vec();
                 let engine_config =
                     McEngineConfig::new(mc_params.n_paths, time_grid).parallel(true);
                 let engine = McEngine::new(engine_config);
@@ -544,10 +561,10 @@ impl CommodityOption {
 
                 // Dispatch on option type (EuropeanCall / EuropeanPut are
                 // distinct concrete types, so we branch here).
-                let unit_pv = match self.option_type {
+                let estimate = match self.option_type {
                     OptionType::Call => {
                         let payoff = EuropeanCall::new(self.strike, 1.0, maturity_step);
-                        let est = engine.price(
+                        engine.price(
                             &rng,
                             &process,
                             &disc_scheme,
@@ -555,12 +572,11 @@ impl CommodityOption {
                             &payoff,
                             self.underlying.currency,
                             df,
-                        )?;
-                        est.mean.amount()
+                        )?
                     }
                     OptionType::Put => {
                         let payoff = EuropeanPut::new(self.strike, 1.0, maturity_step);
-                        let est = engine.price(
+                        engine.price(
                             &rng,
                             &process,
                             &disc_scheme,
@@ -568,15 +584,29 @@ impl CommodityOption {
                             &payoff,
                             self.underlying.currency,
                             df,
-                        )?;
-                        est.mean.amount()
+                        )?
                     }
                 };
 
-                Ok(Money::new(
-                    unit_pv * self.quantity * self.multiplier,
-                    self.underlying.currency,
-                )?)
+                let scale = self.quantity * self.multiplier;
+                Ok((
+                    Money::new(estimate.mean.amount() * scale, self.underlying.currency)?,
+                    Some(crate::results::MonteCarloValuationDetails {
+                        model_key: crate::pricer::ModelKey::MonteCarloSchwartzSmith,
+                        standard_error: estimate.stderr * scale.abs(),
+                        training_paths: 0,
+                        training_simulated_paths: 0,
+                        make_whole_training_paths: 0,
+                        make_whole_training_simulated_paths: 0,
+                        estimator_paths: estimate.num_paths,
+                        simulated_paths: estimate.num_simulated_paths,
+                        seed,
+                        time_grid: time_grid_values,
+                        antithetic: false,
+                        sobol: false,
+                        brownian_bridge: false,
+                    }),
+                ))
             }
         }
     }

@@ -293,9 +293,9 @@ impl Pricer for CmsOptionPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let cms = crate::pricer::expect_inst::<CmsOption>(instrument, InstrumentType::CmsOption)?;
 
-        let pv = self.price_internal(cms, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let pv = self
+            .price_internal(cms, market, as_of)
+            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
     }

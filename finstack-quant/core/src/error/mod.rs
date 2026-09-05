@@ -276,8 +276,7 @@ impl Error {
     /// - `Calibration`, `Internal`, `CircularDependency`, and
     ///   `InputError::{SolverConvergenceFailed, VolatilityConversionFailed,
     ///   TooLarge}` → [`ErrorKind::Computation`]
-    /// - `MetricCalculationFailed` follows its cause: solver / calibration /
-    ///   internal / cycle causes are `Computation`, anything else `Validation`
+    /// - `MetricCalculationFailed` preserves its cause's category recursively
     /// - Everything else → [`ErrorKind::Validation`]
     #[must_use]
     pub fn kind(&self) -> ErrorKind {
@@ -296,15 +295,7 @@ impl Error {
                 | InputError::VolatilityConversionFailed { .. }
                 | InputError::TooLarge { .. },
             ) => ErrorKind::Computation,
-            Error::MetricCalculationFailed { cause, .. } => match cause.as_ref() {
-                Error::Calibration { .. }
-                | Error::Internal(_)
-                | Error::CircularDependency { .. }
-                | Error::Input(InputError::SolverConvergenceFailed { .. }) => {
-                    ErrorKind::Computation
-                }
-                _ => ErrorKind::Validation,
-            },
+            Error::MetricCalculationFailed { cause, .. } => cause.kind(),
             _ => ErrorKind::Validation,
         }
     }

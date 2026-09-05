@@ -146,3 +146,63 @@ fn test_theta_sign_diagnostic() {
         "Bond theta should be positive (carry > 0 for long bond), got {theta}"
     );
 }
+
+#[test]
+fn theta_receives_coupon_and_redemption_once_at_maturity() {
+    use finstack_quant_core::{
+        dates::StubKind,
+        market_data::{context::MarketContext, term_structures::DiscountCurve},
+        types::Rate,
+    };
+    use finstack_quant_valuations::{
+        instruments::PricingOptions, metrics::collect_cashflows_in_period,
+    };
+    let maturity = date!(2025 - 07 - 02);
+    let as_of = date!(2025 - 07 - 01);
+    let bond = Bond::fixed(
+        "THETA-REDEMPTION",
+        Money::from((1_000_000_i64, Currency::USD)),
+        Rate::from_decimal(0.04).unwrap(),
+        date!(2025 - 01 - 02),
+        maturity,
+        StubKind::None,
+        "USD-OIS",
+    )
+    .unwrap();
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, 1.0), (10.0, 1.0)])
+            .build()
+            .unwrap(),
+    );
+    let metrics = [MetricId::Theta, MetricId::ThetaCarry];
+    let result = bond
+        .price_with_metrics(&market, as_of, &metrics, PricingOptions::default())
+        .unwrap();
+    assert!(
+        result.value.amount() > 1_000_000.0,
+        "coupon plus redemption"
+    );
+    assert!((result.measures["theta_carry"] - result.value.amount()).abs() < 1e-7);
+    assert!(result.measures["theta"].abs() < 1e-7);
+    let direct =
+        collect_cashflows_in_period(&bond, &market, as_of, maturity, Currency::USD).unwrap();
+    assert_eq!(direct, result.measures["theta_carry"]);
+    assert_eq!(
+        collect_cashflows_in_period(
+            &bond,
+            &market,
+            maturity,
+            maturity + time::Duration::days(1),
+            Currency::USD
+        )
+        .unwrap(),
+        0.0
+    );
+    let settled = bond
+        .price_with_metrics(&market, maturity, &metrics, PricingOptions::default())
+        .unwrap();
+    assert_eq!(settled.measures["theta"], 0.0);
+    assert_eq!(settled.measures["theta_carry"], 0.0);
+}

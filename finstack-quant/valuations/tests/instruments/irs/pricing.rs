@@ -502,3 +502,89 @@ fn test_irs_npv_currency_matches() {
         "NPV currency should match swap currency"
     );
 }
+
+#[test]
+fn theta_receives_final_coupon_on_roll_date_and_survives_payment_lag() {
+    use finstack_quant_core::market_data::{
+        context::MarketContext,
+        scalars::ScalarTimeSeries,
+        term_structures::{DiscountCurve, ForwardCurve},
+    };
+    use finstack_quant_valuations::{instruments::PricingOptions, metrics::MetricId};
+    use time::macros::date;
+    let start = date!(2025 - 01 - 02);
+    let end = date!(2025 - 04 - 02);
+    for (as_of, lag, rate) in [
+        (date!(2025 - 04 - 01), 0, 0.0_f64),
+        (date!(2025 - 04 - 03), 2, 0.05),
+    ] {
+        let mut swap = test_utils::usd_irs_swap(
+            "THETA-FINAL",
+            Money::from((1_000_000_i64, Currency::USD)),
+            0.04,
+            start,
+            end,
+            PayReceive::Pay,
+        )
+        .unwrap();
+        swap.fixed.frequency = Tenor::quarterly();
+        swap.fixed.day_count = DayCount::Act360;
+        swap.fixed.payment_lag_days = lag;
+        swap.float.payment_lag_days = lag;
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([
+                        (0.0, 1.0),
+                        (1.0, (-rate).exp()),
+                        (10.0, (-10.0 * rate).exp()),
+                    ])
+                    .build()
+                    .unwrap(),
+            )
+            .insert(
+                ForwardCurve::builder("USD-SOFR-3M", 0.25)
+                    .base_date(as_of)
+                    .knots([(0.0, 0.05), (1.0, 0.05), (10.0, 0.05)])
+                    .build()
+                    .unwrap(),
+            )
+            .insert_series(
+                ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(start, 0.05)], None).unwrap(),
+            );
+        let result = swap
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[
+                    MetricId::Theta,
+                    MetricId::ThetaCarry,
+                    MetricId::ThetaPeriodDays,
+                ],
+                PricingOptions::default(),
+            )
+            .unwrap();
+        assert_eq!(result.measures["theta_period_days"], 1.0);
+        assert!((result.measures["theta_carry"] - 2500.0).abs() < 1e-8);
+        let expected = 2500.0 - result.value.amount();
+        assert!((result.measures["theta"] - expected).abs() < 1e-7);
+        let paid_date = as_of + time::Duration::days(1);
+        let paid = swap
+            .price_with_metrics(
+                &market,
+                paid_date,
+                &[
+                    MetricId::Theta,
+                    MetricId::ThetaCarry,
+                    MetricId::ThetaPeriodDays,
+                ],
+                PricingOptions::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            paid.measures["theta"], 0.0,
+            "paid coupon must not be received twice"
+        );
+    }
+}

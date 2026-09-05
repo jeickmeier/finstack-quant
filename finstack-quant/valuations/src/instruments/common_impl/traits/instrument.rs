@@ -803,11 +803,38 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         crate::instruments::json_loader::instrument_json_from_any(self.as_any())
     }
 
+    /// Whether valuation includes cash payable on the valuation date.
+    ///
+    /// The default is start-of-day valuation (`date >= as_of`). Instruments
+    /// whose pricers exclude already-settled same-day payments override this
+    /// to return `false` (`date > as_of`). Period-cash metrics use this policy
+    /// to avoid dropping or double-counting payments at either endpoint.
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
+
+    /// Last date with outstanding settlement economics for period-carry metrics.
+    ///
+    /// Defaults to contractual expiry. Products with adjusted or lagged cash
+    /// settlement override this independently of option exercise expiry.
+    ///
+    /// # Arguments
+    /// * `curves` - Market inputs used by products that construct projected cashflows.
+    /// * `as_of` - Valuation date used to resolve historical versus projected receipts.
+    fn last_payment_date(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Option<Date>> {
+        let _ = (curves, as_of);
+        Ok(self.expiry())
+    }
+
     /// Get the instrument's expiry or maturity date, if applicable.
     ///
     /// Returns the date at which the instrument expires, matures, or otherwise
-    /// terminates. This is used by theta calculations to cap the roll date
-    /// and by other time-dependent calculations.
+    /// terminates. Payment-based metrics also inspect the cashflow schedule:
+    /// adjusted or lagged settlement can occur after this contractual date.
     ///
     /// # Returns
     ///

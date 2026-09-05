@@ -22,7 +22,7 @@
 //! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
 use super::market_handle::JsMarket;
-use crate::utils::{to_js_err, to_js_error, to_js_value, to_js_value_with_bigints};
+use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::results::ValuationResult;
@@ -51,7 +51,7 @@ pub(super) fn parse_pricing_instrument_json(
         instrument_json,
         pricing_options,
     )
-    .map_err(|e| to_js_error(&e))
+    .map_err(to_js_err)
 }
 
 pub(super) fn valuation_result_json(result: ValuationResult) -> Result<String, JsValue> {
@@ -87,7 +87,7 @@ pub(super) fn price_result_with_context(
         market_history_json,
         binding_pricing_options(),
     )
-    .map_err(|e| to_js_error(&e))
+    .map_err(to_js_err)
 }
 
 #[cfg(test)]
@@ -197,7 +197,7 @@ pub fn validate_valuation_result_json(json: &str) -> Result<String, JsValue> {
 /// serialized.
 #[wasm_bindgen(js_name = validateInstrumentJson)]
 pub fn validate_instrument_json(json: &str) -> Result<String, JsValue> {
-    finstack_quant_valuations::pricer::validate_instrument_json(json).map_err(|e| to_js_error(&e))
+    finstack_quant_valuations::pricer::validate_instrument_json(json).map_err(to_js_err)
 }
 
 /// Construct a canonical bond instrument envelope from a cashflow schedule.
@@ -330,7 +330,7 @@ pub fn instrument_cashflows_json(
         as_of,
         model,
     )
-    .map_err(|e| to_js_error(&e))?;
+    .map_err(to_js_err)?;
     serde_json::to_string(&envelope).map_err(to_js_err)
 }
 
@@ -507,7 +507,7 @@ pub fn instrument_cashflows_with_market_json(
         as_of,
         model,
     )
-    .map_err(|e| to_js_error(&e))?;
+    .map_err(to_js_err)?;
     serde_json::to_string(&envelope).map_err(to_js_err)
 }
 

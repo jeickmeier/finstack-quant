@@ -198,9 +198,9 @@ impl Pricer for CmsSwapPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let cms = crate::pricer::expect_inst::<CmsSwap>(instrument, InstrumentType::CmsSwap)?;
 
-        let pv = self.price_internal(cms, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let pv = self
+            .price_internal(cms, market, as_of)
+            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
     }
@@ -216,7 +216,8 @@ impl Pricer for CmsSwapPricer {
 /// E^{T_pay}[S] = F + (Caplet(F) − Floorlet(F)) / DF(T_pay)
 /// ```
 ///
-/// where `Caplet`/`Floorlet` are exact replicated CMS optionlets. Embedded
+/// where `Caplet`/`Floorlet` use the shared normalized payment-to-annuity
+/// mapping and smile-aware replication. Embedded
 /// caps and floors on the coupon are priced with the same replicated
 /// optionlets (smile-consistent), instead of the Hagan path's Black-76 on the
 /// adjusted forward:
@@ -328,21 +329,26 @@ impl CmsSwapReplicationPricer {
                 vol_surface: vol_surface.as_ref(),
                 cms_tenor: inst.cms_tenor,
                 payments_per_year,
+                payment_delay: DayCount::Act365F.year_fraction(
+                    inst.reference_swap().reference_swap_start(fixing_date)?,
+                    payment_date,
+                    DayCountContext::default(),
+                )?,
             };
             let caplet = |k: f64| replicated_cms_optionlet(&inputs, k, OptionType::Call);
             let floorlet = |k: f64| replicated_cms_optionlet(&inputs, k, OptionType::Put);
 
             // Payment-measure expected CMS rate via parity at K = F.
             let expected_cms =
-                forward_rate + (caplet(forward_rate) - floorlet(forward_rate)) / df_pay;
+                forward_rate + (caplet(forward_rate)? - floorlet(forward_rate)?) / df_pay;
 
             // Coupon rate with spread and smile-consistent embedded cap/floor.
             let mut coupon_rate = expected_cms + inst.cms_spread;
             if let Some(cap) = inst.cms_cap {
-                coupon_rate -= caplet(cap - inst.cms_spread) / df_pay;
+                coupon_rate -= caplet(cap - inst.cms_spread)? / df_pay;
             }
             if let Some(floor) = inst.cms_floor {
-                coupon_rate += floorlet(floor - inst.cms_spread) / df_pay;
+                coupon_rate += floorlet(floor - inst.cms_spread)? / df_pay;
             }
 
             total_pv += coupon_rate * accrual_fraction * df_pay * inst.notional.amount();
@@ -371,9 +377,9 @@ impl Pricer for CmsSwapReplicationPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let cms = crate::pricer::expect_inst::<CmsSwap>(instrument, InstrumentType::CmsSwap)?;
 
-        let pv = self.price_internal(cms, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let pv = self
+            .price_internal(cms, market, as_of)
+            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
     }

@@ -57,7 +57,7 @@ fn test_dm_fixed_bond_is_rejected_in_strict_mode() {
         .expect_err("discount margin should not be available for fixed-rate bonds");
 
     match err {
-        ValuationError::Pricing(PricingError::ModelFailure { message, context }) => {
+        ValuationError::Pricing(PricingError::InvalidInput { message, context }) => {
             assert!(
                 message.contains("discount_margin"),
                 "pricing error should mention discount_margin, got: {message}"

@@ -621,6 +621,25 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
         Some(self)
     }
 
+    fn last_payment_date(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<Option<finstack_quant_core::dates::Date>> {
+        let schedule =
+            crate::cashflow::traits::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
+        Ok(schedule
+            .get_flows()
+            .iter()
+            .map(|flow| flow.date)
+            .chain(self.expiry())
+            .max())
+    }
+
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
+
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.fixed.end)
     }

@@ -358,10 +358,29 @@ impl PricingError {
                     ),
                     context,
                 },
-                other => PricingError::InvalidInput {
-                    message: other.to_string(),
-                    context,
-                },
+                other => {
+                    let error = finstack_quant_core::Error::Input(other);
+                    match error.kind() {
+                        finstack_quant_core::error::ErrorKind::NotFound => {
+                            PricingError::MissingMarketData {
+                                missing_id: error.to_string(),
+                                context,
+                            }
+                        }
+                        finstack_quant_core::error::ErrorKind::Validation => {
+                            PricingError::InvalidInput {
+                                message: error.to_string(),
+                                context,
+                            }
+                        }
+                        finstack_quant_core::error::ErrorKind::Computation => {
+                            PricingError::ModelFailure {
+                                message: error.to_string(),
+                                context,
+                            }
+                        }
+                    }
+                }
             },
             finstack_quant_core::Error::Validation(msg) => PricingError::InvalidInput {
                 message: msg,
@@ -733,11 +752,31 @@ mod tests {
                 ErrorKind::Computation,
             ),
         ];
-        for (core, expected) in cases {
-            let display = core.to_string();
-            let back: finstack_quant_core::Error =
-                PricingError::from_core(core, ctx.clone()).into();
-            assert_eq!(back.kind(), expected, "kind lost for {display}");
+        for (core, expected) in cases.into_iter().chain([(
+            finstack_quant_core::InputError::SolverConvergenceFailed {
+                iterations: 16,
+                residual: 0.1,
+                last_x: 1.0,
+                reason: "iteration limit".into(),
+            }
+            .into(),
+            ErrorKind::Computation,
+        )]) {
+            for nested in [false, true] {
+                let error = if nested {
+                    finstack_quant_core::Error::MetricCalculationFailed {
+                        metric_id: "theta".into(),
+                        cause: Box::new(core.clone()),
+                    }
+                } else {
+                    core.clone()
+                };
+                let display = error.to_string();
+                assert_eq!(error.kind(), expected, "core kind lost for {display}");
+                let back: finstack_quant_core::Error =
+                    PricingError::from_core(error, ctx.clone()).into();
+                assert_eq!(back.kind(), expected, "kind lost for {display}");
+            }
         }
     }
 

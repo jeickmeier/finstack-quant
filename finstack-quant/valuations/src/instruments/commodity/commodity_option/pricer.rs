@@ -18,15 +18,18 @@ use finstack_quant_core::market_data::context::MarketContext;
 /// Commodity option pricer using Monte Carlo with Schwartz-Smith dynamics.
 ///
 /// This pricer is registered under `ModelKey::MonteCarloSchwartzSmith` and
-/// delegates to `CommodityOption::npv_mc`. The `CommodityMcParams` must be
-/// supplied via the instrument's focused model configuration (future work)
-/// or by calling `npv_mc` directly.
+/// reports the estimator standard error, path counts, seed and time grid in
+/// `ValuationDetails::MonteCarlo`. Parameters come from registration, with
+/// the instrument path-count override taking precedence.
 pub struct CommodityOptionMcPricer {
     mc_params: super::types::CommodityMcParams,
 }
 
 impl CommodityOptionMcPricer {
     /// Create a new Schwartz-Smith MC pricer.
+    ///
+    /// # Arguments
+    /// * `mc_params` - Risk-neutral model parameters, path count, grid steps and RNG seed.
     pub fn new(mc_params: super::types::CommodityMcParams) -> Self {
         Self { mc_params }
     }
@@ -57,10 +60,16 @@ impl Pricer for CommodityOptionMcPricer {
             }
         }
 
-        let pv = option.npv_mc(&mc_params, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let (pv, diagnostics) = option
+            .price_mc(&mc_params, market, as_of)
+            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
 
-        Ok(ValuationResult::stamped(option.id(), as_of, pv))
+        let result = ValuationResult::stamped(option.id(), as_of, pv);
+        Ok(match diagnostics {
+            Some(details) => {
+                result.with_details(crate::results::ValuationDetails::MonteCarlo(details))
+            }
+            None => result,
+        })
     }
 }

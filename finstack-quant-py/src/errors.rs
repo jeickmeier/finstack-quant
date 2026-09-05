@@ -153,8 +153,7 @@ fn format_chain(err: &dyn std::error::Error) -> String {
 /// - Calibration, solver, and operational failures (`Error::{Calibration,
 ///   Internal, CircularDependency}`, `InputError::{SolverConvergenceFailed,
 ///   VolatilityConversionFailed, TooLarge}`) → `RuntimeError`
-/// - `MetricCalculationFailed` → classified by its cause: solver/calibration/
-///   internal causes raise `RuntimeError`, everything else raises `ValueError`
+/// - `MetricCalculationFailed` → classified recursively by its underlying cause
 /// - Everything else → `ValueError`
 pub fn core_to_py(e: finstack_quant_core::Error) -> PyErr {
     use finstack_quant_core::error::ErrorKind;

@@ -640,6 +640,24 @@ pub enum FundingLegSpec {
 
 impl crate::instruments::common_impl::traits::Instrument for CmsSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::CmsSwap);
+    fn last_payment_date(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<Option<finstack_quant_core::dates::Date>> {
+        let schedule =
+            crate::cashflow::traits::CashflowProvider::cashflow_schedule(self, curves, as_of)?;
+        Ok(schedule
+            .get_flows()
+            .iter()
+            .map(|flow| flow.date)
+            .chain(self.expiry())
+            .max())
+    }
+
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         CmsSwap::validate(self)

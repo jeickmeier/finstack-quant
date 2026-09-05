@@ -59,9 +59,7 @@ pub(super) fn enrich(
         };
         let (metric_measures, details) = composite
             .valuation_details_with_metrics(market.as_ref(), as_of, metrics, options)
-            .map_err(|error| {
-                PricingError::model_failure_with_context(error.to_string(), err_ctx.clone())
-            })?;
+            .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?;
         base_result.details = Some(crate::results::ValuationDetails::Composite(details));
         attach_metric_measures(&mut base_result, metric_measures);
         return Ok(base_result);
@@ -88,9 +86,7 @@ pub(super) fn enrich(
                 ),
             },
         )
-        .map_err(|error| {
-            PricingError::model_failure_with_context(error.to_string(), err_ctx.clone())
-        })?;
+        .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?;
         attach_metric_measures(&mut base_result, metric_measures);
         return Ok(base_result);
     }
@@ -123,9 +119,7 @@ pub(super) fn enrich(
                 ),
             },
         )
-        .map_err(|error| {
-            PricingError::model_failure_with_context(error.to_string(), err_ctx.clone())
-        })?
+        .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?
     };
 
     if !risk_metrics.is_empty() {
@@ -149,9 +143,7 @@ pub(super) fn enrich(
                 ),
             },
         )
-        .map_err(|error| {
-            PricingError::model_failure_with_context(error.to_string(), err_ctx.clone())
-        })?;
+        .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?;
         for (key, value) in risk_measures {
             metric_measures.insert(key, value);
         }

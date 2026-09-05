@@ -1,0 +1,194 @@
+{
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "forward",
+        "id": "USD-LIBOR-3M",
+        "base": "2025-01-02",
+        "reset_lag": 2,
+        "day_count": "act_360",
+        "tenor": 0.25,
+        "knot_points": [
+          [
+            0.0,
+            0.03
+          ],
+          [
+            1.0,
+            0.03
+          ],
+          [
+            20.0,
+            0.03
+          ]
+        ],
+        "projection_grid": null,
+        "interp_style": "linear",
+        "extrapolation": "flat_forward",
+        "rate_calibration": null,
+        "fx_policy": null
+      },
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-01-02",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            1.0,
+            0.97
+          ],
+          [
+            20.0,
+            0.55
+          ]
+        ],
+        "interp_style": "monotone_convex",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": -0.005,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      },
+      {
+        "type": "price",
+        "id": "WTI-FORWARD",
+        "base": "2025-01-02",
+        "day_count": "act_365f",
+        "spot_price": 80.0,
+        "knot_points": [
+          [
+            0.0,
+            80.0
+          ],
+          [
+            1.0,
+            80.0
+          ],
+          [
+            20.0,
+            80.0
+          ]
+        ],
+        "interp_style": "linear",
+        "extrapolation": "flat_zero"
+      }
+    ],
+    "fx": null,
+    "surfaces": [
+      {
+        "id": "USD-CMS10Y-VOL",
+        "expiries": [
+          0.1,
+          1.0,
+          10.0
+        ],
+        "strikes": [
+          0.01,
+          0.03,
+          0.1
+        ],
+        "secondary_axis": "strike",
+        "quote_type": "black_lognormal",
+        "interpolation_mode": "vol",
+        "vols_row_major": [
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2
+        ]
+      }
+    ],
+    "prices": {},
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  },
+  "cms": {
+    "instrument": {
+      "spec": {
+        "accrual_fractions": [
+          0.25
+        ],
+        "attributes": {},
+        "cms_tenor": 10.0,
+        "day_count": "act_365f",
+        "discount_curve_id": "USD-OIS",
+        "fixing_dates": [
+          "2026-01-02"
+        ],
+        "forward_curve_id": "USD-LIBOR-3M",
+        "id": "CMSOPT-10Y-USD",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "option_type": "call",
+        "payment_dates": [
+          "2026-04-02"
+        ],
+        "strike": "0.025",
+        "swap_convention": "usd_sofr",
+        "swap_float_day_count": "act_360",
+        "vol_surface_id": "USD-CMS10Y-VOL",
+        "swap_fixed_frequency": {
+          "count": 6,
+          "unit": "months"
+        },
+        "swap_float_frequency": {
+          "count": 3,
+          "unit": "months"
+        }
+      },
+      "type": "cms_option"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "commodity": {
+    "instrument": {
+      "spec": {
+        "attributes": {},
+        "commodity_type": "Energy",
+        "currency": "USD",
+        "day_count": "act_365f",
+        "discount_curve_id": "USD-OIS",
+        "exercise_style": "european",
+        "expiry": "2025-06-15",
+        "forward_curve_id": "WTI-FORWARD",
+        "id": "WTI-OPT-2025M06",
+        "multiplier": 1.0,
+        "option_type": "call",
+        "quantity": 1000.0,
+        "settlement": "cash",
+        "strike": 75.0,
+        "ticker": "CL",
+        "unit": "BBL",
+        "vol_surface_id": "WTI-VOL",
+        "instrument_pricing_overrides": {
+          "model_config": {
+            "mc_paths": 2000
+          }
+        }
+      },
+      "type": "commodity_option"
+    },
+    "schema": "finstack_quant.instrument/1"
+  }
+}

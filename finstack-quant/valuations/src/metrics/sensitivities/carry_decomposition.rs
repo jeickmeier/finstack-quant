@@ -17,7 +17,7 @@ use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
 };
 use crate::instruments::Bond;
 use crate::metrics::sensitivities::theta::{
-    calculate_theta_date, collect_cashflows_in_period_cached,
+    calculate_theta_date, collect_cashflows_in_period_cached, theta_termination_date,
 };
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
@@ -30,12 +30,12 @@ pub(crate) struct CarryDecompositionCalculator;
 
 impl MetricCalculator for CarryDecompositionCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let expiry_date = theta_termination_date(context)?;
         let period_str = context
             .get_metric_overrides()
             .and_then(|po| po.theta_period.as_deref())
             .unwrap_or("1D");
 
-        let expiry_date = context.instrument.expiry();
         let rolled_date = calculate_theta_date(context.as_of, period_str, expiry_date)?;
 
         if rolled_date <= context.as_of {
