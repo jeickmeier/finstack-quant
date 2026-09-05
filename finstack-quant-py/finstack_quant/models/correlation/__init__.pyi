@@ -852,12 +852,13 @@ class PortfolioLossResult:
     @property
     def expected_shortfall(self) -> float:
         """
-        Mean loss beyond VaR, loss-positive.
+        Probability-weighted mean loss in the worst ``1 - confidence`` tail.
 
         Returns
         -------
         float
-            Sample mean of losses at or beyond VaR, in portfolio currency.
+            Loss-positive tail mean in portfolio currency, with fractional
+            weight on the boundary observation when necessary.
 
         Notes
         -----
@@ -1192,12 +1193,12 @@ class TrancheLossStatistics:
     @property
     def expected_shortfall_fraction(self) -> float:
         """
-        Mean tranche loss share from the VaR observation through the worst path.
+        Mean tranche loss share in the worst `1 - confidence` probability mass, with fractional boundary weight.
 
         Returns
         -------
         float
-            Mean tranche loss share from the VaR observation through the worst path.
+            Mean tranche loss share in the worst `1 - confidence` probability mass, with fractional boundary weight.
 
         Notes
         -----
@@ -1208,12 +1209,12 @@ class TrancheLossStatistics:
     @property
     def expected_shortfall_amount(self) -> float:
         """
-        Mean tranche loss amount from the VaR observation through the worst path.
+        Mean tranche loss amount in the worst `1 - confidence` probability mass, with fractional boundary weight.
 
         Returns
         -------
         float
-            Mean tranche loss amount from the VaR observation through the worst path.
+            Mean tranche loss amount in the worst `1 - confidence` probability mass, with fractional boundary weight.
 
         Notes
         -----
@@ -2587,8 +2588,8 @@ def simulate_portfolio_loss(
     Simulate finite-pool losses with deterministic path-indexed RNG streams.
 
     Losses are positive amounts. VaR is the nearest-rank empirical quantile at
-    ``config.confidence``; expected shortfall includes the VaR observation and
-    every worse path. If ``recovery`` is provided, its conditional LGD replaces
+    ``config.confidence``; expected shortfall averages exactly the worst
+    ``1 - config.confidence`` probability mass, with fractional boundary weight. If ``recovery`` is provided, its conditional LGD replaces
     each exposure's constant LGD and exactly one systematic factor is required.
 
     Parameters

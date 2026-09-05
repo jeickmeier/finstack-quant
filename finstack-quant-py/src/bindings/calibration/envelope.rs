@@ -492,7 +492,10 @@ impl PyCdsQuote {
             doc_clause,
             pillar,
             vec![
-                ("running_spread_bp", extract_basis_points(running_spread_bp)?),
+                (
+                    "running_spread_bp",
+                    extract_basis_points(running_spread_bp)?,
+                ),
                 ("upfront_pct", upfront_pct),
                 ("recovery_rate", recovery_rate),
             ],

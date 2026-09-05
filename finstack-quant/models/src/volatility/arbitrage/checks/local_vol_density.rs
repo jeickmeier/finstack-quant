@@ -59,7 +59,12 @@ impl ArbitrageCheck for LocalVolDensityCheck {
                 let dw_dt = finite_diff_time(surface, expiries, ei, strikes[si]);
 
                 // dw/dk and d2w/dk2 via finite differences along the strike dimension
-                let (dw_dk, d2w_dk2) = finite_diff_strike(surface, strikes, si, expiries[ei]);
+                let (dw_dstrike, d2w_dstrike2) =
+                    finite_diff_strike(surface, strikes, si, expiries[ei]);
+                // k = ln(K/F): d/dk = K d/dK. The density condition is
+                // dimensionless and must be invariant to price-unit changes.
+                let dw_dk = big_k * dw_dstrike;
+                let d2w_dk2 = big_k * big_k * d2w_dstrike2 + dw_dk;
 
                 // Dupire denominator
                 let term1 = 1.0 - k / w * dw_dk;
@@ -157,11 +162,11 @@ fn finite_diff_time(surface: &VolSurface, expiries: &[f64], ei: usize, strike: f
     }
 }
 
-/// Compute dw/dk and d2w/dk2 at a grid point using finite differences along
+/// Compute dw/dK and d2w/dK2 at a grid point using finite differences along
 /// the strike axis.
 ///
 /// Returns (first_derivative, second_derivative) of total variance with
-/// respect to log-moneyness.
+/// respect to the raw strike K.
 fn finite_diff_strike(surface: &VolSurface, strikes: &[f64], si: usize, expiry: f64) -> (f64, f64) {
     let total_var = |idx: usize| -> f64 {
         let v = crate::volatility::get_surface_vol_clamped(surface, expiry, strikes[idx]);

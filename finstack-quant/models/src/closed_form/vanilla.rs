@@ -270,7 +270,11 @@ pub fn bs_price_unchecked(
     };
 
     // Numerical cancellation can produce tiny negative values for deep OTM options.
-    raw_price.max(0.0)
+    if raw_price.is_finite() {
+        raw_price.max(0.0)
+    } else {
+        raw_price
+    }
 }
 
 /// Checked Black–Scholes / Garman–Kohlhagen price for host-language bindings.
@@ -278,6 +282,13 @@ pub fn bs_price_unchecked(
 /// The raw `bs_price_unchecked` primitive remains an infallible formula for Rust call
 /// sites that intentionally handle `NaN` / infinity. Bindings should use this
 /// checked wrapper so invalid inputs cross the host boundary as errors.
+/// Spot and strike must be finite and positive; rates must be finite, and
+/// volatility and expiry must be finite and non-negative. Zero expiry returns
+/// intrinsic value; zero volatility returns discounted deterministic payoff.
+///
+/// # Errors
+/// Returns a validation error for inputs outside this domain or non-finite
+/// discounted legs or formula output.
 ///
 /// # Arguments
 ///
@@ -299,11 +310,34 @@ pub fn bs_price(
     expiry: f64,
     option_type: OptionType,
 ) -> Result<f64> {
+    for (name, value) in [("spot", spot), ("strike", strike)] {
+        if !value.is_finite() || value <= 0.0 {
+            return Err(Error::Validation(format!(
+                "Black-Scholes {name} must be finite and positive, got {value}"
+            )));
+        }
+    }
+    for (name, value) in [("rate", rate), ("div_yield", div_yield)] {
+        if !value.is_finite() {
+            return Err(Error::Validation(format!(
+                "Black-Scholes {name} must be finite, got {value}"
+            )));
+        }
+    }
+    if !expiry.is_finite() || expiry < 0.0 {
+        return Err(Error::Validation(format!(
+            "Black-Scholes expiry must be finite and non-negative, got {expiry}"
+        )));
+    }
     if !vol.is_finite() || vol < 0.0 {
         return Err(Error::Validation(format!(
             "Black-Scholes volatility must be finite and non-negative, got {vol}"
         )));
     }
+    // Validate discounted legs before the zero-volatility payoff clamp can
+    // hide overflow or an indeterminate infinity-minus-infinity result.
+    checked_closed_form_value(spot * (-div_yield * expiry).exp(), "discounted spot")?;
+    checked_closed_form_value(strike * (-rate * expiry).exp(), "discounted strike")?;
     checked_closed_form_value(
         bs_price_unchecked(spot, strike, rate, div_yield, vol, expiry, option_type),
         "Black-Scholes price",

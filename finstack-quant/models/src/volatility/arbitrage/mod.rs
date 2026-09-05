@@ -77,7 +77,8 @@ pub struct ArbitrageCheckConfig {
     /// Optional per-expiry forward prices used by butterfly, calendar, and
     /// local-vol density checks.
     ///
-    /// Supply one value to broadcast across expiries or one value per expiry.
+    /// Required when any check is enabled. Supply one finite positive value
+    /// to broadcast across expiries or one such value per expiry.
     pub forward_prices: Option<Vec<f64>>,
     /// Tolerance for all checks (total-variance units).
     pub tolerance: f64,
@@ -108,16 +109,17 @@ impl Default for ArbitrageCheckConfig {
 ///
 /// * `expiry_count` - Number of volatility-surface expiries requiring a
 ///   forward price.
-/// * `forward_prices` - One forward price to broadcast, or one finite forward
+/// * `forward_prices` - One finite positive forward to broadcast, or one such forward
 ///   price per expiry in surface order.
 ///
 /// # Errors
-/// Returns a validation error when the supplied vector has neither length one
-/// nor `expiry_count`.
+/// Returns a validation error when a forward is non-finite or non-positive,
+/// or the supplied vector has neither length one nor `expiry_count`.
 pub fn expand_forward_prices(
     expiry_count: usize,
     forward_prices: Vec<f64>,
 ) -> finstack_quant_core::Result<Vec<f64>> {
+    validate_forward_prices(&forward_prices)?;
     match forward_prices.len() {
         len if len == expiry_count => Ok(forward_prices),
         1 => Ok(vec![forward_prices[0]; expiry_count]),
@@ -125,6 +127,24 @@ pub fn expand_forward_prices(
             "forward_prices has {len} entries but expiries has {expiry_count}; expected 1 or {expiry_count}"
         ))),
     }
+}
+
+fn validate_forward_prices(forwards: &[f64]) -> finstack_quant_core::Result<()> {
+    if forwards.iter().any(|f| !f.is_finite() || *f <= 0.0) {
+        return Err(finstack_quant_core::Error::Validation(
+            "forward prices must be finite and positive".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_tolerance(tolerance: f64) -> finstack_quant_core::Result<()> {
+    if !tolerance.is_finite() || tolerance < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "arbitrage tolerance must be finite and non-negative".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn local_vol_density_violations(
@@ -173,8 +193,8 @@ fn local_vol_density_violations(
 ///
 /// Butterfly, calendar-spread, and local-vol-density checks require forward
 /// prices. `config.forward_prices` accepts one value to broadcast or one value
-/// for every surface expiry. If omitted, the enabled checks are skipped and
-/// the report contains no violations. Results below `config.min_severity` are
+/// for every surface expiry. Omitting forwards while any check is enabled
+/// returns a validation error. Results below `config.min_severity` are
 /// filtered before the report is sorted from highest to lowest severity.
 ///
 /// The tolerance is interpreted in total-variance units by the individual
@@ -183,13 +203,22 @@ fn local_vol_density_violations(
 ///
 /// # Errors
 ///
-/// Returns an error only if `config.forward_prices` contains neither one value
-/// nor one value per surface expiry. It does not validate the finiteness or
-/// positivity of forward prices or the tolerance.
+/// Returns an error if required forwards are missing, non-finite, non-positive,
+/// or have the wrong length, or if tolerance is non-finite or negative.
 pub fn check_surface(
     surface: &VolSurface,
     config: &ArbitrageCheckConfig,
 ) -> finstack_quant_core::Result<ArbitrageReport> {
+    validate_tolerance(config.tolerance)?;
+    if config.forward_prices.is_none()
+        && (config.check_butterfly
+            || config.check_calendar_spread
+            || config.check_local_vol_density)
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "forward prices are required when arbitrage checks are enabled".into(),
+        ));
+    }
     let start = std::time::Instant::now();
     let mut all_violations: Vec<ArbitrageViolation> = Vec::new();
 
@@ -263,7 +292,8 @@ pub fn check_surface(
 ///   used when classifying violations.
 ///
 /// # Errors
-/// Returns an error if the volatility grid or forward vector is invalid.
+/// Returns an error if the grid or forward vector is invalid, any forward is
+/// non-finite or non-positive, or tolerance is non-finite or negative.
 pub fn check_butterfly_grid(
     strikes: &[f64],
     expiries: &[f64],
@@ -271,6 +301,7 @@ pub fn check_butterfly_grid(
     forward_prices: Vec<f64>,
     tolerance: f64,
 ) -> finstack_quant_core::Result<Vec<ArbitrageViolation>> {
+    validate_tolerance(tolerance)?;
     let surface = VolSurface::from_rows("surface-grid", expiries, strikes, vols)?;
     let forwards = expand_forward_prices(expiries.len(), forward_prices)?;
     Ok(ButterflyCheck {
@@ -292,7 +323,8 @@ pub fn check_butterfly_grid(
 ///   used when classifying violations.
 ///
 /// # Errors
-/// Returns an error if the volatility grid or forward vector is invalid.
+/// Returns an error if the grid or forward vector is invalid, any forward is
+/// non-finite or non-positive, or tolerance is non-finite or negative.
 pub fn check_calendar_spread_grid(
     strikes: &[f64],
     expiries: &[f64],
@@ -300,6 +332,7 @@ pub fn check_calendar_spread_grid(
     forward_prices: Vec<f64>,
     tolerance: f64,
 ) -> finstack_quant_core::Result<Vec<ArbitrageViolation>> {
+    validate_tolerance(tolerance)?;
     let surface = VolSurface::from_rows("surface-grid", expiries, strikes, vols)?;
     let forwards = expand_forward_prices(expiries.len(), forward_prices)?;
     Ok(CalendarSpreadCheck {
@@ -319,18 +352,19 @@ pub fn check_calendar_spread_grid(
 /// * `strikes` - Strictly ordered strike grid shared by every volatility row.
 /// * `expiries` - Strictly ordered expiry times in years, one per row in `vols`.
 /// * `vols` - Implied-volatility rows aligned with `expiries` and `strikes`.
-/// * `forward_prices` - One finite forward price for every expiry, in the same
+/// * `forward_prices` - One finite positive forward price for every expiry, in the same
 ///   order as `expiries`.
 ///
 /// # Errors
 /// Returns an error if the volatility grid is invalid or the forward vector
-/// length does not match the expiry count.
+/// length does not match the expiry count, or any forward is non-finite or non-positive.
 pub fn check_local_vol_density_grid(
     strikes: &[f64],
     expiries: &[f64],
     vols: &[Vec<f64>],
     forward_prices: Vec<f64>,
 ) -> finstack_quant_core::Result<Vec<ArbitrageViolation>> {
+    validate_forward_prices(&forward_prices)?;
     if forward_prices.len() != expiries.len() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "forward_prices has {} entries but expiries has {}",
@@ -361,7 +395,8 @@ pub fn check_local_vol_density_grid(
 ///   used when classifying violations.
 ///
 /// # Errors
-/// Returns an error if the volatility grid or forward-vector shape is invalid.
+/// Returns an error if the grid or forward vector is invalid, any forward is
+/// non-finite or non-positive, or tolerance is non-finite or negative.
 pub fn check_surface_grid(
     strikes: &[f64],
     expiries: &[f64],
@@ -783,7 +818,7 @@ mod tests {
     }
 
     #[test]
-    fn config_skips_checks_when_no_forward() {
+    fn config_rejects_enabled_checks_without_forwards() {
         let surface = flat_surface();
         let config = ArbitrageCheckConfig {
             check_butterfly: true,
@@ -791,12 +826,7 @@ mod tests {
             check_local_vol_density: true,
             ..Default::default()
         };
-        let report = check_surface(&surface, &config).expect("arbitrage check should succeed");
-
-        assert!(
-            report.violations.is_empty(),
-            "All checks requiring forward should be skipped when forward is None"
-        );
+        assert!(check_surface(&surface, &config).is_err());
     }
 
     // ---- SVI-specific tests ----

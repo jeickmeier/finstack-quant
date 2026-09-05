@@ -36,7 +36,7 @@ use pyo3::prelude::*;
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put.
 /// n_terms : int, optional
-///     Number of cosine terms in the expansion; omit to use the pricer default.
+///     Positive number of cosine terms in the expansion; omit to use the pricer default.
 ///
 /// Returns
 /// -------
@@ -46,7 +46,7 @@ use pyo3::prelude::*;
 /// Raises
 /// ------
 /// ValueError
-///     If ``vol`` is not strictly positive, the COS truncation range is
+///     If ``n_terms`` is zero, ``vol`` is not strictly positive, the COS truncation range is
 ///     degenerate, or the price is non-finite.
 ///
 /// Sources
@@ -105,7 +105,7 @@ fn bs_cos_price(
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put.
 /// n_terms : int, optional
-///     Number of cosine terms; omit to use the pricer default (heavier tails may need more).
+///     Positive number of cosine terms; omit to use the pricer default (heavier tails may need more).
 ///
 /// Returns
 /// -------
@@ -175,7 +175,7 @@ fn vg_cos_price(
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put.
 /// n_terms : int, optional
-///     Number of cosine terms; omit to use the pricer default.
+///     Positive number of cosine terms; omit to use the pricer default.
 ///
 /// Returns
 /// -------

@@ -89,13 +89,13 @@ fn constant_recovery_model_matches_equivalent_exposure_lgd_bit_for_bit() {
 }
 
 #[test]
-fn loss_positive_var_uses_nearest_rank_and_es_includes_the_var_observation() {
+fn loss_positive_var_uses_nearest_rank_and_es_uses_exact_tail_mass() {
     let result = PortfolioLossResult::from_losses(vec![20.0, 0.0, 10.0, 0.0], 0.75)
         .expect("valid loss distribution");
 
     assert_eq!(result.expected_loss, 7.5);
     assert_eq!(result.var, 10.0);
-    assert_eq!(result.expected_shortfall, 15.0);
+    assert_eq!(result.expected_shortfall, 20.0);
     assert!(result.expected_shortfall >= result.var);
 }
 

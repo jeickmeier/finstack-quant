@@ -310,8 +310,8 @@ fn check_calendar_spread_grid<'py>(
 /// vols : list[list[float]]
 ///     Implied vols shaped ``[n_expiries][n_strikes]`` (decimal).
 /// forward_prices : list[float]
-///     Forward price per expiry (length must equal ``len(expiries)``) or a
-///     single value to broadcast.
+///     One finite positive forward per expiry; length must equal
+///     ``len(expiries)``. A single forward is not broadcast.
 ///
 /// Returns
 /// -------

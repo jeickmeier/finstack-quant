@@ -23,10 +23,10 @@ use std::f64::consts::PI;
 /// COS method configuration.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct CosConfig {
-    /// Number of cosine terms (default: 128).
+    /// Positive number of cosine terms (default: 128).
     /// More terms = higher accuracy for non-smooth or heavy-tailed densities.
     pub num_terms: usize,
-    /// Truncation range multiplier L (default: 10.0).
+    /// Finite positive truncation range multiplier L (default: 10.0).
     /// Integration domain is [c1 - L*sqrt(c2 + sqrt(|c4|)), c1 + L*sqrt(c2 + sqrt(|c4|))].
     pub truncation_l: f64,
 }
@@ -57,7 +57,7 @@ pub struct BlackScholesCosParams {
     pub expiry: f64,
     /// `true` for call, `false` for put.
     pub is_call: bool,
-    /// Optional COS term count; defaults to [`CosConfig::default`].
+    /// Optional positive COS term count; defaults to [`CosConfig::default`].
     pub n_terms: Option<usize>,
 }
 
@@ -82,7 +82,7 @@ pub struct VarianceGammaCosParams {
     pub expiry: f64,
     /// `true` for call, `false` for put.
     pub is_call: bool,
-    /// Optional COS term count; defaults to [`CosConfig::default`].
+    /// Optional positive COS term count; defaults to [`CosConfig::default`].
     pub n_terms: Option<usize>,
 }
 
@@ -109,7 +109,7 @@ pub struct MertonJumpCosParams {
     pub expiry: f64,
     /// `true` for call, `false` for put.
     pub is_call: bool,
-    /// Optional COS term count; defaults to [`CosConfig::default`].
+    /// Optional positive COS term count; defaults to [`CosConfig::default`].
     pub n_terms: Option<usize>,
 }
 
@@ -341,6 +341,16 @@ impl<'a> CosPricer<'a> {
         t: f64,
         is_call: bool,
     ) -> Result<Vec<f64>, FourierError> {
+        if self.config.num_terms == 0 {
+            return Err(FourierError::model_failure(
+                "COS method: num_terms must be positive",
+            ));
+        }
+        if !self.config.truncation_l.is_finite() || self.config.truncation_l <= 0.0 {
+            return Err(FourierError::model_failure(
+                "COS method: truncation_l must be finite and positive",
+            ));
+        }
         if strikes.is_empty() {
             return Ok(Vec::new());
         }

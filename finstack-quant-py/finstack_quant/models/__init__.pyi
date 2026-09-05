@@ -283,8 +283,8 @@ def bs_price(
     Raises
     ------
     ValueError
-        If ``vol`` is negative or non-finite, or the supplied inputs produce a
-        non-finite Black-Scholes price.
+        If spot or strike is non-positive, volatility or expiry is negative,
+        any numerical input is non-finite, or discounted legs or price overflow.
 
     Examples
     --------
@@ -1196,7 +1196,7 @@ def bs_cos_price(
     is_call : bool
         ``True`` for a call, ``False`` for a put.
     n_terms : int, optional
-        Number of COS terms. Uses a default when ``None``.
+        Positive number of COS terms. Uses a default when ``None``.
 
     Returns
     -------
@@ -1260,7 +1260,7 @@ def vg_cos_price(
     is_call : bool
         ``True`` for a call, ``False`` for a put.
     n_terms : int, optional
-        Number of COS terms. Uses a default when ``None``.
+        Positive number of COS terms. Uses a default when ``None``.
 
     Returns
     -------
@@ -1327,7 +1327,7 @@ def merton_jump_cos_price(
     is_call : bool
         ``True`` for a call, ``False`` for a put.
     n_terms : int, optional
-        Number of COS terms. Uses a default when ``None``.
+        Positive number of COS terms. Uses a default when ``None``.
 
     Returns
     -------

@@ -1508,7 +1508,7 @@ def check_local_vol_density_grid(
     vols : list[list[float]]
         Implied vols shaped ``[n_expiries][n_strikes]``.
     forward_prices : list[float]
-        Forward prices per expiry or one broadcast value.
+        One finite positive forward per expiry; no single-value broadcasting.
 
     Returns
     -------
@@ -1518,7 +1518,7 @@ def check_local_vol_density_grid(
     Raises
     ------
     ValueError
-        If grid dimensions are inconsistent or inputs are non-finite.
+        If grid dimensions are inconsistent, inputs are non-finite, or forwards are non-positive.
 
     Sources
     -------

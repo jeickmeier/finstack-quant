@@ -73,7 +73,7 @@ pub struct PortfolioLossResult {
     pub expected_loss: f64,
     /// Loss-positive nearest-rank VaR at the configured confidence.
     pub var: f64,
-    /// Mean loss from the VaR observation through the worst path.
+    /// Probability-weighted mean of the worst `1 - confidence` share of losses.
     pub expected_shortfall: f64,
     /// Loss-positive confidence used for [`Self::var`] and
     /// [`Self::expected_shortfall`], in `(0, 1)`.
@@ -111,9 +111,9 @@ pub struct TrancheLossStatistics {
     pub var_fraction: f64,
     /// Nearest-rank tranche loss amount at the distribution's confidence.
     pub var_amount: f64,
-    /// Mean tranche loss fraction from the VaR observation through the worst path.
+    /// Probability-weighted mean tranche loss fraction in the worst confidence tail.
     pub expected_shortfall_fraction: f64,
-    /// Mean tranche loss amount from the VaR observation through the worst path.
+    /// Probability-weighted mean tranche loss amount in the worst confidence tail.
     pub expected_shortfall_amount: f64,
     /// Share of paths whose pool loss fraction strictly exceeds `attachment`.
     pub prob_attachment_breached: f64,
@@ -132,7 +132,9 @@ impl PortfolioLossResult {
     /// # Arguments
     ///
     /// * `losses` - Loss observations in portfolio-value units used by the risk calculation.
-    /// * `confidence` - Tail confidence level in (0.5, 1), for example 0.99 for 99% VaR
+    /// * `confidence` - Confidence in `(0, 1)`, for example 0.99 for 99% VaR.
+    ///   ES averages the worst `1 - confidence` probability mass, with fractional
+    ///   weight on the boundary observation when necessary.
     pub fn from_losses(losses: Vec<f64>, confidence: f64) -> Result<Self> {
         validate_confidence(confidence)?;
         if losses.is_empty() {
@@ -165,8 +167,24 @@ impl PortfolioLossResult {
             .saturating_sub(1)
             .min(sorted.len() - 1);
         let var = sorted[var_index];
-        let tail = &sorted[var_index..];
-        let expected_shortfall = scaled_mean(tail, "expected shortfall")?;
+        let tail_mass = (1.0 - confidence) * sorted.len() as f64;
+        let whole = tail_mass.floor() as usize;
+        let fraction = tail_mass - whole as f64;
+        let tail_start = sorted.len() - whole;
+        // Normalize before summing so finite large losses cannot overflow.
+        let scale = sorted[sorted.len() - 1];
+        let expected_shortfall = if scale == 0.0 {
+            0.0
+        } else {
+            let mut sum = NeumaierAccumulator::new();
+            for &loss in &sorted[tail_start..] {
+                sum.add(loss / scale);
+            }
+            if fraction > 0.0 {
+                sum.add(fraction * (sorted[tail_start - 1] / scale));
+            }
+            (sum.total() / tail_mass).min(1.0) * scale
+        };
         if !var.is_finite() || !expected_loss.is_finite() || !expected_shortfall.is_finite() {
             return Err(validation_error("portfolio loss statistics must be finite"));
         }
@@ -194,7 +212,7 @@ impl PortfolioLossResult {
     /// so the tranche absorbs nothing until the pool loss breaches `A` and is
     /// fully written down once it reaches `D`. Expected loss, VaR, and expected
     /// shortfall are then aggregated from that per-path fraction distribution
-    /// using exactly the same loss-positive nearest-rank conventions as
+    /// using the same loss-positive nearest-rank VaR and probability-weighted ES as
     /// [`PortfolioLossResult::from_losses`], evaluated at this result's own
     /// [`Self::confidence`].
     ///

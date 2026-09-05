@@ -3171,7 +3171,7 @@ export declare class Performance {
   /**
    * Rolling benchmark annualized Jensen alpha/beta for one asset over a window.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
-   * @param window - Finite non-negative integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
+   * @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
    * @returns `{ dates, alphas, betas }` series for the selected ticker.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
@@ -3180,7 +3180,7 @@ export declare class Performance {
   /**
    * Rolling volatility series for one asset over a window.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
-   * @param window - Finite non-negative integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
+   * @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
    * @returns `{ dates, volatility }` series for the selected ticker.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
    */
@@ -3188,7 +3188,7 @@ export declare class Performance {
   /**
    * Rolling Sortino ratio series for one asset over a window.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
-   * @param window - Finite non-negative integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
+   * @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
    * @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
    * @returns `{ dates, sortino }` series for the selected ticker.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
@@ -3197,7 +3197,7 @@ export declare class Performance {
   /**
    * Rolling Sharpe ratio series for one asset over a window.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
-   * @param window - Finite non-negative integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
+   * @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
    * @returns `{ dates, sharpe }` series for the selected ticker.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created.
@@ -3206,9 +3206,9 @@ export declare class Performance {
   /**
    * Rolling compounded return series for one asset over a window.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
-   * @param window - Finite non-negative integer observation count. Invalid numeric values are rejected; zero yields an empty series.
+   * @param window - Finite positive integer observation count. Zero, fractional, non-finite, and out-of-range values are rejected.
    * @returns `{ dates, return }` series for the selected ticker.
-   * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created. A zero or overlong `window` returns an empty series rather than rejecting.
+   * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns or the JavaScript result object's properties cannot be created. An overlong `window` returns an empty series; a zero window is rejected.
    */
   rollingReturns(tickerIdx: number, window: number): DatedSeries;
   /**
@@ -4485,11 +4485,11 @@ export interface TrancheLossStatisticsJson {
    */
   var_amount: number;
   /**
-   * Mean tranche loss fraction from the VaR observation through the worst path.
+   * Probability-weighted mean tranche loss fraction in the worst confidence tail.
    */
   expected_shortfall_fraction: number;
   /**
-   * Mean tranche loss amount from the VaR observation through the worst path.
+   * Probability-weighted mean tranche loss amount in the worst confidence tail.
    */
   expected_shortfall_amount: number;
   /**
@@ -4592,7 +4592,8 @@ export interface CorrelationNamespace {
    * a 0-3% equity tranche is `(0.0, 0.03)`, not `(0.0, 3.0)`. Each path's pool
    * loss fraction `L = loss / poolNotional` maps through
    * `clamp(L - attachment, 0, width) / width`, and the resulting distribution
-   * is aggregated at `confidence` using loss-positive nearest-rank conventions.
+   * uses loss-positive nearest-rank VaR and ES over exactly the worst
+   * `1 - confidence` probability mass, with fractional boundary weight.
    * @returns Returns the tranche notional, expected loss, VaR, expected shortfall, and breach probabilities.
    * @param losses - Loss-positive path losses in one caller-defined unit, one entry per simulated path.
    * @param confidence - Loss-positive VaR and expected-shortfall confidence strictly between 0 and 1.
@@ -7740,7 +7741,7 @@ export interface ModelsNamespace {
    * @param expiry - Time to expiry in **years**.
    * @param isCall - `true` for a call, `false` for a put.
    * @returns Per-unit option price.
-   * @throws If the inputs produce a non-finite price (e.g. negative volatility).
+   * @throws If spot or strike is non-positive, volatility or expiry is negative, any numerical input is non-finite, or discounted legs or price overflow.
    */
   bsPrice(
     spot: number,

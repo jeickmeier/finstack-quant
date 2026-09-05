@@ -206,8 +206,8 @@ impl PyBsGreeks {
 /// Raises
 /// ------
 /// ValueError
-///     If ``vol`` is negative or non-finite, or the inputs produce a
-///     non-finite price.
+///     If spot or strike is non-positive, volatility or expiry is negative,
+///     any numerical input is non-finite, or discounted legs or price overflow.
 ///
 /// Examples
 /// --------

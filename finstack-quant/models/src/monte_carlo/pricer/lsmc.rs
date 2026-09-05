@@ -30,8 +30,8 @@
 //!
 //! Early exercise is evaluated on the discrete simulation steps listed in
 //! [`LsmcConfig::exercise_dates`] (the GBM convenience constructors use every
-//! step `1..=num_steps`). That is a **Bermudan** option on the time grid, not a
-//! continuous American. Immediate exercise at valuation (`t = 0`) is applied
+//! step `0..=num_steps`). That is a **Bermudan** option on the time grid, not a
+//! continuous American. When index `0` is included, immediate exercise is applied
 //! as a floor on the reported price so the estimate cannot print below
 //! intrinsic. When that floor binds, the reported mean is the intrinsic
 //! value while stderr and sample standard deviation stay those of the
@@ -201,7 +201,7 @@ pub struct LsmcConfig {
     pub num_paths: usize,
     /// Random seed
     pub seed: u64,
-    /// Exercise dates (step indices)
+    /// Exercise dates as step indices; include `0` to permit valuation-date exercise.
     pub exercise_dates: Vec<usize>,
     /// Use parallel execution
     pub use_parallel: bool,
@@ -213,8 +213,8 @@ impl LsmcConfig {
     /// Create a validated LSMC configuration.
     ///
     /// Verifies that `num_paths > 0`, `exercise_dates` is non-empty with
-    /// strictly positive step indices, and every date satisfies
-    /// `0 < date <= num_steps`. Dates are sorted and de-duplicated: a
+    /// non-negative step indices, `num_steps > 0`, and every date satisfies
+    /// `0 <= date <= num_steps`. Dates are sorted and de-duplicated: a
     /// duplicate exercise date would run the same-step regression twice with
     /// already-exercised cashflows, corrupting the second pass.
     ///
@@ -223,8 +223,8 @@ impl LsmcConfig {
     /// (American boundary condition) whether or not it is listed — a
     /// Bermudan whose last exercise right ends strictly before maturity is
     /// not representable; set `num_steps` to the last exercise step instead.
-    /// Immediate exercise at valuation (`t = 0`) is applied as a floor on the
-    /// reported price, so the estimate cannot print below intrinsic.
+    /// Immediate exercise at valuation is permitted only when `exercise_dates`
+    /// contains `0`; only then is intrinsic value a floor on the reported price.
     ///
     /// Antithetic pairing (`Z` and `-Z` from the same draws) is taken from the
     /// registry default unless overridden with [`Self::with_antithetic`].
@@ -232,9 +232,17 @@ impl LsmcConfig {
     /// # Errors
     ///
     /// Returns an error if `num_paths` is zero, no exercise date is supplied,
-    /// any date is zero, or any date exceeds `num_steps`. Duplicate dates are
+    /// `num_steps` is zero, or any date exceeds `num_steps`. Duplicate dates are
     /// accepted but removed after sorting, and the registry supplies the
     /// default seed, parallel-execution, and antithetic settings.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_paths` - Positive number of independent Monte Carlo estimators.
+    /// * `exercise_dates` - Non-empty exercise step indices in `0..=num_steps`;
+    ///   include `0` to permit valuation-date exercise. Terminal payoff at
+    ///   maturity remains the boundary condition even when omitted here.
+    /// * `num_steps` - Positive number of uniform simulation intervals to maturity.
     pub fn new(
         num_paths: usize,
         exercise_dates: Vec<usize>,
@@ -250,16 +258,15 @@ impl LsmcConfig {
                 "exercise_dates must have at least one element".to_string(),
             ));
         }
-        if let Some(pos) = exercise_dates.iter().position(|&d| d == 0) {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "exercise_dates must be strictly positive step indices (exercise_dates[{pos}] = 0 \
-                 implies exercise before the first simulated step)"
-            )));
+        if num_steps == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "num_steps must be positive".to_string(),
+            ));
         }
         if let Some(&bad) = exercise_dates.iter().find(|&&d| d > num_steps) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "exercise_dates contain {bad} which exceeds num_steps={num_steps}; each date \
-                 must satisfy 0 < date <= num_steps"
+                 must satisfy 0 <= date <= num_steps"
             )));
         }
         let mut exercise_dates = exercise_dates;
@@ -277,7 +284,7 @@ impl LsmcConfig {
     }
 
     /// American convenience schedule: exercise at every simulated step
-    /// `1..=num_steps`, including the terminal date.
+    /// `0..=num_steps`, including valuation and the terminal date.
     ///
     /// This is the exercise grid used by the host-binding `LsmcPricer` GBM
     /// helpers; both hosts delegate here rather than building the index vector
@@ -287,14 +294,13 @@ impl LsmcConfig {
     ///
     /// * `num_paths` - Simulated paths; must be positive.
     /// * `num_steps` - Time-grid steps between `0` and expiry; the returned
-    ///   dates are `1..=num_steps`.
+    ///   dates are `0..=num_steps`.
     ///
     /// # Errors
     ///
-    /// Returns an error if `num_paths` is zero or `num_steps` is zero (empty
-    /// exercise schedule).
+    /// Returns an error if `num_paths` or `num_steps` is zero.
     pub fn every_step(num_paths: usize, num_steps: usize) -> finstack_quant_core::Result<Self> {
-        Self::new(num_paths, (1..=num_steps).collect(), num_steps)
+        Self::new(num_paths, (0..=num_steps).collect(), num_steps)
     }
 
     /// Set random seed.
@@ -441,7 +447,7 @@ impl LsmcPricer {
     /// Price a Bermudan-style option on the configured exercise grid.
     ///
     /// Early exercise is decided on `exercise_dates` (typically `1..=num_steps`).
-    /// After averaging path present values, the reported price is floored at
+    /// If index `0` is included, the average of path present values is floored at
     /// `exercise_value(initial_spot)`. If that intrinsic binds, the mean is
     /// replaced by the intrinsic value while stderr and sample standard
     /// deviation stay those of the unfloored sample. The 95% CI is the
@@ -460,7 +466,8 @@ impl LsmcPricer {
     ///
     /// # Returns
     ///
-    /// Statistical estimate of the Bermudan value with the `t = 0` intrinsic floor.
+    /// Statistical estimate of the Bermudan value, including immediate exercise
+    /// only when index `0` belongs to the exercise schedule.
     #[allow(clippy::too_many_arguments)]
     pub fn price<E, B>(
         &self,
@@ -646,7 +653,7 @@ impl LsmcPricer {
         Ok(PathMatrix { data, stride })
     }
 
-    /// Average antithetic pairs if enabled, then floor the mean at `t = 0` intrinsic.
+    /// Average antithetic pairs, then apply intrinsic only if index `0` is eligible.
     ///
     /// When the floor binds, stderr and sample standard deviation are kept
     /// from the unfloored sample. The published CI is the unfloored interval
@@ -670,23 +677,24 @@ impl LsmcPricer {
         }
 
         let intrinsic = exercise.exercise_value(initial_spot);
-        let (mean, stderr, ci_95, std_dev) = if stats.mean() < intrinsic {
-            let (lo, hi) = stats.confidence_interval(0.05);
-            let lower = lo.max(intrinsic);
-            (
-                intrinsic,
-                stats.stderr(),
-                (lower, hi.max(lower)),
-                stats.std_dev(),
-            )
-        } else {
-            (
-                stats.mean(),
-                stats.stderr(),
-                stats.confidence_interval(0.05),
-                stats.std_dev(),
-            )
-        };
+        let (mean, stderr, ci_95, std_dev) =
+            if self.config.exercise_dates.contains(&0) && stats.mean() < intrinsic {
+                let (lo, hi) = stats.confidence_interval(0.05);
+                let lower = lo.max(intrinsic);
+                (
+                    intrinsic,
+                    stats.stderr(),
+                    (lower, hi.max(lower)),
+                    stats.std_dev(),
+                )
+            } else {
+                (
+                    stats.mean(),
+                    stats.stderr(),
+                    stats.confidence_interval(0.05),
+                    stats.std_dev(),
+                )
+            };
 
         let num_simulated_paths = if self.config.antithetic {
             2 * self.config.num_paths
@@ -1696,14 +1704,11 @@ mod tests {
     }
 
     #[test]
-    fn test_lsmc_config_rejects_zero_exercise_date() {
-        let err = LsmcConfig::new(100, vec![0, 10, 20], 100)
-            .expect_err("should reject zero step")
-            .to_string();
-        assert!(
-            err.contains("strictly positive"),
-            "unexpected error message: {err}"
-        );
+    fn test_lsmc_config_accepts_explicit_valuation_exercise() {
+        let config = LsmcConfig::new(100, vec![0, 10, 20], 100)
+            .expect("zero denotes valuation-date exercise");
+        assert_eq!(config.exercise_dates, vec![0, 10, 20]);
+        assert!(LsmcConfig::new(100, vec![0], 0).is_err());
     }
 
     #[test]

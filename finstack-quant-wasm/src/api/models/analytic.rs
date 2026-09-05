@@ -67,7 +67,7 @@ const DEFAULT_THETA_DAYS_PER_YEAR: f64 = 365.0;
 /// // price ≈ 10.45
 /// ```
 ///
-/// @throws If the inputs produce a non-finite price (e.g. negative volatility).
+/// @throws If spot or strike is non-positive, volatility or expiry is negative, any numerical input is non-finite, or discounted legs or price overflow.
 #[wasm_bindgen(js_name = bsPrice)]
 pub fn bs_price(
     spot: f64,

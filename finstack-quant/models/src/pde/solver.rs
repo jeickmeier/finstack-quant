@@ -5,7 +5,7 @@
 //! [`PdeSolution`] with the solution values, interpolation, and finite-difference
 //! Greeks (delta, gamma) read directly from the grid.
 
-use super::exercise::PenaltyExercise;
+use super::exercise::{ExerciseType, PenaltyExercise};
 use super::grid::{find_nearest, Grid1D};
 use super::problem::PdeProblem1D;
 use super::stepper::{RannacherStepper, StepperError, ThetaStepper, TimeStepper};
@@ -81,7 +81,13 @@ impl Solver1DBuilder {
         self
     }
 
-    /// Add Bermudan early exercise constraint.
+    /// Add a Bermudan constraint; `solve` rejects dates outside its time grid.
+    ///
+    /// # Arguments
+    ///
+    /// * `payoff_values` - Intrinsic values at each interior spatial grid node.
+    /// * `exercise_times` - Finite year fractions in `[0, maturity]` that must
+    ///   coincide with the configured solver's time levels.
     pub fn bermudan(mut self, payoff_values: Vec<f64>, exercise_times: Vec<f64>) -> Self {
         self.exercise = Some(PenaltyExercise::bermudan(payoff_values, exercise_times));
         self
@@ -121,12 +127,20 @@ impl Solver1D {
 
     /// Solve the PDE problem and return the solution at `t = 0`.
     ///
+    /// # Arguments
+    ///
+    /// * `problem` - PDE coefficients, terminal payoff and boundary conditions
+    ///   evaluated on this solver's spatial and time grids.
+    /// * `maturity` - Strictly positive finite time to maturity in years.
+    ///
     /// # Errors
     ///
     /// - [`PdeSolverError::NonPositiveMaturity`] if `maturity <= 0`.
     /// - [`PdeSolverError::ZeroTimeSteps`] if the stepper has no time steps
     ///   (the backward march would never run, leaving the bare terminal
     ///   payoff as the "solution").
+    /// - [`PdeSolverError::InvalidExerciseTime`] if a Bermudan date is non-finite,
+    ///   outside `[0, maturity]`, or absent from the time grid.
     /// - [`PdeSolverError::Stepper`] if the time stepper fails — in practice,
     ///   an explicit / under-damped (`theta < 0.5`) scheme whose time step
     ///   violates the CFL stability condition, or a degenerate tridiagonal
@@ -156,6 +170,21 @@ impl Solver1D {
 
         // Time levels: T → 0
         let levels = self.stepper.time_levels(maturity);
+        if let Some(PenaltyExercise {
+            exercise_type: ExerciseType::Bermudan { exercise_times },
+            ..
+        }) = &self.exercise
+        {
+            for &time in exercise_times {
+                if !time.is_finite()
+                    || time < 0.0
+                    || time > maturity
+                    || !levels.iter().any(|&level| (level - time).abs() < 1e-10)
+                {
+                    return Err(PdeSolverError::InvalidExerciseTime { time });
+                }
+            }
+        }
 
         let mut exercise_boundary: Vec<(f64, f64)> = Vec::new();
 
@@ -393,6 +422,12 @@ pub enum PdeSolverError {
     /// march never runs and the "solution" would be the bare terminal payoff.
     #[error("PDE solve requires at least one time step, got n_steps = 0")]
     ZeroTimeSteps,
+    /// A Bermudan exercise time is invalid or absent from the solver time grid.
+    #[error("Bermudan exercise time {time} must be finite, within maturity, and aligned with the PDE time grid")]
+    InvalidExerciseTime {
+        /// Rejected year fraction from valuation.
+        time: f64,
+    },
     /// Time-stepping error — e.g. an explicit / under-damped scheme whose
     /// time step violates the CFL stability condition.
     #[error(transparent)]

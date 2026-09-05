@@ -235,7 +235,9 @@ pub(crate) fn bdc_from_py(
     obj: &Bound<'_, PyAny>,
     what: &str,
 ) -> PyResult<finstack_quant_core::dates::BusinessDayConvention> {
-    if let Ok(convention) = obj.cast::<crate::bindings::core::dates::calendar::PyBusinessDayConvention>() {
+    if let Ok(convention) =
+        obj.cast::<crate::bindings::core::dates::calendar::PyBusinessDayConvention>()
+    {
         return Ok(convention.borrow().inner);
     }
     if let Ok(text) = obj.extract::<std::borrow::Cow<'_, str>>() {

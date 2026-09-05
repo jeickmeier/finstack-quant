@@ -1052,7 +1052,7 @@ impl PyPortfolioLossResult {
         self.inner.var
     }
 
-    /// Mean loss beyond `var`, loss-positive.
+    /// Probability-weighted mean loss in the worst `1 - confidence` tail, loss-positive.
     #[getter]
     fn expected_shortfall(&self) -> f64 {
         self.inner.expected_shortfall

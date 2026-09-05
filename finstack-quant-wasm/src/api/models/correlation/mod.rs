@@ -391,7 +391,9 @@ pub fn nearest_correlation(
 /// `[0, 1]` — a 0-3% equity tranche is `(0.0, 0.03)`, not `(0.0, 3.0)`. Each
 /// path's pool loss fraction `L = loss / poolNotional` maps through
 /// `clamp(L - attachment, 0, width) / width`, and the resulting distribution is
-/// aggregated at `confidence` using the loss-positive nearest-rank conventions.
+/// aggregated at `confidence` using loss-positive nearest-rank VaR and ES over
+/// exactly the worst `1 - confidence` probability mass, with fractional weight
+/// on the boundary observation when necessary.
 ///
 /// Returns an object with `attachment`, `detachment`, `tranche_notional`,
 /// `expected_loss_fraction`, `expected_loss_amount`, `var_fraction`,
