@@ -26,14 +26,22 @@ const DEFAULT_PNL_SCENARIO_POINTS: usize =
     frozen,
     skip_from_py_object
 )]
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct PySensitivityMatrix {
+    base_currency: finstack_quant_core::currency::Currency,
+    #[serde(flatten)]
     pub(crate) inner: finstack_quant_portfolio::sensitivity::SensitivityMatrix,
 }
 
 impl PySensitivityMatrix {
-    fn from_inner(inner: finstack_quant_portfolio::sensitivity::SensitivityMatrix) -> Self {
-        Self { inner }
+    fn from_inner(
+        inner: finstack_quant_portfolio::sensitivity::SensitivityMatrix,
+        base_currency: finstack_quant_core::currency::Currency,
+    ) -> Self {
+        Self {
+            inner,
+            base_currency,
+        }
     }
 }
 
@@ -45,18 +53,23 @@ impl PySensitivityMatrix {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Parse from JSON (``{position_ids, factor_ids, data, n_factors}``).
+    /// Parse from JSON (``{base_currency, position_ids, factor_ids, data}``).
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
+        serde_json::from_str(json).map_err(display_to_py)
     }
 
     /// Serialize to compact JSON.
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serde_json::to_string(self).map_err(display_to_py)
+    }
+
+    /// ISO reporting currency for every sensitivity entry.
+    #[getter]
+    fn base_currency(&self) -> String {
+        self.base_currency.to_string()
     }
 
     /// Ordered position identifiers (row axis).
@@ -187,7 +200,7 @@ impl PyFactorPnlProfile {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Parse from JSON (``{factor_id, position_ids, shifts, position_pnls}``).
+    /// Parse from JSON (``{base_currency, factor_id, position_ids, shifts, position_pnls}``).
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -199,6 +212,12 @@ impl PyFactorPnlProfile {
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
+    }
+
+    /// ISO reporting currency for every P&L amount.
+    #[getter]
+    fn base_currency(&self) -> String {
+        self.inner.base_currency.to_string()
     }
 
     /// Factor identifier.
@@ -270,6 +289,8 @@ impl PyFactorPnlProfile {
 /// as_of : datetime.date | str
 ///     Valuation date, either a date-like object (``datetime.date``,
 ///     ``pandas.Timestamp``) or an ISO 8601 string.
+/// base_currency : str
+///     ISO reporting currency for every returned sensitivity or P&L amount; missing FX raises KeyError.
 /// bump_config_json : str, optional
 ///     JSON-serialized ``BumpSizeConfig``.  Defaults to 1 bp / 1 % per
 ///     factor type.
@@ -279,13 +300,14 @@ impl PyFactorPnlProfile {
 /// SensitivityMatrix
 ///     Positions × factors delta matrix.
 #[pyfunction]
-#[pyo3(signature = (positions_json, factors_json, market, as_of, bump_config_json=None))]
+#[pyo3(signature = (positions_json, factors_json, market, as_of, base_currency, bump_config_json=None))]
 fn compute_factor_sensitivities(
     py: Python<'_>,
     positions_json: &Bound<'_, PyAny>,
     factors_json: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
+    base_currency: &str,
     bump_config_json: Option<&str>,
 ) -> PyResult<PySensitivityMatrix> {
     let positions_json =
@@ -295,6 +317,9 @@ fn compute_factor_sensitivities(
     let factors_json: &str = &factors_json;
     let market = extract_market(py, market)?;
     let date = crate::bindings::date_utils::extract_date(as_of)?;
+    let base_currency = base_currency
+        .parse::<finstack_quant_core::currency::Currency>()
+        .map_err(display_to_py)?;
     let positions_json = positions_json.to_owned();
     let factors_json = factors_json.to_owned();
     let bump_config_json = bump_config_json.map(str::to_owned);
@@ -305,9 +330,10 @@ fn compute_factor_sensitivities(
             &factors_json,
             &market,
             date,
+            base_currency,
             bump_config_json.as_deref(),
         )
-        .map(PySensitivityMatrix::from_inner)
+        .map(|matrix| PySensitivityMatrix::from_inner(matrix, base_currency))
     })
     .map_err(core_to_py)
 }
@@ -329,6 +355,8 @@ fn compute_factor_sensitivities(
 /// as_of : datetime.date | str
 ///     Valuation date, either a date-like object (``datetime.date``,
 ///     ``pandas.Timestamp``) or an ISO 8601 string.
+/// base_currency : str
+///     ISO reporting currency for every returned sensitivity or P&L amount; missing FX raises KeyError.
 /// bump_config_json : str, optional
 ///     JSON-serialized ``BumpSizeConfig``.
 /// n_scenario_points : int, optional
@@ -340,18 +368,19 @@ fn compute_factor_sensitivities(
 ///     One profile per factor, each containing scenario P&L for every position.
 #[pyfunction]
 #[pyo3(
-    signature = (positions_json, factors_json, market, as_of, bump_config_json=None, n_scenario_points=DEFAULT_PNL_SCENARIO_POINTS),
-    text_signature = "(positions_json, factors_json, market, as_of, bump_config_json=None, n_scenario_points=5)"
+    signature = (positions_json, factors_json, market, as_of, base_currency, bump_config_json=None, n_scenario_points=DEFAULT_PNL_SCENARIO_POINTS),
+    text_signature = "(positions_json, factors_json, market, as_of, base_currency, bump_config_json=None, n_scenario_points=5)"
 )]
 fn compute_pnl_profiles(
-    py: Python<'_>,
     positions_json: &Bound<'_, PyAny>,
     factors_json: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
+    base_currency: &str,
     bump_config_json: Option<&str>,
     n_scenario_points: usize,
 ) -> PyResult<Vec<PyFactorPnlProfile>> {
+    let py = market.py();
     let positions_json =
         crate::bindings::extract::extract_records_json(py, positions_json, "positions")?;
     let positions_json: &str = &positions_json;
@@ -359,6 +388,9 @@ fn compute_pnl_profiles(
     let factors_json: &str = &factors_json;
     let market = extract_market(py, market)?;
     let date = crate::bindings::date_utils::extract_date(as_of)?;
+    let base_currency = base_currency
+        .parse::<finstack_quant_core::currency::Currency>()
+        .map_err(display_to_py)?;
     let positions_json = positions_json.to_owned();
     let factors_json = factors_json.to_owned();
     let bump_config_json = bump_config_json.map(str::to_owned);
@@ -369,6 +401,7 @@ fn compute_pnl_profiles(
             &factors_json,
             &market,
             date,
+            base_currency,
             bump_config_json.as_deref(),
             n_scenario_points,
         )

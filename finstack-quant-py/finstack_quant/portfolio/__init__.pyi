@@ -3835,11 +3835,11 @@ class ReplayResult:
     ...         "num_steps": 0,
     ...         "start_value": money,
     ...         "end_value": money,
-    ...         "total_pnl": money,
-    ...         "max_drawdown": money,
-    ...         "max_drawdown_pct": 0.0,
-    ...         "max_drawdown_peak_date": "2025-01-15",
-    ...         "max_drawdown_trough_date": "2025-01-15",
+    ...         "total_mtm_pnl": money,
+    ...         "max_mtm_drawdown": money,
+    ...         "max_mtm_drawdown_pct": 0.0,
+    ...         "max_mtm_drawdown_peak_date": "2025-01-15",
+    ...         "max_mtm_drawdown_trough_date": "2025-01-15",
     ...     },
     ... }
     >>> ReplayResult.from_json(json.dumps(doc)).summary["num_steps"]
@@ -3929,7 +3929,7 @@ class ReplayResult:
         """
         Per-step value and P&L ladder as a pandas DataFrame.
 
-        Columns: ``date``, ``value``, ``daily_pnl``, ``cumulative_pnl``. The schema is pinned, so an empty result keeps the
+        Columns: ``date``, ``value``, ``daily_mtm_pnl``, ``cumulative_mtm_pnl``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
 
         Returns
@@ -7668,8 +7668,8 @@ def twrr_linked(returns_json: str | dict[str, Any] | list[Any] | pd.DataFrame, h
     Raises
     ------
     ValueError
-        If ``returns_json`` is malformed, any sub-period return is non-finite,
-        or the compounded growth factor is non-positive.
+        If ``returns_json`` is malformed, any sub-period return is non-finite
+        or at most -1, or the compounded growth factor is non-positive.
 
     Examples
     --------
@@ -7704,7 +7704,7 @@ def twrr_linked_json(returns_json: str | dict[str, Any] | list[Any] | pd.DataFra
     ------
     ValueError
         If ``returns_json`` is malformed, any sub-period return is
-        non-finite, or the compounded growth factor is non-positive.
+        non-finite or at most -1, or the compounded growth factor is non-positive.
 
     Examples
     --------
@@ -8937,6 +8937,7 @@ def position_what_if(
         List of dictionaries. Remove changes use
         ``{"kind": "remove", "position_id": "..."}``; resize changes use
         ``{"kind": "resize", "position_id": "...", "new_quantity": 123.0}``.
+        Supply at most one final change per position; duplicate IDs raise ValueError.
         Add changes are not supported by this JSON-shaped Python helper
         because adding requires a typed Rust position object.
 
@@ -9057,7 +9058,8 @@ class WeightingScheme:
         -------
         WeightingScheme
             Weights as signed shares of
-            ``|instrument.notional().amount()| * scale_factor()``.
+            absolute deal notional converted to portfolio base currency at the
+            valuation date, multiplied by ``scale_factor()``.
             Instruments that do not expose deal notional fail; there is no
             fallback to ``scale_factor()`` as a dollar proxy.
 
@@ -9081,7 +9083,9 @@ class WeightingScheme:
         Returns
         -------
         WeightingScheme
-            Existing weights as quantity multipliers and candidate weights as quantities.
+            Existing weights as quantity multipliers starting at one, and candidate
+            weights as quantities starting at zero. Turnover is the sum of absolute
+            multiplier changes for existing holdings.
 
         Notes
         -----
@@ -11868,7 +11872,8 @@ class PortfolioOptimizationSpec:
         Parameters
         ----------
         constraint : Constraint
-            Constraint to append to the current optimization specification.
+            Constraint to append to the current optimization specification. An explicit
+            budget replaces the implicit sum-of-weights budget of one when solving.
 
         Returns
         -------
@@ -12521,10 +12526,26 @@ class SensitivityMatrix:
     --------
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import compute_factor_sensitivities
-    >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15")
+    >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "USD")
     >>> (matrix.n_positions, matrix.n_factors)
     (0, 0)
     """
+
+    @property
+    def base_currency(self) -> str:
+        """
+        ISO reporting currency of monetary entries.
+
+        Returns
+        -------
+        str
+            Three-letter currency code used for the calculation.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
 
     @staticmethod
     def from_json(json: str) -> SensitivityMatrix:
@@ -12738,11 +12759,27 @@ class FactorPnlProfile:
     --------
     >>> from finstack_quant.portfolio import FactorPnlProfile
     >>> profile = FactorPnlProfile.from_json(
-    ...     '{"factor_id":"USD_10Y","position_ids":["P1"],"shifts":[-1.0,0.0,1.0],"position_pnls":[[-1.0],[0.0],[1.0]]}'
+    ...     '{"base_currency":"USD","factor_id":"USD_10Y","position_ids":["P1"],"shifts":[-1.0,0.0,1.0],"position_pnls":[[-1.0],[0.0],[1.0]]}'
     ... )
     >>> profile.to_dataframe()["P1"].tolist()
     [-1.0, 0.0, 1.0]
     """
+
+    @property
+    def base_currency(self) -> str:
+        """
+        ISO reporting currency of monetary entries.
+
+        Returns
+        -------
+        str
+            Three-letter currency code used for the calculation.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
 
     @staticmethod
     def from_json(json: str) -> FactorPnlProfile:
@@ -12883,7 +12920,8 @@ def compute_factor_sensitivities(
     factors_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
     market: MarketContext | str,
     as_of: datetime.date | str,
-    bump_config_json: str | dict[str, Any] | list[Any] | pd.DataFrame | None = None,
+    base_currency: str,
+    bump_config_json: str | None = None,
 ) -> SensitivityMatrix:
     """
         Compute first-order factor sensitivities using central finite differences.
@@ -12899,6 +12937,8 @@ def compute_factor_sensitivities(
             ``MarketContext`` instance or JSON string.
         as_of : datetime.date | str
             Valuation date, either a date-like object or an ISO 8601 string.
+        base_currency : str
+            ISO reporting currency for every sensitivity or P&L amount. Missing FX raises KeyError.
         bump_config_json : str, optional
             Optional JSON-serialized ``BumpSizeConfig``.
             Defaults to 1 bp / 1 % per factor type.
@@ -12922,7 +12962,7 @@ def compute_factor_sensitivities(
         --------
         >>> from finstack_quant.core.market_data import MarketContext
         >>> from finstack_quant.portfolio import compute_factor_sensitivities
-        >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15")
+        >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "USD")
         >>> matrix.to_dataframe().shape
         (0, 0)
     """
@@ -12933,7 +12973,8 @@ def compute_pnl_profiles(
     factors_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
     market: MarketContext | str,
     as_of: datetime.date | str,
-    bump_config_json: str | dict[str, Any] | list[Any] | pd.DataFrame | None = None,
+    base_currency: str,
+    bump_config_json: str | None = None,
     n_scenario_points: int = 5,
 ) -> list[FactorPnlProfile]:
     """
@@ -12950,7 +12991,9 @@ def compute_pnl_profiles(
         ``MarketContext`` instance or JSON string.
     as_of : datetime.date | str
         Valuation date, either a date-like object or an ISO 8601 string.
-    bump_config_json : str | dict | list | pandas.DataFrame, optional
+    base_currency : str
+        ISO reporting currency for every P&L amount; missing FX raises KeyError.
+    bump_config_json : str, optional
         Optional JSON-serialized ``BumpSizeConfig``.
     n_scenario_points : int, default 5
         Number of scenario grid points
@@ -12976,7 +13019,7 @@ def compute_pnl_profiles(
     --------
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import compute_pnl_profiles
-    >>> compute_pnl_profiles("[]", "[]", MarketContext(), "2025-01-15")
+    >>> compute_pnl_profiles("[]", "[]", MarketContext(), "2025-01-15", "USD")
     []
     """
     ...
@@ -12996,7 +13039,7 @@ class FactorRiskDecomposition:
     --------
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import compute_factor_sensitivities, decompose_factor_risk
-    >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15")
+    >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "USD")
     >>> decompose_factor_risk(matrix, '{"factor_ids":[],"n":0,"data":[]}').total_risk
     0.0
     """
@@ -13261,7 +13304,7 @@ def decompose_factor_risk(
     --------
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import compute_factor_sensitivities, decompose_factor_risk
-    >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15")
+    >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "USD")
     >>> result = decompose_factor_risk(matrix, '{"factor_ids":[],"n":0,"data":[]}', "volatility")
     >>> (result.total_risk, result.to_factor_dataframe().shape)
     (0.0, (0, 4))

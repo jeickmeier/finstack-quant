@@ -35,6 +35,7 @@ struct NettingSetMarginWire {
     total_margin: Money,
     position_count: usize,
     im_methodology: ImMethodology,
+    is_approximate: bool,
     sensitivities: Option<SimmSensitivitiesJson>,
     im_breakdown: BTreeMap<String, Money>,
 }
@@ -49,6 +50,7 @@ impl From<&NettingSetMargin> for NettingSetMarginWire {
             total_margin: m.total_margin,
             position_count: m.position_count,
             im_methodology: m.im_methodology,
+            is_approximate: m.is_approximate,
             sensitivities: m.sensitivities.as_ref().map(SimmSensitivitiesJson::from),
             im_breakdown: m
                 .im_breakdown
@@ -69,6 +71,7 @@ impl From<NettingSetMarginWire> for NettingSetMargin {
             total_margin: w.total_margin,
             position_count: w.position_count,
             im_methodology: w.im_methodology,
+            is_approximate: w.is_approximate,
             sensitivities: w.sensitivities.map(SimmSensitivities::from),
             im_breakdown: w.im_breakdown.into_iter().collect(),
         }

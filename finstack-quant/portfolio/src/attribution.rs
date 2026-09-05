@@ -295,6 +295,10 @@ impl FactorAccumulator {
             convert(pos_attr.market_scalars_pnl)?.amount(),
         );
         self.add(FactorBucket::Residual, convert(pos_attr.residual)?.amount());
+        self.add(
+            FactorBucket::FxTranslationPnl,
+            convert(pos_attr.fx_translation_pnl)?.amount(),
+        );
         Ok(())
     }
 
@@ -2070,6 +2074,19 @@ mod tests {
             "residual should be 400.0, got {}",
             report.total_residual
         );
+    }
+
+    #[test]
+    fn embedded_fx_translation_is_preserved_once() {
+        let mut position = sample_position_attr("COMPOSITE", 10.0, 0.0, 0.0);
+        position.fx_translation_pnl = Money::from((10_i64, Currency::USD));
+        let mut acc = FactorAccumulator::new();
+        acc.add_converted(&position, &Ok).expect("convert");
+        let result = acc
+            .into_portfolio_attribution(Currency::USD, IndexMap::new())
+            .expect("aggregate");
+        assert_eq!(result.total_pnl.amount(), 10.0);
+        assert_eq!(result.fx_translation_pnl.amount(), 10.0);
     }
 
     /// Audit (Portfolio): a single invalid constituent must flag the whole

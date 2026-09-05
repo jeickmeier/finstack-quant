@@ -71,15 +71,19 @@ impl PortfolioMarginAggregator {
     /// # Returns
     ///
     /// Aggregator pre-populated with positions that expose margin metadata.
-    #[must_use]
-    pub fn from_portfolio(portfolio: &Portfolio) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if positions in one netting set carry
+    /// conflicting margin specifications.
+    pub fn from_portfolio(portfolio: &Portfolio) -> Result<Self> {
         let mut aggregator = Self::new(portfolio.base_currency);
 
         for position in &portfolio.positions {
-            aggregator.add_position(position);
+            aggregator.add_position(position)?;
         }
 
-        aggregator
+        Ok(aggregator)
     }
 
     /// Add a position to the aggregator.
@@ -90,9 +94,9 @@ impl PortfolioMarginAggregator {
     /// # Arguments
     ///
     /// * `position` - Position to inspect and register.
-    pub(crate) fn add_position(&mut self, position: &Position) {
+    pub(crate) fn add_position(&mut self, position: &Position) -> Result<()> {
         let Some(marginable) = position.instrument.as_marginable() else {
-            return;
+            return Ok(());
         };
         let netting_set_id = marginable.netting_set_id();
         let margin_spec = marginable.margin_spec().cloned();
@@ -103,20 +107,26 @@ impl PortfolioMarginAggregator {
                 .entry(ns_id.clone())
                 .or_insert_with(|| NettingSet::new(ns_id.clone()));
             if let Some(spec) = margin_spec {
-                match &netting_set.margin_spec {
-                    None => netting_set.margin_spec = Some(spec),
-                    Some(existing) if existing != &spec => {
-                        tracing::warn!(
-                            netting_set_id = ?netting_set.id,
-                            "Conflicting margin specs registered for netting set; keeping first spec"
-                        );
+                if let Some(existing) = &netting_set.margin_spec {
+                    if existing.csa != spec.csa
+                        || existing.clearing_status != spec.clearing_status
+                        || existing.im_methodology != spec.im_methodology
+                        || existing.vm_frequency != spec.vm_frequency
+                        || existing.settlement_lag != spec.settlement_lag
+                    {
+                        return Err(Error::validation(format!(
+                            "Conflicting margin specifications for netting set '{}' at position '{}' (registered positions: {:?})",
+                            netting_set.id, position.position_id, netting_set.positions
+                        )));
                     }
-                    Some(_) => {}
+                } else {
+                    netting_set.margin_spec = Some(spec);
                 }
             }
             netting_set.positions.push(position.position_id.clone());
             self.positions.push((position.position_id.clone(), ns_id));
         }
+        Ok(())
     }
 
     /// Calculate margin requirements for the portfolio.
@@ -381,6 +391,8 @@ impl PortfolioMarginAggregator {
             im_methodology,
         )?;
 
+        result.is_approximate = netting_set.is_cleared();
+
         if let Some((sensitivities, breakdown)) = simm_breakdown {
             result = result.with_simm_breakdown(sensitivities, breakdown);
         }
@@ -417,14 +429,12 @@ impl PortfolioMarginAggregator {
 
             match calculator.calculate(marginable, market, as_of) {
                 Ok(im_result) => {
-                    // B-6: the calculator prices the marginable's deal
-                    // exposure (instrument already carries deal notional,
-                    // matching `mtm_for_vm`), so scale the IM contribution
-                    // by the signed lot multiplier. The sign is preserved:
-                    // identical cleared contracts are fungible at the CCP,
-                    // so an offsetting short cancels its long's IM
-                    // contribution.
-                    let scaled_im = position.scale_value(im_result.amount)?;
+                    // This conservative proxy grants no portfolio offsets. A short
+                    // requires collateral just as a long does; signed sensitivity
+                    // netting belongs to the SIMM path, not standalone IM amounts.
+                    let scaled_im = im_result
+                        .amount
+                        .checked_mul_f64(position.scale_factor().abs())?;
                     let amount = if scaled_im.currency() == self.base_currency {
                         Ok(scaled_im.amount())
                     } else {
@@ -662,6 +672,48 @@ mod tests {
     }
 
     #[test]
+    fn conflicting_csa_terms_are_rejected_in_either_order() {
+        let mut first = OtcMarginSpec::usd_bilateral().expect("CSA");
+        first.settlement_lag = 1;
+        let mut second = first.clone();
+        second.settlement_lag = 2;
+        for specs in [[first.clone(), second.clone()], [second, first]] {
+            let mut builder = Portfolio::builder("CONFLICT")
+                .base_currency(Currency::USD)
+                .as_of(date!(2024 - 01 - 01))
+                .entity(Entity::new(DUMMY_ENTITY_ID));
+            for (i, spec) in specs.into_iter().enumerate() {
+                let id = format!("position-{i}");
+                let instrument = Arc::new(
+                    TestMarginableInstrument::new(
+                        &id,
+                        NettingSetId::bilateral("BANK", "CSA"),
+                        0.0,
+                        Money::from((0_i64, Currency::USD)),
+                    )
+                    .with_margin_spec(spec),
+                );
+                builder = builder.position(
+                    Position::new(
+                        id.as_str(),
+                        DUMMY_ENTITY_ID,
+                        &id,
+                        instrument,
+                        1.0,
+                        PositionUnit::Units,
+                    )
+                    .unwrap(),
+                );
+            }
+            let error = PortfolioMarginAggregator::from_portfolio(&builder.build().unwrap())
+                .expect_err("conflicting CSA");
+            assert!(error
+                .to_string()
+                .contains("Conflicting margin specifications"));
+        }
+    }
+
+    #[test]
     fn test_aggregator_creation() {
         let aggregator = PortfolioMarginAggregator::new(Currency::USD);
         assert!(aggregator.netting_sets.is_empty());
@@ -710,7 +762,8 @@ mod tests {
             .position(position)
             .build()
             .expect("portfolio should build");
-        let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio);
+        let mut aggregator =
+            PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
 
         let first = aggregator
             .calculate(&portfolio, &MarketContext::new(), as_of)
@@ -756,7 +809,8 @@ mod tests {
             .position(position)
             .build()
             .expect("portfolio should build");
-        let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio);
+        let mut aggregator =
+            PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
 
         let result = aggregator
             .calculate(&portfolio, &MarketContext::new(), as_of)
@@ -807,7 +861,8 @@ mod tests {
             .position(position)
             .build()
             .expect("portfolio should build");
-        let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio);
+        let mut aggregator =
+            PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
 
         let result = aggregator
             .calculate(&portfolio, &MarketContext::new(), as_of)
@@ -853,7 +908,8 @@ mod tests {
             .position(position)
             .build()
             .expect("portfolio should build");
-        let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio);
+        let mut aggregator =
+            PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
 
         let result = aggregator
             .calculate(&portfolio, &MarketContext::new(), as_of)
@@ -903,7 +959,8 @@ mod tests {
             .entity(Entity::new(DUMMY_ENTITY_ID))
             .build()
             .expect("empty portfolio should build");
-        let mut aggregator = PortfolioMarginAggregator::from_portfolio(&original_portfolio);
+        let mut aggregator = PortfolioMarginAggregator::from_portfolio(&original_portfolio)
+            .expect("consistent margin terms");
 
         let result = aggregator
             .calculate(&empty_portfolio, &MarketContext::new(), as_of)

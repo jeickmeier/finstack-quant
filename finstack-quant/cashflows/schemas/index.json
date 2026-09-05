@@ -10,7 +10,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json",
-      "bytes": 10136,
+      "bytes": 10199,
       "kind": "component",
       "path": "schemas/cashflow/1/coupon_specs.schema.json",
       "summary": "Coupon rate, frequency, day count and stub handling for one leg.",

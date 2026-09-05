@@ -35,6 +35,13 @@ come from `finstack-quant-margin`.
 
 ## Conventions
 
+- **Clearing estimate.** The clearing path sums nonnegative standalone proxy IM
+  using absolute position scales, with no assumed offsets. Each such netting-set
+  result carries `is_approximate = true`; it is not a CCP portfolio-margin replication.
+- **Agreement consistency.** `from_portfolio` returns an error for conflicting
+  CSA, clearing, methodology, frequency, or settlement terms within one netting
+  set. Trade-specific SIMM credit classifications may differ.
+
 - **Per-netting-set IM.** Initial margin is computed per netting set, never on a
   gross portfolio basis, then summed into the base currency.
 - **Signed, scaled sensitivities.** `Marginable::simm_sensitivities` returns
@@ -75,7 +82,7 @@ fn report(
     portfolio: &Portfolio,
     market: &MarketContext,
 ) -> finstack_quant_portfolio::Result<()> {
-    let mut aggregator = PortfolioMarginAggregator::from_portfolio(portfolio);
+    let mut aggregator = PortfolioMarginAggregator::from_portfolio(portfolio).expect("consistent margin terms");
     let result = aggregator.calculate(portfolio, market, date!(2025 - 01 - 15))?;
 
     println!("Total IM: {}", result.total_initial_margin);

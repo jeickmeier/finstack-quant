@@ -153,7 +153,8 @@ fn bench_margin_aggregation(c: &mut Criterion) {
             &n_positions,
             |b, _| {
                 b.iter(|| {
-                    let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio);
+                    let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio)
+                        .expect("consistent margin terms");
                     aggregator
                         .calculate(
                             std::hint::black_box(&portfolio),

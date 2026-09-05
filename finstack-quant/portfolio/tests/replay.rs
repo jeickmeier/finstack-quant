@@ -185,14 +185,14 @@ mod replay_tests {
         assert_eq!(result.steps.len(), 3);
 
         // Step 0 has no P&L
-        assert!(result.steps[0].daily_pnl.is_none());
-        assert!(result.steps[0].cumulative_pnl.is_none());
+        assert!(result.steps[0].daily_mtm_pnl.is_none());
+        assert!(result.steps[0].cumulative_mtm_pnl.is_none());
         assert!(result.steps[0].attribution.is_none());
 
         // All steps in PvOnly have no P&L fields
         for step in &result.steps {
-            assert!(step.daily_pnl.is_none());
-            assert!(step.cumulative_pnl.is_none());
+            assert!(step.daily_mtm_pnl.is_none());
+            assert!(step.cumulative_mtm_pnl.is_none());
             assert!(step.attribution.is_none());
         }
 
@@ -252,19 +252,19 @@ mod replay_tests {
         .unwrap();
 
         // Step 0: no P&L
-        assert!(result.steps[0].daily_pnl.is_none());
-        assert!(result.steps[0].cumulative_pnl.is_none());
+        assert!(result.steps[0].daily_mtm_pnl.is_none());
+        assert!(result.steps[0].cumulative_mtm_pnl.is_none());
 
         // Steps 1+: has P&L, no attribution
         for step in &result.steps[1..] {
-            assert!(step.daily_pnl.is_some());
-            assert!(step.cumulative_pnl.is_some());
+            assert!(step.daily_mtm_pnl.is_some());
+            assert!(step.cumulative_mtm_pnl.is_some());
             assert!(step.attribution.is_none());
         }
 
         // Cumulative at last step equals total_pnl in summary
-        let last_cum = result.steps.last().unwrap().cumulative_pnl.unwrap();
-        let diff = (last_cum.amount() - result.summary.total_pnl.amount()).abs();
+        let last_cum = result.steps.last().unwrap().cumulative_mtm_pnl.unwrap();
+        let diff = (last_cum.amount() - result.summary.total_mtm_pnl.amount()).abs();
         assert!(diff < 1e-6, "cumulative P&L should match summary total_pnl");
     }
 
@@ -312,8 +312,73 @@ mod replay_tests {
         );
 
         // Also has P&L in FullAttribution mode
-        assert!(result.steps[1].daily_pnl.is_some());
-        assert!(result.steps[1].cumulative_pnl.is_some());
+        assert!(result.steps[1].daily_mtm_pnl.is_some());
+        assert!(result.steps[1].cumulative_mtm_pnl.is_some());
+    }
+
+    #[test]
+    fn replay_labels_mtm_separately_from_cash_inclusive_attribution() {
+        let before = date!(2024 - 06 - 20);
+        let after = date!(2024 - 07 - 05);
+        let bond = finstack_quant_valuations::instruments::Bond::fixed(
+            "COUPON",
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).unwrap(),
+            date!(2024 - 01 - 01),
+            date!(2026 - 01 - 01),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD",
+        )
+        .unwrap();
+        let portfolio = Portfolio::builder("COUPON_REPLAY")
+            .base_currency(Currency::USD)
+            .as_of(before)
+            .entity(Entity::new("ENTITY_A"))
+            .position(
+                Position::new(
+                    "COUPON",
+                    "ENTITY_A",
+                    "COUPON",
+                    Arc::new(bond),
+                    1.0,
+                    PositionUnit::Units,
+                )
+                .unwrap(),
+            )
+            .build()
+            .unwrap();
+        let timeline = ReplayTimeline::new(vec![
+            (before, market_at_rate(before, 450.0)),
+            (after, market_at_rate(after, 450.0)),
+        ])
+        .unwrap();
+        let config = ReplayConfig {
+            mode: ReplayMode::FullAttribution,
+            attribution_method: AttributionMethod::Parallel,
+            valuation_options: PortfolioValuationOptions {
+                metrics: RequestedMetrics::Only(vec![]),
+                ..Default::default()
+            },
+            on_error: ReplayErrorPolicy::Strict,
+        };
+        let result = finstack_quant_portfolio::replay::replay_portfolio(
+            &portfolio,
+            &timeline,
+            &config,
+            &FinstackConfig::default(),
+        )
+        .unwrap();
+        let step = &result.steps[1];
+        let mtm = step.daily_mtm_pnl.unwrap().amount();
+        let economic = step.attribution.as_ref().unwrap().total_pnl.amount();
+        assert!(mtm < -20_000.0, "the coupon payment reduces marked PV");
+        assert!(
+            economic - mtm > 24_000.0,
+            "attribution includes the paid coupon"
+        );
+        let json = serde_json::to_value(&result).unwrap();
+        assert!(json["steps"][1].get("daily_pnl").is_none());
+        assert!(json["summary"].get("total_mtm_pnl").is_some());
     }
 
     #[test]
@@ -397,12 +462,15 @@ mod replay_tests {
         .unwrap();
 
         // Max drawdown should be positive (a loss amount)
-        assert!(result.summary.max_drawdown.amount() >= 0.0);
+        assert!(result.summary.max_mtm_drawdown.amount() >= 0.0);
         // Peak should be at step 0 (rates started at 0)
-        assert_eq!(result.summary.max_drawdown_peak_date, date!(2024 - 01 - 01));
+        assert_eq!(
+            result.summary.max_mtm_drawdown_peak_date,
+            date!(2024 - 01 - 01)
+        );
         // Trough should be at step 1 (highest rates)
         assert_eq!(
-            result.summary.max_drawdown_trough_date,
+            result.summary.max_mtm_drawdown_trough_date,
             date!(2024 - 01 - 02)
         );
     }
@@ -670,7 +738,7 @@ mod replay_tests {
         assert_eq!(result.skipped_dates[0].0, failed_date);
         assert_eq!(
             result.steps[1]
-                .daily_pnl
+                .daily_mtm_pnl
                 .expect("surviving step daily P&L")
                 .amount(),
             200.0,
@@ -703,8 +771,11 @@ mod replay_tests {
                 parallel_step.valuation.total_base_currency,
                 serial_step.valuation.total_base_currency
             );
-            assert_eq!(parallel_step.daily_pnl, serial_step.daily_pnl);
-            assert_eq!(parallel_step.cumulative_pnl, serial_step.cumulative_pnl);
+            assert_eq!(parallel_step.daily_mtm_pnl, serial_step.daily_mtm_pnl);
+            assert_eq!(
+                parallel_step.cumulative_mtm_pnl,
+                serial_step.cumulative_mtm_pnl
+            );
         }
     }
 

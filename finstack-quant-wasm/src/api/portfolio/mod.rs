@@ -533,7 +533,7 @@ pub fn twrr_modified_dietz(period_json: &str) -> Result<f64, JsValue> {
 /// # Errors
 ///
 /// Throws a JavaScript exception if `returnsJson` is malformed, the return
-/// series is invalid (non-finite sub-period return, non-positive compounded
+/// series is invalid (non-finite sub-period return or return at most -1, non-positive compounded
 /// growth factor), or the linked result cannot be converted to a JavaScript
 /// value.
 #[wasm_bindgen(js_name = twrrLinked)]

@@ -25,6 +25,8 @@ pub struct NettingSetMargin {
     pub position_count: usize,
     /// IM methodology used
     pub im_methodology: ImMethodology,
+    /// Whether IM is a conservative gross-exposure proxy rather than a CCP portfolio calculation.
+    pub is_approximate: bool,
     /// Aggregated sensitivities (for SIMM breakdown)
     pub sensitivities: Option<SimmSensitivities>,
     /// Breakdown by risk class (for SIMM)
@@ -61,6 +63,7 @@ impl NettingSetMargin {
                 total_margin: total,
                 position_count,
                 im_methodology,
+                is_approximate: false,
                 sensitivities: None,
                 im_breakdown: HashMap::default(),
             }

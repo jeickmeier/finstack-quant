@@ -192,8 +192,8 @@ fn run_twrr_linked(
 /// Raises
 /// ------
 /// ValueError
-///     When any sub-period return is non-finite or the compounded growth
-///     factor is non-positive.
+///     When any sub-period return is non-finite or at most -1, or the
+///     compounded growth factor is non-positive.
 #[pyfunction]
 #[pyo3(text_signature = "(returns_json, horizon_years)")]
 fn twrr_linked(

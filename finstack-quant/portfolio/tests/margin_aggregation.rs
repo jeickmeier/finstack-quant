@@ -172,7 +172,8 @@ fn run_margin(
         builder = builder.position(position);
     }
     let portfolio = builder.build().expect("portfolio should build");
-    let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio);
+    let mut aggregator =
+        PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
     let result = aggregator
         .calculate(&portfolio, &MarketContext::new(), as_of)
         .expect("margin run should succeed");
@@ -242,6 +243,14 @@ fn b6_clearing_im_scales_with_position_quantity() {
     );
 
     let unit = run_margin(Arc::clone(&instrument), &[1.0]);
+    let short = run_margin(Arc::clone(&instrument), &[-1.0]);
+    let offset = run_margin(Arc::clone(&instrument), &[1.0, -1.0]);
+    assert_eq!(short.total_initial_margin, unit.total_initial_margin);
+    assert!(
+        (offset.total_initial_margin.amount() - 2.0 * unit.total_initial_margin.amount()).abs()
+            < 1e-9
+    );
+    assert!(short.by_netting_set.values().all(|set| set.is_approximate));
     let scaled = run_margin(instrument, &[10.0]);
 
     assert!(
@@ -310,7 +319,8 @@ fn run_margin_for(
         builder = builder.position(position);
     }
     let portfolio = builder.build().expect("portfolio should build");
-    let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio);
+    let mut aggregator =
+        PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
     let result = aggregator
         .calculate(&portfolio, market, as_of)
         .expect("margin run should succeed");

@@ -16,6 +16,8 @@ use finstack_quant_valuations::instruments::Instrument;
 /// P&L profile for one factor across a scenario grid.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FactorPnlProfile {
+    /// Reporting currency of all per-position P&L amounts.
+    pub base_currency: Currency,
     /// Identifier of the shocked factor.
     pub factor_id: FactorId,
     /// Ordered position identifiers indexing the inner `position_pnls` axis.
@@ -215,6 +217,7 @@ impl FullRepricingEngine {
             }
 
             Ok(FactorPnlProfile {
+                base_currency,
                 factor_id: factor.id.clone(),
                 position_ids: positions.iter().map(|(id, _, _)| id.clone()).collect(),
                 shifts: self.scenario_grid.shifts().to_vec(),

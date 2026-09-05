@@ -12,6 +12,7 @@ use crate::Portfolio;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
+use finstack_quant_core::HashSet;
 use finstack_quant_models::factor::risk::{FactorContribution, RiskDecomposition};
 use finstack_quant_models::factor::FactorId;
 
@@ -132,13 +133,14 @@ impl<'a> WhatIfEngine<'a> {
     /// # Errors
     ///
     /// Returns an error for an unsupported add, unknown position, non-finite
-    /// replacement quantity, or an attempt to proportionally resize a zero
-    /// quantity. Propagates decomposition, portfolio-update, and credit-risk
-    /// calculation errors.
+    /// replacement quantity, a proportional resize of a zero quantity, or
+    /// multiple changes to one position. Propagates decomposition,
+    /// portfolio-update, and credit-risk calculation errors.
     pub fn position_what_if(&self, changes: &[PositionChange]) -> Result<WhatIfResult> {
         let mut sensitivities = self.base_sensitivities.clone();
         let mut scenario_positions = self.portfolio.positions().to_vec();
 
+        let mut changed = HashSet::default();
         for change in changes {
             match change {
                 PositionChange::Add { .. } => {
@@ -147,6 +149,11 @@ impl<'a> WhatIfEngine<'a> {
                     ));
                 }
                 PositionChange::Remove { position_id } => {
+                    if !changed.insert(position_id) {
+                        return Err(Error::invalid_input(format!(
+                            "Multiple what-if changes for position '{position_id}'; supply one final change per position"
+                        )));
+                    }
                     let Some(position_idx) = self.position_index(position_id) else {
                         return Err(Error::invalid_input(format!(
                             "Unknown position '{}'",
@@ -162,6 +169,11 @@ impl<'a> WhatIfEngine<'a> {
                     position_id,
                     new_quantity,
                 } => {
+                    if !changed.insert(position_id) {
+                        return Err(Error::invalid_input(format!(
+                            "Multiple what-if changes for position '{position_id}'; supply one final change per position"
+                        )));
+                    }
                     if !new_quantity.is_finite() {
                         return Err(Error::invalid_input(format!(
                             "PositionChange::Resize new_quantity must be finite for position '{}', got {}",
@@ -523,6 +535,24 @@ mod tests {
     }
 
     #[test]
+    fn repeated_position_changes_are_rejected() {
+        let (model, portfolio, market) = build_test_model().expect("setup");
+        let as_of = date!(2024 - 01 - 01);
+        let (base, sensitivities) = model
+            .analyze_with_sensitivities(&portfolio, &market, as_of)
+            .expect("analysis");
+        let changes = [20.0, 30.0].map(|new_quantity| PositionChange::Resize {
+            position_id: PositionId::new("pos-1"),
+            new_quantity,
+        });
+        let error = model
+            .what_if(&base, &sensitivities, &portfolio, &market, as_of)
+            .position_what_if(&changes)
+            .expect_err("duplicate changes");
+        assert!(error.to_string().contains("Multiple what-if changes"));
+    }
+
+    #[test]
     fn test_m1_position_resize_rejects_non_finite_quantity() {
         let Some((model, portfolio, market)) = build_test_model() else {
             panic!("setup");
@@ -806,7 +836,6 @@ mod tests {
 
     #[test]
     fn factor_stress_matches_manually_stressed_market_for_credit_hierarchy() {
-        use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
         use finstack_quant_models::factor::credit::hierarchy::{
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
@@ -818,22 +847,7 @@ mod tests {
 
         let as_of = date!(2024 - 01 - 01);
         let curve_id = CurveId::new("ISSUER-B-HAZ");
-        let discount = DiscountCurve::builder("USD-OIS")
-            .base_date(as_of)
-            .knots([
-                (0.0, 1.0),
-                (1.0, (-0.05_f64).exp()),
-                (5.0, (-0.25_f64).exp()),
-            ])
-            .build()
-            .expect("discount");
-        let hazard = HazardCurve::builder(curve_id.clone())
-            .base_date(as_of)
-            .knots([(1.0, 0.01), (5.0, 0.01)])
-            .recovery_rate(0.40)
-            .build()
-            .expect("hazard");
-        let market = MarketContext::new().insert(discount).insert(hazard);
+        let market = super::super::model::tests::credit_market(as_of, curve_id.clone());
         let factors = vec![
             FactorDefinition {
                 id: FactorId::new("credit::level0::Rating::B"),

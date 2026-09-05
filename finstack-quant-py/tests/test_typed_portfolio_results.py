@@ -460,7 +460,7 @@ def test_replay_portfolio_returns_typed_result() -> None:
     _assert_contract(result, pf.ReplayResult)
     assert result.summary["num_steps"] == expected["summary"]["num_steps"] == 2
     assert len(result.steps) == 2
-    assert _frame_columns(result) == ["date", "value", "daily_pnl", "cumulative_pnl"]
+    assert _frame_columns(result) == ["date", "value", "daily_mtm_pnl", "cumulative_mtm_pnl"]
 
 
 # ---------------------------------------------------------------------------

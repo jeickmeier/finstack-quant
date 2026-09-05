@@ -1790,3 +1790,142 @@ fn exclude_policy_skips_missing_metric_in_weighted_sum() {
         "free weight should move toward the high-Ytm name"
     );
 }
+
+#[test]
+fn unit_scaling_zero_turnover_preserves_long_and_short_quantities() {
+    use finstack_quant_portfolio::optimization::{Constraint, PositionFilter};
+    let as_of = create_date(2024, Month::January, 1).unwrap();
+    let mut builder = PortfolioBuilder::new("UNIT_BASELINE")
+        .base_currency(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"));
+    for (id, quantity) in [("LONG", 10.0), ("SHORT", -10.0)] {
+        builder = builder.position(
+            Position::new(
+                id,
+                "ENT_A",
+                id,
+                Arc::new(MetricInstrument::new(
+                    id,
+                    Money::from((100_i64, Currency::USD)),
+                    IndexMap::new(),
+                )),
+                quantity,
+                PositionUnit::Units,
+            )
+            .unwrap(),
+        );
+    }
+    let mut problem = PortfolioOptimizationProblem::new(
+        builder.build().unwrap(),
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(0.0),
+            filter: None,
+        }),
+    );
+    problem.weighting = WeightingScheme::UnitScaling;
+    problem.constraints = vec![
+        Constraint::Budget { rhs: 2.0 },
+        Constraint::MaxTurnover {
+            label: None,
+            max_turnover: 0.0,
+        },
+    ];
+    let market = build_mock_market();
+    for held in [None, Some(PositionFilter::All)] {
+        problem.trade_universe.held_filter = held;
+        let result = DefaultLpOptimizer
+            .optimize(&problem, &market, &FinstackConfig::default())
+            .unwrap();
+        assert_eq!(result.current_weights["LONG"], 1.0);
+        assert_eq!(result.current_weights["SHORT"], 1.0);
+        assert!((result.implied_quantities["LONG"] - 10.0).abs() < 1e-9);
+        assert!((result.implied_quantities["SHORT"] + 10.0).abs() < 1e-9);
+    }
+    problem.trade_universe.held_filter = None;
+    problem.constraints = vec![Constraint::Budget { rhs: 4.0 }];
+    let expanded = DefaultLpOptimizer
+        .optimize(&problem, &market, &FinstackConfig::default())
+        .unwrap();
+    assert!(
+        (expanded.implied_quantities["LONG"] / 10.0 + expanded.implied_quantities["SHORT"] / -10.0
+            - 4.0)
+            .abs()
+            < 1e-9
+    );
+}
+
+#[test]
+fn notional_weights_convert_native_currencies_before_normalizing() {
+    use finstack_quant_portfolio::optimization::Constraint;
+    let as_of = create_date(2024, Month::January, 1).unwrap();
+    let usd = test_deposit("USD", 1_000_000.0, as_of).unwrap();
+    let mut eur = test_deposit("EUR", 1_000_000.0, as_of).unwrap();
+    eur.notional = Money::from((1_000_000_i64, Currency::EUR));
+    eur.discount_curve_id = "EUR-OIS".into();
+    let portfolio = PortfolioBuilder::new("FX_NOTIONAL")
+        .base_currency(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"))
+        .position(
+            Position::new(
+                "USD",
+                "ENT_A",
+                "USD",
+                Arc::new(usd),
+                1.0,
+                PositionUnit::Units,
+            )
+            .unwrap(),
+        )
+        .position(
+            Position::new(
+                "EUR",
+                "ENT_A",
+                "EUR",
+                Arc::new(eur),
+                1.0,
+                PositionUnit::Units,
+            )
+            .unwrap(),
+        )
+        .build()
+        .unwrap();
+    let mut problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(0.0),
+            filter: None,
+        }),
+    );
+    problem.weighting = WeightingScheme::NotionalWeight;
+    problem.constraints.push(Constraint::MaxTurnover {
+        label: None,
+        max_turnover: 0.0,
+    });
+    let result = DefaultLpOptimizer
+        .optimize(
+            &problem,
+            &build_multi_currency_market(),
+            &FinstackConfig::default(),
+        )
+        .unwrap();
+    assert!((result.current_weights["USD"] - 1.0 / 2.2).abs() < 1e-9);
+    assert!((result.current_weights["EUR"] - 1.2 / 2.2).abs() < 1e-9);
+    assert!((result.implied_quantities["EUR"] - 1.0).abs() < 1e-9);
+
+    // The shared host path must honor this explicit budget exactly once.
+    let mut spec = finstack_quant_portfolio::optimization::PortfolioOptimizationSpec::new(
+        problem.portfolio.to_spec(),
+        problem.objective.clone(),
+    );
+    spec.weighting = problem.weighting;
+    spec.constraints = problem.constraints.clone();
+    let from_spec = finstack_quant_portfolio::optimization::optimize_from_spec(
+        &spec,
+        &build_multi_currency_market(),
+        &FinstackConfig::default(),
+    )
+    .unwrap();
+    assert_eq!(from_spec.implied_quantities, result.implied_quantities);
+}

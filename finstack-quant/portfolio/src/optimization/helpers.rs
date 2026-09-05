@@ -22,7 +22,8 @@ pub struct PortfolioOptimizationSpec {
     pub portfolio: PortfolioSpec,
     /// Optimization objective.
     pub objective: Objective,
-    /// Constraints on the optimized portfolio.
+    /// Constraints on the optimized portfolio. An explicit budget replaces the
+    /// default sum-of-weights budget of one; duplicate explicit budgets are rejected.
     #[serde(default)]
     pub constraints: Vec<Constraint>,
     /// How weights are defined.
@@ -109,6 +110,13 @@ pub fn optimize_from_spec(
     problem.weighting = spec.weighting;
     problem.missing_metric_policy = spec.missing_metric_policy;
     problem.label = spec.label.clone();
+    if spec
+        .constraints
+        .iter()
+        .any(|constraint| matches!(constraint, Constraint::Budget { .. }))
+    {
+        problem.constraints.clear();
+    }
     problem.constraints.extend(spec.constraints.iter().cloned());
     if let Some(universe) = &spec.trade_universe {
         problem = problem.with_trade_universe(universe.clone());

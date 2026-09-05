@@ -6804,17 +6804,17 @@
       "oneOf": [
         {
           "const": "cash",
-          "description": "Cash variant.",
+          "description": "Entire coupon paid in cash.",
           "type": "string"
         },
         {
           "const": "pik",
-          "description": "PIK variant.",
+          "description": "Entire coupon capitalized into principal.",
           "type": "string"
         },
         {
           "additionalProperties": false,
-          "description": "Split variant.",
+          "description": "Coupon split between cash and PIK.",
           "properties": {
             "split": {
               "additionalProperties": false,

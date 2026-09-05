@@ -40,7 +40,7 @@
 //! # let portfolio: Portfolio = unimplemented!("Provide your portfolio");
 //! # let market: MarketContext = unimplemented!("Provide market context");
 //! let as_of = date!(2025-11-21);
-//! let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio);
+//! let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
 //!
 //! // Calculate margin requirements
 //! let margin_results = aggregator.calculate(&portfolio, &market, as_of)?;

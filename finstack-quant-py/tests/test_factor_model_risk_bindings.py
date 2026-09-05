@@ -8,10 +8,15 @@ from __future__ import annotations
 
 from datetime import date
 import json
+import pickle
+
+import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.portfolio import (
+    SensitivityMatrix,
     compute_factor_sensitivities,
+    compute_pnl_profiles,
     decompose_factor_risk,
 )
 
@@ -85,6 +90,7 @@ def test_decompose_factor_risk_zero_factors_returns_zero_risk() -> None:
         "[]",  # empty factor list → n_factors == 0
         market,
         "2025-01-15",
+        "USD",
     )
     assert zero_factor_matrix.n_factors == 0, "Precondition: matrix must have n_factors == 0 for this regression test"
 
@@ -97,3 +103,17 @@ def test_decompose_factor_risk_zero_factors_returns_zero_risk() -> None:
     assert decomposition.residual_risk == 0.0
     assert decomposition.factor_contributions() == []
     assert decomposition.position_factor_contributions() == []
+
+
+def test_sensitivity_reporting_currency_is_required_and_survives_round_trip() -> None:
+    market = MarketContext()
+    with pytest.raises(TypeError):
+        compute_factor_sensitivities("[]", "[]", market, "2025-01-15")
+    matrix = compute_factor_sensitivities("[]", "[]", market, "2025-01-15", "EUR")
+    assert matrix.base_currency == "EUR"
+    assert json.loads(matrix.to_json())["base_currency"] == "EUR"
+    assert SensitivityMatrix.from_json(matrix.to_json()).base_currency == "EUR"
+    assert pickle.loads(pickle.dumps(matrix)).base_currency == "EUR"  # noqa: S301 - trusted local roundtrip
+    assert compute_pnl_profiles("[]", "[]", market, "2025-01-15", "EUR") == []
+    with pytest.raises(ValueError, match="Matching variant not found"):
+        compute_factor_sensitivities("[]", "[]", market, "2025-01-15", "INVALID")

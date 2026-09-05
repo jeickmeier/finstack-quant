@@ -1,6 +1,6 @@
 //! Portfolio performance measurement — TWRR, MWRR, and GIPS-style linking.
 //!
-//! The raw PV delta on `ReplaySummary.total_pnl` ignores external
+//! The raw PV delta on `ReplaySummary.total_mtm_pnl` ignores external
 //! cashflows (contributions, withdrawals, fees, dividends) and so
 //! conflates manager alpha with client capital moves, which is not a
 //! legitimate return under any industry standard.
@@ -207,14 +207,15 @@ pub struct DatedCashflow {
 /// # Arguments
 ///
 /// * `periods` - Sequential sub-period returns as decimal fractions, such as
-///   `0.02` for 2%; every value must be finite.
+///   `0.02` for 2%; every value must be finite and greater than -1. A
+///   complete loss terminates the return series and is rejected.
 /// * `horizon_years` - Full elapsed horizon in 365-day calendar years; values
 ///   below one skip annualization.
 ///
 /// # Errors
 ///
 /// Returns [`finstack_quant_core::Error::Validation`] when:
-/// - any sub-period return is non-finite;
+/// - any sub-period return is non-finite or at most -1;
 /// - the compounded growth factor `Π(1 + r_i)` is non-finite or non-positive,
 ///   which means the portfolio was wiped out (or worse) and no geometric link
 ///   is defined.
@@ -223,10 +224,10 @@ pub fn twrr_linked(
     horizon_years: f64,
 ) -> finstack_quant_core::Result<LinkedReturn> {
     for (index, r) in periods.iter().enumerate() {
-        if !r.is_finite() {
+        if !r.is_finite() || *r <= -1.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "TWRR sub-period return {index} is non-finite ({r}); every linked \
-                 sub-period return must be finite"
+                "TWRR sub-period return {index} is invalid ({r}); every linked \
+                 sub-period return must be finite and greater than -1"
             )));
         }
     }
@@ -395,6 +396,14 @@ mod tests {
     #[test]
     fn linked_return_rejects_non_finite_period() {
         assert!(twrr_linked(&[0.05, f64::NAN], 1.0).is_err());
+    }
+
+    #[test]
+    fn linked_return_rejects_complete_loss_subperiods() {
+        for periods in [[-2.0, -2.0], [-1.0, 0.5], [0.1, -1.1]] {
+            assert!(twrr_linked(&periods, 1.0).is_err());
+        }
+        assert!((twrr_linked(&[0.1, -0.1], 1.0).unwrap().cumulative + 0.01).abs() < 1e-12);
     }
 
     /// Zero denominator (full-redemption mid-period) → validation error.

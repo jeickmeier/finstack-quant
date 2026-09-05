@@ -9535,6 +9535,10 @@ export interface ScenarioPnlResult {
  */
 export interface SensitivityMatrixResult {
   /**
+   * ISO reporting currency for all monetary sensitivity entries.
+   */
+  base_currency: string;
+  /**
    * Ordered position identifiers, one per row of `data`.
    */
   position_ids: string[];
@@ -9552,6 +9556,14 @@ export interface SensitivityMatrixResult {
  * Repriced scenario P&L profile for one shocked factor.
  */
 export interface FactorPnlProfile {
+  /**
+   * ISO reporting currency for all P&L entries.
+   */
+  base_currency: string;
+  /**
+   * Ordered position identifiers indexing each P&L row.
+   */
+  position_ids: string[];
   /**
    * Shocked factor identifier.
    */
@@ -10272,7 +10284,7 @@ export interface PortfolioNamespace {
    * @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.
    * @param returnsJson - Numeric return-series JSON.
    * @param horizonYears - Return-linking horizon measured in years for annualization.
-   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, the return series is invalid (non-finite sub-period return, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.
    */
   twrrLinked(returnsJson: string, horizonYears: number): Record<string, unknown>;
   /**
@@ -10493,6 +10505,7 @@ export interface PortfolioNamespace {
    * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
    * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; any JSON input is malformed; a factor definition or bump configuration is invalid or unsupported; bumping or repricing fails; or the sensitivity matrix cannot be converted to a JavaScript value.
    */
@@ -10501,6 +10514,7 @@ export interface PortfolioNamespace {
     factorsJson: string,
     marketJson: string,
     asOf: string,
+    baseCurrency: string,
     bumpConfigJson?: string
   ): SensitivityMatrixResult;
   /**
@@ -10512,6 +10526,7 @@ export interface PortfolioNamespace {
    * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
    * @param market - Market context or JSON payload supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
    * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor definition is invalid or unsupported; bumping or repricing fails; or the sensitivity matrix cannot be converted to a JavaScript value.
    */
@@ -10520,6 +10535,7 @@ export interface PortfolioNamespace {
     factorsJson: string,
     market: Market,
     asOf: string,
+    baseCurrency: string,
     bumpConfigJson?: string
   ): SensitivityMatrixResult;
   /**
@@ -10533,6 +10549,7 @@ export interface PortfolioNamespace {
    * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
    * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
    * @param nScenarioPoints - Positive number of evenly spaced bump levels in each P-and-L profile.
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; any JSON input is malformed; a factor, bump configuration, or scenario-point count is invalid or unsupported; bumping or repricing fails; or the profiles cannot be converted to a JavaScript value.
@@ -10542,6 +10559,7 @@ export interface PortfolioNamespace {
     factorsJson: string,
     marketJson: string,
     asOf: string,
+    baseCurrency: string,
     bumpConfigJson?: string,
     nScenarioPoints?: number
   ): FactorPnlProfile[];
@@ -10552,6 +10570,7 @@ export interface PortfolioNamespace {
    * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
    * @param market - Market context or JSON payload supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
    * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
    * @param nScenarioPoints - Positive number of evenly spaced bump levels in each P-and-L profile.
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor or scenario-point count is invalid or unsupported; bumping or repricing fails; or the profiles cannot be converted to a JavaScript value.
@@ -10561,6 +10580,7 @@ export interface PortfolioNamespace {
     factorsJson: string,
     market: Market,
     asOf: string,
+    baseCurrency: string,
     bumpConfigJson?: string,
     nScenarioPoints?: number
   ): FactorPnlProfile[];

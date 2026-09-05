@@ -16,6 +16,7 @@ use wasm_bindgen::prelude::*;
 /// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param base_currency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
 /// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
 ///
 /// # Errors
@@ -30,9 +31,13 @@ pub fn compute_factor_sensitivities(
     factors_json: &str,
     market_json: &str,
     as_of: &str,
+    base_currency: &str,
     bump_config_json: Option<String>,
 ) -> Result<JsValue, JsValue> {
     let as_of = parse_iso_date(as_of)?;
+    let base_currency = base_currency
+        .parse::<finstack_quant_core::currency::Currency>()
+        .map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let matrix = finstack_quant_portfolio::sensitivity::compute_factor_sensitivities_from_json(
@@ -40,10 +45,14 @@ pub fn compute_factor_sensitivities(
         factors_json,
         &market,
         as_of,
+        base_currency,
         bump_config_json.as_deref(),
     )
     .map_err(to_js_err)?;
-    let output = finstack_quant_portfolio::sensitivity::SensitivityMatrixJson::from(&matrix);
+    let output = finstack_quant_portfolio::sensitivity::SensitivityMatrixJson::from_matrix(
+        &matrix,
+        base_currency,
+    );
     to_js_value(&output)
 }
 
@@ -54,6 +63,7 @@ pub fn compute_factor_sensitivities(
 /// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
 /// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param base_currency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
 /// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
 ///
 /// # Errors
@@ -68,18 +78,26 @@ pub fn compute_factor_sensitivities_with_market(
     factors_json: &str,
     market: &JsMarket,
     as_of: &str,
+    base_currency: &str,
     bump_config_json: Option<String>,
 ) -> Result<JsValue, JsValue> {
     let as_of = parse_iso_date(as_of)?;
+    let base_currency = base_currency
+        .parse::<finstack_quant_core::currency::Currency>()
+        .map_err(to_js_err)?;
     let matrix = finstack_quant_portfolio::sensitivity::compute_factor_sensitivities_from_json(
         positions_json,
         factors_json,
         market.inner(),
         as_of,
+        base_currency,
         bump_config_json.as_deref(),
     )
     .map_err(to_js_err)?;
-    let output = finstack_quant_portfolio::sensitivity::SensitivityMatrixJson::from(&matrix);
+    let output = finstack_quant_portfolio::sensitivity::SensitivityMatrixJson::from_matrix(
+        &matrix,
+        base_currency,
+    );
     to_js_value(&output)
 }
 
@@ -92,6 +110,7 @@ pub fn compute_factor_sensitivities_with_market(
 /// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param base_currency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
 /// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
 /// @param n_scenario_points - Positive number of evenly spaced bump levels in each P-and-L profile.
 ///
@@ -107,10 +126,14 @@ pub fn compute_pnl_profiles(
     factors_json: &str,
     market_json: &str,
     as_of: &str,
+    base_currency: &str,
     bump_config_json: Option<String>,
     n_scenario_points: Option<usize>,
 ) -> Result<JsValue, JsValue> {
     let as_of = parse_iso_date(as_of)?;
+    let base_currency = base_currency
+        .parse::<finstack_quant_core::currency::Currency>()
+        .map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let profiles = finstack_quant_portfolio::sensitivity::compute_pnl_profiles_from_json(
@@ -118,6 +141,7 @@ pub fn compute_pnl_profiles(
         factors_json,
         &market,
         as_of,
+        base_currency,
         bump_config_json.as_deref(),
         n_scenario_points
             .unwrap_or(finstack_quant_portfolio::sensitivity::DEFAULT_PNL_SCENARIO_POINTS),
@@ -135,6 +159,7 @@ pub fn compute_pnl_profiles(
 /// @param factors_json - Canonical factor-definition JSON identifying the market factors to shock.
 /// @param market - Market context or JSON payload supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param base_currency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
 /// @param bump_config_json - Canonical bump-configuration JSON defining factor shock sizes and conventions.
 /// @param n_scenario_points - Positive number of evenly spaced bump levels in each P-and-L profile.
 ///
@@ -150,15 +175,20 @@ pub fn compute_pnl_profiles_with_market(
     factors_json: &str,
     market: &JsMarket,
     as_of: &str,
+    base_currency: &str,
     bump_config_json: Option<String>,
     n_scenario_points: Option<usize>,
 ) -> Result<JsValue, JsValue> {
     let as_of = parse_iso_date(as_of)?;
+    let base_currency = base_currency
+        .parse::<finstack_quant_core::currency::Currency>()
+        .map_err(to_js_err)?;
     let profiles = finstack_quant_portfolio::sensitivity::compute_pnl_profiles_from_json(
         positions_json,
         factors_json,
         market.inner(),
         as_of,
+        base_currency,
         bump_config_json.as_deref(),
         n_scenario_points
             .unwrap_or(finstack_quant_portfolio::sensitivity::DEFAULT_PNL_SCENARIO_POINTS),

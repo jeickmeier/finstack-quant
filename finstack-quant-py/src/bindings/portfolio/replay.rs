@@ -24,8 +24,8 @@ thread_local! {
 const REPLAY_STEP_COLUMNS: &[ColumnSchema<'static>] = &[
     ("date", "str"),
     ("value", "float64"),
-    ("daily_pnl", "float64"),
-    ("cumulative_pnl", "float64"),
+    ("daily_mtm_pnl", "float64"),
+    ("cumulative_mtm_pnl", "float64"),
 ];
 
 /// One row of the replay step ladder.
@@ -33,8 +33,8 @@ const REPLAY_STEP_COLUMNS: &[ColumnSchema<'static>] = &[
 struct ReplayStepRow {
     date: String,
     value: f64,
-    daily_pnl: Option<f64>,
-    cumulative_pnl: Option<f64>,
+    daily_mtm_pnl: Option<f64>,
+    cumulative_mtm_pnl: Option<f64>,
 }
 
 /// Full output of a historical replay run.
@@ -59,8 +59,8 @@ impl PyReplayResult {
             .map(|step| ReplayStepRow {
                 date: step.date.to_string(),
                 value: step.valuation.total_base_currency.amount(),
-                daily_pnl: step.daily_pnl.map(|m| m.amount()),
-                cumulative_pnl: step.cumulative_pnl.map(|m| m.amount()),
+                daily_mtm_pnl: step.daily_mtm_pnl.map(|m| m.amount()),
+                cumulative_mtm_pnl: step.cumulative_mtm_pnl.map(|m| m.amount()),
             })
             .collect()
     }
@@ -88,11 +88,11 @@ impl PyReplayResult {
 
     /// Per-step value and P&L ladder as a :class:`pandas.DataFrame`.
     ///
-    /// One row per replay step; ``daily_pnl`` and ``cumulative_pnl`` are
+    /// One row per replay step; ``daily_mtm_pnl`` and ``cumulative_mtm_pnl`` exclude paid cashflows and are
     /// null at step 0. Full per-step valuations remain available from the
     /// ``steps`` getter.
     ///
-    /// Columns: ``date``, ``value``, ``daily_pnl``, ``cumulative_pnl``.
+    /// Columns: ``date``, ``value``, ``daily_mtm_pnl``, ``cumulative_mtm_pnl``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_rows_to_dataframe_with_schema(py, &self.rows(), REPLAY_STEP_COLUMNS)
     }

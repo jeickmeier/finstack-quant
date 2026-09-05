@@ -10,7 +10,6 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::factor::{BumpSizeConfig, FactorDefinition};
-use finstack_quant_valuations::instruments::Instrument;
 use serde::Serialize;
 
 /// Default scenario count for symmetric P&L profile grids.
@@ -21,6 +20,8 @@ pub const DEFAULT_PNL_SCENARIO_POINTS: usize = 5;
 /// JSON shape returned by WASM factor sensitivity helpers.
 #[derive(Debug, Clone, Serialize)]
 pub struct SensitivityMatrixJson {
+    /// Reporting currency of every monetary sensitivity.
+    pub base_currency: Currency,
     /// Ordered position identifiers.
     pub position_ids: Vec<String>,
     /// Ordered factor identifiers.
@@ -32,6 +33,10 @@ pub struct SensitivityMatrixJson {
 /// JSON shape returned by WASM P&L profile helpers.
 #[derive(Debug, Clone, Serialize)]
 pub struct FactorPnlProfileJson {
+    /// Reporting currency of each P&L amount.
+    pub base_currency: Currency,
+    /// Ordered position identifiers for each P&L row.
+    pub position_ids: Vec<String>,
     /// Shocked factor identifier.
     pub factor_id: String,
     /// Scenario shift coordinates.
@@ -80,29 +85,12 @@ pub(crate) fn parse_bump_config_json(json: Option<&str>) -> Result<BumpSizeConfi
     }
 }
 
-/// Reporting currency for standalone JSON factor endpoints.
-///
-/// The JSON façade has no [`crate::Portfolio`], so it reports in the first
-/// position's native pricing currency and converts every other row into that
-/// currency on the (bumped) market. An empty book never converts.
-fn json_reporting_currency(
-    positions: &[(String, &dyn Instrument, f64)],
-    market: &MarketContext,
-    as_of: Date,
-) -> Result<Currency> {
-    match positions.first() {
-        Some((_, instrument, _)) => Ok(instrument.value_raw_with_currency(market, as_of)?.1),
-        None => Ok(Currency::USD),
-    }
-}
-
 /// Compute position-by-factor sensitivities from JSON binding inputs.
 ///
 /// Positions and factor definitions are parsed from JSON, while `market` and
 /// `as_of` are already-typed Rust values. The result preserves engine ordering:
 /// rows correspond to priced positions and columns to the supplied factors.
-/// Sensitivities are in the first position's native currency; other positions
-/// are converted into that currency on each bumped market.
+/// All sensitivities are converted to `base_currency` on each bumped market.
 ///
 /// # Arguments
 ///
@@ -114,6 +102,7 @@ fn json_reporting_currency(
 ///   after each factor bump.
 /// * `as_of` - Valuation date applied to instrument pricing and market-data
 ///   lookups.
+/// * `base_currency` - Reporting currency used for every bumped PV and returned exposure.
 /// * `bump_config_json` - Optional UTF-8 JSON [`BumpSizeConfig`]; `None`
 ///   selects canonical bump sizes and `Some` replaces that configuration.
 ///
@@ -126,6 +115,7 @@ pub fn compute_factor_sensitivities_from_json(
     factors_json: &str,
     market: &MarketContext,
     as_of: Date,
+    base_currency: Currency,
     bump_config_json: Option<&str>,
 ) -> Result<SensitivityMatrix> {
     let parsed_positions = parse_positions_json(positions_json)?;
@@ -133,7 +123,6 @@ pub fn compute_factor_sensitivities_from_json(
     let factors = parse_factor_definitions_json(factors_json)?;
     let bump_config = parse_bump_config_json(bump_config_json)?;
     let engine = DeltaBasedEngine::new(bump_config);
-    let base_currency = json_reporting_currency(&positions, market, as_of)?;
     engine.compute_sensitivities(&positions, &factors, market, as_of, base_currency)
 }
 
@@ -141,8 +130,7 @@ pub fn compute_factor_sensitivities_from_json(
 ///
 /// Each factor is shifted across `n_scenario_points` around its configured
 /// bump. The resulting profiles hold per-position P&L rows indexed by shift;
-/// their units are base-currency amounts (first position's native currency
-/// on this JSON path; [`crate::Portfolio::base_currency`] when wrapping a book).
+/// their units are amounts in the explicitly supplied `base_currency`.
 ///
 /// # Arguments
 ///
@@ -152,6 +140,7 @@ pub fn compute_factor_sensitivities_from_json(
 ///   profile, in the returned profile order.
 /// * `market` - Typed market snapshot used to fully reprice every scenario.
 /// * `as_of` - Valuation date used by each scenario reprice and lookup.
+/// * `base_currency` - Reporting currency used for every bumped PV and returned exposure.
 /// * `bump_config_json` - Optional UTF-8 JSON [`BumpSizeConfig`]; `None`
 ///   uses canonical factor bump sizes.
 /// * `n_scenario_points` - Number of evenly spaced shock points per factor;
@@ -166,6 +155,7 @@ pub fn compute_pnl_profiles_from_json(
     factors_json: &str,
     market: &MarketContext,
     as_of: Date,
+    base_currency: Currency,
     bump_config_json: Option<&str>,
     n_scenario_points: usize,
 ) -> Result<Vec<FactorPnlProfile>> {
@@ -174,13 +164,19 @@ pub fn compute_pnl_profiles_from_json(
     let factors = parse_factor_definitions_json(factors_json)?;
     let bump_config = parse_bump_config_json(bump_config_json)?;
     let engine = FullRepricingEngine::new(bump_config, n_scenario_points)?;
-    let base_currency = json_reporting_currency(&positions, market, as_of)?;
     engine.compute_pnl_profiles(&positions, &factors, market, as_of, base_currency)
 }
 
-impl From<&SensitivityMatrix> for SensitivityMatrixJson {
-    fn from(matrix: &SensitivityMatrix) -> Self {
+impl SensitivityMatrixJson {
+    /// Serialize a matrix with its explicit monetary reporting unit.
+    ///
+    /// # Arguments
+    ///
+    /// * `matrix` - Position-by-factor monetary sensitivities to serialize.
+    /// * `base_currency` - Currency in which all matrix entries were calculated.
+    pub fn from_matrix(matrix: &SensitivityMatrix, base_currency: Currency) -> Self {
         Self {
+            base_currency,
             position_ids: matrix.position_ids().to_vec(),
             factor_ids: matrix
                 .factor_ids()
@@ -197,9 +193,85 @@ impl From<&SensitivityMatrix> for SensitivityMatrixJson {
 impl From<&FactorPnlProfile> for FactorPnlProfileJson {
     fn from(profile: &FactorPnlProfile) -> Self {
         Self {
+            base_currency: profile.base_currency,
+            position_ids: profile.position_ids.clone(),
             factor_id: profile.factor_id.to_string(),
             shifts: profile.shifts.clone(),
             position_pnls: profile.position_pnls.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+    use finstack_quant_models::factor::{FactorId, FactorType, MarketMapping};
+    use finstack_quant_valuations::instruments::{Equity, InstrumentEnvelope, InstrumentJson};
+    use std::sync::Arc;
+
+    #[test]
+    fn reporting_currency_is_explicit_and_independent_of_position_order() {
+        let as_of = time::macros::date!(2025 - 01 - 01);
+        let provider = Arc::new(SimpleFxProvider::new());
+        provider
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
+            .unwrap();
+        let market = MarketContext::new().insert_fx(FxMatrix::new(provider));
+        let mut positions: Vec<_> = [("USD", Currency::USD), ("EUR", Currency::EUR)]
+            .into_iter()
+            .map(|(id, currency)| {
+                let mut equity = Equity::new(id, id, currency);
+                equity.price_quote = Some(100.0);
+                serde_json::json!({
+                    "id": id,
+                    "instrument": InstrumentEnvelope::new(InstrumentJson::Equity(equity)),
+                    "weight": 1.0
+                })
+            })
+            .collect();
+        let factors = serde_json::to_string(&vec![FactorDefinition {
+            id: FactorId::new("EURUSD"),
+            factor_type: FactorType::Fx,
+            market_mapping: MarketMapping::FxRate {
+                pair: (Currency::EUR, Currency::USD),
+            },
+            description: None,
+        }])
+        .unwrap();
+        let json = serde_json::to_string(&positions).unwrap();
+        let first = compute_factor_sensitivities_from_json(
+            &json,
+            &factors,
+            &market,
+            as_of,
+            Currency::USD,
+            None,
+        )
+        .unwrap();
+        let profiles =
+            compute_pnl_profiles_from_json(&json, &factors, &market, as_of, Currency::USD, None, 3)
+                .unwrap();
+        positions.reverse();
+        let second = compute_factor_sensitivities_from_json(
+            &serde_json::to_string(&positions).unwrap(),
+            &factors,
+            &market,
+            as_of,
+            Currency::USD,
+            None,
+        )
+        .unwrap();
+        assert_eq!(first.delta(0, 0), 0.0);
+        assert!(first.delta(1, 0).abs() > 1.0);
+        assert_eq!(first.delta(1, 0), second.delta(0, 0));
+        assert_eq!(first.delta(0, 0), second.delta(1, 0));
+        assert_eq!(
+            SensitivityMatrixJson::from_matrix(&first, Currency::USD).base_currency,
+            Currency::USD
+        );
+        let profile = FactorPnlProfileJson::from(&profiles[0]);
+        assert_eq!(profile.base_currency, Currency::USD);
+        assert_eq!(profile.position_ids, vec!["USD", "EUR"]);
     }
 }

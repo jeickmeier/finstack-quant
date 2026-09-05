@@ -10,6 +10,10 @@
 //! The public API is intentionally split between a configuration-time builder
 //! ([`FactorModelBuilder`]) and an execution-time model ([`FactorModel`]).
 //!
+//! Credit hierarchy factors shock stored CDS spread quotes and require a lossless
+//! calibration recipe on every matched hazard curve. Intensity-only curves cannot
+//! supply spread-factor risk. All monetary exposures use portfolio base currency.
+//!
 //! # References
 //!
 //! - Factor-model portfolio construction: `docs/REFERENCES.md#meucci-risk-and-asset-allocation`
@@ -28,8 +32,12 @@ use crate::sensitivity::{
     SensitivityMatrix,
 };
 use crate::{MarketFactorKey, Portfolio};
+use finstack_quant_calibration::api::schema::HazardCurveParams;
+use finstack_quant_calibration::recalibration::bump_hazard_spreads;
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_models::factor::matching::ISSUER_ID_META_KEY;
 use finstack_quant_models::factor::risk::{
     apply_residual_contributions, ParametricDecomposer, PositionResidualContribution,
@@ -40,6 +48,7 @@ use finstack_quant_models::factor::{
     FactorType, MarketDependency, MatchingConfig, PricingMode, RiskMeasure, UnmatchedPolicy,
 };
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::recalibration::QuoteBump;
 use std::collections::{BTreeMap, HashMap};
 
 /// Builder for the top-level portfolio factor-model orchestrator.
@@ -279,7 +288,7 @@ impl FactorModel {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<SensitivityMatrix> {
-        let mut credit_exposures = CreditExposureMatrix::new(market);
+        let mut credit_exposures = CreditExposureMatrix::new(market, portfolio.base_currency);
         self.compute_sensitivities_with_credit_exposures(
             portfolio,
             market,
@@ -473,7 +482,7 @@ impl FactorModel {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<(RiskDecomposition, SensitivityMatrix)> {
-        let mut credit_exposures = CreditExposureMatrix::new(market);
+        let mut credit_exposures = CreditExposureMatrix::new(market, portfolio.base_currency);
         let sensitivities = self.compute_sensitivities_with_credit_exposures(
             portfolio,
             market,
@@ -499,7 +508,7 @@ impl FactorModel {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<()> {
-        let mut credit_exposures = CreditExposureMatrix::new(market);
+        let mut credit_exposures = CreditExposureMatrix::new(market, portfolio.base_currency);
         self.add_credit_residual_risk_with_credit_exposures(
             decomposition,
             portfolio,
@@ -899,13 +908,15 @@ struct CreditExposureKey {
 /// financially distinct kernel intentionally does not enter the Money-valued
 /// portfolio executor.
 struct CreditExposureMatrix<'a> {
+    base_currency: Currency,
     bump_contexts: CreditBumpContexts<'a>,
     exposures: HashMap<CreditExposureKey, f64>,
 }
 
 impl<'a> CreditExposureMatrix<'a> {
-    fn new(base: &'a MarketContext) -> Self {
+    fn new(base: &'a MarketContext, base_currency: Currency) -> Self {
         Self {
+            base_currency,
             bump_contexts: CreditBumpContexts::new(base),
             exposures: HashMap::default(),
         }
@@ -935,8 +946,9 @@ impl<'a> CreditExposureMatrix<'a> {
         }
 
         let (up, down) = self.bump_contexts.get(curve_id, bump_size)?;
-        let pv_up = instrument.value_raw(up, as_of)?;
-        let pv_down = instrument.value_raw(down, as_of)?;
+        let pv_up = crate::sensitivity::raw_pv_in_base(instrument, up, as_of, self.base_currency)?;
+        let pv_down =
+            crate::sensitivity::raw_pv_in_base(instrument, down, as_of, self.base_currency)?;
         let exposure = (pv_up - pv_down) / (2.0 * bump_size) * quantity;
         self.exposures.insert(key, exposure);
         Ok(exposure)
@@ -966,9 +978,8 @@ impl<'a> CreditBumpContexts<'a> {
             bump_bits: bump_size.to_bits(),
         };
         if !self.contexts.contains_key(&key) {
-            let curve = self.base.get_hazard(curve_id.as_str())?;
-            let up_curve = curve.with_parallel_hazard_rate_bump_bp(bump_size)?;
-            let down_curve = curve.with_parallel_hazard_rate_bump_bp(-bump_size)?;
+            let up_curve = bump_credit_spreads(self.base, curve_id, bump_size)?;
+            let down_curve = bump_credit_spreads(self.base, curve_id, -bump_size)?;
             self.contexts.insert(
                 key.clone(),
                 (
@@ -984,7 +995,35 @@ impl<'a> CreditBumpContexts<'a> {
     }
 }
 
-/// Shift each matched hazard curve by `beta × delta_bp`.
+/// Recalibrate the issuer curve after shocking its stored CDS spread quotes.
+fn bump_credit_spreads(
+    market: &MarketContext,
+    curve_id: &finstack_quant_core::types::CurveId,
+    bump_bp: f64,
+) -> Result<HazardCurve> {
+    let curve = market.get_hazard(curve_id.as_str())?;
+    let recipe = curve.hazard_calibration().ok_or_else(|| {
+        Error::invalid_input(format!(
+            "Credit spread factor requires a lossless calibration recipe for '{curve_id}'"
+        ))
+    })?;
+    let params: HazardCurveParams =
+        serde_json::from_value(recipe.hazard_params.clone()).map_err(|err| {
+            Error::invalid_input(format!(
+                "Invalid credit replay parameters for '{curve_id}': {err}"
+            ))
+        })?;
+    Ok(bump_hazard_spreads(
+        &curve,
+        market,
+        &QuoteBump::ParallelBp(bump_bp),
+        Some(&params.discount_curve_id),
+        None,
+        None,
+    )?)
+}
+
+/// Shift each matched issuer's CDS spreads by `beta × delta_bp` and recalibrate.
 ///
 /// Under the hierarchy model `Δs_i = β_i · ΔF`, a factor shock of
 /// `delta_bp` moves issuer `i`'s spread by its calibrated loading times the
@@ -1004,15 +1043,14 @@ fn shift_credit_curves(
         if scaled == 0.0 {
             continue;
         }
-        let curve = out.get_hazard(curve_id.as_str())?;
-        let bumped = curve.with_parallel_hazard_rate_bump_bp(scaled)?;
+        let bumped = bump_credit_spreads(&out, curve_id, scaled)?;
         out = out.insert(bumped);
     }
     Ok(out)
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use crate::position::{Position, PositionUnit};
     use crate::sensitivity::{FactorSensitivityEngine, SensitivityMatrix};
@@ -1411,6 +1449,14 @@ mod tests {
             Ok(self.base_value(market, as_of)?.amount())
         }
 
+        fn base_value_raw_with_currency(
+            &self,
+            market: &MarketContext,
+            as_of: Date,
+        ) -> finstack_quant_core::Result<(f64, Currency)> {
+            Ok((self.base_value_raw(market, as_of)?, Currency::USD))
+        }
+
         fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
             let mut dependencies = MarketDependencies::new();
             dependencies
@@ -1746,9 +1792,9 @@ mod tests {
         bond
     }
 
-    fn credit_market(as_of: Date, curve_id: CurveId) -> MarketContext {
+    pub(crate) fn credit_market(as_of: Date, curve_id: CurveId) -> MarketContext {
         use finstack_quant_core::dates::DayCount;
-        use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+        use finstack_quant_core::market_data::term_structures::{DiscountCurve, Seniority};
         let discount = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
@@ -1760,14 +1806,108 @@ mod tests {
             ])
             .build()
             .expect("discount curve");
-        let hazard = HazardCurve::builder(curve_id)
+        use finstack_quant_calibration::api::{
+            engine, market_datum::MarketDatum, prior_market::PriorMarketObject, schema::*,
+        };
+        use finstack_quant_calibration::quotes::{
+            cds::CdsQuote,
+            ids::{Pillar, QuoteId},
+            market_quote::MarketQuote,
+        };
+        use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+        let quotes: Vec<MarketQuote> = [1, 5, 10]
+            .into_iter()
+            .map(|years| {
+                MarketQuote::Cds(CdsQuote::CdsParSpread {
+                    id: QuoteId::new(format!("CDS-{years}")),
+                    entity: "ISSUER-B".to_string(),
+                    pillar: Pillar::Date(
+                        Date::from_calendar_date(as_of.year() + years, time::Month::March, 20)
+                            .expect("maturity"),
+                    ),
+                    spread_bp: 100.0,
+                    recovery_rate: 0.4,
+                    convention: CdsConventionKey {
+                        currency: Currency::USD,
+                        doc_clause: CdsDocClause::Cr14,
+                    },
+                })
+            })
+            .collect();
+        let quote_ids = quotes
+            .iter()
+            .map(|quote| QuoteId::new(quote.id()))
+            .collect();
+        let request = CalibrationEnvelope::new(
+            CalibrationPlan {
+                id: "credit-factor-test".into(),
+                description: None,
+                quote_sets: indexmap::IndexMap::from([("credit".into(), quote_ids)]),
+                settings: Default::default(),
+                steps: vec![CalibrationStep {
+                    id: "hazard".into(),
+                    quote_set: "credit".into(),
+                    params: StepParams::Hazard(HazardCurveParams {
+                        curve_id,
+                        entity: "ISSUER-B".into(),
+                        seniority: Seniority::Senior,
+                        currency: Currency::USD,
+                        base_date: as_of,
+                        discount_curve_id: "USD-OIS".into(),
+                        recovery_rate: 0.4,
+                        notional: 1.0,
+                        method: Default::default(),
+                        interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+                        par_interp:
+                            finstack_quant_core::market_data::term_structures::ParInterp::Linear,
+                        doc_clause: Some("cr14".into()),
+                        cds_valuation_convention: None,
+                    }),
+                }],
+            },
+            quotes.into_iter().map(MarketDatum::from).collect(),
+            vec![PriorMarketObject::DiscountCurve(discount)],
+        );
+        let result = engine::execute(&request).expect("calibrate issuer spreads");
+        MarketContext::try_from(result.result.final_market).expect("calibrated market")
+    }
+
+    #[test]
+    fn credit_exposures_use_spread_quotes_and_reporting_currency() {
+        use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+        let as_of = date!(2024 - 01 - 01);
+        let id = CurveId::new("ISSUER-B-HAZ");
+        let fx = Arc::new(SimpleFxProvider::new());
+        fx.set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
+            .unwrap();
+        let market = credit_market(as_of, id.clone()).insert_fx(FxMatrix::new(fx));
+        let bumped = bump_credit_spreads(&market, &id, 1.0).unwrap();
+        let base = market.get_hazard(id.as_str()).unwrap();
+        assert!(bumped.hazard_calibration().is_some());
+        for ((_, old), (_, new)) in base.par_spread_points().zip(bumped.par_spread_points()) {
+            assert!(
+                (new - old - 1.0).abs() < 1e-8,
+                "factor shock must move CDS spreads by one bp"
+            );
+        }
+        let bond = canonical_credit_bond(id.clone());
+        let usd = CreditExposureMatrix::new(&market, Currency::USD)
+            .exposure(0, &bond, 1.0, as_of, &id, 1.0)
+            .unwrap();
+        let eur = CreditExposureMatrix::new(&market, Currency::EUR)
+            .exposure(0, &bond, 1.0, as_of, &id, 1.0)
+            .unwrap();
+        assert!(usd.abs() > 1.0);
+        assert!((usd - 1.1 * eur).abs() < 1e-7);
+        let raw = finstack_quant_core::market_data::term_structures::HazardCurve::builder("RAW")
             .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .knots([(1.0, 0.01), (5.0, 0.01), (10.0, 0.01)])
-            .recovery_rate(0.40)
+            .knots([(1.0, 0.01), (5.0, 0.01)])
+            .recovery_rate(0.4)
             .build()
-            .expect("hazard curve");
-        MarketContext::new().insert(discount).insert(hazard)
+            .unwrap();
+        let error =
+            bump_credit_spreads(&market.insert(raw), &CurveId::new("RAW"), 1.0).unwrap_err();
+        assert!(error.to_string().contains("calibration recipe"));
     }
 
     #[test]
@@ -1805,7 +1945,7 @@ mod tests {
         let calls = Arc::new(AtomicUsize::new(0));
         let instrument = MockInstrument::new("credit-count", "USD-OIS", vec![])
             .with_raw_value_calls(Arc::clone(&calls));
-        let mut exposures = CreditExposureMatrix::new(&market);
+        let mut exposures = CreditExposureMatrix::new(&market, Currency::USD);
 
         let first = exposures
             .exposure(3, &instrument, 1.0, as_of, &curve_id, 1.0)

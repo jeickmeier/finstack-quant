@@ -44,9 +44,10 @@ impl EquityForwardInputs {
             ));
         }
         let date = self.base_date + time::Duration::days(days.floor() as i64);
-        let dc = discount.day_count();
-        let curve_time =
-            |date| dc.signed_year_fraction(discount.base_date(), date, DayCountContext::default());
+        let day_count = discount.day_count();
+        let curve_time = |date| {
+            day_count.signed_year_fraction(discount.base_date(), date, DayCountContext::default())
+        };
         let mut expiry_time = curve_time(date)?;
         let fraction = days.fract();
         if fraction > 0.0 {
@@ -619,12 +620,12 @@ mod tests {
         let expected = (100.0
             - 5.0 * (-0.05 * (ex_date - surface_base).whole_days() as f64 / 365.0).exp())
             * (0.05_f64).exp();
-        for (dc, denominator) in [(DayCount::Act365F, 365.0), (DayCount::Act360, 360.0)] {
+        for (day_count, denominator) in [(DayCount::Act365F, 365.0), (DayCount::Act360, 360.0)] {
             for curve_base in [base, surface_base] {
                 let days = (expiry - curve_base).whole_days() as f64;
                 let curve = DiscountCurve::builder("USD")
                     .base_date(curve_base)
-                    .day_count(dc)
+                    .day_count(day_count)
                     .knots([
                         (0.0, 1.0),
                         (days / denominator, (-0.05 * days / 365.0).exp()),

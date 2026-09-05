@@ -988,3 +988,20 @@ test('factor-risk kernels are absent from the portfolio namespace', () => {
   assert.equal('historicalVarDecomposition' in portfolio, false);
   assert.equal('evaluateRiskBudget' in portfolio, false);
 });
+
+test('standalone sensitivity outputs require and retain the reporting currency', () => {
+  const result = portfolio.computeFactorSensitivities(
+    '[]',
+    '[]',
+    EMPTY_MARKET,
+    '2025-01-15',
+    'EUR'
+  );
+  assert.equal(result.base_currency, 'EUR');
+  assert.deepEqual(result.position_ids, []);
+  assert.deepEqual(result.data, []);
+  assert.deepEqual(portfolio.computePnlProfiles('[]', '[]', EMPTY_MARKET, '2025-01-15', 'EUR'), []);
+  assert.throws(() =>
+    portfolio.computeFactorSensitivities('[]', '[]', EMPTY_MARKET, '2025-01-15', 'INVALID')
+  );
+});

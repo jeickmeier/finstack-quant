@@ -33,7 +33,8 @@ pub enum WeightingScheme {
     /// `w_i` is share of signed deal notional; still normalized so `∑ w_i = 1`
     /// on a long-only book (shorts enter the denominator as absolute value).
     ///
-    /// Per-position notional is `|instrument.notional().amount()| * scale_factor()`.
+    /// Per-position notional is the absolute deal notional converted to portfolio
+    /// base currency at the valuation date, multiplied by `scale_factor()`.
     /// Instruments that do not expose `notional()` fail under this scheme —
     /// there is no silent fallback to `scale_factor()` as a dollar proxy.
     /// Quantity reconstruction divides the target notional share by the
@@ -46,6 +47,9 @@ pub enum WeightingScheme {
     /// Unlike `ValueWeight` and `NotionalWeight`, this is not a PV share.
     /// For existing positions, `w_i = 1.0` means "keep the current quantity",
     /// `w_i = 0.5` means "halve it", and `w_i = 0.0` means "close it".
+    /// Existing multipliers are nonnegative by default; an explicit budget
+    /// or weight bound controls increases above one. Turnover is measured as
+    /// the sum of absolute changes in these multipliers.
     /// For new candidates, `w_i` is interpreted directly as the target quantity
     /// because there is no live quantity to scale.
     UnitScaling,

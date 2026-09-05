@@ -114,7 +114,7 @@ def test_per_position_metric_accepts_standard_and_custom_paths() -> None:
 
 
 def _variance_decomposition():  # noqa: ANN202
-    matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), AS_OF)
+    matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), AS_OF, "USD")
     return decompose_factor_risk(matrix, '{"factor_ids":[],"n":0,"data":[]}')
 
 

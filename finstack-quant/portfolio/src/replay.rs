@@ -3,6 +3,12 @@
 //! Replays a static portfolio through a sequence of dated market snapshots,
 //! producing configurable P&L and attribution output at each step.
 //!
+//! `daily_mtm_pnl`, `cumulative_mtm_pnl`, `total_mtm_pnl`, and
+//! `max_mtm_drawdown*` describe changes in marked holdings and exclude paid
+//! cashflows. In full-attribution mode, `attribution.total_pnl` includes those
+//! payments. A coupon or redemption therefore creates an expected difference
+//! between these explicitly distinct measures; cash is not reinvested here.
+//!
 //! This module is only available when the `scenarios` feature is enabled.
 
 use crate::attribution::{
@@ -28,7 +34,7 @@ const STRICT_ENDPOINT_BATCH_SIZE: usize = 8;
 pub enum ReplayMode {
     /// Just portfolio PV at each date.
     PvOnly,
-    /// PV + daily/cumulative P&L.
+    /// PV + daily/cumulative mark-to-market P&L.
     PvAndPnl,
     /// PV + P&L + per-position factor decomposition.
     FullAttribution,
@@ -174,10 +180,10 @@ pub struct ReplayStep {
     pub date: Date,
     /// Full portfolio valuation at this date.
     pub valuation: PortfolioValuation,
-    /// Daily P&L (this step minus prior step). `None` at step 0.
-    pub daily_pnl: Option<Money>,
-    /// Cumulative P&L (this step minus step 0). `None` at step 0.
-    pub cumulative_pnl: Option<Money>,
+    /// Daily mark-to-market P&L, excluding paid cashflows (this PV minus prior PV). `None` at step 0.
+    pub daily_mtm_pnl: Option<Money>,
+    /// Cumulative mark-to-market P&L, excluding paid cashflows (this PV minus initial PV). `None` at step 0.
+    pub cumulative_mtm_pnl: Option<Money>,
     /// Factor attribution between prior step and this step. `None` at step 0
     /// and in non-attribution modes.
     pub attribution: Option<PortfolioAttribution>,
@@ -196,31 +202,31 @@ pub struct ReplaySummary {
     pub start_value: Money,
     /// Portfolio value at the last step.
     pub end_value: Money,
-    /// Total P&L (end value minus start value).
-    pub total_pnl: Money,
-    /// Maximum drawdown from peak to trough, selected on the largest
+    /// Total mark-to-market P&L (end PV minus start PV), excluding paid cashflows.
+    pub total_mtm_pnl: Money,
+    /// Maximum mark-to-market drawdown from peak to trough, selected on the largest
     /// base-currency (dollar) decline from a running high-water mark.
-    pub max_drawdown: Money,
-    /// Maximum percentage drawdown, selected independently of
-    /// [`max_drawdown`](Self::max_drawdown) as the largest `decline / peak`
+    pub max_mtm_drawdown: Money,
+    /// Maximum percentage mark-to-market drawdown, selected independently of
+    /// [`max_mtm_drawdown`](Self::max_mtm_drawdown) as the largest `decline / peak`
     /// ratio over positive peaks. The dollar-largest and percentage-largest
     /// drawdowns can come from different peak/trough pairs (a small early
     /// peak can host the deepest relative loss). `0.0` when no positive peak
     /// ever existed: a percentage decline from a non-positive portfolio value
     /// is not meaningful.
-    pub max_drawdown_pct: f64,
+    pub max_mtm_drawdown_pct: f64,
     /// Date of the peak before the maximum (dollar-selected) drawdown.
-    pub max_drawdown_peak_date: Date,
+    pub max_mtm_drawdown_peak_date: Date,
     /// Date of the trough of the maximum (dollar-selected) drawdown.
-    pub max_drawdown_trough_date: Date,
+    pub max_mtm_drawdown_trough_date: Date,
     /// Date of the peak before the maximum percentage-selected drawdown.
     /// `None` when no positive peak ever produced a decline.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_drawdown_pct_peak_date: Option<Date>,
+    pub max_mtm_drawdown_pct_peak_date: Option<Date>,
     /// Date of the trough of the maximum percentage-selected drawdown.
     /// `None` when no positive peak ever produced a decline.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_drawdown_pct_trough_date: Option<Date>,
+    pub max_mtm_drawdown_pct_trough_date: Option<Date>,
 }
 
 /// Full output of a replay run.
@@ -480,8 +486,8 @@ pub fn replay_portfolio(
     steps.push(ReplayStep {
         date: first_date,
         valuation: val_0,
-        daily_pnl: None,
-        cumulative_pnl: None,
+        daily_mtm_pnl: None,
+        cumulative_mtm_pnl: None,
         attribution: None,
     });
 
@@ -525,7 +531,7 @@ pub fn replay_portfolio(
             })?;
             let prev_step = &steps[steps.len() - 1];
 
-            let daily_pnl = if compute_pnl {
+            let daily_mtm_pnl = if compute_pnl {
                 Some(
                     val_i
                         .total_base_currency
@@ -543,7 +549,7 @@ pub fn replay_portfolio(
                 None
             };
 
-            let cumulative_pnl = if compute_pnl {
+            let cumulative_mtm_pnl = if compute_pnl {
                 Some(
                     val_i
                         .total_base_currency
@@ -599,8 +605,8 @@ pub fn replay_portfolio(
             steps.push(ReplayStep {
                 date,
                 valuation: val_i,
-                daily_pnl,
-                cumulative_pnl,
+                daily_mtm_pnl,
+                cumulative_mtm_pnl,
                 attribution,
             });
             prev_market = market;
@@ -621,15 +627,15 @@ pub fn replay_portfolio(
 ///
 /// # Errors
 ///
-/// Returns [`Error::InvalidInput`] when the end-minus-start total P&L is not
+/// Returns [`Error::InvalidInput`] when the end-minus-start total MTM P&L is not
 /// representable (the same `checked_sub` discipline used for the per-step
 /// daily and cumulative P&L).
 fn compute_summary(steps: &[ReplayStep]) -> Result<ReplaySummary> {
     let start_value = steps[0].valuation.total_base_currency;
     let end_value = steps[steps.len() - 1].valuation.total_base_currency;
-    let total_pnl = end_value.checked_sub(start_value).map_err(|e| {
+    let total_mtm_pnl = end_value.checked_sub(start_value).map_err(|e| {
         Error::InvalidInput(format!(
-            "total P&L overflow computing {} minus {} (base {}): {e}",
+            "total MTM P&L overflow computing {} minus {} (base {}): {e}",
             steps[steps.len() - 1].date,
             steps[0].date,
             end_value.currency()
@@ -683,13 +689,13 @@ fn compute_summary(steps: &[ReplayStep]) -> Result<ReplaySummary> {
         num_steps: steps.len(),
         start_value,
         end_value,
-        total_pnl,
-        max_drawdown: Money::new(max_dd, start_value.currency())?,
-        max_drawdown_pct: max_dd_pct,
-        max_drawdown_peak_date: max_dd_peak_date,
-        max_drawdown_trough_date: max_dd_trough_date,
-        max_drawdown_pct_peak_date: max_dd_pct_peak_date,
-        max_drawdown_pct_trough_date: max_dd_pct_trough_date,
+        total_mtm_pnl,
+        max_mtm_drawdown: Money::new(max_dd, start_value.currency())?,
+        max_mtm_drawdown_pct: max_dd_pct,
+        max_mtm_drawdown_peak_date: max_dd_peak_date,
+        max_mtm_drawdown_trough_date: max_dd_trough_date,
+        max_mtm_drawdown_pct_peak_date: max_dd_pct_peak_date,
+        max_mtm_drawdown_pct_trough_date: max_dd_pct_trough_date,
     })
 }
 
@@ -713,8 +719,8 @@ mod tests {
                 fx_collapse_policy: FxConversionPolicy::CashflowDate,
                 provenance: None,
             },
-            daily_pnl: None,
-            cumulative_pnl: None,
+            daily_mtm_pnl: None,
+            cumulative_mtm_pnl: None,
             attribution: None,
         }
     }
@@ -736,11 +742,11 @@ mod tests {
         let summary = compute_summary(&steps).expect("summary computes");
 
         // Largest dollar decline is 100 -> 50 = 50.
-        assert_eq!(summary.max_drawdown.amount(), 50.0);
+        assert_eq!(summary.max_mtm_drawdown.amount(), 50.0);
         // Its percentage is 50/100 = 50%, NOT 50/200 = 25%.
-        assert_eq!(summary.max_drawdown_pct, 0.5);
-        assert_eq!(summary.max_drawdown_peak_date, date!(2024 - 01 - 01));
-        assert_eq!(summary.max_drawdown_trough_date, date!(2024 - 01 - 02));
+        assert_eq!(summary.max_mtm_drawdown_pct, 0.5);
+        assert_eq!(summary.max_mtm_drawdown_peak_date, date!(2024 - 01 - 01));
+        assert_eq!(summary.max_mtm_drawdown_trough_date, date!(2024 - 01 - 02));
     }
 
     /// The percentage drawdown must be selected independently of the dollar
@@ -749,7 +755,7 @@ mod tests {
     /// 50% (from the 100 peak). Selecting the trough on dollar decline and
     /// then reporting its ratio understates the percentage drawdown.
     #[test]
-    fn max_drawdown_pct_is_selected_independently_of_dollar_drawdown() {
+    fn max_mtm_drawdown_pct_is_selected_independently_of_dollar_drawdown() {
         let steps = vec![
             synthetic_step(date!(2024 - 01 - 01), 100.0),
             synthetic_step(date!(2024 - 01 - 02), 50.0),
@@ -760,17 +766,17 @@ mod tests {
         let summary = compute_summary(&steps).expect("summary computes");
 
         // Dollar-selected drawdown: 1000 -> 900 = 100.
-        assert_eq!(summary.max_drawdown.amount(), 100.0);
-        assert_eq!(summary.max_drawdown_peak_date, date!(2024 - 01 - 03));
-        assert_eq!(summary.max_drawdown_trough_date, date!(2024 - 01 - 04));
+        assert_eq!(summary.max_mtm_drawdown.amount(), 100.0);
+        assert_eq!(summary.max_mtm_drawdown_peak_date, date!(2024 - 01 - 03));
+        assert_eq!(summary.max_mtm_drawdown_trough_date, date!(2024 - 01 - 04));
         // Percentage-selected drawdown: 100 -> 50 = 50%.
-        assert_eq!(summary.max_drawdown_pct, 0.5);
+        assert_eq!(summary.max_mtm_drawdown_pct, 0.5);
         assert_eq!(
-            summary.max_drawdown_pct_peak_date,
+            summary.max_mtm_drawdown_pct_peak_date,
             Some(date!(2024 - 01 - 01))
         );
         assert_eq!(
-            summary.max_drawdown_pct_trough_date,
+            summary.max_mtm_drawdown_pct_trough_date,
             Some(date!(2024 - 01 - 02))
         );
     }
@@ -805,9 +811,9 @@ mod tests {
 
         let summary = compute_summary(&steps).expect("summary computes");
 
-        assert_eq!(summary.max_drawdown.amount(), 50.0);
-        assert_eq!(summary.max_drawdown_pct, 0.0);
-        assert_eq!(summary.max_drawdown_pct_peak_date, None);
-        assert_eq!(summary.max_drawdown_pct_trough_date, None);
+        assert_eq!(summary.max_mtm_drawdown.amount(), 50.0);
+        assert_eq!(summary.max_mtm_drawdown_pct, 0.0);
+        assert_eq!(summary.max_mtm_drawdown_pct_peak_date, None);
+        assert_eq!(summary.max_mtm_drawdown_pct_trough_date, None);
     }
 }

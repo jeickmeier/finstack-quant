@@ -359,6 +359,7 @@ def test_sensitivity_result_conversion_and_decomposition_release_gil() -> None:
             factors_json,
             market,
             AS_OF.isoformat(),
+            "USD",
         )
     )
     decomposition = _assert_releases_gil(lambda: decompose_factor_risk(matrix, covariance_json))

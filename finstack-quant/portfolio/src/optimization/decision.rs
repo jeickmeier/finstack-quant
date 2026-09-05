@@ -59,8 +59,8 @@ pub(crate) struct DecisionFeatures {
     /// therefore uses scale `0.5`. Used to reconstruct implied quantities
     /// under [`WeightingScheme::ValueWeight`].
     pub pv_per_unit: f64,
-    /// Absolute instrument deal notional per 1.0 of scale
-    /// (`|instrument.notional().amount()|`). Zero when the weighting scheme
+    /// Absolute base-currency instrument deal notional per 1.0 of scale.
+    /// Zero when the weighting scheme
     /// is not [`WeightingScheme::NotionalWeight`].
     pub deal_notional_abs: f64,
     /// Metric measures by string key (as in `ValuationResult::measures`).
@@ -114,17 +114,24 @@ fn pv_per_scale_unit(pv_base: f64, scale: f64) -> f64 {
     }
 }
 
-/// `|instrument.notional().amount()|`, or an error under `NotionalWeight`.
-fn require_deal_notional_abs(instrument: &dyn Instrument, id: &str) -> Result<f64> {
-    instrument
-        .notional()?
-        .map(|m| m.amount().abs())
-        .ok_or_else(|| {
-            Error::invalid_input(format!(
-                "NotionalWeight requires instrument.notional() for '{id}'; \
+/// Absolute deal notional converted to the portfolio reporting currency.
+fn require_deal_notional_abs(
+    instrument: &dyn Instrument,
+    id: &str,
+    portfolio: &crate::Portfolio,
+    market: &MarketContext,
+) -> Result<f64> {
+    let notional = instrument.notional()?.ok_or_else(|| {
+        Error::invalid_input(format!(
+            "NotionalWeight requires instrument.notional() for '{id}'; \
                  the instrument does not carry deal notional"
-            ))
-        })
+        ))
+    })?;
+    Ok(
+        crate::fx::convert_to_base(notional, portfolio.as_of, market, portfolio.base_currency)?
+            .amount()
+            .abs(),
+    )
 }
 
 /// Build decision items and associated features from the portfolio and trade universe.
@@ -162,6 +169,8 @@ pub(crate) fn build_decision_space(
             let deal_abs = require_deal_notional_abs(
                 position.instrument.as_ref(),
                 position.position_id.as_str(),
+                &problem.portfolio,
+                market,
             )?;
             let signed_notional = deal_abs * position.scale_factor();
             position_notionals.insert(position.position_id.clone(), signed_notional);
@@ -228,13 +237,13 @@ pub(crate) fn build_decision_space(
             unit: position.unit,
         });
 
-        // M-7: Preserve the sign of existing positions by default. Longs remain
-        // long-only, shorts remain short-only; explicit WeightBounds constraints
-        // can further tighten these ranges.
-        let (min_weight, max_weight) = if pv_base < 0.0 {
-            (-1.0, 0.0)
-        } else {
-            (0.0, 1.0)
+        // UnitScaling variables are nonnegative multipliers, including for
+        // short or negative-PV deals. Their budget/explicit bounds limit growth.
+        let (min_weight, max_weight) = match problem.weighting {
+            WeightingScheme::UnitScaling => (0.0, f64::INFINITY),
+            WeightingScheme::NotionalWeight if position.scale_factor() < 0.0 => (-1.0, 0.0),
+            WeightingScheme::ValueWeight if pv_base < 0.0 => (-1.0, 0.0),
+            _ => (0.0, 1.0),
         };
         features.push(DecisionFeatures {
             pv_base,
@@ -306,7 +315,12 @@ pub(crate) fn build_decision_space(
         let unit_scale = scale_of_quantity(candidate.unit, 1.0);
         let pv_per_unit = pv_per_scale_unit(pv_unit, unit_scale);
         let deal_notional_abs = if matches!(problem.weighting, WeightingScheme::NotionalWeight) {
-            require_deal_notional_abs(candidate.instrument.as_ref(), candidate.id.as_str())?
+            require_deal_notional_abs(
+                candidate.instrument.as_ref(),
+                candidate.id.as_str(),
+                &problem.portfolio,
+                market,
+            )?
         } else {
             0.0
         };
@@ -388,8 +402,16 @@ pub(crate) fn build_decision_space(
                 }
             }
         }
-        WeightingScheme::ValueWeight | WeightingScheme::UnitScaling => {
-            // For ValueWeight/UnitScaling: use signed PV / gross market value
+        WeightingScheme::UnitScaling => {
+            for item in &items {
+                current_weights.insert(
+                    item.position_id.clone(),
+                    if item.is_existing { 1.0 } else { 0.0 },
+                );
+            }
+        }
+        WeightingScheme::ValueWeight => {
+            // For ValueWeight: use signed PV / gross market value
             // This handles hedged portfolios where net PV is ~0 but we still want meaningful weights.
             if gross_pv_base.abs() > GROSS_BASE_TOL {
                 for (item, feat) in items.iter().zip(&features) {
