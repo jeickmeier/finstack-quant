@@ -125,8 +125,8 @@ impl PyHazardCurve {
     ///     ``(time_years, par_spread_bp)`` market quotes in **basis points**
     ///     kept for reporting and re-bootstrap risk.
     /// interp : str, optional
-    ///     Survival-probability interpolation between pillars; default
-    ///     ``"log_linear"`` (piecewise-constant hazard).
+    ///     Survival-probability interpolation; only ``"log_linear"`` is supported
+    ///     to preserve piecewise-constant hazards.
     /// par_interp : str, optional
     ///     Par-spread readout interpolation: ``"linear"`` (default) or ``"log_linear"``.
     /// issuer : str, optional

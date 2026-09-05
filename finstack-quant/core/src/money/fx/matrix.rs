@@ -235,6 +235,31 @@ pub struct FxMatrix {
     config: FxConfig,
 }
 
+/// Resolve only the shocked pair through the original matrix. Other pairs
+/// remain provider lookups so the new matrix can triangulate through bumped legs.
+struct ResolvedPairProvider {
+    matrix: FxMatrix,
+    pair: Pair,
+}
+
+impl FxProvider for ResolvedPairProvider {
+    fn rate(
+        &self,
+        from: Currency,
+        to: Currency,
+        on: Date,
+        policy: FxConversionPolicy,
+    ) -> crate::Result<f64> {
+        if Pair(from, to) == self.pair || Pair(to, from) == self.pair {
+            return self
+                .matrix
+                .rate(FxQuery::with_policy(from, to, on, policy))
+                .map(|result| result.rate);
+        }
+        self.matrix.provider.rate(from, to, on, policy)
+    }
+}
+
 impl FxMatrix {
     /// Create a new [`FxMatrix`] wrapping the given provider with the default configuration.
     ///
@@ -781,9 +806,9 @@ impl FxMatrix {
     /// to bump FX spot while preserving all other market data. The bump is
     /// **relative and term-structure preserving**: the wrapper provider applies
     /// `rate(query) * (1 + bump_pct)` to the delegated per-date rate, so a
-    /// date-aware provider keeps its term structure under the bump
-    /// (the previous implementation froze one
-    /// absolute rate for every date/policy, flattening the FX term structure).
+    /// date-aware provider keeps its term structure under the bump. Derived
+    /// pairs are resolved through the original matrix for each date/policy
+    /// before applying the multiplier.
     ///
     /// Explicit pair-global quotes and pinned (date/policy-scoped) fixings for
     /// the bumped pair are carried over **scaled by the same multiplier**
@@ -791,11 +816,12 @@ impl FxMatrix {
     /// bumped pair moves coherently. Quotes for other pairs are carried over
     /// unchanged.
     ///
-    /// # Parameters
-    /// - `from`: Base currency
-    /// - `to`: Quote currency
-    /// - `bump_pct`: Relative bump size (e.g., 0.01 for 1% increase)
-    /// - `on`: Date used to verify a rate exists and the bumped value is valid
+    /// # Arguments
+    /// - `from` - Base currency of the pair to shock; must differ from `to`.
+    /// - `to` - Quote currency, whose units are paid per unit of `from`.
+    /// - `bump_pct` - Relative decimal shock; 0.01 increases the rate by 1%.
+    ///   Must be finite and greater than -1.
+    /// - `on` - Reference date used to validate the shocked CashflowDate quote.
     ///
     /// # Returns
     /// New FxMatrix with the relatively bumped pair
@@ -810,16 +836,29 @@ impl FxMatrix {
         bump_pct: f64,
         on: Date,
     ) -> crate::Result<Self> {
+        if from == to {
+            return Err(crate::Error::Validation(
+                "cannot bump an identity FX pair".to_string(),
+            ));
+        }
         // Verify a rate exists on the reference date and the bumped value is valid.
         let query = FxQuery::new(from, to, on);
         let current_rate = self.rate(query)?.rate;
         validate_fx_rate(from, to, current_rate * (1.0 + bump_pct))?;
 
-        // Create bumped provider applying the relative bump per query.
+        // Preserve authoritative quotes without freezing date-aware provider
+        // observations into pair-global rates.
+        let source = Self::try_with_config(Arc::clone(&self.provider), self.config)?;
+        *lock(&source.quotes) = lock(&self.quotes).clone();
+        *lock(&source.pinned_quotes) = lock(&self.pinned_quotes).clone();
+
+        // Create bumped provider applying the relative bump per resolved query.
         use super::providers::BumpedFxProvider;
-        use std::sync::Arc;
         let bumped_provider = Arc::new(BumpedFxProvider::new(
-            Arc::clone(&self.provider),
+            Arc::new(ResolvedPairProvider {
+                matrix: source,
+                pair: Pair(from, to),
+            }),
             from,
             to,
             bump_pct,

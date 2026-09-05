@@ -158,7 +158,7 @@ impl MarketContext {
                 let surface = Arc::make_mut(&mut self.surfaces)
                     .get_mut(id.as_str())
                     .ok_or_else(|| crate::error::InputError::NotFound { id: id.to_string() })?;
-                Arc::make_mut(surface).unbump_point_in_place(expiry, strike, original_vol);
+                Arc::make_mut(surface).unbump_point_in_place(expiry, strike, original_vol)?;
             }
             ContextScratchBump::Curve {
                 id,

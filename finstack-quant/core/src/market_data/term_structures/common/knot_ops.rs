@@ -107,27 +107,27 @@ pub(crate) fn roll_knots(knots: &[f64], values: &[f64], dt: f64) -> Vec<(f64, f6
 
 /// Apply an additive parallel bump to a slice of (t, value) knots.
 ///
-/// Each value is clamped to zero from below: `max(0, v + bump)`.
+/// Signed prices are preserved: `v + bump`.
 /// Returns the bumped knots as a new `Vec`.
 #[inline]
 pub(crate) fn bump_knots_parallel(knots: &[f64], values: &[f64], bump: f64) -> Vec<(f64, f64)> {
     knots
         .iter()
         .zip(values.iter())
-        .map(|(&t, &v)| (t, (v + bump).max(0.0)))
+        .map(|(&t, &v)| (t, v + bump))
         .collect()
 }
 
 /// Apply a multiplicative percentage bump to a slice of (t, value) knots.
 ///
-/// Each value is scaled by `1 + pct` and clamped to zero from below.
+/// Each signed price is scaled by `1 + pct`.
 #[inline]
 pub(crate) fn bump_knots_percentage(knots: &[f64], values: &[f64], pct: f64) -> Vec<(f64, f64)> {
     let factor = 1.0 + pct;
     knots
         .iter()
         .zip(values.iter())
-        .map(|(&t, &v)| (t, (v * factor).max(0.0)))
+        .map(|(&t, &v)| (t, v * factor))
         .collect()
 }
 

@@ -388,6 +388,9 @@ impl VolSurface {
     /// # }
     /// ```
     pub fn bump_point(&self, expiry: f64, strike: f64, bump_pct: f64) -> crate::Result<Self> {
+        if !expiry.is_finite() || !strike.is_finite() || !bump_pct.is_finite() {
+            return Err(InputError::Invalid.into());
+        }
         // Get bounds safely using first/last
         let (Some(&exp_min), Some(&exp_max)) = (self.expiries.first(), self.expiries.last()) else {
             return Err(crate::error::InputError::TooFewPoints.into());
@@ -446,7 +449,7 @@ impl VolSurface {
         strike: f64,
         bump_abs: f64,
     ) -> crate::Result<f64> {
-        if !bump_abs.is_finite() {
+        if !expiry.is_finite() || !strike.is_finite() || !bump_abs.is_finite() {
             return Err(crate::Error::Validation(format!(
                 "absolute volatility point bump must be finite, got {bump_abs}"
             )));
@@ -463,7 +466,11 @@ impl VolSurface {
             find_closest_grid_index(self.strikes.as_ref(), strike.clamp(str_min, str_max));
         let idx = expiry_idx * self.strikes.len() + strike_idx;
         let original = self.vols[idx];
-        self.vols[idx] = (original + bump_abs).max(0.0);
+        let bumped = original + bump_abs;
+        if !bumped.is_finite() {
+            return Err(InputError::Invalid.into());
+        }
+        self.vols[idx] = bumped.max(0.0);
         Ok(original)
     }
 
@@ -474,14 +481,31 @@ impl VolSurface {
     /// * `expiry` - Option expiry date or year-fraction used to locate the volatility point
     /// * `strike` - Option strike in the surface's quote units (absolute or relative)
     /// * `original_vol` - Original annualized volatility restored after the temporary bump.
-    pub fn unbump_point_in_place(&mut self, expiry: f64, strike: f64, original_vol: f64) {
+    ///
+    /// # Errors
+    ///
+    /// Rejects non-finite coordinates or a non-finite/negative restored value
+    /// without modifying the surface.
+    pub fn unbump_point_in_place(
+        &mut self,
+        expiry: f64,
+        strike: f64,
+        original_vol: f64,
+    ) -> crate::Result<()> {
+        if !expiry.is_finite()
+            || !strike.is_finite()
+            || !original_vol.is_finite()
+            || original_vol < 0.0
+        {
+            return Err(InputError::Invalid.into());
+        }
         let clamped_expiry = match (self.expiries.first(), self.expiries.last()) {
             (Some(&min), Some(&max)) => expiry.clamp(min, max),
-            _ => return,
+            _ => return Err(InputError::TooFewPoints.into()),
         };
         let clamped_strike = match (self.strikes.first(), self.strikes.last()) {
             (Some(&min), Some(&max)) => strike.clamp(min, max),
-            _ => return,
+            _ => return Err(InputError::TooFewPoints.into()),
         };
 
         let expiry_idx = find_closest_grid_index(self.expiries.as_ref(), clamped_expiry);
@@ -489,6 +513,7 @@ impl VolSurface {
 
         let n_strikes = self.strikes.len();
         self.vols[expiry_idx * n_strikes + strike_idx] = original_vol;
+        Ok(())
     }
 
     /// Return a new volatility surface scaled uniformly by `scale`.
@@ -499,10 +524,22 @@ impl VolSurface {
     ///
     /// For greek bumps that apply a uniform percentage change to the entire
     /// surface, prefer this method over `to_state()`/`from_grid()`.
-    pub fn scaled(&self, scale: f64) -> Self {
+    ///
+    /// # Arguments
+    ///
+    /// * `scale` - Finite nonnegative multiplier applied to each annualized
+    ///   volatility. A value of 1.01 increases all volatilities by 1%.
+    ///
+    /// # Errors
+    ///
+    /// Rejects a negative/non-finite multiplier or non-finite scaled values.
+    pub fn scaled(&self, scale: f64) -> crate::Result<Self> {
+        if !scale.is_finite() || scale < 0.0 {
+            return Err(InputError::Invalid.into());
+        }
         // Fast path: return an identical copy when scale == 1.0
-        if (scale - 1.0).abs() < f64::EPSILON {
-            return Self {
+        if scale.total_cmp(&1.0).is_eq() {
+            return Ok(Self {
                 id: self.id.clone(),
                 expiries: self.expiries.clone(),
                 strikes: self.strikes.clone(),
@@ -510,13 +547,16 @@ impl VolSurface {
                 quote_type: self.quote_type,
                 interpolation_mode: self.interpolation_mode,
                 vols: self.vols.clone(),
-            };
+            });
         }
 
         // Scale all vols
         let scaled_vols = self.vols.iter().map(|&v| v * scale).collect::<Box<[f64]>>();
+        if scaled_vols.iter().any(|v| !v.is_finite()) {
+            return Err(InputError::Invalid.into());
+        }
 
-        Self {
+        Ok(Self {
             id: self.id.clone(),
             expiries: self.expiries.clone(),
             strikes: self.strikes.clone(),
@@ -524,7 +564,7 @@ impl VolSurface {
             quote_type: self.quote_type,
             interpolation_mode: self.interpolation_mode,
             vols: scaled_vols,
-        }
+        })
     }
 }
 
@@ -553,13 +593,13 @@ impl Bumpable for VolSurface {
             }
         })?;
 
-        let bumped_vols = if is_multiplicative {
-            // Factor bump: new_vol = vol * factor
-            self.vols.iter().map(|&v| (v * raw_val).max(0.0)).collect()
-        } else {
-            // Additive bump: new_vol = vol + delta
-            self.vols.iter().map(|&v| (v + raw_val).max(0.0)).collect()
-        };
+        if is_multiplicative {
+            return self.scaled(raw_val);
+        }
+        let bumped_vols: Box<[f64]> = self.vols.iter().map(|&v| (v + raw_val).max(0.0)).collect();
+        if bumped_vols.iter().any(|v| !v.is_finite()) {
+            return Err(InputError::Invalid.into());
+        }
 
         Ok(Self {
             id: self.id.clone(),
@@ -602,6 +642,12 @@ impl VolSurface {
         strikes_filter: Option<&[f64]>,
         pct: f64,
     ) -> Option<Self> {
+        if !pct.is_finite()
+            || expiries_filter.is_some_and(|values| values.iter().any(|v| !v.is_finite()))
+            || strikes_filter.is_some_and(|values| values.iter().any(|v| !v.is_finite()))
+        {
+            return None;
+        }
         let factor = 1.0 + pct / 100.0;
         let (n_expiries, n_strikes) = self.grid_shape();
         let mut builder = VolSurface::builder(self.id.clone())

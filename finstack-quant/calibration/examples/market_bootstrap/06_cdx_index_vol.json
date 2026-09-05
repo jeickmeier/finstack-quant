@@ -62,7 +62,7 @@
         "recovery_rate": 0.4,
         "notional": 1.0,
         "method": "bootstrap",
-        "interpolation": "linear",
+        "interpolation": "log_linear",
         "par_interp": "linear"
       },
       {

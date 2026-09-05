@@ -373,10 +373,8 @@ impl PriceCurve {
     ///
     /// Prices are bumped additively in the curve's native price unit (for
     /// example, USD/bbl), including the stored spot. Finite negative prices are
-    /// valid for markets such as power; the bumped spot is nevertheless floored
-    /// at zero by this convenience shock, while knot prices retain the helper's
-    /// additive values. Use a custom rebuilt curve when a negative bumped spot
-    /// is economically required.
+    /// valid for markets such as power and are preserved. Volatility-index
+    /// curves reject shocks that produce negative levels.
     ///
     /// # Errors
     ///
@@ -384,6 +382,9 @@ impl PriceCurve {
     /// prices or an invalid interpolation configuration. A successful result
     /// preserves base date, day count, interpolation, and extrapolation.
     pub fn with_parallel_bump(&self, bump: f64) -> crate::Result<Self> {
+        if !bump.is_finite() {
+            return Err(InputError::Invalid.into());
+        }
         let bumped_points = bump_knots_parallel(&self.knots, &self.prices, bump);
         let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bump * 100.0);
 
@@ -391,7 +392,7 @@ impl PriceCurve {
             .kind(self.kind)
             .base_date(self.base)
             .day_count(self.day_count)
-            .spot_price((self.spot_price + bump).max(0.0))
+            .spot_price(self.spot_price + bump)
             .knots(bumped_points)
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
@@ -407,10 +408,9 @@ impl PriceCurve {
     /// A new price curve with all prices scaled.
     ///
     /// Each knot is multiplied by `1 + pct`; the stored spot uses the same
-    /// multiplier and is then floored at zero. Therefore a `-1.0` shock maps
-    /// spot to zero, while a larger negative shock does not create a negative
-    /// spot through this helper. The method changes price levels, not delivery
-    /// dates or interpolation mechanics.
+    /// multiplier, preserving signed prices. Volatility-index curves reject
+    /// shocks that produce negative levels. The method changes price levels,
+    /// not delivery dates or interpolation mechanics.
     ///
     /// # Errors
     ///
@@ -419,6 +419,9 @@ impl PriceCurve {
     /// percentage bump because signed forward-price markets can require shocks
     /// outside conventional equity-style bounds.
     pub fn with_percentage_bump(&self, pct: f64) -> crate::Result<Self> {
+        if !pct.is_finite() {
+            return Err(InputError::Invalid.into());
+        }
         let bumped_points = bump_knots_percentage(&self.knots, &self.prices, pct);
         let new_id = format!("{}+{:.2}%", self.id.as_str(), pct * 100.0);
 
@@ -426,7 +429,7 @@ impl PriceCurve {
             .kind(self.kind)
             .base_date(self.base)
             .day_count(self.day_count)
-            .spot_price((self.spot_price * (1.0 + pct)).max(0.0))
+            .spot_price(self.spot_price * (1.0 + pct))
             .knots(bumped_points)
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
@@ -502,19 +505,20 @@ impl PriceCurve {
     /// A new price curve with updated base date and shifted knots.
     ///
     /// # Errors
-    /// Returns an error if fewer than 2 knot points remain after filtering expired points.
+    /// Returns an error if no future knot remains after filtering expired points.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
         let new_base = self.base + time::Duration::days(days);
         let dt_years = year_fraction_to(self.base, new_base, self.day_count)?;
 
-        let rolled_points = roll_knots(&self.knots, &self.prices, dt_years);
+        let mut rolled_points = roll_knots(&self.knots, &self.prices, dt_years);
 
-        if rolled_points.len() < 2 {
+        if rolled_points.is_empty() {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
 
         // New spot is interpolated from old curve at dt_years
         let new_spot = self.price(dt_years);
+        rolled_points.insert(0, (0.0, new_spot));
 
         PriceCurve::builder(self.id.clone())
             .kind(self.kind)

@@ -294,6 +294,11 @@ impl HazardCurveTarget {
         config: CalibrationConfig,
         quotes: &[CdsQuote],
     ) -> Result<Self> {
+        if params.interpolation != finstack_quant_core::math::interp::InterpStyle::LogLinear {
+            return Err(finstack_quant_core::Error::Validation(
+                "hazard calibration requires log-linear survival interpolation".to_string(),
+            ));
+        }
         let quote_refs: Vec<&CdsQuote> = quotes.iter().collect();
         let cds_conventions = resolve_hazard_conventions(&params, &quote_refs)?;
 
@@ -817,7 +822,7 @@ mod tests {
             recovery_rate: 0.4,
             notional: 1.0,
             method: crate::config::CalibrationMethod::Bootstrap,
-            interpolation: InterpStyle::Linear,
+            interpolation: InterpStyle::LogLinear,
             par_interp: ParInterp::Linear,
             doc_clause: None,
             cds_valuation_convention: None,
@@ -934,5 +939,20 @@ mod tests {
         assert!((0.0..=1.0).contains(&s5));
         assert!((0.0..=1.0).contains(&s10));
         assert!(s1 >= s5 && s5 >= s10);
+    }
+
+    #[test]
+    fn incompatible_survival_interpolation_fails_before_solving() {
+        let mut params = base_params();
+        params.interpolation = InterpStyle::Linear;
+        let result = HazardCurveTarget::new(
+            params,
+            MarketContext::default(),
+            CalibrationConfig::default(),
+            &[],
+        );
+        assert!(
+            matches!(result, Err(finstack_quant_core::Error::Validation(message)) if message.contains("log-linear survival"))
+        );
     }
 }

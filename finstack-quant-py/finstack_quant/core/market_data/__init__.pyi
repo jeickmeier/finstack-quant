@@ -1170,8 +1170,8 @@ class HazardCurve:
             ``(time_years, par_spread_bp)`` market quotes in **basis points**
             kept for reporting and re-bootstrap risk.
         interp : str, optional
-            Survival-probability interpolation between pillars; default
-            ``"log_linear"`` (piecewise-constant hazard).
+            Survival-probability interpolation; only ``"log_linear"`` is supported
+            to preserve the piecewise-constant hazard representation.
         par_interp : str, optional
             Par-spread readout interpolation: ``"linear"`` (default) or ``"log_linear"``.
         issuer : str, optional
@@ -1187,8 +1187,8 @@ class HazardCurve:
         ------
         ValueError
             If a knot is non-finite, negative, duplicated or above
-            ``max_hazard_rate``, ``recovery_rate`` is outside ``[0, 1]``, or a
-            label is unknown.
+            ``max_hazard_rate``, ``recovery_rate`` is outside ``[0, 1]``,
+            survival interpolation is not log-linear, or a label is unknown.
         TypeError
             If ``recovery_rate`` is omitted.
 
@@ -2393,7 +2393,8 @@ class InflationCurve:
         base_date : datetime.date or str
             Valuation date anchoring ``t = 0``.
         base_cpi : float
-            Reference CPI level at ``t = 0`` used by :meth:`index_ratio`.
+            Finite, strictly positive reference CPI level at ``t = 0`` used by
+            :meth:`index_ratio`; must equal any zero-time CPI knot.
         knots : Sequence[tuple[float, float]]
             ``(time_years, cpi_level)`` pairs; levels must be positive.
         day_count : str, optional
@@ -2409,7 +2410,8 @@ class InflationCurve:
         ------
         ValueError
             If no knots are given, a knot is non-finite, duplicated or
-            non-positive, or a label is unknown.
+            non-positive, base CPI is non-finite/non-positive or differs from
+            a zero-time knot, or a label is unknown.
 
         Examples
         --------
@@ -2560,17 +2562,19 @@ class InflationCurve:
         Parameters
         ----------
         t1 : float
-            Start year fraction.
+            Finite start time in years from the curve base date.
         t2 : float
-            End year fraction.
+            Finite end time in years, strictly greater than ``t1``.
 
         Returns
         -------
         float
             Annualized inflation rate as a decimal.
-        Notes
-        -----
-        This method does not raise.
+        Raises
+        ------
+        ValueError
+            If times are non-finite or not increasing, CPI levels are
+            non-positive/non-finite, or the annualized rate is non-finite.
 
         """
         ...

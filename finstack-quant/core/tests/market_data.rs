@@ -41,6 +41,9 @@ mod context;
 #[path = "market_data/bumps.rs"]
 mod bumps;
 
+#[path = "market_data/lifecycle.rs"]
+mod lifecycle;
+
 // FX providers
 #[path = "market_data/fx.rs"]
 mod fx;

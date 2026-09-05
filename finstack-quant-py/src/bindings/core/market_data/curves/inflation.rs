@@ -215,9 +215,16 @@ impl PyInflationCurve {
     /// Returns
     /// -------
     /// float
+    ///     Annualized CPI growth as a decimal rate.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If times are non-finite or not increasing, CPI levels are invalid,
+    ///     or the annualized rate is non-finite.
     #[pyo3(text_signature = "(self, t1, t2)")]
-    fn inflation_rate(&self, t1: f64, t2: f64) -> f64 {
-        self.inner.inflation_rate(t1, t2)
+    fn inflation_rate(&self, t1: f64, t2: f64) -> PyResult<f64> {
+        self.inner.inflation_rate(t1, t2).map_err(core_to_py)
     }
 
     /// Export knots as a pandas ``DataFrame`` with columns ``t`` (years) and ``cpi``.

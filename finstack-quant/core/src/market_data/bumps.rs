@@ -608,7 +608,7 @@ impl Bumpable for InflationCurve {
                 continue;
             }
 
-            let zero_rate = self.inflation_rate(0.0, t);
+            let zero_rate = self.inflation_rate(0.0, t)?;
             let weight = match spec.bump_type {
                 BumpType::Parallel => 1.0,
                 BumpType::TriangularKeyRate {

@@ -855,8 +855,9 @@ pub struct HazardCurveParams {
     pub method: CalibrationMethod,
     /// Interpolation style for survival probabilities between pillars.
     ///
-    /// Defaults to log-linear (piecewise-constant hazard), the market
-    /// standard for credit curves.
+    /// Only log-linear survival interpolation is supported, preserving the
+    /// piecewise-constant hazard representation. Other styles are rejected
+    /// before calibration starts.
     #[serde(default = "default_interp_log_linear")]
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub interpolation: InterpStyle,
@@ -865,7 +866,7 @@ pub struct HazardCurveParams {
     ///
     /// Note: this is used for *quoting/interpolation of stored par spreads* and does not affect
     /// survival no-arbitrage, which is enforced via non-negative hazards together with the
-    /// survival interpolation selected by `interpolation` (log-linear by default).
+    /// required log-linear survival interpolation.
     #[serde(default = "default_par_interp_linear")]
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub par_interp: ParInterp,

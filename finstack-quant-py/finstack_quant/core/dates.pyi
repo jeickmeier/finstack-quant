@@ -3505,7 +3505,9 @@ class ScheduleBuilder:
         Parameters
         ----------
         eom : bool
-            Whether to enable end-of-month rolling.
+            Whether to enable end-of-month rolling. Requires a month/year tenor
+            and a regular schedule rule; ``build`` raises ``ValueError`` for
+            day/week tenors or IMM/CDS modes.
 
         Returns
         -------

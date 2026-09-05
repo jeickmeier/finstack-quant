@@ -55,7 +55,7 @@
 //!     .interp(InterpStyle::LogLinear)
 //!     .build()
 //!     .expect("InflationCurve builder should succeed");
-//! assert!(ic.inflation_rate(0.0, 5.0) > 0.0);
+//! assert!(ic.inflation_rate(0.0, 5.0).expect("valid interval") > 0.0);
 //! ```
 //!
 //! # References
@@ -230,7 +230,7 @@ impl InflationCurve {
     ///     .interp(InterpStyle::LogLinear)
     ///     .build()
     ///     .expect("InflationCurve builder should succeed");
-    /// assert!(curve.inflation_rate(0.0, 5.0) > 0.0);
+    /// assert!(curve.inflation_rate(0.0, 5.0).expect("valid interval") > 0.0);
     /// ```
     #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> InflationCurveBuilder {
@@ -379,21 +379,35 @@ impl InflationCurve {
     ///
     /// # Arguments
     ///
-    /// * `t1` - Start year-fraction of the forward or rate interval being queried
-    /// * `t2` - End year-fraction of the forward or rate interval being queried
-    #[must_use]
-    pub fn inflation_rate(&self, t1: f64, t2: f64) -> f64 {
-        debug_assert!(
-            t1.is_finite() && t2.is_finite() && t2 > t1,
-            "InflationCurve::inflation_rate requires finite t1 < t2 (got t1={t1}, t2={t2})"
-        );
-        if !(t1.is_finite() && t2.is_finite()) || t2 <= t1 {
-            return f64::NAN;
+    /// * `t1` - Finite start time in years from the curve base date, using its
+    ///   day-count convention. Non-positive times use the base CPI.
+    /// * `t2` - Finite end time in the same units, strictly greater than `t1`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for invalid intervals, non-positive or
+    /// non-finite interpolated CPI levels, or a non-finite annualized rate.
+    pub fn inflation_rate(&self, t1: f64, t2: f64) -> crate::Result<f64> {
+        let dt = t2 - t1;
+        if !t1.is_finite() || !t2.is_finite() || !dt.is_finite() || dt <= 0.0 {
+            return Err(crate::Error::Validation(
+                "inflation_rate requires finite t1 < t2 and a finite interval".to_string(),
+            ));
         }
         let c1 = self.cpi(t1);
         let c2 = self.cpi(t2);
-        let dt = t2 - t1;
-        (c2 / c1).powf(1.0 / dt) - 1.0
+        if !c1.is_finite() || !c2.is_finite() || c1 <= 0.0 || c2 <= 0.0 {
+            return Err(crate::Error::Validation(
+                "inflation_rate requires finite positive CPI levels".to_string(),
+            ));
+        }
+        let rate = ((c2.ln() - c1.ln()) / dt).exp_m1();
+        if !rate.is_finite() {
+            return Err(crate::Error::Validation(
+                "annualized inflation rate is not finite".to_string(),
+            ));
+        }
+        Ok(rate)
     }
 
     /// CPI level on a specific calendar date, without indexation lag.
@@ -528,11 +542,12 @@ impl InflationCurve {
         let new_base_cpi = self.cpi(dt_years);
 
         // Shift knots and filter expired points using shared helper
-        let rolled_points = roll_knots(&self.knots, &self.cpi_levels, dt_years);
+        let mut rolled_points = roll_knots(&self.knots, &self.cpi_levels, dt_years);
 
         if rolled_points.is_empty() {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
+        rolled_points.insert(0, (0.0, new_base_cpi));
 
         InflationCurve::builder(self.id.clone())
             .base_date(new_base)
@@ -564,7 +579,7 @@ impl InflationCurve {
 ///     .interp(InterpStyle::LogLinear)
 ///     .build()
 ///     .expect("InflationCurve builder should succeed");
-/// assert!(curve.inflation_rate(0.0, 5.0) > 0.0);
+/// assert!(curve.inflation_rate(0.0, 5.0).expect("valid interval") > 0.0);
 /// ```
 pub struct InflationCurveBuilder {
     id: CurveId,
@@ -580,6 +595,11 @@ pub struct InflationCurveBuilder {
 
 impl InflationCurveBuilder {
     /// Set the **base CPI** level at t = 0.
+    ///
+    /// # Arguments
+    ///
+    /// * `cpi` - Finite, strictly positive absolute index level at the base
+    ///   date. Must equal any supplied zero-time CPI knot; validated at build.
     pub fn base_cpi(mut self, cpi: f64) -> Self {
         self.base_cpi = cpi;
         self
@@ -638,9 +658,15 @@ impl InflationCurveBuilder {
     ///
     /// Returns an error if the base date was not explicitly set, no knots are
     /// supplied, knot times are invalid or not strictly increasing, a supplied
-    /// CPI knot is non-positive, or the selected interpolation strategy cannot
-    /// be built from the knot grid and CPI levels.
+    /// CPI knot or base CPI is non-finite/non-positive, a zero-time knot differs
+    /// from base CPI, or the selected interpolation strategy cannot be built
+    /// from the knot grid and CPI levels.
     pub fn build(self) -> crate::Result<InflationCurve> {
+        if !self.base_cpi.is_finite() || self.base_cpi <= 0.0 {
+            return Err(crate::Error::Validation(
+                "base_cpi must be finite and strictly positive".to_string(),
+            ));
+        }
         if !self.base_date_set {
             return Err(InputError::Invalid.into());
         }
@@ -650,8 +676,17 @@ impl InflationCurveBuilder {
         crate::math::interp::utils::validate_knots(
             &self.points.iter().map(|p| p.0).collect::<Vec<_>>(),
         )?;
-        if self.points.iter().any(|&(_, c)| c <= 0.0) {
+        if self.points.iter().any(|&(_, c)| !c.is_finite() || c <= 0.0) {
             return Err(InputError::NonPositiveValue.into());
+        }
+        if self
+            .points
+            .iter()
+            .any(|&(t, c)| t == 0.0 && c.total_cmp(&self.base_cpi).is_ne())
+        {
+            return Err(crate::Error::Validation(
+                "CPI knot at t=0 must equal base_cpi".to_string(),
+            ));
         }
         let (kvec, cvec): (Vec<f64>, Vec<f64>) = split_points(self.points);
         crate::math::interp::utils::validate_knots(&kvec)?;
@@ -702,49 +737,28 @@ mod tests {
     #[test]
     fn inflation_rate_positive() {
         let ic = sample_curve();
-        let r = ic.inflation_rate(0.0, 1.0);
+        let r = ic.inflation_rate(0.0, 1.0).expect("valid interval");
         assert!(r > 0.0);
     }
 
-    // Misordered/non-finite times are caller bugs: debug builds fire a
-    // `debug_assert`, release builds return NaN (documented NaN contract).
-    #[cfg(debug_assertions)]
     #[test]
-    #[should_panic(expected = "inflation_rate requires finite t1 < t2")]
-    fn inflation_rate_non_increasing_times_debug_asserts() {
+    fn inflation_rate_rejects_invalid_intervals() {
         let ic = sample_curve();
-        let _ = ic.inflation_rate(1.0, 0.0);
-    }
-
-    #[cfg(not(debug_assertions))]
-    #[test]
-    fn inflation_rate_rejects_non_increasing_times_with_nan() {
-        let ic = sample_curve();
-        assert!(ic.inflation_rate(1.0, 0.0).is_nan());
-        assert!(ic.inflation_rate(1.0, 1.0).is_nan());
-    }
-
-    #[cfg(debug_assertions)]
-    #[test]
-    #[should_panic(expected = "inflation_rate requires finite t1 < t2")]
-    fn inflation_rate_non_finite_times_debug_asserts() {
-        let ic = sample_curve();
-        let _ = ic.inflation_rate(f64::NAN, 1.0);
-    }
-
-    #[cfg(not(debug_assertions))]
-    #[test]
-    fn inflation_rate_rejects_non_finite_times_with_nan() {
-        let ic = sample_curve();
-        assert!(ic.inflation_rate(f64::NAN, 1.0).is_nan());
-        assert!(ic.inflation_rate(0.0, f64::INFINITY).is_nan());
+        for (t1, t2) in [
+            (1.0, 0.0),
+            (1.0, 1.0),
+            (f64::NAN, 1.0),
+            (0.0, f64::INFINITY),
+        ] {
+            assert!(ic.inflation_rate(t1, t2).is_err());
+        }
     }
 
     #[test]
     fn inflation_rate_uses_cagr() {
         let ic = sample_curve();
         // CPI goes from 300 to 306 in 1 year → CAGR = (306/300)^1 - 1 = 2%
-        let r = ic.inflation_rate(0.0, 1.0);
+        let r = ic.inflation_rate(0.0, 1.0).expect("valid interval");
         assert!(
             (r - 0.02).abs() < 1e-6,
             "Expected ~2% CAGR inflation rate, got {:.4}%",

@@ -182,8 +182,8 @@ mod serde_tests {
 
         // Test inflation rate calculation
         for (t1, t2) in [(0.0, 1.0), (1.0, 2.0), (2.0, 5.0), (5.0, 10.0)] {
-            let original_rate = original.inflation_rate(t1, t2);
-            let deserialized_rate = deserialized.inflation_rate(t1, t2);
+            let original_rate = original.inflation_rate(t1, t2).unwrap();
+            let deserialized_rate = deserialized.inflation_rate(t1, t2).unwrap();
             assert!(
                 (original_rate - deserialized_rate).abs() < 1e-12,
                 "Inflation rate mismatch for period {}-{}: {} vs {}",

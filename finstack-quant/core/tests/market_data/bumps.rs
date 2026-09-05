@@ -167,8 +167,10 @@ fn inflation_curve_parallel_shift_is_tenor_consistent_in_zero_rate_space() {
         .apply_bump(BumpSpec::inflation_shift_pct(1.0))
         .expect("inflation shift should succeed");
 
-    let one_year_shift = bumped.inflation_rate(0.0, 1.0) - curve.inflation_rate(0.0, 1.0);
-    let two_year_shift = bumped.inflation_rate(0.0, 2.0) - curve.inflation_rate(0.0, 2.0);
+    let one_year_shift =
+        bumped.inflation_rate(0.0, 1.0).unwrap() - curve.inflation_rate(0.0, 1.0).unwrap();
+    let two_year_shift =
+        bumped.inflation_rate(0.0, 2.0).unwrap() - curve.inflation_rate(0.0, 2.0).unwrap();
 
     assert!(
         (one_year_shift - two_year_shift).abs() < 1e-10,

@@ -21,6 +21,26 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use time::Month;
 
+#[test]
+fn scalar_npv_rejects_nonfinite_amounts_and_overflow() {
+    use finstack_quant_core::cashflow::npv_amounts_with_curve;
+    let base = d(2025, 1, 1);
+    let future = d(2026, 1, 1);
+    let flat = FlatRateCurve::new("FLAT", base, 0.0);
+    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(npv_amounts_with_curve(&flat, base, &[(future, invalid)]).is_err());
+    }
+    assert!(
+        npv_amounts_with_curve(&flat, base, &[(future, f64::MAX), (future, f64::MAX)]).is_err()
+    );
+    let negative_rate = FlatRateCurve::new("NEG", base, -1.0);
+    assert!(npv_amounts_with_curve(&negative_rate, base, &[(future, f64::MAX)]).is_err());
+    assert_eq!(
+        npv_amounts_with_curve(&flat, base, &[(future, -10.0), (future, 15.0)]).unwrap(),
+        5.0
+    );
+}
+
 // Test Helpers
 
 /// Tolerance for financial amount comparisons based on notional.

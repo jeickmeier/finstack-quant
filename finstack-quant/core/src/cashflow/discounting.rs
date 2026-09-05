@@ -368,7 +368,8 @@ pub(crate) fn npv_with_ctx<D: Discounting + ?Sized>(
 /// # Errors
 ///
 /// Returns an error for an empty flow slice, day-count failures, or non-finite
-/// and non-positive discount factors.
+/// and non-positive discount factors, non-finite cashflow amounts, or
+/// non-finite discounted products or totals.
 pub fn npv_amounts_with_curve<D: Discounting + ?Sized>(
     disc: &D,
     base: Date,
@@ -378,6 +379,12 @@ pub fn npv_amounts_with_curve<D: Discounting + ?Sized>(
         return Err(crate::error::InputError::TooFewPoints.into());
     }
 
+    if flows.iter().any(|(_, amount)| !amount.is_finite()) {
+        return Err(crate::Error::Validation(
+            "cashflow amounts must be finite".to_string(),
+        ));
+    }
+
     let mut total = NeumaierAccumulator::new();
     for_each_discounted(
         disc,
@@ -385,11 +392,23 @@ pub fn npv_amounts_with_curve<D: Discounting + ?Sized>(
         DayCountContext::default(),
         flows,
         |amount, df| {
-            total.add(amount * df);
+            let discounted = amount * df;
+            if !discounted.is_finite() {
+                return Err(crate::Error::Validation(
+                    "discounted cashflow amount must be finite".to_string(),
+                ));
+            }
+            total.add(discounted);
             Ok(())
         },
     )?;
-    Ok(total.total())
+    let result = total.total();
+    if !result.is_finite() {
+        return Err(crate::Error::Validation(
+            "cashflow NPV must be finite".to_string(),
+        ));
+    }
+    Ok(result)
 }
 
 fn for_each_discounted<T, D, F>(

@@ -348,7 +348,7 @@ fn calibrate_native_interpolant<Eval, Target>(
 ) -> Result<()>
 where
     Eval: FnMut(&[f64], f64) -> Result<f64>,
-    Target: Fn(f64, f64) -> f64,
+    Target: Fn(f64, f64) -> Result<f64>,
 {
     if result.interpolate_hits.is_empty() {
         return Ok(());
@@ -364,7 +364,7 @@ where
             .map(|h| (h.t, h.requested, h.neighbors.clone()))
             .collect();
         for (t, requested, neighbors) in &hits {
-            let target = target_at(*t, *requested);
+            let target = target_at(*t, *requested)?;
             scale_neighbor_deltas_to_hit(&mut deltas, neighbors, target, curve_id, *t, |d| {
                 quantity_at(d, *t)
             })?;
@@ -394,11 +394,11 @@ fn preview_discount_zero(base: &DiscountCurve, deltas_bp: &[f64], t: f64) -> Res
     Ok(preview.zero(t))
 }
 
-fn implied_inflation_rate(curve: &InflationCurve, t: f64) -> f64 {
+fn implied_inflation_rate(curve: &InflationCurve, t: f64) -> Result<f64> {
     if t <= 0.0 {
-        return 0.0;
+        return Ok(0.0);
     }
-    curve.inflation_rate(0.0, t)
+    Ok(curve.inflation_rate(0.0, t)?)
 }
 
 fn preview_inflation_implied(base: &InflationCurve, deltas_bp: &[f64], t: f64) -> Result<f64> {
@@ -412,7 +412,7 @@ fn preview_inflation_implied(base: &InflationCurve, deltas_bp: &[f64], t: f64) -
         };
         preview = preview.apply_bump(spec)?;
     }
-    Ok(implied_inflation_rate(&preview, t))
+    implied_inflation_rate(&preview, t)
 }
 
 fn rebuild_forward_curve(base: &ForwardCurve, bumped: Vec<(f64, f64)>) -> Result<ForwardCurve> {
@@ -869,7 +869,7 @@ fn curve_node_effects_on(
                 &knots,
                 curve_id.as_str(),
                 |d, t| preview_discount_zero(&base_curve, d, t),
-                |t, bp| base_curve.zero(t) + bp * 1e-4,
+                |t, bp| Ok(base_curve.zero(t) + bp * 1e-4),
             )?;
             Ok(node_market_bump_effects(
                 curve_id,
@@ -900,7 +900,7 @@ fn curve_node_effects_on(
                 &knots,
                 curve_id.as_str(),
                 |d, t| preview_forward_rate(&base_curve, d, t),
-                |t, bp| base_curve.rate(t) + bp * 1e-4,
+                |t, bp| Ok(base_curve.rate(t) + bp * 1e-4),
             )?;
 
             for &(idx, bp) in &result.indexed_targets {
@@ -962,7 +962,7 @@ fn curve_node_effects_on(
                 &knots,
                 curve_id.as_str(),
                 |d, t| preview_inflation_implied(&base_curve, d, t),
-                |t, bp| implied_inflation_rate(&base_curve, t) + bp * 1e-4,
+                |t, bp| Ok(implied_inflation_rate(&base_curve, t)? + bp * 1e-4),
             )?;
             Ok(node_market_bump_effects(
                 curve_id,
@@ -991,7 +991,7 @@ fn curve_node_effects_on(
                 &knots,
                 curve_id.as_str(),
                 |d, t| preview_commodity_price(&base_curve, d, t),
-                |t, pct| base_curve.price(t) * (1.0 + pct / 100.0),
+                |t, pct| Ok(base_curve.price(t) * (1.0 + pct / 100.0)),
             )?;
 
             let mut prices: Vec<f64> = base_curve.prices().to_vec();

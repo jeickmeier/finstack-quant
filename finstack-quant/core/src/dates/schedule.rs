@@ -700,6 +700,12 @@ impl<'a> ScheduleBuilder<'a> {
     /// When enabled, computed intermediate roll dates are snapped to the
     /// last day of their month. The user-provided start and end dates are
     /// contractual and are never snapped.
+    /// EOM requires a month/year tenor and cannot be combined with IMM or CDS IMM.
+    ///
+    /// # Arguments
+    ///
+    /// * `eom` - Whether to snap intermediate dates to month-end; incompatible
+    ///   tenor or generation-rule combinations are rejected by `build`.
     #[must_use]
     pub fn end_of_month(mut self, eom: bool) -> Self {
         self.eom = eom;
@@ -866,7 +872,20 @@ impl<'a> ScheduleBuilder<'a> {
     /// - Start date is after end date (and graceful mode is disabled)
     /// - Calendar lookup fails under [`ScheduleErrorPolicy::Strict`]
     /// - Any warning is produced under [`ScheduleErrorPolicy::Strict`]
+    /// - EOM is combined with a day/week tenor or an IMM/CDS IMM rule
     pub fn build(self) -> crate::Result<Schedule> {
+        if self.eom
+            && (self.imm_mode
+                || self.cds_imm_mode
+                || !matches!(
+                    self.frequency.unit(),
+                    super::TenorUnit::Months | super::TenorUnit::Years
+                ))
+        {
+            return Err(crate::Error::Validation(
+                "end-of-month requires a month/year tenor and cannot be combined with IMM or CDS IMM".to_string(),
+            ));
+        }
         if self.imm_mode && self.cds_imm_mode {
             return Err(crate::Error::Validation(
                 "standard IMM and CDS IMM modes are mutually exclusive".to_string(),

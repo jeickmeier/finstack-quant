@@ -552,7 +552,7 @@
             "interpolation": {
               "$ref": "#/$defs/InterpStyle",
               "default": "log_linear",
-              "description": "Interpolation style for survival probabilities between pillars.\n\nDefaults to log-linear (piecewise-constant hazard), the market\nstandard for credit curves."
+              "description": "Interpolation style for survival probabilities between pillars.\n\nOnly log-linear survival interpolation is supported, preserving the\npiecewise-constant hazard representation. Other styles are rejected\nbefore calibration starts."
             },
             "kind": {
               "const": "hazard",
@@ -572,7 +572,7 @@
             "par_interp": {
               "$ref": "#/$defs/ParInterp",
               "default": "linear",
-              "description": "Interpolation method for par spreads reported by the calibrated curve.\n\nNote: this is used for *quoting/interpolation of stored par spreads* and does not affect\nsurvival no-arbitrage, which is enforced via non-negative hazards together with the\nsurvival interpolation selected by `interpolation` (log-linear by default)."
+              "description": "Interpolation method for par spreads reported by the calibrated curve.\n\nNote: this is used for *quoting/interpolation of stored par spreads* and does not affect\nsurvival no-arbitrage, which is enforced via non-negative hazards together with the\nrequired log-linear survival interpolation."
             },
             "recovery_rate": {
               "description": "Required recovery-rate assumption as a decimal fraction in `[0, 1]`.",

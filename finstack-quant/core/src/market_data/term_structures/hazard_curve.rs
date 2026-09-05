@@ -1122,9 +1122,13 @@ impl HazardCurveBuilder {
 
     /// Set the interpolation style for survival probabilities between
     /// pillars. The default [`InterpStyle::LogLinear`] is the market
-    /// standard and corresponds to a piecewise-constant hazard rate
-    /// (consistent with the stored λ knots); other styles reshape S(t)
-    /// between pillars while preserving the pillar values.
+    /// standard and the only supported style: it preserves consistency with
+    /// the stored piecewise-constant hazard rates.
+    ///
+    /// # Arguments
+    ///
+    /// * `style` - Survival interpolation; must be [`InterpStyle::LogLinear`].
+    ///   Other styles are rejected by [`build`](Self::build).
     pub fn interp(mut self, style: InterpStyle) -> Self {
         self.survival_interp = style;
         self
@@ -1208,7 +1212,7 @@ impl HazardCurveBuilder {
     ///   must be finite; they are retained for reporting rather than used to
     ///   re-bootstrap hazards
     ///
-    /// The default survival interpolation is log-linear, which corresponds to
+    /// The only supported survival interpolation is log-linear, which corresponds to
     /// piecewise-constant hazards between pillars. A zero-time knot is allowed;
     /// its hazard applies from the base date onward.
     ///
@@ -1217,9 +1221,15 @@ impl HazardCurveBuilder {
     /// Returns an error when the base date was not explicitly set, no knots
     /// are supplied, a time, rate, recovery rate, or stored par spread is
     /// invalid, knot times are duplicated, or a hazard rate exceeds the
-    /// configured maximum. Input points are sorted by time before the curve is
+    /// configured maximum, or survival interpolation is not log-linear.
+    /// Input points are sorted by time before the curve is
     /// constructed; callers need not pre-sort them.
     pub fn build(self) -> crate::Result<HazardCurve> {
+        if self.survival_interp != InterpStyle::LogLinear {
+            return Err(crate::Error::Validation(
+                "HazardCurve requires log-linear survival interpolation for piecewise-constant hazards".to_string(),
+            ));
+        }
         // Require explicit base_date to avoid accidentally anchoring to 1970-01-01
         let default_base =
             Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN);
@@ -1424,43 +1434,25 @@ mod tests {
         assert!(in_place.hazard_calibration().is_none());
     }
 
-    /// The builder's `interp` style must be wired to the survival
-    /// interpolator: Linear and LogLinear curves share pillar values but
-    /// differ strictly between pillars.
     #[test]
-    fn survival_interp_style_is_wired() {
-        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-        let knots = [(1.0, 0.02), (5.0, 0.08)];
-        let log_linear = HazardCurve::builder("LL")
-            .base_date(base)
-            .knots(knots)
-            .recovery_rate(0.40)
-            .build()
-            .expect("log-linear build");
-        let linear = HazardCurve::builder("LIN")
-            .base_date(base)
-            .knots(knots)
-            .interp(crate::math::interp::InterpStyle::Linear)
-            .recovery_rate(0.40)
-            .build()
-            .expect("linear build");
-
-        // Pillar values agree.
-        for t in [1.0, 5.0] {
-            assert!(
-                (log_linear.sp(t) - linear.sp(t)).abs() < 1e-12,
-                "pillar survival at t={t} must match across styles"
-            );
+    fn survival_interpolation_preserves_hazard_consistency() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let builder = || {
+            HazardCurve::builder("HZ")
+                .base_date(base)
+                .knots([(1.0, 0.02), (2.0, 1.0)])
+                .recovery_rate(0.4)
+        };
+        assert!(builder().interp(InterpStyle::Linear).build().is_err());
+        let curve = builder().build().expect("valid hazard curve");
+        for t in [0.5, 1.5, 3.0] {
+            let eps = 1e-5;
+            let implied = -(curve.sp(t + eps).ln() - curve.sp(t - eps).ln()) / (2.0 * eps);
+            assert!((implied - curve.hazard_rate(t)).abs() < 1e-9);
         }
-        // Mid-pillar values differ (linear in S vs log-linear in S).
-        let mid = 3.0;
-        assert!(
-            (log_linear.sp(mid) - linear.sp(mid)).abs() > 1e-6,
-            "survival interpolation style must affect mid-pillar values: \
-             log-linear {} vs linear {}",
-            log_linear.sp(mid),
-            linear.sp(mid)
-        );
+        let mut state = serde_json::to_value(&curve).expect("serialize");
+        state["survival_interp"] = serde_json::to_value(InterpStyle::Linear).expect("style");
+        assert!(serde_json::from_value::<HazardCurve>(state).is_err());
     }
 
     #[test]

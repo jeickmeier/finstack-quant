@@ -6,6 +6,29 @@ use finstack_quant_core::dates::{
 };
 
 #[test]
+fn eom_rejects_incompatible_schedule_rules() {
+    let builder = || ScheduleBuilder::new(make_date(2025, 1, 1), make_date(2025, 12, 20)).unwrap();
+    for frequency in [Tenor::daily(), Tenor::weekly()] {
+        assert!(builder()
+            .frequency(frequency)
+            .end_of_month(true)
+            .build()
+            .is_err());
+    }
+    assert!(builder().cds_imm().end_of_month(true).build().is_err());
+    assert!(builder().end_of_month(true).cds_imm().build().is_err());
+    assert!(builder().imm().end_of_month(true).build().is_err());
+    let weekly = ScheduleBuilder::new(make_date(2025, 1, 1), make_date(2025, 1, 29))
+        .unwrap()
+        .frequency(Tenor::weekly())
+        .build()
+        .unwrap();
+    assert_eq!(weekly.dates.len(), 5);
+    let cds = builder().cds_imm().build().unwrap();
+    assert!(cds.dates.iter().all(|date| date.day() == 20));
+}
+
+#[test]
 fn test_basic_schedule() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 4, 15);
