@@ -153,9 +153,6 @@ def borrower_data() -> dict[str, Any]:
         Scenarios change forecast assumptions only; prior actuals stay fixed.
         The model assumes flat 5% SOFR, while loan valuation uses market forwards.
 
-    Notes:
-        This fixed data factory does not raise exceptions.
-
     >>> borrower_data()["loan"]["holding_notional"]
     1000000.0
     """

@@ -124,7 +124,7 @@ mod tests {
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
         )
-        .expect("test should succeed");
+        .unwrap();
 
         // Should use explicit value, not formula
         assert_eq!(source, NodeValueSource::Value(100.0));
@@ -139,7 +139,7 @@ mod tests {
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
         )
-        .expect("test should succeed");
+        .unwrap();
 
         // Should use formula
         assert!(source.is_formula());
@@ -195,7 +195,7 @@ mod tests {
             &PeriodId::quarter(2025, 3).expect("valid period fixture"),
             false,
         )
-        .expect("test should succeed");
+        .unwrap();
         assert_eq!(source, NodeValueSource::Forecast);
     }
 
@@ -216,7 +216,7 @@ mod tests {
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
         )
-        .expect("test should succeed");
+        .unwrap();
         assert!(source.is_formula());
     }
 }

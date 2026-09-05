@@ -282,7 +282,6 @@ pub fn calculate_period_flows(
     let is_two_leg = schedule_is_two_leg(&full_schedule);
     let mut net_interest_cash = 0.0_f64;
 
-    // Extract flows that fall within this period
     for cf in full_schedule.get_flows() {
         if cf.date >= period.start && cf.date < period.end {
             // Currency safety: every in-period flow must share the breakdown
@@ -381,10 +380,8 @@ pub fn calculate_period_flows(
     breakdown.interest_expense_cash = Money::new(expense, currency)?;
     breakdown.interest_income_cash = Some(Money::new(income, currency)?);
 
-    // Get closing balance from outstanding_by_date.
-    // Find the most recent outstanding balance at or before period end.
-    // Note: outstanding_path only has entries on dates when cashflows occur,
-    // so we need to find the latest entry <= period.end to get the correct balance.
+    // outstanding_path only has entries on cashflow dates, so take the latest
+    // entry at or before period.end.
     let scheduled_closing_balance = outstanding_path
         .iter()
         .rev()

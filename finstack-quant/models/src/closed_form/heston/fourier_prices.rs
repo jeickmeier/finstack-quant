@@ -194,10 +194,11 @@ pub fn heston_call_prices_fourier(
         ..initial
     };
     for attempt in [initial, retry] {
-        if let Some(pricer) = HestonStripPricer::new(spot, time, params, &attempt) {
-            if let Ok(prices) = pricer.price_calls(strikes) {
-                return Ok(prices);
-            }
+        let Some(pricer) = HestonStripPricer::new(spot, time, params, &attempt) else {
+            continue;
+        };
+        if let Ok(prices) = pricer.price_calls(strikes) {
+            return Ok(prices);
         }
     }
 

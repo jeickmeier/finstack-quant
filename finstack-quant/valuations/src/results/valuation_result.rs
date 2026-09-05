@@ -559,7 +559,8 @@ impl ValuationResult {
     ///
     /// # Arguments
     ///
-    /// * `details` - Details used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `details` - Model-specific valuation payload (tree nodes, MC stats, cashflow
+    ///   breakdown) stored on the result.
     pub fn with_details(mut self, details: ValuationDetails) -> Self {
         self.details = Some(details);
         self
@@ -569,7 +570,7 @@ impl ValuationResult {
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
+    /// * `id` - Metric identifier to look up in `self.measures`.
     pub fn metric(&self, id: MetricId) -> Option<f64> {
         self.measures.get(&id).copied()
     }

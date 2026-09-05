@@ -1058,24 +1058,11 @@ mod tests {
     }
 }
 
-/// Convert a trait object reference to Arc-wrapped trait object.
-///
-/// This helper clones the instrument via `clone_box()` and converts it to Arc.
-/// Used by language bindings (Python/WASM) that work with trait object references.
-///
-/// # Implementation
-///
-/// Uses `clone_box()` to get a `Box<dyn Instrument>`, then converts it to `Arc`
-/// using `Arc::from()`. This works because `Arc::from()` can convert from `Box<T>`
-/// when `T: ?Sized` (which trait objects are).
+/// Clone `instrument` into an `Arc<dyn Instrument>` for host bindings.
 pub(crate) fn instrument_to_arc(
     instrument: &dyn crate::instruments::common_impl::traits::Instrument,
 ) -> Arc<dyn crate::instruments::common_impl::traits::Instrument> {
-    // Clone via clone_box() to get Box<dyn Instrument>
-    let boxed = instrument.clone_box();
-    // Convert Box to Arc using Arc::from()
-    // This works because Arc::from() can convert Box<T> to Arc<T> for any T
-    Arc::from(boxed)
+    Arc::from(instrument.clone_box())
 }
 
 /// Black-Scholes inputs with discount factor (DF-first approach).

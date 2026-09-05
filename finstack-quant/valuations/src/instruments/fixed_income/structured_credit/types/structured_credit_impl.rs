@@ -358,7 +358,8 @@ impl StructuredCredit {
     ///
     /// # Arguments
     ///
-    /// * `waterfall` - Waterfall used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `waterfall` - Replacement payment waterfall used verbatim by pricing; must
+    ///   reference this deal's tranches and currency.
     pub fn with_waterfall(mut self, waterfall: Waterfall) -> finstack_quant_core::Result<Self> {
         self.waterfall = Some(waterfall);
         self.validate_custom_waterfall()?;

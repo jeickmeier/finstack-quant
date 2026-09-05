@@ -78,14 +78,13 @@ impl Discretization<CirProcess> for QeCir {
         let params = process.params();
         let v_t = x[0].max(0.0);
 
-        // Apply QE scheme
         let v_next = self.step_variance(v_t, params.kappa, params.theta, params.sigma, dt, z[0]);
 
         x[0] = v_next;
     }
 
     fn work_size(&self, _process: &CirProcess) -> usize {
-        0 // No workspace needed
+        0
     }
 }
 

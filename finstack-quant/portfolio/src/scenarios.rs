@@ -114,12 +114,6 @@ fn selective_invalidation(
 
 /// Apply a scenario to a portfolio.
 ///
-/// This function:
-/// 1. Borrows the portfolio for market-only scenarios
-/// 2. Clones instruments only when the scenario requires instrument access
-/// 3. Applies the scenario using the engine
-/// 4. Owns a modified portfolio only when instruments changed
-///
 /// # Aliasing contract
 ///
 /// The input `portfolio` and `market` references are **never mutated**.
@@ -239,7 +233,6 @@ fn replace_portfolio_instruments(
         )));
     }
 
-    // Update portfolio positions with modified instruments (move boxes into `Arc`, no extra clone).
     for (position, modified_inst) in portfolio.positions.iter_mut().zip(instruments) {
         position.instrument = Arc::from(modified_inst);
     }
@@ -250,9 +243,7 @@ fn replace_portfolio_instruments(
 
 /// Apply a scenario and re-value the portfolio.
 ///
-/// Convenience function that applies a scenario and immediately
-/// re-values the portfolio with the modified market data. Revaluation
-/// uses [`PortfolioValuationOptions::default`](crate::valuation::PortfolioValuationOptions::default)
+/// Revaluation uses [`PortfolioValuationOptions::default`](crate::valuation::PortfolioValuationOptions::default)
 /// (standard risk set, `strict_risk = true`).
 ///
 /// # Arguments

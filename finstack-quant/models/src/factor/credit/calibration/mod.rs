@@ -39,7 +39,7 @@
 //! Every keyed map is a [`std::collections::BTreeMap`] and every iteration order is stable. Two
 //! calibrations with the same inputs serialize to byte-identical JSON.
 //!
-//! # Reuse with PR-3
+//! # Anchoring
 //!
 //! The anchoring step (step 7) implements the same math as
 //! [`decompose_levels`][crate::factor::credit::decomposition::decompose_levels]

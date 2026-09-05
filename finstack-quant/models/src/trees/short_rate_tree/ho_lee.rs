@@ -36,7 +36,7 @@ impl ShortRateTree {
 
         let sigma = self.config.volatility;
         // Calibration must use the same per-node discount convention as
-        // pricing : a tree calibrated with continuous
+        // pricing: a tree calibrated with continuous
         // `exp(-r*dt)` but priced with e.g. simple `1/(1+r*dt)` silently
         // fails to reprice the curve.
         let comp = self.config.compounding;
@@ -49,7 +49,6 @@ impl ShortRateTree {
 
         rates[0] = vec![r0];
 
-        // State prices (Arrow-Debreu prices) for the current step
         let mut state_prices = vec![1.0]; // Q[0] = 1.0
 
         for step in 0..self.config.steps {
@@ -76,14 +75,12 @@ impl ShortRateTree {
                 let q = state_prices[i];
                 let df = comp.df(current_rate, dt);
 
-                // Up move (to i+1)
                 let r_up_base = current_rate + sigma * dt.sqrt();
                 if i + 1 < next_nodes {
                     next_rates_base[i + 1] = r_up_base;
                     next_state_prices[i + 1] += q * df * 0.5;
                 }
 
-                // Down move (to i)
                 let r_down_base = current_rate - sigma * dt.sqrt();
                 if i < next_nodes {
                     next_rates_base[i] = r_down_base;
@@ -91,8 +88,6 @@ impl ShortRateTree {
                 }
             }
 
-            // 2. Solve for theta (drift adjustment to match discount curve)
-            //
             // Ho-Lee calibration: r_next[j] = r_base[j] + θ. The model ZCB
             // price Σ Q_next[j] · df(r_base[j] + θ, dt) must equal P_target.
             //
@@ -107,7 +102,6 @@ impl ShortRateTree {
                 let mut p_model_base_cont = 0.0;
                 for (j, &q_next) in next_state_prices.iter().enumerate() {
                     let r_base = next_rates_base[j];
-                    // Discount from t_{i+2} to t_{i+1} using r_{i+1}
                     p_model_base += q_next * comp.df(r_base, dt);
                     p_model_base_cont += q_next * (-r_base * dt).exp();
                 }
@@ -145,7 +139,6 @@ impl ShortRateTree {
                 0.0
             };
 
-            // 3. Apply theta directly to get final rates (θ is the rate adjustment)
             let mut next_rates = vec![0.0; next_nodes];
             for j in 0..next_nodes {
                 next_rates[j] = next_rates_base[j] + theta;

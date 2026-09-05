@@ -272,12 +272,10 @@ fn partition_ranks(values: &[Option<f64>], indices: &[usize], mode: RankMode) ->
     }
     if n == 1 {
         let rank = match mode {
-            RankMode::ClosedPercentile => Some(0.0),
-            RankMode::OpenPercentile => Some(0.5),
+            RankMode::ClosedPercentile => 0.0,
+            RankMode::OpenPercentile => 0.5,
         };
-        return rank
-            .map(|rank| vec![(finite_values[0].0, rank)])
-            .unwrap_or_default();
+        return vec![(finite_values[0].0, rank)];
     }
 
     let mut output = Vec::with_capacity(n);
@@ -349,14 +347,14 @@ fn robust_zscore(values: &[Option<f64>], indices: &[usize], output: &mut [Option
 
 fn minmax_scale(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
     let finite_values = finite_partition(values, indices);
-    let mut min_value = f64::INFINITY;
-    let mut max_value = f64::NEG_INFINITY;
-    for (_, value) in &finite_values {
+    let Some(((_, first), rest)) = finite_values.split_first() else {
+        return;
+    };
+    let mut min_value = *first;
+    let mut max_value = *first;
+    for (_, value) in rest {
         min_value = min_value.min(*value);
         max_value = max_value.max(*value);
-    }
-    if !min_value.is_finite() || !max_value.is_finite() {
-        return;
     }
     let range = max_value - min_value;
     for (idx, value) in finite_values {
@@ -439,7 +437,7 @@ fn long_short_weights(
         return Ok(());
     };
 
-    let mut centered = finite_values
+    let centered = finite_values
         .iter()
         .map(|(idx, value)| {
             let mut weight = *value - center;
@@ -456,7 +454,7 @@ fn long_short_weights(
         }
         return Ok(());
     }
-    for (idx, weight) in centered.drain(..) {
+    for (idx, weight) in centered {
         output[idx] = Some(weight / gross);
     }
     Ok(())

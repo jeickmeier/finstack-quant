@@ -83,7 +83,6 @@ impl MertonModel {
             }
         }
 
-        // Sort tenors and validate positivity
         let mut sorted_tenors: Vec<f64> = tenors.to_vec();
         sorted_tenors.sort_by(|a, b| a.total_cmp(b));
 

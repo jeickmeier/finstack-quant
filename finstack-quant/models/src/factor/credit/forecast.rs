@@ -1,14 +1,12 @@
 //! Credit factor covariance and idiosyncratic-volatility forecasts.
 //!
-//! # PR-6 scope
-//!
 //! The [`FactorVolModel::Sample`] and [`FactorVolModel::Ewma`] variants are supported. `OneStep` and
 //! `Unconditional` map to the calibrated annualized variance unchanged;
 //! `NSteps(n)` means `n` annualized model periods and multiplies variance by
 //! `n`; fractional calendar horizons use `Years(y)` or parser input
 //! `{"n_steps": N, "periods_per_year": P}`. `VolHorizon::Custom` is
-//! intentionally **not** exposed in PR-6 to keep PyO3 / WASM binding generation
-//! in PR-10/11 simple.
+//! not exposed, so PyO3 / WASM bindings do not need to serialize arbitrary
+//! scaling callables.
 //!
 //! # Reuse
 //!
@@ -25,10 +23,10 @@ use finstack_quant_core::types::IssuerId;
 
 /// Forecast horizon used to scale a calibrated `Sample` vol estimate.
 ///
-/// PR-6 supports annualized period counts and explicit fractional-year
-/// horizons. The `Custom` variant from the design spec is intentionally
-/// **not** exposed yet to keep the PyO3 / WASM bindings simple to generate
-/// without serializing arbitrary scaling callables.
+/// Supports annualized period counts and explicit fractional-year
+/// horizons. The `Custom` variant from the design spec is not
+/// exposed, so PyO3 / WASM bindings do not need to serialize arbitrary
+/// scaling callables.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum VolHorizon {
     /// One-period horizon. Returns the calibrated annualized variance
@@ -53,8 +51,8 @@ pub enum VolHorizon {
 impl VolHorizon {
     /// Parse a horizon descriptor string into a [`VolHorizon`].
     ///
-    /// This is the canonical horizon-string parser shared by the PyO3 and
-    /// WASM binding crates so that the accepted vocabulary stays in lockstep.
+    /// Shared by the PyO3 and WASM binding crates so the accepted vocabulary
+    /// stays in lockstep.
     ///
     /// Accepted forms (leading/trailing whitespace is trimmed):
     /// - `"one_step"` → [`VolHorizon::OneStep`]
@@ -81,12 +79,12 @@ impl VolHorizon {
                     )
                 })?;
                 if let Some(years) = v.get("years").and_then(serde_json::Value::as_f64) {
-                    if years.is_finite() && years >= 0.0 {
-                        return Ok(VolHorizon::Years(years));
+                    if !(years.is_finite() && years >= 0.0) {
+                        return Err(format!(
+                            "invalid horizon object {other:?}: years must be finite and non-negative"
+                        ));
                     }
-                    return Err(format!(
-                        "invalid horizon object {other:?}: years must be finite and non-negative"
-                    ));
+                    return Ok(VolHorizon::Years(years));
                 }
                 let n = v
                     .get("n_steps")
@@ -101,12 +99,12 @@ impl VolHorizon {
                     .get("periods_per_year")
                     .and_then(serde_json::Value::as_f64)
                 {
-                    if periods_per_year.is_finite() && periods_per_year > 0.0 {
-                        return Ok(VolHorizon::Years(n as f64 / periods_per_year));
+                    if !(periods_per_year.is_finite() && periods_per_year > 0.0) {
+                        return Err(format!(
+                            "invalid horizon object {other:?}: periods_per_year must be finite and positive"
+                        ));
                     }
-                    return Err(format!(
-                        "invalid horizon object {other:?}: periods_per_year must be finite and positive"
-                    ));
+                    return Ok(VolHorizon::Years(n as f64 / periods_per_year));
                 }
                 Ok(VolHorizon::NSteps(n as usize))
             }
@@ -175,7 +173,6 @@ impl<'a> FactorCovarianceForecast<'a> {
             .collect();
         let n = factor_ids.len();
 
-        // Validate ρ axes line up with factor universe.
         let rho_ids = &self.model.static_correlation.factor_ids;
         if rho_ids.as_slice() != factor_ids.as_slice() {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -265,7 +262,7 @@ impl<'a> FactorCovarianceForecast<'a> {
         Ok(variance.sqrt())
     }
 
-    /// Build the canonical factor-model config using `Σ(t, h)` at the given
+    /// Build a factor-model config using `Σ(t, h)` at the given
     /// horizon and requested risk measure.
     ///
     /// # Errors

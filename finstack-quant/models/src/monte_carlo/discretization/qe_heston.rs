@@ -371,7 +371,6 @@ impl Discretization<HestonProcess> for QeHeston {
 
         let s_next = s_t * log_increment.exp();
 
-        // Update state
         x[0] = s_next;
         x[1] = v_next;
     }
@@ -408,7 +407,6 @@ mod tests {
         let params =
             HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
 
-        // Test with various shocks
         for z in [-3.0, -1.0, 0.0, 1.0, 3.0] {
             let v_next =
                 qe.step_variance(0.04, params.kappa, params.theta, params.sigma_v, 0.01, z);
@@ -443,7 +441,6 @@ mod tests {
 
         qe.step(&heston, 0.0, 0.01, &mut x, &z, &mut work);
 
-        // Spot and variance should be positive
         assert!(x[0] > 0.0);
         assert!(x[1] >= 0.0);
 
@@ -464,8 +461,7 @@ mod tests {
 
         qe.step(&heston, 0.0, 0.01, &mut x1, &z_neg_var, &mut work);
 
-        // With ρ=-0.7, negative variance shock gives positive contribution to spot
-        // This is captured in the correlation structure
+        // With ρ=-0.7, a negative variance shock contributes positively to spot.
         assert!(x1[0] > 0.0);
         assert!(x1[1] >= 0.0);
     }
@@ -492,7 +488,6 @@ mod tests {
             upper
         );
 
-        // Should equal the midpoint
         let midpoint = (v_t + v_next) / 2.0 * dt;
         assert!(
             (int_var - midpoint).abs() < 1e-12,
@@ -504,7 +499,6 @@ mod tests {
 
     #[test]
     fn test_integrated_variance_symmetric() {
-        // When v_t == v_next, result should equal v * dt
         let qe = QeHeston::new();
         let v = 0.04;
         let dt = 0.1;
@@ -524,7 +518,6 @@ mod tests {
 
     #[test]
     fn test_integrated_variance_various_dt() {
-        // Test with various time steps
         let qe = QeHeston::new();
         let v_t = 0.04;
         let v_next = 0.05;
@@ -547,7 +540,6 @@ mod tests {
 
     #[test]
     fn test_exact_integrated_variance() {
-        // Test exact method vs trapezoidal
         let qe_trap = QeHeston::new();
         let qe_exact = QeHeston::exact_variance();
 
@@ -560,12 +552,9 @@ mod tests {
         let trap = qe_trap.integrated_variance(v_t, v_next, dt, kappa, theta);
         let exact = qe_exact.integrated_variance(v_t, v_next, dt, kappa, theta);
 
-        // Both should be positive
         assert!(trap > 0.0);
         assert!(exact > 0.0);
 
-        // Exact should differ from trapezoidal for high kappa
-        // (they're not equal but both reasonable)
         let diff_pct = ((exact - trap) / trap).abs() * 100.0;
         assert!(
             diff_pct < 20.0,
@@ -600,11 +589,9 @@ mod tests {
 
     #[test]
     fn test_builder_pattern() {
-        // Test that builder pattern works for configuring QE scheme
         let qe = QeHeston::new()
             .with_integrated_variance(IntegratedVarianceMethod::MeanReversionAdjusted);
 
-        // Verify it works without panics
         let params =
             HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
         let v = qe.step_variance(0.04, params.kappa, params.theta, params.sigma_v, 0.1, 0.0);
@@ -613,12 +600,10 @@ mod tests {
 
     #[test]
     fn test_with_psi_c() {
-        // Test custom psi_c threshold
         let qe = QeHeston::with_psi_c(2.0).expect("psi_c = 2.0 is the Andersen upper bound");
         let params =
             HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
 
-        // Variance should remain positive
         for z in [-2.0, 0.0, 2.0] {
             let v = qe.step_variance(0.04, params.kappa, params.theta, params.sigma_v, 0.1, z);
             assert!(v >= 0.0);

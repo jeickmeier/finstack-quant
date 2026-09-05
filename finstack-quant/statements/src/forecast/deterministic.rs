@@ -41,7 +41,6 @@ pub(super) fn growth_pct(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    // Extract rate parameter
     let rate = params.get("rate").and_then(|v| v.as_f64()).ok_or_else(|| {
         Error::forecast(
             "Missing or invalid 'rate' parameter for GrowthPct forecast. \
@@ -81,7 +80,6 @@ pub(super) fn growth_pct(
     for period_id in forecast_periods {
         current_value *= 1.0 + rate;
 
-        // Check for overflow/underflow
         if !current_value.is_finite() {
             return Err(Error::forecast(format!(
                 "Overflow in compound growth calculation at period {:?}. \
@@ -109,7 +107,6 @@ pub(super) fn curve_pct(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    // Extract curve parameter
     let curve_json = params.get("curve").ok_or_else(|| {
         Error::forecast(
             "Missing 'curve' parameter for CurvePct forecast. \

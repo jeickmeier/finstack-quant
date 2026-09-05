@@ -451,7 +451,6 @@ mod tests {
             .price(&gbm, 100.0, 1.0, 10, &call, Currency::USD, 0.95)
             .expect("should succeed");
 
-        // Should get a reasonable option value
         assert!(result.mean.amount() > 0.0);
         assert!(result.mean.amount() < 50.0); // Sanity check
         assert_eq!(result.num_paths, 1000);
@@ -489,7 +488,6 @@ mod tests {
             .price(&gbm, 100.0, 1.0, 100, &call, Currency::USD, 1.0)
             .expect("should succeed");
 
-        // Should be close to intrinsic value of 50
         assert!((result.mean.amount() - 50.0).abs() < 5.0);
     }
 

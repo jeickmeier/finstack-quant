@@ -347,7 +347,6 @@ mod tests {
             Grid1D::sinh_concentrated(x_min, x_max, 121, spot.ln(), 0.1).expect("valid x-grid");
         let gy = Grid1D::sinh_concentrated(v_min, v_max, 51, theta_v, 0.2).expect("valid v-grid");
 
-        // Solve call
         let pde_call = HestonPde {
             r,
             q,
@@ -365,7 +364,6 @@ mod tests {
             .expect("Heston call grid is within the MCS stability regime");
         let call_price = sol_call.interpolate(spot.ln(), v0);
 
-        // Solve put
         let pde_put = HestonPde {
             r,
             q,

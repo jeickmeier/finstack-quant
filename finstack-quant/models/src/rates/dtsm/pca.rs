@@ -100,11 +100,9 @@ impl YieldPca {
             )));
         }
 
-        // Compute yield changes: (T-1) x N
         let changes = panel.yield_changes();
         let m = changes.nrows(); // T - 1
 
-        // Column means
         let mut mean_change = DVector::zeros(n);
         for j in 0..n {
             let mut sum = 0.0;
@@ -114,7 +112,6 @@ impl YieldPca {
             mean_change[j] = sum / m as f64;
         }
 
-        // De-mean the changes
         let mut centered = changes;
         for i in 0..m {
             for j in 0..n {
@@ -126,7 +123,6 @@ impl YieldPca {
         let ct = centered.transpose();
         let cov = (&ct * &centered) / (m as f64 - 1.0).max(1.0);
 
-        // Check for degenerate covariance
         let trace = (0..n).map(|i| cov[(i, i)]).sum::<f64>();
         if trace < 1e-30 {
             return Err(finstack_quant_core::Error::Validation(
@@ -134,7 +130,6 @@ impl YieldPca {
             ));
         }
 
-        // Symmetric eigendecomposition
         let eigen = SymmetricEigen::new(cov);
 
         // nalgebra returns eigenvalues in ascending order; we want descending
@@ -142,7 +137,6 @@ impl YieldPca {
         let raw_eigenvalues = eigen.eigenvalues;
         let raw_eigenvectors = eigen.eigenvectors;
 
-        // Sort indices by eigenvalue descending
         let mut indices: Vec<usize> = (0..k).collect();
         indices.sort_by(|&a, &b| {
             raw_eigenvalues[b]
@@ -174,10 +168,8 @@ impl YieldPca {
             }
         }
 
-        // Compute scores: (T-1) x K = centered * loadings
         let scores = &centered * &loadings;
 
-        // Variance explained
         let total_var: f64 = eigenvalues.iter().sum();
         let variance_explained: Vec<f64> = eigenvalues
             .iter()
@@ -405,7 +397,6 @@ impl YieldPca {
         let loadings_k = self.loadings.columns(0, num_components);
         let reconstructed = scores_k * loadings_k.transpose();
 
-        // Add back the mean
         let mut result = DMatrix::zeros(m, n);
         for i in 0..m {
             for j in 0..n {
@@ -540,7 +531,6 @@ mod tests {
         assert_eq!(pca.tenors().len(), tenors.len());
         assert_eq!(pca.eigenvalues().len(), tenors.len());
 
-        // Eigenvalues should be in descending order
         for i in 1..pca.eigenvalues().len() {
             assert!(
                 pca.eigenvalues()[i] <= pca.eigenvalues()[i - 1] + 1e-15,
@@ -548,11 +538,9 @@ mod tests {
             );
         }
 
-        // Variance explained should sum to 1
         let total: f64 = pca.variance_explained().iter().sum();
         assert!((total - 1.0).abs() < 1e-10);
 
-        // Cumulative variance should be monotone
         for i in 1..pca.cumulative_variance().len() {
             assert!(pca.cumulative_variance()[i] >= pca.cumulative_variance()[i - 1] - 1e-15);
         }
@@ -594,11 +582,9 @@ mod tests {
     #[test]
     fn pca_three_factor_explains_most_variance() {
         let tenors = standard_tenors();
-        // Generate data with 3 dominant factors
         let panel = make_synthetic_panel(100, &tenors, &[0.01, 0.005, 0.002]);
         let pca = YieldPca::fit(&panel).unwrap();
 
-        // First 3 PCs should explain vast majority
         assert!(
             pca.cumulative_variance()[2] > 0.90,
             "First 3 PCs explain only {:.1}% of variance",
@@ -623,7 +609,6 @@ mod tests {
         let panel = make_synthetic_panel(50, &tenors, &[0.01, 0.005, 0.002]);
         let pca = YieldPca::fit(&panel).unwrap();
 
-        // Full reconstruction should match original changes
         let changes = panel.yield_changes();
         let reconstructed = pca.reconstruct(pca.num_components()).unwrap();
 
@@ -686,7 +671,6 @@ mod tests {
         let shocked = pca.apply_scenario(&base, &[2.0, -1.0]).unwrap();
 
         assert_eq!(shocked.len(), tenors.len());
-        // Shocked yields should differ from base
         let max_diff: f64 = base
             .iter()
             .zip(shocked.iter())
@@ -704,7 +688,6 @@ mod tests {
         let l0 = pca.loading(0).unwrap();
         assert_eq!(l0.len(), tenors.len());
 
-        // Out-of-range should error
         assert!(pca.loading(tenors.len()).is_err());
     }
 
@@ -718,10 +701,7 @@ mod tests {
     #[test]
     fn pca_too_few_tenors() {
         let data = DMatrix::from_row_slice(5, 1, &[0.01, 0.02, 0.03, 0.04, 0.05]);
-        // Should fail at YieldPanel::new since we need sorted ascending > 0
-        // But we also need at least 2 tenors for PCA
         let panel = YieldPanel::new(data, vec![1.0], None);
-        // If panel construction succeeds, PCA should fail
         if let Ok(p) = panel {
             assert!(YieldPca::fit(&p).is_err());
         }

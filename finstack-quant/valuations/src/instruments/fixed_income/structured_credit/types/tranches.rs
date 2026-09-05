@@ -683,7 +683,8 @@ impl TrancheStructure {
     ///
     /// # Arguments
     ///
-    /// * `tranches` - Tranches used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `tranches` - Ordered notes that form the capital structure; must be non-empty
+    ///   and pass structural validation before payment priorities are assigned.
     pub fn new(mut tranches: Vec<Tranche>) -> finstack_quant_core::Result<Self> {
         if tranches.is_empty() {
             return Err(finstack_quant_core::InputError::TooFewPoints.into());

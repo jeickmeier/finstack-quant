@@ -83,7 +83,6 @@ impl TestEngineBuilder {
     }
 }
 
-// Dummy implementations for testing
 #[derive(Clone)]
 struct DummyRng;
 impl RandomStream for DummyRng {
@@ -299,15 +298,6 @@ fn test_basic_pricing() {
 
 #[test]
 fn test_parallel_execution_error_propagation() {
-    // Test that parallel execution properly propagates errors instead of panicking.
-    // The key change is that we replaced .expect() with ? operator, which ensures
-    // errors are propagated via Result rather than panicking.
-    //
-    // This test verifies that:
-    // 1. Parallel execution works correctly for valid inputs
-    // 2. Error handling mechanism is in place (verified by compilation - ? operator
-    //    requires Result return type)
-
     let engine = McEngine::builder()
         .num_paths(100)
         .uniform_grid(1.0, 10)
@@ -322,7 +312,6 @@ fn test_parallel_execution_error_propagation() {
     let initial_state = vec![100.0];
     let payoff = DummyPayoff;
 
-    // Valid input should work
     let result = engine.price(
         &rng,
         &process,
@@ -336,10 +325,6 @@ fn test_parallel_execution_error_propagation() {
     assert!(result.is_ok());
     let estimate = result.expect("MC pricing should succeed in test");
     assert_eq!(estimate.num_paths, 100);
-
-    // Note: Testing actual error scenarios would require extensive mocking
-    // of simulate_path. The important change is that errors are now propagated
-    // via Result instead of panicking (verified by ? operator usage).
 }
 
 #[test]

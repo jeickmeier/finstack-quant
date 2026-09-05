@@ -263,16 +263,19 @@ impl CmsSwap {
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
+    /// * `id` - Trade identifier stored on the swap and used in results and serialization.
     /// * `start_date` - Inclusive schedule or accrual start date in the instrument calendar
     /// * `maturity` - Final payment or expiry date of the instrument being constructed
-    /// * `cms_frequency` - Cms frequency used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `cms_tenor` - Cms tenor used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `cms_spread` - Cms spread used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `funding_leg` - Funding leg used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `cms_frequency` - Payment and fixing frequency used to generate both the CMS and
+    ///   funding schedules.
+    /// * `cms_tenor` - Reference swap tenor in years for the CMS rate (e.g. `10.0` for a 10Y CMS).
+    /// * `cms_spread` - Additive spread on the CMS rate in decimal (e.g. `0.001` = 10bp).
+    /// * `funding_leg` - Fixed or floating other leg; its schedule is generated from the same
+    ///   start, maturity, and CMS frequency.
     /// * `notional` - Trade notional amount in the instrument currency's major units
-    /// * `cms_day_count` - Cms day count used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `swap_convention` - Swap convention used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `cms_day_count` - Day-count convention for CMS-leg accrual fractions.
+    /// * `swap_convention` - IRS convention supplying the calendar and reset lag used to
+    ///   build both schedules.
     /// * `side` - Trade side (buy/sell or pay/receive) controlling sign conventions
     /// * `discount_curve_id` - Identifier of the discount curve used for present-value calculations.
     /// * `forward_curve_id` - Identifier of the forward curve used to project floating rates.

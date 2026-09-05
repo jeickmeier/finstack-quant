@@ -141,13 +141,11 @@ pub fn implied_vol_black(
     t: f64,
     is_call: bool,
 ) -> finstack_quant_core::Result<f64> {
-    // ── 1. Input validation ──────────────────────────────────────────────
     validate_positive(forward)?;
     validate_positive(strike)?;
     validate_time(t)?;
     validate_price(price)?;
 
-    // ── 2. Intrinsic value and arbitrage bounds ──────────────────────────
     let scale = forward.max(strike);
     let intrinsic = if is_call {
         (forward - strike).max(0.0)
@@ -173,13 +171,11 @@ pub fn implied_vol_black(
         .into());
     }
 
-    // ── 3. Convert to OTM option via put-call parity ─────────────────────
     let (otm_price, otm_is_call) = to_otm(price, forward, strike, is_call);
     if otm_price <= f64::EPSILON * scale {
         return Ok(0.0);
     }
 
-    // ── 4. Bracket & bisect for initial guess ────────────────────────────
     let price_fn = |sigma: f64| -> f64 {
         if otm_is_call {
             black_call(forward, strike, sigma, t)
@@ -190,9 +186,7 @@ pub fn implied_vol_black(
     let analytical = analytical_guess_black(otm_price, forward, strike, t);
     let mut sigma = bracket_and_bisect(otm_price, &price_fn, analytical, VOL_CEIL_BLACK);
 
-    // ── 5. Householder (Halley) refinement ───────────────────────────────
-    //
-    // Third-order convergence using:
+    // Third-order Householder (Halley) convergence using:
     // f(σ) = black_price(σ) − target
     // f′(σ) = vega = F √T φ(d₁)
     // f″(σ) = volga = vega · d₁ · d₂ / σ
@@ -214,7 +208,6 @@ pub fn implied_vol_black(
             break;
         }
 
-        // Compute d₁, d₂ for volga
         let st = sigma * sqrt_t;
         // d1/d2 intentionally inline: ln_fk pre-hoisted for Newton loop performance
         let d1 = (ln_fk + 0.5 * st * st) / st;
@@ -231,7 +224,6 @@ pub fn implied_vol_black(
         sigma = sigma.clamp(VOL_FLOOR, VOL_CEIL_BLACK);
     }
 
-    // ── 6. Final convergence verification ────────────────────────────────
     verify_convergence_black(sigma, otm_price, forward, strike, t, otm_is_call)
 }
 
@@ -304,14 +296,12 @@ pub fn implied_vol_bachelier(
     t: f64,
     is_call: bool,
 ) -> finstack_quant_core::Result<f64> {
-    // ── 1. Input validation ──────────────────────────────────────────────
     if !forward.is_finite() || !strike.is_finite() {
         return Err(InputError::Invalid.into());
     }
     validate_time(t)?;
     validate_price(price)?;
 
-    // ── 2. Intrinsic value and arbitrage bounds ──────────────────────────
     let scale = forward.abs().max(strike.abs()).max(1e-10);
     let intrinsic = if is_call {
         (forward - strike).max(0.0)
@@ -326,13 +316,11 @@ pub fn implied_vol_bachelier(
         return Ok(0.0);
     }
 
-    // ── 3. Convert to OTM option via put-call parity ─────────────────────
     let (otm_price, otm_is_call) = to_otm(price, forward, strike, is_call);
     if otm_price <= f64::EPSILON * scale {
         return Ok(0.0);
     }
 
-    // ── 4. Bracket & bisect for initial guess ────────────────────────────
     let price_fn = |sigma: f64| -> f64 {
         if otm_is_call {
             bachelier_call(forward, strike, sigma, t)
@@ -347,8 +335,6 @@ pub fn implied_vol_bachelier(
     let vol_ceil = forward.abs().max(strike.abs()).max(1.0) * VOL_CEIL_BACH;
     let mut sigma = bracket_and_bisect(otm_price, &price_fn, analytical, vol_ceil);
 
-    // ── 5. Householder (Halley) refinement ───────────────────────────────
-    //
     // Bachelier derivatives:
     // f′(σ) = vega = √T × φ(d)
     // f″(σ) = volga = vega × d² / σ
@@ -368,7 +354,6 @@ pub fn implied_vol_bachelier(
             break;
         }
 
-        // Volga for Householder correction
         let st = sigma * sqrt_t;
         let d = if st > VOL_FLOOR {
             (forward - strike) / st
@@ -390,7 +375,6 @@ pub fn implied_vol_bachelier(
         sigma = sigma.clamp(VOL_FLOOR, vol_ceil);
     }
 
-    // ── 6. Final convergence verification ────────────────────────────────
     verify_convergence_bachelier(sigma, otm_price, forward, strike, t, otm_is_call)
 }
 
@@ -480,7 +464,6 @@ fn bracket_and_bisect(
     let mut lo = VOL_FLOOR;
     let mut hi = analytical_guess.max(VOL_FLOOR * 2.0);
 
-    // Expand bracket upward until price_fn(hi) ≥ target
     for _ in 0..64 {
         if price_fn(hi) >= target || hi >= vol_ceil {
             break;
@@ -494,7 +477,6 @@ fn bracket_and_bisect(
         lo = VOL_FLOOR;
     }
 
-    // Bisect to narrow the bracket
     for _ in 0..BISECTION_STEPS {
         let mid = 0.5 * (lo + hi);
         if mid <= lo || mid >= hi {
@@ -574,8 +556,6 @@ fn check_residual(
     Ok(sigma)
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -651,8 +631,6 @@ mod tests {
              (F={forward}, K={strike}, T={t}, call={is_call})"
         );
     }
-
-    // ── Black-76: Round-Trip Tests ───────────────────────────────────────
 
     #[test]
     fn black_rt_atm_various_expiries() {
@@ -775,8 +753,6 @@ mod tests {
         }
     }
 
-    // ── Black-76: Put-Call Parity ────────────────────────────────────────
-
     #[test]
     fn black_put_call_parity_consistency() {
         let f = 0.05;
@@ -819,8 +795,6 @@ mod tests {
         );
     }
 
-    // ── Black-76: Known Values ───────────────────────────────────────────
-
     #[test]
     fn black_known_atm_100() {
         // F = K = 100, σ = 20%, T = 1 → well-known ATM price
@@ -837,7 +811,6 @@ mod tests {
 
     #[test]
     fn black_known_otm_100() {
-        // F = 100, K = 110, σ = 25%, T = 0.5
         let f = 100.0;
         let k = 110.0;
         let sigma = 0.25;
@@ -849,8 +822,6 @@ mod tests {
             "Known OTM: expected {sigma}, got {implied}"
         );
     }
-
-    // ── Black-76: Boundary / Edge Cases ──────────────────────────────────
 
     #[test]
     fn black_intrinsic_only() {
@@ -870,8 +841,6 @@ mod tests {
         let vol = implied_vol_black(0.0, f, k, t, true).expect("zero OTM should succeed");
         assert_eq!(vol, 0.0);
     }
-
-    // ── Black-76: Error Cases ────────────────────────────────────────────
 
     #[test]
     fn black_err_negative_price() {
@@ -922,8 +891,6 @@ mod tests {
         assert!(implied_vol_black(0.001, 0.05, f64::INFINITY, 1.0, true).is_err());
         assert!(implied_vol_black(0.001, 0.05, 0.05, f64::INFINITY, true).is_err());
     }
-
-    // ── Bachelier: Round-Trip Tests ──────────────────────────────────────
 
     #[test]
     fn bach_rt_atm_various_expiries() {
@@ -1007,8 +974,6 @@ mod tests {
         assert_rt_bach(f, k, sigma, t, false);
     }
 
-    // ── Bachelier: Put-Call Parity ───────────────────────────────────────
-
     #[test]
     fn bach_put_call_parity() {
         let f = 0.03;
@@ -1029,8 +994,6 @@ mod tests {
         );
     }
 
-    // ── Bachelier: Edge Cases ────────────────────────────────────────────
-
     #[test]
     fn bach_intrinsic_only() {
         let f = 0.03;
@@ -1047,8 +1010,6 @@ mod tests {
             implied_vol_bachelier(0.0, 0.03, 0.04, 1.0, true).expect("zero OTM should succeed");
         assert_eq!(vol, 0.0);
     }
-
-    // ── Bachelier: Error Cases ───────────────────────────────────────────
 
     #[test]
     fn bach_err_negative_price() {
@@ -1082,8 +1043,6 @@ mod tests {
         let intrinsic = f - k;
         assert!(implied_vol_bachelier(intrinsic - 0.001, f, k, 1.0, true).is_err());
     }
-
-    // ── Cross-Model Sanity ───────────────────────────────────────────────
 
     #[test]
     fn black_vs_bachelier_atm_approx() {

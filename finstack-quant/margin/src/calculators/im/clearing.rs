@@ -345,27 +345,16 @@ impl ImCalculator for ClearingHouseImCalculator {
         as_of: Date,
     ) -> Result<ImResult> {
         let mut mpor_days = self.params().mpor_days;
-
-        // Try the external source first (and pick up any MPOR override).
-        // If no source is registered or the source declines this trade,
-        // fall back to `|exposure_base| × conservative_rate`. The
-        // exposure-base lookup fails closed when neither is available.
-        let (im_amount, approximation) = if let Some(source) = &self.input_source {
+        let external_im = self.input_source.as_ref().and_then(|source| {
             if let Some(override_mpor) = source.external_mpor_days() {
                 mpor_days = override_mpor;
             }
-            match source.external_initial_margin(instrument, context, as_of) {
-                Some(amount) => (amount, false),
-                None => (
-                    self.conservative_fallback(instrument, context, as_of)?,
-                    true,
-                ),
-            }
-        } else {
-            (
-                self.conservative_fallback(instrument, context, as_of)?,
-                true,
-            )
+            source.external_initial_margin(instrument, context, as_of)
+        });
+        let approximation = external_im.is_none();
+        let im_amount = match external_im {
+            Some(amount) => amount,
+            None => self.conservative_fallback(instrument, context, as_of)?,
         };
 
         if approximation {

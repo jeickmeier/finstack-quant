@@ -43,9 +43,6 @@ def performance_history() -> list[dict[str, Any]]:
         and trades in an explicit USD cash ledger; external flows change that
         ledger at their actual dates. No NAV or portfolio return is invented.
 
-    Notes:
-        This fixed data factory does not raise exceptions.
-
     >>> history = performance_history()
     >>> history[0]["end"] == history[1]["start"]
     True
@@ -66,9 +63,6 @@ def history_events() -> list[dict[str, Any]]:
         PV, with the opposite amount booked to cash and no transaction costs.
         Contractual payments are extracted from the native cashflow API rather
         than copied into this ledger. Settled USD cash earns zero interest.
-
-    Notes:
-        This fixed data factory does not raise exceptions.
 
     >>> history_events()[1]["instrument_id"]
     'SPX-CALL'
@@ -204,9 +198,6 @@ def risk_panel() -> pd.DataFrame:
         (30/40/20/10 percent), and a daily risk-free return. Factor exposures
         generate the proxy returns; these are not repriced instrument returns.
         Dates are weekdays, not an exchange trading calendar.
-
-    Notes:
-        This fixed data factory does not raise exceptions.
 
     >>> panel = risk_panel()
     >>> panel.index.is_unique and not panel.isna().any().any()

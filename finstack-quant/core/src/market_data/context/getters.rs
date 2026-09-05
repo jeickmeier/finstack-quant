@@ -360,7 +360,7 @@ impl MarketContext {
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
+    /// * `id` - Identifier used when the surface was inserted.
     pub fn get_fx_delta_vol_surface(&self, id: impl AsRef<str>) -> Result<Arc<FxDeltaVolSurface>> {
         self.get_cloned(&self.fx_delta_vol_surfaces, id.as_ref())
     }

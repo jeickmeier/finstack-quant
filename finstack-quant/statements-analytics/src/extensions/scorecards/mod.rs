@@ -1,16 +1,8 @@
 //! Credit scorecard analysis extension.
 //!
-//! This extension provides credit rating assignment based on financial metrics
-//! and configurable thresholds.
-//!
-//! # Features
-//!
-//! - Credit rating assignment based on financial metrics
-//! - Configurable rating scales and thresholds
-//! - Weighted scoring across multiple metrics
-//! - Support for multiple rating agencies (S&P, Moody's, Fitch)
-//! - Minimum rating compliance checks
-//! - Detailed metric evaluation with scores and weights
+//! Credit rating assignment from financial metrics and configurable
+//! thresholds. Supports S&P, Moody's, and Fitch scales, weighted scoring,
+//! and optional minimum-rating compliance checks.
 //!
 //! # Configuration Schema
 //!
@@ -331,7 +323,6 @@ impl CreditScorecardExtension {
         let mut warnings = Vec::new();
         let mut excluded = 0usize;
 
-        // Evaluate each metric
         for metric_config in &config.metrics {
             match self.evaluate_metric(metric_config, model, results, &config, &target_period) {
                 Ok(evaluation) => {
@@ -347,14 +338,11 @@ impl CreditScorecardExtension {
             }
         }
 
-        // Calculate weighted average score over the included factors only
-        // (excluded NM factors renormalize the remaining weights).
+        // Excluded NM factors renormalize the remaining weights.
         let total_score = self.calculate_weighted_score(&scores);
 
-        // Determine rating based on scale
         let rating = self.determine_rating(total_score, &config.rating_scale)?;
 
-        // Check minimum rating requirement
         if let Some(min_rating) = &config.min_rating {
             if !self.meets_minimum_rating(&rating, min_rating, &config.rating_scale)? {
                 warnings.push(format!(
@@ -364,7 +352,6 @@ impl CreditScorecardExtension {
             }
         }
 
-        // Build report
         let (status, message) = if errors.is_empty() {
             (
                 ScorecardStatus::Success,
@@ -443,7 +430,6 @@ impl CreditScorecardExtension {
         config: &ScorecardConfig,
         target_period: &finstack_quant_core::dates::Period,
     ) -> Result<MetricEvaluation> {
-        // Parse and evaluate the formula
         let expr = finstack_quant_statements::dsl::parse_and_compile(&metric.formula)?;
 
         let node_to_column: indexmap::IndexMap<finstack_quant_statements::types::NodeId, usize> =
@@ -490,7 +476,6 @@ impl CreditScorecardExtension {
             }
         }
 
-        // Evaluate the formula
         let value = finstack_quant_statements::evaluator::formula::evaluate_formula(
             &expr,
             &mut eval_context,
@@ -508,8 +493,8 @@ impl CreditScorecardExtension {
             });
         }
 
-        // Calculate score based on thresholds; an unmatched value is also
-        // excluded rather than silently scoring the registry default.
+        // An unmatched value is excluded rather than silently scoring
+        // the registry default.
         match self.matching_threshold_score(value, &metric.thresholds, &config.rating_scale)? {
             Some(score) => Ok(MetricEvaluation {
                 score: Some(MetricScore {
@@ -578,14 +563,12 @@ impl CreditScorecardExtension {
     fn determine_rating(&self, score: f64, rating_scale: &str) -> Result<String> {
         let scale = get_rating_scale(rating_scale)?;
 
-        // Find the rating by checking score thresholds
         for level in &scale.ratings {
             if score >= level.min_score {
                 return Ok(level.name.clone());
             }
         }
 
-        // Fallback to lowest rating
         Ok(scale
             .ratings
             .last()

@@ -89,7 +89,6 @@ impl Solver2D {
             }
         }
 
-        // Time levels: T → 0
         let levels = self.stepper.time_levels(maturity);
 
         // Pre-allocate ADI scratch buffers once per solve and reuse across all
@@ -110,7 +109,6 @@ impl Solver2D {
             )?;
         }
 
-        // Final boundary fill
         fill_boundaries(problem, &self.grid, &mut u_full, &u_int, 0.0);
 
         Ok(PdeSolution2D {
@@ -159,8 +157,6 @@ impl PdeSolution2D {
         }
 
         let j = find_nearest(y_pts, y);
-
-        // Node nearest x — the x-stencil is centred here.
         let i = find_nearest(x_pts, x);
 
         if i == 0 {
@@ -176,7 +172,6 @@ impl PdeSolution2D {
             }
             (self.values[(n - 1) * ny + j] - self.values[(n - 2) * ny + j]) / h
         } else {
-            // Second-order non-uniform central stencil centred on node i.
             let h_m = x_pts[i] - x_pts[i - 1];
             let h_p = x_pts[i + 1] - x_pts[i];
             let h_sum = h_m + h_p;
@@ -407,7 +402,6 @@ mod tests {
         let gx = Grid1D::uniform(0.0, pi, 21).expect("valid grid");
         let gy = Grid1D::uniform(0.0, pi, 21).expect("valid grid");
 
-        // Non-positive maturity.
         let solver = Solver2D::new(
             Grid2D::new(gx.clone(), gy.clone()),
             CraigSneydStepper::new(50),
@@ -427,7 +421,6 @@ mod tests {
             "negative maturity must be rejected"
         );
 
-        // Zero time steps.
         let zero_step_solver = Solver2D::new(Grid2D::new(gx, gy), CraigSneydStepper::new(0));
         assert!(
             matches!(

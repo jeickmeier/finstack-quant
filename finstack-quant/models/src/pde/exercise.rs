@@ -109,8 +109,7 @@ impl PenaltyExercise {
         for _ in 0..self.iterations {
             for (&payoff, u_val) in self.payoff_values.iter().zip(u.iter_mut()) {
                 if *u_val < payoff {
-                    // Apply penalty: push u toward payoff.
-                    // In the continuous limit: u = (u + lambda*dt*payoff) / (1 + lambda*dt).
+                    // Continuous limit: u = (u + lambda*dt*payoff) / (1 + lambda*dt).
                     // With lambda*dt = penalty_factor >> 1, this ≈ payoff.
                     *u_val = (*u_val + lambda * dt * payoff) / (1.0 + lambda * dt);
                 }
@@ -136,7 +135,6 @@ mod tests {
         let payoff = vec![5.0, 3.0, 1.0, 0.0, 0.0];
         let exercise = PenaltyExercise::american(payoff.clone());
 
-        // Solution below intrinsic should be pushed up
         let mut u = vec![4.0, 2.0, 0.5, 1.0, 2.0];
         exercise.apply(&mut u, 0.01);
 

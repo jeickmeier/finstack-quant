@@ -373,8 +373,6 @@ impl FactorModel {
                                      in the factor model"
                             );
                         }
-                        // Residual (and any future policy variants —
-                        // the enum is non_exhaustive): keep going.
                         _ => {}
                     }
                     continue;

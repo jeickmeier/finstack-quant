@@ -5,10 +5,7 @@
 //! names, so a cross-language divergence reads as a one-screen diff.
 //!
 //! These assertions are made against the hand-written `index.d.ts`, which is
-//! the published contract JS consumers compile against. A runtime shape that
-//! contradicts the declaration is exactly the class of bug this refactor
-//! existed to remove: several `correlation` signatures and the scenario
-//! envelope had been lying about their types for a while.
+//! the published contract JS consumers compile against.
 
 use std::fs;
 use std::path::PathBuf;
@@ -120,9 +117,7 @@ fn json_suffixed_exports_return_strings() {
     }
 }
 
-/// The converse: computation results must NOT be declared as bare strings.
-/// This is finding B1 — the same Rust result arriving as a typed object in
-/// Python and an anonymous string in JS.
+/// Computation results must not be declared as bare strings.
 #[test]
 fn computation_results_are_structured_not_strings() {
     let dts = index_dts();
@@ -130,11 +125,7 @@ fn computation_results_are_structured_not_strings() {
         "priceInstrument",
         "priceInstrumentWithMarket",
         "calibrate",
-        // The audit found attributePnl missing from this list — it was
-        // declared `string` while its Python twin returned a typed wrapper.
         "attributePnl",
-        // Structured-credit tranche analytics: typed plain objects matching
-        // the Python OasResult / TrancheMetrics / ScenarioTable wrappers.
         "structuredCreditTrancheOas",
         "structuredCreditTrancheMetrics",
         "structuredCreditTrancheScenarioTable",

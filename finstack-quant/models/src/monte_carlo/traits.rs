@@ -92,8 +92,6 @@ pub trait RandomStream: Clone + Send + Sync {
 
     /// Fill a buffer with uniform random numbers in the open interval (0, 1).
     ///
-    /// This is a vectorized operation for efficiency.
-    ///
     /// Implementations must never return exactly 0.0 or 1.0: consumers feed
     /// these values into inverse CDFs and logs, and antithetic sampling
     /// mirrors them as `1 − u`, so either boundary value would produce
@@ -758,8 +756,6 @@ pub trait ProportionalDiffusion: StochasticProcess {}
 /// * `work` - Workspace buffer for intermediate calculations
 pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
     /// Advance state from t to t + dt.
-    ///
-    /// This method updates `x` in-place using the provided random shocks `z`.
     fn step(&self, process: &P, t: f64, dt: f64, x: &mut [f64], z: &[f64], work: &mut [f64]);
 
     /// Precompute per-run constants that depend on the process and the time
@@ -810,8 +806,6 @@ pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
         "generic"
     }
 }
-
-// Pricing-specific traits
 
 /// Payoff computation with currency safety.
 ///

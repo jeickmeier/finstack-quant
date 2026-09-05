@@ -1,10 +1,4 @@
-//! Covenant engine for evaluating and applying covenant consequences.
-//!
-//! This module provides a comprehensive covenant evaluation system that:
-//! - Evaluates financial covenants against current metrics
-//! - Manages grace/cure periods
-//! - Applies consequences when covenants are breached
-//! - Supports both financial and non-financial covenants
+//! Point-in-time covenant evaluation, breach tracking, and consequence application.
 //!
 //! # Scope and conventions
 //!
@@ -48,17 +42,8 @@ mod tests {
         Date::from_calendar_date(y, time::Month::try_from(m).unwrap(), d).unwrap()
     }
 
-    /// A NaN springing metric is indeterminate — it must NOT silently deactivate
-    /// the covenant and report a pass. `NaN <= t` and `NaN >= t` are both false,
-    /// so a raw comparison concluded "condition not met" and returned
-    /// `passed: true` with detail "Springing condition not met" — a covenant on
-    /// undefined data reporting a clean bill of health.
-    ///
-    /// The crate's established convention is NaN ⇒ breached
-    /// (`helpers::is_covenant_breached`, and the forecast path's
-    /// "Mirror the point-in-time engine convention: NaN ⇒ breached"). The
-    /// fail-closed analogue for a springing trigger is to ACTIVATE, so the
-    /// covenant is then evaluated and its own NaN handling applies.
+    /// A NaN springing metric activates the covenant rather than treating an
+    /// undefined trigger as unmet and reporting a pass.
     #[test]
     fn nan_springing_metric_activates_rather_than_silently_passing() {
         let covenant = Covenant::new(
@@ -74,9 +59,6 @@ mod tests {
         let mut engine = CovenantEngine::new();
         engine.add_spec(spec);
 
-        // Healthy underlying metric: activation is still the correct outcome, and
-        // the covenant then legitimately passes on its own merits (3.2 < 4.5).
-        // What must NOT happen is the covenant being skipped as "inactive".
         let metrics = HashMapMetricSource::from_pairs([
             ("revolver_utilization", f64::NAN),
             ("debt_to_ebitda", 3.2),
@@ -95,8 +77,6 @@ mod tests {
             "a NaN springing metric must not be reported as an unmet condition"
         );
 
-        // Breaching underlying metric: activation now surfaces a real breach that
-        // the old behaviour hid entirely behind a passing "inactive" report.
         let breaching = HashMapMetricSource::from_pairs([
             ("revolver_utilization", f64::NAN),
             ("debt_to_ebitda", 5.0),
@@ -109,7 +89,6 @@ mod tests {
         );
     }
 
-    /// The ordinary springing paths must keep working unchanged.
     #[test]
     fn springing_condition_still_gates_on_finite_metrics() {
         let build = |utilization: f64| {
@@ -133,12 +112,10 @@ mod tests {
             reports["springing_leverage"].clone()
         };
 
-        // Below the trigger: covenant inactive, reports pass.
         let inactive = build(0.10);
         assert!(inactive.passed);
         assert_eq!(inactive.actual_value, None);
 
-        // At/above the trigger: covenant active and breaching at 5.0 > 4.5.
         let active = build(0.50);
         assert!(!active.passed);
         assert_eq!(active.actual_value, Some(5.0));
@@ -536,22 +513,12 @@ mod tests {
     }
 
     #[test]
-    fn instance_key_uses_label_when_set() {
+    fn instance_key_is_the_declared_label() {
         let cov = Covenant::new(
             CovenantType::MaxDebtToEbitda { threshold: 4.5 },
             Tenor::quarterly(),
             "senior",
         );
         assert_eq!(cov.instance_key(), "senior");
-    }
-
-    #[test]
-    fn instance_key_is_the_declared_label() {
-        let cov = Covenant::new(
-            CovenantType::MaxDebtToEbitda { threshold: 4.5 },
-            Tenor::quarterly(),
-            "max_debt_ebitda",
-        );
-        assert_eq!(cov.instance_key(), "max_debt_ebitda");
     }
 }

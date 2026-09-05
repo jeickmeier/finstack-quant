@@ -97,7 +97,6 @@ impl Grid2D {
         let ix = find_interval(x_pts, x);
         let jy = find_interval(y_pts, y);
 
-        // Clamp to valid ranges for interpolation
         let i0 = ix.min(x_pts.len().saturating_sub(2));
         let j0 = jy.min(y_pts.len().saturating_sub(2));
         let i1 = i0 + 1;
@@ -160,7 +159,6 @@ mod tests {
             })
             .collect();
 
-        // At grid nodes
         let v = g.interpolate(&values, 0.0, 0.0);
         assert!((v - 0.0).abs() < 1e-12);
 
@@ -179,7 +177,6 @@ mod tests {
 
         let values = vec![1.0; 9];
 
-        // Outside domain clamps gracefully
         let v = g.interpolate(&values, -1.0, -1.0);
         assert!((v - 1.0).abs() < 1e-12);
 

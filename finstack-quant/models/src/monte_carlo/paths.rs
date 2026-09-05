@@ -467,7 +467,6 @@ impl PathDataset {
         sampling_method: PathSamplingMethod,
         process_params: ProcessParams,
     ) -> Self {
-        // Pre-allocate based on sampling method
         let estimated_capacity = match sampling_method {
             PathSamplingMethod::All => num_paths_total,
             PathSamplingMethod::RandomSample { count, .. } => count,
@@ -515,12 +514,10 @@ impl PathDataset {
     /// are synthesized as `state_0`, `state_1`, ... based on the widest
     /// captured state vector in the dataset.
     pub fn state_var_keys(&self) -> Vec<String> {
-        // Use factor names from process metadata if available
         if !self.process_params.factor_names.is_empty() {
             return self.process_params.factor_names.clone();
         }
 
-        // Otherwise, generate generic names based on max dimension
         let max_dim = self
             .paths
             .iter()
@@ -546,7 +543,6 @@ mod tests {
         assert!(point.payoff_value.is_none());
         assert!(point.cashflows.is_empty());
 
-        // Create a point with state
         let mut state = SmallVec::new();
         state.push(100.0); // spot
         let mut point_with_state = PathPoint::with_state(0, 0.0, state);
@@ -555,7 +551,6 @@ mod tests {
         point_with_state.set_payoff(42.5);
         assert_eq!(point_with_state.payoff_value, Some(42.5));
 
-        // Test cashflows
         point.add_cashflow(0.25, 1000.0);
         point.add_cashflow(0.25, 500.0);
         assert_eq!(point.cashflows.len(), 2);
@@ -566,7 +561,6 @@ mod tests {
         assert_eq!(point.get_cashflows()[1], (0.25, 500.0, CashflowType::Other));
         assert_eq!(point.total_cashflow(), 1500.0);
 
-        // Test typed cashflows
         let mut point2 = PathPoint::new(1, 0.5);
         point2.add_typed_cashflow(0.5, 100.0, CashflowType::Interest);
         point2.add_typed_cashflow(0.5, 50.0, CashflowType::Principal);
@@ -613,7 +607,6 @@ mod tests {
     fn test_simulated_path_cashflows() {
         let mut path = SimulatedPath::with_capacity(1, 10);
 
-        // Add points with cashflows
         let mut point1 = PathPoint::new(0, 0.0);
         point1.add_cashflow(0.0, -100.0); // Initial outflow
         path.add_point(point1);
@@ -627,7 +620,6 @@ mod tests {
         point3.add_cashflow(0.50, 5.0); // Interest payment
         path.add_point(point3);
 
-        // Extract all cashflows
         let all_cashflows = path.extract_cashflows();
         assert_eq!(all_cashflows.len(), 4);
         assert_eq!(all_cashflows[0], (0.0, -100.0));
@@ -732,7 +724,6 @@ mod tests {
 
     #[test]
     fn test_state_var_keys_extraction() {
-        // Test with factor names in metadata
         let mut process_params = ProcessParams::new("GBM");
         process_params.factor_names = vec!["spot".to_string(), "variance".to_string()];
         let mut dataset = PathDataset::new(10, PathSamplingMethod::All, process_params);
@@ -750,7 +741,6 @@ mod tests {
         assert_eq!(keys[0], "spot");
         assert_eq!(keys[1], "variance");
 
-        // Test with no factor names (should generate generic names)
         let process_params2 = ProcessParams::new("GBM");
         let mut dataset2 = PathDataset::new(10, PathSamplingMethod::All, process_params2);
 

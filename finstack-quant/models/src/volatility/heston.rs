@@ -450,7 +450,6 @@ impl HestonParams {
         if is_call {
             call.max(0.0)
         } else {
-            // Put-call parity
             (call - spot * (-q * t).exp() + strike * (-r * t).exp()).max(0.0)
         }
     }

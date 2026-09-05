@@ -1,11 +1,7 @@
 //! Structured warnings emitted during scenario application.
 //!
-//! [`ApplicationReport`] carries a
-//! `Vec<Warning>` instead of a `Vec<String>` so that operations alerting
-//! pipelines can pattern-match on warning categories without parsing free-text
-//! strings. The `Display` impl produces the same human-readable form as the
-//! previous string-based warnings, so existing log lines and UI summaries
-//! continue to render the same way.
+//! [`ApplicationReport`] carries a `Vec<Warning>` so callers can match on
+//! warning categories without parsing free-text strings.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;

@@ -95,7 +95,6 @@ impl MasterScale {
             return Err(PdCalibrationError::EmptyInput);
         }
 
-        // Validate PD values
         for g in &grades {
             if g.upper_pd <= 0.0 || g.upper_pd > 1.0 || !g.upper_pd.is_finite() {
                 return Err(PdCalibrationError::ValueOutOfRange {
@@ -113,7 +112,6 @@ impl MasterScale {
             }
         }
 
-        // Validate ascending order
         for i in 1..grades.len() {
             if grades[i].upper_pd <= grades[i - 1].upper_pd {
                 return Err(PdCalibrationError::GradesNotSorted);

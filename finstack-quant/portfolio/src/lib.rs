@@ -15,18 +15,10 @@
         clippy::float_cmp,
     )
 )]
-// Allow expect() in doc tests (they are test code)
 #![doc(test(attr(allow(clippy::expect_used))))]
 
-//! Portfolio management and aggregation for finstack_quant.
-//!
-//! This crate provides portfolio-level operations including:
-//! - Entity and position management
-//! - Valuation aggregation across positions
-//! - Metrics aggregation with cross-currency support
-//! - Attribute-based grouping and analysis
-//! - Scenario application
-//! - Tabular exports for analysis
+//! Portfolio construction, valuation, metrics, attribution, scenarios, and
+//! optimization on top of `finstack-quant-core` instruments.
 //!
 //! # Quick Start
 //!
@@ -42,7 +34,6 @@
 //!
 //! let as_of = date!(2024-01-01);
 //!
-//! // Create a deposit instrument
 //! let deposit = Deposit::builder()
 //!     .id("DEP_1M".into())
 //!     .notional(Money::from((1_000_000_i64, Currency::USD)))
@@ -53,7 +44,6 @@
 //!     .build()
 //!     .expect("test should succeed");
 //!
-//! // Create a position holding the deposit
 //! let position = Position::new(
 //!     "POS_001",
 //!     "ACME_CORP",
@@ -64,7 +54,6 @@
 //! ).expect("test should succeed")
 //!  .with_text_attribute("asset_class", "cash");
 //!
-//! // Build the portfolio with the entity and position
 //! let portfolio = Portfolio::builder("MY_FUND")
 //!     .base_currency(Currency::USD)
 //!     .as_of(as_of)
@@ -89,24 +78,16 @@ macro_rules! define_string_id {
         $vis struct $name(String);
 
         impl $name {
- /// Create a new identifier.
- ///
+            /// Wrap `id` as a typed identifier.
+            ///
             /// # Arguments
             ///
-            /// * `id` - The identifier string.
-            ///
-            /// # Returns
-            ///
-            /// A strongly typed identifier wrapping the supplied string.
+            /// * `id` - Identifier string stored without extra validation.
             pub fn new(id: impl Into<String>) -> Self {
                 Self(id.into())
             }
 
-            /// Get the identifier as a string slice.
-            ///
-            /// # Returns
-            ///
-            /// Borrowed view of the underlying identifier without allocating.
+            /// Borrowed identifier string.
             #[inline]
             pub fn as_str(&self) -> &str {
                 &self.0
@@ -206,12 +187,6 @@ pub mod schema;
 /// Result envelopes for portfolio operations.
 pub mod results;
 /// Factor sensitivity engines (delta-based + full-repricing) and JSON façade.
-///
-/// Hosts engines that bump-and-reprice `&dyn Instrument` against a
-/// `MarketContext` to produce positions × factors sensitivity matrices and
-/// scenario-grid P&L profiles. Originally lived in
-/// `finstack-quant-valuations::factor_model::sensitivity`; relocated here because
-/// these are portfolio-level analytics with no per-instrument metric semantics.
 pub mod sensitivity;
 /// Core portfolio entity and ID types.
 pub mod types;
@@ -239,10 +214,6 @@ pub use error::{Error, Result};
 pub use portfolio::Portfolio;
 pub use types::{AttributeTest, AttributeValue, ComparisonOp, Entity, PositionId};
 
-// Headline analytics types at the crate root so callers don't have to thread
-// through long module paths for the most common workflows. Anything not
-// re-exported here is still reachable via its module path; the goal is just
-// to surface the canonical entry points.
 pub use brinson::{
     brinson_fachler, carino_link, carino_link_from_sector_periods, BrinsonPeriodResult,
     CarinoLinkedAttribution, SectorPeriod,

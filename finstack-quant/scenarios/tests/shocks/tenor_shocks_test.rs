@@ -58,9 +58,6 @@ fn test_tenor_exact_match() {
     let report = engine.apply(&scenario, &mut ctx).unwrap();
     assert_eq!(report.operations_applied, 1);
 
-    // Verify the actual shock was applied
-    // Note: The new scenario engine updates the curve in-place (same ID in market context).
-    // It does NOT create a suffixed ID like "USD-OIS_bump_25bp" anymore.
     let bumped_curve = market.get_discount("USD-OIS").unwrap();
     let df_5y = bumped_curve.df(5.0);
     // An exact-match tenor shock shifts the continuously-compounded zero at the

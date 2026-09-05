@@ -345,11 +345,6 @@ pub struct InflationIndex {
 impl InflationIndex {
     /// Create a new inflation index from observations.
     ///
-    /// # Parameters
-    /// - `id`: stable identifier, e.g. `"US-CPI-U"`
-    /// - `observations`: `(Date, value)` pairs in chronological order
-    /// - `currency`: reporting currency
-    ///
     /// Observations are normalized and validated by [`ScalarTimeSeries`]; the
     /// default lookup convention is step interpolation with no publication lag
     /// and no seasonality. Configure the returned index explicitly for the
@@ -363,9 +358,9 @@ impl InflationIndex {
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
-    /// * `observations` - Dated index observations used to build the inflation time series.
-    /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
+    /// * `id` - Stable identifier such as `"US-CPI-U"`.
+    /// * `observations` - `(Date, CPI)` pairs in chronological order.
+    /// * `currency` - Reporting currency of the published index levels.
     pub fn new(
         id: impl Into<String>,
         observations: Vec<(Date, f64)>,

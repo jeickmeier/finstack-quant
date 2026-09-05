@@ -555,10 +555,13 @@ impl CashFlow {
         Ok(())
     }
 }
-// Guard the inline record size.
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::currency::Currency;
+    use core::mem::size_of;
+    use time::Month;
 
     fn assert_roundtrip<T>(value: T)
     where
@@ -570,14 +573,9 @@ mod tests {
             "roundtrip failed for {label}"
         );
     }
-    use crate::currency::Currency;
-    use core::mem::size_of;
-    use time::Month;
 
     #[test]
     fn cashflow_size_is_reasonable() {
-        // Calendar metadata owns its identifier; principal deltas remain inline.
-        // Guard against unintended record growth.
         let size = size_of::<CashFlow>();
         assert!(size <= 168, "CashFlow grew to {size} bytes");
     }

@@ -232,7 +232,6 @@ mod tests {
     fn test_portfolio_margin_aggregation() {
         let mut portfolio_result = PortfolioMarginResult::new(test_date(), Currency::USD);
 
-        // Add bilateral netting set
         let bilateral = NettingSetMargin::new(
             NettingSetId::bilateral("BANK_A", "CSA_001"),
             test_date(),
@@ -246,7 +245,6 @@ mod tests {
             .add_netting_set(bilateral)
             .expect("valid add_netting_set fixture");
 
-        // Add cleared netting set
         let cleared = NettingSetMargin::new(
             NettingSetId::cleared("LCH"),
             test_date(),

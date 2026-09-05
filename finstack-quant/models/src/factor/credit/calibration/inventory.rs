@@ -54,26 +54,26 @@ pub(super) fn build_bucket_inventory(
     // occupancy counts all member modes.
     for issuer in modes.keys() {
         let issuer_tags = tags.get(issuer).cloned().unwrap_or_default();
-        // Update tag taxonomy (every dimension seen contributes a value).
         // Tag values used by hierarchy dimensions must not contain the '.'
         // bucket-path separator: a dotted value would mis-segment
         // `synth_tags_from_path`, the fold-up parent computation, and the
         // matcher's factor IDs, silently corrupting factor identity.
         for dim in &hierarchy.levels {
             let key = dimension_key(dim);
-            if let Some(v) = issuer_tags.0.get(key) {
-                if v.contains('.') {
-                    return Err(validation_err(format!(
-                        "CreditCalibrator: issuer {:?} tag {key:?} = {v:?} contains '.', \
+            let Some(v) = issuer_tags.0.get(key) else {
+                continue;
+            };
+            if v.contains('.') {
+                return Err(validation_err(format!(
+                    "CreditCalibrator: issuer {:?} tag {key:?} = {v:?} contains '.', \
                          which is reserved as the bucket-path separator",
-                        issuer.as_str()
-                    )));
-                }
-                tag_taxonomy
-                    .entry(key.to_owned())
-                    .or_default()
-                    .insert(v.clone());
+                    issuer.as_str()
+                )));
             }
+            tag_taxonomy
+                .entry(key.to_owned())
+                .or_default()
+                .insert(v.clone());
         }
         let paths = hierarchy.bucket_paths(&issuer_tags).map_err(|missing| {
             validation_err(format!(

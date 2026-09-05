@@ -233,6 +233,23 @@ fn is_missing(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
     Ok(false)
 }
 
+fn optional_json_field<T: serde::de::DeserializeOwned>(
+    frame: &Bound<'_, PyAny>,
+    columns: &Option<Vec<Bound<'_, PyAny>>>,
+    index: usize,
+    label: &str,
+) -> PyResult<Option<T>> {
+    match columns.as_ref().map(|rows| &rows[index]) {
+        Some(value) if !is_missing(value)? => {
+            let json = crate::bindings::module_utils::py_to_json_string(frame.py(), value, label)?;
+            serde_json::from_str(&json)
+                .map(Some)
+                .map_err(|e| crate::errors::serde_json_to_py(e, &format!("invalid {label}")))
+        }
+        _ => Ok(None),
+    }
+}
+
 /// Extract cashflow rows from ``list[CashFlow]`` or a DataFrame with columns
 /// ``date, amount, currency, kind`` and optional ``reset_date, accrual_factor, rate``.
 pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
@@ -279,30 +296,8 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
                 accrual_factor,
                 rate,
             );
-            if let Some(value) = accruals.as_ref().map(|rows| &rows[i]) {
-                if !is_missing(value)? {
-                    let json = crate::bindings::module_utils::py_to_json_string(
-                        obj.py(),
-                        value,
-                        "CashFlowAccrual",
-                    )?;
-                    flow.accrual = Some(serde_json::from_str(&json).map_err(|e| {
-                        crate::errors::serde_json_to_py(e, "invalid CashFlowAccrual")
-                    })?);
-                }
-            }
-            if let Some(value) = deltas.as_ref().map(|rows| &rows[i]) {
-                if !is_missing(value)? {
-                    let json = crate::bindings::module_utils::py_to_json_string(
-                        obj.py(),
-                        value,
-                        "principal_delta",
-                    )?;
-                    flow.principal_delta = Some(serde_json::from_str(&json).map_err(|e| {
-                        crate::errors::serde_json_to_py(e, "invalid principal_delta")
-                    })?);
-                }
-            }
+            flow.accrual = optional_json_field(obj, &accruals, i, "CashFlowAccrual")?;
+            flow.principal_delta = optional_json_field(obj, &deltas, i, "principal_delta")?;
             flow.validate().map_err(core_to_py)?;
             flows.push(flow);
         }

@@ -89,10 +89,7 @@ impl SabrSmile {
         &self.model
     }
 
-    /// Returns the ATM (at-the-money) implied volatility.
-    ///
-    /// This is a convenience method that computes the implied volatility
-    /// at strike = forward, which is the most frequently quoted volatility level.
+    /// ATM implied volatility (strike = forward).
     ///
     /// # Returns
     ///
@@ -222,7 +219,6 @@ impl SabrSmile {
         // Tolerance for numerical noise (0.1 bp of notional)
         let tol = 1e-6;
 
-        // Check monotonicity: C(K₁) > C(K₂) for K₁ < K₂
         for i in 1..prices.len() {
             if prices[i] > prices[i - 1] + tol {
                 result.monotonicity_violations.push(MonotonicityViolation {
@@ -234,7 +230,6 @@ impl SabrSmile {
             }
         }
 
-        // Check butterfly positivity (convexity)
         for i in 1..prices.len() - 1 {
             let butterfly = prices[i - 1] - 2.0 * prices[i] + prices[i + 1];
             if butterfly < -tol {
@@ -333,7 +328,6 @@ impl SabrSmile {
             return self.generate_smile(strikes);
         }
 
-        // Generate initial smile
         let mut vols = self.generate_smile(strikes)?;
 
         let mut prices: Vec<f64> = strikes
@@ -342,7 +336,6 @@ impl SabrSmile {
             .map(|(&k, &vol)| bs_call_price(self.forward, k, r, q, vol, self.time_to_expiry))
             .collect();
 
-        // Iterative repair
         for _ in 0..max_iterations {
             let mut changed = false;
 
@@ -385,8 +378,7 @@ impl SabrSmile {
             let target_price = prices[i];
             let k = strikes[i];
 
-            // Newton-Raphson to find implied vol.
-            let mut vol = vols[i]; // Start from original vol
+            let mut vol = vols[i];
             let mut converged = false;
             for _ in 0..50 {
                 let price = bs_call_price(self.forward, k, r, q, vol, self.time_to_expiry);
@@ -404,7 +396,7 @@ impl SabrSmile {
                 }
 
                 vol -= error / vega;
-                vol = vol.clamp(0.001, 5.0); // Reasonable bounds
+                vol = vol.clamp(0.001, 5.0);
             }
 
             if !converged {
@@ -549,8 +541,6 @@ mod smile_tests {
     use super::*;
     use crate::volatility::sabr::{SabrModel, SabrParameters};
 
-    // ── W-05: bs_call_price must use Black-76, not double-drifted BS ─────────
-
     /// Black-76 ATM call: df · F · (N(d1) - N(d2)).
     /// With F=K=100, σ=0.2, T=1, r=0.05:
     ///   d1 = 0.5·σ²·T / (σ·√T) = 0.1, d2 = -0.1
@@ -601,8 +591,6 @@ mod smile_tests {
         );
     }
 
-    // ── W-04: monotonicity repair must not cascade across valid strikes ───────
-
     /// When only the first interior strike violates monotonicity, the greedy repair
     /// must NOT drag the remaining (already-valid) strikes down by a compounding
     /// factor.  The old `prices[i] = prices[i-1] * 0.9999` relative formula cascaded;
@@ -628,7 +616,6 @@ mod smile_tests {
 
         assert_eq!(repaired.len(), strikes.len());
 
-        // Convert repaired vols back to prices to check monotonicity holds cleanly.
         let repaired_prices: Vec<f64> = strikes
             .iter()
             .zip(repaired.iter())
@@ -659,8 +646,6 @@ mod smile_tests {
         );
     }
 
-    // ── Item 6: repair_arbitrage must re-validate and surface non-convergence ─
-
     /// `repair_arbitrage` must re-run no-arbitrage validation on the *repaired*
     /// vols before returning them. The fix wires `post_repair_validation` after
     /// the price→vol inversion; this test pins the contract that any `Ok`
@@ -685,8 +670,6 @@ mod smile_tests {
             .expect("repair should succeed on a well-behaved smile");
         assert_eq!(repaired.len(), strikes.len());
 
-        // The contract: a successful repair returns an arbitrage-free smile.
-        // We assert it directly via the repaired-vol validator.
         let post = smile
             .post_repair_validation(&strikes, &repaired, r, q)
             .expect("post-repair validation should run");
@@ -698,7 +681,6 @@ mod smile_tests {
             post.monotonicity_violations.len()
         );
 
-        // And every repaired vol is a sane positive number.
         for (k, v) in strikes.iter().zip(repaired.iter()) {
             assert!(
                 *v > 0.0 && v.is_finite(),
@@ -733,7 +715,6 @@ mod smile_tests {
             .repair_arbitrage(&strikes, 0.05, 0.0, 10)
             .expect("inversion must converge for a clean, attainable smile");
 
-        // Round-trip: repaired vols reproduce a strictly-decreasing price curve.
         let prices: Vec<f64> = strikes
             .iter()
             .zip(repaired.iter())

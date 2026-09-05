@@ -606,7 +606,8 @@ impl FinancingLegSpec {
     ///
     /// # Arguments
     ///
-    /// * `compounding` - Compounding used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `compounding` - Term-rate versus overnight-compounded convention applied when
+    ///   projecting the TRS funding leg.
     pub fn with_compounding(mut self, compounding: FinancingRateCompounding) -> Self {
         self.compounding = compounding;
         self

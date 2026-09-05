@@ -491,7 +491,7 @@ mod tests {
         let bf = brinson_fachler(&sectors).expect("valid BF inputs");
 
         close(bf.total_allocation, r.allocation, 1e-12, "BF allocation");
-        // NOTE: this is the one place classical BF and factor-Brinson
+        // This is the one place classical BF and factor-Brinson
         // terminology diverge. Classical BF's `selection` term is
         // benchmark-weighted (`w_b,i (r_p,i - r_b,i)`) and reports the
         // *joint* effect of over/underweighting and stock-picking

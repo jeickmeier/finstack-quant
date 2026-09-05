@@ -739,20 +739,17 @@ impl LsmcPricer {
         let num_paths = paths.num_paths();
         let dt = time_to_maturity / num_steps as f64;
 
-        // Cashflow matrix: when each path exercises
         let mut cashflows = vec![0.0; num_paths];
         let mut exercise_times = vec![time_to_maturity; num_paths];
 
-        // Initialize with terminal values
         for (i, cf) in cashflows.iter_mut().enumerate() {
             let terminal_spot = paths.row(i)[num_steps];
             *cf = exercise.exercise_value(terminal_spot);
         }
 
-        // Backward induction through exercise dates
         let mut sorted_exercise_dates = self.config.exercise_dates.clone();
         sorted_exercise_dates.sort_unstable();
-        sorted_exercise_dates.reverse(); // Go backward
+        sorted_exercise_dates.reverse();
 
         let valid_exercise_count = sorted_exercise_dates
             .iter()
@@ -767,7 +764,6 @@ impl LsmcPricer {
             );
         }
 
-        // Pre-allocate regression buffers to avoid reallocations
         let mut regression_x = Vec::with_capacity(num_paths / 2);
         let mut regression_y = Vec::with_capacity(num_paths / 2);
         let mut regression_indices = Vec::with_capacity(num_paths / 2);
@@ -783,7 +779,6 @@ impl LsmcPricer {
 
             let t = exercise_step as f64 * dt;
 
-            // Clear buffers for this exercise date (reuse capacity)
             regression_x.clear();
             regression_y.clear();
             regression_indices.clear();
@@ -795,7 +790,6 @@ impl LsmcPricer {
 
                 // Only regress on ITM paths
                 if immediate > 0.0 {
-                    // Discount cashflow to this exercise date
                     let time_to_cashflow = exercise_times[i] - t;
                     let discounted_cf = cashflows[i] * (-discount_rate * time_to_cashflow).exp();
 
@@ -805,32 +799,8 @@ impl LsmcPricer {
                 }
             }
 
-            // Perform regression if we have enough ITM paths
-            if regression_x.len() > basis.num_basis() + 10 {
-                match regression_with_basis(&regression_x, &regression_y, basis) {
-                    Ok(continuation_values) => {
-                        // Exercise decision
-                        for (j, &i) in regression_indices.iter().enumerate() {
-                            let spot = paths.row(i)[exercise_step];
-                            let immediate = exercise.exercise_value(spot);
-                            let continuation = continuation_values[j];
-
-                            // Exercise if immediate value > continuation value
-                            if immediate > continuation {
-                                cashflows[i] = immediate;
-                                exercise_times[i] = t;
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "LSMC regression failed at step {exercise_step} with {} ITM paths: {err}",
-                            regression_x.len()
-                        )));
-                    }
-                }
-            } else {
-                // Fallback: too few ITM paths for stable regression.
+            if regression_x.len() <= basis.num_basis() + 10 {
+                // Too few ITM paths for stable regression.
                 // Preserve existing continuation cashflows instead of forcing early exercise.
                 tracing::debug!(
                     exercise_step,
@@ -838,10 +808,30 @@ impl LsmcPricer {
                     min_required = basis.num_basis() + 10,
                     "LSMC: insufficient ITM paths for regression, preserving continuation values"
                 );
+                continue;
+            }
+            match regression_with_basis(&regression_x, &regression_y, basis) {
+                Ok(continuation_values) => {
+                    for (j, &i) in regression_indices.iter().enumerate() {
+                        let spot = paths.row(i)[exercise_step];
+                        let immediate = exercise.exercise_value(spot);
+                        let continuation = continuation_values[j];
+
+                        if immediate > continuation {
+                            cashflows[i] = immediate;
+                            exercise_times[i] = t;
+                        }
+                    }
+                }
+                Err(err) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "LSMC regression failed at step {exercise_step} with {} ITM paths: {err}",
+                        regression_x.len()
+                    )));
+                }
             }
         }
 
-        // Discount all cashflows to present
         let mut present_values = vec![0.0; num_paths];
         for i in 0..num_paths {
             present_values[i] = cashflows[i] * (-discount_rate * exercise_times[i]).exp();
@@ -1114,39 +1104,38 @@ impl LsmcPricer {
                 }
             }
 
-            if regression_x.len() > basis.num_basis() + 10 {
-                match regression_coefficients_with_basis(&regression_x, &regression_y, basis) {
-                    Ok(coeffs) => {
-                        // Use the fitted coefficients to update training cashflows
-                        // (so subsequent earlier-date regressions see the right Y).
-                        for &i in &regression_indices {
-                            let spot = paths.row(i)[exercise_step];
-                            basis.evaluate(spot, &mut basis_vals);
-                            let mut continuation = 0.0;
-                            for k in 0..coeffs.len() {
-                                continuation += coeffs[k] * basis_vals[k];
-                            }
-                            let immediate = exercise.exercise_value(spot);
-                            if immediate > continuation {
-                                cashflows[i] = immediate;
-                                exercise_times[i] = t;
-                            }
-                        }
-                        coefficients_by_date.push((exercise_step, coeffs));
-                    }
-                    Err(err) => {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "LSMC regression failed at step {exercise_step} with {} ITM paths: {err}",
-                            regression_x.len()
-                        )));
-                    }
-                }
-            } else {
+            if regression_x.len() <= basis.num_basis() + 10 {
                 tracing::debug!(
                     exercise_step,
                     itm_paths = regression_x.len(),
                     "LSMC fit_exercise_policy: insufficient ITM paths, skipping date"
                 );
+                continue;
+            }
+            match regression_coefficients_with_basis(&regression_x, &regression_y, basis) {
+                Ok(coeffs) => {
+                    // Subsequent earlier-date regressions must see the updated Y.
+                    for &i in &regression_indices {
+                        let spot = paths.row(i)[exercise_step];
+                        basis.evaluate(spot, &mut basis_vals);
+                        let mut continuation = 0.0;
+                        for k in 0..coeffs.len() {
+                            continuation += coeffs[k] * basis_vals[k];
+                        }
+                        let immediate = exercise.exercise_value(spot);
+                        if immediate > continuation {
+                            cashflows[i] = immediate;
+                            exercise_times[i] = t;
+                        }
+                    }
+                    coefficients_by_date.push((exercise_step, coeffs));
+                }
+                Err(err) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "LSMC regression failed at step {exercise_step} with {} ITM paths: {err}",
+                        regression_x.len()
+                    )));
+                }
             }
         }
 
@@ -1533,13 +1522,11 @@ mod tests {
 
     #[test]
     fn test_laguerre_basis_non_standard_strikes() {
-        // Test that normalization works for non-standard strikes
         let basis_low = LaguerreBasis::new(2, 1.0);
         let basis_high = LaguerreBasis::new(2, 1000.0);
         let mut out_low = vec![0.0; 3];
         let mut out_high = vec![0.0; 3];
 
-        // Both should normalize to x=1.0 when spot equals strike
         basis_low.evaluate(1.0, &mut out_low);
         basis_high.evaluate(1000.0, &mut out_high);
 
@@ -1547,7 +1534,6 @@ mod tests {
         assert_eq!(out_low[1], 0.0);
         assert_eq!(out_high[1], 0.0);
 
-        // Verify strike accessor
         assert_eq!(basis_low.strike(), 1.0);
         assert_eq!(basis_high.strike(), 1000.0);
     }
@@ -1586,7 +1572,6 @@ mod tests {
 
     #[test]
     fn test_lsmc_basic() {
-        // Basic test of LSMC infrastructure
         let exercise_dates = vec![50, 100];
         let config = LsmcConfig::new(1_000, exercise_dates, 100)
             .unwrap()
@@ -1601,9 +1586,8 @@ mod tests {
             .price(&gbm, 100.0, 1.0, 100, &put, &basis, Currency::USD, 0.05)
             .expect("LSMC pricing should succeed in test");
 
-        // American put should have positive value
         assert!(result.mean.amount() > 0.0);
-        assert!(result.mean.amount() < 50.0); // Sanity check
+        assert!(result.mean.amount() < 50.0);
     }
 
     #[test]
@@ -1619,12 +1603,10 @@ mod tests {
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.3).unwrap());
         let put = AmericanPut { strike: 100.0 };
 
-        // High-degree polynomial basis (more prone to ill-conditioning)
         let basis = PolynomialBasis::new(5);
 
         let result = pricer.price(&gbm, 80.0, 1.0, 100, &put, &basis, Currency::USD, 0.05);
 
-        // Should not panic or produce NaN
         assert!(result.is_ok());
         let price = result.expect("LSMC pricing should succeed in test");
         assert!(price.mean.amount().is_finite());
@@ -1643,14 +1625,12 @@ mod tests {
             .with_seed(123);
         let pricer = LsmcPricer::new(config);
 
-        // High vol to get wide spot range
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 1.0).unwrap());
         let put = AmericanPut { strike: 100.0 };
         let basis = PolynomialBasis::new(3);
 
         let result = pricer.price(&gbm, 100.0, 1.0, 100, &put, &basis, Currency::USD, 0.05);
 
-        // Should remain stable even with extreme paths
         assert!(result.is_ok());
         let price = result.expect("LSMC pricing should succeed in test");
         assert!(price.mean.amount().is_finite());
@@ -1669,20 +1649,17 @@ mod tests {
             .with_seed(456);
         let pricer = LsmcPricer::new(config);
 
-        // Low vol, deep OTM
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.05).unwrap());
         let put = AmericanPut { strike: 50.0 };
         let basis = PolynomialBasis::new(2);
 
-        // Start well above strike
         let result = pricer.price(&gbm, 150.0, 0.5, 100, &put, &basis, Currency::USD, 0.05);
 
-        // Should handle gracefully (very small value expected)
         assert!(result.is_ok());
         let price = result.expect("LSMC pricing should succeed in test");
         assert!(price.mean.amount().is_finite());
         assert!(price.mean.amount() >= 0.0);
-        assert!(price.mean.amount() < 0.1); // Should be near zero
+        assert!(price.mean.amount() < 0.1);
 
         println!("Few ITM paths LSMC: {}", price.mean);
     }

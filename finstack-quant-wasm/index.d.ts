@@ -3332,11 +3332,7 @@ export interface AnalyticsNamespace {
    * @param returns - Per-period simple decimal returns in date order.
    * @param rf - Annualized risk-free rate as a decimal (`0.02` for 2%); defaults to `0`.
    * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
-   * @param returns - Per-period simple decimal returns in date order.
-   * @param rf - Annualized risk-free rate as a decimal; defaults to `0`.
-   * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
    * @returns The Sharpe ratio; `±Infinity` when volatility is zero with a non-zero excess return, `NaN` for fewer than two observations, non-finite inputs, or an invalid `periodsPerYear`.
-   * @throws Error - Rejects a `returns` value that is not a numeric array.
    * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
   sharpe(returns: NumericArray, rf?: number, periodsPerYear?: number): number;
@@ -3345,11 +3341,7 @@ export interface AnalyticsNamespace {
    * @param returns - Per-period simple decimal returns in date order.
    * @param mar - Minimum acceptable return per period as a decimal (not annualized); defaults to `0`.
    * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
-   * @param returns - Per-period simple decimal returns in date order.
-   * @param mar - Minimum acceptable return per period as a decimal; defaults to `0`.
-   * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
    * @returns The Sortino ratio; `±Infinity` with no downside deviation but a non-zero excess mean, `NaN` for fewer than two observations, non-finite inputs, or an invalid `periodsPerYear`.
-   * @throws Error - Rejects a `returns` value that is not a numeric array.
    * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
   sortino(returns: NumericArray, mar?: number, periodsPerYear?: number): number;
@@ -3357,19 +3349,14 @@ export interface AnalyticsNamespace {
    * Annualized sample volatility (n−1 denominator) of one return series.
    * @param returns - Per-period simple decimal returns in date order.
    * @param periodsPerYear - Observations per year; the per-period standard deviation is scaled by its square root. Defaults to `252`.
-   * @param returns - Per-period simple decimal returns in date order.
-   * @param periodsPerYear - Observations per year; the per-period standard deviation is scaled by its square root. Defaults to `252`.
    * @returns Annualized volatility as a decimal; `0` for an empty array, `NaN` for non-finite inputs or an invalid `periodsPerYear`.
-   * @throws Error - Rejects a `returns` value that is not a numeric array.
    * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
   volatility(returns: NumericArray, periodsPerYear?: number): number;
   /**
    * Maximum peak-to-trough drawdown of one return series.
    * @param returns - Per-period simple decimal returns in date order; they are compounded into a wealth path before the running-peak decline is measured.
-   * @param returns - Per-period simple decimal returns in date order.
    * @returns Non-positive fraction (`-0.25` is a 25% loss); `0` when the series never falls below its running peak or is empty. Non-finite returns or reconstructed drawdowns yield `NaN`.
-   * @throws Error - Rejects a `returns` value that is not a numeric array.
    * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
   maxDrawdown(returns: NumericArray): number;
@@ -7695,8 +7682,6 @@ export interface ModelsNamespace {
   credit: ModelCreditNamespace;
   /**
    * Copula, recovery, and credit-correlation model infrastructure.
-   * @throws Error - Throws a JavaScript exception if `x` or `y` cannot be decoded as a numeric array.
-   * @returns Sample correlation in `[-1, 1]`, or NaN when a series has fewer than two points.
    */
   correlation: CorrelationNamespace;
   /**
@@ -7705,9 +7690,6 @@ export interface ModelsNamespace {
   rates: RatesNamespace;
   /**
    * Product-independent volatility models and evaluators.
-   * @returns Annualized volatility as a decimal; `0` for an empty array, `NaN` for non-finite inputs or an invalid `periodsPerYear`.
-   * @throws Error - Rejects a `returns` value that is not a numeric array.
-   * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
   volatility: VolatilityNamespace;
   /**

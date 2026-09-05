@@ -205,7 +205,6 @@ pub fn forecast_breaches(
     model: Option<&FinancialModelSpec>,
     config: CovenantForecastConfig,
 ) -> Result<Vec<FutureBreach>> {
-    // Extract all periods from results
     let mut periods: Vec<PeriodId> = results
         .nodes
         .values()
@@ -492,7 +491,6 @@ mod tests {
 
     #[test]
     fn test_forecast_breaches_concrete() {
-        // 1. Setup Covenant Engine
         let mut engine = CovenantEngine::new();
         let covenant = Covenant::new(
             CovenantType::MaxDebtToEbitda { threshold: 4.0 },
@@ -506,7 +504,6 @@ mod tests {
         };
         engine.add_spec(spec);
 
-        // 2. Setup Results (Forecast)
         let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
@@ -521,12 +518,10 @@ mod tests {
             ..StatementResult::default()
         };
 
-        // 3. Run Forecast
         let config = CovenantForecastConfig::default();
         let breaches =
             forecast_breaches(&results, &engine, None, config).expect("Forecast should succeed");
 
-        // 4. Verify
         assert_eq!(breaches.len(), 1);
         assert_eq!(breaches[0].covenant_id, "max_debt_ebitda");
         assert_eq!(breaches[0].covenant_description, "Debt/EBITDA <= 4.00x");

@@ -52,7 +52,6 @@ _CORE_STAGES = ("base", "common")
 
 
 def _resolve_core_stage(stage: str, core_stage: str | None) -> str:
-    """Return the underlying common-book stage for a track workflow."""
     if stage not in TRACKS:
         raise ValueError(f"stage must be one of {TRACKS}; got {stage!r}")
     resolved = ("common" if stage == "credit" else "base") if core_stage is None else core_stage
@@ -854,9 +853,6 @@ def ohlc_observations() -> dict[str, list[tuple[date, float]]]:
     Returns:
         Four series IDs mapped to dated prices from December 2024 through
         AS_OF, with high >= max(open, close) and low <= min(open, close).
-
-    Raises:
-        ValueError: If date arithmetic fails.
 
     >>> sorted(ohlc_observations())
     ['SPX-CLOSE', 'SPX-HIGH', 'SPX-LOW', 'SPX-OPEN']

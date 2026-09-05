@@ -18,8 +18,7 @@
 //!
 //! [`CovenantEngine::evaluate`] returns an error for invalid engine
 //! configuration, duplicate applicable covenant instance keys, missing metric
-//! values, failing custom calculators or evaluators, or a covenant that cannot
-//! produce a test value.
+//! values, or a covenant that cannot produce a test value.
 //!
 //! # Example
 //!
@@ -38,9 +37,9 @@
 //! let mut engine = CovenantEngine::new();
 //! engine.add_spec(CovenantSpec::with_metric(covenant, "debt_to_ebitda"));
 //!
-//! let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.2)]);
+//! let metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.2)]);
 //! let test_date = create_date(2025, Month::March, 31)?;
-//! let reports = engine.evaluate(&mut metrics, test_date)?;
+//! let reports = engine.evaluate(&metrics, test_date)?;
 //!
 //! assert!(reports["max_total_leverage"].passed);
 //! assert_eq!(reports["max_total_leverage"].threshold, Some(4.5));
@@ -71,11 +70,8 @@ pub(crate) mod engine;
 pub(crate) mod forward;
 pub mod json;
 pub mod metric;
-/// Covenant report types and structures
 pub(crate) mod report;
-/// Covenant threshold schedules (piecewise-constant step-downs)
 pub(crate) mod schedule;
-/// Covenant package templates for common deal structures
 pub mod templates;
 
 pub use engine::{

@@ -67,15 +67,13 @@ impl ShortRateTree {
         let t1 = self.time_steps[1];
         let r0 = -discount_curve.df(t1).ln() / t1;
 
-        rates[0] = vec![r0.clamp(alpha_lb, alpha_ub)]; // Ensure within bounds
+        rates[0] = vec![r0.clamp(alpha_lb, alpha_ub)];
         let mut state_prices = vec![vec![1.0]]; // Q[0] = [1.0]
 
-        // Track calibration quality for diagnostics
         let mut max_error_bp = 0.0_f64;
         let mut max_error_step = 0_usize;
         let mut fallback_count = 0_usize;
 
-        // Build tree forward, calibrating drift at each step
         for step in 0..self.config.steps {
             let current_time = self.time_steps[step + 1];
             let target_df = discount_curve.df(current_time);
@@ -105,17 +103,15 @@ impl ShortRateTree {
                 model_price - target_df
             };
 
-            // Initial guess for alpha based on previous step or forward rate
             let initial_alpha = if step == 0 {
                 r0.clamp(alpha_lb, alpha_ub)
             } else {
-                // Use geometric mean of previous step rates as initial guess
+                // Geometric mean of previous step rates as the initial guess.
                 let mean_rate =
                     current_rates.iter().map(|&r| r.ln()).sum::<f64>() / current_rates.len() as f64;
                 mean_rate.exp().clamp(alpha_lb, alpha_ub)
             };
 
-            // Solve for alpha with convergence tracking
             let (alpha, used_fallback) = match solver.solve(objective, initial_alpha) {
                 Ok(a) => (a.clamp(alpha_lb, alpha_ub), false),
                 Err(_) => {
@@ -153,7 +149,6 @@ impl ShortRateTree {
                 max_error_step = step;
             }
 
-            // Log warning if calibration error is significant (>1bp) or fallback was used
             if error_bp > 1.0 || used_fallback {
                 tracing::warn!(
                     "BDT calibration step {}: error={:.2}bp, target_df={:.6}, model_df={:.6}{}",
@@ -169,8 +164,6 @@ impl ShortRateTree {
                 );
             }
 
-            // Build next step rates using calibrated alpha.
-            //
             // Terminal row note (same convention as Ho-Lee and BK): the final
             // iteration populates rates[N] for lattice geometry and accessor
             // consistency, but that row's alpha is the one solved for the last
@@ -185,7 +178,6 @@ impl ShortRateTree {
                 let discount_factor = comp.df(current_step_rates[j], dt);
                 let state_price_contribution = state_price * discount_factor;
 
-                // Up move: j -> j+1
                 if j + 1 < next_nodes {
                     let up_rate = alpha * u.powf(next_nodes as f64 - 1.0 - 2.0 * (j + 1) as f64);
                     if materially_clamped(up_rate) && !clamp_engaged {
@@ -196,7 +188,6 @@ impl ShortRateTree {
                     next_state_prices[j + 1] += state_price_contribution * p;
                 }
 
-                // Down move: j -> j
                 if j < next_nodes {
                     let down_rate = alpha * u.powf(next_nodes as f64 - 1.0 - 2.0 * j as f64);
                     if materially_clamped(down_rate) && !clamp_engaged {
@@ -212,7 +203,6 @@ impl ShortRateTree {
             state_prices.push(next_state_prices);
         }
 
-        // Log calibration summary
         if max_error_bp > 1.0 || fallback_count > 0 {
             tracing::warn!(
                 "BDT calibration completed: max error={:.2}bp at step {}, fallbacks={} (target: <1bp, 0 fallbacks)",

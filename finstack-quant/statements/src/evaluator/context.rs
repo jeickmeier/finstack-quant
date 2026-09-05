@@ -494,12 +494,8 @@ mod tests {
             Arc::new(IndexMap::new()),
         );
 
-        ctx.set_value("revenue", 100_000.0)
-            .expect("test should succeed");
-        assert_eq!(
-            ctx.get_value("revenue").expect("test should succeed"),
-            100_000.0
-        );
+        ctx.set_value("revenue", 100_000.0).unwrap();
+        assert_eq!(ctx.get_value("revenue").unwrap(), 100_000.0);
     }
 
     #[test]

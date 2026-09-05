@@ -307,8 +307,6 @@ mod tests {
         out[..k].iter().sum()
     }
 
-    // -- Construction ------------------------------------------------------
-
     #[test]
     fn rejects_bad_hurst() {
         assert!(RiemannLiouvilleVolterra::new(1.0, 10, 0.0).is_err());
@@ -332,8 +330,6 @@ mod tests {
         assert_eq!(gen.num_steps(), 32);
         assert!((gen.hurst() - 0.1).abs() < 1e-14);
     }
-
-    // -- Kernel weights ----------------------------------------------------
 
     /// Unit test (i): the far-field power-law weight for lag `m` equals
     /// `((m + b_m)·Δt)^γ` with the Bennedsen-Lunde-Pakkanen optimal point
@@ -390,8 +386,6 @@ mod tests {
         assert!((cov - expected_cov).abs() < 1e-14);
         assert!((var_i - expected_var_i).abs() < 1e-14);
     }
-
-    // -- Variance reconstruction ------------------------------------------
 
     /// Unit test (ii): accumulating the generated-increment variance must
     /// reconstruct `Var(Ỹ_{t_k}) = t_k^{2H}` for the √(2H)-normalised process.
@@ -514,8 +508,6 @@ mod tests {
             );
         }
     }
-
-    // -- Determinism -------------------------------------------------------
 
     #[test]
     fn generation_is_deterministic() {

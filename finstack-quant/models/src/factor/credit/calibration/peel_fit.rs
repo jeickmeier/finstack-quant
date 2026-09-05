@@ -115,7 +115,6 @@ pub(super) fn run_peel(
     #[allow(clippy::needless_range_loop)]
     for k in 0..num_levels {
         // 5a. For each surviving (non-folded) bucket, compute factor return series.
-        // Build a map: bucket_path → vector of issuer IDs participating.
         // Folded issuers contribute β=0 at this level and DO NOT participate
         // in computing the bucket factor return; they simply propagate
         // residuals unchanged.

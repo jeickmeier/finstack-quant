@@ -1137,23 +1137,6 @@ mod tests {
         );
     }
 
-    // NOTE on the Task 1 carried finding (trailing flat extrapolation through
-    // a public API): `cell_returns_from_curves` does not close this gap.
-    // Every cell it produces is `observed: true` by construction — a curve
-    // supplies a discount factor at every queried midpoint, so there is
-    // nothing to interpolate or extrapolate (see the module-level ambiguity
-    // note and this task's report for the full reasoning). And
-    // `cell_returns_from_reference` still cannot reach the trailing branch
-    // either: `num_cells = ceil(max_duration / width)` is derived from the
-    // *largest reference duration itself*, so the top cell always contains
-    // that duration and is always observed — there is no parameter that lets
-    // a caller extend the grid past the data, by design (see that function's
-    // doc comment: "there is no separate range parameter in this stage").
-    // The gap remains covered only by the direct `fill_gaps` unit test
-    // (`fill_gaps_extrapolates_leading_and_trailing_flat` above); closing it
-    // through a public API would require a future stage to add an explicit
-    // upper-bound parameter to `cell_returns_from_reference` itself.
-
     #[test]
     fn cell_table_interpolates_interior_and_extrapolates_ends() {
         // Observed: cell 0.0-0.5 => 0.01, cell 2.0-2.5 => 0.05. Gaps 0.5-2.0 interpolate

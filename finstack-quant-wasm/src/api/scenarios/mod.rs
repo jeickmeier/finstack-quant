@@ -412,7 +412,6 @@ pub fn compute_horizon_return(
     let scenario: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(scenario_json).map_err(to_js_err)?;
 
-    // Parse method via the canonical scenarios-crate parser (shared with Python).
     let method_str = method.as_deref().unwrap_or("parallel");
     let attribution_method =
         finstack_quant_scenarios::horizon::attribution_method_from_str(method_str)

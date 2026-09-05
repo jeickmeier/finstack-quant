@@ -1,15 +1,8 @@
 //! Deterministic scenario execution engine.
 //!
-//! The engine glues together adapters from this crate to compose multiple
-//! [`ScenarioSpec`] definitions and apply them to
-//! a mutable [`ExecutionContext`]. Its responsibilities are:
-//! - enforce a repeatable ordering of operations
-//! - dispatch each `OperationSpec` variant to the appropriate adapter function
-//!   via a centralized exhaustive `match`
-//! - flush market bumps **per operation** (not once per scenario) so
-//!   sequential adapters see a fully-applied prior state
-//! - collect reporting metadata about how many operations ran and any
-//!   warnings produced during execution
+//! Applies [`ScenarioSpec`] operations to a mutable [`ExecutionContext`] in a
+//! fixed order, flushing market bumps after each operation so later adapters
+//! observe the fully-applied prior state.
 
 mod effects;
 mod hierarchy;
@@ -27,7 +20,7 @@ pub use types::{
 
 use crate::adapters::traits::ScenarioEffect;
 use crate::error::Result;
-use crate::spec::{OperationSpec, RateBindingSpec, ScenarioSpec};
+use crate::spec::{NodeId, OperationSpec, RateBindingSpec, ScenarioSpec};
 use crate::warning::Warning;
 use effects::{
     apply_generated_effects, flush_pending_bumps, generate_replace_curve_effects_parallel,
@@ -36,20 +29,16 @@ use effects::{
 use finstack_quant_core::dates::HolidayCalendar;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::types::CurveId;
 use finstack_quant_statements::FinancialModelSpec;
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
 use hierarchy::{expand_hierarchy_operations, ExpansionOutcome};
 use std::sync::Arc;
 
-/// Apply one rate binding to `model`, recording a warning instead of a hard
-/// error when the update produces no forecast values or fails.
+/// Apply one rate binding, recording a warning instead of a hard error.
 ///
-/// Shared by the engine's Phase 2 (context-configured bindings) and Phase 3
-/// (`ScenarioEffect::RateBinding` operations) so the update-and-warn logic is
-/// written once. Returns `true` when [`update_rate_from_binding`] returned
-/// `Ok(_)` (regardless of whether values were produced), `false` on error.
-///
-/// [`update_rate_from_binding`]: crate::adapters::statements::update_rate_from_binding
+/// Returns `true` when the binding update succeeded (including the no-forecast
+/// case) and `false` when it failed.
 fn apply_rate_binding(
     binding: &RateBindingSpec,
     model: &mut FinancialModelSpec,
@@ -77,19 +66,85 @@ fn apply_rate_binding(
     }
 }
 
-fn results_stamp(
-    config: &finstack_quant_core::config::FinstackConfig,
-) -> Option<finstack_quant_core::config::ResultsMeta> {
-    Some(finstack_quant_core::config::results_meta(config))
+fn statement_model<'m>(
+    model: &'m mut Option<&mut FinancialModelSpec>,
+    operation: &str,
+) -> Result<&'m mut FinancialModelSpec> {
+    model
+        .as_deref_mut()
+        .ok_or_else(|| crate::error::Error::missing_statement_model(operation))
 }
 
-/// Orchestrates the deterministic application of a [`ScenarioSpec`].
+fn record_forecast_result(
+    result: Result<bool>,
+    node_id: &NodeId,
+    op: &str,
+    applied: &mut usize,
+    applied_stmt_ops: &mut usize,
+    warnings: &mut Vec<Warning>,
+) {
+    match result {
+        Ok(true) => {
+            *applied += 1;
+            *applied_stmt_ops += 1;
+        }
+        Ok(false) => warnings.push(Warning::StatementNodeNoValues {
+            node_id: node_id.as_str().to_string(),
+            op: op.to_string(),
+        }),
+        Err(e) => warnings.push(Warning::StatementOpFailed {
+            node_id: node_id.as_str().to_string(),
+            op: op.to_string(),
+            reason: e.to_string(),
+        }),
+    }
+}
+
+fn par_cds_ids(op: &OperationSpec) -> Option<(&CurveId, Option<&CurveId>)> {
+    match op {
+        OperationSpec::CurveParallelBp {
+            curve_kind: crate::CurveKind::ParCDS,
+            curve_id,
+            discount_curve_id,
+            ..
+        }
+        | OperationSpec::CurveNodeBp {
+            curve_kind: crate::CurveKind::ParCDS,
+            curve_id,
+            discount_curve_id,
+            ..
+        } => Some((curve_id, discount_curve_id.as_ref())),
+        _ => None,
+    }
+}
+
+fn par_cds_hazard_rolls(
+    ops: &[OperationSpec],
+    market: &MarketContext,
+) -> Result<Vec<(CurveId, CurveId)>> {
+    let mut hazard_rolls = Vec::new();
+    for op in ops {
+        let Some((curve_id, discount_curve_id)) = par_cds_ids(op) else {
+            continue;
+        };
+        if hazard_rolls.iter().any(|(id, _)| id == curve_id) {
+            continue;
+        }
+        let (discount_id, _) = crate::adapters::curves::resolve_discount_curve_id(
+            market,
+            discount_curve_id,
+            Some(curve_id),
+        )?;
+        hazard_rolls.push((curve_id.clone(), discount_id));
+    }
+    Ok(hazard_rolls)
+}
+
+/// Deterministic scenario applicator.
 ///
-/// The engine is intentionally lightweight: it owns an immutable
-/// [`FinstackConfig`](finstack_quant_core::config::FinstackConfig) (used to stamp
-/// the active rounding policy into reports) and an optional shared
-/// quote-recalibration provider. All other mutable inputs are supplied via
-/// [`ExecutionContext`].
+/// Owns the active [`FinstackConfig`](finstack_quant_core::config::FinstackConfig)
+/// (stamped into reports) and an optional shared quote-recalibration provider.
+/// All other mutable inputs come from [`ExecutionContext`].
 #[derive(Default, Clone)]
 pub struct ScenarioEngine {
     /// Active configuration; its rounding mode is stamped into
@@ -113,15 +168,14 @@ impl std::fmt::Debug for ScenarioEngine {
 }
 
 impl ScenarioEngine {
-    /// Create a new scenario engine with the default [`FinstackConfig`](finstack_quant_core::config::FinstackConfig).
+    /// Create a new scenario engine with the default configuration.
     ///
     /// # Examples
     /// ```rust
     /// use finstack_quant_scenarios::ScenarioEngine;
     ///
     /// let engine = ScenarioEngine::new();
-    /// let other = ScenarioEngine::default();
-    /// assert_eq!(format!("{:?}", engine), format!("{:?}", other));
+    /// assert!(engine.recalibration_provider().is_none());
     /// ```
     #[must_use]
     pub fn new() -> Self {
@@ -131,8 +185,7 @@ impl ScenarioEngine {
     /// Create a scenario engine carrying the caller's active configuration.
     ///
     /// The configuration's rounding mode is stamped into
-    /// [`ApplicationReport::meta`] so reports reflect the policy
-    /// actually in force rather than the library default.
+    /// [`ApplicationReport::meta`].
     ///
     /// # Arguments
     ///
@@ -165,13 +218,7 @@ impl ScenarioEngine {
         self.recalibration_provider.as_ref()
     }
 
-    /// Strict composition: returns an error at compose time when the
-    /// concatenated operations would be rejected at apply time.
-    ///
-    /// Delegates to [`ScenarioSpec::compose`]; kept as a method so existing
-    /// callers holding a [`ScenarioEngine`] do not need a throwaway instance
-    /// replaced. Production callers should prefer
-    /// [`ScenarioSpec::compose`] directly.
+    /// Merge scenarios via [`ScenarioSpec::compose`].
     ///
     /// # Errors
     ///
@@ -227,17 +274,14 @@ impl ScenarioEngine {
     ///
     /// # Arguments
     ///
-    /// * `spec` - Validated specification defining the requested operation.
-    /// * `ctx` - Market or evaluation context supplying dependencies required by the calculation.
+    /// * `spec` - Scenario operations to apply, including hierarchy targets.
+    /// * `ctx` - Mutable market, optional statements, instruments, and as-of date.
     #[tracing::instrument(skip_all, fields(scenario_id = %spec.id))]
     pub fn apply(
         &self,
         spec: &ScenarioSpec,
         ctx: &mut ExecutionContext,
     ) -> Result<ApplicationReport> {
-        // Validate up-front so malformed specs cannot reach adapters. FFI
-        // bindings (Python, WASM) deserialize JSON straight into a spec and
-        // call this entry point without their own validation pass.
         spec.validate()?;
 
         let mut applied = 0;
@@ -247,11 +291,6 @@ impl ScenarioEngine {
 
         let user_operations = spec.operations.len();
 
-        // Phase -1: Expand hierarchy-targeted operations to direct operations.
-        // Errors fast if the spec contains hierarchy ops but no hierarchy is
-        // attached to the market context. Hierarchy targets that resolve to
-        // zero curves emit a `Warning::HierarchyNoMatch` so the caller can
-        // detect the unintended no-op.
         let ExpansionOutcome {
             operations: expanded_ops,
             warnings: expansion_warnings,
@@ -259,90 +298,59 @@ impl ScenarioEngine {
         let expanded_operations = expanded_ops.len();
         warnings.extend(expansion_warnings);
 
-        // Phase 0: Time Roll Forward (`spec.validate()` already enforced the
-        // at-most-one invariant; no need to re-count here.)
-        let mut time_roll: Option<RollForwardReport> = None;
-        for op in expanded_ops.iter() {
-            if let OperationSpec::TimeRollForward {
-                period,
-                apply_shocks,
-                roll_mode,
-            } = op
-            {
-                let _span = tracing::info_span!("phase_0_time_roll", period = %period).entered();
-                let mut hazard_rolls = Vec::new();
-                if *apply_shocks && spec.hazard_bump_mode == crate::HazardBumpMode::SolveToPar {
-                    for operation in expanded_ops.iter() {
-                        if let OperationSpec::CurveParallelBp {
-                            curve_kind: crate::CurveKind::ParCDS,
-                            curve_id,
-                            discount_curve_id,
-                            ..
-                        }
-                        | OperationSpec::CurveNodeBp {
-                            curve_kind: crate::CurveKind::ParCDS,
-                            curve_id,
-                            discount_curve_id,
-                            ..
-                        } = operation
-                        {
-                            if !hazard_rolls.iter().any(|(id, _)| id == curve_id) {
-                                let (discount_id, _) =
-                                    crate::adapters::curves::resolve_discount_curve_id(
-                                        ctx.market,
-                                        discount_curve_id.as_ref(),
-                                        Some(curve_id),
-                                    )?;
-                                hazard_rolls.push((curve_id.clone(), discount_id));
-                            }
-                        }
-                    }
-                }
-                let roll_report = crate::adapters::time_roll::apply_time_roll_forward_with_credit(
-                    ctx,
+        let time_roll = if let Some((period, apply_shocks, roll_mode)) =
+            expanded_ops.iter().find_map(|op| match op {
+                OperationSpec::TimeRollForward {
                     period,
-                    *roll_mode,
-                    &hazard_rolls,
-                    self.recalibration_provider.as_deref(),
-                )?;
-                applied += 1;
-
-                // Valuation failures during the roll must not vanish: surface
-                // each as a structured warning so callers that only inspect
-                // the ApplicationReport still see them.
-                for (instrument_id, reason) in &roll_report.failed_instruments {
-                    warnings.push(Warning::TimeRollInstrumentFailed {
-                        instrument_id: instrument_id.clone(),
-                        reason: reason.clone(),
-                    });
-                }
-
-                let stop_after_roll = !*apply_shocks;
-                time_roll = Some(roll_report);
-                changes.as_of_changed = ctx.as_of != initial_as_of;
-                changes.all_dirty |= changes.as_of_changed;
-
-                if stop_after_roll {
-                    return Ok(ApplicationReport {
-                        operations_applied: applied,
-                        user_operations,
-                        expanded_operations,
-                        changes,
-                        warnings,
-                        meta: results_stamp(&self.config),
-                        time_roll,
-                    });
-                }
+                    apply_shocks,
+                    roll_mode,
+                } => Some((period, *apply_shocks, *roll_mode)),
+                _ => None,
+            }) {
+            let _span = tracing::info_span!("phase_0_time_roll", period = %period).entered();
+            let hazard_rolls =
+                if apply_shocks && spec.hazard_bump_mode == crate::HazardBumpMode::SolveToPar {
+                    par_cds_hazard_rolls(&expanded_ops, ctx.market)?
+                } else {
+                    Vec::new()
+                };
+            let roll_report = crate::adapters::time_roll::apply_time_roll_forward_with_credit(
+                ctx,
+                period,
+                roll_mode,
+                &hazard_rolls,
+                self.recalibration_provider.as_deref(),
+            )?;
+            applied += 1;
+            for (instrument_id, reason) in &roll_report.failed_instruments {
+                warnings.push(Warning::TimeRollInstrumentFailed {
+                    instrument_id: instrument_id.clone(),
+                    reason: reason.clone(),
+                });
             }
-        }
+            changes.as_of_changed = ctx.as_of != initial_as_of;
+            changes.all_dirty |= changes.as_of_changed;
+            if !apply_shocks {
+                return Ok(ApplicationReport {
+                    operations_applied: applied,
+                    user_operations,
+                    expanded_operations,
+                    changes,
+                    warnings,
+                    meta: Some(finstack_quant_core::config::results_meta(&self.config)),
+                    time_roll: Some(roll_report),
+                });
+            }
+            Some(roll_report)
+        } else {
+            None
+        };
 
         let has_rate_bindings = ctx.rate_bindings.is_some();
         let mut deferred_stmts = Vec::new();
         let mut pending_bumps: Vec<MarketBump> = Vec::new();
 
-        // A direct rate bump changes replay dependencies without changing the
-        // hazard curve. Retain the calibration market for each hazard until
-        // that curve itself is rebuilt, including after a horizon requote.
+        // Retain each hazard's calibration market until that curve is rebuilt.
         let initial_market = Arc::new(ctx.market.clone());
         let mut hazard_sources: indexmap::IndexMap<_, _> = ctx
             .market
@@ -356,16 +364,6 @@ impl ScenarioEngine {
             .map(|(id, _)| (id.clone(), Arc::clone(&initial_market)))
             .collect();
 
-        // Phase 1: Generate effects and split into market bumps (intra-op
-        // batched), curve replacements, instrument shocks, and deferred
-        // statement ops. Bumps from the previous iteration are flushed before
-        // generating effects for the next op so adapters always observe a
-        // fully-applied prior-op market state — this preserves the sequential
-        // semantics that downstream cross-curve calibrations depend on.
-        //
-        // Consecutive independent ParCDS / inflation replacements (distinct
-        // curve ids) may be generated in parallel after that flush. Dependent
-        // pairs such as discount-then-hazard stay sequential.
         {
             let _span = tracing::info_span!("phase_1_market", ops = expanded_operations).entered();
             let mut sink = EffectSink {
@@ -379,11 +377,9 @@ impl ScenarioEngine {
             while idx < expanded_ops.len() {
                 if let OperationSpec::TimeRollForward { .. } = &expanded_ops[idx] {
                     idx += 1;
-                    continue; // handled in Phase 0
+                    continue;
                 }
 
-                // Apply any bumps queued by the previous iteration so the
-                // adapter's `ctx.market` reads reflect everything done so far.
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
 
                 let env = HazardApplyEnv {
@@ -404,32 +400,16 @@ impl ScenarioEngine {
                     1
                 };
                 for op in &expanded_ops[idx..idx + processed] {
-                    if let OperationSpec::CurveParallelBp {
-                        curve_kind: crate::CurveKind::ParCDS,
-                        curve_id,
-                        ..
-                    }
-                    | OperationSpec::CurveNodeBp {
-                        curve_kind: crate::CurveKind::ParCDS,
-                        curve_id,
-                        ..
-                    } = op
-                    {
+                    if let Some((curve_id, _)) = par_cds_ids(op) {
                         hazard_sources.insert(curve_id.clone(), Arc::new(ctx.market.clone()));
                     }
                 }
                 idx += processed;
             }
 
-            // Flush any remaining bumps before moving on to statements.
             flush_pending_bumps(sink.pending_bumps, ctx.market)?;
         }
 
-        // Phase 2: Rate bindings update (from context configuration).
-        //
-        // The map key is authoritative for routing; mismatched binding.node_id
-        // is a hard error so the caller fixes the binding upstream rather than
-        // discovering a silent rewrite later.
         if let Some(bindings) = &ctx.rate_bindings {
             let _span = tracing::info_span!("phase_2_rate_bindings").entered();
             for (node_id, binding) in bindings {
@@ -442,14 +422,11 @@ impl ScenarioEngine {
                     )));
                 }
 
-                let Some(model) = ctx.model.as_deref_mut() else {
-                    return Err(crate::error::Error::missing_statement_model("rate binding"));
-                };
+                let model = statement_model(&mut ctx.model, "rate binding")?;
                 apply_rate_binding(binding, model, ctx.market, ctx.calendar, &mut warnings);
             }
         }
 
-        // Phase 3: Statement Operations (Deferred)
         let mut applied_stmt_ops = 0usize;
         {
             let _span = tracing::info_span!("phase_3_statements").entered();
@@ -459,11 +436,7 @@ impl ScenarioEngine {
                         if let Some(rb) = &mut ctx.rate_bindings {
                             rb.insert(binding.node_id.clone(), binding.clone());
                         }
-                        let Some(model) = ctx.model.as_deref_mut() else {
-                            return Err(crate::error::Error::missing_statement_model(
-                                "rate binding",
-                            ));
-                        };
+                        let model = statement_model(&mut ctx.model, "rate binding")?;
                         if apply_rate_binding(
                             &binding,
                             model,
@@ -476,71 +449,44 @@ impl ScenarioEngine {
                         }
                     }
                     ScenarioEffect::StmtForecastPercent { node_id, pct } => {
-                        let Some(model) = ctx.model.as_deref_mut() else {
-                            return Err(crate::error::Error::missing_statement_model(
-                                "statement forecast percent",
-                            ));
-                        };
-                        match crate::adapters::statements::apply_forecast_percent(
-                            model,
-                            node_id.as_str(),
-                            pct,
-                        ) {
-                            Ok(true) => {
-                                applied += 1;
-                                applied_stmt_ops += 1;
-                            }
-                            Ok(false) => warnings.push(Warning::StatementNodeNoValues {
-                                node_id: node_id.as_str().to_string(),
-                                op: "forecast_percent".to_string(),
-                            }),
-                            Err(e) => warnings.push(Warning::StatementOpFailed {
-                                node_id: node_id.as_str().to_string(),
-                                op: "forecast_percent".to_string(),
-                                reason: e.to_string(),
-                            }),
-                        }
+                        let model = statement_model(&mut ctx.model, "statement forecast percent")?;
+                        record_forecast_result(
+                            crate::adapters::statements::apply_forecast_percent(
+                                model,
+                                node_id.as_str(),
+                                pct,
+                            ),
+                            &node_id,
+                            "forecast_percent",
+                            &mut applied,
+                            &mut applied_stmt_ops,
+                            &mut warnings,
+                        );
                     }
                     ScenarioEffect::StmtForecastAssign { node_id, value } => {
-                        let Some(model) = ctx.model.as_deref_mut() else {
-                            return Err(crate::error::Error::missing_statement_model(
-                                "statement forecast assign",
-                            ));
-                        };
-                        match crate::adapters::statements::apply_forecast_assign(
-                            model,
-                            node_id.as_str(),
-                            value,
-                            None,
-                        ) {
-                            Ok(true) => {
-                                applied += 1;
-                                applied_stmt_ops += 1;
-                            }
-                            Ok(false) => warnings.push(Warning::StatementNodeNoValues {
-                                node_id: node_id.as_str().to_string(),
-                                op: "forecast_assign".to_string(),
-                            }),
-                            Err(e) => warnings.push(Warning::StatementOpFailed {
-                                node_id: node_id.as_str().to_string(),
-                                op: "forecast_assign".to_string(),
-                                reason: e.to_string(),
-                            }),
-                        }
+                        let model = statement_model(&mut ctx.model, "statement forecast assign")?;
+                        record_forecast_result(
+                            crate::adapters::statements::apply_forecast_assign(
+                                model,
+                                node_id.as_str(),
+                                value,
+                                None,
+                            ),
+                            &node_id,
+                            "forecast_assign",
+                            &mut applied,
+                            &mut applied_stmt_ops,
+                            &mut warnings,
+                        );
                     }
                     _ => {}
                 }
             }
         }
 
-        // Phase 4: Re-evaluate statements only if statement work was performed.
         if applied_stmt_ops > 0 || has_rate_bindings {
             let _span = tracing::info_span!("phase_4_reevaluate").entered();
-            let Some(model) = ctx.model.as_deref_mut() else {
-                return Err(crate::error::Error::missing_statement_model(
-                    "statement re-evaluation",
-                ));
-            };
+            let model = statement_model(&mut ctx.model, "statement re-evaluation")?;
             match crate::adapters::statements::reevaluate_model(model) {
                 Ok(eval_warnings) => warnings.extend(eval_warnings),
                 Err(e) => warnings.push(Warning::ModelReevaluationFailed {
@@ -558,7 +504,7 @@ impl ScenarioEngine {
             expanded_operations,
             changes,
             warnings,
-            meta: results_stamp(&self.config),
+            meta: Some(finstack_quant_core::config::results_meta(&self.config)),
             time_roll,
         })
     }

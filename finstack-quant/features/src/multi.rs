@@ -346,6 +346,7 @@ pub fn rolling_regression_residual(
 ///   cross-sections.
 /// * `volatility` - Row-aligned risk estimates; zero, missing, or non-finite
 ///   values produce missing output weights.
+///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ.
@@ -418,8 +419,6 @@ pub fn normalize_signal(
     params: Option<&Value>,
 ) -> Result<Vec<Option<f64>>> {
     let method = string_param(params, "method", "zscore")?;
-    // `method` selects the op; strip it so the op's own strict parameter check
-    // only sees the keys that op reads.
     let op_params = params.and_then(|value| {
         let mut object = value.as_object()?.clone();
         object.remove("method");
@@ -436,6 +435,7 @@ pub fn normalize_signal(
 ///   normalization.
 /// * `time_key` - Row-aligned labels defining independently normalized
 ///   cross-sections.
+///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ.

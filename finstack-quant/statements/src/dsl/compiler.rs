@@ -412,7 +412,6 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
     };
 
     if let Some(f) = func {
-        // Validate argument counts for custom functions
         match f {
             Function::Sum | Function::Mean | Function::Min | Function::Max => {
                 if compiled_args.is_empty() {

@@ -633,7 +633,6 @@ mod tests {
             asset_value: Some(200.0),
             ..Default::default()
         };
-        // Should not panic; result is a boolean.
         let _ = model.should_pik(&state, &mut rng);
     }
 

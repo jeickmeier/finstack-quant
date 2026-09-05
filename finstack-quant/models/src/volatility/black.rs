@@ -84,9 +84,6 @@ pub fn d2(spot: f64, strike: f64, r: f64, sigma: f64, t: f64, q: f64) -> f64 {
 
 /// Calculate both d1 and d2 for Black–Scholes in a single pass.
 ///
-/// This is the preferred function for hot paths (e.g., Greeks calculations)
-/// where both values are needed. Computes shared intermediate values only once.
-///
 /// # Arguments
 ///
 /// * `spot` - Current underlying spot price in the option's price units.
@@ -128,7 +125,6 @@ pub fn d1_d2(spot: f64, strike: f64, r: f64, sigma: f64, t: f64, q: f64) -> (f64
         return (limit, limit);
     }
 
-    // Compute shared intermediate values once
     let sqrt_t = t.sqrt();
     let sigma_sqrt_t = sigma * sqrt_t;
     let d1 = ((spot / strike).ln() + (r - q + 0.5 * sigma * sigma) * t) / sigma_sqrt_t;
@@ -194,8 +190,6 @@ pub fn d2_black76(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 
 /// Calculate both d1 and d2 for Black76 model in a single pass.
 ///
-/// This is the preferred function for hot paths where both values are needed.
-///
 /// # Arguments
 ///
 /// * `forward` - Forward price or rate at option expiry.
@@ -228,7 +222,6 @@ pub fn d1_d2_black76(forward: f64, strike: f64, sigma: f64, t: f64) -> (f64, f64
         return (limit, limit);
     }
 
-    // Compute shared intermediate values once
     let sqrt_t = t.sqrt();
     let sigma_sqrt_t = sigma * sqrt_t;
     let variance = sigma_sqrt_t * sigma_sqrt_t; // sigma^2 * t

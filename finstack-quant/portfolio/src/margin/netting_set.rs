@@ -102,7 +102,6 @@ mod tests {
         let id = NettingSetId::bilateral("BANK_A", "CSA_001");
         let mut ns = NettingSet::new(id);
 
-        // Create two sets of sensitivities
         let mut sens1 = SimmSensitivities::new(Currency::USD);
         sens1.add_ir_delta(Currency::USD, "5Y", 100_000.0);
 

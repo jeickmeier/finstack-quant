@@ -215,11 +215,8 @@ pub struct XvaResult {
 
     /// All-in valuation adjustment: `CVA − DVA + FVA + MVA`.
     ///
-    /// Equivalently, this is `CVA − DVA + FVA + MVA`. Uncomputed components
-    /// contribute zero.
-    ///
-    /// This is the quantity subtracted from the risk-free value of the
-    /// netting set.
+    /// Uncomputed components contribute zero. This is the quantity subtracted
+    /// from the risk-free value of the netting set.
     ///
     /// # References
     ///
@@ -467,8 +464,6 @@ mod tests {
         };
         assert!(benefit_above_cost.validate().is_err());
     }
-
-    // ── ExposureProfile validation tests ─────────────────────────
 
     #[test]
     fn profile_validate_valid() {

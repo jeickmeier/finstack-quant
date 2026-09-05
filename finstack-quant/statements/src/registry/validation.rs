@@ -17,7 +17,6 @@ use crate::registry::schema::MetricDefinition;
 ///
 /// Returns `Ok(())` when the definition passes all checks.
 pub fn validate_metric_definition(metric: &MetricDefinition, namespace: &str) -> Result<()> {
-    // Validate ID
     if metric.id.is_empty() {
         return Err(Error::registry(
             "Metric ID cannot be empty. Provide a unique identifier (e.g., 'gross_margin').",
@@ -42,7 +41,6 @@ pub fn validate_metric_definition(metric: &MetricDefinition, namespace: &str) ->
         )));
     }
 
-    // Validate name
     if metric.name.is_empty() {
         return Err(Error::registry(format!(
             "Metric '{}' has empty name. Provide a human-readable name (e.g., 'Gross Margin %').",
@@ -50,7 +48,6 @@ pub fn validate_metric_definition(metric: &MetricDefinition, namespace: &str) ->
         )));
     }
 
-    // Validate formula
     if metric.formula.trim().is_empty() {
         return Err(Error::registry(format!(
             "Metric '{}' has empty formula. Provide a valid DSL expression (e.g., 'revenue - cogs').",
@@ -58,7 +55,6 @@ pub fn validate_metric_definition(metric: &MetricDefinition, namespace: &str) ->
         )));
     }
 
-    // Validate formula syntax and compilation in one pass.
     parse_and_compile(&metric.formula).map_err(|e| {
         Error::registry(format!(
             "Invalid formula for metric '{}.{}': {}",

@@ -164,29 +164,15 @@ impl SimmParams {
         }
     }
 
-    /// Commodity inter-bucket correlation lookup.
-    ///
-    /// Looks up `(a, b)` in the row-major 17×17 matrix stored on
-    /// [`SimmParams::commodity_inter_bucket_correlations`]. The calling code
-    /// passes 1-based bucket ids (1..=17); this method translates to the
-    /// 0-based flat index. Returns `0.0` for out-of-range buckets so bad
-    /// bucket labels degrade to a zero-correlation contribution rather than
-    /// a panic.
-    ///
-    /// Routing through `SimmParams` (rather than a free function over a
-    /// hard-coded `const`) keeps this matrix under the same registry-
-    /// load PSD validation as the other SIMM correlation matrices.
+    /// Look up 1-based SIMM commodity buckets in the row-major registry matrix.
+    /// Out-of-range ids contribute `0.0` correlation.
     fn commodity_inter_bucket_correlation(&self, a: u8, b: u8) -> f64 {
-        let n = COMMODITY_BUCKET_COUNT;
-        if !(1..=u8::try_from(n).unwrap_or(u8::MAX)).contains(&a)
-            || !(1..=u8::try_from(n).unwrap_or(u8::MAX)).contains(&b)
-        {
+        let a = usize::from(a);
+        let b = usize::from(b);
+        if a == 0 || b == 0 || a > COMMODITY_BUCKET_COUNT || b > COMMODITY_BUCKET_COUNT {
             return 0.0;
         }
-        // After validate_simm_correlations_psd, the field has exactly n*n entries.
-        let i = (a - 1) as usize;
-        let j = (b - 1) as usize;
-        let idx = i * n + j;
+        let idx = (a - 1) * COMMODITY_BUCKET_COUNT + (b - 1);
         self.commodity_inter_bucket_correlations
             .get(idx)
             .copied()
@@ -246,11 +232,6 @@ impl IrTenorCorrelationMatrix {
                     continue;
                 }
                 let key = ordered_tenor_pair(tenor_i, tenor_j);
-                // Post-`validate_simm_params`: every tenor pair is
-                // guaranteed present in `ir_tenor_correlations`. The 0.5
-                // fallback is a defensive safety net that should be dead
-                // code after successful validation; hitting it indicates
-                // a registry bug bypassing the constructor's validation.
                 let rho = match params.ir_tenor_correlations.get(&key).copied() {
                     Some(r) => r,
                     None => {
@@ -416,7 +397,6 @@ impl SimmCalculator {
         &self,
         ir_delta: &HashMap<(Currency, String), f64>,
     ) -> f64 {
-        // Group sensitivities by currency.
         let mut by_currency: HashMap<Currency, HashMap<String, f64>> = HashMap::default();
         for ((ccy, tenor), delta) in ir_delta {
             *by_currency
@@ -426,20 +406,13 @@ impl SimmCalculator {
                 .or_insert(0.0) += delta;
         }
 
-        // For each currency: weight the sensitivities, derive the per-
-        // currency concentration factor from the net weighted amount,
-        // then compute K_c using the (scaled) weighted sensitivities.
-        //
-        // Iterate currencies in a canonical (sorted) order and sort each tenor
-        // bucket by index, so the order-sensitive f64 quadratic-form reductions
-        // below are bit-reproducible regardless of `HashMap` iteration order
-        // (mirrors the sort in `calculate_curvature`).
+        // Canonical currency and tenor order so the f64 quadratic-form
+        // reductions are bit-reproducible regardless of HashMap iteration.
         let mut currencies: Vec<(&Currency, &HashMap<String, f64>)> = by_currency.iter().collect();
         currencies.sort_by_key(|(ccy, _)| **ccy);
         let k_values: Vec<f64> = currencies
             .into_iter()
             .map(|(_, tenor_map)| {
-                // Compute WS per tenor, then net_ws, then CR, then K.
                 let mut weighted: Vec<(usize, f64)> = tenor_map
                     .iter()
                     .filter_map(|(tenor, dv01)| {
@@ -649,7 +622,6 @@ impl SimmCalculator {
         weight_for: impl Fn(SimmCreditSector) -> f64,
         apply_concentration: bool,
     ) -> f64 {
-        // Group sensitivities by sector bucket.
         let mut by_sector: HashMap<SimmCreditSector, Vec<f64>> = HashMap::default();
         for ((sector, _issuer, _tenor), amount) in bucketed {
             let weight = weight_for(*sector);
@@ -659,10 +631,8 @@ impl SimmCalculator {
 
         let rho = self.params.cq_intra_bucket_correlation;
 
-        // Compute K_b and S_b (capped) for each bucket.
         let mut bucket_results: Vec<(SimmCreditSector, f64, f64)> = Vec::new();
         for (sector, weighted_sensitivities) in &by_sector {
-            // Per-bucket concentration factor on the raw net weighted sum.
             let raw_net: f64 = weighted_sensitivities.iter().sum();
             let cf = if apply_concentration {
                 self.params.cq_concentration_factor(*sector, raw_net)
@@ -672,9 +642,7 @@ impl SimmCalculator {
 
             // K_b = sqrt(sum_i sum_j rho_ij * (CR*WS_i) * (CR*WS_j))
             //     = |CR| * sqrt(sum_i sum_j rho_ij * WS_i * WS_j)
-            // Build it from the scaled WS directly for clarity.
             let mut scaled: Vec<f64> = weighted_sensitivities.iter().map(|ws| ws * cf).collect();
-            // Canonical order so the intra-bucket f64 quadratic form is reproducible.
             scaled.sort_by(f64::total_cmp);
             let k_b = correlated_norm(&scaled, |_, _| rho);
 
@@ -685,12 +653,9 @@ impl SimmCalculator {
             bucket_results.push((*sector, k_b, s_b));
         }
 
-        // Canonical bucket order so the inter-bucket f64 reduction is
-        // reproducible regardless of `HashMap` iteration order.
         bucket_results.sort_by_key(|(sector, _, _)| *sector as u8);
 
-        // Inter-bucket aggregation:
-        //   K = sqrt(sum_b K_b^2 + sum_{b != c} gamma_bc * S_b * S_c)
+        // Inter-bucket: K = sqrt(sum_b K_b^2 + sum_{b != c} gamma_bc * S_b * S_c)
         let ks: Vec<(f64, f64)> = bucket_results.iter().map(|&(_, k, s)| (k, s)).collect();
         inter_bucket_pairwise(&ks, |i, j| {
             self.params

@@ -321,8 +321,6 @@ mod tests {
         }
     }
 
-    // -- rBergomi spot martingale property ---------------------------------
-
     /// Spot martingale test: with `r = q = 0` the discounted spot
     /// `E[S_T] = S_0` must hold under the rBergomi dynamics, even with a large
     /// vol-of-vol `η` and a strong leverage `ρ`.
@@ -396,8 +394,6 @@ mod tests {
             );
         }
     }
-
-    // -- rBergomi forward-variance (martingale) property -------------------
 
     /// Martingale test: under the rBergomi variance reconstruction
     /// `V_t = ξ₀(t)·exp(η·Ỹ_t − ½η²t^{2H})`, the forward-variance property

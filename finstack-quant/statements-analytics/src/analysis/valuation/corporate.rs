@@ -293,8 +293,6 @@ pub fn evaluate_dcf_with_market(
     Ok(result)
 }
 
-// DCF sensitivity (tornado)
-
 /// Tornado parameter id for the discount-rate shock.
 const SENSITIVITY_PARAM_WACC: &str = "wacc";
 /// Tornado parameter id for the terminal growth-rate shock.
@@ -585,8 +583,6 @@ pub fn dcf_sensitivity(
         terminal_growth_up_clamped,
     })
 }
-
-// Cost of capital
 
 /// Tolerance applied when checking that the capital weights sum to one.
 ///
@@ -925,8 +921,6 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         calculate_net_debt_from_model(model, results, net_debt_period)?
     };
 
-    // Create DCF instrument.
-    //
     // The discount curve id is risk-attribution metadata only: the DCF
     // pricer always discounts every component (explicit flows, terminal
     // value, equity) at the WACC. The conventional "{CCY}-DISCOUNT" name
@@ -960,14 +954,12 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         .build()
         .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
 
-    // Calculate valuation
     let default_market = MarketContext::default();
     let market_ref = context.market.unwrap_or(&default_market);
     let equity_value = dcf
         .value(market_ref, valuation_date)
         .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
 
-    // Calculate components for result
     let pv_explicit = dcf.calculate_pv_explicit_flows();
     let tv = dcf
         .calculate_terminal_value()
@@ -977,8 +969,6 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         .map_err(|e| finstack_quant_statements::error::Error::Eval(e.to_string()))?;
     let enterprise_value = pv_explicit + pv_terminal;
 
-    // Record base valuation in the explanation trace
-    // Compute per-share metrics if shares outstanding is set
     let equity_val = equity_value.amount();
     let equity_value_per_share = dcf.equity_value_per_share(equity_val);
     let diluted_shares = dcf.diluted_shares(equity_val);

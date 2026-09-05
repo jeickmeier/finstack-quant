@@ -1,9 +1,7 @@
 //! Binomial tree models for option pricing.
 //!
-//! Implements various binomial tree methods including Cox-Ross-Rubinstein (CRR)
-//! and Leisen-Reimer for American and Bermudan option pricing.
-//!
-//! Now includes generic TreeModel implementation for pricing arbitrary instruments.
+//! Implements Cox-Ross-Rubinstein (CRR) and Leisen-Reimer binomial trees
+//! for American and Bermudan options via the generic [`TreeModel`] engine.
 
 use crate::trees::NodeState;
 use crate::types::{OptionMarketParams, OptionType};
@@ -290,7 +288,6 @@ impl BinomialTree {
         market_params: &OptionMarketParams,
         exercise_steps: Option<&[usize]>,
     ) -> Result<f64> {
-        // Compute lattice parameters honoring the configured binomial model
         let factors = self.calculate_parameters(
             market_params.spot,
             market_params.strike,
@@ -478,10 +475,7 @@ impl BinomialTree {
         self.price_with_exercise(market_params, Some(&steps))
     }
 
-    /// Generic pricing engine for arbitrary instruments
-    ///
-    /// This method implements the TreeModel trait, providing a flexible
-    /// interface for pricing any instrument that implements TreeValuator.
+    /// Generic [`TreeModel`] pricing for an arbitrary [`TreeValuator`].
     ///
     /// **Leisen-Reimer note:** this generic path has no spot/strike, so it
     /// calls `calculate_parameters` with `spot = strike = 0.0`. A tree
@@ -507,7 +501,6 @@ impl BinomialTree {
             .get(state_keys::VOLATILITY)
             .ok_or_else(|| Error::internal("binomial tree requires initial volatility"))?;
 
-        // Calculate binomial parameters and delegate to the shared engine
         let factors = self.calculate_parameters(0.0, 0.0, r, sigma, time_to_maturity, q)?;
         self.induct(
             factors,
@@ -539,10 +532,8 @@ mod tests {
 
     #[test]
     fn test_crr_european_converges_to_black_scholes() {
-        // Test that CRR converges to Black-Scholes for European options
         let market_params = OptionMarketParams::call(100.0, 100.0, 0.05, 0.20, 1.0);
 
-        // Calculate with increasing steps
         let tree_50 = BinomialTree::crr(50);
         let tree_200 = BinomialTree::crr(200);
 
@@ -553,8 +544,7 @@ mod tests {
             .price_european(&market_params)
             .expect("should succeed");
 
-        // With higher steps, should be closer to Black-Scholes (approximately 10.45)
-        // Note: Binomial trees don't always converge monotonically due to discrete step effects
+        // Binomial trees need not converge monotonically (odd/even oscillation).
         let bs_value = 10.45;
         let error_50 = (price_50 - bs_value).abs();
         let error_200 = (price_200 - bs_value).abs();
@@ -571,13 +561,11 @@ mod tests {
             error_200
         );
 
-        // Should be close to Black-Scholes (approximately 10.45)
         assert!((price_200 - 10.45).abs() < 0.15);
     }
 
     #[test]
     fn test_leisen_reimer_better_convergence() {
-        // Test that Leisen-Reimer converges faster than CRR
         let market_params = OptionMarketParams::call(100.0, 100.0, 0.05, 0.20, 1.0);
 
         let crr = BinomialTree::crr(401);
@@ -586,10 +574,7 @@ mod tests {
         let crr_price = crr.price_european(&market_params).expect("should succeed");
         let lr_price = lr.price_european(&market_params).expect("should succeed");
 
-        // Both should be close to Black-Scholes value
-        let bs_value = 10.4506; // Known Black-Scholes value
-
-        // CRR should be reasonably close to Black-Scholes
+        let bs_value = 10.4506;
         assert!(
             (crr_price - bs_value).abs() < 1.0,
             "CRR price {} should be close to BS value {}, diff={}",
@@ -598,8 +583,6 @@ mod tests {
             (crr_price - bs_value).abs()
         );
 
-        // LR should be within 10c of Black-Scholes at higher odd steps
-        // (relaxed from 5c to account for numerical variations)
         assert!(
             (lr_price - bs_value).abs() < 0.10,
             "LR(401) price {} should be within 10c of BS {}, diff={}",
@@ -611,13 +594,12 @@ mod tests {
 
     #[test]
     fn test_leisen_reimer_converges_put() {
-        // Validate LR convergence for put via put-call parity
         let market_params = OptionMarketParams::put(100.0, 100.0, 0.05, 0.20, 1.0);
 
         let lr = BinomialTree::leisen_reimer(201);
         let lr_put = lr.price_european(&market_params).expect("should succeed");
 
-        // BS call value known; derive put via parity: P = C - S e^{-qT} + K e^{-rT}
+        // P = C − S e^{−qT} + K e^{−rT}
         let bs_call = 10.4506;
         let bs_put = bs_call
             - market_params.spot
@@ -635,7 +617,6 @@ mod tests {
 
     #[test]
     fn test_leisen_reimer_parameter_sanity_edges() {
-        // Check probability and u/d bounds for short maturities and edge vols
         let spot = 100.0;
         let strike = 100.0;
         let r = 0.02;
@@ -643,7 +624,7 @@ mod tests {
         let t_small = 1e-3;
 
         for &sigma in &[0.01, 0.10, 0.50] {
-            let tree = BinomialTree::leisen_reimer(51); // prefer odd steps
+            let tree = BinomialTree::leisen_reimer(51);
             let (u, d, p) = tree
                 .calculate_parameters(spot, strike, r, sigma, t_small, q)
                 .expect("LR params should compute");

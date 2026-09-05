@@ -9,13 +9,9 @@ use finstack_quant_core::market_data::hierarchy::{
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{HashMap, HashSet};
 
-/// Tracks a hierarchy-expanded operation with metadata needed for deduplication.
 struct HierarchyExpansion {
-    /// Depth of the matched hierarchy node (deeper = more specific).
     matched_depth: usize,
-    /// The expanded direct operation.
     operation: OperationSpec,
-    /// Operation family + identifier used for resolution-mode deduplication.
     key: HierarchyExpansionKey,
 }
 
@@ -112,8 +108,6 @@ fn dedup_matches_keep_deepest(matches: Vec<HierarchyResolvedMatch>) -> Vec<Hiera
     out
 }
 
-/// Returns `true` if any operation is a hierarchy-targeted variant.
-#[inline]
 fn has_hierarchy_op(operations: &[OperationSpec]) -> bool {
     operations.iter().any(|op| {
         matches!(
@@ -126,9 +120,7 @@ fn has_hierarchy_op(operations: &[OperationSpec]) -> bool {
     })
 }
 
-/// Result of `expand_hierarchy_operations`: the (possibly-borrowed) list of
-/// direct operations plus any warnings that should be appended to the
-/// `ApplicationReport` (currently only [`Warning::HierarchyNoMatch`]).
+/// Direct operations after hierarchy expansion, plus any skip/no-match warnings.
 pub(super) struct ExpansionOutcome<'a> {
     pub(super) operations: std::borrow::Cow<'a, [OperationSpec]>,
     pub(super) warnings: Vec<Warning>,
@@ -151,15 +143,7 @@ fn expand_matches(
         .collect()
 }
 
-/// Drop hierarchy-resolved identifiers that do not exist in the market
-/// collection the operation targets, emitting a
-/// [`Warning::HierarchyResolvedIdSkipped`] per dropped id.
-///
-/// Hierarchy nodes share a single `curve_ids` collection across curves, vol
-/// surfaces, equity prices, and base-correlation surfaces. Without this
-/// filter, a node grouping mixed content would expand into direct operations
-/// that hard-error with `MarketDataNotFound` mid-apply — the wrong failure
-/// mode for machine-derived ids the user never typed.
+/// Skip hierarchy-resolved ids that are not in this operation's market collection.
 fn retain_existing_targets(
     matches: Vec<HierarchyResolvedMatch>,
     op_kind: &str,
@@ -180,7 +164,6 @@ fn retain_existing_targets(
     kept
 }
 
-/// Whether `id` exists in the market collection corresponding to `curve_kind`.
 fn curve_kind_target_exists(
     market: &finstack_quant_core::market_data::context::MarketContext,
     curve_kind: CurveKind,
@@ -197,20 +180,10 @@ fn curve_kind_target_exists(
 
 /// Expand hierarchy-targeted operations into direct-targeted operations.
 ///
-/// Errors if the spec contains hierarchy operations but the market context has
-/// no hierarchy attached — that combination would otherwise silently produce
-/// `operations_applied = 0` and a "not supported" warning, which is too quiet
-/// for a stress system.
-///
-/// When a hierarchy target resolves to zero curves the operation is dropped
-/// from the expanded list and a [`Warning::HierarchyNoMatch`] is emitted so
-/// the caller can detect the (likely-unintended) no-op. Resolved identifiers
-/// that exist in the hierarchy but not in the market collection the operation
-/// targets are skipped with a [`Warning::HierarchyResolvedIdSkipped`] instead
-/// of aborting the scenario at apply time.
-///
-/// Returns a borrowed slice equivalent (via `Cow`) when the input contains no
-/// hierarchy variants, avoiding an unnecessary clone of the operation list.
+/// Errors if the spec contains hierarchy operations but the market has no
+/// hierarchy attached. Zero-curve matches emit [`Warning::HierarchyNoMatch`];
+/// identifiers that exist in the hierarchy but not in the targeted market
+/// collection emit [`Warning::HierarchyResolvedIdSkipped`] instead of aborting.
 pub(super) fn expand_hierarchy_operations<'a>(
     operations: &'a [OperationSpec],
     market: &finstack_quant_core::market_data::context::MarketContext,

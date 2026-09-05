@@ -60,8 +60,6 @@ impl std::fmt::Display for Stage {
     }
 }
 
-// Qualitative flags
-
 /// Qualitative triggers for SICR detection (IFRS 9 B5.5.17) and
 /// "unlikely-to-pay" evidence of default (IFRS 9 B5.5.37).
 ///
@@ -366,8 +364,6 @@ impl Exposure {
         ead_revolver(drawn, self.undrawn, self.ccf)
     }
 }
-
-// PD Term Structure trait
 
 /// Abstraction over PD term structure sources.
 ///

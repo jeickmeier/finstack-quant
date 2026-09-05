@@ -4,22 +4,10 @@ use crate::types::{EntityId, PositionId};
 use finstack_quant_core::currency::Currency;
 use thiserror::Error;
 
-/// Convenience result type used throughout the portfolio crate.
-///
-/// This alias helps reduce boilerplate when returning [`enum@Error`].
+/// Result type used throughout the portfolio crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Errors that can occur during portfolio operations.
-///
-/// Each variant captures the context needed to diagnose failures when building,
-/// validating, or valuing a portfolio.
-///
-/// # Derive policy
-///
-/// All Finstack Quant domain error types that may cross FFI boundaries (Python/WASM)
-/// derive `Serialize`/`Deserialize`. `PartialEq` is included for ergonomic
-/// assertions in tests. Infrastructure errors that wrap opaque driver types
-/// may opt out of `Serialize` and `PartialEq`.
 #[derive(Debug, Clone, PartialEq, Error, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -93,10 +81,6 @@ impl Error {
     /// # Arguments
     ///
     /// * `msg` - Human-readable description of the validation failure.
-    ///
-    /// # Returns
-    ///
-    /// [`Error::ValidationFailed`] carrying the supplied message.
     pub fn validation(msg: impl Into<String>) -> Self {
         Self::ValidationFailed(msg.into())
     }
@@ -107,10 +91,6 @@ impl Error {
     ///
     /// * `position_id` - Position that triggered the valuation failure.
     /// * `msg` - Human-readable error detail.
-    ///
-    /// # Returns
-    ///
-    /// [`Error::ValuationError`] carrying position context and the supplied message.
     pub fn valuation(position_id: impl Into<PositionId>, msg: impl Into<String>) -> Self {
         Self::ValuationError {
             position_id: position_id.into(),
@@ -123,10 +103,6 @@ impl Error {
     /// # Arguments
     ///
     /// * `msg` - Description of the bad caller input.
-    ///
-    /// # Returns
-    ///
-    /// [`Error::InvalidInput`] carrying the supplied message.
     pub fn invalid_input(msg: impl Into<String>) -> Self {
         Self::InvalidInput(msg.into())
     }
@@ -139,10 +115,6 @@ impl Error {
     ///   `"positions"`.
     /// * `found` - Observed byte or item count that exceeded the bound.
     /// * `limit` - Configured maximum byte or item count.
-    ///
-    /// # Returns
-    ///
-    /// [`Error::ContractLimitExceeded`] retaining structured limit context.
     pub fn contract_limit_exceeded(what: impl Into<String>, found: usize, limit: usize) -> Self {
         Self::ContractLimitExceeded {
             what: what.into(),

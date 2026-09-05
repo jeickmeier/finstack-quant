@@ -56,7 +56,9 @@ pub enum StepperError {
     /// non-positive `dt` arises from a non-positive maturity, or from a
     /// degenerate time grid; in release builds it would otherwise propagate
     /// silently as NaN / inf rather than being caught by the `debug_assert`.
-    #[error("invalid time step: dt = {dt:e} must be strictly positive (t_from={t_from:e}, t_to={t_to:e})")]
+    #[error(
+        "invalid time step: dt = {dt:e} must be strictly positive (t_from={t_from:e}, t_to={t_to:e})"
+    )]
     NonPositiveStep {
         /// The non-positive step size.
         dt: f64,
@@ -348,21 +350,19 @@ fn theta_step(
 
     let is_homogeneous = problem.is_time_homogeneous();
 
-    // Assemble the operator at t_from (explicit side)
     let op_from = TridiagOperator::assemble(problem, grid, t_from);
 
     // Explicit part: y = (I + (1-theta)*dt * A_from) * u + (1-theta)*dt*(source + bc)
     let beta = (1.0 - theta) * dt;
     let mut rhs = op_from.apply_explicit(beta, u);
 
-    // If time-homogeneous, reuse op_from for the implicit side
     let op_to = if is_homogeneous {
         op_from
     } else {
         TridiagOperator::assemble(problem, grid, t_to)
     };
 
-    // Add implicit-side source and boundary corrections: theta * dt * (source_to + bc_to)
+    // Implicit-side source and boundary corrections: theta * dt * (source_to + bc_to)
     let alpha = theta * dt;
     op_to.add_implicit_corrections(alpha, &mut rhs);
 
@@ -418,13 +418,11 @@ mod tests {
         let grid = Grid1D::uniform(0.0, std::f64::consts::PI, n_space).expect("valid grid");
         let stepper = ThetaStepper::implicit(n_time);
 
-        // Initialize terminal condition (interior points only)
         let mut u: Vec<f64> = grid.points()[1..grid.n() - 1]
             .iter()
             .map(|&x| problem.terminal_condition(x))
             .collect();
 
-        // Step backward
         let levels = stepper.time_levels(t_mat);
         for i in 0..n_time {
             stepper
@@ -432,7 +430,6 @@ mod tests {
                 .expect("implicit step is unconditionally stable");
         }
 
-        // Compare with exact solution at t=0
         let exact_factor = (-t_mat).exp();
         let mid = grid.n_interior() / 2;
         let x_mid = grid.points()[mid + 1];
@@ -811,14 +808,12 @@ mod tests {
         let grid = Grid1D::uniform(0.0, std::f64::consts::PI, 11).expect("valid grid");
         let mut u = vec![1.0; grid.n_interior()];
 
-        // dt = 0 (t_from == t_to).
         let zero = ThetaStepper::implicit(1).step(&problem, &grid, &mut u, 0.3, 0.3, 0);
         assert!(
             matches!(zero, Err(StepperError::NonPositiveStep { dt, .. }) if dt == 0.0),
             "dt = 0 must be rejected as NonPositiveStep, got {zero:?}"
         );
 
-        // dt < 0 (t_from < t_to — a backward march with non-positive maturity).
         let neg = ThetaStepper::implicit(1).step(&problem, &grid, &mut u, 0.1, 0.4, 0);
         assert!(
             matches!(neg, Err(StepperError::NonPositiveStep { dt, .. }) if dt < 0.0),

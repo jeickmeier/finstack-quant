@@ -236,13 +236,13 @@ mod tests {
     fn test_empty_results() {
         let results = StatementResult::default();
 
-        let table_long = to_table_long(&results).expect("test should succeed");
+        let table_long = to_table_long(&results).unwrap();
         assert_eq!(table_long.row_count, 0);
         assert_eq!(table_long.columns.len(), 6);
         assert_eq!(nullable_float_column(&table_long, "value_money").len(), 0);
         assert_eq!(nullable_string_column(&table_long, "currency").len(), 0);
 
-        let table_wide = to_table_wide(&results).expect("test should succeed");
+        let table_wide = to_table_wide(&results).unwrap();
         assert_eq!(table_wide.row_count, 0);
         assert_eq!(table_wide.columns.len(), 1);
     }

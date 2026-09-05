@@ -305,8 +305,8 @@ host twin; both bindings go through the string/JSON entry points.
 ## Tests
 
 [`tests/transforms.rs`](tests/transforms.rs) is the single integration suite; it
-covers every op in the tables above plus the validation errors. The crate has no
-benchmarks.
+covers every op in the tables above plus the validation errors. Criterion
+targets live under [`benches/`](benches).
 
 ## Verification
 

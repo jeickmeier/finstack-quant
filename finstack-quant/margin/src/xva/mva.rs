@@ -476,8 +476,6 @@ mod tests {
         }
     }
 
-    // ── decay factors ─────────────────────────────────────────────
-
     #[test]
     fn decay_factors_match_definitions() {
         assert!((ImDecayProfile::Constant.factor(7.3) - 1.0).abs() < 1e-15);
@@ -508,8 +506,6 @@ mod tests {
         .is_err());
         assert!(ImDecayProfile::Constant.validate().is_ok());
     }
-
-    // ── im_profile_from_simm ──────────────────────────────────────
 
     #[test]
     fn im_profile_from_simm_scales_base_im_by_decay() {
@@ -543,8 +539,6 @@ mod tests {
         assert!(im_profile_from_simm(&calc, &sens, Currency::USD, &decay, &[1.0, 0.5]).is_err());
         assert!(im_profile_from_simm(&calc, &sens, Currency::USD, &decay, &[0.0, 1.0]).is_err());
     }
-
-    // ── compute_mva ───────────────────────────────────────────────
 
     #[test]
     fn mva_flat_spread_zero_rates_no_survival() {

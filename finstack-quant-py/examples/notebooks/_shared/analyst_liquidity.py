@@ -25,9 +25,6 @@ def liquidity_panel() -> pd.DataFrame:
         fraction of mid price. Cash has no liquidation spread; the unquoted
         term loan has unavailable capacity, represented by NaN rather than zero.
 
-    Notes:
-        This deterministic fixture does not raise exceptions.
-
     >>> len(liquidity_panel())
     8
     """
@@ -69,10 +66,7 @@ def position_factor_panel() -> pd.DataFrame:
         benchmark and risk-free columns on identical dates. Position values are
         modeled P&L divided by fixed risk capital, not actual investment returns
         or the three-period book history. For derivatives this denominator avoids
-        division by a near-zero PV. Factor loadings are disclosed teaching inputs.
-
-    Notes:
-        This deterministic fixture does not raise exceptions.
+        division by a near-zero PV.         Factor loadings are disclosed teaching inputs.
 
     >>> position_factor_panel().index.is_unique
     True

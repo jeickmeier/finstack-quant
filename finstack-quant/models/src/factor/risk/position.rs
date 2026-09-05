@@ -59,9 +59,9 @@ pub struct DecompositionConfig {
 impl DecompositionConfig {
     /// Parametric configuration at an arbitrary confidence level.
     ///
-    /// This is the canonical constructor behind the binding entry points
-    /// (`parametric_var_decomposition` / `parametric_es_decomposition`), which
-    /// accept the confidence directly rather than mutating a preset.
+    /// Binding entry points (`parametric_var_decomposition` /
+    /// `parametric_es_decomposition`) accept the confidence directly rather than
+    /// mutating a preset.
     ///
     /// # Arguments
     ///
@@ -664,7 +664,6 @@ impl ParametricPositionDecomposer {
 
         let n = weights.len();
 
-        // Empty portfolio.
         if n == 0 {
             return Ok(PositionRiskDecomposition {
                 portfolio_var: 0.0,
@@ -729,7 +728,6 @@ impl ParametricPositionDecomposer {
             0.0
         };
 
-        // Per-position decomposition.
         let mut var_contributions = Vec::with_capacity(n);
         let mut es_contributions = Vec::with_capacity(n);
         // Accumulated inline (ascending position order) so the Euler residual
@@ -937,7 +935,6 @@ impl HistoricalPositionDecomposer {
             )));
         }
 
-        // Compute portfolio P&L for each scenario.
         let mut portfolio_pnls: Vec<(usize, f64)> = (0..n_scenarios)
             .map(|s| {
                 let row_start = s * n;
@@ -1080,7 +1077,6 @@ mod tests {
         let decomposer = ParametricPositionDecomposer;
         let result = decomposer.decompose_positions(&weights, &covariance, &ids, &config)?;
 
-        // sum(component_var) must equal portfolio_var.
         let sum_cvar: f64 = result
             .var_contributions
             .iter()
@@ -1092,7 +1088,6 @@ mod tests {
             result.portfolio_var
         );
 
-        // sum(relative_var) must equal 1.0.
         let sum_rel: f64 = result
             .var_contributions
             .iter()
@@ -1103,7 +1098,6 @@ mod tests {
             "relative VaR sum failed: {sum_rel}"
         );
 
-        // Euler residual should be Some(~0) in parametric mode.
         let residual = result
             .euler_residual
             .expect("parametric decomposition must report euler_residual");
@@ -1247,7 +1241,6 @@ mod tests {
         let decomposer = ParametricPositionDecomposer;
         let result = decomposer.decompose_positions(&weights, &covariance, &ids, &config)?;
 
-        // All component VaRs should be equal.
         let first_cvar = result.var_contributions[0].component_var;
         for c in &result.var_contributions {
             assert!(
@@ -1257,7 +1250,6 @@ mod tests {
             );
         }
 
-        // Each relative VaR should be 1/n.
         for c in &result.var_contributions {
             assert!(
                 (c.relative_var - w).abs() < 1e-12,
@@ -1279,16 +1271,14 @@ mod tests {
         let decomposer = ParametricPositionDecomposer;
         let result = decomposer.decompose_positions(&weights, &covariance, &ids, &config)?;
 
-        // Component VaR == portfolio VaR.
         assert!((result.var_contributions[0].component_var - result.portfolio_var).abs() < 1e-12);
 
-        // Marginal VaR == portfolio VaR (single position, weight = 1).
+        // Single-position, weight = 1: marginal VaR equals portfolio VaR.
         let mvar = result.var_contributions[0]
             .marginal_var
             .expect("parametric: marginal_var must be Some");
         assert!((mvar - result.portfolio_var).abs() < 1e-12);
 
-        // Incremental VaR == portfolio VaR.
         let ivar = result.var_contributions[0]
             .incremental_var
             .unwrap_or(f64::NAN);
@@ -1298,7 +1288,6 @@ mod tests {
             result.portfolio_var
         );
 
-        // Relative VaR == 1.0.
         assert!((result.var_contributions[0].relative_var - 1.0).abs() < 1e-12);
 
         Ok(())
@@ -1423,7 +1412,6 @@ mod tests {
     fn euler_exhaustion_five_positions() -> TestResult {
         // 5-position portfolio with a realistic covariance structure.
         let weights = [0.15, 0.25, 0.20, 0.25, 0.15];
-        // Build a PSD covariance matrix from a Cholesky factor.
         let n = 5;
         // Lower triangular L (hand-crafted to ensure PSD).
         #[rustfmt::skip]
@@ -1549,7 +1537,6 @@ mod tests {
         let decomposer = ParametricPositionDecomposer;
         let result = decomposer.decompose_positions(&weights, &covariance, &ids, &config)?;
 
-        // All incremental VaRs should be present.
         for c in &result.var_contributions {
             assert!(
                 c.incremental_var.is_some(),
@@ -1558,7 +1545,6 @@ mod tests {
             );
         }
 
-        // Incremental VaRs should be finite.
         for c in &result.var_contributions {
             let ivar = c.incremental_var.unwrap_or(f64::NAN);
             assert!(

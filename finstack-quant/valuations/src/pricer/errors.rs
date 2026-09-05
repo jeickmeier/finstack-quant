@@ -32,9 +32,6 @@ impl PricingErrorContext {
 
     /// Create context from an instrument, capturing ID and type.
     ///
-    /// This is a convenience method to reduce boilerplate when building
-    /// error context in pricer implementations.
-    ///
     /// # Example
     ///
     /// ```
@@ -331,8 +328,11 @@ impl PricingError {
     ///
     /// # Arguments
     ///
-    /// * `err` - Err used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `context` - Market or evaluation context supplying dependencies required by the calculation.
+    /// * `err` - Core error to classify. Lookup misses become [`Self::MissingMarketData`],
+    ///   validation failures become [`Self::InvalidInput`], and computation or calibration
+    ///   failures become [`Self::ModelFailure`].
+    /// * `context` - Instrument, model, and curve identifiers attached to the resulting
+    ///   pricing error for diagnostics.
     pub fn from_core(err: finstack_quant_core::Error, context: PricingErrorContext) -> Self {
         match err {
             finstack_quant_core::Error::Input(input) => match input {

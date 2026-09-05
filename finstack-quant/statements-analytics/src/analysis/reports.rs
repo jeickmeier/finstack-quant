@@ -1,13 +1,5 @@
-//! Convenience reporting for financial statements.
-//!
-//! This module provides human-friendly formatted reports for common statement
-//! analysis tasks.
-//!
-//! # Features
-//!
-//! - **Table Formatting** - ASCII and Markdown table builders
-//! - **P&L Reports** - Summary views for income statements
-//! - **Credit Assessment** - Credit metric reports
+//! Convenience reporting for financial statements: ASCII P&L summaries and
+//! structured credit-assessment views over evaluated statement results.
 //!
 //! # Examples
 //!
@@ -30,34 +22,13 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Write as FmtWrite};
 
-// Table Formatting
-
-/// Alignment options for table columns.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) enum Alignment {
-    /// Left-aligned
     #[default]
     Left,
-    /// Right-aligned
     Right,
 }
 
-/// Builder for ASCII tables.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// use finstack_quant_statements_analytics::analysis::reports::{TableBuilder, Alignment};
-///
-/// let mut table = TableBuilder::new();
-/// table.add_header("Name");
-/// table.add_header_with_alignment("Value", Alignment::Right);
-/// table.add_row(vec!["Revenue".to_string(), "$100M".to_string()]);
-/// table.add_row(vec!["COGS".to_string(), "$40M".to_string()]);
-///
-/// let ascii = table.build();
-/// println!("{}", ascii);
-/// ```
 #[derive(Debug, Clone)]
 pub(crate) struct TableBuilder {
     headers: Vec<String>,
@@ -66,7 +37,6 @@ pub(crate) struct TableBuilder {
 }
 
 impl TableBuilder {
-    /// Create a new table builder.
     pub fn new() -> Self {
         Self {
             headers: Vec::new(),
@@ -75,39 +45,20 @@ impl TableBuilder {
         }
     }
 
-    /// Add a column header.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Column header text
     pub fn add_header(&mut self, name: impl Into<String>) {
         self.headers.push(name.into());
         self.alignment.push(Alignment::Left);
     }
 
-    /// Add a column header with specific alignment.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Column header text
-    /// * `alignment` - Column alignment
     pub fn add_header_with_alignment(&mut self, name: impl Into<String>, alignment: Alignment) {
         self.headers.push(name.into());
         self.alignment.push(alignment);
     }
 
-    /// Add a data row.
-    ///
-    /// # Arguments
-    ///
-    /// * `cells` - Vector of cell values
     pub fn add_row(&mut self, cells: Vec<String>) {
         self.rows.push(cells);
     }
 
-    /// Build ASCII table.
-    ///
-    /// Returns a formatted ASCII table with box-drawing characters.
     #[allow(clippy::expect_used)] // write! to String is infallible
     pub fn build(&self) -> String {
         if self.headers.is_empty() {
@@ -115,11 +66,8 @@ impl TableBuilder {
         }
 
         let mut output = String::new();
-
-        // Calculate column widths
         let widths = self.calculate_column_widths();
 
-        // Top border
         self.write_border(&mut output, &widths, "┌", "┬", "┐");
         output.push('\n');
 
@@ -131,11 +79,9 @@ impl TableBuilder {
         }
         output.push('\n');
 
-        // Header separator
         self.write_border(&mut output, &widths, "├", "┼", "┤");
         output.push('\n');
 
-        // Data rows
         for row in &self.rows {
             output.push('│');
             for (i, cell) in row.iter().enumerate() {
@@ -153,7 +99,6 @@ impl TableBuilder {
             output.push('\n');
         }
 
-        // Bottom border
         self.write_border(&mut output, &widths, "└", "┴", "┘");
 
         output
@@ -211,8 +156,6 @@ impl Default for TableBuilder {
         Self::new()
     }
 }
-
-// P&L Summary Report
 
 /// P&L summary report.
 ///
@@ -307,13 +250,11 @@ impl fmt::Display for PLSummaryReport<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut table = TableBuilder::new();
 
-        // Header row with periods
         table.add_header("Line Item");
         for period in &self.periods {
             table.add_header_with_alignment(period.to_string(), Alignment::Right);
         }
 
-        // Data rows
         for line_item in &self.line_items {
             let mut row = vec![line_item.clone()];
             for period in &self.periods {
@@ -331,8 +272,6 @@ impl fmt::Display for PLSummaryReport<'_> {
         write!(formatter, "P&L Summary\n\n{}", table.build())
     }
 }
-
-// Shared credit metric helpers
 
 /// Trailing-twelve-month sum of `node_id` ending at (and including) `at`.
 ///
@@ -472,8 +411,6 @@ impl CreditAssessment {
         }
     }
 }
-
-// Credit Assessment Report
 
 /// Credit assessment report.
 ///

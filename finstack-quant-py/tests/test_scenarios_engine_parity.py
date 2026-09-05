@@ -28,10 +28,12 @@ from finstack_quant.scenarios import (
     ScenarioSpec,
     TenorMatchMode,
     TimeRollMode,
+    apply_scenario,
     apply_scenario_to_market,
     compute_horizon_return,
     validate_scenario_spec,
 )
+from finstack_quant.valuations.instruments import Bond
 
 AS_OF = "2025-01-15"
 
@@ -345,9 +347,6 @@ def test_rate_binding_spec_equality_and_validation() -> None:
 
 @pytest.mark.parametrize("with_model", [False, True])
 def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) -> None:
-    from finstack_quant.scenarios import apply_scenario
-    from finstack_quant.valuations.instruments import Bond
-
     original = Bond.example()
     before = original.to_json()
     scenario = ScenarioSpec("losses", [OperationSpec.instrument_price_pct_by_type(["bond"], -60.0)] * 2)
@@ -373,7 +372,6 @@ def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) 
         payload = json.loads(restored.instruments[0])
         shock = payload["instrument"]["spec"]["scenario_pricing_overrides"]["scenario_price_shock_pct"]
         assert 100.0 * (1.0 + shock) == pytest.approx(16.0)
-        # Returned copies can be used directly in another scenario call.
         next_result = apply_scenario_to_market(
             ScenarioSpec("half", [OperationSpec.instrument_price_pct_by_type(["bond"], -50.0)]),
             _market(),

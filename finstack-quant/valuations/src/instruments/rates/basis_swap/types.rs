@@ -173,10 +173,11 @@ impl BasisSwap {
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
-    /// * `notional` - Trade notional amount in the instrument currency's major units
-    /// * `primary_leg` - Primary leg used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `reference_leg` - Reference leg used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `id` - Trade identifier stored on the instrument and used in results and serialization.
+    /// * `notional` - Swap notional in the shared leg currency; must be finite and strictly positive.
+    /// * `primary_leg` - Spread-receiving floating leg (dates, index, discount curve, and spread).
+    /// * `reference_leg` - Flat floating leg paid against the primary. Must use a different
+    ///   forward curve unless constructed with `new_allowing_same_curve`.
     pub fn new(
         id: impl Into<String>,
         notional: Money,

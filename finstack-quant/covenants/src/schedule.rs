@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Entries are stored sorted by date ascending. The effective threshold for a
 /// test date is the last entry with date <= test_date. If no entry applies,
-/// `threshold_for_date` returns `None`.
+/// [`ThresholdSchedule::threshold_for`] returns `None`.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ThresholdSchedule(Vec<(Date, f64)>);
 
@@ -70,33 +70,18 @@ impl ThresholdSchedule {
     /// * `test_date` - Covenant test date for which the latest threshold
     ///   effective on or before that date is required.
     pub fn threshold_for(&self, test_date: Date) -> Option<f64> {
-        threshold_for_date(self, test_date)
-    }
-}
-
-/// Resolve threshold for a given test date from a piecewise-constant schedule.
-///
-/// # Arguments
-///
-/// * `schedule` - Effective-date threshold schedule sorted in ascending date
-///   order; an empty schedule returns `None`.
-/// * `test_date` - Covenant test date for which the latest threshold effective
-///   on or before that date is required.
-pub(crate) fn threshold_for_date(schedule: &ThresholdSchedule, test_date: Date) -> Option<f64> {
-    if schedule.0.is_empty() {
-        return None;
-    }
-    debug_assert!(
-        schedule.0.windows(2).all(|w| w[0].0 <= w[1].0),
-        "ThresholdSchedule entries must be sorted by date ascending"
-    );
-    let mut last: Option<f64> = None;
-    for (d, v) in &schedule.0 {
-        if *d <= test_date {
-            last = Some(*v);
-        } else {
-            break;
+        debug_assert!(
+            self.0.windows(2).all(|w| w[0].0 <= w[1].0),
+            "ThresholdSchedule entries must be sorted by date ascending"
+        );
+        let mut last = None;
+        for (d, v) in &self.0 {
+            if *d <= test_date {
+                last = Some(*v);
+            } else {
+                break;
+            }
         }
+        last
     }
-    last
 }

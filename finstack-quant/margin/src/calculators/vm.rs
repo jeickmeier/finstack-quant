@@ -162,10 +162,6 @@ impl VmCalculator {
         }
 
         let vm_params = &self.csa.vm_params;
-
-        // Single source of truth for the threshold + IA formula. Both
-        // the reported net_exposure and the margin call are derived
-        // from VmParameters so the two cannot silently drift.
         let net_exposure_money = vm_params.required_credit_support(exposure)?;
         let exp = exposure.amount();
 
@@ -180,8 +176,6 @@ impl VmCalculator {
             }
             std::cmp::Ordering::Less => {
                 let abs_amt = Money::new(net_call.amount().abs(), currency)?;
-                // Negative credit support: return excess collateral when exposure ≥ 0;
-                // post margin to counterparty when exposure < 0 (bilateral netting).
                 if exp >= 0.0 {
                     (Money::from((0_i64, currency)), abs_amt)
                 } else {
@@ -194,7 +188,6 @@ impl VmCalculator {
             ),
         };
 
-        // Calculate settlement date
         let settlement_date = self.calculate_settlement_date(as_of)?;
 
         Ok(VmResult {

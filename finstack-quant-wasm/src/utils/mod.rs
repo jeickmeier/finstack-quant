@@ -184,13 +184,6 @@ pub fn to_js_err(e: impl IntoJsError) -> JsValue {
     structured_js_error("FinstackError", &e.js_message(), Some(e.js_kind()), None)
 }
 
-/// Convert a typed `finstack_quant_core::Error` into a structured `JsValue`
-/// error. Identical to [`to_js_err`]; kept for call sites that hold a
-/// reference.
-pub fn to_js_err_core(e: &finstack_quant_core::Error) -> JsValue {
-    to_js_err(e)
-}
-
 /// Convert an error with a `source()` chain into a structured `JsValue` error.
 pub fn to_js_error(e: &dyn std::error::Error) -> JsValue {
     js_value_from_message(format_error_chain(e))

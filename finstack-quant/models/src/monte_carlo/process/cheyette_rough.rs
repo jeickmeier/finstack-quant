@@ -369,8 +369,6 @@ mod tests {
         vec![(0.0, 0.02), (5.0, 0.025), (30.0, 0.03)]
     }
 
-    // -- Parameter validation -----------------------------------------------
-
     #[test]
     fn test_valid_params() {
         let params = CheyetteRoughVolParams::new(
@@ -571,8 +569,6 @@ mod tests {
         assert!(res.is_err());
     }
 
-    // -- Phi interpolation -------------------------------------------------
-
     #[test]
     fn test_phi_flat_extrapolation_left() {
         let params = CheyetteRoughVolParams::new(
@@ -635,8 +631,6 @@ mod tests {
         assert!((params.phi(0.0) - 0.02).abs() < 1e-15);
         assert!((params.phi(10.0) - 0.02).abs() < 1e-15);
     }
-
-    // -- Process dimensions -------------------------------------------------
 
     #[test]
     fn test_process_dim() {

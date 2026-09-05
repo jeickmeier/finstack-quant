@@ -1,9 +1,7 @@
-//! Covenant forward-projection with headroom analytics.
+//! Generic covenant forecasting driven by [`ModelTimeSeries`].
 //!
-//! This module provides generic covenant forecasting that can be driven by any
-//! time-series model implementing the [`ModelTimeSeries`] trait. Statement-model
-//! adapters live in `finstack-quant-statements-analytics` so this crate has no
-//! statements dependency.
+//! Statement-model adapters live in `finstack-quant-statements-analytics` so
+//! this crate has no statements dependency.
 
 use crate::engine::{
     headroom_for, is_covenant_breached, spec_metric_names, springing_condition_met, BoundKind,
@@ -211,11 +209,6 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
     }
 
     validate_config(&config)?;
-    // The point-in-time path validates via `CovenantEngine::evaluate`; the
-    // forecast path had no equivalent, so a non-finite threshold reached the
-    // model. `3.0 > NaN` is false => "not breached", and `headroom_for` returns
-    // NaN => `None`, indistinguishable from an inactive covenant. A garbage
-    // threshold produced a clean bill of health.
     covenant.validate()?;
 
     let id = covenant.covenant.instance_key();
@@ -254,11 +247,10 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
         let date = model.period_end_date(pid);
         test_dates.push(date);
 
-        // Threshold: schedule > static base
         let thr = covenant
             .threshold_schedule
             .as_ref()
-            .and_then(|s| crate::schedule::threshold_for_date(s, date))
+            .and_then(|s| s.threshold_for(date))
             .unwrap_or(base_threshold);
         thresholds.push(thr);
 
@@ -278,7 +270,6 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
         values.push(v);
     }
 
-    // Deterministic headroom and breach flag
     let mut headroom: Vec<Option<f64>> = values
         .iter()
         .zip(thresholds.iter())
@@ -290,9 +281,6 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
         })
         .collect();
 
-    // A NaN projected metric (e.g. a leverage ratio whose EBITDA denominator
-    // collapsed through zero) is indeterminate. Mirror the point-in-time
-    // engine convention (`CovenantEngine::evaluate_spec`): NaN ⇒ breached.
     let mut deterministic_breach_prob: Vec<f64> = values
         .iter()
         .zip(thresholds.iter())
@@ -312,10 +300,6 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
     let mut breach_probability = deterministic_breach_prob.clone();
     let mut breach_probability_stderr = vec![0.0_f64; values.len()];
 
-    // Stochastic overlay: GBM shock scaled by time horizon,
-    //   V(T) = base · exp(-0.5·σ²·T + σ·√T·Z),  T = years from ref date.
-    // num_paths == 0 → closed-form probabilities via norm_cdf;
-    // num_paths > 0  → path-consistent Monte Carlo with identical dynamics.
     if config.stochastic {
         let sigma = config.volatility.ok_or_else(|| {
             finstack_quant_core::Error::Validation(
@@ -336,9 +320,6 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
                 .unwrap_or(test_dates[0])
         });
 
-        // Classify each date: deterministic convention, or eligible for the
-        // lognormal overlay (analytic or MC). The conventions are identical
-        // in both stochastic sub-modes.
         let mut eligible: Vec<usize> = Vec::new();
         let mut horizons: Vec<f64> = Vec::new();
         for i in 0..values.len() {
@@ -349,14 +330,7 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
             let base = values[i];
             let thr = thresholds[i];
 
-            // The lognormal multiplicative shock `base · exp(...)` is only valid
-            // for a strictly positive base: the multiplier is always > 0, so for
-            // a non-positive base (e.g. a distressed name with negative EBITDA →
-            // negative coverage/leverage) the sign can never cross zero and the
-            // shock direction inverts, producing a backwards breach probability.
-            // Fall back to a deterministic assessment in that regime. A NaN
-            // base is indeterminate and follows the engine convention
-            // (NaN ⇒ breached, probability 1).
+            // Multiplicative lognormal shock is only valid for base > 0.
             if !base.is_finite() || base <= 0.0 {
                 let breached = is_covenant_breached(&covenant.covenant.covenant_type, base, thr);
                 breach_probability[i] = if breached { 1.0 } else { 0.0 };
@@ -477,9 +451,6 @@ pub fn forecast_breaches_generic<MTS: ModelTimeSeries>(
     periods: &[PeriodId],
     config: CovenantForecastConfig,
 ) -> Result<Vec<FutureBreach>> {
-    // Same gap as `forecast_covenant_generic`: this entry point validated
-    // nothing at all, so an unvalidated engine could forecast against
-    // non-finite thresholds and report zero breaches.
     validate_config(&config)?;
     engine.validate()?;
 
@@ -522,8 +493,6 @@ pub fn forecast_breaches_generic<MTS: ModelTimeSeries>(
         let forecast = forecast_covenant_generic(spec, model, &covered, config.clone())?;
 
         for (i, &headroom) in forecast.headroom.iter().enumerate() {
-            // Check for breach: negative headroom, or a NaN metric (NaN
-            // headroom) which is indeterminate and treated as breached.
             let is_breach = forecast.breach_probability[i] >= 1.0;
             let prob = forecast.breach_probability[i];
 
@@ -755,7 +724,6 @@ mod tests {
                 .copied()
         }
         fn period_end_date(&self, period: &PeriodId) -> Date {
-            // simple quarterly end approximation
             let m = [3u8, 6, 9, 12][(period.index as usize - 1).min(3)];
             Date::from_calendar_date(
                 period.year,
@@ -802,7 +770,6 @@ mod tests {
     }
 
     #[test]
-
     fn stochastic_breach_probability_moves_with_vol() {
         // Debt/EBITDA <= 1.0, base ~ 1.0; with high vol, breach prob should be material
         let spec = CovenantSpec::with_metric(
@@ -1119,8 +1086,6 @@ mod tests {
 
     #[test]
     fn mc_converges_to_analytic_lognormal_probability() {
-        // THE key test: same drift/vol assumptions => MC must converge to the
-        // closed-form answer. Fixed seed => fully deterministic assertion.
         let (spec, mts, periods) = atm_spec_and_model();
 
         let analytic = forecast_covenant_generic(&spec, &mts, &periods, mc_config(0, false, 42))

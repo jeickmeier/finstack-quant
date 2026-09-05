@@ -113,13 +113,11 @@ impl SviArbitrageCheck {
                     continue;
                 }
 
-                // Analytical derivatives of raw SVI
                 let km = k - params.m;
                 let r = (km * km + params.sigma * params.sigma).sqrt();
                 let w_prime = params.b * (params.rho + km / r);
                 let w_double_prime = params.b * params.sigma * params.sigma / (r * r * r);
 
-                // Density function g(k)
                 let term1 = 1.0 - k * w_prime / (2.0 * w);
                 let g = term1 * term1 - w_prime * w_prime / 4.0 * (1.0 / w + 0.25)
                     + w_double_prime / 2.0;

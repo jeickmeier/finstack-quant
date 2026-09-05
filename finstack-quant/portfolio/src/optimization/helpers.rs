@@ -1,8 +1,4 @@
-//! Helper functions for portfolio optimization use cases.
-//!
-//! These helpers live in the core crate so that bindings (Python, WASM)
-//! only need to perform type conversions and can pass through directly
-//! to Rust logic.
+//! JSON-serializable helpers for portfolio optimization bindings.
 
 use super::{
     Constraint, DefaultLpOptimizer, MissingMetricPolicy, Objective, PortfolioOptimizationProblem,
@@ -13,8 +9,6 @@ use crate::portfolio::{Portfolio, PortfolioSpec};
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::market_data::context::MarketContext;
 use serde::{Deserialize, Serialize};
-
-// General-purpose optimization spec (JSON-friendly)
 
 /// JSON-serializable specification for a portfolio optimization problem.
 ///

@@ -916,8 +916,7 @@ impl RatesCreditTree {
         let (dt, _) = self.validate_calibration_targets(targets)?;
         let steps = self.config.steps;
 
-        // Build a complete candidate and commit only after every validation
-        // passes. A failed recalibration must not leave mixed old/new factors.
+        // A failed recalibration must not leave mixed old/new factors.
         let mut candidate = Self::new(self.config.clone());
         candidate.recovery_rate = targets.recovery_rate;
         candidate.calibration_times = targets.times.clone();
@@ -1613,11 +1612,9 @@ impl RatesCreditTree {
             nodes: 1,
         });
 
-        // Arrow-Debreu state prices
         let mut state_prices = vec![1.0];
         let mut saturation = HazardFloorSaturation::default();
 
-        // Value actually used for discounting/survival at a node.
         let effective = |x: f64| -> f64 {
             if floor_at_zero {
                 Self::effective_hazard(x)
@@ -1636,8 +1633,6 @@ impl RatesCreditTree {
                 nodes: next_nodes,
             };
 
-            // Propagate state prices and compute base rates (without theta).
-            //
             // The transition probability uses the SAME mean-reversion-aware
             // function the pricing pass applies, evaluated on the (calibrated)
             // current-row rate. Forward induction here is the exact dual of the
@@ -1647,12 +1642,10 @@ impl RatesCreditTree {
                 let df_i = (-effective(current_rate) * dt).exp();
                 let p_up = up_prob_fn(current_rate);
 
-                // Up move (to node i+1)
                 if i + 1 < next_nodes {
                     next_state_prices[i + 1] += q * df_i * p_up;
                 }
 
-                // Down move (to node i)
                 if i < next_nodes {
                     next_state_prices[i] += q * df_i * (1.0 - p_up);
                 }
@@ -1688,7 +1681,6 @@ impl RatesCreditTree {
                 0.0
             };
 
-            // Apply the calibrated row shift without materializing its nodes.
             let next_rates = FactorRow {
                 base: next_rates_base.base + theta,
                 ..next_rates_base
@@ -2139,8 +2131,6 @@ impl RatesCreditTree {
         // fields and `state.step`. Build each `NodeState` via `with_cached`
         // (supplying the per-node values directly) and skip the per-node
         // `HashMap` writes entirely — `initial_vars` passes through unchanged.
-
-        // Initialize terminal values
         for i in 0..=steps {
             let r_t = self.calibrated_rates[steps].value_unchecked(i);
             for j in 0..=steps {
@@ -2161,7 +2151,6 @@ impl RatesCreditTree {
             }
         }
 
-        // Backward induction with double-buffering
         for k in (0..steps).rev() {
             for i in 0..=k {
                 let r_t = self.calibrated_rates[k].value_unchecked(i);
@@ -2191,10 +2180,8 @@ impl RatesCreditTree {
                         dt,
                     );
 
-                    // Joint probabilities
                     let (p_uu, p_ud, p_du, p_dd) = self.joint_probabilities(p_r, p_h);
 
-                    // Continuation from four children at step k+1
                     let v_uu = curr_values[(i + 1) * max_nodes + (j + 1)];
                     let v_ud = curr_values[(i + 1) * max_nodes + j];
                     let v_du = curr_values[i * max_nodes + (j + 1)];
@@ -2240,7 +2227,6 @@ impl RatesCreditTree {
                     next_values[i * max_nodes + j] = valuator.value_at_node(&state, cont, dt)?;
                 }
             }
-            // Swap buffers (O(1) pointer swap, no data copy)
             std::mem::swap(&mut curr_values, &mut next_values);
         }
 
@@ -2896,9 +2882,7 @@ mod tests {
         });
         calibrate_for_test(&mut tree, &disc, &haz, 5.0).expect("calibrate");
 
-        // Rate factor has no mean reversion: undistorted default.
         assert_eq!(tree.rate_variance_retention(), VarianceRetention::default());
-        // Hazard factor does: it is scanned, and reports real numbers.
         let hazard = tree.hazard_variance_retention();
         assert!(hazard.total_nodes > 0, "hazard factor must be scanned");
         assert!(
@@ -2906,7 +2890,6 @@ mod tests {
             "kappa*T = 0.4 must distort without clamping: {hazard:?}"
         );
 
-        // An uncalibrated tree reports the undistorted default for both.
         let fresh = RatesCreditTree::new(RatesCreditConfig::default());
         assert_eq!(
             fresh.rate_variance_retention(),
@@ -3007,14 +2990,12 @@ mod tests {
 
             let sum = p_uu + p_ud + p_du + p_dd;
             assert!((sum - 1.0).abs() < 1e-14, "probs must sum to 1, got {sum}");
-            // Marginals preserved.
             assert!(
                 (p_uu + p_ud - 0.5).abs() < 1e-14 && (p_uu + p_du - 0.5).abs() < 1e-14,
                 "marginals distorted at rho={target_rho}: pr={}, ph={}",
                 p_uu + p_ud,
                 p_uu + p_du
             );
-            // Realized correlation matches the configured value exactly.
             let realized = p_uu + p_dd - p_ud - p_du;
             assert!(
                 (realized - target_rho).abs() < 1e-14,
@@ -3766,7 +3747,6 @@ mod tests {
         let disc = sloped_discount_curve();
         let haz = test_hazard_curve();
 
-        // Exactly at the threshold: must succeed.
         let mut tree_at_limit = RatesCreditTree::new(RatesCreditConfig {
             steps: 20,
             rate_vol: 0.01,
@@ -3777,7 +3757,6 @@ mod tests {
         calibrate_for_test(&mut tree_at_limit, &disc, &haz, 5.0)
             .expect("kappa == KAPPA_MAX must succeed");
 
-        // Just above the threshold: must fail with Validation.
         let over_rate = KAPPA_MAX + 0.01;
         let mut tree_over_rate = RatesCreditTree::new(RatesCreditConfig {
             steps: 20,
@@ -3800,7 +3779,6 @@ mod tests {
             other => panic!("expected Validation error for rate κ={over_rate}, got: {other:?}"),
         }
 
-        // Hazard factor guard: just above the threshold.
         let over_hazard = KAPPA_MAX + 0.01;
         let mut tree_over_hazard = RatesCreditTree::new(RatesCreditConfig {
             steps: 20,
@@ -3864,7 +3842,6 @@ mod tests {
             "p_high={p_high}, expected={expected}"
         );
 
-        // Always in [0, 1], even for an extreme node.
         let p_extreme =
             RatesCreditTree::mean_reverting_up_prob(r_ref + 100.0, r_ref, kappa, sigma, dt);
         assert!(

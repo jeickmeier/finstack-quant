@@ -124,7 +124,6 @@ pub(crate) fn pade_expm(a: &DMatrix<f64>) -> Result<DMatrix<f64>, MigrationError
     let scale = (2.0_f64).powi(s);
     let a_scaled = if s > 0 { a / scale } else { a.clone() };
 
-    // Compute matrix powers.
     let identity = DMatrix::identity(n, n);
     let a2 = &a_scaled * &a_scaled;
     let a4 = &a2 * &a2;

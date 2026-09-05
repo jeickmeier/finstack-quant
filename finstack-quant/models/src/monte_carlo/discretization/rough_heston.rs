@@ -209,7 +209,6 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
     ) {
         let p = process.params();
 
-        // ── Determine step index ──────────────────────────────────
         // The engine zero-initialises `work` before every path
         // (see `run_path_loop` in engine/simulation.rs), so the step
         // counter starts at 0.0 cleanly without resorting to `t < ε`
@@ -218,21 +217,16 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
         let step = work[2 * n] as usize;
 
         let v_current = x[1].max(0.0);
-        let z_vol = z[1]; // Standard normal for variance noise
+        let z_vol = z[1];
         let dw_tilde = z_vol * dt.sqrt();
 
-        // ── Store drift and noise components for this step ─────────────
-        //
-        //   a_j = κ(θ − V_j)            (drift rate, weighted by ∫K ds)
-        //   n_j = σᵥ √V_j dW̃_j          (noise increment)
-        //
+        // a_j = κ(θ − V_j)            (drift rate, weighted by ∫K ds)
+        // n_j = σᵥ √V_j dW̃_j          (noise increment)
         work[step] = p.kappa * (p.theta - v_current);
         work[n + step] = p.sigma_v * v_current.sqrt() * dw_tilde;
 
-        // ── Evaluate Volterra integral to obtain V_{next} ──────────────
-        //
-        //   V_{next} = v₀ + (1/Γ(α)) Σ_{j=0}^{step} [a_j·∫_{t_j}^{t_{j+1}}K ds
-        //                                            + w_j·n_j]
+        // V_{next} = v₀ + (1/Γ(α)) Σ_{j=0}^{step} [a_j·∫_{t_j}^{t_{j+1}}K ds
+        //                                          + w_j·n_j]
         //
         // The per-interval kernel integral and noise weight depend only on the
         // fixed grid and α, so they are precomputed once in `new`
@@ -250,17 +244,13 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
         }
         let v_next = (p.v0 + self.inv_gamma_alpha * volterra_sum).max(0.0);
 
-        // ── Correlate spot noise with variance driver ──────────────────
         let z_spot = p.rho * z_vol + (1.0 - p.rho * p.rho).max(0.0).sqrt() * z[0];
 
-        // ── Log-spot update ────────────────────────────────────────────
         let sqrt_v_dt = (v_current * dt).max(0.0).sqrt();
         x[0] *= ((p.r - p.q - 0.5 * v_current) * dt + sqrt_v_dt * z_spot).exp();
 
-        // ── Update variance state ──────────────────────────────────────
         x[1] = v_next;
 
-        // ── Increment step counter ─────────────────────────────────────
         work[2 * n] = (step + 1) as f64;
     }
 
@@ -296,8 +286,6 @@ mod tests {
         (0..=n).map(|i| t_max * i as f64 / n as f64).collect()
     }
 
-    // -- Construction -------------------------------------------------------
-
     #[test]
     fn test_construction_valid() {
         let times = uniform_grid(100, 1.0);
@@ -318,8 +306,6 @@ mod tests {
         assert!(RoughHestonHybrid::new(&times, 0.5).is_err());
         assert!(RoughHestonHybrid::new(&times, 0.6).is_err());
     }
-
-    // -- Single step --------------------------------------------------------
 
     #[test]
     fn test_single_step_zero_shocks() {
@@ -384,7 +370,6 @@ mod tests {
             expected_v
         );
 
-        // Check spot
         let z_spot = p.rho * z_vol + (1.0 - p.rho * p.rho).max(0.0).sqrt() * z_indep;
         let sqrt_v_dt = (v0 * dt).sqrt();
         let expected_s = s0 * ((p.r - p.q - 0.5 * v0) * dt + sqrt_v_dt * z_spot).exp();
@@ -396,8 +381,6 @@ mod tests {
             expected_s
         );
     }
-
-    // -- Multi-step ---------------------------------------------------------
 
     #[test]
     fn test_volterra_integral_accumulates_history() {
@@ -416,15 +399,11 @@ mod tests {
             disc.step(&process, t, dt_step, &mut x, &z, &mut work);
         }
 
-        // Step counter should equal n
         let step_count = work[2 * n] as usize;
         assert_eq!(step_count, n, "Step counter should track executed steps");
 
-        // Variance should differ from v0 after accumulating history
         assert!(x[1] >= 0.0, "Variance must be non-negative");
     }
-
-    // -- Path reset ---------------------------------------------------------
 
     #[test]
     fn test_work_buffer_reset_across_paths() {
@@ -442,7 +421,6 @@ mod tests {
         let z = vec![0.2, 0.15];
         let mut work = vec![0.0; disc.work_size(&process)];
 
-        // Run path 1
         for i in 0..n {
             disc.step(
                 &process,
@@ -464,17 +442,12 @@ mod tests {
         x[1] = 0.04;
         disc.step(&process, 0.0, times[1] - times[0], &mut x, &z, &mut work);
 
-        // Step counter should be 1 (zeroed then incremented).
         assert_eq!(
             work[2 * n] as usize,
             1,
             "Step counter should reset for new path"
         );
     }
-
-    // -- Work size ----------------------------------------------------------
-
-    // -- M8 kernel weights ----------------------------------------------------
 
     /// The singular last-interval noise weight must be variance-exact:
     /// the one-step noise contribution to V is `(1/Γ(α))·σᵥ√v₀·∫₀^Δt s^{α−1} dW`,
@@ -690,8 +663,6 @@ mod tests {
             rel_errs[1]
         );
     }
-
-    // -- Spot positivity under stress ---------------------------------------
 
     #[test]
     fn test_spot_stays_positive_under_large_shocks() {

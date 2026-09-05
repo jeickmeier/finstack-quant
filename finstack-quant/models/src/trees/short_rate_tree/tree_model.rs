@@ -44,7 +44,6 @@ impl ShortRateTree {
             }
         };
 
-        // Terminal payoffs.
         let mut values: Vec<f64> = Vec::with_capacity(self.rates[steps].len());
         for &r in self.rates[steps].iter() {
             let state = NodeState::with_cached(
@@ -57,7 +56,6 @@ impl ShortRateTree {
             values.push(valuator.value_at_maturity(&state)?);
         }
 
-        // Backward induction with per-node probabilities.
         let mut scratch: Vec<f64> = Vec::new();
         for step in (0..steps).rev() {
             let curr_j_max = step.min(j_max);
@@ -124,10 +122,8 @@ impl TreeModel for ShortRateTree {
         self.validate_lattice_geometry()?;
 
         if !initial_vars.contains_key(state_keys::INTEREST_RATE) {
-            if let Some(row) = self.rates.first() {
-                if let Some(&r0) = row.first() {
-                    initial_vars.insert(state_keys::INTEREST_RATE, r0);
-                }
+            if let Some(&r0) = self.rates.first().and_then(|row| row.first()) {
+                initial_vars.insert(state_keys::INTEREST_RATE, r0);
             }
         }
 
@@ -152,7 +148,6 @@ impl TreeModel for ShortRateTree {
             );
         }
 
-        // Create custom state generator that uses pre-calibrated rates
         // Clone rates (cheap Arc clone) to avoid lifetime issues with closures
         let rates_clone = std::sync::Arc::clone(&self.rates);
         let state_gen: Box<dyn Fn(usize, usize) -> f64> =
@@ -160,7 +155,7 @@ impl TreeModel for ShortRateTree {
                 if step < rates_clone.len() && node < rates_clone[step].len() {
                     rates_clone[step][node]
                 } else {
-                    0.0 // Fallback
+                    0.0
                 }
             });
 

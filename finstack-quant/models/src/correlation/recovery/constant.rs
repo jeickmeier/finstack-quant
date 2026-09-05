@@ -141,7 +141,6 @@ mod tests {
     fn test_conditional_equals_unconditional() {
         let model = ConstantRecovery::new(0.40);
 
-        // Conditional should equal unconditional for all market factors
         for z in [-3.0, -1.0, 0.0, 1.0, 3.0] {
             assert!((model.conditional_recovery(z) - model.expected_recovery()).abs() < 1e-10);
         }

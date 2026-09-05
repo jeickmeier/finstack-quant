@@ -116,7 +116,6 @@ impl StochasticDefault for IntensityProcessDefault {
     ) -> f64 {
         let z = factors.first().copied().unwrap_or(0.0);
 
-        // Conditional intensity
         let intensity = self.intensity(z);
 
         // Apply seasoning ramp: linear over first 24 months, then flat at 1.0.

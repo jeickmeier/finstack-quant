@@ -118,14 +118,11 @@ impl PathCaptureConfig {
         match self.capture_mode {
             PathCaptureMode::All => true,
             PathCaptureMode::Sample { count, seed } => {
-                // Use hash-based sampling for determinism
-                // This ensures same paths are selected across runs
-                // Use a proper hash function that provides good distribution
                 let mut hash = path_id as u64;
                 hash = hash.wrapping_mul(0x9e3779b97f4a7c15); // Multiplicative hash constant
                 hash ^= seed;
                 hash = hash.wrapping_mul(0x9e3779b97f4a7c15);
-                hash ^= hash >> 16; // Mix bits
+                hash ^= hash >> 16;
                 hash = hash.wrapping_mul(0x85ebca6b);
                 hash ^= hash >> 13;
                 hash = hash.wrapping_mul(0xc2b2ae35);

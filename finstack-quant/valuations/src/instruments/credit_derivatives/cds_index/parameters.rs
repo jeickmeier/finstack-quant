@@ -56,11 +56,12 @@ impl CDSIndexParams {
     ///
     /// # Arguments
     ///
-    /// * `index_name` - Index name used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `series` - Time-ordered numeric samples for a single risk factor or price series
-    /// * `version` - Schema or registry version required for compatibility checks.
+    /// * `index_name` - Credit-index family name (e.g. `"CDX.NA.IG"`, `"iTraxx Europe"`).
+    /// * `series` - Published series number of this index (e.g. 42 for CDX.NA.IG Series 42).
+    /// * `version` - Index version within the series after reconstitutions (typically 1 at launch).
     /// * `fixed_coupon_bp` - Fixed coupon rate expressed in basis points per annum.
-    /// * `convention` - Convention used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `convention` - Regional ISDA CDS convention (day count, calendar, payment frequency)
+    ///   applied to the index CDS.
     pub fn new(
         index_name: impl Into<String>,
         series: u16,
@@ -94,8 +95,8 @@ impl CDSIndexParams {
     ///
     /// # Arguments
     ///
-    /// * `series` - Time-ordered numeric samples for a single risk factor or price series
-    /// * `version` - Schema or registry version required for compatibility checks.
+    /// * `series` - Published series number of this index (e.g. 42 for CDX.NA.IG Series 42).
+    /// * `version` - Index version within the series after reconstitutions (typically 1 at launch).
     /// * `fixed_coupon_bp` - Fixed coupon rate expressed in basis points per annum.
     pub fn cdx_na_ig(series: u16, version: u16, fixed_coupon_bp: f64) -> Self {
         Self::new(
@@ -116,8 +117,8 @@ impl CDSIndexParams {
     ///
     /// # Arguments
     ///
-    /// * `series` - Time-ordered numeric samples for a single risk factor or price series
-    /// * `version` - Schema or registry version required for compatibility checks.
+    /// * `series` - Published series number of this index (e.g. 42 for CDX.NA.IG Series 42).
+    /// * `version` - Index version within the series after reconstitutions (typically 1 at launch).
     /// * `fixed_coupon_bp` - Fixed coupon rate expressed in basis points per annum.
     pub fn cdx_na_hy(series: u16, version: u16, fixed_coupon_bp: f64) -> Self {
         Self::new(
@@ -137,8 +138,8 @@ impl CDSIndexParams {
     ///
     /// # Arguments
     ///
-    /// * `series` - Time-ordered numeric samples for a single risk factor or price series
-    /// * `version` - Schema or registry version required for compatibility checks.
+    /// * `series` - Published series number of this index (e.g. 42 for CDX.NA.IG Series 42).
+    /// * `version` - Index version within the series after reconstitutions (typically 1 at launch).
     /// * `fixed_coupon_bp` - Fixed coupon rate expressed in basis points per annum.
     pub fn itraxx_europe(series: u16, version: u16, fixed_coupon_bp: f64) -> Self {
         Self::new(

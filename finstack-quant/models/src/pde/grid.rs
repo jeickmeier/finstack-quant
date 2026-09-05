@@ -195,7 +195,6 @@ impl Grid1D {
             return values[values.len() - 1];
         }
 
-        // Binary search for the interval
         let idx = match self.points.binary_search_by(|p| p.total_cmp(&x)) {
             Ok(i) => return values[i], // exact match
             Err(i) => i - 1,           // x is between points[i-1] and points[i]
@@ -327,7 +326,6 @@ mod tests {
     fn sinh_grid_concentrates_near_center() {
         let g = Grid1D::sinh_concentrated(-5.0, 5.0, 101, 0.0, 0.1).expect("valid grid");
         assert_eq!(g.n(), 101);
-        // Check spacing is smaller near center than near boundaries
         let mid = g.n() / 2;
         let h_center = g.h_right(mid);
         let h_boundary = g.h_right(0);

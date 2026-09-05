@@ -241,15 +241,9 @@ impl Default for PortfolioValuationOptions {
 
 /// Value all positions in a portfolio with full metrics.
 ///
-/// This function:
-/// 1. Iterates through all positions (in parallel if enabled)
-/// 2. Prices each instrument with metrics
-/// 3. Converts values to base currency using FX rates
-/// 4. Aggregates by entity
-///
-/// Portfolio valuation uses compensated summation during aggregation and treats
-/// `PositionUnit` as part of the pricing contract, so the reported portfolio
-/// totals reflect scaled holdings rather than raw instrument PVs.
+/// Uses compensated summation during aggregation and treats `PositionUnit` as
+/// part of the pricing contract, so totals reflect scaled holdings rather than
+/// raw instrument PVs.
 ///
 /// # Arguments
 ///
@@ -386,12 +380,11 @@ fn value_portfolio_with_execution_at(
 
 /// Revalue only the positions affected by a set of changed market factor keys.
 ///
-/// This function consults the portfolio's [`crate::dependencies::DependencyIndex`] to determine which
-/// positions depend on the supplied keys, reprices only those positions against
-/// the (updated) market context, and patches the prior valuation with fresh
-/// results.  Unaffected positions retain their prior values.  Positions whose
-/// dependencies could not be resolved are always repriced as a conservative
-/// fallback.
+/// Consults the portfolio's [`crate::dependencies::DependencyIndex`] to
+/// determine which positions depend on the supplied keys, reprices those
+/// against the updated market, and patches the prior valuation. Unaffected
+/// positions keep their prior values. Positions whose dependencies could not
+/// be resolved are always repriced.
 ///
 /// The resulting [`PortfolioValuation`] is fully recomputed (totals, entity
 /// rollups, degraded-risk tracking) and is identical to what
@@ -507,7 +500,6 @@ mod tests {
             .expect("test should succeed");
 
         assert_eq!(valuation.position_values.len(), 1);
-        // Note: With flat curve, deposit PV is small but should be present
         assert!(valuation.total_base_currency.amount().abs() >= 0.0);
         assert_eq!(valuation.by_entity.len(), 1);
     }

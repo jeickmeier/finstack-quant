@@ -282,7 +282,6 @@ impl AlmgrenChrissModel {
         let mut time_points = Vec::with_capacity(num_buckets + 1);
         let mut quantities = Vec::with_capacity(num_buckets);
 
-        // Generate the optimal remaining position at each time point
         remaining.push(q);
         time_points.push(0.0);
 
@@ -312,7 +311,6 @@ impl AlmgrenChrissModel {
             }
         }
 
-        // Compute expected cost and cost variance of the trajectory
         let mut expected_cost = 0.0;
         let mut cost_variance = 0.0;
 
@@ -330,7 +328,6 @@ impl AlmgrenChrissModel {
             let avg_inventory = (remaining[j].abs() + remaining[j + 1].abs()) / 2.0;
             expected_cost += self.gamma * quantities[j].abs() * avg_inventory;
 
-            // Temporary impact cost contribution
             expected_cost += self.eta * trade_rate.abs().powf(self.delta) * quantities[j].abs();
 
             // Variance contribution: Almgren-Chriss (2001), eq. (7),
@@ -500,7 +497,6 @@ mod tests {
             "trajectory should trade entire quantity, got {total_traded}"
         );
 
-        // Remaining should start at Q and end at 0
         assert!((traj.remaining[0] - 50_000.0).abs() < 1e-10);
         assert!(traj.remaining[10].abs() < 1e-10);
         Ok(())

@@ -477,7 +477,6 @@ impl RoughHestonFourierParams {
         t: f64,
         is_call: bool,
     ) -> f64 {
-        // Degenerate / invalid inputs
         if t <= 0.0 {
             if !spot.is_finite() || !strike.is_finite() {
                 return f64::NAN;
@@ -594,8 +593,6 @@ impl RoughHestonFourierParams {
 mod tests {
     use super::*;
 
-    // Parameter validation
-
     #[test]
     fn valid_params() {
         assert!(RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, 0.1).is_ok());
@@ -661,8 +658,6 @@ mod tests {
             r#"{"v0":0.04,"kappa":2.0,"theta":0.04,"sigma":0.3,"rho":-0.7,"hurst":0.1,"x":1}"#;
         assert!(serde_json::from_str::<RoughHestonFourierParams>(unknown).is_err());
     }
-
-    // Fractional Riccati solver
 
     #[test]
     fn riccati_initial_condition() {
@@ -733,8 +728,6 @@ mod tests {
         );
     }
 
-    // Characteristic function
-
     #[test]
     fn char_func_at_zero() {
         let params = RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, 0.1).expect("valid");
@@ -777,8 +770,6 @@ mod tests {
             "φ(−i) should equal e^{{(r−q)T}} = {expected}, got {phi}"
         );
     }
-
-    // European pricing
 
     #[test]
     #[ignore = "slow: covered by mise rust-test-slow"]
@@ -958,8 +949,6 @@ mod tests {
         }
     }
 
-    // Price sensitivity
-
     #[test]
     #[ignore = "slow: covered by mise rust-test-slow"]
     fn price_increases_with_vol_of_vol() {
@@ -979,7 +968,6 @@ mod tests {
             "Higher sigma should increase OTM put: base={base_otm:.6}, high={high_otm:.6}"
         );
 
-        // ATM: both should be reasonable prices
         assert!(
             base_price > 0.0,
             "Base ATM call should be positive: {base_price}"
@@ -1030,7 +1018,6 @@ mod tests {
         let iv = params.implied_vol(spot, strike, r, q, t, true);
         assert!(iv.is_some(), "Should produce valid implied vol");
 
-        // Re-price using Black-76 with the implied vol
         let vol = iv.expect("checked above");
         let forward = spot * ((r - q) * t).exp();
         let repriced = (-r * t).exp() * crate::closed_form::black_call(forward, strike, vol, t);

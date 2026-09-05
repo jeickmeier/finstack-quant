@@ -36,14 +36,12 @@ pub(crate) fn evaluate_forecast(
     mc_z_cache: &mut Option<&mut IndexMap<NodeId, IndexMap<PeriodId, f64>>>,
     visibility_cutoff: Option<Date>,
 ) -> Result<f64> {
-    // Check cache first
     if let Some(cached) = forecast_cache.get(node_spec.node_id.as_str()) {
         if let Some(value) = cached.get(period_id) {
             return Ok(*value);
         }
     }
 
-    // Get forecast spec
     let forecast_spec = node_spec
         .forecast
         .as_ref()
@@ -154,10 +152,8 @@ pub(crate) fn evaluate_forecast(
         )?
     };
 
-    // Cache results
     forecast_cache.insert(node_spec.node_id.clone(), forecast_results.clone());
 
-    // Return value for requested period
     forecast_results.get(period_id).copied().ok_or_else(|| {
         Error::eval(format!(
             "Forecast did not produce value for period {:?}",
@@ -182,13 +178,6 @@ pub(crate) fn evaluate_forecast(
 ///    particular node (e.g., the node was added after earlier periods).
 /// 3. **Error** — if no historical data exists at all, evaluation fails with a
 ///    descriptive message so the analyst can provide at least one actual.
-///
-/// # Assumption
-///
-/// The resolved base value is assumed to be correct and representative.
-/// Callers should ensure that the actuals feeding the model are clean and
-/// reviewed before running forecasts—this function does **not** attempt to
-/// detect outliers, stale data, or unit mismatches.
 fn determine_base_value(
     node_spec: &NodeSpec,
     current_period_id: &PeriodId,
@@ -196,29 +185,24 @@ fn determine_base_value(
     context: &EvaluationContext,
     visibility_cutoff: Option<Date>,
 ) -> Result<f64> {
-    // Try to get the last actual period whose observation is visible under
-    // the as-of policy.
     let last_actual_period = model.periods.iter().rfind(|period| {
         period.id < *current_period_id
             && period.is_actual
             && node_spec.explicit_value_is_visible(period, visibility_cutoff)
     });
     if let Some(last_actual) = last_actual_period {
-        // Check node's explicit values
         if let Some(values) = &node_spec.values {
             if let Some(val) = values.get(&last_actual.id) {
                 return Ok(val.value());
             }
         }
 
-        // Check historical context
         if let Some(val) = context.get_historical_value(node_spec.node_id.as_str(), &last_actual.id)
         {
             return Ok(val);
         }
     }
 
-    // Try to find the most recent historical value by chronological ordering
     if let Some(&column) = context.node_to_column.get(node_spec.node_id.as_str()) {
         if let Some((_, value)) = context
             .history
@@ -236,7 +220,6 @@ fn determine_base_value(
         }
     }
 
-    // No base value found
     Err(Error::forecast(format!(
         "Cannot determine base value for forecast of node '{}'. \
          No actual period value or historical value found. \

@@ -1,8 +1,7 @@
 //! wasm-bindgen-test suite for `api::attribution`.
 //!
-//! The attribution execute path previously had no WASM test at all. Covers the
-//! full JSON pipeline (attributePnl / attributePnlJson), the schema gate
-//! in validateAttributionJson, and the default helpers.
+//! Covers the JSON pipeline (`attributePnl` / `attributePnlJson`),
+//! `validateAttributionJson`, and the default helpers.
 
 #![cfg(target_arch = "wasm32")]
 
@@ -99,7 +98,6 @@ fn attribute_pnl_end_to_end_parallel() {
 #[wasm_bindgen_test]
 fn attribute_pnl_returns_structured_object_matching_json_twin() {
     let value = attribute_pnl(&params("\"parallel\"")).expect("attributePnl should succeed");
-    // The typed export returns a structured object, never a string.
     assert!(
         value.as_string().is_none(),
         "attributePnl must not return a string"
@@ -164,7 +162,6 @@ fn validate_attribution_json_rejects_wrong_schema() {
 
 #[wasm_bindgen_test]
 fn attribute_pnl_missing_market_data_yields_structured_error() {
-    use time::macros::date;
     let empty = serde_json::to_string(&MarketContextState::from(&MarketContext::new())).unwrap();
     let p = JsAttributionParams::new(
         bond_json(),
@@ -176,9 +173,7 @@ fn attribute_pnl_missing_market_data_yields_structured_error() {
         None,
         None,
     );
-    let _ = date!(2025 - 01 - 15);
     let err = attribute_pnl(&p).expect_err("missing curves must error");
-    // The error is a structured AttributionError object with a stable kind tag.
     let kind = js_sys::Reflect::get(&err, &"kind".into())
         .ok()
         .and_then(|v| v.as_string());

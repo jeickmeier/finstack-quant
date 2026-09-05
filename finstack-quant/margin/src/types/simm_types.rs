@@ -8,18 +8,8 @@ use core::hash::Hash;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::HashMap;
 
-/// Add every `(key, value)` from `source` into `target`, accumulating
-/// values for keys that already exist.
-///
-/// Centralises the per-bucket merge step used by
-/// [`SimmSensitivities::merge`] so adding a new sensitivity bucket is a
-/// one-line change in `merge` rather than a copy-paste-edit cycle that
-/// risks dropping the new field.
-/// The thirteen signed-amount maps of [`SimmSensitivities`], listed once.
-///
-/// `is_empty`, `merge` and `scale_amounts` all walk every map; routing them
-/// through this list means a new bucket is added in exactly one place (plus
-/// the explicit JSON DTO, which stays hand-written for wire stability).
+/// The thirteen signed-amount maps of [`SimmSensitivities`], listed once so
+/// `is_empty`, `merge`, and `scale_amounts` walk them in one place.
 macro_rules! amount_maps {
     (@fields $($args:tt)*) => {
         amount_maps!($($args)*;

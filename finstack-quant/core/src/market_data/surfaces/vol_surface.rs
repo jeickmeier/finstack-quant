@@ -37,8 +37,6 @@
 //! assert_eq!(surface.vols()[1], 0.21);
 //! ```
 
-// Box and Vec are available from the standard prelude; no explicit alloc import needed.
-
 use crate::{
     error::InputError,
     market_data::bumps::{BumpSpec, Bumpable},
@@ -811,11 +809,11 @@ impl VolSurface {
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
+    /// * `id` - Market-data identifier stored on the surface and used for context lookup.
     /// * `expiries` - Strictly increasing option expiries in year-fraction units.
     /// * `strikes` - Strictly ordered strike coordinates in underlying price units.
     /// * `vols_row_major` - Annualized decimal volatilities flattened in expiry-major row order.
-    /// * `opts` - Options controlling validation, interpolation, or execution behavior.
+    /// * `opts` - Secondary-axis meaning, quote type, and interpolation contract for the grid.
     pub fn from_grid_opts(
         id: impl AsRef<str>,
         expiries: &[f64],
@@ -863,7 +861,7 @@ impl VolSurface {
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
+    /// * `id` - Market-data identifier stored on the surface and used for context lookup.
     /// * `expiries` - Strictly increasing option expiries in year-fraction units.
     /// * `strikes` - Strictly ordered strike coordinates in underlying price units.
     /// * `vols_row_major` - Annualized decimal volatilities flattened in expiry-major row order.

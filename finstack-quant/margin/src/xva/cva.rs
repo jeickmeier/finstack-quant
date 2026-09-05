@@ -34,9 +34,7 @@
 //! MVA = Σᵢ s_im × IM_mid(tᵢ) × DF_mid(tᵢ) × S_joint_mid(tᵢ) × Δtᵢ
 //! ```
 //!
-//! **Legacy bilateral adjustment** = CVA - DVA + FVA
-//!
-//! **Total XVA** = bilateral adjustment + MVA
+//! **Total XVA** = CVA − DVA + FVA + MVA
 //!
 //! where `EPE_mid` and `DF_mid` are averaged over consecutive time points
 //! for O(Δt²) convergence.
@@ -758,7 +756,6 @@ mod tests {
             .expect("DiscountCurve should build")
     }
 
-    /// Helper: build a uniform EPE profile.
     fn uniform_profile(epe_value: f64, times: &[f64]) -> ExposureProfile {
         ExposureProfile {
             times: times.to_vec(),
@@ -768,8 +765,6 @@ mod tests {
             diagnostics: None,
         }
     }
-
-    // ── CVA formula tests ────────────────────────────────────────
 
     #[test]
     fn cva_zero_hazard_rate_gives_zero_cva() {
@@ -1052,8 +1047,6 @@ mod tests {
         );
     }
 
-    // ── B2: Mismatched vector length validation ─────────────────
-
     #[test]
     fn cva_rejects_mismatched_epe_length() {
         let hazard = flat_hazard_curve(0.02);
@@ -1087,8 +1080,6 @@ mod tests {
             "Should reject profile with mismatched ENE length"
         );
     }
-
-    // ── M1: Effective EPE time-weighted average ─────────────────
 
     #[test]
     fn effective_epe_uniform_profile() {
@@ -1130,9 +1121,6 @@ mod tests {
         );
     }
 
-    // ── DVA tests ────────────────────────────────────────────────
-
-    /// Helper: build a profile with uniform ENE (negative exposure).
     fn uniform_ene_profile(ene_value: f64, times: &[f64]) -> ExposureProfile {
         ExposureProfile {
             times: times.to_vec(),
@@ -1238,8 +1226,6 @@ mod tests {
         assert!(compute_dva(&profile, &own_hazard, &discount, 1.5).is_err());
     }
 
-    // ── FVA tests ────────────────────────────────────────────────
-
     #[test]
     fn fva_zero_funding_spread_gives_zero_fva() {
         let discount = flat_discount_curve(0.03);
@@ -1337,8 +1323,6 @@ mod tests {
             "FVA numerical ({fva:.2}) should be close to analytical ({analytical:.2}), rel_error={rel_error:.6}"
         );
     }
-
-    // ── Bilateral XVA tests ──────────────────────────────────────
 
     #[test]
     fn bilateral_cva_equals_cva_minus_dva() {

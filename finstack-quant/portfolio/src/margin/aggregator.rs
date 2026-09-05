@@ -18,8 +18,6 @@ use crate::position::{Position, PositionUnit};
 use crate::types::PositionId;
 use crate::{Error, Result};
 
-// Portfolio Margin Aggregator
-
 /// Aggregates margin requirements across a portfolio.
 ///
 /// Organizes positions into netting sets and calculates aggregate
@@ -151,14 +149,6 @@ impl PortfolioMarginAggregator {
             netting_set.reset_sensitivities();
         }
 
-        // Phase A (parallel): compute SIMM sensitivities for every tracked
-        // position. Each `simm_sensitivities` call is a read-only function of
-        // the shared `MarketContext` and position state; per-call work
-        // (sensitivity extraction across the ISDA SIMM risk classes) dwarfs
-        // the Rayon dispatch overhead, so par_iter is a clear win for large
-        // margin portfolios. Results are collected positionally so the
-        // downstream merge keeps the same deterministic order the serial
-        // version produced.
         let map_position = |(pos_id, ns_id): &(PositionId, NettingSetId)| {
             if let Some(position) = portfolio.get_position(pos_id.as_str()) {
                 let sens = self.calculate_position_sensitivities(position, market, as_of);
@@ -191,9 +181,6 @@ impl PortfolioMarginAggregator {
             Result<SimmSensitivities>,
         )> = self.positions.iter().map(map_position).collect();
 
-        // Phase B (serial): merge into the netting set map. Serial keeps
-        // mutation to `self.netting_sets` trivially correct and preserves the
-        // tracing warn order callers expect from the prior implementation.
         for (position_id, ns_id, sens_result) in position_sensitivities {
             match sens_result {
                 Ok(sensitivities) => {
@@ -212,7 +199,6 @@ impl PortfolioMarginAggregator {
             }
         }
 
-        // Calculate margin for each netting set
         for netting_set in self.netting_sets.values() {
             let (ns_margin, degraded_positions) =
                 self.calculate_netting_set_margin(netting_set, portfolio, market, as_of)?;
@@ -222,7 +208,6 @@ impl PortfolioMarginAggregator {
             result.add_netting_set(ns_margin)?;
         }
 
-        // Count positions without margin
         result.positions_without_margin = portfolio
             .positions
             .len()
@@ -255,7 +240,6 @@ impl PortfolioMarginAggregator {
             // currency safety and the SIMM calculation-currency convention.
             self.convert_sensitivities_to_base(sens, market, as_of, &position.position_id)
         } else {
-            // Default: return empty sensitivities
             Ok(SimmSensitivities::new(self.base_currency))
         }
     }
@@ -298,7 +282,6 @@ impl PortfolioMarginAggregator {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<(NettingSetMargin, Vec<(PositionId, String)>)> {
-        // Calculate aggregated VM from position MTMs, FX-converting to base currency
         let mut total_mtm = 0.0;
         let mut position_count = 0;
         let mut degraded_positions = Vec::new();
@@ -307,7 +290,6 @@ impl PortfolioMarginAggregator {
             if let Some(position) = portfolio.get_position(pos_id.as_str()) {
                 match self.get_position_mtm(position, market, as_of) {
                     Ok(mtm) => {
-                        // FX-convert MTM to base currency if necessary
                         let mtm_base = if mtm.currency() == self.base_currency {
                             Ok(mtm.amount())
                         } else {
@@ -511,15 +493,11 @@ impl PortfolioMarginAggregator {
             }
             Ok(position.scale_value(unit_mtm)?)
         } else {
-            // Default: return zero
             Ok(Money::from((0_i64, self.base_currency)))
         }
     }
 
-    /// Convert a monetary amount to base currency using the FX matrix.
-    ///
-    /// Thin wrapper over the portfolio spot FX helper that returns the
-    /// converted amount as `f64` (margin aggregation works in scalar space).
+    /// Spot-convert `amount` to the aggregator base currency as `f64`.
     fn convert_to_base(&self, amount: Money, market: &MarketContext, as_of: Date) -> Result<f64> {
         crate::fx::convert_to_base(amount, as_of, market, self.base_currency).map(|m| m.amount())
     }

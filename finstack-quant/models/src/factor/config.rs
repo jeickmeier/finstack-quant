@@ -793,7 +793,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // PR-2 test: matcher-emitted factor IDs must exist in `factors`
     #[test]
     fn credit_hierarchical_config_rejects_unknown_factor_id() {
         use crate::factor::credit::hierarchy::{

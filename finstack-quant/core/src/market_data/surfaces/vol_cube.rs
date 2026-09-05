@@ -150,10 +150,10 @@ impl VolCube {
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
+    /// * `id` - Market-data identifier stored on the cube and used for context lookup.
     /// * `expiries` - Strictly increasing option expiries in year-fraction units.
     /// * `tenors` - Strictly ordered tenor coordinates in year-fraction units.
-    /// * `params` - Validated model or algorithm parameters controlling this calculation.
+    /// * `params` - SABR nodes in expiry-major, tenor-minor row order, one per grid point.
     /// * `forwards` - Forward levels aligned one-for-one with the corresponding grid coordinates.
     pub fn from_grid(
         id: impl AsRef<str>,

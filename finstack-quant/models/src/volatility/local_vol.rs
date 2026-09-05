@@ -123,11 +123,11 @@ impl LocalVolSurface {
             return Err(finstack_quant_core::error::InputError::TooFewPoints.into());
         }
 
-        // Step 1: Compute undiscounted Black-76 forward call prices at each
-        // grid point: C̃(T, K) = Black_Call(F, K, σ(T,K), T). No discount
-        // factor: the forward-measure Dupire ratio requires undiscounted
-        // prices (the e^{-rT} factor cancels in the strike derivatives but
-        // corrupts ∂C̃/∂T with a −r·C̃ term, biasing local vol low for r > 0).
+        // Undiscounted Black-76 forward call prices at each grid point:
+        // C̃(T, K) = Black_Call(F, K, σ(T,K), T). No discount factor: the
+        // forward-measure Dupire ratio requires undiscounted prices (the
+        // e^{-rT} factor cancels in the strike derivatives but corrupts
+        // ∂C̃/∂T with a −r·C̃ term, biasing local vol low for r > 0).
         let mut call_prices = vec![0.0; n_exp * n_str];
         for (ei, &t) in expiries.iter().enumerate() {
             for (si, &k) in strikes.iter().enumerate() {
@@ -137,7 +137,6 @@ impl LocalVolSurface {
             }
         }
 
-        // Step 2: Apply Dupire formula using finite differences
         let mut local_vols = vec![0.0; n_exp * n_str];
 
         // Floor to prevent division by zero in gamma. The denominator
@@ -237,7 +236,6 @@ impl LocalVolSurface {
                 // Denominator: (1/2) × K² × ∂²C/∂K²
                 let denominator = 0.5 * k * k * d2c_dk2;
 
-                // Compute local variance
                 let local_var = if denominator.abs() < denom_floor {
                     // Gamma is too small — fall back to implied vol
                     tracing::warn!(
@@ -335,10 +333,8 @@ impl LocalVolSurface {
             return Err(finstack_quant_core::error::InputError::TooFewPoints.into());
         }
 
-        // Read raw IVs and smooth along strike axis.
         let mut smoothed_vols = vec![0.0; n_exp * n_str];
         for (ei, &t) in expiries.iter().enumerate() {
-            // Raw IVs for this expiry.
             let raw: Vec<f64> = strikes
                 .iter()
                 .map(|&k| {
@@ -348,7 +344,6 @@ impl LocalVolSurface {
                 })
                 .collect();
 
-            // Apply Gaussian kernel smoothing.
             for (si, &k_center) in strikes.iter().enumerate() {
                 let mut weight_sum = 0.0;
                 let mut value_sum = 0.0;
@@ -393,7 +388,6 @@ impl LocalVolSurface {
             return f64::NAN;
         }
 
-        // Clamp to grid bounds
         let exp_min = self.expiries[0];
         let exp_max = self.expiries[n_exp - 1];
         let str_min = self.strikes[0];
@@ -402,7 +396,6 @@ impl LocalVolSurface {
         let t = expiry.clamp(exp_min, exp_max);
         let k = strike.clamp(str_min, str_max);
 
-        // Find segment indices
         let ei = find_segment(&self.expiries, t);
         let si = find_segment(&self.strikes, k);
 
@@ -440,7 +433,6 @@ impl LocalVolSurface {
             (k - s0) / (s1 - s0)
         };
 
-        // Bilinear interpolation
         (1.0 - u) * (1.0 - v) * q11 + u * (1.0 - v) * q21 + (1.0 - u) * v * q12 + u * v * q22
     }
 
@@ -598,7 +590,6 @@ mod tests {
         let lv =
             LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
 
-        // Interpolated point between grid nodes
         let vol = lv.value(0.75, 97.5);
         assert!(
             vol > 0.0 && vol.is_finite(),
@@ -612,7 +603,6 @@ mod tests {
         let lv =
             LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
 
-        // Outside grid bounds should clamp (flat extrapolation)
         let vol_low = lv.value(0.1, 60.0);
         let vol_high = lv.value(3.0, 150.0);
 
@@ -632,7 +622,6 @@ mod tests {
         let lv =
             LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
 
-        // Local vol should be of similar magnitude to implied vol (within 3x)
         let atm_local = lv.value(1.0, 100.0);
         let atm_implied =
             crate::volatility::get_surface_vol(&surface, 1.0, 100.0).expect("in-bounds lookup");
@@ -659,7 +648,6 @@ mod tests {
         let lv =
             LocalVolSurface::from_implied_vol(&flat, 100.0).expect("extraction should succeed");
 
-        // Interior points (not boundaries) should be close to 0.20
         let vol_mid = lv.value(0.75, 100.0);
         assert!(
             (vol_mid - 0.20).abs() < 0.05,

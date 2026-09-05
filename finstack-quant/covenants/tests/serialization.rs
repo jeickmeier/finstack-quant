@@ -1,6 +1,4 @@
 //! Roundtrip serialization tests for covenant types.
-//!
-//! Ensures all covenant types serialize to JSON and deserialize back correctly.
 
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_covenants::{
@@ -21,7 +19,6 @@ fn date(year: i32, month: u8, day: u8) -> Date {
     .expect("Valid test date")
 }
 
-/// Helper to perform JSON roundtrip and assert equality.
 fn roundtrip<T>(value: &T) -> T
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
@@ -29,8 +26,6 @@ where
     let json = serde_json::to_string_pretty(value).expect("serialize to JSON");
     serde_json::from_str(&json).expect("deserialize from JSON")
 }
-
-// mod_types.rs
 
 #[test]
 fn covenant_report_roundtrip() {
@@ -54,8 +49,6 @@ fn covenant_report_passed_roundtrip() {
     let rt = roundtrip(&report);
     assert_eq!(report, rt);
 }
-
-// engine.rs
 
 #[test]
 fn covenant_type_all_variants_roundtrip() {
@@ -326,8 +319,6 @@ fn consequence_application_roundtrip() {
     assert_eq!(application, rt);
 }
 
-// forward.rs
-
 #[test]
 fn covenant_forecast_config_roundtrip() {
     let config = CovenantForecastConfig {
@@ -426,8 +417,6 @@ fn future_breach_roundtrip() {
     assert_eq!(breach, rt);
 }
 
-// schedule.rs
-
 #[test]
 fn threshold_schedule_roundtrip() {
     let schedule = ThresholdSchedule::new(vec![
@@ -453,11 +442,8 @@ fn threshold_schedule_deserialization_uses_constructor_validation() {
     assert!(error.to_string().contains("duplicate date"));
 }
 
-// Complex nested structures
-
 #[test]
 fn complex_covenant_package_roundtrip() {
-    // Simulates a full credit agreement covenant package
     let mut engine = CovenantEngine::new();
 
     // Leverage covenant with step-downs implied via multiple specs

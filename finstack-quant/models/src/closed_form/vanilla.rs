@@ -103,15 +103,12 @@ impl BsGreeks {
     /// Theta and rhos have no strict sign constraints.
     #[must_use]
     pub fn is_valid(&self) -> bool {
-        // Gamma must be non-negative
         if self.gamma < 0.0 {
             return false;
         }
-        // Vega must be non-negative
         if self.vega < 0.0 {
             return false;
         }
-        // All values must be finite
         self.delta.is_finite()
             && self.gamma.is_finite()
             && self.vega.is_finite()
@@ -249,10 +246,8 @@ pub fn bs_price_unchecked(
         };
     }
 
-    // Use combined d1_d2 to avoid redundant computation
     let (d1, d2) = d1_d2(spot, strike, rate, vol, expiry, div_yield);
 
-    // Compute CDFs - use symmetry N(-x) = 1 - N(x) to reduce calls
     let cdf_d1 = finstack_quant_core::math::norm_cdf(d1);
     let cdf_d2 = finstack_quant_core::math::norm_cdf(d2);
 
@@ -262,7 +257,6 @@ pub fn bs_price_unchecked(
     let raw_price = match option_type {
         OptionType::Call => spot * exp_q_t * cdf_d1 - strike * exp_r_t * cdf_d2,
         OptionType::Put => {
-            // Use symmetry: N(-x) = 1 - N(x)
             let cdf_m_d1 = 1.0 - cdf_d1;
             let cdf_m_d2 = 1.0 - cdf_d2;
             strike * exp_r_t * cdf_m_d2 - spot * exp_q_t * cdf_m_d1
@@ -434,40 +428,33 @@ pub fn bs_greeks_unchecked(
         };
     }
 
-    // Use combined d1_d2 to compute both values in one pass (avoids duplicate ln/sqrt)
     let (d1, d2) = d1_d2(spot, strike, rate, vol, expiry, div_yield);
 
-    // Pre-compute shared exponentials
     let exp_q_t = (-div_yield * expiry).exp();
     let exp_r_t = (-rate * expiry).exp();
     let sqrt_t = expiry.sqrt();
 
-    // PDF is always needed for gamma/vega/theta
     let pdf_d1 = finstack_quant_core::math::norm_pdf(d1);
 
-    // Compute CDFs only twice - use symmetry N(-x) = 1 - N(x) for the complements
     let cdf_d1 = finstack_quant_core::math::norm_cdf(d1);
     let cdf_d2 = finstack_quant_core::math::norm_cdf(d2);
-    let cdf_m_d1 = 1.0 - cdf_d1; // N(-d1) = 1 - N(d1)
-    let cdf_m_d2 = 1.0 - cdf_d2; // N(-d2) = 1 - N(d2)
+    let cdf_m_d1 = 1.0 - cdf_d1;
+    let cdf_m_d2 = 1.0 - cdf_d2;
 
     let delta = match option_type {
         OptionType::Call => exp_q_t * cdf_d1,
         OptionType::Put => -exp_q_t * cdf_m_d1,
     };
 
-    // Gamma is the same for calls and puts
     let gamma = if spot <= 0.0 || vol <= 0.0 || sqrt_t <= 0.0 {
         0.0
     } else {
         exp_q_t * pdf_d1 / (spot * vol * sqrt_t)
     };
 
-    // Vega is the same for calls and puts (per 1% vol)
     let vega = spot * exp_q_t * pdf_d1 * sqrt_t / ONE_PERCENT;
 
-    // Theta differs by option type
-    // Common term for both: -S * φ(d1) * σ * e^(-qT) / (2√T)
+    // Common annualized term: −S · φ(d1) · σ · e^(−qT) / (2√T)
     let theta_common = if sqrt_t > 0.0 {
         -spot * pdf_d1 * vol * exp_q_t / (2.0 * sqrt_t)
     } else {
@@ -644,7 +631,6 @@ pub(crate) fn bs_vega_unchecked(
     }
 
     let d1_val = d1(spot, strike, rate, vol, time, div_yield);
-    // Scale by 0.01 to represent sensitivity per 1% vol change
     0.01 * spot * (-div_yield * time).exp() * time.sqrt() * norm_pdf(d1_val)
 }
 
@@ -655,7 +641,6 @@ mod tests {
     #[test]
     fn test_bs_price_call_atm() {
         let price = bs_price_unchecked(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Call);
-        // ATM call with these params should be around 9-10
         assert!(price > 8.0 && price < 12.0, "price = {}", price);
     }
 
@@ -688,7 +673,6 @@ mod tests {
     #[test]
     fn test_bs_price_put_atm() {
         let price = bs_price_unchecked(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Put);
-        // Put-call parity check
         let call = bs_price_unchecked(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Call);
         let parity = call - price - 100.0 * (-0.02_f64).exp() + 100.0 * (-0.05_f64).exp();
         assert!(parity.abs() < 1e-10, "Put-call parity violated: {}", parity);

@@ -572,7 +572,6 @@ impl PathDependentPricer {
     where
         P: Payoff,
     {
-        // Create time grid
         let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
         self.price_with_grid(
             process,
@@ -732,7 +731,7 @@ impl PathDependentPricer {
                 .map(|result| result.estimate);
         }
 
-        // Create MC engine. Antithetic pairing is handled inline by the engine
+        // Antithetic pairing is handled inline by the engine
         // (see McEngine::simulate_antithetic_pair); path-capture + antithetic
         // is rejected at validate_runtime.
         let engine_config = McEngineConfig {
@@ -777,9 +776,6 @@ impl PathDependentPricer {
     }
 
     /// Price with full Monte Carlo result (including captured paths if enabled).
-    ///
-    /// This method returns a `MonteCarloResult` which includes the estimate
-    /// and optionally captured paths based on the pricer configuration.
     #[allow(clippy::too_many_arguments)]
     pub fn price_with_paths<P>(
         &self,
@@ -818,10 +814,8 @@ impl PathDependentPricer {
             );
         }
 
-        // Create time grid
         let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
 
-        // Create MC engine with path capture
         let engine_config = McEngineConfig {
             num_paths: self.config.num_paths,
             time_grid,
@@ -939,7 +933,6 @@ impl PathDependentPricer {
         let disc = ExactGbm::new();
         let initial_state = vec![initial_spot];
 
-        // Process metadata
         let process_params = process.metadata();
 
         let full = engine.price_with_capture(
@@ -953,7 +946,6 @@ impl PathDependentPricer {
             process_params,
         )?;
 
-        // Extract estimate and paths
         let estimate = full.estimate.clone();
         let paths = match &full.paths {
             Some(ds) => &ds.paths,
@@ -1180,7 +1172,6 @@ mod tests {
             .price(&gbm, 100.0, 1.0, 252, &asian, Currency::USD, 1.0)
             .expect("should succeed");
 
-        // Should get reasonable Asian option value
         assert!(result.mean.amount() > 0.0);
         assert!(result.mean.amount() < 20.0);
     }
@@ -1378,7 +1369,6 @@ mod tests {
             .price(&gbm, 100.0, 1.0, 252, &lookback, Currency::USD, 1.0)
             .expect("should succeed");
 
-        // Lookback should have positive value
         assert!(result.mean.amount() > 0.0);
     }
 

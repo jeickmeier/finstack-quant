@@ -68,14 +68,12 @@ impl PortfolioEclResult {
         let mut ecl_by_segment: IndexMap<String, f64> = IndexMap::new();
         let mut migration_matrix: IndexMap<Stage, IndexMap<Stage, usize>> = IndexMap::new();
 
-        // Initialize all stages
         for stage in &[Stage::Stage1, Stage::Stage2, Stage::Stage3] {
             ecl_by_stage.entry(*stage).or_insert(0.0);
             count_by_stage.entry(*stage).or_insert(0);
             ead_by_stage.entry(*stage).or_insert(0.0);
         }
 
-        // Build exposure lookup by id
         let exposure_map: IndexMap<&str, &super::types::Exposure> =
             exposures.iter().map(|e| (e.id.as_str(), e)).collect();
 
@@ -93,12 +91,10 @@ impl PortfolioEclResult {
             if let Some(exposure) = exposure_map.get(exp_id) {
                 *ead_by_stage.entry(stage).or_insert(0.0) += exposure.ead;
 
-                // Segment aggregation
                 for segment in &exposure.segments {
                     *ecl_by_segment.entry(segment.clone()).or_insert(0.0) += ecl;
                 }
 
-                // Migration matrix
                 if let Some(prev_stage) = &exposure.previous_stage {
                     let inner = migration_matrix.entry(*prev_stage).or_default();
                     *inner.entry(stage).or_insert(0) += 1;
@@ -154,8 +150,6 @@ impl PortfolioEclResult {
         self.exposure_results.len()
     }
 }
-
-// Provision waterfall
 
 /// Provision movement waterfall between two reporting dates.
 ///
@@ -218,7 +212,6 @@ pub fn compute_waterfall(
     let opening = previous.total_ecl;
     let closing = current.total_ecl;
 
-    // Build lookup maps by exposure_id
     let prev_map: IndexMap<&str, &ExposureEclResult> = previous
         .exposure_results
         .iter()
@@ -239,21 +232,18 @@ pub fn compute_waterfall(
     let mut cured_to_stage2 = 0.0;
     let mut remeasurement = 0.0;
 
-    // New originations: in current but not in previous
     for (id, curr_result) in &curr_map {
         if !prev_map.contains_key(id) {
             new_originations += curr_result.ecl_result.ecl;
         }
     }
 
-    // Derecognitions: in previous but not in current
     for (id, prev_result) in &prev_map {
         if !curr_map.contains_key(id) {
             derecognitions -= prev_result.ecl_result.ecl; // Negative = release
         }
     }
 
-    // Stage transfers and remeasurement for matched exposures
     for (id, curr_result) in &curr_map {
         if let Some(prev_result) = prev_map.get(id) {
             let prev_stage = prev_result.stage_result.stage;

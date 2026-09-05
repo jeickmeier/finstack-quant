@@ -215,8 +215,7 @@ pub fn geometric_asian_call(
 
 /// Price a geometric Asian call with explicit discount factor (DF-first API).
 ///
-/// This is the preferred entry point when `df` is known directly (e.g., from
-/// date-based curve lookup). Derives `r_eff = -ln(df)/t` internally.
+/// Derives `r_eff = -ln(df)/t` from a curve-looked-up discount factor.
 ///
 /// See [`geometric_asian_call`] for formula details.
 ///
@@ -249,7 +248,6 @@ pub fn geometric_asian_call_df(
         return Ok((spot - strike).max(0.0));
     }
     validate_discount_factor(df)?;
-    // Derive rate from DF (df validated strictly positive above).
     let rate = -df.ln() / time;
     Ok(geometric_asian_call_core(
         spot,
@@ -324,7 +322,6 @@ fn geometric_asian_call_core(
         rate - (rate - div_yield - 0.5 * vol * vol) * drift_factor - var_half
     };
 
-    // Now price as vanilla option with adjusted parameters
     vanilla_call_bs(spot, strike, time, rate, div_yield_adj, vol_adj)
 }
 
@@ -358,8 +355,7 @@ pub fn geometric_asian_put(
 
 /// Price a geometric Asian put with explicit discount factor (DF-first API).
 ///
-/// This is the preferred entry point when `df` is known directly (e.g., from
-/// date-based curve lookup). Derives `r_eff = -ln(df)/t` internally.
+/// Derives `r_eff = -ln(df)/t` from a curve-looked-up discount factor.
 ///
 /// See [`geometric_asian_call`] for formula details.
 ///
@@ -516,9 +512,8 @@ pub fn arithmetic_asian_call_tw(
 
 /// Price an arithmetic Asian call with explicit discount factor (DF-first API).
 ///
-/// This is the preferred entry point when `df` is known directly (e.g., from
-/// date-based curve lookup). Derives `r_eff = -ln(df)/t` internally for moment
-/// calculations that require a rate.
+/// Derives `r_eff = -ln(df)/t` internally for moment calculations that require a
+/// rate.
 ///
 /// See [`arithmetic_asian_call_tw`] for formula details.
 ///
@@ -597,10 +592,7 @@ fn arithmetic_asian_call_tw_core(
         return df * (m1 - strike).max(0.0);
     }
 
-    // Compute first moment: E[A]
     let m1 = compute_arithmetic_mean_first_moment(spot, time, rate, div_yield, num_fixings);
-
-    // Compute second moment: E[A²]
     let m2 = compute_arithmetic_mean_second_moment(spot, time, rate, div_yield, vol, num_fixings);
 
     // No-arbitrage upper bound: an arithmetic-average call cannot be worth more
@@ -610,7 +602,6 @@ fn arithmetic_asian_call_tw_core(
     // bound for deep-ITM / high-vol inputs, so every return path is capped.
     let upper_bound = df * m1;
 
-    // Match to lognormal distribution
     // For X ~ LogNormal(μ*, σ*²):
     // - E[X] = m1 = exp(μ* + σ*²/2)
     // - E[X²] = m2 = exp(2μ* + 2σ*²)
@@ -675,9 +666,8 @@ pub fn arithmetic_asian_put_tw(
 
 /// Price an arithmetic Asian put with explicit discount factor (DF-first API).
 ///
-/// This is the preferred entry point when `df` is known directly (e.g., from
-/// date-based curve lookup). Derives `r_eff = -ln(df)/t` internally for moment
-/// calculations that require a rate.
+/// Derives `r_eff = -ln(df)/t` internally for moment calculations that require a
+/// rate.
 ///
 /// See [`arithmetic_asian_call_tw`] for formula details.
 ///
@@ -1115,7 +1105,6 @@ fn compute_arithmetic_mean_second_moment(
     let n = num_fixings as f64;
     let dt = time / n;
 
-    // Exponent parameters
     let a = 2.0 * rate - 2.0 * div_yield + vol * vol; // coefficient for min(tᵢ, tⱼ)
     let b = rate - div_yield; // coefficient for |tᵢ - tⱼ|
     let a_minus_b = a - b; // = r - q + σ²
@@ -1136,7 +1125,6 @@ fn compute_arithmetic_mean_second_moment(
         // Each pair (i,j) with i<j contributes exp((a-b)·tᵢ + b·tⱼ)
         upper_acc.add((b * tk).exp() * prefix_ab);
 
-        // Update prefix sum for next iteration (i=k will be < next j)
         prefix_ab += (a_minus_b * tk).exp();
     }
 
@@ -1287,9 +1275,8 @@ mod tests {
     #[test]
     fn test_first_moment_computation() {
         let m1 = compute_arithmetic_mean_first_moment(100.0, 1.0, 0.05, 0.02, 12);
-        // Should be close to forward value
         let forward_approx = 100.0 * ((0.05_f64 - 0.02) * 1.0).exp();
-        assert!((m1 - forward_approx).abs() < 5.0); // Reasonable proximity
+        assert!((m1 - forward_approx).abs() < 5.0);
     }
 
     // ==================== DF-WRAPPER TESTS ====================
@@ -1354,7 +1341,6 @@ mod tests {
         let num_fixings = 26;
         let df = (-rate * time).exp();
 
-        // Geometric put
         let geo_put_rate =
             geometric_asian_put(spot, strike, time, rate, div_yield, vol, num_fixings);
         let geo_put_df =
@@ -1367,7 +1353,6 @@ mod tests {
             geo_put_df
         );
 
-        // Arithmetic put
         let arith_put_rate =
             arithmetic_asian_put_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
         let arith_put_df =
@@ -1385,7 +1370,6 @@ mod tests {
 
     #[test]
     fn test_tw_call_non_negative() {
-        // Ensure call prices are non-negative across parameter ranges
         for strike in [80.0, 100.0, 120.0] {
             for vol in [0.1, 0.2, 0.3, 0.5] {
                 let price = arithmetic_asian_call_tw(100.0, strike, 1.0, 0.05, 0.02, vol, 12);
@@ -1402,7 +1386,6 @@ mod tests {
 
     #[test]
     fn test_tw_put_non_negative() {
-        // Ensure put prices are non-negative across parameter ranges
         for strike in [80.0, 100.0, 120.0] {
             for vol in [0.1, 0.2, 0.3, 0.5] {
                 let price = arithmetic_asian_put_tw(100.0, strike, 1.0, 0.05, 0.02, vol, 12);
@@ -1504,7 +1487,6 @@ mod tests {
         let m1 = compute_arithmetic_mean_first_moment(spot, time, rate, div_yield, num_fixings);
         let intrinsic = df * (m1 - strike);
 
-        // For deep ITM, price should be close to intrinsic
         assert!(
             (price - intrinsic).abs() < 2.0,
             "Deep ITM call {} should be close to intrinsic {}",

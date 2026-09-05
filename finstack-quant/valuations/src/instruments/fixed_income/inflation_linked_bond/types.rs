@@ -577,8 +577,9 @@ impl InflationLinkedBond {
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
-    /// * `bond_params` - Bond params used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `id` - Trade identifier stored on the gilt and used in results and serialization.
+    /// * `bond_params` - UK linker economics: notional, real coupon, frequency, day count,
+    ///   issue, maturity, and base RPI.
     /// * `base_date` - Curve or model anchor date from which times are measured.
     /// * `discount_curve_id` - Identifier of the discount curve used for present-value calculations.
     /// * `inflation_index_id` - Identifier of the inflation index used for fixing lookup.

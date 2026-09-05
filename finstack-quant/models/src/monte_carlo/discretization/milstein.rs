@@ -176,7 +176,6 @@ mod tests {
 
         disc.step(&process, t, dt, &mut x, &z, &mut work);
 
-        // Should be positive
         assert!(x[0] > 0.0);
         // Should have moved up (positive drift + positive shock)
         assert!(x[0] > 100.0);

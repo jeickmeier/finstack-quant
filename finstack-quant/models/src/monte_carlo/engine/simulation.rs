@@ -283,13 +283,12 @@ impl McEngine {
             let state_vec = SmallVec::from_slice(state);
             let mut point = PathPoint::with_state(step + 1, t + dt, state_vec);
 
-            // Transfer cashflows from PathState to PathPoint
             path_state.drain_cashflows(|time, amount, cf_type| {
                 point.add_typed_cashflow(time, amount, cf_type);
             });
 
             if self.config.path_capture.capture_payoffs {
-                // Capture intermediate payoff value (undiscounted)
+                // Undiscounted intermediate payoff.
                 let payoff_money = payoff.value(currency)?;
                 point.set_payoff(payoff_money.amount());
             }

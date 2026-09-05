@@ -610,16 +610,12 @@ impl ModelBuilder<Ready> {
         let node_id = node_id.into();
         let formula = formula.into();
 
-        // Validate node ID doesn't use reserved prefixes
         validate_node_id(node_id.as_str())?;
 
-        // Basic validation: formula should not be empty
         if formula.trim().is_empty() {
             return Err(Error::formula_parse("Formula cannot be empty"));
         }
 
-        // Validate formula syntax by attempting to parse and compile
-        // This catches syntax errors and invalid function arguments early
         crate::dsl::parse_and_compile(&formula)?;
 
         let node = NodeSpec::new(node_id.clone(), NodeType::Calculated).with_formula(formula);
@@ -712,9 +708,7 @@ impl ModelBuilder<Ready> {
     ) -> Self {
         let node_id = node_id.into();
 
-        // Get or create the node (converting to Mixed type if needed)
         if let Some(node) = self.nodes.get_mut(node_id.as_str()) {
-            // Set forecast on existing node
             node.forecast = Some(forecast_spec);
 
             // A node carrying a forecast must be Mixed so precedence resolves
@@ -726,7 +720,6 @@ impl ModelBuilder<Ready> {
                 node.node_type = NodeType::Mixed;
             }
         } else {
-            // Create new Mixed node with just the forecast
             let node = NodeSpec::new(node_id.clone(), NodeType::Mixed).with_forecast(forecast_spec);
             self.nodes.insert(node_id, node);
         }
@@ -950,10 +943,8 @@ impl ModelBuilder<Ready> {
         qualified_id: &str,
         registry: &crate::registry::Registry,
     ) -> Result<&mut Self> {
-        // Get dependencies (in dependency order)
         let dependencies = registry.get_metric_dependencies(qualified_id)?;
 
-        // Extract namespace from qualified_id
         let namespace = qualified_id
             .split('.')
             .next()
@@ -963,12 +954,10 @@ impl ModelBuilder<Ready> {
             )))?;
         let metrics_in_namespace = Self::metric_ids_in_namespace(registry, namespace);
 
-        // Add all dependencies first (if not already added)
         for dep_id in dependencies {
             if !self.nodes.contains_key(dep_id.as_str()) {
                 let dep_metric = registry.get(&dep_id)?;
 
-                // Update formula to use qualified references for metrics in the same namespace
                 let formula = Self::qualify_metric_references_with_namespace_set(
                     &dep_metric.definition.formula,
                     namespace,
@@ -979,11 +968,9 @@ impl ModelBuilder<Ready> {
             }
         }
 
-        // Add the requested metric (if not already added)
         if !self.nodes.contains_key(qualified_id) {
             let stored_metric = registry.get(qualified_id)?;
 
-            // Update formula to use qualified references for metrics in the same namespace
             let formula = Self::qualify_metric_references_with_namespace_set(
                 &stored_metric.definition.formula,
                 namespace,
@@ -1004,10 +991,7 @@ impl ModelBuilder<Ready> {
         let prefix = format!("{namespace}.");
         registry
             .namespace(namespace)
-            .map(|(id, _)| {
-                // Extract unqualified ID
-                id.strip_prefix(&prefix).unwrap_or(id).to_string()
-            })
+            .map(|(id, _)| id.strip_prefix(&prefix).unwrap_or(id).to_string())
             .collect()
     }
 
@@ -1016,7 +1000,6 @@ impl ModelBuilder<Ready> {
         namespace: &str,
         metrics_in_namespace: &IndexSet<String>,
     ) -> String {
-        // Use shared utility to qualify identifiers
         crate::utils::formula::qualify_identifiers(formula, metrics_in_namespace, namespace)
     }
 
@@ -1182,7 +1165,6 @@ impl MixedNodeBuilder {
     pub fn try_formula(&mut self, formula: impl Into<String>) -> Result<&mut Self> {
         let formula = formula.into();
 
-        // Validate formula syntax
         if formula.trim().is_empty() {
             return Err(Error::formula_parse("Formula cannot be empty"));
         }

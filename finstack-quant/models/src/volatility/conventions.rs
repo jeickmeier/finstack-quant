@@ -31,27 +31,25 @@ pub(super) fn validate_forward_for_convention(
         VolatilityConvention::Normal => Ok(()),
         VolatilityConvention::Lognormal => {
             if forward_rate <= 0.0 {
-                Err(InputError::NonPositiveForwardForLognormal {
+                return Err(InputError::NonPositiveForwardForLognormal {
                     forward: forward_rate,
                     required_shift: (-forward_rate).max(0.0) + 1e-4,
                 }
-                .into())
-            } else {
-                Ok(())
+                .into());
             }
+            Ok(())
         }
         VolatilityConvention::ShiftedLognormal { shift } => {
             let shifted = forward_rate + shift;
             if shifted <= 0.0 {
-                Err(InputError::NonPositiveShiftedForward {
+                return Err(InputError::NonPositiveShiftedForward {
                     forward: forward_rate,
                     shift,
                     shifted,
                 }
-                .into())
-            } else {
-                Ok(())
+                .into());
             }
+            Ok(())
         }
     }
 }

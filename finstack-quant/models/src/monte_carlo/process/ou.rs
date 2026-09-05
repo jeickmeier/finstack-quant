@@ -222,15 +222,13 @@ impl HullWhite1FParams {
 
     /// Get θ(t) at a given time.
     pub fn theta_at_time(&self, t: f64) -> f64 {
-        // Find the appropriate theta value for time t
-        // Use piecewise-constant interpolation
+        // Piecewise-constant interpolation.
         for i in (0..self.theta_times.len()).rev() {
             if t >= self.theta_times[i] {
                 return self.theta_curve[i];
             }
         }
 
-        // If t < first breakpoint, use first value
         self.theta_curve[0]
     }
 
@@ -368,8 +366,6 @@ impl StochasticProcess for HullWhite1FProcess {
         }
     }
 }
-
-// Curve-Derived θ(t) Calibration
 
 /// Build Hull-White 1F parameters with θ(t) derived from a discount curve.
 ///
@@ -539,10 +535,10 @@ where
         return instantaneous_forward(discount_curve_fn, t);
     }
 
-    // Compute f(0,t) = instantaneous forward rate
+    // f(0,t) = instantaneous forward rate
     let f_t = instantaneous_forward(discount_curve_fn, t);
 
-    // Compute ∂f/∂t via finite difference
+    // ∂f/∂t via finite difference
     let df_dt = forward_derivative(discount_curve_fn, t);
 
     // Vol-correction term in the Vasicek convention: σ²/(2κ²)·(1 − e^{−2κt}).
@@ -663,7 +659,6 @@ mod tests {
 
         process.drift(0.0, &x, &mut drift);
 
-        // Drift should be negative (pull back to mean)
         assert!(drift[0] < 0.0);
         assert_eq!(drift[0], 0.1 * (0.03 - 0.04));
     }
@@ -678,7 +673,6 @@ mod tests {
 
         process.diffusion(0.0, &x, &mut diffusion);
 
-        // Constant diffusion
         assert_eq!(diffusion[0], 0.01);
     }
 
@@ -711,7 +705,6 @@ mod tests {
         assert_eq!(params.sigma_at_time(0.0), 0.01);
         assert_eq!(params.theta_times().len(), 5);
 
-        // Theta values should be positive and reasonable
         for &theta in params.theta_values() {
             assert!(theta.is_finite(), "Theta must be finite");
             assert!(

@@ -132,7 +132,6 @@ impl MertonModel {
         let dt = horizon / num_steps as f64;
         let sqrt_dt = dt.sqrt();
 
-        // Build time grid: t = 0, dt, 2*dt, ..., T
         let times: Vec<f64> = (0..=num_steps).map(|i| i as f64 * dt).collect();
 
         let v0 = self.asset_value;
@@ -140,7 +139,6 @@ impl MertonModel {
         let r = self.risk_free_rate;
         let q = self.payout_rate;
 
-        // Determine drift and whether we have jumps
         let (drift_per_step, jump_params) = match &self.dynamics {
             AssetDynamics::GeometricBrownian | AssetDynamics::CreditGrades { .. } => {
                 let drift = (r - q - 0.5 * sigma * sigma) * dt;
@@ -161,7 +159,6 @@ impl MertonModel {
 
         let diffusion = sigma * sqrt_dt;
 
-        // Determine how many base paths to generate
         let (n_base, gen_antithetic) = if antithetic {
             // For num_paths requested: generate ceil(num_paths/2) base paths
             // and their mirrors. Total = 2 * n_base.
@@ -178,10 +175,8 @@ impl MertonModel {
         let mut normals = vec![0.0; num_steps];
 
         for _ in 0..n_base {
-            // Generate normals for this base path
             normals.iter_mut().for_each(|z| *z = rng.normal(0.0, 1.0));
 
-            // Generate jump data if needed
             let jump_data: Option<Vec<StepJumpData>> = jump_params.map(|(lambda, _, _)| {
                 let lambda_dt = lambda * dt;
                 (0..num_steps)
@@ -209,7 +204,6 @@ impl MertonModel {
                 let z = normals[step];
                 v *= (drift_per_step + diffusion * z).exp();
 
-                // Apply jumps if present
                 if let (Some(ref jd), Some((_, mu_j, sigma_j))) = (&jump_data, jump_params) {
                     let jump_step = &jd[step];
                     for &jz in jump_step.jump_normals.iter().take(jump_step.base_count) {
@@ -224,7 +218,6 @@ impl MertonModel {
                 all_paths.push(v);
             }
 
-            // Build the antithetic (mirror) path if requested
             if gen_antithetic && all_paths.len() / values_per_path < num_paths {
                 all_paths.push(v0);
                 let mut v_anti = v0;

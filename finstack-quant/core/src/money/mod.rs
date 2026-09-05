@@ -15,21 +15,17 @@
 //! # fn main() -> finstack_quant_core::Result<()> {
 //!
 //! let gross = Money::new(125.25, Currency::USD).expect("valid money fixture");
-//! let tax   = Money::new(10.00, Currency::USD).expect("valid money fixture");
+//! let tax = Money::new(10.00, Currency::USD).expect("valid money fixture");
 //! let total = gross.checked_add(tax)?;
 //! assert_eq!(format!("{}", total), "USD 135.25");
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! Default constructors ([`Money::new`][crate::money::Money::new],
-//! [`Money::new`][crate::money::Money::new]) preserve the raw finite
-//! amount without rounding -- internal pricing math relies on retained
-//! precision. Use
-//! [`Money::new_with_config`][crate::money::Money::new_with_config]
-//! (or [`Money::new_with_config`][crate::money::Money::new_with_config]) when
-//! you explicitly want ISO-4217 minor-unit rounding for ledger-style
-//! construction.
+//! [`Money::new`][crate::money::Money::new] preserves the raw finite amount
+//! without rounding — internal pricing math relies on retained precision. Use
+//! [`Money::new_with_config`][crate::money::Money::new_with_config] when you
+//! explicitly want ISO-4217 minor-unit rounding for ledger-style construction.
 /// Submodule for FX interfaces.
 pub mod fx;
 

@@ -140,7 +140,8 @@ impl CompiledExpr {
     ///
     /// # Arguments
     ///
-    /// * `ast` - Ast used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `ast` - Expression tree to compile. Statements-layer functions such as
+    ///   `Ttm` are accepted here and fail at [`Self::eval`].
     pub fn new(ast: Expr) -> Self {
         Self {
             ast,
@@ -167,7 +168,8 @@ impl CompiledExpr {
     ///
     /// # Arguments
     ///
-    /// * `ast` - Ast used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `ast` - Expression tree that must be evaluable by the scalar engine;
+    ///   period-aware functions are rejected immediately.
     pub fn try_new_scalar(ast: Expr) -> crate::Result<Self> {
         super::ast_walk::ensure_scalar_evaluable(&ast)?;
         Ok(Self::new(ast))
@@ -217,12 +219,10 @@ impl CompiledExpr {
     /// than that are truncated. Missing tail values therefore propagate as
     /// NaN rather than being silently zero-filled.
     ///
-    /// The context determines the column position for each named expression
-    /// reference. An explicit plan in `opts` takes precedence over a plan
-    /// attached to this instance; otherwise a plan is built once and retained
-    /// for subsequent calls with a default-config metadata snapshot. Evaluation
-    /// does not add timing or parallelism data to that metadata. The compiled
-    /// expression may reuse plan topology and scratch allocation, but every call
+    /// The context maps column names to positions in `cols`. A plan attached
+    /// via [`Self::with_planning`] is reused; otherwise a plan is built once
+    /// and cached. Auto-built plans carry a default-config metadata snapshot.
+    /// Evaluation does not add timing or parallelism data. Every call
     /// recomputes values from the supplied columns.
     ///
     /// # Errors
@@ -236,18 +236,16 @@ impl CompiledExpr {
     ///
     /// # Arguments
     ///
-    /// * `ctx` - Market or evaluation context supplying dependencies required by the calculation.
-    /// * `cols` - Cols used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `opts` - Options controlling validation, interpolation, or execution behavior.
+    /// * `ctx` - Column-name to index map used to resolve `Expr` column references.
+    /// * `cols` - Column arrays aligned with `ctx`; output length is the first
+    ///   column's length.
+    /// * `opts` - Arena size limit; `max_arena_bytes = 0` disables the configured cap.
     pub fn eval(
         &self,
         ctx: &SimpleContext,
         cols: &[&[f64]],
         opts: EvalOpts,
     ) -> crate::Result<EvaluationResult> {
-        // Decide on execution plan preference: self > lazy-cached auto-build.
-        // Use references to avoid cloning ExecutionPlan (which contains Vec<DagNode>
-        // with recursive Expr trees). Only build a new owned plan when none exists.
         let owned_plan;
         let plan_to_use: &ExecutionPlan = if let Some(ref plan) = self.plan {
             plan
@@ -265,8 +263,6 @@ impl CompiledExpr {
                     )
                 })?,
                 Err(plan) => {
-                    // Race: another thread set it first. Use theirs (already cached).
-                    // Keep our plan alive for this call as a fallback.
                     owned_plan = plan;
                     self.lazy_plan.get().unwrap_or(&owned_plan)
                 }
@@ -366,10 +362,6 @@ impl CompiledExpr {
             eval_result?
         };
 
-        // Stamp the metadata carried by the execution plan (set by the caller
-        // via `with_planning`); auto-built plans carry the
-        // default-config snapshot. The evaluator does not record
-        // timings/cache/parallel.
         let meta = plan_to_use.meta.clone();
 
         Ok(EvaluationResult {

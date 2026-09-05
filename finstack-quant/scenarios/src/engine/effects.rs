@@ -11,13 +11,10 @@ use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashSet;
 
-/// Dispatch a single operation to the appropriate adapter and produce its effects.
+/// Dispatch one operation to its adapter and produce effects.
 ///
-/// Centralised match — the engine relies on Rust's exhaustiveness checker to
-/// catch any newly added [`OperationSpec`] variant at compile time. Hierarchy-
-/// targeted variants and `TimeRollForward` are handled separately and are
-/// unreachable here (hierarchy variants are expanded upstream and time-roll is
-/// processed in Phase 0 before this function is invoked).
+/// Hierarchy variants and `TimeRollForward` are handled upstream; reaching
+/// them here is an engine bug and returns [`crate::error::Error::Internal`].
 fn generate_effects(
     op: &OperationSpec,
     ctx: &ExecutionContext,
@@ -137,13 +134,6 @@ fn generate_effects(
         | OperationSpec::HierarchyVolSurfaceParallelPct { .. }
         | OperationSpec::HierarchyEquityPricePct { .. }
         | OperationSpec::HierarchyBaseCorrParallelPts { .. } => {
-            // These variants should never reach the centralized dispatch:
-            // `TimeRollForward` is processed in Phase 0 and `Hierarchy*` ops
-            // are expanded upstream by `expand_hierarchy_operations`. Returning
-            // a typed error rather than panicking preserves the
-            // `#![deny(clippy::panic)]` discipline and lets the caller surface
-            // the bug through the normal error path instead of crashing the
-            // process.
             Err(crate::error::Error::Internal(format!(
                 "scenario engine reached centralized dispatch for an op that should have been \
                  handled upstream (Phase 0 or hierarchy expansion); this indicates a bug in the \
@@ -316,10 +306,6 @@ pub(super) struct EffectSink<'a> {
     pub changes: &'a mut ScenarioChangeManifest,
 }
 
-/// Process a single op's effects, threading them through `pending_bumps`,
-/// `deferred_stmts`, and the running counters. Extracted from `apply` to keep
-/// the main pipeline readable; the dispatch is otherwise identical to the
-/// inline match.
 pub(super) fn process_effects(
     op: &OperationSpec,
     ctx: &mut ExecutionContext,
@@ -340,9 +326,6 @@ pub(super) fn apply_generated_effects(
     for effect in effects {
         match effect {
             ScenarioEffect::MarketBump(b) => {
-                // Within a single op's effects, two bumps targeting the same
-                // curve/surface/FX pair must compose sequentially rather than
-                // collapse into one batch entry; flush before queueing if so.
                 if would_conflict_with_pending(sink.pending_bumps, &b) {
                     flush_pending_bumps(sink.pending_bumps, ctx.market)?;
                 }
@@ -355,9 +338,6 @@ pub(super) fn apply_generated_effects(
             }
             ScenarioEffect::Warning(w) => sink.warnings.push(w),
             ScenarioEffect::UpdateCurve(storage) => {
-                // Flush any pending bumps so the curve replacement observes
-                // the bumped market state in the same order as the original
-                // per-effect application.
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
                 match market_target_for_curve_update(op, &storage) {
                     Some(target) => sink.changes.record_market_target(target),
@@ -441,11 +421,8 @@ pub(super) fn flush_pending_bumps(
 /// Returns `true` when applying `incoming` would collide with a pending bump.
 ///
 /// `MarketContext::bump_observed` keys [`MarketBump::Curve`] effects in a
-/// `HashMap<CurveId, BumpSpec>`, so two bumps targeting the same curve in a
-/// single batch would overwrite each other instead of composing
-/// `pre * (1+a) * (1+b)`. To preserve the established sequential semantics,
-/// we flush the pending batch whenever a new bump would land on the same
-/// target as an already-queued one.
+/// `HashMap<CurveId, BumpSpec>`, so two same-target bumps in one batch would
+/// overwrite instead of composing `pre * (1+a) * (1+b)`.
 fn would_conflict_with_pending(pending: &[MarketBump], incoming: &MarketBump) -> bool {
     pending.iter().any(|p| match (p, incoming) {
         (
@@ -475,8 +452,6 @@ fn would_conflict_with_pending(pending: &[MarketBump], incoming: &MarketBump) ->
             MarketBump::BaseCorrBucketPts { surface_id: a, .. },
             MarketBump::BaseCorrBucketPts { surface_id: b, .. },
         ) => a == b,
-        // A `Curve` bump on the same id as a `VolBucketPct` is also a logical
-        // conflict (both target a vol surface) — flush to be safe.
         (
             MarketBump::Curve { id: a, .. },
             MarketBump::VolBucketPct {

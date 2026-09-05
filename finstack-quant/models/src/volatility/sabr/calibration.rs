@@ -664,7 +664,6 @@ impl SabrCalibrator {
             )));
         }
 
-        // Use analytical derivatives from the parent module
         use crate::volatility::sabr_derivatives::{SabrCalibrationDerivatives, SabrMarketData};
         use finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver;
 
@@ -677,14 +676,12 @@ impl SabrCalibrator {
             shift: None,
         };
 
-        // Finite-difference derivatives provider for the LM solver.
         let derivatives_provider = SabrCalibrationDerivatives::new(market_data.clone());
 
         let solver = LevenbergMarquardtSolver::new()
             .with_tolerance(self.tolerance)
             .with_max_iterations(self.max_iterations);
 
-        // Define objective function: sum of squared volatility errors
         let objective = move |params: &[f64]| -> f64 {
             let alpha = params[0];
             let nu = params[1];
@@ -711,7 +708,6 @@ impl SabrCalibrator {
             }
         };
 
-        // Initial guess for parameters
         let atm_vol = self.find_atm_vol(forward, strikes, market_vols)?;
         let initial = vec![
             initial_alpha_guess(atm_vol, forward, beta), // alpha
@@ -719,14 +715,12 @@ impl SabrCalibrator {
             0.0,                                         // rho
         ];
 
-        // Parameter bounds
         let bounds = vec![
             (1e-6, 5.0),   // alpha bounds
             (1e-6, 2.0),   // nu bounds
             (-0.99, 0.99), // rho bounds
         ];
 
-        // Solve with analytical derivatives
         let solution = solver.minimize_with_derivatives(
             objective,
             &derivatives_provider,
@@ -788,7 +782,6 @@ impl SabrCalibrator {
             return Ok(last.1);
         }
 
-        // Find the bracket [k_lo, k_hi] with k_lo <= forward < k_hi.
         for window in quotes.windows(2) {
             let (k_lo, v_lo) = window[0];
             let (k_hi, v_hi) = window[1];
@@ -817,11 +810,10 @@ impl SabrCalibrator {
         Ok(first.1)
     }
 
-    /// Calibrate SABR with ATM volatility pinning (market-standard approach).
+    /// Calibrate SABR with ATM volatility pinning.
     ///
-    /// This method ensures the calibrated model matches the ATM volatility exactly
-    /// by solving for alpha analytically, then fitting only nu and rho to the smile.
-    /// This is the standard market approach for SABR calibration.
+    /// Solves for alpha analytically so the model matches ATM vol exactly, then
+    /// fits only nu and rho to the smile.
     ///
     /// # Arguments
     /// * `forward` - Forward rate
@@ -973,10 +965,8 @@ pub(super) fn solve_alpha_for_atm(
 
     const MAX_ITER: usize = 50;
 
-    // Newton iteration to refine alpha
     let mut last_error = f64::INFINITY;
     for _ in 0..MAX_ITER {
-        // Compute model ATM vol with current alpha
         let params = SabrParameters::new(alpha, beta, nu, rho)?;
         let model = SabrModel::new(params);
         let model_vol = model.atm_volatility(forward, time_to_expiry)?;
@@ -1000,9 +990,8 @@ pub(super) fn solve_alpha_for_atm(
 
         // Newton step with damping for stability
         let step = -error / d_vol_d_alpha;
-        alpha += step.clamp(-alpha * 0.5, alpha * 0.5); // Limit step size
+        alpha += step.clamp(-alpha * 0.5, alpha * 0.5);
 
-        // Ensure alpha stays positive
         if alpha <= 0.0 {
             alpha = target_atm_vol * f_pow * 0.5;
         }

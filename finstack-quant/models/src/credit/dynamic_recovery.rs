@@ -211,7 +211,6 @@ impl DynamicRecoverySpec {
                 r.max(floor)
             }
         };
-        // Clamp to [0, base_recovery]
         raw.clamp(0.0, self.base_recovery)
     }
 

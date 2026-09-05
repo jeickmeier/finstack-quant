@@ -32,20 +32,16 @@ use indexmap::IndexMap;
 /// let analyzer = SensitivityAnalyzer::new(&model);
 /// let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
 ///
-/// // Define parameter to vary
 /// config.add_parameter(ParameterSpec::with_percentages(
 ///     "revenue",
 ///     PeriodId::quarter(2025, 1).expect("valid period fixture"),
 ///     100_000.0,
 ///     vec![-10.0, 0.0, 10.0],
 /// ));
-///
-/// // Define target metric to observe
 /// config.add_target_metric("gross_profit");
 ///
-/// // Run sensitivity analysis
 /// let result = analyzer.run(&config)?;
-/// assert_eq!(result.scenarios.len(), 3); // One for each perturbation
+/// assert_eq!(result.scenarios.len(), 3);
 /// # Ok(())
 /// # }
 /// ```
@@ -431,8 +427,6 @@ pub(crate) fn descending_f64(lhs: f64, rhs: f64) -> std::cmp::Ordering {
     let rhs = if rhs.is_nan() { f64::NEG_INFINITY } else { rhs };
     rhs.total_cmp(&lhs)
 }
-
-// ── Tornado chart generation ──
 
 /// Generate tornado chart entries for a specific metric from sensitivity results.
 ///

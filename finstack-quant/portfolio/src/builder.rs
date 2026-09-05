@@ -350,7 +350,6 @@ impl PortfolioBuilder {
             crate::error::Error::ValidationFailed("Valuation date (as_of) must be set".to_string())
         })?;
 
-        // Auto-create dummy entity if needed
         let needs_dummy = self
             .positions
             .iter()
@@ -441,7 +440,6 @@ mod tests {
             .build()
             .expect("test should succeed");
 
-        // Dummy entity should be auto-created
         assert!(portfolio.entities.contains_key(DUMMY_ENTITY_ID));
         assert_eq!(portfolio.positions.len(), 1);
     }

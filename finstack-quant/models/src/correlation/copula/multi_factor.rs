@@ -294,7 +294,6 @@ mod tests {
             copula.conditional_default_prob(threshold, factors, correlation)
         });
 
-        // Should be close to unconditional
         assert!(
             (integrated_prob - pd).abs() < 0.01,
             "Integrated probability {} should be close to unconditional {}",

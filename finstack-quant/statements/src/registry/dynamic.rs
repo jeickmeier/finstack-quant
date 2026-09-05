@@ -156,14 +156,12 @@ impl Registry {
     pub fn load_registry(&mut self, registry: MetricRegistry) -> Result<()> {
         let namespace = registry.namespace.clone();
 
-        // Validate namespace
         if namespace.is_empty() {
             return Err(Error::registry(
                 "Namespace cannot be empty. Provide a namespace identifier (e.g., 'fin', 'custom')."
             ));
         }
 
-        // Sort metrics by dependency order
         let sorted_metrics = self.sort_metrics_by_dependencies(&registry)?;
 
         // Validate and stage into a local buffer first, committing to `self`
@@ -194,7 +192,6 @@ impl Registry {
             ));
         }
 
-        // Commit atomically.
         self.namespaces.insert(namespace);
         for (qualified_id, stored) in staged {
             self.metrics.insert(qualified_id, stored);
@@ -294,8 +291,6 @@ impl Registry {
     ) -> Result<Vec<MetricDefinition>> {
         let namespace = &registry.namespace;
 
-        // Build map of metric_id -> MetricDefinition for lookup.
-        //
         // Collision must be detected here rather than left to `IndexMap`'s
         // last-wins insert: coalescing two same-id definitions into one entry
         // would silently discard a metric *before* `load_registry`'s duplicate
@@ -316,27 +311,19 @@ impl Registry {
             metric_map.insert(m.id.to_owned(), m.clone());
         }
 
-        // Build dependency graph: metric_id -> set of metrics it depends on
         let mut dependencies: IndexMap<String, IndexSet<String>> = IndexMap::new();
 
-        // Collect already-loaded metrics from the same namespace (these are valid dependencies)
         let mut existing_metric_ids: IndexSet<String> = IndexSet::new();
         for (qualified_id, stored) in &self.metrics {
             if stored.namespace == *namespace {
-                // Extract just the metric ID (without namespace prefix)
                 if let Some(id) = qualified_id.strip_prefix(&format!("{}.", namespace)) {
                     existing_metric_ids.insert(id.to_string());
                 }
             }
         }
 
-        // Build the set of all metric IDs that can participate in dependency analysis:
-        // - metrics that are already loaded in this namespace
-        // - metrics that are being loaded from the current registry
-        //
-        // This allows us to:
-        // - detect true circular dependencies between metrics in the same registry, and
-        // - still treat references to previously loaded metrics as valid (external) dependencies.
+        // Include already-loaded metrics in this namespace so intra-document
+        // cycles are detected while prior metrics remain valid dependencies.
         let mut all_metric_ids: IndexSet<String> = existing_metric_ids;
         for metric_id in metric_map.keys() {
             all_metric_ids.insert(metric_id.clone());
@@ -396,12 +383,9 @@ impl Registry {
     /// normally avoid the latter case because formulas are checked at load
     /// time.
     pub fn get_metric_dependencies(&self, qualified_id: &str) -> Result<Vec<String>> {
-        // Recursively get transitive dependencies
         let mut all_deps = IndexSet::new();
         let mut visited = IndexSet::new();
         self.collect_transitive_dependencies(qualified_id, &mut all_deps, &mut visited)?;
-
-        // Return in dependency order (dependencies before dependents)
         Ok(all_deps.into_iter().collect())
     }
 
@@ -412,7 +396,6 @@ impl Registry {
         all_deps: &mut IndexSet<String>,
         visited: &mut IndexSet<String>,
     ) -> Result<()> {
-        // Avoid infinite loops
         if visited.contains(qualified_id) {
             return Ok(());
         }
@@ -421,7 +404,6 @@ impl Registry {
         let metric = self.get(qualified_id)?;
         let namespace = &metric.namespace;
 
-        // Get all metric IDs in this namespace
         let all_metric_ids: IndexSet<String> = self
             .namespace(namespace)
             .map(|(id, _)| {
@@ -431,10 +413,8 @@ impl Registry {
             })
             .collect();
 
-        // Extract direct dependencies
         let deps = self.extract_metric_dependencies(&metric.definition.formula, &all_metric_ids)?;
 
-        // Recursively process each dependency
         for dep_id in deps {
             let dep_qualified = format!("{}.{}", namespace, dep_id);
             if self.has(&dep_qualified) {

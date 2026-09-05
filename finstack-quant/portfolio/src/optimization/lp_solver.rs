@@ -76,7 +76,6 @@ impl DefaultLpOptimizer {
             }
         };
 
-        // Scan objective
         match &problem.objective {
             super::types::Objective::Maximize(expr) | super::types::Objective::Minimize(expr) => {
                 match expr {
@@ -88,7 +87,6 @@ impl DefaultLpOptimizer {
             }
         }
 
-        // Scan constraints
         for constraint in &problem.constraints {
             match constraint {
                 Constraint::MetricBound { metric, .. } => match metric {
@@ -369,7 +367,6 @@ impl DefaultLpOptimizer {
             }
         }
 
-        // Step 4: Build objective coefficients.
         let objective_expr = &problem.objective;
         let coeffs_objective = match objective_expr {
             super::types::Objective::Maximize(expr) | super::types::Objective::Minimize(expr) => {
@@ -382,7 +379,6 @@ impl DefaultLpOptimizer {
             }
         };
 
-        // Step 5: Build constraints as LP rows.
         let mut lp_constraints: Vec<LpConstraint> = Vec::new();
 
         for constraint in &problem.constraints {
@@ -487,9 +483,9 @@ impl DefaultLpOptimizer {
     /// Declare `good_lp` variables, assemble the objective and constraint rows
     /// into a solver model, and solve it.
     ///
-    /// This covers Step 6 of [`Self::optimize`]. On solver failure the error is
-    /// mapped to a structured [`OptimizationStatus`] and surfaced as `Ok(Err)`
-    /// so the caller can build the failure-result envelope.
+    /// On solver failure the error is mapped to a structured
+    /// [`OptimizationStatus`] and surfaced as `Ok(Err)` so the caller can
+    /// build the failure-result envelope.
     #[allow(clippy::type_complexity)]
     fn assemble_and_solve(
         problem: &PortfolioOptimizationProblem,
@@ -499,11 +495,9 @@ impl DefaultLpOptimizer {
         rows: &LpRows,
         n_vars: usize,
     ) -> Result<std::result::Result<AssembledModel, OptimizationStatus>> {
-        // Step 6: Assemble LP model using good_lp.
         let maximise = matches!(problem.objective, super::types::Objective::Maximize(_));
         let mut vars = good_lp::variables!();
 
-        // Decision variables w_i
         let mut w_vars = Vec::with_capacity(n_vars);
         for (item, feat) in decision_items.iter().zip(decision_features) {
             let current_weight = current_weights
@@ -527,7 +521,6 @@ impl DefaultLpOptimizer {
             w_vars.push(vars.add(variable().min(var_min).max(var_max)));
         }
 
-        // Auxiliary variables for turnover t_i (|w_i - w0_i|) if needed.
         let has_turnover_constraint = problem
             .constraints
             .iter()
@@ -553,11 +546,6 @@ impl DefaultLpOptimizer {
         }
         .using(default_solver);
 
-        // NOTE: effective-weight bounds are implicit: each variable is
-        // declared directly on `[min_w, max_w]`. No additional constraints
-        // are needed — they would be algebraically redundant.
-
-        // Add primary constraints
         for lc in &rows.lp_constraints {
             if lc.is_turnover_placeholder {
                 continue;
@@ -575,7 +563,6 @@ impl DefaultLpOptimizer {
             };
         }
 
-        // Turnover constraint with auxiliary variables: Σ t_i <= max_turnover.
         if let Some(Constraint::MaxTurnover { max_turnover, .. }) = problem
             .constraints
             .iter()
@@ -604,15 +591,9 @@ impl DefaultLpOptimizer {
             problem_model = problem_model.with(constraint!(lhs_turnover <= *max_turnover));
         }
 
-        // Solve LP — map solver failures to structured OptimizationStatus
-        // rather than opaque errors so callers can inspect the reason.
-        //
-        // On failure the result carries:
-        //   - `objective_value = NaN` — callers must check `status.is_feasible()`
-        //     before consuming this value.
-        //   - Empty weight/delta/quantity maps — no phantom allocations.
-        //   - `conflicting_constraints = []` for Infeasible — the `good_lp` crate
-        //     does not expose irreducible infeasible set (IIS) information.
+        // Solver failures become structured `OptimizationStatus` (`Ok(Err)`):
+        // `objective_value = NaN`, empty weight maps, and empty
+        // `conflicting_constraints` because `good_lp` does not expose an IIS.
         match problem_model.solve() {
             Ok(sol) => Ok(Ok(AssembledModel {
                 solution: Box::new(sol),
@@ -652,7 +633,6 @@ impl DefaultLpOptimizer {
         let AssembledModel { solution, w_vars } = model;
         let solution = solution.as_ref();
 
-        // Extract weights
         let mut optimal_weights: IndexMap<PositionId, f64> = IndexMap::new();
         let mut weight_deltas: IndexMap<PositionId, f64> = IndexMap::new();
 
@@ -666,7 +646,6 @@ impl DefaultLpOptimizer {
             weight_deltas.insert(item.position_id.clone(), w_star - w0);
         }
 
-        // Implied quantities
         let mut implied_quantities: IndexMap<PositionId, f64> = IndexMap::new();
         let reconstruction_denominator =
             Self::reconstruction_denominator(problem.weighting, denominators);
@@ -708,7 +687,6 @@ impl DefaultLpOptimizer {
             implied_quantities.insert(item.position_id.clone(), qty);
         }
 
-        // Objective value at solution: a · w*
         let mut objective_acc = NeumaierAccumulator::new();
         for (coef, w_var) in rows.coeffs_objective.iter().zip(w_vars) {
             let w_star = solution.value(*w_var);
@@ -716,11 +694,9 @@ impl DefaultLpOptimizer {
         }
         let objective_value = objective_acc.current();
 
-        // Evaluate additional metric expressions of interest (for now: just objective).
         let mut metric_values: IndexMap<String, f64> = IndexMap::new();
         metric_values.insert("objective".to_string(), objective_value);
 
-        // Constraint slacks
         let mut constraint_slacks: IndexMap<String, f64> = IndexMap::new();
         for lc in &rows.lp_constraints {
             if lc.is_turnover_placeholder {
@@ -832,16 +808,13 @@ impl DefaultLpOptimizer {
         market: &MarketContext,
         config: &FinstackConfig,
     ) -> Result<PortfolioOptimizationResult> {
-        // Step 0: Validate portfolio and problem basics.
         problem.portfolio.validate()?;
 
-        // Ensure there is at least one budget constraint, or we will add one with rhs=1.0.
         let has_budget = problem
             .constraints
             .iter()
             .any(|c| matches!(c, Constraint::Budget { .. }));
 
-        // Step 1: Discover required metrics and value portfolio.
         let required_metrics = Self::required_metrics(problem);
         let options = crate::valuation::PortfolioValuationOptions {
             strict_risk: matches!(problem.missing_metric_policy, MissingMetricPolicy::Strict),
@@ -855,7 +828,6 @@ impl DefaultLpOptimizer {
         let valuation =
             crate::valuation::value_portfolio(&problem.portfolio, market, config, &options)?;
 
-        // Step 2: Build decision space.
         let (decision_items, mut decision_features, current_weights, denominators) =
             build_decision_space(problem, &valuation, &required_metrics, market, config)?;
 
@@ -867,7 +839,6 @@ impl DefaultLpOptimizer {
 
         let n_vars = decision_items.len();
 
-        // Step 3: Apply weight bounds from WeightBounds constraints.
         for constraint in &problem.constraints {
             if let Constraint::WeightBounds {
                 filter, min, max, ..
@@ -909,7 +880,6 @@ impl DefaultLpOptimizer {
             }
         }
 
-        // Steps 4-5: Build objective coefficients and LP constraint rows.
         let rows = Self::build_lp_rows(
             problem,
             &decision_features,
@@ -918,7 +888,6 @@ impl DefaultLpOptimizer {
             has_budget,
         )?;
 
-        // Step 6: Declare variables, assemble the model, and solve.
         let model = match Self::assemble_and_solve(
             problem,
             &decision_items,
@@ -929,8 +898,6 @@ impl DefaultLpOptimizer {
         )? {
             Ok(model) => model,
             Err(status) => {
-                // On failure the result carries `objective_value = NaN` and
-                // empty maps — callers must check `status.is_feasible()`.
                 let meta = finstack_quant_core::config::results_meta_now(config);
                 return Ok(PortfolioOptimizationResult {
                     problem: problem.clone(),
@@ -979,7 +946,6 @@ impl DefaultLpOptimizer {
             }
         }
 
-        // Post-solve: reconstruct the portfolio-level result.
         Ok(Self::reconstruct_result(
             problem,
             &decision_items,

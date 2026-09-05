@@ -204,19 +204,17 @@ def test_empty_detail_dataframes_keep_schema_columns() -> None:
 
 def test_attribute_pnl_typed_inputs_many_and_bridge() -> None:
     """Typed MarketContext / date inputs, the batch table and the scalar bridge."""
-    import datetime
-
     market_t0 = MarketContext.from_json(_market_json(AS_OF_T0))
     market_t1 = MarketContext.from_json(_market_json(AS_OF_T1, shift=0.002))
     attr = attribute_pnl(
         _bond_json(),
         market_t0,
         market_t1,
-        datetime.date.fromisoformat(AS_OF_T0),
-        datetime.date.fromisoformat(AS_OF_T1),
+        date.fromisoformat(AS_OF_T0),
+        date.fromisoformat(AS_OF_T1),
         "parallel",
     )
-    assert attr.t0 == datetime.date.fromisoformat(AS_OF_T0)
+    assert attr.t0 == date.fromisoformat(AS_OF_T0)
     assert attr.required_metrics() == []
     assert "sub" in attr.to_long_dataframe().columns
 

@@ -399,7 +399,6 @@ impl CorporateAnalysisBuilder {
             ));
         }
 
-        // Step 2: Equity valuation (if configured)
         let equity = match self.dcf {
             Some(DcfSpec {
                 wacc,
@@ -431,8 +430,6 @@ impl CorporateAnalysisBuilder {
             None => None,
         };
 
-        // Step 3: Compute credit context for each instrument (single pass)
-        // Use enterprise value as LTV reference when available from equity step.
         let ev_raw = equity.as_ref().map(|eq| eq.enterprise_value.amount());
         let ev_for_ltv = ev_raw.filter(|ev| *ev > 0.0);
         // Surface (rather than silently drop) a non-positive EV: LTV-style

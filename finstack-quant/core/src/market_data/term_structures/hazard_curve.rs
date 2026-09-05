@@ -940,8 +940,9 @@ impl HazardCurve {
     ///
     /// # Arguments
     ///
-    /// * `t` - Year-fraction time from the curve or surface base date to the query point
-    /// * `method` - Named algorithm or interpolation method applied by the operation
+    /// * `t` - Year fraction from the curve base date to the quoted CDS horizon.
+    /// * `method` - Interpolation of stored par-spread quotes; log-linear falls
+    ///   back to linear when a quote is non-positive.
     #[must_use]
     pub fn cds_quote_bp(&self, t: f64, method: ParInterp) -> f64 {
         if self.par_tenors.len() < 2 || self.par_tenors.len() != self.par_spreads_bp.len() {

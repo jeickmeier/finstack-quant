@@ -382,7 +382,6 @@ fn parse_schedule_im(value: Option<&Value>) -> Result<HashMap<String, ScheduleIm
                 "schedule_im bucket boundaries must be increasing and > 0".to_string(),
             ));
         }
-        // Fallback maturity must be finite and plausible.
         if !record.default_maturity_years.is_finite()
             || record.default_maturity_years < 0.0
             || record.default_maturity_years > 100.0

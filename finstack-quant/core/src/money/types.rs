@@ -368,7 +368,6 @@ impl Money {
     /// let lhs = Money::from((50_i64, Currency::USD));
     /// let rhs = Money::from((25_i64, Currency::USD));
     ///
-    /// // Preferred: explicit about Result return
     /// let sum = lhs.checked_add(rhs).expect("Currency match should succeed");
     /// assert_eq!(sum.amount(), 75.0);
     /// ```
@@ -406,7 +405,6 @@ impl Money {
     /// let lhs = Money::from((50_i64, Currency::USD));
     /// let rhs = Money::from((25_i64, Currency::USD));
     ///
-    /// // Preferred: explicit about Result return
     /// let diff = lhs.checked_sub(rhs).expect("Currency match should succeed");
     /// assert_eq!(diff.amount(), 25.0);
     /// ```

@@ -70,7 +70,6 @@ pub struct PhiloxRng {
     spare_normal: Option<f64>,
 }
 
-// Philox constants
 const PHILOX_M0: u32 = 0xD2511F53;
 const PHILOX_M1: u32 = 0xCD9E8D57;
 const PHILOX_W0: u32 = 0x9E3779B9;
@@ -140,28 +139,20 @@ impl PhiloxRng {
         rng
     }
 
-    /// Generate a new block of random values.
-    ///
-    /// This is a hot path method called frequently during simulation.
-    /// The loop is unrolled by the compiler for optimal performance.
     #[inline]
     fn generate_block(&mut self) {
-        // Combine stream_id and counter to form the full counter
         let ctr0 = (self.counter & 0xFFFFFFFF) as u32;
         let ctr1 = ((self.counter >> 32) & 0xFFFFFFFF) as u32;
         let ctr2 = (self.stream_id & 0xFFFFFFFF) as u32;
         let ctr3 = ((self.stream_id >> 32) & 0xFFFFFFFF) as u32;
 
-        // Extract key parts
         let key0 = (self.key & 0xFFFFFFFF) as u32;
         let key1 = ((self.key >> 32) & 0xFFFFFFFF) as u32;
 
-        // Apply Philox-4x32-10 rounds
         let (mut v0, mut v1, mut v2, mut v3) = (ctr0, ctr1, ctr2, ctr3);
         let (mut k0, mut k1) = (key0, key1);
 
         for _ in 0..10 {
-            // Feistel-like round
             let (hi0, lo0) = mulhilo(v0, PHILOX_M0);
             let (hi1, lo1) = mulhilo(v2, PHILOX_M1);
 
@@ -170,7 +161,6 @@ impl PhiloxRng {
             v2 = hi0 ^ v3 ^ k1;
             v3 = lo0;
 
-            // Update key
             k0 = k0.wrapping_add(PHILOX_W0);
             k1 = k1.wrapping_add(PHILOX_W1);
         }
@@ -180,9 +170,6 @@ impl PhiloxRng {
         self.counter = self.counter.wrapping_add(1);
     }
 
-    /// Get next u32 value.
-    ///
-    /// Hot path method - called very frequently during simulation.
     #[inline]
     fn next_u32(&mut self) -> u32 {
         if self.idx >= 4 {
@@ -193,9 +180,6 @@ impl PhiloxRng {
         val
     }
 
-    /// Get next u64 value (combines two u32s).
-    ///
-    /// Hot path method - used for generating uniforms.
     #[inline]
     fn next_u64(&mut self) -> u64 {
         let lo = self.next_u32() as u64;
@@ -207,14 +191,11 @@ impl PhiloxRng {
 impl RandomStream for PhiloxRng {
     #[inline]
     fn split(&self, stream_id: u64) -> Option<Self> {
-        // Create a new stream with a different stream_id
-        // This ensures independence between streams
+        // Independent streams require distinct stream_id values.
         Some(PhiloxRng::with_stream(self.key, stream_id))
     }
 
     /// Fill buffer with uniform random numbers in the open interval (0, 1).
-    ///
-    /// Hot path method - called on every timestep of every path.
     ///
     /// The grid-centred mapping `(bits + 0.5)·2⁻⁵³` never produces exactly
     /// 0 or 1 (matching core's Sobol normal mapping), so inverse-CDF
@@ -231,8 +212,7 @@ impl RandomStream for PhiloxRng {
 
     /// Fill buffer with standard normal random numbers.
     ///
-    /// Hot path method - called on every timestep of every path.
-    /// Uses Box-Muller transform in pairs for efficiency.
+    /// Uses Box-Muller transform in pairs.
     #[inline]
     fn fill_std_normals(&mut self, out: &mut [f64]) {
         let mut i = 0;
@@ -347,7 +327,6 @@ mod tests {
         let mut stream1 = rng.substream(1);
         let mut stream2 = rng.substream(2);
 
-        // Different streams should produce different values
         let val1 = stream1.next_u01();
         let val2 = stream2.next_u01();
         assert_ne!(val1, val2);
@@ -359,7 +338,6 @@ mod tests {
         let mut stream1a = rng.substream(1);
         let mut stream1b = rng.substream(1);
 
-        // Same stream ID should produce same values
         for _ in 0..100 {
             assert_eq!(stream1a.next_u32(), stream1b.next_u32());
         }
@@ -371,12 +349,10 @@ mod tests {
         let mut normals = vec![0.0; 1000];
         rng.fill_std_normals(&mut normals);
 
-        // Check basic statistical properties
         let mean: f64 = normals.iter().sum::<f64>() / normals.len() as f64;
         let variance: f64 =
             normals.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (normals.len() - 1) as f64;
 
-        // Mean should be close to 0, variance close to 1
         assert!(mean.abs() < 0.1);
         assert!((variance - 1.0).abs() < 0.1);
     }

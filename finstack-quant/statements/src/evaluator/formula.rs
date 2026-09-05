@@ -217,11 +217,8 @@ pub(crate) fn build_context_for_period(
 
 /// Collect expression values over all available periods in chronological order.
 ///
-/// **Performance note:** For complex expressions (not simple Column or Literal),
-/// this rebuilds an evaluation context and re-evaluates the expression for each
-/// historical period, giving O(P) evaluations. If the expression itself contains
-/// aggregate functions that also walk history, the total cost is O(P²). Consider
-/// caching results by `(expr_hash, period_id)` if this becomes a bottleneck.
+/// Complex expressions (not a simple column or literal) are re-evaluated once
+/// per historical period (O(P)); nested aggregates make this O(P²).
 pub(crate) fn collect_expression_values_sorted(
     expr: &Expr,
     context: &EvaluationContext,
@@ -393,7 +390,6 @@ pub(crate) fn collect_expression_window_values(
 /// a delegated function cannot evaluate. IEEE non-finite arithmetic may still
 /// return `NaN` with a warning rather than an error where the DSL defines that
 /// as a propagating numerical result.
-/// Recursively evaluate an expression.
 pub fn evaluate_formula(
     expr: &Expr,
     context: &mut EvaluationContext,
@@ -415,8 +411,6 @@ pub fn evaluate_formula(
             crate::evaluator::formula_dispatch::evaluate_function(func, args, context, node_id)
         }
         ExprNode::BinOp { op, left, right } => {
-            // Note: Binary operations are evaluated directly here rather than
-            // through the Function enum. This is intentional - see module docs.
             let left_val = evaluate_formula(left, context, node_id)?;
 
             // Short-circuit logical operators before touching the right-hand
@@ -436,7 +430,6 @@ pub fn evaluate_formula(
             let right_val = evaluate_formula(right, context, node_id)?;
 
             let result = match op {
-                // Arithmetic operations - evaluated directly for performance
                 BinOp::Add => left_val + right_val,
                 BinOp::Sub => left_val - right_val,
                 BinOp::Mul => left_val * right_val,

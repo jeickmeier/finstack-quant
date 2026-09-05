@@ -116,7 +116,6 @@ pub fn quanto_call(
     let d1 = ((spot / strike).ln() + (drift_adj + 0.5 * vol_asset * vol_asset) * time) / vol_sqrt_t;
     let d2 = d1 - vol_sqrt_t;
 
-    // Forward adjusted for quanto
     let forward_adj = spot * (drift_adj * time).exp();
 
     // Discount at domestic rate
@@ -226,7 +225,6 @@ mod tests {
         let quanto_call_price =
             quanto_call(spot, strike, time, rate, rate, div_yield, vol, 0.1, 0.0);
 
-        // Vanilla BS call
         let sqrt_t = time.sqrt();
         let d1 =
             ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time) / (vol * sqrt_t);

@@ -134,15 +134,12 @@ mod tests {
         let sigma = 0.005;
         let t = 1.0;
 
-        // ITM call: delta should be close to 1
         let delta_itm = bachelier_delta_call(forward, 0.01, sigma, t);
         assert!(delta_itm > 0.9, "ITM call delta should be close to 1");
 
-        // OTM call: delta should be close to 0
         let delta_otm = bachelier_delta_call(forward, 0.05, sigma, t);
         assert!(delta_otm < 0.1, "OTM call delta should be close to 0");
 
-        // ATM call: delta should be close to 0.5
         let delta_atm = bachelier_delta_call(forward, forward, sigma, t);
         assert!(
             (delta_atm - 0.5).abs() < 0.01,
@@ -156,7 +153,6 @@ mod tests {
         let sigma = 0.20;
         let t = 1.0;
 
-        // All deltas should be in [0, 1] for calls
         let delta_itm = black_delta_call(forward, 0.02, sigma, t);
         let delta_atm = black_delta_call(forward, forward, sigma, t);
         let delta_otm = black_delta_call(forward, 0.08, sigma, t);
@@ -165,7 +161,6 @@ mod tests {
         assert!((0.0..=1.0).contains(&delta_atm));
         assert!((0.0..=1.0).contains(&delta_otm));
 
-        // Ordering: ITM > ATM > OTM
         assert!(delta_itm > delta_atm);
         assert!(delta_atm > delta_otm);
 
@@ -189,7 +184,6 @@ mod tests {
         let gamma = bachelier_gamma(forward, strike, sigma, t);
         assert!(gamma > 0.0, "Bachelier gamma should be positive");
 
-        // Gamma should be highest at ATM
         let gamma_atm = bachelier_gamma(forward, forward, sigma, t);
         let gamma_otm = bachelier_gamma(forward, forward + 0.02, sigma, t);
         assert!(
@@ -239,7 +233,6 @@ mod tests {
         let strike_otm = 0.07;
         let sigma = 0.20;
 
-        // Call at expiry
         assert_eq!(
             bachelier_call(forward, strike_itm, sigma, 0.0),
             forward - strike_itm
@@ -252,7 +245,6 @@ mod tests {
         );
         assert_eq!(black_call(forward, strike_otm, sigma, 0.0), 0.0);
 
-        // Put at expiry
         assert_eq!(bachelier_put(forward, strike_itm, sigma, 0.0), 0.0);
         assert_eq!(
             bachelier_put(forward, strike_otm, sigma, 0.0),
@@ -285,7 +277,6 @@ mod tests {
 
     #[test]
     fn test_brenner_subrahmanyam_atm() {
-        // Test ATM case where approximation is most accurate
         let forward = 0.05;
         let strike = 0.05; // ATM
         let sigma_actual = 0.20;
@@ -294,7 +285,6 @@ mod tests {
         let price = black_call(forward, strike, sigma_actual, t);
         let sigma_approx = brenner_subrahmanyam_approx(forward, strike, price, t);
 
-        // For ATM options, approximation should be within 15% relative error
         let rel_error = (sigma_approx - sigma_actual).abs() / sigma_actual;
         assert!(
             rel_error < 0.15,
@@ -305,7 +295,6 @@ mod tests {
 
     #[test]
     fn test_brenner_subrahmanyam_various_vols() {
-        // Test across range of volatilities
         let forward = 0.05;
         let strike = 0.05; // ATM
         let t = 1.0;
@@ -314,7 +303,6 @@ mod tests {
             let price = black_call(forward, strike, sigma_actual, t);
             let sigma_approx = brenner_subrahmanyam_approx(forward, strike, price, t);
 
-            // Should be within 20% relative error for all vols
             let rel_error = (sigma_approx - sigma_actual).abs() / sigma_actual;
             assert!(
                 rel_error < 0.20,
@@ -334,14 +322,12 @@ mod tests {
 
         let approx = manaster_koehler_approx(forward, strike, t);
 
-        // Should return a reasonable positive volatility
         assert!(approx > 0.0, "Approximation should be positive");
         assert!(approx < 2.0, "Approximation should be reasonable (<200%)");
     }
 
     #[test]
     fn test_implied_vol_initial_guess_consistency() {
-        // Test that combined guess is always in valid range
         let forward = 0.05;
         let t = 1.0;
 
@@ -361,7 +347,6 @@ mod tests {
 
     #[test]
     fn test_implied_vol_edge_cases() {
-        // Edge cases should return default volatility
         assert_eq!(brenner_subrahmanyam_approx(0.05, 0.05, 0.001, 0.0), 0.2); // t = 0
         assert_eq!(brenner_subrahmanyam_approx(0.05, 0.05, 0.0, 1.0), 0.2); // price = 0
         assert_eq!(brenner_subrahmanyam_approx(0.0, 0.05, 0.001, 1.0), 0.2); // forward = 0
@@ -379,7 +364,6 @@ mod tests {
         let price = black_call(forward, strike, sigma_actual, t);
         let sigma_approx = brenner_subrahmanyam_approx(forward, strike, price, t);
 
-        // Should be reasonably close
         let rel_error = (sigma_approx - sigma_actual).abs() / sigma_actual;
         assert!(
             rel_error < 0.25,

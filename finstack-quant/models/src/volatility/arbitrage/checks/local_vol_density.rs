@@ -55,10 +55,8 @@ impl ArbitrageCheck for LocalVolDensityCheck {
                     continue; // Skip near-zero variance points
                 }
 
-                // dw/dT via finite differences along the expiry dimension
                 let dw_dt = finite_diff_time(surface, expiries, ei, strikes[si]);
 
-                // dw/dk and d2w/dk2 via finite differences along the strike dimension
                 let (dw_dstrike, d2w_dstrike2) =
                     finite_diff_strike(surface, strikes, si, expiries[ei]);
                 // k = ln(K/F): d/dk = K d/dK. The density condition is
@@ -66,13 +64,11 @@ impl ArbitrageCheck for LocalVolDensityCheck {
                 let dw_dk = big_k * dw_dstrike;
                 let d2w_dk2 = big_k * big_k * d2w_dstrike2 + dw_dk;
 
-                // Dupire denominator
                 let term1 = 1.0 - k / w * dw_dk;
                 let term2 = 0.25 * (-0.25 - 1.0 / w + k * k / (w * w)) * dw_dk * dw_dk;
                 let term3 = 0.5 * d2w_dk2;
                 let denominator = term1 + term2 + term3;
 
-                // Local variance = dw_dt / denominator
                 if denominator < -self.tolerance {
                     let magnitude = -denominator;
                     let severity = classify_severity(magnitude, 1e-8, 1e-5, 1e-3);

@@ -75,7 +75,6 @@ pub fn aggregate_by_book(
 ) -> Result<IndexMap<BookId, Money>> {
     let mut book_totals: IndexMap<BookId, Money> = IndexMap::new();
 
-    // Build a map of position values by position_id for quick lookup
     let position_values: HashMap<&crate::types::PositionId, &Money> = valuation
         .position_values
         .iter()
@@ -91,7 +90,6 @@ pub fn aggregate_by_book(
         visiting: &mut HashSet<BookId>,
         depth: usize,
     ) -> Result<Money> {
-        // Check memo first
         if let Some(cached) = memo.get(book_id) {
             return Ok(*cached);
         }
@@ -110,10 +108,8 @@ pub fn aggregate_by_book(
             crate::error::Error::InvalidInput(format!("Book not found: {}", book_id))
         })?;
 
-        // Start with zero
         let mut total = Money::from((0_i64, base_currency));
 
-        // Add direct position values
         for pos_id in &book.position_ids {
             let &&value = position_values.get(pos_id).ok_or_else(|| {
                 crate::error::Error::invalid_input(format!(
@@ -123,7 +119,6 @@ pub fn aggregate_by_book(
             total = total.checked_add(value)?;
         }
 
-        // Recursively add child book totals
         for child_id in &book.child_book_ids {
             let child_total = compute_book_total(
                 child_id,
@@ -143,7 +138,6 @@ pub fn aggregate_by_book(
         Ok(total)
     }
 
-    // Compute totals for all books
     let mut memo: HashMap<BookId, Money> = HashMap::default();
     for book_id in books.keys() {
         let mut visiting = HashSet::default();

@@ -109,7 +109,6 @@ impl TridiagOperator {
         let mut upper = vec![0.0; n];
         let mut source = vec![0.0; n];
 
-        // Assemble interior stencils (grid indices 1..n_grid-1 map to operator indices 0..n-1)
         for k in 0..n {
             let i = k + 1; // grid index
             let x = grid.points()[i];
@@ -210,13 +209,11 @@ impl TridiagOperator {
             return y;
         }
 
-        // First row
         y[0] = self.main[0] * x[0] + self.source[0] + self.bc_lower_rhs;
         if self.n > 1 {
             y[0] += self.upper[0] * x[1];
         }
 
-        // Interior rows
         for i in 1..self.n.saturating_sub(1) {
             y[i] = self.lower[i] * x[i - 1]
                 + self.main[i] * x[i]
@@ -224,7 +221,6 @@ impl TridiagOperator {
                 + self.source[i];
         }
 
-        // Last row
         if self.n > 1 {
             let last = self.n - 1;
             y[last] = self.lower[last] * x[last - 1]
@@ -251,13 +247,11 @@ impl TridiagOperator {
             return;
         }
 
-        // First row
         out[0] = self.main[0] * x[0] + self.source[0] + self.bc_lower_rhs;
         if self.n > 1 {
             out[0] += self.upper[0] * x[1];
         }
 
-        // Interior rows
         for i in 1..self.n.saturating_sub(1) {
             out[i] = self.lower[i] * x[i - 1]
                 + self.main[i] * x[i]
@@ -265,7 +259,6 @@ impl TridiagOperator {
                 + self.source[i];
         }
 
-        // Last row
         if self.n > 1 {
             let last = self.n - 1;
             out[last] = self.lower[last] * x[last - 1]
@@ -304,12 +297,10 @@ impl TridiagOperator {
         let n = self.n;
         let mut x = vec![0.0; n];
 
-        // Build the modified system: (I - alpha * A)
-        // Diagonal:      d[i] = 1 - alpha * main[i]
-        // Sub-diagonal:  a[i] = -alpha * lower[i]
-        // Super-diagonal: c[i] = -alpha * upper[i]
-
-        // Forward elimination (in-place using temporary vectors)
+        // (I - alpha * A):
+        //   d[i] = 1 - alpha * main[i]
+        //   a[i] = -alpha * lower[i]
+        //   c[i] = -alpha * upper[i]
         let mut d = vec![0.0; n]; // modified diagonal
         let mut r = vec![0.0; n]; // modified RHS
 
@@ -398,13 +389,11 @@ impl TridiagOperator {
             return y;
         }
 
-        // First row
         y[0] = x[0] + beta * (self.main[0] * x[0] + self.source[0] + self.bc_lower_rhs);
         if self.n > 1 {
             y[0] += beta * self.upper[0] * x[1];
         }
 
-        // Interior rows
         for i in 1..self.n.saturating_sub(1) {
             y[i] = x[i]
                 + beta
@@ -414,7 +403,6 @@ impl TridiagOperator {
                         + self.source[i]);
         }
 
-        // Last row
         if self.n > 1 {
             let last = self.n - 1;
             y[last] = x[last]

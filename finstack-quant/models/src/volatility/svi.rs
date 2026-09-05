@@ -428,7 +428,6 @@ pub fn calibrate_svi(
         }
     }
 
-    // Convert to log-moneyness and total variance
     let ks: Vec<f64> = strikes.iter().map(|&k| (k / forward).ln()).collect();
     let ws: Vec<f64> = vols.iter().map(|&v| v * v * expiry).collect();
 
@@ -516,7 +515,6 @@ pub fn calibrate_svi(
         sigma,
     };
 
-    // Validate no-arbitrage and compute RMSE
     params.validate()?;
 
     let sse: f64 = ks
@@ -685,7 +683,6 @@ mod tests {
 
     #[test]
     fn calibrate_svi_round_trip() {
-        // Generate synthetic market data from known SVI params
         let true_params = SviParams {
             a: 0.04,
             b: 0.3,
@@ -714,7 +711,6 @@ mod tests {
         let calibrated =
             calibrate_svi(&strikes, &vols, forward, expiry).expect("calibration should succeed");
 
-        // Check vol fit is close at each strike
         for (&k, &mkt_vol) in strikes.iter().zip(vols.iter()) {
             let log_k = (k / forward).ln();
             let cal_vol = calibrated

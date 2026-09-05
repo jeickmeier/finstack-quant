@@ -1,9 +1,7 @@
 //! Adapter modules that implement the mechanics of each `OperationSpec`.
 //!
 //! The engine dispatches each [`OperationSpec`](crate::spec::OperationSpec)
-//! variant via a centralized `match` to the appropriate free function in the
-//! submodules below. There is no polymorphic adapter trait — the enum is
-//! closed and the dispatch is exhaustive at compile time.
+//! variant to a free function in the submodules below.
 
 pub(crate) mod asset_corr;
 pub(crate) mod basecorr;

@@ -42,7 +42,6 @@ pub fn roll_effective_spread(returns: &[f64]) -> Option<f64> {
 
     let n = returns.len();
 
-    // Mean of all returns
     let mean: f64 = returns.iter().sum::<f64>() / n as f64;
 
     // Serial covariance: Cov(r_t, r_{t-1})

@@ -411,16 +411,14 @@ impl EquityOption {
 
     /// Create a European call option with standard conventions.
     ///
-    /// This convenience constructor eliminates the builder for the most common case.
-    ///
     /// # Errors
     ///
     /// Returns an error if the builder fails validation.
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
-    /// * `ticker` - Ticker used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `id` - Trade identifier stored on the option and used in results and serialization.
+    /// * `ticker` - Underlying equity identifier used to look up spot, vol, and dividend market data.
     /// * `strike` - Option strike in the surface's quote units (absolute or relative)
     /// * `expiry` - Option expiry date or year-fraction used to locate the volatility point
     /// * `notional` - Trade notional amount in the instrument currency's major units

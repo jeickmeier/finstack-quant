@@ -92,7 +92,6 @@ impl NormalizationEngine {
             }
         }
 
-        // Iterate over all periods where the target node has a value
         for (period_id, &base_value) in target_values {
             if !base_value.is_finite() {
                 return Err(Error::eval(format!(
@@ -150,7 +149,6 @@ impl NormalizationEngine {
             });
         }
 
-        // Sort by period for consistent output
         normalization_results.sort_by_key(|r| r.period);
 
         Ok(normalization_results)

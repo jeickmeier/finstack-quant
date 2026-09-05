@@ -52,7 +52,6 @@ impl DependencyGraph {
     /// It does not reject cycles; call [`detect_cycles`](Self::detect_cycles) or
     /// [`evaluate_order`] after construction when an executable order is needed.
     pub fn from_model(model: &FinancialModelSpec) -> Result<Self> {
-        // Validate all formula references before building graph
         Self::validate_formula_references(model)?;
 
         let mut dependencies = IndexMap::new();
@@ -65,7 +64,6 @@ impl DependencyGraph {
 
         let all_node_ids: IndexSet<NodeId> = model.nodes.keys().cloned().collect();
 
-        // Extract dependencies from formulas and where clauses
         for (node_id, node_spec) in &model.nodes {
             if let Some(formula) = &node_spec.formula_text {
                 let node_deps = extract_dependencies(formula, &all_node_ids)?;
@@ -89,61 +87,26 @@ impl DependencyGraph {
     /// This catches typos and unknown references at build time instead of runtime.
     fn validate_formula_references(model: &FinancialModelSpec) -> Result<()> {
         let valid_identifiers: IndexSet<NodeId> = model.nodes.keys().cloned().collect();
-
-        // Check each formula
         for (node_id, node_spec) in &model.nodes {
             if let Some(formula) = &node_spec.formula_text {
-                // Extract all identifiers from the formula
-                let all_identifiers = crate::utils::formula::extract_all_identifiers(formula)?;
-
-                // Check each identifier
-                for identifier in &all_identifiers {
-                    // Skip cs.* references (capital structure - validated at runtime)
-                    if identifier.starts_with("cs.") {
-                        continue;
-                    }
-
-                    // Check if identifier exists in model nodes
-                    if !valid_identifiers.contains(identifier.as_str()) {
-                        return Err(Error::eval(format!(
-                            "Unknown identifier '{}' in formula for node '{}'. \
-                             Formula: '{}'. \
-                             This identifier does not exist in the model. \
-                             Did you mean one of: {}?",
-                            identifier,
-                            node_id,
-                            formula,
-                            suggest_similar_identifiers(identifier, &valid_identifiers)
-                        )));
-                    }
-                }
+                validate_known_identifiers(
+                    formula,
+                    "formula",
+                    "Formula",
+                    node_id,
+                    &valid_identifiers,
+                )?;
             }
-
-            // Also validate where clauses
             if let Some(where_clause) = &node_spec.where_text {
-                let all_identifiers = crate::utils::formula::extract_all_identifiers(where_clause)?;
-
-                for identifier in &all_identifiers {
-                    if identifier.starts_with("cs.") {
-                        continue;
-                    }
-
-                    if !valid_identifiers.contains(identifier.as_str()) {
-                        return Err(Error::eval(format!(
-                            "Unknown identifier '{}' in where clause for node '{}'. \
-                             Where clause: '{}'. \
-                             This identifier does not exist in the model. \
-                             Did you mean one of: {}?",
-                            identifier,
-                            node_id,
-                            where_clause,
-                            suggest_similar_identifiers(identifier, &valid_identifiers)
-                        )));
-                    }
-                }
+                validate_known_identifiers(
+                    where_clause,
+                    "where clause",
+                    "Where clause",
+                    node_id,
+                    &valid_identifiers,
+                )?;
             }
         }
-
         Ok(())
     }
 
@@ -360,6 +323,30 @@ fn levenshtein(a: &str, b: &str) -> usize {
     prev[m]
 }
 
+fn validate_known_identifiers(
+    source: &str,
+    location: &str,
+    label: &str,
+    node_id: &NodeId,
+    valid_identifiers: &IndexSet<NodeId>,
+) -> Result<()> {
+    for identifier in crate::utils::formula::extract_all_identifiers(source)? {
+        if identifier.starts_with("cs.") {
+            continue;
+        }
+        if !valid_identifiers.contains(identifier.as_str()) {
+            return Err(Error::eval(format!(
+                "Unknown identifier '{identifier}' in {location} for node '{node_id}'. \
+                 {label}: '{source}'. \
+                 This identifier does not exist in the model. \
+                 Did you mean one of: {}?",
+                suggest_similar_identifiers(&identifier, valid_identifiers)
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Suggest similar identifiers for a typo using Levenshtein distance.
 ///
 /// Returns a comma-separated list of up to 3 most similar identifiers.
@@ -368,11 +355,7 @@ fn suggest_similar_identifiers(typo: &str, valid: &IndexSet<NodeId>) -> String {
         .iter()
         .map(|id| (levenshtein(typo, id.as_str()), id))
         .collect();
-
-    // Sort by distance (closest first)
     similarities.sort_by_key(|(dist, _)| *dist);
-
-    // Take top 3
     similarities
         .iter()
         .take(3)
@@ -390,19 +373,18 @@ mod tests {
     fn test_simple_dag() {
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
+            .unwrap()
             .compute("a", "10")
-            .expect("test should succeed")
+            .unwrap()
             .compute("b", "a * 2")
-            .expect("test should succeed")
+            .unwrap()
             .compute("c", "b + a")
-            .expect("test should succeed")
+            .unwrap()
             .build()
-            .expect("test should succeed");
+            .unwrap();
 
-        let graph = DependencyGraph::from_model(&model).expect("test should succeed");
+        let graph = DependencyGraph::from_model(&model).unwrap();
 
-        // Check dependencies
         assert_eq!(graph.dependencies["a"].len(), 0);
         assert!(graph.dependencies["b"].contains("a"));
         assert!(graph.dependencies["c"].contains("b"));
@@ -413,32 +395,22 @@ mod tests {
     fn test_topological_sort() {
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
+            .unwrap()
             .compute("a", "10")
-            .expect("test should succeed")
+            .unwrap()
             .compute("b", "a * 2")
-            .expect("test should succeed")
+            .unwrap()
             .compute("c", "b + a")
-            .expect("test should succeed")
+            .unwrap()
             .build()
-            .expect("test should succeed");
+            .unwrap();
 
-        let graph = DependencyGraph::from_model(&model).expect("test should succeed");
-        let order = evaluate_order(&graph).expect("test should succeed");
+        let graph = DependencyGraph::from_model(&model).unwrap();
+        let order = evaluate_order(&graph).unwrap();
 
-        // 'a' should come before 'b' and 'c'
-        let a_pos = order
-            .iter()
-            .position(|n| n == "a")
-            .expect("test should succeed");
-        let b_pos = order
-            .iter()
-            .position(|n| n == "b")
-            .expect("test should succeed");
-        let c_pos = order
-            .iter()
-            .position(|n| n == "c")
-            .expect("test should succeed");
+        let a_pos = order.iter().position(|n| n == "a").unwrap();
+        let b_pos = order.iter().position(|n| n == "b").unwrap();
+        let c_pos = order.iter().position(|n| n == "c").unwrap();
 
         assert!(a_pos < b_pos);
         assert!(b_pos < c_pos);
@@ -449,13 +421,13 @@ mod tests {
         // Cycles are now caught at build time by ModelBuilder::build()
         let result = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
+            .unwrap()
             .compute("a", "b + 1")
-            .expect("test should succeed")
+            .unwrap()
             .compute("b", "c + 1")
-            .expect("test should succeed")
+            .unwrap()
             .compute("c", "a + 1")
-            .expect("test should succeed")
+            .unwrap()
             .build();
 
         assert!(result.is_err());
@@ -537,22 +509,22 @@ mod tests {
     fn test_lag_breaks_cycle() {
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
+            .unwrap()
             .compute("a", "lag(b, 1)") // a depends on b (lagged)
-            .expect("test should succeed")
+            .unwrap()
             .compute("b", "a + 1") // b depends on a (direct)
-            .expect("test should succeed")
+            .unwrap()
             .build()
-            .expect("test should succeed");
+            .unwrap();
 
-        let graph = DependencyGraph::from_model(&model).expect("test should succeed");
+        let graph = DependencyGraph::from_model(&model).unwrap();
 
         // Should NOT detect cycle because a's dependency on b is lagged
         let result = graph.detect_cycles();
         assert!(result.is_ok());
 
         // Order should be a then b (since b depends on a, and a depends on nothing in current period)
-        let order = evaluate_order(&graph).expect("test should succeed");
+        let order = evaluate_order(&graph).unwrap();
         let a_pos = order
             .iter()
             .position(|n| n == "a")
@@ -589,18 +561,18 @@ mod tests {
     fn test_where_clause_adds_dependencies() {
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
+            .unwrap()
             .value("revenue", &[])
             .mixed("margin")
             .formula("1.0")
-            .expect("test should succeed")
+            .unwrap()
             .build()
-            .expect("test should succeed")
+            .unwrap()
             .where_clause("revenue > 0.0")
             .build()
-            .expect("test should succeed");
+            .unwrap();
 
-        let graph = DependencyGraph::from_model(&model).expect("test should succeed");
+        let graph = DependencyGraph::from_model(&model).unwrap();
         assert!(graph.dependencies["margin"].contains("revenue"));
         assert!(graph.dependents["revenue"].contains("margin"));
     }

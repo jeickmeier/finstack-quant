@@ -127,7 +127,7 @@ impl HullWhiteCalibrationParams {
     }
 }
 
-/// Canonical Hull-White parameters with piecewise-constant short-rate volatility.
+/// Hull-White parameters with piecewise-constant short-rate volatility.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(try_from = "RawHullWhiteParams")]
 pub struct HullWhiteParams {

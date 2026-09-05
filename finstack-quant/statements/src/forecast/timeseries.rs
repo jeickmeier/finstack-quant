@@ -77,7 +77,6 @@ pub(super) fn timeseries_forecast(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    // Get historical data
     let historical = params
         .get("historical")
         .and_then(|v| v.as_array())
@@ -93,7 +92,6 @@ pub(super) fn timeseries_forecast(
 
     let hist_data = parse_historical_series(historical, "Time-series forecast")?;
 
-    // Get method (default to "linear")
     let method = params
         .get("method")
         .and_then(|v| v.as_str())
@@ -112,7 +110,6 @@ pub(super) fn timeseries_forecast(
 
     match method {
         "linear" => {
-            // Linear trend using least squares
             let (slope, intercept) = calculate_linear_trend(&hist_data);
             let n_hist = hist_data.len() as f64;
 
@@ -130,8 +127,7 @@ pub(super) fn timeseries_forecast(
         }
 
         "exponential" => {
-            // Double exponential smoothing (Holt's method)
-            // Both parameters are required per market standards (no universal defaults)
+            // Both Holt parameters are required; there is no universal default.
             let alpha = params
                 .get("alpha")
                 .and_then(|v| v.as_f64())
@@ -221,7 +217,6 @@ pub(super) fn timeseries_forecast(
         }
 
         "moving_average" => {
-            // Simple moving average with trend extrapolation
             let window = params
                 .get("window")
                 .and_then(|v| v.as_u64())
@@ -245,12 +240,8 @@ pub(super) fn timeseries_forecast(
                 )));
             }
 
-            let window = window.min(hist_data.len());
-
-            // Calculate moving average of last 'window' periods
             let ma: f64 = hist_data.iter().rev().take(window).sum::<f64>() / window as f64;
 
-            // Calculate trend from moving averages
             if hist_data.len() > window {
                 let prev_ma: f64 = hist_data[..hist_data.len() - 1]
                     .iter()
@@ -440,7 +431,6 @@ fn seasonal_forecast_with_decomposition(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    // Get historical data
     let historical = params
         .get("historical")
         .and_then(|v| v.as_array())
@@ -448,7 +438,7 @@ fn seasonal_forecast_with_decomposition(
 
     let hist_data = parse_historical_series(historical, "Seasonal forecast")?;
 
-    // Get season length (required parameter - no default per market standards)
+    // No default: season length must match the data's cycle (4 quarterly, 12 monthly).
     let season_length = params
         .get("season_length")
         .and_then(|v| v.as_u64())
@@ -475,7 +465,6 @@ fn seasonal_forecast_with_decomposition(
         )));
     }
 
-    // Get mode (type-safe enum)
     let mode = params.get("mode").ok_or_else(|| {
         Error::forecast(
             "'mode' parameter required for seasonal forecast. \
@@ -486,13 +475,10 @@ fn seasonal_forecast_with_decomposition(
         Error::forecast("Invalid 'mode' parameter. Must be 'additive' or 'multiplicative'.")
     })?;
 
-    // Decompose the series using the requested seasonal semantics.
     let (trend, seasonal, _residual) = decompose_series_with_mode(&hist_data, season_length, mode)?;
 
-    // Get growth rate for trend projection
     let growth = params.get("growth").and_then(|v| v.as_f64()).unwrap_or(0.0);
 
-    // Project forward
     let mut results = IndexMap::new();
     let last_trend = trend
         .last()
@@ -500,22 +486,17 @@ fn seasonal_forecast_with_decomposition(
         .unwrap_or_else(|| hist_data.last().copied().unwrap_or(0.0));
 
     for (i, period_id) in forecast_periods.iter().enumerate() {
-        // Calculate trend component with growth
         let trend_value = if growth == 0.0 {
             last_trend
         } else {
             last_trend * (1.0 + growth).powi(i as i32 + 1)
         };
 
-        // Get seasonal component. The decomposition keys factors by *data
-        // position* (index 0 of `seasonal` corresponds to the first
-        // historical observation), so the forecast simply continues the
-        // positional cycle. Adding `season_start` here would double-shift
-        // and rotate the pattern (e.g. apply the Q4 uplift to Q1).
+        // Seasonal factors are keyed by data position; adding season_start here
+        // would double-shift the cycle (e.g. apply the Q4 uplift to Q1).
         let season_idx = (hist_data.len() + i) % season_length;
         let seasonal_value = seasonal.get(season_idx).copied().unwrap_or(0.0);
 
-        // Combine based on mode (type-safe match)
         let value = match mode {
             SeasonalMode::Additive => trend_value + seasonal_value,
             SeasonalMode::Multiplicative => trend_value * seasonal_value,
@@ -650,10 +631,8 @@ fn decompose_additive(
     }
     let n = data.len();
 
-    // Calculate detrended series
     let detrended: Vec<f64> = data.iter().zip(&trend).map(|(d, t)| d - t).collect();
 
-    // Calculate seasonal component (average of same season across years)
     let mut seasonal = vec![0.0; season_length];
     for (season, seasonal_val) in seasonal.iter_mut().enumerate().take(season_length) {
         let mut sum = 0.0;
@@ -677,7 +656,6 @@ fn decompose_additive(
         *s -= seasonal_mean;
     }
 
-    // Calculate residual
     let mut residual = vec![0.0; n];
     for i in 0..n {
         let season_idx = i % season_length;
@@ -812,10 +790,8 @@ mod tests {
         let result =
             seasonal_forecast(100.0, &periods, &params).expect("seasonal_forecast should succeed");
 
-        // Should produce forecasts for all 4 quarters with seasonal pattern
         assert!(result.len() == 4);
 
-        // Check that growth is applied
         let q1 = result[&PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let q2 = result[&PeriodId::quarter(2025, 2).expect("valid period fixture")];
         assert!(q1 > 0.0, "Q1 should be positive");
@@ -940,7 +916,6 @@ mod tests {
 
     #[test]
     fn test_seasonal_decomposition() {
-        // Create data with clear seasonal pattern
         let data = vec![
             100.0, 90.0, 110.0, 85.0, // Year 1
             105.0, 95.0, 115.0, 90.0, // Year 2
@@ -949,7 +924,6 @@ mod tests {
 
         let (trend, seasonal, _residual) = decompose_series(&data, 4);
 
-        // Check that decomposition produces reasonable results
         assert_eq!(
             trend.len(),
             data.len(),
@@ -957,14 +931,12 @@ mod tests {
         );
         assert_eq!(seasonal.len(), 4, "Seasonal should have 4 components");
 
-        // Check that seasonal components sum to approximately zero (for additive)
         let seasonal_sum: f64 = seasonal.iter().sum();
         assert!(
             seasonal_sum.abs() < 1.0,
             "Seasonal components should sum to near zero"
         );
 
-        // There should be some variation in seasonal components
         let seasonal_max = seasonal.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
         let seasonal_min = seasonal.iter().fold(f64::INFINITY, |a, &b| a.min(b));
         assert!(

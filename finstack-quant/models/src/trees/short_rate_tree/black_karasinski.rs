@@ -124,7 +124,6 @@ impl ShortRateTree {
                 })
                 .collect();
 
-            // Forward-induce Arrow-Debreu prices to the next step.
             let mut next_q = vec![0.0; 2 * next_j_max + 1];
             // Branch switching only applies once the lattice has reached its
             // cap (curr and next widths equal); while still growing, all

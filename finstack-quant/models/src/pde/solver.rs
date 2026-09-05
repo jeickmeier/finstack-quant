@@ -168,7 +168,6 @@ impl Solver1D {
             .map(|&x| problem.terminal_condition(x))
             .collect();
 
-        // Time levels: T → 0
         let levels = self.stepper.time_levels(maturity);
         if let Some(PenaltyExercise {
             exercise_type: ExerciseType::Bermudan { exercise_times },
@@ -188,7 +187,6 @@ impl Solver1D {
 
         let mut exercise_boundary: Vec<(f64, f64)> = Vec::new();
 
-        // Step backward in time
         for i in 0..n_steps {
             let t_from = levels[i];
             let t_to = levels[i + 1];
@@ -197,8 +195,6 @@ impl Solver1D {
             self.stepper
                 .step(problem, &self.grid, &mut u, t_from, t_to, i)?;
 
-            // Apply early exercise constraint.
-            //
             // The penalty method uses λ = penalty_factor/dt = 1e8/dt, so
             // λ·dt = 1e8 >> 1.  This effectively hard-clamps u to the payoff
             // at every violated node after each step (both implicit Rannacher
@@ -215,31 +211,27 @@ impl Solver1D {
             // for CN to amplify.  Verified empirically: Rannacher+penalty and
             // Implicit+penalty prices agree to < 0.5% on a 101-point grid
             // (see `w08_rannacher_american_put_price_matches_implicit_*` test).
-            if let Some(ref exercise) = self.exercise {
-                if exercise.is_exercise_time(t_to) {
-                    if let Some(boundary_idx) = exercise.apply(&mut u, dt) {
-                        // Record exercise boundary: (time, spot level)
-                        let grid_idx = boundary_idx + 1; // interior index → grid index
-                        if grid_idx < self.grid.n() {
-                            exercise_boundary.push((t_to, self.grid.points()[grid_idx]));
-                        }
-                    }
-                }
+            let Some(ref exercise) = self.exercise else {
+                continue;
+            };
+            if !exercise.is_exercise_time(t_to) {
+                continue;
+            }
+            let Some(boundary_idx) = exercise.apply(&mut u, dt) else {
+                continue;
+            };
+            let grid_idx = boundary_idx + 1; // interior index → grid index
+            if grid_idx < self.grid.n() {
+                exercise_boundary.push((t_to, self.grid.points()[grid_idx]));
             }
         }
 
-        // Build full solution vector (including boundary values at t=0)
         let mut values = Vec::with_capacity(self.grid.n());
         let bc_lower = problem.lower_boundary(0.0);
         let bc_upper = problem.upper_boundary(0.0);
 
-        // Lower boundary value
         values.push(boundary_value(bc_lower, &u, &self.grid, true));
-
-        // Interior values
         values.extend_from_slice(&u);
-
-        // Upper boundary value
         values.push(boundary_value(bc_upper, &u, &self.grid, false));
 
         let exercise_boundary_out = if exercise_boundary.is_empty() {
@@ -268,7 +260,6 @@ fn boundary_value(
     match bc {
         BoundaryCondition::Dirichlet(g) => g,
         BoundaryCondition::Neumann(g) => {
-            // Linear extrapolation from the nearest interior point
             if is_lower {
                 let h = grid.h_left(1);
                 u[0] - h * g
@@ -279,19 +270,14 @@ fn boundary_value(
         }
         BoundaryCondition::Linear => {
             // d²u/dx² = 0: u_boundary = 2*u_1 - u_2
+            let n = u.len();
+            if n < 2 {
+                return u[0];
+            }
             if is_lower {
-                if u.len() >= 2 {
-                    2.0 * u[0] - u[1]
-                } else {
-                    u[0]
-                }
+                2.0 * u[0] - u[1]
             } else {
-                let n = u.len();
-                if n >= 2 {
-                    2.0 * u[n - 1] - u[n - 2]
-                } else {
-                    u[n - 1]
-                }
+                2.0 * u[n - 1] - u[n - 2]
             }
         }
     }
@@ -338,25 +324,21 @@ impl PdeSolution {
             return 0.0;
         }
 
-        // Node nearest x — the stencil is centred here.
         let i = find_nearest(pts, x);
 
         if i == 0 {
-            // Forward difference at the left boundary node.
             let h = pts[1] - pts[0];
             if h.abs() < 1e-30 {
                 return 0.0;
             }
             (self.values[1] - self.values[0]) / h
         } else if i >= n - 1 {
-            // Backward difference at the right boundary node.
             let h = pts[n - 1] - pts[n - 2];
             if h.abs() < 1e-30 {
                 return 0.0;
             }
             (self.values[n - 1] - self.values[n - 2]) / h
         } else {
-            // Second-order non-uniform central stencil centred on node i.
             let h_m = pts[i] - pts[i - 1];
             let h_p = pts[i + 1] - pts[i];
             let h_sum = h_m + h_p;
@@ -423,7 +405,9 @@ pub enum PdeSolverError {
     #[error("PDE solve requires at least one time step, got n_steps = 0")]
     ZeroTimeSteps,
     /// A Bermudan exercise time is invalid or absent from the solver time grid.
-    #[error("Bermudan exercise time {time} must be finite, within maturity, and aligned with the PDE time grid")]
+    #[error(
+        "Bermudan exercise time {time} must be finite, within maturity, and aligned with the PDE time grid"
+    )]
     InvalidExerciseTime {
         /// Rejected year fraction from valuation.
         time: f64,
@@ -482,7 +466,6 @@ mod tests {
             .solve(&HeatSin, 0.5)
             .expect("CN solve is unconditionally stable");
 
-        // Check at x = pi/2
         let x = std::f64::consts::FRAC_PI_2;
         let exact = (-0.5_f64).exp() * x.sin();
         let computed = solution.interpolate(x);
@@ -547,7 +530,6 @@ mod tests {
             .map(|&x| (strike - x.exp()).max(0.0))
             .collect();
 
-        // Rannacher solver (2 implicit + CN)
         let rannacher_solver = Solver1D::builder()
             .grid(grid.clone())
             .rannacher(2, n_time)
@@ -559,7 +541,6 @@ mod tests {
             .expect("rannacher solve");
         let rannacher_price = rannacher_sol.interpolate(spot.ln());
 
-        // Pure implicit solver (reference)
         let implicit_solver = Solver1D::builder()
             .grid(grid)
             .implicit(n_time)
@@ -571,7 +552,6 @@ mod tests {
             .expect("implicit solve");
         let implicit_price = implicit_sol.interpolate(spot.ln());
 
-        // Both prices must be finite and positive
         assert!(
             rannacher_price.is_finite() && rannacher_price > 0.0,
             "Rannacher price must be finite and positive, got {rannacher_price}"
@@ -581,14 +561,12 @@ mod tests {
             "Implicit price must be finite and positive, got {implicit_price}"
         );
 
-        // Both must be >= intrinsic value (American option lower bound)
         let intrinsic = (strike - spot).max(0.0);
         assert!(
             rannacher_price >= intrinsic - 1e-6,
             "Rannacher price {rannacher_price:.4} must be >= intrinsic {intrinsic:.4}"
         );
 
-        // Prices must agree within 0.5% (spatial discretisation dominates)
         let rel_diff = (rannacher_price - implicit_price).abs() / implicit_price;
         assert!(
             rel_diff < 0.005,
@@ -759,7 +737,6 @@ mod tests {
     fn solver_rejects_invalid_maturity_and_zero_steps() {
         let grid = Grid1D::uniform(0.0, std::f64::consts::PI, 21).expect("valid grid");
 
-        // Non-positive maturity.
         let solver = Solver1D::builder()
             .grid(grid.clone())
             .crank_nicolson(50)
@@ -780,7 +757,6 @@ mod tests {
             "negative maturity must be rejected"
         );
 
-        // Zero time steps.
         let zero_step_solver = Solver1D::builder()
             .grid(grid)
             .crank_nicolson(0)

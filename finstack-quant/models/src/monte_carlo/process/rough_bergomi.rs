@@ -292,8 +292,6 @@ mod tests {
         HurstExponent::new(h).expect("valid hurst")
     }
 
-    // -- Parameter validation -----------------------------------------------
-
     #[test]
     fn test_valid_params() {
         let params = RoughBergomiParams::new(0.05, 0.02, make_hurst(0.1), 1.9, -0.9, make_xi());
@@ -353,8 +351,6 @@ mod tests {
         let res = RoughBergomiParams::new(0.05, 0.02, make_hurst(0.1), 1.9, 1.0, make_xi());
         assert!(res.is_ok());
     }
-
-    // -- Process dimensions -------------------------------------------------
 
     #[test]
     fn test_process_dim() {

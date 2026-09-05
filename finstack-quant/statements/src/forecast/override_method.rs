@@ -18,7 +18,6 @@ pub(super) fn apply_override(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    // Extract overrides parameter
     let overrides_json = params.get("overrides").ok_or_else(|| {
         Error::forecast(
             "Missing 'overrides' parameter for Override method. \

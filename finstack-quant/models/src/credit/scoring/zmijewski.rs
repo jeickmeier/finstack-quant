@@ -87,7 +87,6 @@ pub fn zmijewski_score(input: &ZmijewskiInput) -> Result<ScoringResult, CreditSc
     // Probit transform: PD = Phi(Y)
     let implied_pd = norm_cdf(y);
 
-    // Zone classification based on PD
     let zone = if implied_pd < 0.10 {
         ScoringZone::Safe
     } else if implied_pd > 0.50 {

@@ -47,7 +47,6 @@ impl Operators2D {
         let x_pts = grid.x().points();
         let y_pts = grid.y().points();
 
-        // Assemble x-direction operators: one tridiag per interior y-level
         let mut op_x = Vec::with_capacity(ny_int);
         for jj in 0..ny_int {
             let j = jj + 1; // grid index
@@ -58,7 +57,6 @@ impl Operators2D {
             op_x.push(op);
         }
 
-        // Assemble y-direction operators: one tridiag per interior x-level
         let mut op_y = Vec::with_capacity(nx_int);
         for ii in 0..nx_int {
             let i = ii + 1;
@@ -69,7 +67,6 @@ impl Operators2D {
             op_y.push(op);
         }
 
-        // Cross-derivative at interior points
         let cross_deriv = compute_cross_derivative(problem, grid, t);
 
         Self {

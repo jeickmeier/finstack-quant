@@ -96,11 +96,6 @@ pub fn bridge_hit_probability(s_t: f64, s_t_dt: f64, barrier: f64, sigma: f64, d
 
 /// Check if a barrier was hit using bridge correction.
 ///
-/// This function combines discrete monitoring with continuous correction:
-/// 1. Check if barrier was crossed between observations (discrete check)
-/// 2. If not, compute bridge hit probability
-/// 3. Generate uniform random and compare
-///
 /// # Arguments
 ///
 /// * `s_t` - Underlying spot at the start of the monitoring interval, in the
@@ -128,36 +123,22 @@ pub fn check_barrier_hit(
 ) -> bool {
     match barrier_type {
         BarrierDirection::Up => {
-            // Check discrete crossing
             if s_t >= barrier || s_t_dt >= barrier {
                 return true;
             }
-
-            // Both below barrier - check bridge probability
-            if s_t < barrier && s_t_dt < barrier {
-                let p_hit = bridge_hit_probability(s_t, s_t_dt, barrier, sigma, dt);
-                // Textbook inverse-CDF test: hit iff u < p. `fill_u01`
-                // guarantees u ∈ (0, 1), so no boundary guard is needed.
-                return uniform_random < p_hit;
-            }
-
-            false
+            let p_hit = bridge_hit_probability(s_t, s_t_dt, barrier, sigma, dt);
+            // Textbook inverse-CDF test: hit iff u < p. `fill_u01`
+            // guarantees u ∈ (0, 1), so no boundary guard is needed.
+            uniform_random < p_hit
         }
         BarrierDirection::Down => {
-            // Check discrete crossing
             if s_t <= barrier || s_t_dt <= barrier {
                 return true;
             }
-
-            // Both above barrier - check bridge probability
-            if s_t > barrier && s_t_dt > barrier {
-                let p_hit = bridge_hit_probability(s_t, s_t_dt, barrier, sigma, dt);
-                // Textbook inverse-CDF test: hit iff u < p. `fill_u01`
-                // guarantees u ∈ (0, 1), so no boundary guard is needed.
-                return uniform_random < p_hit;
-            }
-
-            false
+            let p_hit = bridge_hit_probability(s_t, s_t_dt, barrier, sigma, dt);
+            // Textbook inverse-CDF test: hit iff u < p. `fill_u01`
+            // guarantees u ∈ (0, 1), so no boundary guard is needed.
+            uniform_random < p_hit
         }
     }
 }
@@ -177,7 +158,6 @@ mod tests {
 
     #[test]
     fn test_bridge_hit_probability_definite_hit() {
-        // Barrier between observations - should return 1.0
         let p = bridge_hit_probability(90.0, 110.0, 100.0, 0.2, 0.1);
         assert_eq!(p, 1.0);
     }
@@ -198,7 +178,6 @@ mod tests {
 
     #[test]
     fn test_barrier_check_discrete_hit_up() {
-        // Discrete hit for up barrier
         assert!(check_barrier_hit(
             95.0,
             105.0,
@@ -237,7 +216,6 @@ mod tests {
 
     #[test]
     fn test_barrier_check_discrete_hit_down() {
-        // Discrete hit for down barrier
         assert!(check_barrier_hit(
             105.0,
             95.0,
@@ -264,7 +242,6 @@ mod tests {
         let p_up = bridge_hit_probability(110.0, 120.0, 100.0, 0.2, 0.1);
         let p_down = bridge_hit_probability(90.0, 80.0, 100.0, 0.2, 0.1);
 
-        // Should be similar due to symmetry
         assert!((p_up - p_down).abs() < 0.1);
     }
 }

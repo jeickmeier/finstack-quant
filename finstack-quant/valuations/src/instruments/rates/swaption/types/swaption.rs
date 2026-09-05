@@ -779,7 +779,9 @@ impl Swaption {
     ///
     /// * `disc` - Discounting callback or curve used to present-value path cashflows
     /// * `as_of` - Valuation or observation date that anchors discounting and schedule logic
-    /// * `forward_rate` - Forward rate used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `forward_rate` - Swap rate in decimal used only for `ParYield` cash settlement
+    ///   (the closed-form flat-yield annuity). Ignored for physical settlement and other
+    ///   cash methods.
     pub fn annuity(&self, disc: &dyn Discounting, as_of: Date, forward_rate: f64) -> Result<f64> {
         match self.settlement {
             SwaptionSettlement::Physical => self.swap_annuity(disc, as_of),

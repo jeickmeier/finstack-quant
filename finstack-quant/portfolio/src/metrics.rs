@@ -265,11 +265,10 @@ pub(crate) fn is_summable(metric_id: &str) -> bool {
 
 /// Aggregate metrics from portfolio valuation results.
 ///
-/// This function:
-/// 1. Collects all metrics from position valuations (in parallel if enabled)
-/// 2. FX-converts summable metrics to portfolio base currency before aggregation
-/// 3. Aggregates summable metrics by entity and portfolio total
-/// 4. Stores non-summable metrics by position only (in native currency)
+/// Collects position metrics (in parallel when enabled), FX-converts summable
+/// metrics to the portfolio base currency, rolls those up by entity and
+/// portfolio total, and stores non-summable metrics per position in native
+/// currency.
 ///
 /// # FX Conversion
 ///
@@ -405,10 +404,6 @@ pub fn aggregate_metrics(
         .collect::<Result<Vec<PositionMetricData>>>()?;
 
     let mut metrics = aggregate_collected_metrics(collected);
-    // Positions that fell back to PV-only carry no measures at all, so they
-    // contribute zero to every total without leaving a trace in the collected
-    // data. Mirror the valuation's degraded set so the totals are
-    // self-describing.
     metrics
         .degraded_positions
         .clone_from(&valuation.degraded_positions);
@@ -475,26 +470,15 @@ struct PositionMetricData {
 }
 
 /// Aggregate collected position metric data into portfolio metrics.
-///
-/// This is the shared Phase 2+3 logic used by both serial and parallel implementations.
-/// Takes ownership of `collected` to move metric maps instead of cloning them.
 fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioMetrics {
     use std::sync::Arc;
 
     let n = collected.len();
     let mut by_position: IndexMap<PositionId, PositionMetrics> = IndexMap::with_capacity(n);
 
-    // Intern metric IDs: each unique string is stored once as Arc<str>,
-    // eliminating per-position String clones during accumulation. The
-    // intern table's iteration order doesn't affect output, so HashMap
-    // is fine here.
     let mut intern: HashMap<String, Arc<str>> = HashMap::default();
 
-    // These two maps drive the serialization order of
-    // `PortfolioMetrics.aggregated` and `AggregatedMetric.by_entity`.
-    // `IndexMap` preserves insertion order so CSV/JSON snapshots of
-    // portfolio metrics are reproducible run-to-run (a plain `HashMap`
-    // would randomise iteration per-process under SipHash).
+    // IndexMap keeps aggregated/by_entity insertion order stable for snapshots.
     let mut metric_values: IndexMap<Arc<str>, Vec<f64>> = IndexMap::new();
     let mut entity_values: IndexMap<Arc<str>, IndexMap<EntityId, Vec<f64>>> = IndexMap::new();
     let mut skipped_metrics: Vec<SkippedMetric> = Vec::new();
@@ -507,8 +491,6 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
         for (metric_id, value) in &data.metrics {
             let metric_name = metric_id.as_str();
             if !is_summable(metric_name) {
-                // Present per position but never rolled up: record the name so
-                // the omission is visible on the result.
                 unaggregated.insert(metric_name.to_string());
             } else {
                 if !value.is_finite() {
@@ -594,7 +576,6 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
         aggregated,
         by_position,
         skipped_metrics,
-        // Filled in by `aggregate_metrics`, which has the valuation in hand.
         degraded_positions: Vec::new(),
         unaggregated_metrics,
     }
@@ -632,7 +613,6 @@ mod tests {
         assert!(!is_summable("ytm"));
         assert!(!is_summable("duration"));
 
-        // Test bucketed/composite keys
         assert!(is_summable("bucketed_dv01::2y"));
         assert!(is_summable("bucketed_cs01::AAA::5y"));
         assert!(is_summable("bucketed_vega::SURFACE::1y"));
@@ -749,7 +729,6 @@ mod tests {
         let metrics = aggregate_metrics(&valuation, Currency::USD, &market, as_of)
             .expect("test should succeed");
 
-        // Should have position-level metrics
         assert_eq!(valuation.position_values.len(), 1);
         assert!(
             !metrics.by_position.is_empty(),

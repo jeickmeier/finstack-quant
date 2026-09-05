@@ -245,21 +245,14 @@ mod tests {
 
     #[test]
     fn test_exposure_limit_validation() {
-        // Valid: 0.0
         assert!(Constraint::exposure_limit("rating", "CCC", 0.0).is_ok());
-
-        // Valid: 1.0
         assert!(Constraint::exposure_limit("rating", "CCC", 1.0).is_ok());
-
-        // Valid: 0.5
         assert!(Constraint::exposure_limit("rating", "CCC", 0.5).is_ok());
 
-        // Invalid: negative
         let result = Constraint::exposure_limit("rating", "CCC", -0.1);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("max_share"));
 
-        // Invalid: > 1.0
         let result = Constraint::exposure_limit("rating", "CCC", 1.5);
         assert!(result.is_err());
     }
@@ -268,24 +261,18 @@ mod tests {
     fn test_exposure_minimum_validation() {
         assert!(Constraint::exposure_minimum("rating", "IG", 0.5).is_ok());
 
-        // Invalid: negative
         let result = Constraint::exposure_minimum("rating", "IG", -0.1);
         assert!(result.is_err());
 
-        // Invalid: > 1.0
         let result = Constraint::exposure_minimum("rating", "IG", 1.1);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_weight_bounds_validation() {
-        // Valid: min < max
         assert!(Constraint::weight_bounds(PositionFilter::All, 0.0, 0.1).is_ok());
-
-        // Valid: min == max
         assert!(Constraint::weight_bounds(PositionFilter::All, 0.05, 0.05).is_ok());
 
-        // Invalid: min > max
         let result = Constraint::weight_bounds(PositionFilter::All, 0.2, 0.1);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("min"));
@@ -296,7 +283,6 @@ mod tests {
         assert!(Constraint::max_turnover(0.5).is_ok());
         assert!(Constraint::max_turnover(0.0).is_ok());
 
-        // Invalid: negative
         let result = Constraint::max_turnover(-0.1);
         assert!(result.is_err());
     }

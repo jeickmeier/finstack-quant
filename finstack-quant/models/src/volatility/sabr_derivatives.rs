@@ -266,13 +266,11 @@ mod tests {
 
         let deriv_provider = SabrCalibrationDerivatives::new(market_data);
 
-        // Test at some reasonable parameter values
         let params = vec![0.15, 0.3, -0.1]; // alpha, nu, rho
         let mut gradient = vec![0.0; 3];
 
         deriv_provider.gradient(&params, &mut gradient);
 
-        // Gradient should be finite and reasonable
         assert!(gradient[0].is_finite());
         assert!(gradient[1].is_finite());
         assert!(gradient[2].is_finite());
@@ -291,7 +289,6 @@ mod tests {
 
         let deriv_provider = SabrCalibrationDerivatives::new(market_data.clone());
 
-        // Provider gradient of the vega-weighted least-squares objective.
         let params = vec![0.15, 0.3, -0.1];
         let mut provider_grad = vec![0.0; 3];
         deriv_provider.gradient(&params, &mut provider_grad);
@@ -345,7 +342,6 @@ mod tests {
 
     #[test]
     fn test_gradient_otm_strikes() {
-        // Test with out-of-the-money strikes
         let market_data = SabrMarketData {
             forward: 100.0,
             time_to_expiry: 1.0,
@@ -357,7 +353,6 @@ mod tests {
 
         let deriv_provider = SabrCalibrationDerivatives::new(market_data.clone());
 
-        // Provider gradient.
         let params = vec![0.15, 0.3, -0.1];
         let mut provider_grad = vec![0.0; 3];
         deriv_provider.gradient(&params, &mut provider_grad);

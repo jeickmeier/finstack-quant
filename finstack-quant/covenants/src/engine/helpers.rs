@@ -36,19 +36,11 @@ pub(crate) fn headroom_for(bound: Option<BoundKind>, value: f64, threshold: f64)
 /// `NaN <= t` and `NaN >= t` are both false, which would deactivate the
 /// covenant and report a pass on undefined data. A NaN trigger therefore
 /// activates so the covenant's own NaN handling decides the outcome.
-///
-/// # Arguments
-///
-/// * `metric` - Trigger metric id used only in the NaN warning.
-/// * `value` - Observed trigger metric. `NaN` activates; finite values use
-///   `test`.
-/// * `test` - Minimum or maximum bound applied to a finite `value`.
 pub(crate) fn springing_condition_met(metric: &str, value: f64, test: ThresholdTest) -> bool {
     if value.is_nan() {
         tracing::warn!(
             metric,
-            "springing condition metric is NaN \u{2014} activating the covenant \
-             rather than silently treating it as inactive",
+            "springing condition metric is NaN; activating the covenant"
         );
         return true;
     }
@@ -61,11 +53,6 @@ pub(crate) fn springing_condition_met(metric: &str, value: f64, test: ThresholdT
 /// Ordered metric names for a spec: explicit id, then type default, then
 /// Custom/Basket name. The engine uses only the first name (missing is an
 /// error). Forecast tries each name until one resolves.
-///
-/// # Arguments
-///
-/// * `spec` - Specification whose `metric_id` and covenant type supply the
-///   candidate names.
 pub(crate) fn spec_metric_names(spec: &CovenantSpec) -> Vec<&str> {
     let mut names = Vec::new();
     if let Some(id) = &spec.metric_id {
@@ -96,8 +83,6 @@ pub(crate) fn is_covenant_breached(
     threshold: f64,
 ) -> bool {
     if value.is_nan() {
-        // Only NaN is genuinely indeterminate. Infinities retain IEEE ordering:
-        // +inf is good for minimum covenants and bad for maximum covenants.
         return true;
     }
     if covenant_type.is_ratio_max() && value < 0.0 {

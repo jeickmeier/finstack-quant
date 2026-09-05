@@ -282,14 +282,9 @@ fn transform_entity(
     }
 }
 
-/// Visit every row of one entity together with the finite observation
-/// `periods` finite observations earlier (pandas `skipna` counting).
-///
-/// `periods` counts finite observations, not rows: `None`/non-finite rows are
-/// skipped when looking back and never advance the lag themselves. Rows whose
-/// own value is missing, or that have fewer than `periods` finite
-/// predecessors, are visited with `None` as the current value or `None` as the
-/// previous value respectively, and the operation writes `None`.
+/// Visit each entity row with the current finite value and the value `periods`
+/// finite observations earlier (pandas `skipna`). Missing rows do not advance
+/// the lag and are visited as `(None, None)`.
 fn for_each_finite_lag(
     values: &[Option<f64>],
     indices: &[usize],
@@ -473,11 +468,29 @@ impl EwmaState {
     }
 }
 
-fn ewma_step(state: Option<EwmaState>, value: f64, alpha: f64) -> EwmaState {
-    match state {
-        Some(prev) => prev.update(value, alpha),
-        None => EwmaState::first(value),
+fn ewma_scan(
+    values: &[Option<f64>],
+    indices: &[usize],
+    params: Option<&Value>,
+    output: &mut [Option<f64>],
+    project: impl Fn(EwmaState, f64) -> Option<f64>,
+) -> Result<()> {
+    let alpha = ewma_alpha(params)?;
+    let mut state: Option<EwmaState> = None;
+    for &idx in indices {
+        output[idx] = match finite(values[idx]) {
+            Some(value) => {
+                let next = match state {
+                    Some(prev) => prev.update(value, alpha),
+                    None => EwmaState::first(value),
+                };
+                state = Some(next);
+                project(next, value)
+            }
+            None => None,
+        };
     }
+    Ok(())
 }
 
 fn ewma_mean(
@@ -486,18 +499,7 @@ fn ewma_mean(
     params: Option<&Value>,
     output: &mut [Option<f64>],
 ) -> Result<()> {
-    let alpha = ewma_alpha(params)?;
-    let mut state = None;
-    for &idx in indices {
-        output[idx] = match finite(values[idx]) {
-            Some(value) => {
-                state = Some(ewma_step(state, value, alpha));
-                state.map(|next| next.mean)
-            }
-            None => None,
-        };
-    }
-    Ok(())
+    ewma_scan(values, indices, params, output, |state, _| Some(state.mean))
 }
 
 fn ewma_vol(
@@ -506,18 +508,7 @@ fn ewma_vol(
     params: Option<&Value>,
     output: &mut [Option<f64>],
 ) -> Result<()> {
-    let alpha = ewma_alpha(params)?;
-    let mut state = None;
-    for &idx in indices {
-        output[idx] = match finite(values[idx]) {
-            Some(value) => {
-                state = Some(ewma_step(state, value, alpha));
-                state.and_then(EwmaState::vol)
-            }
-            None => None,
-        };
-    }
-    Ok(())
+    ewma_scan(values, indices, params, output, |state, _| state.vol())
 }
 
 fn ewma_zscore(
@@ -526,16 +517,7 @@ fn ewma_zscore(
     params: Option<&Value>,
     output: &mut [Option<f64>],
 ) -> Result<()> {
-    let alpha = ewma_alpha(params)?;
-    let mut state = None;
-    for &idx in indices {
-        output[idx] = match finite(values[idx]) {
-            Some(value) => {
-                state = Some(ewma_step(state, value, alpha));
-                state.map(|next| next.zscore(value))
-            }
-            None => None,
-        };
-    }
-    Ok(())
+    ewma_scan(values, indices, params, output, |state, value| {
+        Some(state.zscore(value))
+    })
 }

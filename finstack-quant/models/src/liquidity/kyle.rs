@@ -166,7 +166,6 @@ impl KyleLambdaModel {
             0.0
         };
 
-        // Execution risk estimate based on volatility over the horizon
         let execution_risk = params.daily_volatility
             * (params.horizon_days / 3.0).sqrt()
             * q.abs()
@@ -240,7 +239,6 @@ impl KyleLambdaModel {
             time_points.push(j as f64 * dt);
         }
 
-        // Expected cost under uniform execution
         let expected_cost = self.lambda * q * q * 0.5;
         let expected_cost_abs = expected_cost.abs();
 

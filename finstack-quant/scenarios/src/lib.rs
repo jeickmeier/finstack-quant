@@ -15,18 +15,14 @@
         clippy::float_cmp,
     )
 )]
-// Allow expect() in doc tests (they are test code)
 #![doc(test(attr(allow(clippy::expect_used))))]
 
 //! Finstack Quant Scenarios — Lightweight deterministic scenario capability.
 //!
-//! This crate provides a minimal, deterministic API for applying shocks to market data
-//! and financial statement forecasts. It enables what-if analysis and stress testing
-//! without requiring a full DSL parser.
-//!
-//! This is the cross-domain scenario surface. [`ScenarioSpec`] can mutate a
-//! supplied [`ExecutionContext`] across market data, instruments, rate bindings,
-//! and statement forecast nodes. A statement model is optional: market-only and
+//! Apply shocks to market data and financial statement forecasts. This is the
+//! cross-domain scenario surface: [`ScenarioSpec`] mutates a supplied
+//! [`ExecutionContext`] across market data, instruments, rate bindings, and
+//! statement forecast nodes. A statement model is optional: market-only and
 //! instrument-only callers can pass `None`, while statement operations return a
 //! typed error if no model is supplied. Statement-local named scenario sets live
 //! in `finstack-quant-statements-analytics`; those evaluate scalar model overrides and

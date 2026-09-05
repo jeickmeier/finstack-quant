@@ -6,7 +6,6 @@ fn test_pj_char_function_at_zero() {
     let params = HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
     let log_spot = 100.0_f64.ln();
 
-    // At φ=0, ψ_j(0) should equal 1 (or very close)
     for j in [1u8, 2u8] {
         let (psi, _status) = heston_pj_characteristic_function(j, 1e-10, 1.0, log_spot, &params);
         assert!(
@@ -30,7 +29,6 @@ fn test_probabilities_in_valid_range() {
     let params = HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
     let settings = HestonFourierSettings::default();
 
-    // Test various moneyness levels
     for strike in [80.0, 100.0, 120.0] {
         let p1 = heston_pj_with_diagnostics(1, 100.0, strike, 1.0, &params, &settings).probability;
         let p2 = heston_pj_with_diagnostics(2, 100.0, strike, 1.0, &params, &settings).probability;
@@ -138,7 +136,6 @@ fn test_black_scholes_limit() {
 /// that would catch either drifting away from the other.
 #[test]
 fn test_cross_validation_with_core_heston() {
-    // Test parameters
     let spot = 100.0;
     let strike = 100.0;
     let time = 0.5;
@@ -150,12 +147,10 @@ fn test_cross_validation_with_core_heston() {
     let sigma_v = 0.3;
     let rho = -0.7;
 
-    // Our implementation
     let params = HestonPricingParams::new(r, q, kappa, theta, sigma_v, rho, v0).expect("valid");
     let our_price = heston_call_price_fourier(spot, strike, time, &params, None)
         .expect("Heston Fourier call price");
 
-    // Canonical core implementation
     let core_params = crate::volatility::heston::HestonParams::new(v0, kappa, theta, sigma_v, rho)
         .expect("valid Heston params");
     let vol_price = core_params.price_european(spot, strike, r, q, time, true);
@@ -286,7 +281,6 @@ fn test_moneyness_ordering() {
     let call_otm = heston_call_price_fourier(100.0, 110.0, 1.0, &params, None)
         .expect("Heston Fourier call price");
 
-    // ITM > ATM > OTM for calls
     assert!(
         call_itm > call_atm,
         "ITM call {} should be > ATM call {}",
@@ -383,7 +377,6 @@ fn test_short_maturity_adaptive() {
     let price = heston_call_price_fourier(100.0, 100.0, time, &params, None)
         .expect("Heston Fourier call price");
 
-    // Should be close to BS with vol = sqrt(v0) = 0.2
     let bs = black_scholes_call(100.0, 100.0, time, 0.05, 0.0, 0.2);
 
     // With short maturity and moderate vol-of-vol, Heston ≈ BS

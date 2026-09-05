@@ -610,7 +610,6 @@ mod tests {
         assert!(matcher.match_factor_with_betas(&dep, &attrs).is_ok());
     }
 
-    // PR-2 test: known issuer → PC + bucket factors in canonical order
     #[test]
     fn credit_hierarchical_matcher_returns_generic_and_bucket_factors() {
         let matcher = matcher_with_one_issuer();
@@ -651,7 +650,6 @@ mod tests {
         assert!((entries[3].beta - 0.75).abs() < 1e-12);
     }
 
-    // PR-2 test: known issuer with missing tag is a typed error
     #[test]
     fn credit_hierarchical_matcher_errors_on_missing_required_tag() {
         let mut tags = three_level_tags();
@@ -821,7 +819,6 @@ mod tests {
         );
     }
 
-    // PR-2 test: unknown issuer with full tags → BucketOnly (β = 1)
     #[test]
     fn credit_hierarchical_matcher_treats_unknown_issuer_as_bucket_only_when_tags_exist() {
         // Configure with NO known issuers; all matches must come from instrument tags.

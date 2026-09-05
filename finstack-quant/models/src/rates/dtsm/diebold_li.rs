@@ -179,7 +179,6 @@ impl DieboldLi {
 
         self.tenors = panel.tenors.clone();
 
-        // Build N x 3 NS loading matrix
         let x = ns_loading_matrix(self.lambda, &self.tenors);
 
         // Compute (X'X)^{-1} X' once (pseudoinverse for OLS)
@@ -193,7 +192,6 @@ impl DieboldLi {
             )
         })?;
 
-        // Factor and residual storage
         let mut factors = DMatrix::zeros(t, 3);
         let mut residuals = DMatrix::zeros(t, n);
         let mut ss_res = vec![0.0_f64; n];
@@ -230,7 +228,6 @@ impl DieboldLi {
             }
         }
 
-        // R-squared per tenor
         let r_squared: Vec<f64> = ss_res
             .iter()
             .zip(ss_tot.iter())
@@ -321,7 +318,6 @@ impl DieboldLi {
         })?;
         let zty = &zt * &y_mat;
 
-        // Solve column-by-column
         let mut b_hat = DMatrix::zeros(4, 3);
         for k in 0..3 {
             let col = zty.column(k).into_owned();
@@ -335,12 +331,11 @@ impl DieboldLi {
         let c = DVector::from_fn(3, |k, _| b_hat[(0, k)]);
         let phi = DMatrix::from_fn(3, 3, |row, col| b_hat[(col + 1, row)]);
 
-        // Compute unconditional mean: mu = (I - Phi)^{-1} c
+        // Unconditional mean: mu = (I - Phi)^{-1} c
         let eye3 = DMatrix::identity(3, 3);
         let i_minus_phi = &eye3 - &phi;
         let mu = i_minus_phi.try_inverse().map(|inv| &inv * &c).unwrap_or(c); // fallback to c if non-invertible (unit root)
 
-        // Residual covariance Q
         let mut residuals = DMatrix::zeros(n_obs, 3);
         for i in 0..n_obs {
             let z_row = z_mat.row(i).transpose();
@@ -395,7 +390,6 @@ impl DieboldLi {
         })?;
 
         let t = fts.factors.nrows();
-        // Last observed factor vector
         let last_beta = DVector::from_fn(3, |k, _| fts.factors[(t - 1, k)]);
 
         // Iterate forecast: beta_hat(t+h) = mu + Phi^h * (beta(t) - mu)
@@ -414,7 +408,6 @@ impl DieboldLi {
             phi_j = phi * &phi_j;
         }
 
-        // Convert factor forecast to yields
         let x = ns_loading_matrix(self.lambda, &self.tenors);
         let n = self.tenors.len();
 
@@ -681,8 +674,8 @@ pub fn diebold_li_model(lambda: Option<f64>) -> finstack_quant_core::Result<Dieb
 
 /// Extract Diebold-Li factors from row-major yield observations.
 ///
-/// Convenience twin of [`DieboldLi::extract_factors`] for callers holding
-/// plain nested vectors instead of a [`YieldPanel`].
+/// Same as [`DieboldLi::extract_factors`] for callers holding plain nested
+/// vectors instead of a [`YieldPanel`].
 ///
 /// # Arguments
 ///
@@ -861,7 +854,6 @@ mod tests {
 
         let fts = model.factors().unwrap();
 
-        // All extracted betas should match input
         for i in 0..t {
             assert!(
                 (fts.factors[(i, 0)] - beta0).abs() < 1e-10,
@@ -888,7 +880,6 @@ mod tests {
             }
         }
 
-        // R-squared should be 1.0 (within tolerance) for pure NS data
         assert!(fts.r_squared_avg > 0.999);
     }
 
@@ -950,12 +941,10 @@ mod tests {
             .fit_var()
             .unwrap();
 
-        // VAR should have mu, phi, q_cov populated
         assert!(model.mu().is_some());
         assert!(model.phi().is_some());
         assert!(model.q_cov().is_some());
 
-        // Forecast should produce valid yields
         let fc = model.forecast(1).unwrap();
         assert_eq!(fc.yields.len(), tenors.len());
         assert_eq!(fc.tenors.len(), tenors.len());

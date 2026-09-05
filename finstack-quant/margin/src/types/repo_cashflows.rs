@@ -8,9 +8,6 @@ use super::{MarginCall, RepoMarginSpec};
 
 /// Generate margin-related cashflows for a repo.
 ///
-/// This function generates margin call cashflows based on a series of
-/// collateral valuations over the life of the repo.
-///
 /// # Arguments
 ///
 /// * `spec` - Repo margin specification
@@ -41,7 +38,6 @@ pub fn generate_margin_cashflows(
 
         if effective_collateral_value < call_trigger {
             let deficit = required_collateral - effective_collateral_value;
-            // Need to deliver additional collateral
             cashflows.push(CashFlow::new(
                 *date,
                 None,
@@ -52,8 +48,8 @@ pub fn generate_margin_cashflows(
             ));
             margin_balance += deficit;
         } else if effective_collateral_value > required_collateral && i > 0 {
+            // Opening excess is not a return.
             let excess = effective_collateral_value - required_collateral;
-            // Return excess collateral (not on first day)
             cashflows.push(CashFlow::new(
                 *date,
                 None,
@@ -103,16 +99,14 @@ pub fn generate_margin_interest_cashflows(
     currency: finstack_quant_core::currency::Currency,
     day_count: finstack_quant_core::dates::DayCount,
 ) -> finstack_quant_core::Result<Vec<CashFlow>> {
-    if !spec.pays_margin_interest || spec.margin_interest_rate.is_none() {
+    if !spec.pays_margin_interest {
         return Ok(vec![]);
     }
-
-    let rate = spec.margin_interest_rate.unwrap_or(0.0);
+    let Some(rate) = spec.margin_interest_rate else {
+        return Ok(vec![]);
+    };
     let mut cashflows = Vec::new();
 
-    // Calculate interest between consecutive dates using the repo's day count convention.
-    // Previously this was hardcoded to Act/360; now it correctly uses the instrument's
-    // configured day count (e.g., Act/365F for GBP repos).
     for window in margin_balances.windows(2) {
         if let [prev, curr] = window {
             let year_fraction = day_count.year_fraction(
@@ -123,7 +117,6 @@ pub fn generate_margin_interest_cashflows(
             let interest = prev.1 * rate * year_fraction;
 
             if interest.abs() > 0.01 {
-                // Only generate if material
                 cashflows.push(CashFlow::new(
                     curr.0,
                     None,

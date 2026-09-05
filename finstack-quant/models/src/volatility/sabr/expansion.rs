@@ -57,8 +57,6 @@
 //!   *Applied Mathematical Finance*, 12(4), 371-385. `docs/REFERENCES.md#hagan-2002-sabr`
 //! - QuantLib SABR implementation: `ql/termstructures/volatility/sabr.cpp` `docs/REFERENCES.md#hagan-2002-sabr`
 
-// SABR stochastic volatility model implementation.
-
 use super::SabrParameters;
 
 impl SabrParameters {
@@ -66,8 +64,7 @@ impl SabrParameters {
 
     /// Lognormal (Black-76) implied volatility using Hagan's approximation.
     ///
-    /// This is the market-standard SABR approximation from Hagan et al. (2002).
-    /// Returns the Black-76 implied volatility for a given forward, strike, and expiry.
+    /// Hagan et al. (2002) Black-76 implied volatility for a given forward, strike, and expiry.
     ///
     /// # Arguments
     ///
@@ -96,7 +93,6 @@ impl SabrParameters {
         let rho = self.rho;
         let nu = self.nu;
 
-        // Apply shift for negative rate support
         let (f, k) = if let Some(s) = self.shift {
             (f + s, k + s)
         } else {
@@ -131,7 +127,6 @@ impl SabrParameters {
         // χ(z) = log[(√(1 - 2ρz + z²) + z - ρ) / (1 - ρ)]
         let chi_z = chi(z, rho).unwrap_or(f64::NAN);
 
-        // Numerator: α
         let numerator = alpha;
 
         // Denominator: (FK)^((1-β)/2) * [1 + (1-β)²/24 * log²(F/K) + (1-β)⁴/1920 * log⁴(F/K)]
@@ -188,7 +183,6 @@ impl SabrParameters {
         let rho = self.rho;
         let nu = self.nu;
 
-        // Apply shift for negative rate support
         let (f, k) = if let Some(s) = self.shift {
             (f + s, k + s)
         } else {

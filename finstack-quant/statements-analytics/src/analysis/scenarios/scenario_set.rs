@@ -585,7 +585,6 @@ impl ScenarioResults {
             ))
         })?;
 
-        // Pre-allocate output columns.
         let scenario_names: Vec<&str> = self.scenarios.keys().map(|k| k.as_str()).collect();
         let non_baseline_names: Vec<&str> = scenario_names
             .iter()
@@ -611,7 +610,6 @@ impl ScenarioResults {
                 periods_col.push(period.to_string());
                 metrics_col.push((*metric).to_string());
 
-                // Compute scenario values and percent deltas vs baseline.
                 let baseline_value = baseline_results.get(metric, &period);
 
                 for (idx, scenario_name) in scenario_names.iter().enumerate() {
@@ -666,7 +664,6 @@ impl ScenarioResults {
             );
 
             if *scenario_name != baseline_name {
-                // Find index in pct_values for this scenario.
                 if let Some(pct_idx) = non_baseline_names
                     .iter()
                     .position(|name| *name == *scenario_name)

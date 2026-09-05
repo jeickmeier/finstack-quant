@@ -65,12 +65,8 @@ pub struct HaircutImCalculator {
     /// Default collateral asset class to assume.
     default_asset_class: CollateralAssetClass,
 
-    /// Posted collateral currency, if different from the exposure
-    /// currency. The FX add-on is applied iff this is set *and* differs
-    /// from the instrument's MTM currency at calculation time. Replaces
-    /// the previous two-flag (`apply_fx_addon`, `currency_mismatch`)
-    /// builder state with a single explicit value: there is no way to
-    /// configure "apply FX add-on but currencies match" by accident.
+    /// Posted collateral currency. The FX add-on applies only when this is
+    /// set and differs from the instrument's MTM currency.
     posted_collateral_currency: Option<finstack_quant_core::currency::Currency>,
 }
 
@@ -235,8 +231,6 @@ impl ImCalculator for HaircutImCalculator {
                 ))
             })?;
 
-        // Derive the FX-addon flag from the actual currency pair instead
-        // of carrying it as builder state.
         let currency_mismatch = self
             .posted_collateral_currency
             .is_some_and(|c| c != collateral_value.currency());

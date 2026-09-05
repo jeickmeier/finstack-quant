@@ -1,14 +1,10 @@
 //! Portfolio-level cashflow aggregation.
 //!
-//! This module provides utilities to build a **cashflow ladder** across all
-//! positions in a portfolio. Cashflows are aggregated by payment date and
-//! currency using signed canonical schedules from the underlying instruments.
-//!
-//! The aggregation is **currency-preserving**: no implicit FX conversion is
-//! applied. Consumers can apply explicit FX policies on top if a base-currency
-//! ladder is required. Use
-//! `PortfolioCashflows::collapse_to_base_by_date_kind` for a
-//! base-currency projection that preserves `CFKind` classification.
+//! Builds a cashflow ladder across all positions, aggregated by payment date
+//! and currency from signed canonical instrument schedules. Aggregation is
+//! currency-preserving: no implicit FX conversion is applied. Use
+//! `PortfolioCashflows::collapse_to_base_by_date_kind` for a base-currency
+//! projection that preserves `CFKind` classification.
 //!
 //! Base-currency collapse uses spot FX at `as_of` for payments on or before
 //! the valuation date, and the covered-interest-parity forward
@@ -353,13 +349,6 @@ pub fn aggregate_full_cashflows(
     market: &MarketContext,
     options: &CashflowAggregationOptions,
 ) -> Result<PortfolioCashflows> {
-    // Phase A: build each position's cashflow schedule. Every call is an
-    // independent, read-only function of the shared `MarketContext` and the
-    // per-position instrument, so scheduling
-    // it in parallel yields near-linear speedup for portfolios with many
-    // instruments. Small books stay serial to dodge Rayon overhead. Results
-    // are collected in positional order either way, preserving the
-    // deterministic event/merge ordering that the existing tests encode.
     struct PositionCashflowResult {
         position_id: PositionId,
         instrument_id: String,
@@ -425,9 +414,6 @@ pub fn aggregate_full_cashflows(
     let per_position: Vec<PositionCashflowResult> =
         portfolio.positions.iter().map(schedule_position).collect();
 
-    // Phase B (serial): merge per-position results into the aggregated
-    // structures. Serial keeps `events` / `by_position` / `by_date` ordering
-    // deterministic and preserves the existing tracing log order.
     let mut events = Vec::new();
     let mut by_position: IndexMap<PositionId, Vec<PortfolioCashflowEvent>> = IndexMap::new();
     let mut position_summaries: IndexMap<PositionId, PortfolioCashflowPositionSummary> =

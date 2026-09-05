@@ -1,12 +1,4 @@
 //! Regression tests for covenant engine identity and evaluation conventions.
-//!
-//! Covers:
-//! - B3: `project_finance` MinDscr identity collision — a distribution-lockup
-//!   breach must trigger `BlockDistributions` only, never the primary
-//!   covenant's Event of Default.
-//! - Duplicate instance keys are rejected at evaluation time.
-//! - Negative leverage-type ratios (negative EBITDA) breach max covenants.
-//! - Relative headroom keeps its sign for negative thresholds.
 
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_covenants::{
@@ -202,9 +194,6 @@ fn negative_metric_still_passes_custom_maximum() {
 
 #[test]
 fn relative_headroom_keeps_sign_for_negative_threshold() {
-    // Custom Maximum(-1.0): a value of -2.0 is comfortably below the cap →
-    // positive headroom. Pre-fix, dividing by a signed negative threshold
-    // flipped the sign.
     let mut engine = CovenantEngine::new();
     engine.add_spec(CovenantSpec::with_metric(
         Covenant::new(

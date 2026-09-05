@@ -1,7 +1,7 @@
 //! Shared types for dynamic term structure models.
 //!
-//! Provides the canonical data containers used by all DTSM estimators:
-//! yield panel data, factor time series, and forecast results.
+//! Yield panel data, factor time series, and forecast results used by DTSM
+//! estimators.
 
 use nalgebra::DMatrix;
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,6 @@ fn rows_to_dmatrix(rows: &[Vec<f64>], label: &str) -> finstack_quant_core::Resul
 
 /// A panel of yield observations: rows = dates, columns = tenors.
 ///
-/// This is the canonical input format for all DTSM estimators.
 /// Yields are continuously compounded zero rates.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YieldPanel {
@@ -51,8 +50,8 @@ pub struct YieldPanel {
 impl YieldPanel {
     /// Construct a yield panel from row-major yield observations.
     ///
-    /// `yield_rows[date_idx][tenor_idx]` is converted into the canonical
-    /// matrix representation and validated through [`Self::new`].
+    /// `yield_rows[date_idx][tenor_idx]` is converted into a matrix
+    /// and validated through [`Self::new`].
     ///
     /// # Errors
     /// - Yield rows are empty or ragged
@@ -115,7 +114,6 @@ impl YieldPanel {
         tenors: Vec<f64>,
         dates: Option<Vec<finstack_quant_core::dates::Date>>,
     ) -> finstack_quant_core::Result<Self> {
-        // Validate tenor grid
         if tenors.is_empty() {
             return Err(finstack_quant_core::Error::Validation(
                 "Tenor grid must not be empty".into(),
@@ -138,7 +136,6 @@ impl YieldPanel {
             }
         }
 
-        // Validate matrix dimensions
         if yields.ncols() != tenors.len() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Yield matrix has {} columns but tenor grid has {} entries",
@@ -153,18 +150,14 @@ impl YieldPanel {
             )));
         }
 
-        // Validate dates length if provided
-        if let Some(ref d) = dates {
-            if d.len() != yields.nrows() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Dates vector has length {} but yield matrix has {} rows",
-                    d.len(),
-                    yields.nrows()
-                )));
-            }
+        if let Some(d) = dates.as_ref().filter(|d| d.len() != yields.nrows()) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Dates vector has length {} but yield matrix has {} rows",
+                d.len(),
+                yields.nrows()
+            )));
         }
 
-        // Validate all yield values are finite
         for r in 0..yields.nrows() {
             for c in 0..yields.ncols() {
                 if !yields[(r, c)].is_finite() {

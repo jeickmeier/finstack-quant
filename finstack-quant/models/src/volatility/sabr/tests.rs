@@ -7,16 +7,9 @@ use super::*;
 
 #[test]
 fn test_sabr_parameters_validation() {
-    // Valid parameters
     assert!(SabrParameters::new(0.2, 0.5, 0.3, 0.1).is_ok());
-
-    // Invalid alpha
     assert!(SabrParameters::new(-0.1, 0.5, 0.3, 0.1).is_err());
-
-    // Invalid beta
     assert!(SabrParameters::new(0.2, 1.5, 0.3, 0.1).is_err());
-
-    // Invalid rho
     assert!(SabrParameters::new(0.2, 0.5, 0.3, 1.5).is_err());
 }
 
@@ -33,7 +26,6 @@ fn test_sabr_atm_volatility() {
         .atm_volatility(forward, time_to_expiry)
         .expect("ATM volatility calculation should succeed in test");
 
-    // ATM vol should be positive
     assert!(atm_vol > 0.0);
 
     // For ATM, implied vol should match ATM vol
@@ -52,7 +44,6 @@ fn test_sabr_smile_shape() {
     let forward = 100.0;
     let time_to_expiry = 1.0;
 
-    // Generate strikes
     let strikes = vec![80.0, 90.0, 100.0, 110.0, 120.0];
     let mut vols = Vec::new();
 
@@ -66,7 +57,6 @@ fn test_sabr_smile_shape() {
     // With negative rho, we expect downward sloping skew
     // Lower strikes should have higher vols
     // But the actual shape depends on all parameters
-    // Just check that we get different vols (smile exists)
     let vol_range = vols
         .iter()
         .max_by(|a, b| a.total_cmp(b))
@@ -93,9 +83,7 @@ fn test_sabr_normal_model() {
         .implied_volatility(forward, strike, time_to_expiry)
         .expect("Volatility calculation should succeed in test");
 
-    // Should produce reasonable normal vol
     assert!(vol > 0.0);
-    // Normal vol can be very large for small forward rates, so we just check it's positive
 }
 
 #[test]
@@ -113,14 +101,12 @@ fn test_sabr_lognormal_model() {
         .implied_volatility(forward, strike, time_to_expiry)
         .expect("Volatility calculation should succeed in test");
 
-    // Should produce reasonable lognormal vol
     assert!(vol > 0.0);
     assert!(vol < 1.0); // Less than 100% vol
 }
 
 #[test]
 fn test_sabr_calibration() {
-    // Create synthetic market data
     let forward = 100.0;
     let strikes = vec![90.0, 95.0, 100.0, 105.0, 110.0];
     let market_vols = vec![0.22, 0.20, 0.19, 0.195, 0.21];
@@ -138,12 +124,10 @@ fn test_sabr_calibration() {
         .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
         .expect("Volatility calculation should succeed in test");
 
-    // Check calibrated parameters are reasonable
     assert!(params.alpha > 0.0);
     assert!(params.nu >= 0.0);
     assert!(params.rho >= -1.0 && params.rho <= 1.0);
 
-    // Check fit quality
     let model = SabrModel::new(params);
     for (i, &strike) in strikes.iter().enumerate() {
         let model_vol = model
@@ -166,19 +150,16 @@ fn test_sabr_smile_generator() {
         .generate_smile(&strikes)
         .expect("Smile generation should succeed in test");
 
-    // Check all vols are positive
     for vol in &vols {
         assert!(*vol > 0.0);
     }
 
-    // Validate that smile has variation (different volatilities)
     assert!(!vols.is_empty());
     assert!(vols.iter().all(|&v| v > 0.0));
 }
 
 #[test]
 fn test_sabr_negative_rates_shifted() {
-    // Test shifted SABR with negative forward rates
     let forward = -0.005; // -50bps
     let strikes = vec![-0.01, -0.005, 0.0, 0.005, 0.01];
     let shift = 0.02; // 200bps shift
@@ -187,7 +168,6 @@ fn test_sabr_negative_rates_shifted() {
         .expect("SABR parameters should be valid in test"); // Higher alpha for more reasonable vols
     let model = SabrModel::new(params);
 
-    // Should handle negative rates correctly
     for &strike in &strikes {
         let vol = model.implied_volatility(forward, strike, 1.0);
         assert!(vol.is_ok(), "Failed for strike {}: {:?}", strike, vol);
@@ -209,7 +189,6 @@ fn test_sabr_negative_rates_shifted() {
 
 #[test]
 fn test_sabr_atm_stability() {
-    // Test enhanced ATM stability with very close strikes
     let params =
         SabrParameters::new(0.2, 0.5, 0.3, -0.1).expect("SABR parameters should be valid in test");
     let model = SabrModel::new(params);
@@ -223,7 +202,6 @@ fn test_sabr_atm_stability() {
         forward + 1e-10,
     ];
 
-    // All should give very similar results (ATM case)
     let mut vols = Vec::new();
     for &strike in &strikes {
         let vol = model
@@ -232,7 +210,6 @@ fn test_sabr_atm_stability() {
         vols.push(vol);
     }
 
-    // Check all ATM-like volatilities are similar with practical tolerance
     let vol_range = vols
         .iter()
         .max_by(|a, b| a.total_cmp(b))
@@ -246,7 +223,6 @@ fn test_sabr_atm_stability() {
 
 #[test]
 fn test_sabr_auto_shift_calibration() {
-    // Test automatic shift detection and calibration
     let forward = -0.002; // Negative forward
     let strikes = vec![-0.005, -0.002, 0.0, 0.002, 0.005];
     let market_vols = vec![0.015, 0.012, 0.010, 0.011, 0.013]; // More reasonable vols for rates
@@ -258,11 +234,9 @@ fn test_sabr_auto_shift_calibration() {
         .calibrate_auto_shift(forward, &strikes, &market_vols, time_to_expiry, beta)
         .expect("Volatility calculation should succeed in test");
 
-    // Should have detected need for shift
     assert!(params.is_shifted());
     assert!(params.shift().expect("Shift should be Some") > 0.0);
 
-    // Check model works with negative rates
     let model = SabrModel::new(params);
     for &strike in &strikes {
         let vol = model.implied_volatility(forward, strike, time_to_expiry);
@@ -279,7 +253,6 @@ fn test_sabr_auto_shift_calibration() {
 
 #[test]
 fn test_sabr_numerical_stability_extreme_parameters() {
-    // Test with extreme but valid parameters
     let params =
         SabrParameters::new(0.01, 0.1, 0.1, 0.9).expect("SABR parameters should be valid in test");
     let model = SabrModel::new(params);
@@ -298,7 +271,6 @@ fn test_sabr_numerical_stability_extreme_parameters() {
 
 #[test]
 fn test_sabr_chi_function_stability() {
-    // Test chi function with various extreme cases
     let params =
         SabrParameters::new(0.2, 0.5, 0.3, 0.95).expect("SABR parameters should be valid in test"); // High rho
     let model = SabrModel::new(params);
@@ -424,8 +396,6 @@ fn test_sabr_z_over_chi_uses_series_not_fabricated_one() {
     );
 }
 
-// Market Standards Validation Tests (Priority 1, Task 1.2)
-
 #[test]
 fn test_sabr_rejects_negative_alpha() {
     let result = SabrParameters::new(-0.1, 0.5, 0.3, 0.1);
@@ -437,7 +407,6 @@ fn test_sabr_rejects_negative_alpha() {
         "Should return Validation error"
     );
 
-    // Verify error message mentions alpha
     let err_str = format!("{}", err);
     assert!(err_str.contains("alpha") || err_str.contains("α"));
 }
@@ -486,7 +455,6 @@ fn test_sabr_rejects_negative_nu() {
     let err = result.expect_err("should fail");
     assert!(matches!(err, finstack_quant_core::Error::Validation(_)));
 
-    // Verify error message mentions nu
     let err_str = format!("{}", err);
     assert!(err_str.contains("nu") || err_str.contains("ν"));
 }
@@ -520,17 +488,13 @@ fn test_sabr_rejects_invalid_beta() {
 
 #[test]
 fn test_sabr_accepts_boundary_values() {
-    // Test that exact boundary values are accepted
     assert!(SabrParameters::new(1e-10, 0.0, 0.0, -1.0).is_ok());
     assert!(SabrParameters::new(1e-10, 1.0, 0.0, 1.0).is_ok());
     assert!(SabrParameters::new(0.001, 0.5, 0.0, 0.0).is_ok());
 }
 
-// Inverse Normal CDF Precision Tests
-
 #[test]
 fn test_normal_inverse_cdf_precision() {
-    // Test that the inverse CDF has high precision for tail probabilities.
     // These golden values are from high-precision statistical tables.
 
     // Standard values
@@ -595,8 +559,6 @@ fn test_normal_inverse_cdf_boundary_behavior() {
     assert!(near_one > 30.0, "CDF^-1(1-1e-300) should be very positive");
 }
 
-// Arbitrage Validation Tests
-
 #[test]
 fn test_sabr_arbitrage_validation_clean_smile() {
     // Well-behaved SABR parameters should produce arbitrage-free smile
@@ -623,14 +585,12 @@ fn test_sabr_arbitrage_validation_clean_smile() {
 
 #[test]
 fn test_sabr_arbitrage_check_api() {
-    // Test the simplified check API
     let params = SabrParameters::new(0.2, 0.5, 0.3, -0.2).expect("Valid SABR parameters");
     let model = SabrModel::new(params);
     let smile = SabrSmile::new(model, 100.0, 1.0);
 
     let strikes: Vec<f64> = (80..=120).step_by(5).map(|k| k as f64).collect();
 
-    // Should pass without error
     let check_result = smile.check_no_arbitrage(&strikes, 0.05, 0.02);
     assert!(
         check_result.is_ok(),
@@ -640,14 +600,11 @@ fn test_sabr_arbitrage_check_api() {
 
 #[test]
 fn test_sabr_arbitrage_validation_result_methods() {
-    // Test ArbitrageValidationResult helper methods
     let mut result = ArbitrageValidationResult::default();
 
-    // Empty result should be arbitrage-free
     assert!(result.is_arbitrage_free());
     assert!(result.worst_butterfly_severity().is_none());
 
-    // Add a violation
     result.butterfly_violations.push(ButterflyViolation {
         strike: 100.0,
         butterfly_value: -0.01,
@@ -901,7 +858,6 @@ fn test_sabr_beta_zero_nu_zero_is_flat_bachelier_alpha() {
 
     for &forward in &[0.02_f64, 0.03, 0.05] {
         for &expiry in &[0.5_f64, 2.0, 10.0] {
-            // ATM.
             let atm = model
                 .atm_volatility(forward, expiry)
                 .expect("β=0,ν=0 ATM vol should compute");
@@ -1240,8 +1196,6 @@ fn test_sabr_strike_from_delta_round_trip_at_25_delta() {
         "25Δ put round-trip failed: actual |delta| {put_delta}"
     );
 }
-
-// Hagan (1-beta) exponent in the vol denominator
 
 /// At β=1 (lognormal SABR), ν=0 (no vol-of-vol), ρ=0, the model reduces to
 /// dF = α·F·dW, i.e. a pure GBM with constant log-vol α.

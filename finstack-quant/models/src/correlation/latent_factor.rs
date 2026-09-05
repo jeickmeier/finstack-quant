@@ -414,7 +414,6 @@ pub struct LatentTwoFactor {
     correlation_matrix: Vec<f64>,
     volatilities: Vec<f64>,
     // Cholesky lower triangular for correlated sampling: L[1][0], L[1][1]
-    // Used by external callers for generating correlated factors
     cholesky_l10: f64,
     cholesky_l11: f64,
 }
@@ -645,7 +644,6 @@ impl LatentMultiFactor {
             vec![1.0; n]
         };
 
-        // Identity correlation matrix
         let mut corrs = vec![0.0; n * n];
         for i in 0..n {
             corrs[i * n + i] = 1.0;
@@ -835,11 +833,9 @@ mod tests {
         let kind = LatentFactorKind::Two(LatentTwoFactor::new(0.20, 0.30, -0.30));
         let corr = kind.correlation_matrix();
 
-        // Check diagonal is 1
         assert!((corr[0] - 1.0).abs() < 1e-10);
         assert!((corr[3] - 1.0).abs() < 1e-10);
 
-        // Check off-diagonal is correlation
         assert!((corr[1] - (-0.30)).abs() < 1e-10);
         assert!((corr[2] - (-0.30)).abs() < 1e-10);
     }
@@ -1116,7 +1112,6 @@ mod tests {
 
         assert_eq!(model.num_factors(), 3);
 
-        // Check identity correlation
         let corr = model.correlation_matrix();
         for i in 0..3 {
             for j in 0..3 {

@@ -315,10 +315,8 @@ impl HorizonAnalysis {
             )));
         }
 
-        // 1. Price at t0
         let initial_value = instrument.value(market_t0, as_of_t0)?;
 
-        // 2. Clone market and build a market-only execution context
         let calendar = self.resolve_calendar()?;
         let mut market_t1 = market_t0.clone();
         let mut ctx = ExecutionContext {
@@ -330,19 +328,15 @@ impl HorizonAnalysis {
             as_of: as_of_t0,
         };
 
-        // 3. Apply scenario
         let scenario_report = self.engine.apply(scenario, &mut ctx)?;
         let as_of_t1 = ctx.as_of;
 
-        // 4. Derive horizon
         let diff_days = (as_of_t1 - as_of_t0).whole_days();
         let horizon_days = if diff_days > 0 { Some(diff_days) } else { None };
 
-        // 5. Run attribution
         let attribution =
             self.run_attribution(instrument, market_t0, &market_t1, as_of_t0, as_of_t1)?;
 
-        // 6. Price at t1
         let terminal_value = instrument.value(&market_t1, as_of_t1)?;
 
         Ok(HorizonResult {
@@ -354,7 +348,7 @@ impl HorizonAnalysis {
         })
     }
 
-    /// Dispatch to the appropriate attribution function based on `self.attribution_method`.
+    /// Dispatch P&L attribution for `self.attribution_method`.
     fn run_attribution(
         &self,
         instrument: &Arc<dyn Instrument>,

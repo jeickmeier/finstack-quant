@@ -408,7 +408,6 @@ mod tests {
         assert_eq!(format!("{}", id2), "ENTITY_2");
         assert_eq!(id3.to_string(), "ENTITY_3");
 
-        // Test equality
         let id1_clone = EntityId::new("ENTITY_1");
         assert_eq!(id1, id1_clone);
         assert_ne!(id1, id2);

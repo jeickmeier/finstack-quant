@@ -202,7 +202,6 @@ impl Position {
     ) -> Result<Self> {
         let pos_id: PositionId = position_id.into();
 
-        // Validate quantity
         if !quantity.is_finite() {
             return Err(Error::invalid_input(format!(
                 "Position quantity must be finite, got: {} (position_id: {})",
@@ -383,40 +382,21 @@ impl Position {
         self
     }
 
-    /// Check if this position is long (positive quantity).
-    ///
-    /// # Returns
-    ///
-    /// `true` when the stored quantity is strictly greater than zero.
+    /// `true` when quantity is strictly positive.
     pub fn is_long(&self) -> bool {
         self.quantity > 0.0
     }
 
-    /// Check if this position is short (negative quantity).
-    ///
-    /// # Returns
-    ///
-    /// `true` when the stored quantity is strictly less than zero.
+    /// `true` when quantity is strictly negative.
     pub fn is_short(&self) -> bool {
         self.quantity < 0.0
     }
 
-    /// Scale a monetary value by this position's quantity, respecting the unit type.
-    ///
-    /// This function applies unit-aware scaling logic:
-    /// - `Units`: Direct multiplication (quantity = number of units)
-    /// - `Notional`: Direct multiplication (quantity = lot count; the
-    ///   instrument already carries deal notional)
-    /// - `FaceValue`: Direct multiplication (quantity = face-value multiplier)
-    /// - `Percentage`: Quantity represents percentage points (e.g., 50 = 50%), always divided by 100
+    /// Scale a monetary value by [`Self::scale_factor`].
     ///
     /// # Arguments
     ///
-    /// * `value` - The monetary value to scale (typically from `instrument.value()`)
-    ///
-    /// # Returns
-    ///
-    /// The scaled monetary value in the same currency.
+    /// * `value` - Monetary value to scale, typically from `instrument.value()`.
     ///
     /// # Examples
     ///
@@ -454,20 +434,16 @@ impl Position {
     /// # }
     /// ```
     pub fn scale_value(&self, value: Money) -> finstack_quant_core::Result<Money> {
-        Ok({
-            // See [`PositionUnit`] for the full scaling contract. `Notional` treats
-            // `quantity` as a lot multiplier, so the scale factor is simply `quantity`.
-            if let PositionUnit::Notional(Some(notional_currency)) = self.unit {
-                if notional_currency != value.currency() {
-                    tracing::warn!(
-                        position_id = %self.position_id,
-                        "Notional currency {} differs from instrument currency {}",
-                        notional_currency, value.currency()
-                    );
-                }
+        if let PositionUnit::Notional(Some(notional_currency)) = self.unit {
+            if notional_currency != value.currency() {
+                tracing::warn!(
+                    position_id = %self.position_id,
+                    "Notional currency {} differs from instrument currency {}",
+                    notional_currency, value.currency()
+                );
             }
-            Money::new(value.amount() * self.scale_factor(), value.currency())?
-        })
+        }
+        Money::new(value.amount() * self.scale_factor(), value.currency())
     }
 
     /// Unit-aware scale factor applied to instrument P&L or PV.
@@ -501,7 +477,6 @@ impl Position {
     /// A serializable `PositionSpec` carrying tags, metadata, and an optional
     /// instrument payload.
     pub fn to_spec(&self) -> PositionSpec {
-        // Try to convert instrument to JSON (will be implemented in phase 5.3)
         let instrument_spec = self.instrument.to_instrument_json();
 
         PositionSpec {

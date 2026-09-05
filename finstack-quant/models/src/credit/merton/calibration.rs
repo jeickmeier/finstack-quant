@@ -167,7 +167,6 @@ impl MertonModel {
         let sqrt_t = t.sqrt();
         let exp_neg_qt = (-q * t).exp();
 
-        // Initial guesses
         let mut v = e + b;
         let mut sigma_v = sigma_e * e / v;
 
@@ -191,9 +190,8 @@ impl MertonModel {
                 return Err(InputError::Invalid.into());
             }
 
-            // Update V from the call pricing equation: E = V*exp(-qT)*N(d1) - B*exp(-rT)*N(d2)
+            // E = V*exp(-qT)*N(d1) - B*exp(-rT)*N(d2)
             v = (e + b * (-r * t).exp() * nd2) / (exp_neg_qt * nd1);
-            // Update sigma_V from the volatility relation
             sigma_v = sigma_e * e / (nd1 * exp_neg_qt * v);
 
             // Both unknowns must settle. Testing V alone can exit while
@@ -916,7 +914,6 @@ mod tests {
             "CCC PD mismatch"
         );
 
-        // All calibrated barriers should be below asset value
         assert!(m_bb.debt_barrier() < 200.0);
         assert!(m_b.debt_barrier() < 140.0);
         assert!(m_ccc.debt_barrier() < 115.0);

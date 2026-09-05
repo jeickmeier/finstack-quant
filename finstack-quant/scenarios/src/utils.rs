@@ -27,7 +27,6 @@ pub(crate) fn calculate_interpolation_weights(target: f64, knots: &[f64]) -> Int
     let max_knot = knots[knots.len() - 1];
     let min_knot = knots[0];
 
-    // Check for extrapolation beyond curve range
     let (is_extrapolation, extrapolation_distance) = if target > max_knot + 1e-10 {
         (true, Some(target - max_knot))
     } else if target < min_knot - 1e-10 {
@@ -42,12 +41,8 @@ pub(crate) fn calculate_interpolation_weights(target: f64, knots: &[f64]) -> Int
         .unwrap_or(knots.len() - 1);
 
     let weights = if pos == 0 {
-        // Before or at first knot - flat extrapolation to first point
         vec![(0, 1.0)]
     } else if target > max_knot {
-        // Beyond last knot - flat extrapolation to last point.
-        // (`pos` cannot exceed `knots.len() - 1` because `.position()` returns
-        // at most that index via `unwrap_or`.)
         vec![(knots.len() - 1, 1.0)]
     } else {
         let i0 = pos - 1;
@@ -56,8 +51,6 @@ pub(crate) fn calculate_interpolation_weights(target: f64, knots: &[f64]) -> Int
         let t1 = knots[i1];
 
         if (t1 - t0).abs() < 1e-12 {
-            // Coincident points, distribute evenly to avoid div/0
-            // (Should not happen in valid curves)
             vec![(i0, 0.5), (i1, 0.5)]
         } else {
             let w1 = (target - t0) / (t1 - t0);

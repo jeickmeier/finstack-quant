@@ -121,7 +121,6 @@ pub(crate) fn assemble_factor_model_config(
     strategy: CovarianceStrategy,
     annualization_factor: f64,
 ) -> Result<(FactorCorrelationMatrix, FactorModelConfig)> {
-    // Build factor definitions (every factor is Credit / CurveParallel placeholder).
     let mut factors = Vec::with_capacity(factor_id_order.len());
     for fid in factor_id_order {
         // Empty curve_ids are an honest no-op for hierarchy-derived factors;
@@ -194,7 +193,6 @@ pub(crate) fn assemble_factor_model_config(
         CovarianceStrategy::FullSampleRepaired => {
             // Sample correlation ρ; repair if not PSD; Σ = D·ρ_repaired·D.
             let rho_flat = sample_correlation_flat(factor_id_order, factor_returns);
-            // Check if already PSD; repair if not.
             let rho_repaired = if validate_correlation_matrix(&rho_flat, n).is_ok() {
                 rho_flat
             } else {

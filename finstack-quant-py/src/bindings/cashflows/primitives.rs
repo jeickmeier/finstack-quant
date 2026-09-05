@@ -166,6 +166,13 @@ pub struct PyCashFlowAccrual {
     pub(crate) inner: CashFlowAccrual,
 }
 
+impl PyCashFlowAccrual {
+    /// Build from an existing Rust [`CashFlowAccrual`].
+    pub(crate) const fn from_inner(inner: CashFlowAccrual) -> Self {
+        Self { inner }
+    }
+}
+
 #[pymethods]
 impl PyCashFlowAccrual {
     /// Construct contractual coupon metadata.
@@ -206,26 +213,31 @@ impl PyCashFlowAccrual {
             },
         })
     }
+
     /// Inclusive accrual start as a Python date.
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.start)
     }
+
     /// Exclusive accrual end as a Python date.
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.end)
     }
+
     /// Convention used to calculate accrual year fractions.
     #[getter]
     fn day_count(&self) -> PyDayCount {
         PyDayCount::from_inner(self.inner.day_count)
     }
+
     /// Unconstrained decimal index rate, or None if unprojected.
     #[getter]
     fn projected_index_rate(&self) -> Option<f64> {
         self.inner.projected_index_rate
     }
+
     /// Registered accrual calendar identifier, or None when unused.
     #[getter]
     fn calendar_id(&self) -> Option<String> {
@@ -344,7 +356,7 @@ impl PyCashFlow {
         self.inner
             .accrual
             .clone()
-            .map(|inner| PyCashFlowAccrual { inner })
+            .map(PyCashFlowAccrual::from_inner)
     }
     /// Explicit principal movement, or None when derived from kind and amount.
     #[getter]

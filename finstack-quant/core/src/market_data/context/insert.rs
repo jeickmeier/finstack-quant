@@ -20,7 +20,7 @@ impl MarketContext {
     ///
     /// # Arguments
     ///
-    /// * `curve` - Term structure inserted into or consumed from the market context.
+    /// * `curve` - Any curve type convertible into [`CurveStorage`], keyed by its own id.
     pub fn insert<C>(mut self, curve: C) -> Self
     where
         C: Into<CurveStorage>,
@@ -34,9 +34,6 @@ impl MarketContext {
     /// Accepts either an owned [`VolSurface`] or an `Arc<VolSurface>`.
     /// When passing an owned value, it will be wrapped in an `Arc` automatically.
     /// When passing an `Arc`, it is used directly (enabling surface sharing between contexts).
-    ///
-    /// # Parameters
-    /// - `surface`: a [`VolSurface`] or `Arc<VolSurface>`
     ///
     /// # Examples
     /// ```rust
@@ -68,7 +65,7 @@ impl MarketContext {
     ///
     /// # Arguments
     ///
-    /// * `surface` - Volatility surface inserted into or consumed from the market context.
+    /// * `surface` - Owned or shared volatility surface stored under `surface.id()`.
     pub fn insert_surface(mut self, surface: impl Into<Arc<VolSurface>>) -> Self {
         self.insert_surface_mut(surface);
         self
@@ -79,9 +76,6 @@ impl MarketContext {
     /// Accepts either an owned [`FxDeltaVolSurface`] or an `Arc<FxDeltaVolSurface>`.
     /// When passing an owned value, it will be wrapped in an `Arc` automatically.
     /// When passing an `Arc`, it is used directly (enabling surface sharing between contexts).
-    ///
-    /// # Parameters
-    /// - `surface`: a [`FxDeltaVolSurface`] or `Arc<FxDeltaVolSurface>`
     ///
     /// # Examples
     /// ```rust
@@ -101,7 +95,7 @@ impl MarketContext {
     ///
     /// # Arguments
     ///
-    /// * `surface` - Volatility surface inserted into or consumed from the market context.
+    /// * `surface` - Owned or shared FX delta-vol surface stored under `surface.id()`.
     pub fn insert_fx_delta_vol_surface(
         mut self,
         surface: impl Into<Arc<FxDeltaVolSurface>>,
@@ -116,12 +110,9 @@ impl MarketContext {
     /// When passing an owned value, it will be wrapped in an `Arc` automatically.
     /// When passing an `Arc`, it is used directly (enabling cube sharing between contexts).
     ///
-    /// # Parameters
-    /// - `cube`: a [`VolCube`] or `Arc<VolCube>`
-    ///
     /// # Arguments
     ///
-    /// * `cube` - Volatility cube whose expiry, tenor, and strike dimensions are validated.
+    /// * `cube` - Owned or shared SABR vol cube stored under `cube.id()`.
     pub fn insert_vol_cube(mut self, cube: impl Into<Arc<VolCube>>) -> Self {
         self.insert_vol_cube_mut(cube);
         self
@@ -133,12 +124,9 @@ impl MarketContext {
     /// When passing an owned value, it will be wrapped in an `Arc` automatically.
     /// When passing an `Arc`, it is used directly (enabling schedule sharing between contexts).
     ///
-    /// # Parameters
-    /// - `schedule`: a [`DividendSchedule`] or `Arc<DividendSchedule>` built via its builder
-    ///
     /// # Arguments
     ///
-    /// * `schedule` - Dated cash-flow or fixing schedule registered in the market context.
+    /// * `schedule` - Owned or shared dividend schedule stored under `schedule.get_id()`.
     pub fn insert_dividends(mut self, schedule: impl Into<Arc<DividendSchedule>>) -> Self {
         self.insert_dividends_mut(schedule);
         self
@@ -146,14 +134,10 @@ impl MarketContext {
 
     /// Insert a market scalar/price.
     ///
-    /// # Parameters
-    /// - `id`: identifier (string-like) stored as [`CurveId`]
-    /// - `price`: scalar value to store
-    ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
-    /// * `price` - Finite market price in the instrument quote convention.
+    /// * `id` - Lookup key stored as [`CurveId`].
+    /// * `price` - Scalar observable such as a spot price, spread, or unitless parameter.
     pub fn insert_price(mut self, id: impl AsRef<str>, price: MarketScalar) -> Self {
         self.insert_price_mut(id, price);
         self
@@ -161,12 +145,9 @@ impl MarketContext {
 
     /// Insert a scalar time series.
     ///
-    /// # Parameters
-    /// - `series`: [`ScalarTimeSeries`] to store
-    ///
     /// # Arguments
     ///
-    /// * `series` - Time-ordered numeric samples for a single risk factor or price series
+    /// * `series` - Dated scalar series stored under `series.id()`.
     pub fn insert_series(mut self, series: ScalarTimeSeries) -> Self {
         self.insert_series_mut(series);
         self
@@ -177,10 +158,6 @@ impl MarketContext {
     /// Accepts either an owned [`InflationIndex`] or an `Arc<InflationIndex>`.
     /// When passing an owned value, it will be wrapped in an `Arc` automatically.
     /// When passing an `Arc`, it is used directly (enabling index sharing between contexts).
-    ///
-    /// # Parameters
-    /// - `id`: identifier stored as [`CurveId`]
-    /// - `index`: an [`InflationIndex`] or `Arc<InflationIndex>`
     ///
     /// # Examples
     /// ```rust
@@ -214,8 +191,8 @@ impl MarketContext {
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
-    /// * `index` - Zero-based index selecting an entry from the ordered collection
+    /// * `id` - Lookup key stored as [`CurveId`]; must equal `index.id`.
+    /// * `index` - Owned or shared inflation index whose `id` matches `id`.
     pub fn insert_inflation_index(
         mut self,
         id: impl AsRef<str>,
@@ -226,10 +203,6 @@ impl MarketContext {
     }
 
     /// Insert a credit index aggregate.
-    ///
-    /// # Parameters
-    /// - `id`: identifier stored as [`CurveId`]
-    /// - `data`: [`CreditIndexData`] bundle
     ///
     /// # Examples
     /// ```rust
@@ -262,8 +235,8 @@ impl MarketContext {
     ///
     /// # Arguments
     ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
-    /// * `data` - Validated market-data payload to insert or transform.
+    /// * `id` - Lookup key stored as [`CurveId`].
+    /// * `data` - Constituent count, recovery, index hazard curve, and base correlation.
     pub fn insert_credit_index(mut self, id: impl AsRef<str>, data: CreditIndexData) -> Self {
         self.insert_credit_index_mut(id, data);
         self
@@ -274,9 +247,6 @@ impl MarketContext {
     /// Accepts either an owned [`FxMatrix`] or an `Arc<FxMatrix>`.
     /// When passing an owned value, it will be wrapped in an `Arc` automatically.
     /// When passing an `Arc`, it is used directly (enabling FX matrix sharing between contexts).
-    ///
-    /// # Parameters
-    /// - `fx`: [`FxMatrix`] or `Arc<FxMatrix>` instance used for currency conversions
     ///
     /// # Examples
     /// ```rust
@@ -316,16 +286,13 @@ impl MarketContext {
     ///
     /// # Arguments
     ///
-    /// * `fx` - FX matrix or provider used to convert cashflows into reporting currency
+    /// * `fx` - Owned or shared FX matrix used for currency conversion.
     pub fn insert_fx(mut self, fx: impl Into<Arc<FxMatrix>>) -> Self {
         self.insert_fx_mut(fx);
         self
     }
+
     /// Map collateral CSA code to a discount curve identifier.
-    ///
-    /// # Parameters
-    /// - `csa_code`: CSA identifier (e.g., "USD-CSA")
-    /// - `discount_id`: target discount curve [`CurveId`]
     ///
     /// # Examples
     /// ```rust
@@ -348,8 +315,8 @@ impl MarketContext {
     ///
     /// # Arguments
     ///
-    /// * `csa_code` - CSA identifier used to select collateral and discounting terms.
-    /// * `discount_id` - Identifier of the discount curve used for present-value calculations.
+    /// * `csa_code` - Collateral CSA identifier such as `"USD-CSA"`.
+    /// * `discount_id` - Discount curve already present in the context.
     pub fn map_collateral(mut self, csa_code: impl Into<String>, discount_id: CurveId) -> Self {
         self.map_collateral_mut(csa_code, discount_id);
         self

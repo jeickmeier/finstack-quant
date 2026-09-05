@@ -738,7 +738,6 @@ mod tests {
         let corr = CorrelationStructure::flat(0.95, -0.30).expect("valid flat correlation");
         let bumped = corr.bump_asset(0.10);
 
-        // Should clamp to 0.99
         assert!(bumped.asset_correlation() <= 0.99);
     }
 
@@ -756,7 +755,6 @@ mod tests {
         let corr = CorrelationStructure::flat(0.20, -0.95).expect("valid flat correlation");
         let bumped = corr.bump_prepay_default(-0.10);
 
-        // Should clamp to -0.99
         assert!(bumped.prepay_default_correlation() >= -0.99);
     }
 

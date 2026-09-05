@@ -271,8 +271,6 @@ mod tests {
         HurstExponent::new(h).expect("valid hurst")
     }
 
-    // -- Parameter validation -----------------------------------------------
-
     #[test]
     fn test_valid_params() {
         let params = RoughHestonParams {
@@ -454,8 +452,6 @@ mod tests {
         .is_ok());
     }
 
-    // -- Process dimensions -------------------------------------------------
-
     #[test]
     fn test_dim_and_factors() {
         let process = RoughHestonProcess::new(
@@ -476,8 +472,6 @@ mod tests {
         assert_eq!(process.dim(), 2);
         assert_eq!(process.num_factors(), 2);
     }
-
-    // -- Drift / diffusion --------------------------------------------------
 
     #[test]
     fn test_formal_drift_diffusion() {
@@ -513,8 +507,6 @@ mod tests {
         // v diffusion: σᵥ √v = 0.3 × 0.2 = 0.06
         assert!((diffusion[1] - 0.06).abs() < 1e-10);
     }
-
-    // -- Metadata -----------------------------------------------------------
 
     #[test]
     fn test_metadata_name() {

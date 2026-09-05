@@ -191,7 +191,8 @@ impl MarketContext {
     ///
     /// # Arguments
     ///
-    /// * `bumps` - Bumps used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `bumps` - Curve, FX, vol-surface, and base-correlation shocks applied
+    ///   together on a cloned context.
     pub fn bump<I>(&self, bumps: I) -> Result<Self>
     where
         I: IntoIterator<Item = MarketBump>,

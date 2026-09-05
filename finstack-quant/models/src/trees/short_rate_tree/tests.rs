@@ -82,7 +82,6 @@ fn test_tree_calibration() {
     let result = tree.calibrate(&curve, 2.0);
     assert!(result.is_ok());
 
-    // Tree should have rates at each step
     assert_eq!(tree.rates.len(), 11); // 0 to 10 steps
     assert_eq!(tree.rates[0].len(), 1); // First step has one node
     assert_eq!(tree.rates[10].len(), 11); // Last step has 11 nodes
@@ -227,14 +226,12 @@ fn test_rate_access() {
     let curve = create_test_curve();
     tree.calibrate(&curve, 1.0).expect("should succeed");
 
-    // Should be able to access rates at valid nodes
     let r0 = tree.rate_at_node(0, 0).expect("should succeed");
     assert!(r0 > 0.0);
 
     let r_final = tree.rate_at_node(5, 2).expect("should succeed");
     assert!(r_final.is_finite());
 
-    // Invalid access should error
     assert!(tree.rate_at_node(10, 0).is_err());
     assert!(tree.rate_at_node(0, 5).is_err());
 }
@@ -524,11 +521,8 @@ fn bk_kappa_to_zero_converges_to_bdt() {
     );
 }
 
-// Volatility Conversion Tests
-
 #[test]
 fn test_normal_to_lognormal_vol_conversion() {
-    // Test that conversion produces reasonable lognormal vol and round-trips correctly
     let normal_vol = 0.01; // 100 bp
     let rate_level = 0.05; // 5%
 
@@ -541,13 +535,12 @@ fn test_normal_to_lognormal_vol_conversion() {
     )
     .expect("valid conversion");
 
-    // Lognormal vol should be in a reasonable range (roughly normal_vol / rate_level)
+    // Roughly normal_vol / rate_level.
     assert!(
         lognormal > 0.15 && lognormal < 0.25,
         "lognormal vol {lognormal} out of range"
     );
 
-    // Round-trip should recover original
     let recovered = convert_atm_volatility(
         lognormal,
         VolatilityConvention::Lognormal,
@@ -564,7 +557,6 @@ fn test_normal_to_lognormal_vol_conversion() {
 
 #[test]
 fn test_lognormal_to_normal_vol_conversion() {
-    // Test that conversion produces reasonable normal vol and round-trips correctly
     let lognormal_vol = 0.20; // 20%
     let rate_level = 0.05; // 5%
 
@@ -577,13 +569,12 @@ fn test_lognormal_to_normal_vol_conversion() {
     )
     .expect("valid conversion");
 
-    // Normal vol should be in a reasonable range (roughly lognormal_vol * rate_level)
+    // Roughly lognormal_vol * rate_level.
     assert!(
         normal > 0.005 && normal < 0.015,
         "normal vol {normal} out of range"
     );
 
-    // Round-trip should recover original
     let recovered = convert_atm_volatility(
         normal,
         VolatilityConvention::Normal,
@@ -780,8 +771,6 @@ fn bdt_calibration_succeeds_for_a_normal_well_posed_tree() {
     assert!(quality.converged, "quality={quality:?}");
     assert!(quality.is_acceptable(), "quality={quality:?}");
 }
-
-// Config Factory Tests
 
 #[test]
 fn test_config_ho_lee_factory() {

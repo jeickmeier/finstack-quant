@@ -33,8 +33,6 @@ use finstack_quant_core::math::fractional::{
 use finstack_quant_core::{Error, Result};
 use nalgebra::DMatrix;
 
-// FractionalNoiseGenerator trait
-
 /// Generates correlated fractional Brownian motion increments from i.i.d. normals.
 ///
 /// Unlike [`crate::monte_carlo::traits::RandomStream`] (which produces independent samples),
@@ -239,7 +237,6 @@ impl WindowedConditionalFbm {
             ));
         }
 
-        // Build the near-field Cholesky factor (first b increments).
         let near_times = &times[..=b];
         let near_cov = fbm_increment_covariance_matrix(near_times, h.value());
         let near_chol = nalgebra::linalg::Cholesky::new(near_cov).ok_or_else(|| {
@@ -250,9 +247,9 @@ impl WindowedConditionalFbm {
         })?;
         let near_cholesky = near_chol.l();
 
-        // Build conditional-mean weights for steps b..n. Each later increment
-        // is generated from its conditional Gaussian distribution given the
-        // previous b increments; dependence beyond the window is truncated.
+        // Each later increment is generated from its conditional Gaussian
+        // distribution given the previous b increments; dependence beyond the
+        // window is truncated.
         let mut cond_weights = Vec::with_capacity(n.saturating_sub(b));
 
         for i in b..n {
@@ -368,8 +365,6 @@ impl FractionalNoiseGenerator for WindowedConditionalFbm {
     }
 }
 
-// Canonical auto-selecting factory
-
 /// Number of steps below which the auto factory uses exact Cholesky generation.
 pub const FBM_AUTO_CHOLESKY_MAX_STEPS: usize = 199;
 
@@ -446,8 +441,6 @@ mod tests {
         (0..=n).map(|i| i as f64 * dt).collect()
     }
 
-    // -- CholeskyFbm -------------------------------------------------------
-
     #[test]
     fn cholesky_output_dimensions() {
         let times = uniform_grid(1.0, 10);
@@ -459,7 +452,6 @@ mod tests {
         let mut out = vec![0.0; 10];
         gen.generate(&normals, &mut out);
 
-        // All outputs should be finite
         assert!(out.iter().all(|x| x.is_finite()));
     }
 
@@ -512,8 +504,6 @@ mod tests {
         assert!(CholeskyFbm::new(&[0.0, 0.5, 0.3], 0.3).is_err());
         assert!(CholeskyFbm::new(&[0.0, 0.5, 0.5], 0.3).is_err());
     }
-
-    // -- WindowedConditionalFbm ---------------------------------------------------------
 
     #[test]
     fn windowed_matches_cholesky_short_path() {
@@ -675,8 +665,6 @@ mod tests {
             );
         }
     }
-
-    // -- Factory -----------------------------------------------------------
 
     #[test]
     fn factory_auto_selects_cholesky_for_small_grid() {

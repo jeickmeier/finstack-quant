@@ -282,8 +282,8 @@ fn index_issuer_betas(model: &CreditFactorModel) -> BTreeMap<&IssuerId, &IssuerB
 ///
 /// Note: `decompose_levels` only processes `observed_spreads`; an issuer in
 /// `observed_spreads` is always in some bucket of size ≥ 1 (its own residual).
-/// The §5.4 "β=0 fallback for empty bucket" applies at attribution time
-/// (PR-7/8), not here.
+/// The §5.4 "β=0 fallback for empty bucket" applies at attribution time,
+/// not here.
 ///
 /// # Arguments
 ///

@@ -60,9 +60,7 @@ pub fn add_roll_forward_with_opening<State>(
     let beg_node_id = format!("{}_beg", name);
     let end_node_id = format!("{}_end", name);
 
-    // 1. Create Beginning Balance Node
-    // Formula: lag(end_node, 1)
-    // Use coalesce to handle the first period (defaults to `opening` if no
+    // coalesce handles the first period (defaults to `opening` if no
     // history). `{}` formatting is shortest-roundtrip, so the opening value
     // survives the formula round-trip at full f64 precision.
     let beg_formula = format!("coalesce(lag({}, 1), {})", end_node_id, fmt_f64(opening));
@@ -70,8 +68,6 @@ pub fn add_roll_forward_with_opening<State>(
         .with_name(format!("{} (Beginning)", name))
         .with_formula(beg_formula);
 
-    // 2. Create Ending Balance Node
-    // Formula: beg + sum(increases) - sum(decreases)
     let mut end_formula = beg_node_id.clone();
 
     if !increases.is_empty() {
@@ -89,7 +85,6 @@ pub fn add_roll_forward_with_opening<State>(
         .with_name(format!("{} (Ending)", name))
         .with_formula(end_formula);
 
-    // 3. Add nodes to builder
     builder.insert_node(NodeId::from(beg_node_id), beg_node);
     builder.insert_node(NodeId::from(end_node_id), end_node);
 

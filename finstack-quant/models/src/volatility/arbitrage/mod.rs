@@ -180,10 +180,7 @@ fn local_vol_density_violations(
     violations
 }
 
-/// Run the full arbitrage detection suite on a volatility surface.
-///
-/// This is the primary entry point for standalone arbitrage checking.
-/// Returns a report aggregating all violations found.
+/// Run butterfly, calendar-spread, and local-vol density checks on a surface.
 ///
 /// # Arguments
 ///
@@ -252,13 +249,9 @@ pub fn check_surface(
         ));
     }
 
-    // Filter by minimum severity
     all_violations.retain(|v| v.severity >= config.min_severity);
-
-    // Sort: critical first
     all_violations.sort_by_key(|violation| std::cmp::Reverse(violation.severity));
 
-    // Build aggregation maps
     let mut counts_by_type: BTreeMap<ArbitrageType, usize> = BTreeMap::new();
     let mut counts_by_severity: BTreeMap<ArbitrageSeverity, usize> = BTreeMap::new();
     for v in &all_violations {
@@ -421,8 +414,6 @@ mod tests {
     use super::*;
     use crate::volatility::svi::SviParams;
 
-    // ---- Helper surface constructors ----
-
     /// Flat vol surface: constant 20% vol everywhere. Must pass all checks.
     fn flat_surface() -> VolSurface {
         VolSurface::builder("FLAT-20")
@@ -440,9 +431,6 @@ mod tests {
     /// quadratic), term structure with total variance strictly increasing.
     /// Should pass butterfly and calendar spread checks.
     fn clean_smile_surface() -> VolSurface {
-        // Build a smile where total variance w = vol^2 * T is strongly convex
-        // in strike. Use a wider strike spacing and ensure d2w/dk2 > 0 by
-        // making wing vols significantly higher.
         VolSurface::builder("CLEAN-SMILE")
             .expiries(&[0.5, 1.0, 2.0])
             .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
@@ -456,11 +444,6 @@ mod tests {
     /// Surface with butterfly violation: non-convex strike profile at T=1.0.
     /// The middle strike has vol lower than what convexity allows.
     fn butterfly_violation_surface() -> VolSurface {
-        // Create a concave kink at K=100 for T=1.0:
-        // Total variance w = vol^2 * T should be concave at K=100.
-        // Normal convex smile: 0.30, 0.25, 0.20, 0.25, 0.30
-        // Violation smile:     0.22, 0.25, 0.30, 0.25, 0.22
-        //   (this is concave: center is higher than neighbors)
         VolSurface::builder("BUTTERFLY-BAD")
             .expiries(&[0.5, 1.0])
             .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
@@ -484,8 +467,6 @@ mod tests {
             .build()
             .expect("calendar spread violation surface should build")
     }
-
-    // ---- Tests ----
 
     #[test]
     fn expand_forward_prices_broadcasts_single_value() {
@@ -829,11 +810,8 @@ mod tests {
         assert!(check_surface(&surface, &config).is_err());
     }
 
-    // ---- SVI-specific tests ----
-
     #[test]
     fn svi_moment_bound_violation_detected() {
-        // b*(1+rho) = 1.5 * (1 + 0.5) = 2.25 > 2 => violation
         let bad_params = SviParams {
             a: 0.04,
             b: 1.5,

@@ -118,8 +118,6 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
 
-    // --- Minimal test process: 1D spot with 2 factors (spot + fBM slot) ---
-
     #[derive(Debug, Clone)]
     struct TwoFactorSpot;
 
@@ -148,8 +146,6 @@ mod tests {
         }
     }
 
-    // --- Simple discretization that records z[1] into x[0] ---
-
     #[derive(Debug, Clone)]
     struct RecordFbmDisc;
 
@@ -171,8 +167,6 @@ mod tests {
             0
         }
     }
-
-    // --- Trivial payoff that returns final spot ---
 
     #[derive(Debug, Clone, Default)]
     struct TerminalSpotPayoff {

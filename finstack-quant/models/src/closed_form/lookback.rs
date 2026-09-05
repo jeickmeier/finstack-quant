@@ -502,7 +502,6 @@ mod tests {
 
     #[test]
     fn test_floating_intrinsic_value() {
-        // At expiry, should equal intrinsic value
         let spot = 100.0;
         let s_min = 95.0;
 
@@ -512,7 +511,6 @@ mod tests {
 
     #[test]
     fn test_fixed_intrinsic_value() {
-        // At expiry, should equal intrinsic value
         let spot = 100.0;
         let strike = 95.0;
         let s_max = 110.0;
@@ -534,7 +532,6 @@ mod tests {
 
         let lookback = fixed_strike_lookback_call(spot, strike, time, rate, div_yield, vol, spot);
 
-        // Vanilla BS call
         let sqrt_t = time.sqrt();
         let d1 =
             ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time) / (vol * sqrt_t);
@@ -554,7 +551,6 @@ mod tests {
 
     #[test]
     fn test_floating_call_r_equals_q() {
-        // When r = q, should still return a valid positive price
         let spot = 100.0;
         let s_min = 95.0;
         let time = 1.0;
@@ -639,7 +635,6 @@ mod tests {
         let q = 0.05;
 
         let price_at_q = floating_strike_lookback_call(spot, time, q, q, vol, s_min);
-        // Use delta > tolerance to test general formula vs limiting form
         let price_near_q = floating_strike_lookback_call(spot, time, q + 0.02, q, vol, s_min);
 
         let diff = (price_at_q - price_near_q).abs();

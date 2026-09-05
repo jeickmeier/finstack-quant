@@ -26,17 +26,17 @@ fn check_threshold(name: &str, value: f64) -> Result<()> {
 }
 
 fn maintenance(cov_type: CovenantType, frequency: Tenor, metric: &str) -> CovenantSpec {
+    let label = cov_type.covenant_id().to_string();
     CovenantSpec::with_metric(
-        Covenant::new(cov_type.clone(), frequency, cov_type.covenant_id())
-            .with_scope(CovenantScope::Maintenance),
+        Covenant::new(cov_type, frequency, label).with_scope(CovenantScope::Maintenance),
         metric,
     )
 }
 
 fn incurrence(cov_type: CovenantType, frequency: Tenor, metric: &str) -> CovenantSpec {
+    let label = cov_type.covenant_id().to_string();
     CovenantSpec::with_metric(
-        Covenant::new(cov_type.clone(), frequency, cov_type.covenant_id())
-            .with_scope(CovenantScope::Incurrence),
+        Covenant::new(cov_type, frequency, label).with_scope(CovenantScope::Incurrence),
         metric,
     )
 }
@@ -220,8 +220,6 @@ pub fn real_estate(min_dscr: f64, min_debt_yield: f64, max_ltv: f64) -> Result<V
                 Tenor::quarterly(),
                 "debt_yield",
             );
-            // Two Custom covenants share covenant_id "custom"; label them so
-            // their reports/breaches don't collide.
             s.covenant.label = "min_debt_yield".to_string();
             s
         },

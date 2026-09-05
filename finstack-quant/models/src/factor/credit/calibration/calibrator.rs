@@ -206,7 +206,6 @@ impl CreditCalibrator {
             self.config.vol_model,
             self.config.panel_frequency.annualization_factor(),
         );
-        // Build per-level peer proxy index: level_k → bucket_path → [vols].
         let peer_proxy_index = build_peer_proxy_index(
             &from_history_vols,
             &inventory.bucket_paths,

@@ -1085,8 +1085,6 @@ mod tests {
     use finstack_quant_core::dates::create_date;
     use time::Month;
 
-    // Test helpers
-
     fn empty_factor_model_config() -> FactorModelConfig {
         FactorModelConfig {
             factors: vec![],
@@ -1162,13 +1160,11 @@ mod tests {
         }
     }
 
-    // PR-plan test 1: round-trip JSON
     #[test]
     fn credit_factor_model_round_trips_json() {
         let model = minimal_model();
         let json = serde_json::to_string(&model).unwrap();
         let back: CreditFactorModel = serde_json::from_str(&json).unwrap();
-        // Verify key fields survive the round-trip
         assert_eq!(back.schema, CreditFactorModelSchema::CreditFactorModel);
         assert_eq!(back.as_of, model.as_of);
         assert_eq!(back.hierarchy.levels, model.hierarchy.levels);
@@ -1277,7 +1273,6 @@ mod tests {
             .expect_err("unsupported schema marker must fail during deserialization");
     }
 
-    // PR-plan test 2: reject duplicate issuers
     #[test]
     fn credit_factor_model_rejects_duplicate_issuers() {
         let mut model = minimal_model();
@@ -1290,7 +1285,6 @@ mod tests {
         assert!(model.validate().is_err());
     }
 
-    // PR-plan test 3: custom dimensions serialize deterministically
     #[test]
     fn credit_hierarchy_custom_dimensions_serialize_deterministically() {
         let spec = CreditHierarchySpec {
@@ -1304,11 +1298,9 @@ mod tests {
         let back: CreditHierarchySpec = serde_json::from_str(&json1).unwrap();
         let json2 = serde_json::to_string(&back).unwrap();
         assert_eq!(json1, json2);
-        // Verify the round-tripped spec matches the original
         assert_eq!(back.levels, spec.levels);
     }
 
-    // PR-plan test 4: factor IDs are stable for same hierarchy
     #[test]
     fn credit_factor_ids_are_stable_for_same_hierarchy() {
         // Two models with the same hierarchy spec and same factor IDs in config
@@ -1344,13 +1336,11 @@ mod tests {
         assert_eq!(json_a, json_b);
     }
 
-    // PR-plan test 5: empty hierarchy is valid
     #[test]
     fn empty_hierarchy_is_valid() {
         let mut model = minimal_model();
         model.hierarchy = CreditHierarchySpec { levels: vec![] };
         assert!(model.validate().is_ok());
-        // Round-trip
         let json = serde_json::to_string(&model).unwrap();
         let back: CreditFactorModel = serde_json::from_str(&json).unwrap();
         assert!(back.validate().is_ok());

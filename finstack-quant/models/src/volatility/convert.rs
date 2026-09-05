@@ -10,11 +10,7 @@ use finstack_quant_core::error::InputError;
 use finstack_quant_core::math::{BrentSolver, Solver};
 use finstack_quant_core::Result;
 
-/// Convert ATM volatility between conventions.
-///
-/// Converts a volatility quote from one convention to another by equating option prices
-/// at ATM (strike = forward). This is a deterministic conversion that returns explicit
-/// errors rather than silently falling back to guesses.
+/// ATM-only conversion (strike = forward) by equating model prices.
 ///
 /// # Arguments
 /// * `vol` - Input volatility (must be positive and finite)
@@ -34,11 +30,8 @@ use finstack_quant_core::Result;
 /// - Shifted forward is non-positive ([`InputError::NonPositiveShiftedForward`])
 /// - Solver fails to converge ([`InputError::VolatilityConversionFailed`])
 ///
-/// # Design Note
-///
-/// This function explicitly performs **ATM-only** conversion (strike = forward).
-/// For surface-aware or strike-specific conversions, use a volatility surface
-/// implementation that handles the full strike dimension.
+/// Strike-specific conversions belong on a volatility surface that handles the
+/// full strike dimension.
 ///
 /// # Example
 ///
@@ -77,7 +70,6 @@ pub fn convert_atm_volatility(
     forward_rate: f64,
     time_to_expiry: f64,
 ) -> Result<f64> {
-    // Validate inputs
     if !vol.is_finite() || vol <= 0.0 {
         return Err(InputError::InvalidVolatility { value: vol }.into());
     }
@@ -93,7 +85,6 @@ pub fn convert_atm_volatility(
         return Err(InputError::Invalid.into());
     }
 
-    // Validate shifts for shifted-lognormal conventions
     if let VolatilityConvention::ShiftedLognormal { shift } = from_convention {
         if !shift.is_finite() {
             return Err(InputError::Invalid.into());
@@ -112,11 +103,9 @@ pub fn convert_atm_volatility(
         return Ok(vol);
     }
 
-    // Validate forward rate for lognormal conventions
     validate_forward_for_convention(forward_rate, from_convention)?;
     validate_forward_for_convention(forward_rate, to_convention)?;
 
-    // Early returns for identical convention (including same shift)
     match (from_convention, to_convention) {
         (VolatilityConvention::Lognormal, VolatilityConvention::Lognormal)
         | (VolatilityConvention::Normal, VolatilityConvention::Normal) => return Ok(vol),
@@ -127,18 +116,15 @@ pub fn convert_atm_volatility(
         _ => {}
     }
 
-    // Price matching with numerical solver
     let f = forward_rate;
     let t = time_to_expiry.max(0.0);
 
-    // Compute price under source convention (ATM: strike = forward)
     let price_from = match from_convention {
         VolatilityConvention::Normal => bachelier_call(f, f, vol, t),
         VolatilityConvention::Lognormal => black_call(f, f, vol, t),
         VolatilityConvention::ShiftedLognormal { shift } => black_shifted_call(f, f, vol, t, shift),
     };
 
-    // Initial guess derived from ATM approximations
     let guess = compute_initial_guess(vol, from_convention, to_convention, f);
 
     // Objective: find sigma such that price(sigma, to_convention) = price_from.
@@ -157,7 +143,6 @@ pub fn convert_atm_volatility(
         p - price_from
     };
 
-    // Solve with Brent's method using default tolerance from BrentSolver
     let solver = BrentSolver::new();
 
     match solver.solve(objective, guess) {
@@ -174,7 +159,6 @@ pub fn convert_atm_volatility(
             }
         }
         Err(_) => {
-            // Solver failed - return explicit error with diagnostic info
             let residual = objective(guess).abs();
             Err(InputError::VolatilityConversionFailed {
                 tolerance: solver.tolerance,
@@ -231,7 +215,6 @@ fn compute_initial_guess(
             VolatilityConvention::ShiftedLognormal { shift: s1 },
             VolatilityConvention::ShiftedLognormal { shift: s2 },
         ) => {
-            // Converting between different shifts
             let f1 = forward + s1;
             let f2 = forward + s2;
             if f2.abs() > 1e-10 && f1.abs() > 1e-10 {
@@ -243,7 +226,6 @@ fn compute_initial_guess(
         _ => vol,
     };
 
-    // Ensure guess is valid
     if !guess.is_finite() || guess <= 0.0 {
         (vol.abs() + 1e-6).max(1e-6)
     } else {

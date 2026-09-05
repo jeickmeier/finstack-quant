@@ -965,9 +965,12 @@ impl Waterfall {
     ///
     /// * `deal_type` - Deal family that selects CLO-style junior-interest
     ///   diversion versus passthrough coupons
-    /// * `base_currency` - Currency into which portfolio values are converted and aggregated.
-    /// * `tranches` - Tranches used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `fee_recipients` - Fee recipients used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `base_currency` - Deal currency of the waterfall; tranche balances and fees must
+    ///   match this currency.
+    /// * `tranches` - Capital structure whose notes become sequential interest and
+    ///   principal recipients.
+    /// * `fee_recipients` - Fee-tier recipients inserted ahead of interest when non-empty;
+    ///   an empty vec omits the fees tier.
     pub fn standard_sequential(
         deal_type: super::DealType,
         base_currency: Currency,

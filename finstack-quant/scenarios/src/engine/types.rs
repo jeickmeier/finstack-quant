@@ -12,21 +12,9 @@ use indexmap::IndexMap;
 
 /// Execution context for scenario application.
 ///
-/// The context pins all mutable state that a scenario can touch — market data,
-/// optional statement models, instrument inventories, and rate bindings —
-/// together with the current valuation date.
-///
-/// # Fields
-/// - `market`: Shared market data collection that stores curves, surfaces,
-///   FX matrices, and spot prices.
-/// - `model`: Optional financial statement model being shocked. Market-only
-///   and instrument-only scenarios can leave this as `None`.
-/// - `instruments`: Optional set of instruments to receive price/spread shocks
-///   and to calculate carry/theta for time rolls.
-/// - `rate_bindings`: Optional mapping from statement node identifiers to
-///   detailed rate binding specs; used to sync statement rates after curve shocks.
-/// - `calendar`: Optional holiday calendar for calendar-aware tenor calculations.
-/// - `as_of`: Valuation date that operations reference.
+/// Pins the mutable state a scenario can touch — market data, optional
+/// statement models, instruments, and rate bindings — together with the
+/// valuation date.
 ///
 /// # Examples
 /// ```
@@ -68,7 +56,7 @@ pub struct ExecutionContext<'a> {
     /// Optional holiday calendar for calendar-aware tenor calculations.
     pub calendar: Option<&'a dyn finstack_quant_core::dates::HolidayCalendar>,
 
-    /// Valuation date for context.
+    /// Valuation date operations reference.
     pub as_of: time::Date,
 }
 
@@ -148,8 +136,7 @@ pub struct ScenarioChangeManifest {
     pub as_of_changed: bool,
     /// Whether instruments were inserted, removed, or reordered.
     ///
-    /// Current scenario operations do not change portfolio shape, so this is
-    /// `false`; the field is reserved for future shape-changing effects.
+    /// Scenario operations do not change portfolio shape, so this stays `false`.
     pub portfolio_shape_changed: bool,
     /// Whether callers must conservatively treat every dependency as dirty.
     ///
@@ -202,12 +189,11 @@ pub struct RollForwardReport {
 
     /// Calendar days between `old_date` and `new_date`.
     ///
-    /// This is always a calendar-day span, in every
-    /// [`TimeRollMode`](crate::spec::TimeRollMode) — including
-    /// [`TimeRollMode::BusinessDays`](crate::spec::TimeRollMode::BusinessDays),
-    /// where the *target date* is business-day adjusted but the span back to
-    /// `old_date` is still counted in calendar days. Downstream ACT/365F
-    /// annualization depends on this.
+    /// Always a calendar-day span, including under
+    /// [`TimeRollMode::BusinessDays`](crate::spec::TimeRollMode::BusinessDays):
+    /// the target date is business-day adjusted, but the span back to
+    /// `old_date` is still calendar days. Downstream ACT/365F annualization
+    /// depends on this.
     pub days: i64,
 
     /// Per-instrument carry accrual (if instruments provided), grouped by currency.
@@ -368,12 +354,8 @@ impl ApplicationEnvelope {
         })
     }
 
-    /// Split the envelope into its market JSON, optional model JSON, instrument envelopes, and the
-    /// [`ApplicationReport`] it was built from.
-    ///
-    /// This is the inverse of [`from_contexts`](Self::from_contexts) minus the
-    /// context deserialization, so hosts rebuilding a typed result from the
-    /// wire envelope do not hand-copy report fields.
+    /// Split into market JSON, optional model JSON, instrument envelopes, and
+    /// the [`ApplicationReport`] this envelope was built from.
     #[must_use]
     pub fn into_parts(
         self,

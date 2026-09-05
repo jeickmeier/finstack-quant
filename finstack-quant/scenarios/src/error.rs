@@ -1,38 +1,11 @@
 //! Errors emitted by the scenarios crate.
-//!
-//! Most adapter functions and engine methods return the [`Result`] alias which
-//! wraps this [`Error`] type. Variants attempt to surface actionable messages so
-//! callers can decide whether to retry, skip, or abort a scenario application.
 
 use thiserror::Error;
 
-/// Convenient result alias used across the crate.
-///
-/// Returning this type ensures downstream callers can pattern match on
-/// [`enum@Error`] without importing `std::result::Result`.
-///
-/// # Examples
-/// ```rust
-/// use finstack_quant_scenarios::error::{Error, Result};
-///
-/// fn compute(flag: bool) -> Result<()> {
-///     if flag {
-///         Ok(())
-///     } else {
-///         Err(Error::Validation("flag must be true".into()))
-///     }
-/// }
-///
-/// assert!(compute(true).is_ok());
-/// assert!(compute(false).is_err());
-/// ```
+/// Result alias used across the crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Errors that can occur during scenario execution.
-///
-/// The variants are intentionally granular so adapters can convey the precise
-/// failure reason (missing market data, invalid tenor, unsupported operation,
-/// and so on).
 ///
 /// # Examples
 /// ```rust
@@ -48,12 +21,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 ///
 /// assert_eq!(classify(Error::NodeNotFound { node_id: "Revenue".into() }), "statements");
 /// ```
-/// # Derive policy
-///
-/// All Finstack Quant domain error types that may cross FFI boundaries (Python/WASM)
-/// derive `Serialize`/`Deserialize`. `PartialEq` is included for ergonomic
-/// assertions in tests. Infrastructure errors that wrap opaque driver types
-/// may opt out of `Serialize` and `PartialEq`.
 #[derive(Debug, Clone, PartialEq, Error, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -106,9 +73,6 @@ pub enum Error {
     Statements(#[from] finstack_quant_statements::error::Error),
 
     /// Valuations library error.
-    ///
-    /// Used by `HorizonAnalysis` so pricing and attribution failures propagate
-    /// as typed errors rather than as `Internal(String)` downgrades.
     #[error(transparent)]
     Valuations(#[from] finstack_quant_valuations::Error),
 

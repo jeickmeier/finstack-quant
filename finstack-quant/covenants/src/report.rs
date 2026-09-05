@@ -39,12 +39,11 @@ pub struct CovenantReport {
 }
 
 impl CovenantReport {
-    /// Create a passing covenant report.
-    pub fn passed(covenant_type: &str) -> Self {
+    fn new(covenant_type: &str, passed: bool) -> Self {
         Self {
             covenant_type: covenant_type.to_string(),
             covenant_id: None,
-            passed: true,
+            passed,
             actual_value: None,
             threshold: None,
             details: None,
@@ -55,20 +54,14 @@ impl CovenantReport {
         }
     }
 
+    /// Create a passing covenant report.
+    pub fn passed(covenant_type: &str) -> Self {
+        Self::new(covenant_type, true)
+    }
+
     /// Create a failing covenant report.
     pub fn failed(covenant_type: &str) -> Self {
-        Self {
-            covenant_type: covenant_type.to_string(),
-            covenant_id: None,
-            passed: false,
-            actual_value: None,
-            threshold: None,
-            details: None,
-            headroom: None,
-            meta: finstack_quant_core::config::results_meta(
-                &finstack_quant_core::config::FinstackConfig::default(),
-            ),
-        }
+        Self::new(covenant_type, false)
     }
 
     /// Attach the stable covenant identifier.

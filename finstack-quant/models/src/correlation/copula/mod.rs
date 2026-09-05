@@ -611,26 +611,22 @@ mod tests {
 
     #[test]
     fn test_copula_build() {
-        // Test Gaussian
         let gaussian = CopulaSpec::gaussian();
         assert!(gaussian.is_gaussian());
         let g_copula = gaussian.build().expect("Gaussian copula should build");
         assert_eq!(g_copula.num_factors(), 1);
 
-        // Test Student-t
         let student_t = CopulaSpec::student_t(5.0).expect("valid Student-t df");
         assert!(student_t.is_student_t());
         let t_copula = student_t.build().expect("Student-t copula should build");
         // [Z, W]: Gaussian systematic factor plus the shared mixing variable.
         assert_eq!(t_copula.num_factors(), 2);
 
-        // Test RFL
         let rfl = CopulaSpec::random_factor_loading(0.1);
         assert!(rfl.is_rfl());
         let rfl_copula = rfl.build().expect("RFL copula should build");
         assert_eq!(rfl_copula.num_factors(), 2);
 
-        // Test Multi-factor
         let mf = CopulaSpec::multi_factor();
         assert!(mf.is_multi_factor());
         let mf_copula = mf.build().expect("multi-factor copula should build");

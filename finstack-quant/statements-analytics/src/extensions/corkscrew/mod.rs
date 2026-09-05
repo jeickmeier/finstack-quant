@@ -1,16 +1,7 @@
 //! Corkscrew analysis extension.
 //!
-//! This extension provides roll-forward validation for balance sheet accounts, ensuring
-//! that opening balances + changes = closing balances across periods.
-//!
-//! # Features
-//!
-//! - Validate balance sheet articulation (Assets = Liabilities + Equity)
-//! - Track roll-forward schedules (beginning balance to changes to ending balance)
-//! - Detect inconsistencies in period-to-period transitions
-//! - Support for multiple balance sheet sections (assets, liabilities, equity)
-//! - Configurable tolerance for rounding differences
-//! - Optional fail-on-error mode for strict validation
+//! Roll-forward validation for balance sheet accounts: opening + changes =
+//! closing across periods.
 //!
 //! # Configuration Schema
 //!
@@ -245,7 +236,6 @@ impl CorkscrewExtension {
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
 
-        // Process each configured account
         for account in &config.accounts {
             match self.validate_account(account, model, results, config.tolerance) {
                 Ok(validation) => {
@@ -281,7 +271,6 @@ impl CorkscrewExtension {
             }
         }
 
-        // Check for balance sheet articulation using actual balances
         match self.check_articulation(model, results, &config, config.tolerance) {
             Ok(Some(articulation_result)) => {
                 if !articulation_result.is_balanced {
@@ -305,7 +294,6 @@ impl CorkscrewExtension {
             }
         }
 
-        // Build report
         let (status, message) = if errors.is_empty() {
             (
                 CorkscrewStatus::Success,
@@ -363,7 +351,6 @@ impl CorkscrewExtension {
             is_valid: true,
         };
 
-        // Get balance values from results
         let balance_values = results.nodes.get(&account.node_id).ok_or_else(|| {
             finstack_quant_statements::error::Error::missing_data(format!(
                 "Balance account '{}' not found in results",
@@ -371,17 +358,16 @@ impl CorkscrewExtension {
             ))
         })?;
 
-        // Get change values and validate roll-forward
         let periods: Vec<_> = model.periods.iter().collect();
 
         for i in 1..periods.len() {
             let prev_period = &periods[i - 1].id;
             let curr_period = &periods[i].id;
 
-            // Get previous and current balance. A missing value means the
-            // balance node was not evaluated for that period — a genuine
-            // modeling error, not a zero balance. Treating it as zero would
-            // let an incomplete model pass roll-forward validation.
+            // A missing value means the balance node was not evaluated for
+            // that period — a genuine modeling error, not a zero balance.
+            // Treating it as zero would let an incomplete model pass
+            // roll-forward validation.
             let prev_balance = balance_values.get(prev_period).copied().ok_or_else(|| {
                 finstack_quant_statements::error::Error::missing_data(format!(
                     "Balance account '{}' has no value for period '{prev_period}'",
@@ -395,7 +381,6 @@ impl CorkscrewExtension {
                 ))
             })?;
 
-            // Calculate expected balance from changes and decreases.
             // Identity: expected = prev + Σ changes − Σ decreases.
             let mut expected_balance = prev_balance;
 
@@ -421,10 +406,10 @@ impl CorkscrewExtension {
                 results,
             )?;
 
-            // Check if beginning balance override is used. A missing period
-            // value is a hard error, consistent with the other missing-value
-            // checks above — silently falling back to `prev_balance` could
-            // mask a real roll-forward break.
+            // A missing beginning-balance period value is a hard error,
+            // consistent with the other missing-value checks above —
+            // silently falling back to `prev_balance` could mask a real
+            // roll-forward break.
             if let Some(beginning_node) = &account.beginning_balance_node {
                 let beginning_values = results.nodes.get(beginning_node).ok_or_else(|| {
                     finstack_quant_statements::error::Error::missing_data(format!(
@@ -440,7 +425,6 @@ impl CorkscrewExtension {
                 expected_balance = beginning + expected_balance - prev_balance;
             }
 
-            // Validate the roll-forward using an absolute tolerance.
             let error = (curr_balance - expected_balance).abs();
             validation.max_error = validation.max_error.max(error);
             validation.periods_validated += 1;

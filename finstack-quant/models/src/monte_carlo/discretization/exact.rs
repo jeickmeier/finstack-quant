@@ -9,9 +9,7 @@ use finstack_quant_core::math::linalg::{
     check_correlation_matrix, cholesky_correlation, CholeskyError,
 };
 
-/// Exact discretization for Geometric Brownian Motion.
-///
-/// Uses the analytical log-normal solution:
+/// Exact GBM discretization using the analytical log-normal solution:
 ///
 /// ```text
 /// S_{t+Δt} = S_t exp((∫(r - q) - ½σ²)Δt + σ√Δt Z)
@@ -21,8 +19,6 @@ use finstack_quant_core::math::linalg::{
 /// over `[t, t+Δt]`. When the [`GbmProcess`] carries a
 /// [`DriftSchedule`](crate::monte_carlo::process::gbm::DriftSchedule) the increment is read
 /// from it (a non-flat rate curve); otherwise it is the constant `(r - q)·Δt`.
-///
-/// This is numerically exact and has no discretization error.
 #[derive(Debug, Clone, Default)]
 pub struct ExactGbm;
 
@@ -59,7 +55,6 @@ impl Discretization<GbmProcess> for ExactGbm {
         // Diffusion component: σ√Δt Z
         let diffusion = params.sigma * dt.sqrt() * z[0];
 
-        // Apply log-normal update: S_{t+Δt} = S_t exp(drift + diffusion)
         x[0] *= (drift + diffusion).exp();
     }
 
@@ -141,9 +136,7 @@ where
             probe_diffusion,
         };
 
-        // Apply exact GBM formula for each component
         // For diagonal diffusion: S_i(t+dt) = S_i(t) exp((μ_i - ½σ_i²)dt + σ_i√dt Z_i)
-        // √dt is constant across dimensions; hoist it out of the per-component loop.
         let sqrt_dt = dt.sqrt();
         for i in 0..dim {
             // Zero is an absorbing boundary for multiplicative GBM dynamics, so
@@ -259,7 +252,6 @@ impl Discretization<MultiGbmProcess> for ExactMultiGbmCorrelated {
         let (probe_state, rest) = rest.split_at_mut(dim);
         let (probe_drift, probe_diffusion) = rest.split_at_mut(dim);
 
-        // Get drift and diffusion coefficients
         process.drift(_t, x, drift_vec);
         process.diffusion(_t, x, diff_vec);
         let mut recovery_ctx = RateRecoveryContext {
@@ -275,9 +267,7 @@ impl Discretization<MultiGbmProcess> for ExactMultiGbmCorrelated {
         // work_size() allocates 3*dim so z_corr has length dim.
         let _ = self.cholesky_factor.apply(z, z_corr);
 
-        // Apply exact GBM formula for each component using correlated shocks
         // S_i(t+dt) = S_i(t) exp((μ_i - ½σ_i²)dt + σ_i√dt Z_corr_i)
-        // √dt is constant across dimensions; hoist it out of the per-component loop.
         let sqrt_dt = dt.sqrt();
         for i in 0..dim {
             // Zero is an absorbing boundary for multiplicative GBM dynamics, so

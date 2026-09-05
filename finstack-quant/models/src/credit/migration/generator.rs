@@ -292,7 +292,6 @@ pub(crate) fn matrix_log(m: &DMatrix<f64>) -> Result<DMatrix<f64>, MigrationErro
         .eigenvalues()
         .ok_or(MigrationError::ComplexEigenvalues)?;
 
-    // Check all eigenvalues are strictly positive.
     for (idx, &ev) in eigenvalues.iter().enumerate() {
         if ev <= 0.0 {
             return Err(MigrationError::NoValidGenerator {

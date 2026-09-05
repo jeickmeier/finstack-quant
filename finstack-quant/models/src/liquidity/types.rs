@@ -33,8 +33,8 @@ pub enum SpreadVolatilityKind {
 
 /// Market microstructure data for a single instrument.
 ///
-/// This is the primary input to all liquidity calculations. Users supply
-/// this data from their market data systems; the module does not fetch it.
+/// Users supply this data from their market data systems; the module does not
+/// fetch it.
 ///
 /// # Units
 ///

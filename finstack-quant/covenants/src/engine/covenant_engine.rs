@@ -7,7 +7,6 @@ use super::types::{
     CovenantWindow,
 };
 use crate::metric::{CovenantMetricId, CovenantMetricSource};
-use crate::schedule::threshold_for_date;
 use crate::CovenantReport;
 use finstack_quant_core::dates::Date;
 use indexmap::IndexMap;
@@ -167,15 +166,18 @@ impl CovenantEngine {
     ///
     /// # Arguments
     ///
-    /// * `context` - Market or evaluation context supplying dependencies required by the calculation.
-    /// * `test_date` - Calendar date at which the documented condition is evaluated.
+    /// * `context` - Metric source providing the operating values referenced by
+    ///   each applicable specification. Keys are covenant metric identifiers
+    ///   such as `debt_to_ebitda`; ratio values are in turns (`4.5` means 4.5x).
+    /// * `test_date` - Date that selects the active window, waivers, threshold
+    ///   schedule, and cure-period state.
     pub fn evaluate(
         &self,
         context: &dyn CovenantMetricSource,
         test_date: Date,
     ) -> finstack_quant_core::Result<IndexMap<String, CovenantReport>> {
         self.validate()?;
-        let applicable_specs = self.get_applicable_specs_internal(test_date);
+        let applicable_specs = self.applicable_specs(test_date);
         self.evaluate_specs(&applicable_specs, context, test_date)
     }
 
@@ -187,30 +189,20 @@ impl CovenantEngine {
     ) -> finstack_quant_core::Result<IndexMap<String, CovenantReport>> {
         tracing::debug!(spec_count = specs.len(), %test_date, "evaluating covenants");
 
-        // Reject duplicate instance keys up front. Two specs sharing an
-        // identity would silently overwrite each other in the report map and
-        // make consequence resolution ambiguous (e.g. a distribution-lockup
-        // breach resolving to a same-type covenant carrying a Default
-        // consequence). Same-type covenants are disambiguated by their
-        // required [`Covenant::label`].
-        {
-            let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-            for spec in specs {
-                let key = spec.covenant.instance_key();
-                if !seen.insert(key.clone()) {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "duplicate covenant instance key '{key}': covenants sharing a type must \
-                         carry distinct labels",
-                    )));
-                }
+        let mut seen = BTreeSet::new();
+        for spec in specs {
+            let key = spec.covenant.instance_key();
+            if !seen.insert(key.clone()) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "duplicate covenant instance key '{key}': covenants sharing a type must \
+                     carry distinct labels",
+                )));
             }
         }
 
         let mut reports = IndexMap::new();
 
         for spec in specs {
-            // Identity key is the instance label. Reports and breaches are keyed
-            // on it so two same-type covenants don't silently overwrite each other.
             let cid = spec.covenant.instance_key();
             let cid = cid.as_str();
             let description = spec.covenant.description();
@@ -301,8 +293,10 @@ impl CovenantEngine {
     ///
     /// # Arguments
     ///
-    /// * `context` - Market or evaluation context supplying dependencies required by the calculation.
-    /// * `test_date` - Calendar date at which the documented condition is evaluated.
+    /// * `context` - Metric source providing the operating values referenced by
+    ///   each applicable specification.
+    /// * `test_date` - Date that selects the active window, waivers, threshold
+    ///   schedule, and cure-period state, and that stamps new breach records.
     pub fn evaluate_and_track(
         &mut self,
         context: &dyn CovenantMetricSource,
@@ -310,17 +304,14 @@ impl CovenantEngine {
     ) -> finstack_quant_core::Result<IndexMap<String, CovenantReport>> {
         let reports = self.evaluate(context, test_date)?;
 
-        for (_key, report) in &reports {
+        for (cid, report) in &reports {
             if !report.passed {
                 continue;
             }
-            let Some(cid) = report.covenant_id.as_deref() else {
-                continue;
-            };
             if let Some(breach) = self
                 .breach_history
                 .iter_mut()
-                .filter(|b| b.covenant_id == cid && !b.is_cured && b.breach_date <= test_date)
+                .filter(|b| b.covenant_id == *cid && !b.is_cured && b.breach_date <= test_date)
                 .max_by_key(|b| b.breach_date)
             {
                 if breach
@@ -328,7 +319,7 @@ impl CovenantEngine {
                     .is_some_and(|deadline| test_date <= deadline)
                 {
                     tracing::info!(
-                        covenant_id = cid,
+                        covenant_id = %cid,
                         breach_date = %breach.breach_date,
                         %test_date,
                         "marking covenant breach cured by metric recovery",
@@ -338,25 +329,25 @@ impl CovenantEngine {
             }
         }
 
-        for (_key, report) in &reports {
+        for (cid, report) in &reports {
             if report.passed {
                 continue;
             }
 
-            let cid = report.covenant_id.as_deref().unwrap_or("unknown");
-            // Human-readable label for the breach record (the map key is the
-            // stable identity key, not the display name).
             let description = report.covenant_type.clone();
 
             let already_tracked = self
                 .breach_history
                 .iter()
-                .any(|b| b.covenant_id == cid && !b.is_cured && b.breach_date <= test_date);
+                .any(|b| b.covenant_id == *cid && !b.is_cured && b.breach_date <= test_date);
             if already_tracked {
                 continue;
             }
 
-            let spec = self.specs.iter().find(|s| s.covenant.instance_key() == cid);
+            let spec = self
+                .specs
+                .iter()
+                .find(|s| s.covenant.instance_key() == *cid);
 
             let cure_deadline = spec.and_then(|s| {
                 s.covenant
@@ -365,7 +356,7 @@ impl CovenantEngine {
             });
 
             tracing::warn!(
-                covenant_id = cid,
+                covenant_id = %cid,
                 actual = report.actual_value,
                 threshold = report.threshold,
                 %test_date,
@@ -373,8 +364,8 @@ impl CovenantEngine {
             );
 
             self.breach_history.push(CovenantBreach {
-                covenant_id: cid.to_string(),
-                covenant_type: description.clone(),
+                covenant_id: cid.clone(),
+                covenant_type: description,
                 breach_date: test_date,
                 actual_value: report.actual_value,
                 threshold: report.threshold,
@@ -410,9 +401,13 @@ impl CovenantEngine {
     ///
     /// # Arguments
     ///
-    /// * `instrument` - Instrument whose cash flows, dependencies, or value are evaluated.
-    /// * `breaches` - Breaches used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `as_of` - Valuation or observation date that anchors discounting and schedule logic
+    /// * `instrument` - Target implementing [`InstrumentMutator`]; each eligible
+    ///   consequence mutates it in place (rate increase, cash sweep, default
+    ///   flag, distribution block, or maturity acceleration).
+    /// * `breaches` - Breach records to consider, typically from
+    ///   [`Self::breach_history`] after [`Self::evaluate_and_track`].
+    /// * `as_of` - Date used to decide whether a cure period has elapsed and to
+    ///   stamp each application.
     pub fn apply_consequences<T>(
         &mut self,
         instrument: &mut T,
@@ -434,7 +429,6 @@ impl CovenantEngine {
                 }
             }
 
-            // Guard: skip if consequences were already applied for this breach
             let already_applied = self.breach_history.iter().any(|b| {
                 b.covenant_id == breach.covenant_id
                     && b.breach_date == breach.breach_date
@@ -480,26 +474,21 @@ impl CovenantEngine {
         Ok(applications)
     }
 
-    fn get_applicable_specs_internal(&self, test_date: Date) -> Vec<&CovenantSpec> {
-        // Check windows first
+    fn applicable_specs(&self, test_date: Date) -> Vec<&CovenantSpec> {
         for window in &self.windows {
             if test_date >= window.start && test_date <= window.end {
                 return window.covenants.iter().collect();
             }
         }
-
-        // Fall back to all specs
         self.specs.iter().collect()
     }
 
-    #[allow(clippy::unreachable)] // Non-numeric covenant variants return before metric dispatch.
     fn evaluate_spec(
         &self,
         spec: &CovenantSpec,
         context: &dyn CovenantMetricSource,
         test_date: Date,
     ) -> finstack_quant_core::Result<SpecEvaluation> {
-        // Springing conditions: skip evaluation until activation criteria met.
         if let Some(condition) = &spec.covenant.springing_condition {
             let condition_value = context.get_metric(&condition.metric_id)?;
             if !springing_condition_met(
@@ -524,7 +513,6 @@ impl CovenantEngine {
 
         let covenant_type = &spec.covenant.covenant_type;
 
-        // Non-numeric covenants auto-pass until they have explicit evaluators.
         let Some(base_threshold) = covenant_type.threshold_value() else {
             return Ok(SpecEvaluation {
                 passed: true,
@@ -535,7 +523,6 @@ impl CovenantEngine {
             });
         };
 
-        // Resolve the effective threshold: waiver amendment > schedule > static.
         let covenant_cid = spec.covenant.instance_key();
         let threshold = self
             .active_waiver(&covenant_cid, test_date)
@@ -543,20 +530,18 @@ impl CovenantEngine {
             .or_else(|| {
                 spec.threshold_schedule
                     .as_ref()
-                    .and_then(|s| threshold_for_date(s, test_date))
+                    .and_then(|s| s.threshold_for(test_date))
             })
             .unwrap_or(base_threshold);
 
         let Some(metric_name) = spec_metric_names(spec).into_iter().next() else {
-            unreachable!("Non-numeric covenants return early above");
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "covenant '{}' has a threshold but no metric name",
+                spec.covenant.description(),
+            )));
         };
         let metric_value = context.get_metric(&CovenantMetricId::from(metric_name))?;
 
-        // Negative leverage-type ratio: the denominator (EBITDA) has gone
-        // negative, so the ratio is not meaningful. `is_covenant_breached`
-        // already treats this as a breach rather than letting
-        // `value <= threshold` pass with huge apparent headroom. See
-        // [`CovenantType::is_ratio_max`].
         let detail = (covenant_type.is_ratio_max() && metric_value < 0.0).then(|| {
             "Negative ratio value (negative denominator) — not meaningful, treated as breach"
                 .to_string()

@@ -3,18 +3,8 @@
 //! Provides period parsing, date rolling, and a generic theta calculator that
 //! works for any instrument implementing the `Instrument` trait.
 //!
-//! # Quick Start
-//!
-//! ## Example 1: Computing 1-Day Theta for an Equity Option
-//!
-//! ## Example 2: Computing Custom Period Theta (1 Week)
-//!
-//! ## Example 3: Bond Carry (Theta with Coupon Accrual)
-//!
-//! ## Example 4: Computing Theta Near Expiry
-//!
 //! When an instrument expires before the theta period ends, theta is automatically
-//! capped at the expiry date:
+//! capped at the expiry date.
 //!
 //! # How Theta is Calculated
 //!

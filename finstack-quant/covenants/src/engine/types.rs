@@ -110,10 +110,6 @@ impl Covenant {
     }
 
     /// Stable identity key for reports, breaches, and waivers.
-    ///
-    /// This is the instance [`label`](Self::label). Using it (rather than the
-    /// discriminant-only `covenant_id`) prevents two same-type covenants from
-    /// silently overwriting each other in reports and breach tracking.
     pub fn instance_key(&self) -> String {
         self.label.clone()
     }

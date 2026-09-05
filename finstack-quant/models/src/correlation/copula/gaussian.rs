@@ -212,7 +212,6 @@ impl Copula for GaussianCopula {
 
     fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
         // Gauss-Hermite quadrature over standard normal factor Z
-        // Uses cached quadrature for performance
         self.quadrature.integrate(|z| f(&[z]))
     }
 
@@ -252,7 +251,6 @@ mod tests {
         // At Z=0, the conditional probability is Φ(Φ⁻¹(PD) / √(1-ρ))
         let cond_prob = copula.conditional_default_prob(threshold, &[0.0], correlation);
 
-        // Should be a valid probability between 0 and 1
         assert!(cond_prob > 0.0 && cond_prob < 1.0);
         // At Z=0 with positive correlation, conditional should differ from unconditional
         assert!(

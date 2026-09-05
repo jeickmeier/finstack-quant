@@ -41,7 +41,6 @@ pub(crate) fn is_standalone_identifier(
         .next_back()
         .is_none_or(|c| is_identifier_boundary(c) && c != '.');
 
-    // Check character after identifier
     let after_ok = formula[end_idx..].chars().next().is_none_or(|c| {
         if allow_dot_after {
             is_identifier_boundary(c)
@@ -283,8 +282,7 @@ pub(crate) fn qualify_identifiers(
 ) -> String {
     let mut result = formula.to_string();
 
-    // Sort by length descending to replace longer IDs first
-    // This prevents "ebitda_margin" from being partially replaced as "ebitda"
+    // Longer IDs first so "ebitda_margin" is not partially replaced as "ebitda".
     let mut sorted: Vec<_> = identifiers.iter().cloned().collect();
     sorted.sort_by_key(|id| std::cmp::Reverse(id.len()));
 

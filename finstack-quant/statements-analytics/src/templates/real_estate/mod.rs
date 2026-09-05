@@ -583,7 +583,6 @@ pub fn add_rent_roll(
             return Err(Error::build("add_rent_roll: end must be >= start"));
         }
 
-        // Build free-rent mask across all model periods.
         let mut is_free = vec![false; builder.periods_slice().len()];
         apply_free_window(&mut is_free, start_idx, lease.free_rent_periods)?;
         for w in &lease.free_rent_windows {
@@ -617,7 +616,6 @@ pub fn add_rent_roll(
         step_points.sort_by_key(|(i, _)| *i);
 
         let rent_at = |idx: usize, phase_start: usize, phase_base_rent: f64| -> Result<f64> {
-            // Find last step <= idx within the same phase.
             let mut base_idx = phase_start;
             let mut base_rent = phase_base_rent;
             for (si, sr) in &step_points {
@@ -658,12 +656,10 @@ pub fn add_rent_roll(
             .as_ref()
             .map(|r| last_initial_contractual * r.rent_factor);
 
-        // Apply renewal free rent window (if any).
         if let Some(r_start) = renewal_start_idx {
             apply_free_window(&mut is_free, r_start, renewal_free_periods)?;
         }
 
-        // Generate per-period series.
         let mut pgi_vals = Vec::with_capacity(builder.periods_slice().len());
         let mut free_vals = Vec::with_capacity(builder.periods_slice().len());
         let mut vac_vals = Vec::with_capacity(builder.periods_slice().len());

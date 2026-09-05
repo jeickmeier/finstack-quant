@@ -662,11 +662,9 @@ mod tests {
 
     #[test]
     fn test_geometric_asian_closed_form() {
-        // Test that closed form gives reasonable results
         let price = geometric_asian_call_closed_form(100.0, 100.0, 1.0, 0.05, 0.02, 0.2, 12);
 
-        // Should be positive and less than ATM European
         assert!(price > 0.0);
-        assert!(price < 10.0); // Reasonable range
+        assert!(price < 10.0);
     }
 }

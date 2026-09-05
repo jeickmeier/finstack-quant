@@ -105,7 +105,6 @@ impl RiskBudget {
     where
         I: IntoIterator<Item = (&'a String, f64)>,
     {
-        // Validate that targets sum to ~1.0.
         let target_sum: f64 = self.targets.values().sum();
         if !self.targets.is_empty() && (target_sum - 1.0).abs() > 0.05 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -216,10 +215,9 @@ impl RiskBudget {
 
 /// Evaluate a per-position risk budget from parallel binding-style arrays.
 ///
-/// This is the canonical entry point behind the Python
-/// `evaluate_risk_budget` function and the WASM `evaluateRiskBudget` export:
-/// it owns the input validation (array-length agreement and duplicate
-/// position-id rejection) so both hosts share one behavior and one set of
+/// Owns the input validation (array-length agreement and duplicate
+/// position-id rejection) so the Python `evaluate_risk_budget` function and the
+/// WASM `evaluateRiskBudget` export share one behavior and one set of
 /// diagnostics.
 ///
 /// # Arguments

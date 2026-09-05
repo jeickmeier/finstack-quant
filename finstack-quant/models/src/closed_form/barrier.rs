@@ -426,11 +426,9 @@ fn barrier_helper(
     let option_sign = eta;
     let barrier_sign = -phi;
 
-    // Standard vanilla components
     let a = option_sign * spot * forward_discount * norm_cdf(option_sign * x)
         - option_sign * strike * discount * norm_cdf(option_sign * (x - vol * time.sqrt()));
 
-    // Barrier-adjusted components
     let b = option_sign * spot * forward_discount * norm_cdf(option_sign * x1)
         - option_sign * strike * discount * norm_cdf(option_sign * (x1 - vol * time.sqrt()));
 
@@ -1137,7 +1135,6 @@ mod tests {
         let up_in = up_in_call(spot, strike, barrier, time, rate, div_yield, vol);
         let up_out = up_out_call(spot, strike, barrier, time, rate, div_yield, vol);
 
-        // Vanilla call price
         let d1 = ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time)
             / (vol * time.sqrt());
         let d2 = d1 - vol * time.sqrt();

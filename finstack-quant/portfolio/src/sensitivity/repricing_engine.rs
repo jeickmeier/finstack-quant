@@ -169,12 +169,6 @@ impl FullRepricingEngine {
         let base_pvs = Self::collect_base_pvs(positions, market, as_of, base_currency)?;
         let repricing_plan = FactorRepricingPlan::build(positions, factors, market);
 
-        // Each factor's profile is an independent, side-effect-free function of
-        // the read-only base market, the base PVs, and the factor definition, so
-        // fanning out across factors is deterministic: `par_iter().collect()`
-        // preserves factor order and produces identical results regardless of
-        // scheduling. This mirrors `DeltaBasedEngine`, which already
-        // parallelizes the equivalent (and cheaper) work over factors.
         let compute_profile = |(factor_index, factor): (usize, &FactorDefinition)| {
             let (bump_size, bump_unit) = self
                 .bump_config

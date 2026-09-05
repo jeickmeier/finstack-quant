@@ -51,8 +51,6 @@ fn apply_scenario_empty_spec() {
     let model = empty_model_json();
     let result = apply_scenario(&scenario, &market, &model, "2024-01-15", None).unwrap();
     let obj: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
-    // `market`/`model` are nested objects now, not serialized strings: the
-    // envelope used to hand back JSON-inside-JSON.
     assert!(
         obj["market"].is_object(),
         "market should be a nested object"

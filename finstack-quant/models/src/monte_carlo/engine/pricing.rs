@@ -705,7 +705,6 @@ impl McEngine {
         let work_size = disc.work_size(process);
         let correlation = build_correlation_factor(process, disc)?;
 
-        // Pre-allocate buffers (reused across paths)
         let mut state = vec![0.0; dim];
         let mut z = vec![0.0; num_factors];
         // `z_raw` holds independent shocks when the engine applies correlation;
@@ -859,7 +858,7 @@ impl McEngine {
                     validate_discounted_payoff(path_id, payoff_value, discount_factor)?;
                 stats.update(discounted_value);
 
-                // Check auto-stop condition. A 5 000-sample warm-up keeps the
+                // A 5 000-sample warm-up keeps the
                 // half-width estimate stable — the standard error of the sample
                 // standard error is ~1/√(2n), so at n=1 000 the stopping criterion
                 // itself has ≈ 2 % noise which routinely trips the threshold
@@ -926,8 +925,7 @@ impl McEngine {
         prepared_disc.prepare(process, &self.config.time_grid);
         let disc = &prepared_disc;
 
-        // Split paths into chunks for parallel processing. `None` requests
-        // adaptive chunking; `Some(n)` uses exactly `n`.
+        // `None` requests adaptive chunking; `Some(n)` uses exactly `n`.
         let effective_chunk_size = self
             .config
             .chunk_size
@@ -939,7 +937,6 @@ impl McEngine {
         let correlation = build_correlation_factor(process, disc)?;
         let correlation_ref = correlation.as_ref();
 
-        // Process chunks in parallel
         let chunk_results: Vec<Result<OnlineStats>> = chunks
             .par_iter()
             .map(|range| {
@@ -1068,11 +1065,9 @@ impl McEngine {
             })
             .collect();
 
-        // Collect and handle errors (fail-fast on first error)
         let chunk_stats: Vec<OnlineStats> =
             chunk_results.into_iter().collect::<Result<Vec<_>>>()?;
 
-        // Deterministically reduce chunk statistics
         let mut combined = OnlineStats::new();
         for chunk_stat in chunk_stats {
             combined.merge(&chunk_stat);

@@ -122,7 +122,6 @@ impl Discretization<GbmWithDividends> for ExactGbmWithDividends {
             }
         }
 
-        // Update state
         x[0] = spot;
     }
 

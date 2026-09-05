@@ -140,14 +140,11 @@ pub(crate) fn build_decision_space(
     let mut features = Vec::new();
     let mut current_weights = IndexMap::new();
 
-    // Gross market value: sum of absolute PVs (for weight calculation with hedged portfolios)
     let mut gross_pv_base = 0.0_f64;
-    // Track notional values for NotionalWeight scheme
     let mut position_notionals: IndexMap<PositionId, f64> = IndexMap::new();
     let mut gross_notional = 0.0_f64;
 
     for position in &problem.portfolio.positions {
-        // Pull valuation for this position
         let pv_entry = valuation
             .position_values
             .get(&position.position_id)
@@ -174,7 +171,6 @@ pub(crate) fn build_decision_space(
             0.0
         };
 
-        // Extract measures
         let mut measures = IndexMap::new();
         if let Some(val_result) = &pv_entry.valuation_result {
             measures = metrics_to_strings(&val_result.measures);
@@ -190,7 +186,6 @@ pub(crate) fn build_decision_space(
         let missing_required_metrics = !required_metrics.is_empty()
             && is_missing_required_metrics(&measures, required_metrics);
 
-        // Decide if position is held / tradeable
         let explicit_hold = if let Some(ref held) = problem.trade_universe.held_filter {
             held.matches(
                 &position.entity_id,
@@ -244,7 +239,6 @@ pub(crate) fn build_decision_space(
         features.push(DecisionFeatures {
             pv_base,
             pv_native,
-            // When scale_factor == 0, treat pv_per_unit as 0 to avoid division by zero.
             pv_per_unit,
             deal_notional_abs,
             measures,
@@ -254,13 +248,11 @@ pub(crate) fn build_decision_space(
         });
     }
 
-    // Batch price candidates using a temporary portfolio
     let candidate_valuation = if !problem.trade_universe.candidates.is_empty() {
         let mut builder = crate::builder::PortfolioBuilder::new("CANDIDATES")
             .base_currency(problem.portfolio.base_currency)
             .as_of(problem.portfolio.as_of);
 
-        // Use a dummy entity for all candidates
         builder = builder.entity(crate::types::Entity::new("CANDIDATE_POOL"));
 
         for candidate in &problem.trade_universe.candidates {
@@ -269,12 +261,11 @@ pub(crate) fn build_decision_space(
                 "CANDIDATE_POOL",
                 candidate.instrument.id(),
                 std::sync::Arc::clone(&candidate.instrument),
-                1.0, // Quantity 1.0 for unit pricing
+                1.0,
                 candidate.unit,
             )
             .map_err(|e| Error::invalid_input(e.to_string()))?;
 
-            // Copy attributes directly from candidate
             for (k, v) in &candidate.attributes {
                 pos.attributes.insert(k.clone(), v.clone());
             }
@@ -371,11 +362,10 @@ pub(crate) fn build_decision_space(
             measures,
             attributes: candidate.attributes.clone(),
             min_weight: candidate_min_weight,
-            max_weight: candidate.max_weight, // Respect candidate constraints
+            max_weight: candidate.max_weight,
         });
     }
 
-    // Populate current weights based on weighting scheme.
     match problem.weighting {
         WeightingScheme::NotionalWeight => {
             // Signed deal-notional / gross absolute deal-notional.

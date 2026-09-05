@@ -284,7 +284,6 @@ impl Portfolio {
 
         let mut seen_ids: finstack_quant_core::HashSet<_> = HashSet::default();
         for position in &self.positions {
-            // Check for duplicate position IDs
             if !seen_ids.insert(&position.position_id) {
                 return Err(Error::validation(format!(
                     "Duplicate position ID: {}",
@@ -292,7 +291,6 @@ impl Portfolio {
                 )));
             }
 
-            // Check entity exists
             if !self.entities.contains_key(&position.entity_id) {
                 return Err(Error::UnknownEntity {
                     position_id: position.position_id.clone(),
@@ -324,7 +322,6 @@ impl Portfolio {
             }
         }
 
-        // Validate book hierarchy: check for cycles via parent_id chains
         self.validate_book_hierarchy()?;
 
         Ok(())
@@ -340,7 +337,6 @@ impl Portfolio {
     fn validate_book_hierarchy(&self) -> Result<()> {
         use finstack_quant_core::HashSet;
 
-        // (1) Detect cycles via parent_id chains
         for (book_id, book) in &self.books {
             let mut visited = HashSet::default();
             visited.insert(book_id.clone());
@@ -357,7 +353,6 @@ impl Portfolio {
             }
         }
 
-        // (2)+(3) Validate child_book_ids referential integrity
         for (parent_id, parent_book) in &self.books {
             for child_id in &parent_book.child_book_ids {
                 let child = self.books.get(child_id).ok_or_else(|| {
@@ -443,7 +438,6 @@ impl Portfolio {
 
         portfolio.rebuild_index();
 
-        // Validate the reconstructed portfolio
         portfolio.validate()?;
 
         Ok(portfolio)
@@ -511,7 +505,6 @@ mod tests {
             .build()
             .expect("test should succeed");
 
-        // Valid portfolio
         assert!(portfolio.validate().is_ok());
     }
 

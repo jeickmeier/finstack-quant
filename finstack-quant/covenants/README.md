@@ -56,9 +56,9 @@ fn main() -> finstack_quant_core::Result<()> {
     let mut engine = CovenantEngine::new();
     engine.add_spec(CovenantSpec::with_metric(covenant, "debt_to_ebitda"));
 
-    let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.2)]);
+    let metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.2)]);
     let test_date = create_date(2025, Month::March, 31)?;
-    let reports = engine.evaluate(&mut metrics, test_date)?;
+    let reports = engine.evaluate(&metrics, test_date)?;
 
     let report = &reports["max_total_leverage"];
     assert!(report.passed);
@@ -93,12 +93,9 @@ Numeric maintenance and incurrence tests: `MaxDebtToEbitda`,
 `MaxCapex`, `MinLiquidity`, `Basket { name, limit }`, and
 `Custom { metric, test }` with a `ThresholdTest::Minimum`/`Maximum` bound.
 Non-financial `Affirmative { requirement }` and `Negative { restriction }`
-covenants carry text and are evaluated through a registered metric or a custom
-evaluator.
+covenants carry text only and report as passing; they have no numeric test.
 
-Attach a metric with `CovenantSpec::with_metric(covenant, "metric_id")`, a
-closure with `CovenantSpec::with_evaluator(covenant, f)`, or register a named
-calculator on the engine with `CovenantEngine::register_metric`.
+Attach a metric with `CovenantSpec::with_metric(covenant, "metric_id")`.
 
 The bundled `project_finance` package shows why labels are mandatory: it carries
 two `MinDscr` covenants (`min_dscr_default` and `min_dscr_lockup`) whose

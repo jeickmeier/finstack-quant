@@ -32,13 +32,9 @@ pub fn add_vintage_buildup(
     new_volume_node: &str,
     decay_curve: &[f64],
 ) -> Result<ModelBuilder<Ready>> {
-    // We construct the total node using a convolution formula:
-    // Total = New * c0 + lag(New, 1) * c1 + lag(New, 2) * c2 + ...
-
     let mut terms = Vec::new();
 
     for (lag, &rate) in decay_curve.iter().enumerate() {
-        // Skip zero rates to keep formula clean
         if rate.abs() < ZERO_TOLERANCE {
             continue;
         }
@@ -47,11 +43,9 @@ pub fn add_vintage_buildup(
         // (`{}` formatting) — fixed-precision truncation (e.g. `{:.6}`) would
         // silently distort long-tail decay curves.
         let term = if lag == 0 {
-            // Current period term: New * c0
             format!("{} * {}", new_volume_node, super::fmt_f64(rate))
         } else {
-            // Lagged term: lag(New, k) * ck
-            // We use coalesce(lag(...), 0) to handle boundaries gracefully
+            // coalesce keeps the first period defined when lag looks before t=0
             format!(
                 "coalesce(lag({}, {}), 0.0) * {}",
                 new_volume_node,
@@ -63,7 +57,6 @@ pub fn add_vintage_buildup(
         terms.push(term);
     }
 
-    // If curve is empty or all zeros, result is 0
     let formula = if terms.is_empty() {
         "0.0".to_string()
     } else {

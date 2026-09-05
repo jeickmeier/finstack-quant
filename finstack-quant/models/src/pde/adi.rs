@@ -634,7 +634,6 @@ pub fn fill_boundaries(
     // x-boundaries (left and right edges): all y-values
     for j in 0..ny {
         let y = y_pts[j];
-        // Lower x-boundary (i = 0)
         u_full[j] = boundary_value_2d(
             problem.boundary_x_lower(y, t),
             u_full,
@@ -644,7 +643,6 @@ pub fn fill_boundaries(
             true,
             true,
         );
-        // Upper x-boundary (i = nx-1)
         u_full[(nx - 1) * ny + j] = boundary_value_2d(
             problem.boundary_x_upper(y, t),
             u_full,
@@ -660,7 +658,6 @@ pub fn fill_boundaries(
     // (corners already set by x-boundary pass)
     for i in 1..nx - 1 {
         let x = x_pts[i];
-        // Lower y-boundary (j = 0)
         u_full[i * ny] = boundary_value_2d(
             problem.boundary_y_lower(x, t),
             u_full,
@@ -670,7 +667,6 @@ pub fn fill_boundaries(
             false,
             true,
         );
-        // Upper y-boundary (j = ny-1)
         u_full[i * ny + ny - 1] = boundary_value_2d(
             problem.boundary_y_upper(x, t),
             u_full,
@@ -727,23 +723,19 @@ fn boundary_value_2d(
             // d²u/dx² = 0: linear extrapolation from two interior neighbors
             if is_x_dir {
                 if is_lower {
-                    // i=0: extrapolate from i=1, i=2
                     let u1 = u_full[ny + j];
                     let u2 = u_full[2 * ny + j];
                     2.0 * u1 - u2
                 } else {
-                    // i=nx-1: extrapolate from i=nx-2, i=nx-3
                     let u1 = u_full[(i - 1) * ny + j];
                     let u2 = u_full[(i - 2) * ny + j];
                     2.0 * u1 - u2
                 }
             } else if is_lower {
-                // j=0: extrapolate from j=1, j=2
                 let u1 = u_full[i * ny + 1];
                 let u2 = u_full[i * ny + 2];
                 2.0 * u1 - u2
             } else {
-                // j=ny-1: extrapolate from j=ny-2, j=ny-3
                 let u1 = u_full[i * ny + (j - 1)];
                 let u2 = u_full[i * ny + (j - 2)];
                 2.0 * u1 - u2
@@ -822,7 +814,6 @@ mod tests {
         let nx_int = grid.nx_interior();
         let ny_int = grid.ny_interior();
 
-        // Initialize full solution with terminal condition
         let mut u_full = vec![0.0; nx * ny];
         for i in 0..nx {
             for j in 0..ny {
@@ -831,7 +822,6 @@ mod tests {
             }
         }
 
-        // Extract interior
         let mut u_int = vec![0.0; nx_int * ny_int];
         for ii in 0..nx_int {
             for jj in 0..ny_int {
@@ -856,7 +846,6 @@ mod tests {
                 .expect("pure-diffusion 2D heat step is stable");
         }
 
-        // Check at (pi/2, pi/2)
         let exact = (-2.0 * t_mat).exp() * (pi / 2.0).sin() * (pi / 2.0).sin();
         let computed = grid.interpolate(&u_full, pi / 2.0, pi / 2.0);
         let error = (computed - exact).abs();
@@ -1001,13 +990,11 @@ mod tests {
         let mut u_int = vec![1.0; nx_int * ny_int];
 
         let stepper = CraigSneydStepper::new(10);
-        // dt = 0: t_from == t_to.
         let zero = stepper.step(&Heat2D, &grid, &mut u_full, &mut u_int, 0.3, 0.3, 0);
         assert!(
             matches!(zero, Err(StepperError::NonPositiveStep { dt, .. }) if dt == 0.0),
             "dt = 0 must be rejected as NonPositiveStep, got {zero:?}"
         );
-        // dt < 0: t_from < t_to.
         let neg = stepper.step(&Heat2D, &grid, &mut u_full, &mut u_int, 0.1, 0.4, 0);
         assert!(
             matches!(neg, Err(StepperError::NonPositiveStep { dt, .. }) if dt < 0.0),

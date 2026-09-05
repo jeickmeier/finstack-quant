@@ -656,7 +656,6 @@ fn portfolio_dts_pins_python_parity_optional_parameters() {
         &dts,
         "evaluateRiskBudget(positionIdsJson: string, actualVarJson: string, targetVarPctJson: string, portfolioVar: number, utilizationThreshold?: number): RiskBudgetResult;",
     ));
-    // The impact view gained the previously-dropped `execution_risk` field.
     assert!(contains_ignoring_ws(&dts, "execution_risk: number;"));
 }
 
@@ -1276,7 +1275,6 @@ fn core_date_array_outputs_are_exact_typed_arrays() {
 
 #[test]
 fn attribution_dts_matches_json_pipeline_surface() {
-    // The attribution namespace previously had zero dts assertions.
     let dts = index_dts();
 
     assert!(dts.contains("export interface AttributionNamespace"));

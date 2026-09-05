@@ -1,6 +1,6 @@
 //! WASM bindings for date utilities from [`finstack_quant_core::dates`].
 
-use crate::utils::{to_js_err, to_js_err_core};
+use crate::utils::to_js_err;
 use finstack_quant_core::dates::{
     adjust as core_adjust, available_calendars as core_available_calendars,
     fx::resolve_calendar as rust_resolve_calendar, BusinessDayConvention, DayCount as RustDayCount,
@@ -38,7 +38,7 @@ impl JsDayCountContext {
     /// core registry error so unknown codes surface "Did you mean …?"
     /// suggestions and a structured `not_found` kind.
     fn to_rust_ctx(&self) -> Result<RustDayCountContext<'static>, JsValue> {
-        self.inner.to_ctx().map_err(|e| to_js_err_core(&e))
+        self.inner.to_ctx().map_err(to_js_err)
     }
 }
 
@@ -526,7 +526,7 @@ pub fn adjust(epoch_days: i32, convention: &str, calendar_code: &str) -> Result<
     let date = epoch_to_date(epoch_days)?;
     let business_day_convention: BusinessDayConvention =
         convention.parse().map_err(|e: String| to_js_err(e))?;
-    let cal = rust_resolve_calendar(Some(calendar_code)).map_err(|e| to_js_err_core(&e))?;
+    let cal = rust_resolve_calendar(Some(calendar_code)).map_err(to_js_err)?;
     let adjusted = core_adjust(date, business_day_convention, cal).map_err(to_js_err)?;
     Ok(finstack_quant_core::dates::days_since_epoch(adjusted))
 }

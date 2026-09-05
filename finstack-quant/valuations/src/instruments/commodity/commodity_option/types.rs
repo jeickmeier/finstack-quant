@@ -14,8 +14,6 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 
-// Monte Carlo types (feature-gated)
-
 /// Monte Carlo configuration for commodity option pricing.
 ///
 /// When provided, enables simulation-based pricing using the specified

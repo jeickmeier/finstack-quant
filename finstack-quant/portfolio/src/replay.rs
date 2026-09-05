@@ -416,13 +416,8 @@ pub fn replay_portfolio(
         compute_attribution && matches!(config.attribution_method, AttributionMethod::MetricsBased);
     let phase_profile = replay_phase_profile(config, metrics_attribution);
 
-    // Phase A: value the portfolio at every snapshot date. Per-snapshot
-    // results are kept as `Result<_>` so the strict / best-effort branch
-    // below can decide whether a single failure aborts the run.
     let valuation_results = phase_a_results(portfolio, timeline, phase_profile, finstack_config)?;
 
-    // Pair each result with its dated snapshot so best-effort skipping can
-    // record which dates dropped out without losing the alignment.
     let mut skipped_dates: Vec<(Date, String)> = Vec::new();
     let mut surviving: Vec<(Date, &MarketContext, Option<PortfolioValuation>)> =
         Vec::with_capacity(timeline.len());
@@ -476,11 +471,6 @@ pub fn replay_portfolio(
         })
         .collect();
 
-    // Phase B: assemble ReplayStep entries with P&L and (optionally)
-    // attribution. Exact-profile attribution endpoints are prepared in
-    // bounded batches only when Phase A is incompatible. This preserves
-    // state-level Rayon parallelism without retaining a second full timeline
-    // or repricing an endpoint once per adjacent attribution interval.
     let mut steps = Vec::with_capacity(surviving.len());
     let first_date = surviving[0].0;
     let mut prev_market = surviving[0].1;
@@ -804,11 +794,8 @@ mod tests {
         );
     }
 
-    /// Originally Minor-16: the percentage drawdown must never be negative
-    /// for negative peak values. A percentage decline relative to a
-    /// non-positive portfolio value is not meaningful, so pct tracking skips
-    /// non-positive peaks entirely and reports 0.0 (with no pct dates) when
-    /// no positive peak ever existed. The dollar drawdown is still reported.
+    /// Percentage drawdown is 0.0 when no positive peak exists; dollar
+    /// drawdown is still reported.
     #[test]
     fn minor16_drawdown_pct_is_zero_when_no_positive_peak_exists() {
         let steps = vec![

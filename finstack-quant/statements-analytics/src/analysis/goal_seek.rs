@@ -130,7 +130,6 @@ pub fn goal_seek(
     update_model: bool,
     bounds: Option<(f64, f64)>,
 ) -> Result<f64> {
-    // Validate that nodes exist
     if !model.has_node(target_node) {
         return Err(Error::invalid_input(format!(
             "Target node '{}' not found in model",
@@ -145,7 +144,6 @@ pub fn goal_seek(
         )));
     }
 
-    // Validate that periods exist
     if !model.periods.iter().any(|p| p.id == target_period) {
         return Err(Error::invalid_input(format!(
             "Target period '{}' not found in model",
@@ -160,25 +158,10 @@ pub fn goal_seek(
         )));
     }
 
-    // Get initial guess from current driver value if available.
-    //
-    // # Initial Guess Strategy
-    //
-    // When the driver node has an existing value for the target period, we use that
-    // as the initial guess. This provides a reasonable starting point that is likely
-    // close to the solution.
-    //
-    // When no existing value is available, we use a fallback of 1.0 rather than an
-    // arbitrary large number. This is because:
-    // - For ratio/percentage drivers (e.g., margins), 1.0 is a reasonable neutral value
-    // - For absolute drivers (e.g., revenue), the adaptive bounds logic below will
-    //   expand the search range based on abs(initial_guess), so starting at 1.0
-    //   gives a ±10.0 initial bracket which is then refined
-    // - Using 0.0 would cause division-based bounds to collapse
-    //
-    // For better convergence on specific use cases, callers should either:
-    // 1. Ensure the driver node has a value for the period, or
-    // 2. Provide explicit bounds via the `bounds` parameter
+    // Prefer the driver's current value as the Brent start. 1.0 is a
+    // sign-preserving fallback: 0.0 collapses magnitude-scaled brackets,
+    // and a large guess overshoots ratio drivers. Pass `bounds` when the
+    // scale is known.
     let initial_guess = model
         .get_node(driver_node)
         .and_then(|node| node.values.as_ref())
@@ -187,7 +170,7 @@ pub fn goal_seek(
             AmountOrScalar::Scalar(s) => *s,
             AmountOrScalar::Amount(a) => a.amount(),
         })
-        .unwrap_or(1.0); // Default initial guess (see rationale above)
+        .unwrap_or(1.0);
 
     let mut evaluator = Evaluator::new();
     let Ok(prepared) = evaluator.prepare(model) else {

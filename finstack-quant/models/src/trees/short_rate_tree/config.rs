@@ -9,8 +9,6 @@ pub const DEFAULT_NORMAL_VOL: f64 = 0.01; // 100 bp/yr
 /// Default maximum initial-curve repricing error for calibrated trees, in basis points.
 pub const DEFAULT_CURVE_FIT_TOLERANCE_BP: f64 = 0.1;
 
-// Short-Rate Model Types
-
 /// Compounding convention for per-node discount factors in the short-rate tree.
 ///
 /// | Convention | Formula | Use Case |

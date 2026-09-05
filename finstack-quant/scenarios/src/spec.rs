@@ -188,7 +188,7 @@ impl ScenarioSpec {
             }
         }
 
-        // Stable sort by priority (lower = higher priority)
+        // Stable so equal-priority scenarios keep input order.
         scenarios.sort_by_key(|s| s.priority);
 
         let composed_id = if scenarios.is_empty() {

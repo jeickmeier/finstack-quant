@@ -546,7 +546,6 @@ mod tests {
         let mut s3 = create_path_state(10, 1.0, 130.0, 0.5); // Terminal
         barrier_call.on_event(&mut s3).expect("valid payoff event");
 
-        // Should get rebate
         let value = barrier_call.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 5.0);
     }

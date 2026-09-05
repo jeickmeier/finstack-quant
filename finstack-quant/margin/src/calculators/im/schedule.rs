@@ -677,8 +677,6 @@ mod tests {
 
     #[test]
     fn bcbs_constructors_return_ok() {
-        // Verify the embedded registry is available and constructors succeed.
-        // This catches registry configuration issues at CI time.
         assert!(
             RegulatorySchedule::bcbs_iosco().is_ok(),
             "RegulatorySchedule::bcbs_iosco() should return Ok"
@@ -688,8 +686,6 @@ mod tests {
             "ScheduleImCalculator::bcbs_standard() should return Ok"
         );
     }
-
-    // NGR factor for Schedule IM
 
     /// Perfectly-offset netting set (Σ MtM = 0 → NGR = 0): IM reduces
     /// to 40% of the gross value. BCBS-IOSCO: `0.4 + 0.6·NGR = 0.4`.

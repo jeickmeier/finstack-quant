@@ -124,8 +124,6 @@ impl HullWhiteTreeConfig {
     }
 }
 
-// Hull-White Trinomial Tree
-
 /// Calibrated Hull-White trinomial tree.
 ///
 /// The tree is built and calibrated via [`HullWhiteTree::calibrate`] (uniform
@@ -334,8 +332,7 @@ impl HullWhiteTree {
         // The α solved at iteration `step` is the drift adjustment for the
         // interval [t_step, t_{step+1}] (it matches P(0, t_{step+1}) given
         // the state prices at t_step), so it is stored at `alpha[step]` —
-        // the index `backward_induction` uses to discount that interval
-        // .
+        // the index `backward_induction` uses to discount that interval.
         for step in 0..n {
             let dt_i = dts[step];
             let dx_curr = dxs[step];
@@ -690,8 +687,6 @@ impl HullWhiteTree {
         }
     }
 
-    // Accessor Methods
-
     /// Get configuration.
     pub fn config(&self) -> &HullWhiteTreeConfig {
         &self.config
@@ -770,8 +765,6 @@ impl HullWhiteTree {
             .unwrap_or(0.0)
     }
 
-    // Bond Price Calculations
-
     /// Compute zero-coupon bond price P(t, T) at node (step, node_idx).
     ///
     /// Uses the Hull-White analytical formula:
@@ -806,14 +799,12 @@ impl HullWhiteTree {
         let r = self.rate_at_node(step, node_idx);
         let kappa = self.config.kappa;
 
-        // B(t, T) factor
         let b = if kappa.abs() < 1e-10 {
             tau // Limit as κ → 0
         } else {
             (1.0 - (-kappa * tau).exp()) / kappa
         };
 
-        // A(t, T) factor using market discount factors
         let p_0_t = discount_curve.df(t);
         let p_0_tt = discount_curve.df(maturity_time);
 
@@ -912,7 +903,6 @@ impl HullWhiteTree {
             1.0
         };
 
-        // End discount factor
         let p_end = self.bond_price(step, node_idx, swap_end_time, discount_curve);
 
         let annuity = self.annuity(
@@ -954,8 +944,6 @@ impl HullWhiteTree {
             .map(|(&pay_t, &tau)| tau * self.bond_price(step, node_idx, pay_t, discount_curve))
             .sum()
     }
-
-    // Backward Induction
 
     /// Price an instrument using backward induction.
     ///
@@ -1001,7 +989,6 @@ impl HullWhiteTree {
         let mut scratch = vec![0.0; max_nodes];
         let comp = self.config.compounding;
 
-        // Backward induction
         for step in (0..n).rev() {
             let num_nodes = self.num_nodes(step);
             let dt_i = self.dts[step];
@@ -1023,7 +1010,6 @@ impl HullWhiteTree {
                 *scratch_j = intermediate_value_fn(step, idx, discounted);
             }
 
-            // Swap buffers instead of allocating new Vec
             std::mem::swap(&mut values, &mut scratch);
         }
 
@@ -1115,7 +1101,6 @@ mod tests {
         let tree =
             HullWhiteTree::calibrate(config, &curve, 5.0).expect("Calibration should succeed");
 
-        // Tree should have correct number of steps
         assert_eq!(tree.num_steps(), 200);
 
         // State prices should sum to discount factors. With the drift α
@@ -1238,7 +1223,6 @@ mod tests {
         let final_step = tree.num_steps();
         let mid_node = tree.num_nodes(final_step) / 2;
 
-        // Bond price at maturity should be exactly 1.0
         // Production standard: < 1 bp error
         let bp = tree.bond_price(final_step, mid_node, 2.0, &curve);
         let error_bp = (bp - 1.0).abs() * 10000.0;
@@ -1332,7 +1316,6 @@ mod tests {
         let tree =
             HullWhiteTree::calibrate(config, &curve, 1.0).expect("Calibration should succeed");
 
-        // Zero payoff should give zero value
         let terminal = vec![0.0; tree.num_nodes(10)];
         let value = tree
             .backward_induction(&terminal, |_, _, cont| cont)
@@ -1351,7 +1334,6 @@ mod tests {
             HullWhiteTree::calibrate(config, &curve, 1.0).expect("Calibration should succeed");
         let final_step = tree.num_steps();
 
-        // Unit payoff at all nodes should give approximately the discount factor
         let terminal = vec![1.0; tree.num_nodes(final_step)];
         let value = tree
             .backward_induction(&terminal, |_, _, cont| cont)

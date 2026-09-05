@@ -12,7 +12,7 @@ use indexmap::IndexMap;
 fn test_simple_evaluation() {
     let model = ModelBuilder::new("test")
         .periods("2025Q1..Q2", None)
-        .expect("test should succeed")
+        .unwrap()
         .value(
             "revenue",
             &[
@@ -27,10 +27,10 @@ fn test_simple_evaluation() {
             ],
         )
         .build()
-        .expect("test should succeed");
+        .unwrap();
 
     let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).expect("test should succeed");
+    let results = evaluator.evaluate(&model).unwrap();
 
     assert_eq!(
         results.get(
@@ -52,7 +52,7 @@ fn test_simple_evaluation() {
 fn test_formula_evaluation() {
     let model = ModelBuilder::new("test")
         .periods("2025Q1..Q2", None)
-        .expect("test should succeed")
+        .unwrap()
         .value(
             "revenue",
             &[
@@ -67,12 +67,12 @@ fn test_formula_evaluation() {
             ],
         )
         .compute("cogs", "revenue * 0.6")
-        .expect("test should succeed")
+        .unwrap()
         .build()
-        .expect("test should succeed");
+        .unwrap();
 
     let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).expect("test should succeed");
+    let results = evaluator.evaluate(&model).unwrap();
 
     assert_eq!(
         results.get(
@@ -95,11 +95,11 @@ fn test_circular_dependency_error() {
     // Cycles are now caught at build time by ModelBuilder::build()
     let result = ModelBuilder::new("test")
         .periods("2025Q1..Q2", None)
-        .expect("test should succeed")
+        .unwrap()
         .compute("a", "b + 1")
-        .expect("test should succeed")
+        .unwrap()
         .compute("b", "a + 1")
-        .expect("test should succeed")
+        .unwrap()
         .build();
 
     assert!(result.is_err());

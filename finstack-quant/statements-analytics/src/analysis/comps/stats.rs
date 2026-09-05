@@ -185,15 +185,13 @@ pub fn regression_fair_value(
         return None;
     }
 
-    // We regress y on x: y = intercept + slope * x
-    // OnlineCovariance.optimal_beta() returns Cov(X,Y)/Var(Y)
-    // so we pass (y_i, x_i) to get slope = Cov(Y,X)/Var(X)
+    // OnlineCovariance.optimal_beta() returns Cov(X,Y)/Var(Y), so pass
+    // (y_i, x_i) to get slope = Cov(Y,X)/Var(X).
     let mut oc = OnlineCovariance::new();
     for i in 0..n {
         oc.update(y[i], x[i]);
     }
 
-    // slope = Cov(Y, X) / Var(X) = optimal_beta when X is passed as second arg
     let slope = oc.optimal_beta();
     let intercept = oc.mean_x() - slope * oc.mean_y();
     let corr = oc.correlation();

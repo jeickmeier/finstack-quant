@@ -772,7 +772,6 @@ mod tests {
                 );
             }
 
-            // Weights should sum to approximately 1
             let weight_sum: f64 = points.iter().map(|&(_, w)| w).sum();
             assert!(
                 (weight_sum - 1.0).abs() < 0.05,
@@ -998,7 +997,6 @@ mod tests {
         let result_default = integrate(&copula_default);
         let result_ref = integrate(&copula_ref);
 
-        // Both must recover the unconditional PD to 50 bp (existing contract).
         assert!(
             (result_ref - pd).abs() < 0.005,
             "64-node reference: integrated PD {result_ref:.6} should equal {pd} (bias={:.6})",
@@ -1010,7 +1008,6 @@ mod tests {
             (result_default - pd).abs()
         );
 
-        // Default vs reference: bias must be within 5 bp.
         let bias = (result_default - result_ref).abs();
         assert!(
             bias < 0.0005,

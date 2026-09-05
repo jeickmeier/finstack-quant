@@ -255,7 +255,6 @@ impl PortfolioOptimizationResult {
                     TradeType::Existing
                 };
 
-                // Get instrument_id (from existing position or candidate)
                 let instrument_id = existing_position
                     .map(|p| p.instrument_id.clone())
                     .or_else(|| {

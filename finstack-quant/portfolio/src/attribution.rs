@@ -1000,11 +1000,6 @@ fn aggregate_position_attributions(
     let mut by_position: IndexMap<PositionId, PnlAttribution> =
         IndexMap::with_capacity(position_data.len());
 
-    // Hoisted out of the per-position loop: the closure captures `market_t1`,
-    // `base_currency`, and `as_of_t1` by reference and is reused for every field of
-    // every position. Delegates to the shared `crate::fx::convert_to_base`
-    // helper so the FX lookup + error mapping stay consistent with the rest of
-    // the portfolio crate.
     let convert = |money: Money| -> Result<Money> {
         crate::fx::convert_to_base(money, as_of_t1, market_t1, base_currency)
     };

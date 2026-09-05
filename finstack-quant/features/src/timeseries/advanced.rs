@@ -89,15 +89,13 @@ pub(super) fn drawdown(
     indices: &[usize],
     output: &mut [Option<f64>],
 ) -> Result<()> {
-    let mut peak = None;
+    let mut peak: Option<f64> = None;
     for &idx in indices {
         output[idx] = match finite(values[idx]) {
             Some(value) if value > ZERO_TOLERANCE => {
-                peak = Some(match peak {
-                    Some(prev_peak) if prev_peak > value => prev_peak,
-                    _ => value,
-                });
-                peak.map(|peak_value| value / peak_value - 1.0)
+                let peak_value = peak.map_or(value, |prev| prev.max(value));
+                peak = Some(peak_value);
+                Some(value / peak_value - 1.0)
             }
             _ => None,
         };
@@ -105,19 +103,7 @@ pub(super) fn drawdown(
     Ok(())
 }
 
-/// Current row's normalized exponential-decay weight.
-///
-/// `window` and `half_life` count finite observations (pandas `skipna`);
-/// missing rows do not decay. Callers who need business-day half-lives must
-/// resample first.
-///
-/// # Arguments
-///
-/// * `values` - Entity-local observations; missing rows skip without decaying.
-/// * `indices` - Chronological row indices for the current entity.
-/// * `params` - JSON parameters; required positive `half_life` is in finite
-///   observations, and `window` defaults to 1 finite observations.
-/// * `output` - Row-aligned destination overwritten for this entity.
+/// Current row's normalized exponential-decay weight over finite observations.
 pub(super) fn exponential_decay_weights(
     values: &[Option<f64>],
     indices: &[usize],
@@ -141,9 +127,6 @@ pub(super) fn exponential_decay_weights(
             .iter()
             .filter(|window_idx| finite(values[**window_idx]).is_some())
             .count();
-        if finite_count == 0 {
-            continue;
-        }
         let denominator = (0..finite_count)
             .map(|age| decay.powi(age as i32))
             .sum::<f64>();

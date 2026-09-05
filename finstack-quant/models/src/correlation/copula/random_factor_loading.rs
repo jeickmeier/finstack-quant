@@ -356,7 +356,6 @@ impl Copula for RandomFactorLoadingCopula {
 
     fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
         // Double integral: outer over loading shock η, inner over market Z
-        // Uses cached quadrature for performance
         self.outer_quadrature
             .integrate(|eta| self.inner_quadrature.integrate(|z| f(&[z, eta])))
     }
@@ -498,7 +497,6 @@ mod tests {
             copula.conditional_default_prob(threshold, factors, correlation)
         });
 
-        // Should be close to unconditional (within integration error)
         assert!(
             (integrated_prob - pd).abs() < 0.01,
             "Integrated probability {} should be close to unconditional {}",
