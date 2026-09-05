@@ -115,8 +115,6 @@ impl MetricId {
         MetricId::VarianceVega,
         MetricId::Cs01,
         MetricId::BucketedCs01,
-        MetricId::Cs01Hazard,
-        MetricId::BucketedCs01Hazard,
         MetricId::ParSpread,
         MetricId::RiskyPv01,
         MetricId::RiskyAnnuity,

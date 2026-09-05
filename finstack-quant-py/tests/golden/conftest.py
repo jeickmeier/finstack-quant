@@ -417,9 +417,6 @@ def _validate_required_pricing_risk_metrics(fixture: GoldenFixture) -> None:
 
     if domain.startswith("credit."):
         assert _has_expected_metric(fixture, "dv01"), "credit pricing fixtures must assert dv01"
-        assert _has_expected_metric(fixture, "cs01") or _has_expected_metric(fixture, "cs01_hazard"), (
-            "credit pricing fixtures must assert quote-space or direct-hazard CS01"
-        )
 
 
 def _has_expected_metric(fixture: GoldenFixture, base_metric: str) -> bool:

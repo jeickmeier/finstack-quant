@@ -1,11 +1,8 @@
 //! Quoted credit-bond risk regression.
 //!
-//! A bond with a credit (hazard) curve AND a `quoted_clean_price` must still
-//! produce non-zero direct hazard CS01 — the engine calibrates a flat hazard
-//! shift that reproduces the quote and bumps that shifted curve, mirroring the
-//! same bond priced WITHOUT a quote. Before the fix, `Bond::base_value`
-//! short-circuits to the constant quoted price, so the hazard bump reprices the
-//! same constant and CS01 collapses to zero.
+//! A bond with a replayably calibrated hazard curve and a `quoted_clean_price`
+//! must retain non-zero canonical CS01. The risk view pins the observed quote
+//! with OAS while par-spread shocks rebootstrap the source hazard calibration.
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -60,7 +57,7 @@ fn build_market(as_of: time::Date) -> MarketContext {
 }
 
 #[test]
-fn test_quoted_credit_bond_hazard_cs01_nonzero_and_matches_unquoted() {
+fn test_quoted_credit_bond_cs01_nonzero_and_matches_unquoted() {
     let as_of = date!(2025 - 01 - 01);
     let market = build_market(as_of);
 
@@ -70,18 +67,18 @@ fn test_quoted_credit_bond_hazard_cs01_nonzero_and_matches_unquoted() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Cs01Hazard, MetricId::CleanPrice],
-            PricingOptions::default(),
+            &[MetricId::Cs01, MetricId::CleanPrice],
+            crate::test_support::credit::pricing_options(),
         )
         .expect("unquoted credit bond should price");
-    let base_cs01 = *base.measures.get("cs01_hazard").unwrap();
+    let base_cs01 = *base.measures.get("cs01").unwrap();
     let model_clean_pct = *base.measures.get("clean_price").unwrap() / 1_000_000.0 * 100.0;
     assert!(
         base_cs01.abs() > 1e-3,
         "sanity: unquoted credit CS01 should be non-zero, got {base_cs01}"
     );
 
-    // Quoted at the model clean price → calibrated hazard shift ≈ 0 → risk ≈ unquoted.
+    // Quoted at the model clean price → calibrated OAS ≈ 0 → risk ≈ unquoted.
     let mut quoted = build_credit_bond(as_of);
     quoted.instrument_pricing_overrides =
         InstrumentPricingOverrides::default().with_quoted_clean_price(model_clean_pct);
@@ -89,18 +86,18 @@ fn test_quoted_credit_bond_hazard_cs01_nonzero_and_matches_unquoted() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Cs01Hazard, MetricId::BucketedCs01Hazard],
-            PricingOptions::default(),
+            &[MetricId::Cs01, MetricId::BucketedCs01],
+            crate::test_support::credit::pricing_options(),
         )
         .expect("quoted credit bond should price");
 
-    let cs01 = *result.measures.get("cs01_hazard").unwrap();
+    let cs01 = *result.measures.get("cs01").unwrap();
     assert!(
         cs01.abs() > 1e-3,
         "quoted credit CS01 must be non-zero (was 0 before the fix), got {cs01}"
     );
 
-    let bucket_series_prefix = "bucketed_cs01_hazard::USD-CREDIT::";
+    let bucket_series_prefix = "bucketed_cs01::USD-CREDIT::";
     let bucketed_nonzero = result
         .measures
         .iter()
@@ -119,7 +116,7 @@ fn test_quoted_credit_bond_hazard_cs01_nonzero_and_matches_unquoted() {
 }
 
 #[test]
-fn test_quoted_credit_bond_offmodel_changes_hazard_cs01() {
+fn test_quoted_credit_bond_offmodel_changes_cs01() {
     let as_of = date!(2025 - 01 - 01);
     let market = build_market(as_of);
 
@@ -134,7 +131,7 @@ fn test_quoted_credit_bond_offmodel_changes_hazard_cs01() {
         .unwrap();
     let model_clean_pct = *base.measures.get("clean_price").unwrap() / 1_000_000.0 * 100.0;
 
-    let hazard_cs01_at = |clean_pct: f64| -> f64 {
+    let cs01_at = |clean_pct: f64| -> f64 {
         let mut q = build_credit_bond(as_of);
         q.instrument_pricing_overrides =
             InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
@@ -142,21 +139,20 @@ fn test_quoted_credit_bond_offmodel_changes_hazard_cs01() {
             .price_with_metrics(
                 &market,
                 as_of,
-                &[MetricId::Cs01Hazard],
-                PricingOptions::default(),
+                &[MetricId::Cs01],
+                crate::test_support::credit::pricing_options(),
             )
             .unwrap();
-        *r.measures.get("cs01_hazard").unwrap()
+        *r.measures.get("cs01").unwrap()
     };
 
-    // Quoting 8pts below model recalibrates the hazard wider, so CS01 must differ
-    // from the at-model quote. If the calibrated shift were silently discarded
-    // (curve-id bug), both would equal the unquoted CS01 and this would fail.
-    let cs01_model = hazard_cs01_at(model_clean_pct);
-    let cs01_distressed = hazard_cs01_at(model_clean_pct - 8.0);
+    // Quoting 8pts below model requires a wider OAS, changing the bond's
+    // par-spread sensitivity while preserving the replayable hazard recipe.
+    let cs01_model = cs01_at(model_clean_pct);
+    let cs01_distressed = cs01_at(model_clean_pct - 8.0);
     assert!(
         (cs01_distressed - cs01_model).abs() > 1e-2,
-        "off-model quote should recalibrate the hazard and change CS01: \
+        "off-model quote should change canonical CS01 through the OAS anchor: \
          model={cs01_model:.4}, distressed={cs01_distressed:.4}"
     );
 }
@@ -257,30 +253,7 @@ fn test_quoted_credit_bond_callable_oas_dv01_matches_unquoted_model_risk() {
 }
 
 #[test]
-fn test_direct_hazard_risk_propagates_unattainable_quote_calibration_error() {
-    let as_of = date!(2025 - 01 - 01);
-    let market = build_market(as_of);
-    let mut quoted = build_credit_bond(as_of);
-    quoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(10_000.0);
-
-    let err = quoted
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Cs01Hazard],
-            PricingOptions::default(),
-        )
-        .expect_err("an unattainable quote must fail hazard-shift calibration");
-    let message = err.to_string();
-    assert!(
-        message.contains("no sign change") || message.contains("convergence"),
-        "error should preserve the typed root-solve failure, got: {message}"
-    );
-}
-
-#[test]
-fn test_explicit_discounting_with_attached_credit_uses_plain_rate_bucketed_dv01() {
+fn test_explicit_discounting_with_attached_credit_uses_z_spread_cs01_fallback() {
     let as_of = date!(2025 - 01 - 01);
     let market = build_market(as_of);
     let mut quoted = build_credit_bond(as_of);
@@ -293,8 +266,8 @@ fn test_explicit_discounting_with_attached_credit_uses_plain_rate_bucketed_dv01(
             as_of,
             &[
                 MetricId::BucketedDv01,
-                MetricId::Cs01Hazard,
-                MetricId::BucketedCs01Hazard,
+                MetricId::Cs01,
+                MetricId::BucketedCs01,
             ],
             PricingOptions::default().with_model(ModelKey::Discounting),
         )
@@ -306,6 +279,8 @@ fn test_explicit_discounting_with_attached_credit_uses_plain_rate_bucketed_dv01(
         .measures
         .iter()
         .any(|(key, value)| key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6));
-    assert_eq!(result.measures["cs01_hazard"], 0.0);
-    assert_eq!(result.measures["bucketed_cs01_hazard"], 0.0);
+    let cs01 = result.measures["cs01"];
+    let bucketed_cs01 = result.measures["bucketed_cs01"];
+    assert!(cs01.is_finite() && cs01.abs() > 1e-6);
+    assert!((bucketed_cs01 - cs01).abs() <= 1e-10 * cs01.abs().max(1.0));
 }

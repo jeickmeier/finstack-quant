@@ -266,7 +266,6 @@ mod tests {
     use crate::instruments::fixed_income::bond::{
         BondSettlementConvention, CallPut, CallPutSchedule, CashflowSpec,
     };
-    use crate::metrics::{standard_registry, MetricContext, MetricId};
     use crate::pricer::{ModelKey, PricingError};
     use crate::results::ValuationDetails;
     use finstack_quant_core::currency::Currency;
@@ -275,7 +274,6 @@ mod tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_core::{dates::Date, money::Money};
-    use std::sync::Arc;
     use time::Month;
 
     fn build_test_bond(issue: Date, maturity: Date) -> Bond {
@@ -882,70 +880,6 @@ mod tests {
             "Price with higher recovery should be higher (pv_high={}, pv_low={})",
             pv_high_r.amount(),
             pv_low_r.amount()
-        );
-    }
-
-    #[test]
-    fn hazard_cs01_metrics_with_hand_built_curve() {
-        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
-
-        let bond = build_test_bond(issue, maturity);
-        // Base flat hazard curve used for CS01 tests
-        let base_lambda = 0.03;
-        let hazard = HazardCurve::builder("USD-CREDIT")
-            .base_date(issue)
-            .recovery_rate(0.4)
-            .knots([(0.0, base_lambda), (5.0, base_lambda), (10.0, base_lambda)])
-            .build()
-            .expect("Base hazard curve builder should succeed in test");
-        let market = MarketContext::new()
-            .insert(build_flat_discount(issue))
-            .insert(hazard);
-
-        // This hand-built curve intentionally exercises direct model-hazard risk.
-        let base_pv = bond
-            .value(&market, issue)
-            .expect("Base bond valuation should succeed in CS01 test");
-
-        let instrument_arc: Arc<dyn Instrument> = Arc::new(bond);
-        let curves_arc = Arc::new(market);
-        let mut ctx = MetricContext::new(
-            instrument_arc,
-            curves_arc,
-            issue,
-            base_pv,
-            MetricContext::default_config(),
-        );
-
-        let registry = standard_registry();
-        let metric_ids = [MetricId::Cs01Hazard, MetricId::BucketedCs01Hazard];
-        let _ = registry
-            .compute(&metric_ids, &mut ctx)
-            .expect("hazard CS01 metrics should compute for bond with hazard curve");
-
-        // Parallel CS01 should be nonzero since Bond::value now uses the hazard
-        // engine when credit_curve_id is set.
-        let cs01 = ctx
-            .computed
-            .get(&MetricId::Cs01Hazard)
-            .copied()
-            .unwrap_or(0.0);
-        assert!(
-            cs01.abs() > 1e-6,
-            "CS01 should be nonzero for bond with hazard curve; got {}",
-            cs01
-        );
-
-        // Bucketed CS01 series should be stored under its curve-qualified key.
-        let series_id = MetricId::custom("bucketed_cs01_hazard::USD-CREDIT");
-        let series = ctx
-            .get_series(&series_id)
-            .expect("curve-qualified bucketed hazard CS01 series must be present");
-        assert_eq!(
-            series.len(),
-            3,
-            "Bucketed CS01 series should contain each effective hazard node"
         );
     }
 

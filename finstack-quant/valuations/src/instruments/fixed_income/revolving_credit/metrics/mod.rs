@@ -47,23 +47,16 @@ pub(crate) fn register_revolving_credit_metrics(
             (Dv01, crate::metrics::UnifiedDv01Calculator::<
                 crate::instruments::RevolvingCredit,
             >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            // CS01: when a credit curve is present the pricer survival-weights
-            // cashflows, so a par-spread bump moves PV — delegate to the
-            // canonical hazard CS01. With no credit curve, survival is 1.0 and
-            // the canonical CS01 is zero, so fall back to the market-standard
-            // z-spread bump. See `metrics::sensitivities::cs01_z_spread`.
+            // CS01: when a replayable credit curve is present, rebootstrap it
+            // after bumping its par spreads. With no credit curve, survival is
+            // 1.0, so fall back to the market-standard z-spread bump. See
+            // `metrics::sensitivities::cs01_z_spread`.
             (Cs01, crate::metrics::ZSpreadParallelCs01::<
                 crate::instruments::RevolvingCredit,
             >::hazard_when_credit_curve()),
             (BucketedCs01, crate::metrics::ZSpreadBucketedCs01::<
                 crate::instruments::RevolvingCredit,
             >::hazard_when_credit_curve()),
-            (Cs01Hazard, crate::metrics::GenericParallelCs01Hazard::<
-                crate::instruments::RevolvingCredit,
-            >::with_empty_credit_curve_zero()),
-            (BucketedCs01Hazard, crate::metrics::GenericBucketedCs01Hazard::<
-                crate::instruments::RevolvingCredit,
-            >::with_empty_credit_curve_zero()),
             // Theta is now registered universally in metrics::standard_registry()
             (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
                 crate::instruments::RevolvingCredit,

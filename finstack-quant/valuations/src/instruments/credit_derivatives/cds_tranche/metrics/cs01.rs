@@ -13,8 +13,7 @@
 //! (e.g. `"CDX.NA.IG.HAZARD"`), and the actual hazard curve sits inside the
 //! `CreditIndexData` under a different ID (e.g. `"CDX-HAZ"`). These
 //! calculators resolve the index → hazard mapping before delegating to the
-//! shared CS01 bump helpers. The same resolution applies to both par-spread
-//! and direct hazard-rate bump variants.
+//! shared CS01 bump helpers.
 //!
 //! Sign convention (per canonical reference):
 //! - Long tranche / sell tranche protection → CS01 negative.
@@ -27,7 +26,7 @@ use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::{
     compute_key_rate_cs01_series_with_context_raw, compute_parallel_cs01_with_context_raw,
-    sensitivity_central_diff, Cs01Request,
+    Cs01Request,
 };
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
@@ -180,122 +179,5 @@ impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
         compute_key_rate_cs01_series_with_context_raw(
             context, &hazard_id, series_id, &request, reval,
         )
-    }
-}
-
-/// CDS tranche parallel CS01 (direct hazard-rate bump) with index → hazard resolution.
-pub(crate) struct CdsTrancheCs01HazardCalculator;
-
-impl MetricCalculator for CdsTrancheCs01HazardCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let tranche: &CDSTranche = context.instrument_as()?;
-        let (hazard_id, _discount_id) =
-            resolve_tranche_cs01_curves(tranche, context.curves.as_ref())?;
-
-        let bump_bp = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_overrides(),
-        )?
-        .credit_spread_bump_bp;
-
-        let base_ctx = context.curves.as_ref();
-        let index_data = base_ctx.get_credit_index(&tranche.credit_index_id)?;
-        let hazard = base_ctx.get_hazard(hazard_id.as_str())?;
-        let hazard_ref = hazard.as_ref();
-
-        let as_of = context.as_of;
-
-        let bumped_up = Arc::new(hazard_ref.with_parallel_hazard_rate_bump_bp(bump_bp)?);
-        let bumped_down = Arc::new(hazard_ref.with_parallel_hazard_rate_bump_bp(-bump_bp)?);
-
-        let ctx_up = base_ctx
-            .clone()
-            .insert(Arc::clone(&bumped_up))
-            .insert_credit_index(
-                tranche.credit_index_id.as_str(),
-                rebuild_index(index_data.as_ref(), bumped_up)?,
-            );
-        let ctx_down = base_ctx
-            .clone()
-            .insert(Arc::clone(&bumped_down))
-            .insert_credit_index(
-                tranche.credit_index_id.as_str(),
-                rebuild_index(index_data.as_ref(), bumped_down)?,
-            );
-
-        let pv_up = context.reprice_raw(&ctx_up, as_of)?;
-        let pv_down = context.reprice_raw(&ctx_down, as_of)?;
-
-        let cs01 = sensitivity_central_diff(pv_up, pv_down, bump_bp);
-
-        context.computed.insert(
-            MetricId::custom(format!("cs01_hazard::{}", hazard_id.as_str())),
-            cs01,
-        );
-
-        Ok(cs01)
-    }
-}
-
-/// CDS tranche bucketed CS01 (direct hazard-rate bump) with index → hazard resolution.
-pub(crate) struct CdsTrancheBucketedCs01HazardCalculator;
-
-impl MetricCalculator for CdsTrancheBucketedCs01HazardCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let tranche: &CDSTranche = context.instrument_as()?;
-        let (hazard_id, _discount_id) =
-            resolve_tranche_cs01_curves(tranche, context.curves.as_ref())?;
-
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_overrides(),
-        )?;
-        let buckets = defaults.cs01_buckets_years;
-        let bump_bp = defaults.credit_spread_bump_bp;
-
-        let base_ctx = context.curves.as_ref();
-        let index_data = base_ctx.get_credit_index(&tranche.credit_index_id)?;
-        let hazard = base_ctx.get_hazard(hazard_id.as_str())?;
-        let hazard_ref = hazard.as_ref();
-
-        let as_of = context.as_of;
-
-        let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> = Vec::new();
-        let mut total = 0.0;
-
-        for t in buckets {
-            let label = sens_config::format_bucket_label_cow(t);
-
-            let bumped_up = Arc::new(hazard_ref.with_tenor_hazard_rate_bumps_bp(&[(t, bump_bp)])?);
-            let bumped_down =
-                Arc::new(hazard_ref.with_tenor_hazard_rate_bumps_bp(&[(t, -bump_bp)])?);
-
-            let ctx_up = base_ctx
-                .clone()
-                .insert(Arc::clone(&bumped_up))
-                .insert_credit_index(
-                    tranche.credit_index_id.as_str(),
-                    rebuild_index(index_data.as_ref(), bumped_up)?,
-                );
-            let ctx_down = base_ctx
-                .clone()
-                .insert(Arc::clone(&bumped_down))
-                .insert_credit_index(
-                    tranche.credit_index_id.as_str(),
-                    rebuild_index(index_data.as_ref(), bumped_down)?,
-                );
-
-            let pv_up = context.reprice_raw(&ctx_up, as_of)?;
-            let pv_down = context.reprice_raw(&ctx_down, as_of)?;
-
-            let cs01 = sensitivity_central_diff(pv_up, pv_down, bump_bp);
-            series.push((label, cs01));
-            total += cs01;
-        }
-
-        let series_id = MetricId::custom(format!("bucketed_cs01_hazard::{}", hazard_id.as_str()));
-        context.store_bucketed_series(series_id, series);
-
-        Ok(total)
     }
 }

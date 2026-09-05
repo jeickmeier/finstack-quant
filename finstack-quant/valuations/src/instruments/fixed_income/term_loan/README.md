@@ -127,7 +127,17 @@ Both pricers are registered in [`src/pricer/fixed_income.rs`](../../../pricer/fi
 
 The discounting path generates the full internal schedule (DDTL draws,
 interest, amortization, PIK capitalization, fees), filters to cash flows, then
-discounts from `as_of` on the loan's discount curve.
+discounts from the settlement date on the loan's discount curve. The
+callable tree uses the same settlement-date origin.
+
+**Call settlement**: hard/soft calls redeem dirty — clean strike times
+pre-exercise outstanding plus cash accrued at the exercise step. Coupon-date
+accrued is zero, so the coupon booked in the schedule is not double-counted.
+
+**Floating + rates-only tree**: a positive `hw1f_sigma` without
+`credit_curve_id` is rejected. An unset volatility uses a frozen projection;
+supply a hazard curve so stochastic future resets can re-fix on the
+rates-credit lattice.
 
 **PIK treatment**: PIK interest capitalizes into outstanding principal and is
 excluded from PV; it shows up in the final redemption amount. This matches
@@ -150,10 +160,9 @@ Registered for `InstrumentType::TermLoan` in `metrics/mod.rs`:
 | `DiscountMargin` | Additive spread for floating-rate loans that reproduces the price |
 | `custom("all_in_rate")` | Effective borrower cost including fees |
 | `custom("oid_eir_amortization")` | OID effective-interest-rate amortization schedule |
-| `Oas`, `EmbeddedOptionValue` | Callable-tree metrics |
-| `Dv01`, `BucketedDv01` | Parallel and key-rate curve risk |
-| `Cs01`, `BucketedCs01` | Z-spread CS01, delegating to hazard CS01 when a credit curve and the credit-tree model are both present |
-| `Cs01Hazard`, `BucketedCs01Hazard` | Explicit hazard-curve CS01 (zero when there is no credit curve) |
+| `Oas`, `EmbeddedOptionValue` | Callable-tree metrics. OAS is quoted or solved; `EmbeddedOptionValue` is holder `P_callable − P_straight`. |
+| `Dv01`, `BucketedDv01` | Parallel and key-rate risk on the selected model. Quoted callable loans freeze the solved OAS under curve bumps. |
+| `Cs01`, `BucketedCs01` | Parallel and key-rate credit risk on the selected model. The credit tree re-bootstraps par spreads; discounting uses z-spread. |
 
 `Theta` is registered universally by `metrics::standard_registry()`.
 

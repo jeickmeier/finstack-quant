@@ -7831,9 +7831,9 @@ class CreditDefaultSwap:
     :meth:`CreditDefaultSwap.example` or :meth:`CreditDefaultSwap.from_json`.
     Every public Rust field is readable as a property and
     :meth:`CreditDefaultSwap.price` / :meth:`CreditDefaultSwap.metric` run the
-    same pricer as :func:`price_instrument`. The desk CS01 on a hand-built
-    hazard curve is the ``"cs01_hazard"`` metric (``"cs01"`` needs a
-    calibration recipe on the curve).
+    same pricer as :func:`price_instrument`. The ``"cs01"`` and
+    ``"bucketed_cs01"`` metrics rebootstrap a quote-backed hazard curve from
+    its stored calibration recipe.
 
     Examples
     --------
@@ -7981,7 +7981,7 @@ class CreditDefaultSwap:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this instrument (e.g. ``"cs01_hazard"`` or ``"par_spread"``).
+        Compute one scalar metric for this instrument (e.g. ``"cs01"`` or ``"par_spread"``).
 
         Parameters
         ----------
@@ -8837,7 +8837,7 @@ class CDSIndex:
         model: str = "default",
     ) -> float:
         """
-        Compute one scalar metric for this instrument (e.g. ``"cs01_hazard"``).
+        Compute one scalar metric for this instrument (e.g. ``"cs01"``).
 
         Parameters
         ----------
@@ -9083,9 +9083,8 @@ class CDSIndex:
         """
         Credit spread sensitivity (mirrors Rust ``CDSIndex::cs01`` with the cached
         recalibration provider): the hazard curve(s) are rebootstrapped after a
-        1bp parallel spread bump. Hazard curves built by hand (no calibration
-        recipe) raise; use ``metric(market, as_of, "cs01_hazard")`` for a direct
-        hazard-rate bump instead.
+        1bp parallel spread bump. Hazard curves built by hand without a lossless
+        calibration recipe raise.
 
         Parameters
         ----------
@@ -18407,7 +18406,7 @@ def list_standard_metrics() -> list[str]:
     >>> from finstack_quant.valuations.instruments import list_standard_metrics
     >>> metrics = list_standard_metrics()
     >>> (len(metrics), "dirty_price" in metrics, "dv01" in metrics)
-    (220, True, True)
+    (218, True, True)
     """
     ...
 

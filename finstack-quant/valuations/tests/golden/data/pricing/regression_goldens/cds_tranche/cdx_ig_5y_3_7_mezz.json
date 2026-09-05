@@ -6,7 +6,7 @@
     "description": "Synthetic CDX IG 5Y 3-7 percent mezzanine tranche.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Re-baselined 2026-06-09 after intentional tranche pricer corrections (2026-06-09 quant review Majors 4-6): accrual-on-default complement fix ((1-f)*dEL), discount-curve-axis relative discounting from as_of, and senior-side recovery amortization of the detachment. Formula self-test goldens track the canonical calculation; tolerance contract unchanged. Re-baselined 2026-07-11 after the seasoned premium-accrual boundary correction. Re-pinned expected outputs on 2026-07-23 for 0.6.0 release prep (small calibrate/price round-trip drift).",
+    "source_detail": "Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Re-baselined 2026-06-09 after intentional tranche pricer corrections (2026-06-09 quant review Majors 4-6): accrual-on-default complement fix ((1-f)*dEL), discount-curve-axis relative discounting from as_of, and senior-side recovery amortization of the detachment. Formula self-test goldens track the canonical calculation; tolerance contract unchanged. Re-baselined 2026-07-11 after the seasoned premium-accrual boundary correction. Re-pinned expected outputs on 2026-07-23 for 0.6.0 release prep (small calibrate/price round-trip drift). Re-baselined 2026-09-04 from a replayable CDS par-spread calibration so cs01 measures canonical quote-space rebootstrap risk rather than a direct intensity shift.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "claude",
@@ -23,9 +23,35 @@
       "schema": "finstack_quant.calibration/1",
       "plan": {
         "id": "cdx_ig_5y_3_7_mezz_market",
-        "description": "the canonical typed market inputs are supplied with no calibration steps. Routes through engine::execute without changing pricing math.",
-        "quote_sets": {},
-        "steps": [],
+        "description": "The synthetic CDX hazard curve is calibrated from replayable par-spread quotes against the supplied USD-OIS discount curve. The same-ID prior hazard is only a preparation seed needed to resolve CreditIndexData before steps execute; the hazard step replaces it, and the rehydrated final index references the replayable calibrated curve.",
+        "quote_sets": {
+          "cdx_cds": [
+            "CDX-IG-CDS-3M",
+            "CDX-IG-CDS-1Y",
+            "CDX-IG-CDS-3Y",
+            "CDX-IG-CDS-5Y",
+            "CDX-IG-CDS-10Y"
+          ]
+        },
+        "steps": [
+          {
+            "id": "CDX.NA.IG.HAZARD",
+            "quote_set": "cdx_cds",
+            "kind": "hazard",
+            "curve_id": "CDX.NA.IG.HAZARD",
+            "entity": "CDX.NA.IG",
+            "seniority": "senior",
+            "currency": "USD",
+            "base_date": "2026-04-30",
+            "discount_curve_id": "USD-OIS",
+            "recovery_rate": 0.4,
+            "notional": 1.0,
+            "method": "bootstrap",
+            "interpolation": "log_linear",
+            "par_interp": "linear",
+            "doc_clause": "isda_na"
+          }
+        ],
         "settings": {
           "fx": {
             "pivot_currency": "USD",
@@ -35,6 +61,96 @@
         }
       },
       "market_data": [
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-CDS-3M",
+          "entity": "CDX.NA.IG",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 3,
+              "unit": "months"
+            }
+          },
+          "spread_bp": 60.0,
+          "recovery_rate": 0.4
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-CDS-1Y",
+          "entity": "CDX.NA.IG",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 1,
+              "unit": "years"
+            }
+          },
+          "spread_bp": 72.0,
+          "recovery_rate": 0.4
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-CDS-3Y",
+          "entity": "CDX.NA.IG",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 3,
+              "unit": "years"
+            }
+          },
+          "spread_bp": 96.0,
+          "recovery_rate": 0.4
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-CDS-5Y",
+          "entity": "CDX.NA.IG",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 5,
+              "unit": "years"
+            }
+          },
+          "spread_bp": 120.0,
+          "recovery_rate": 0.4
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-CDS-10Y",
+          "entity": "CDX.NA.IG",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 10,
+              "unit": "years"
+            }
+          },
+          "spread_bp": 150.0,
+          "recovery_rate": 0.4
+        },
         {
           "kind": "credit_index",
           "id": "CDX.NA.IG.HAZARD",
@@ -277,11 +393,11 @@
     }
   },
   "expected": {
-    "npv": 1851470.0883021809,
-    "par_spread": 547.116731873908,
-    "spread_dv01": -4140.909870544099,
-    "dv01": -580.285728658782,
-    "cs01_hazard": 15759.680321152089
+    "npv": 2439099.102793273,
+    "par_spread": 701.183429855979,
+    "spread_dv01": -4057.162891827524,
+    "dv01": -786.543323878199,
+    "cs01": 27975.104357133387
   },
   "tolerances": {
     "npv": {
@@ -304,10 +420,10 @@
       "rel": 5e-09,
       "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
     },
-    "cs01_hazard": {
+    "cs01": {
       "abs": 1e-09,
       "rel": 5e-09,
-      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+      "tolerance_reason": "Formula self-test: canonical quote-space CS01 is computed by a symmetric 1bp bump to replayable CDS par-spread quotes followed by hazard-curve rebootstrap; tolerance is pinned to deterministic floating-point stability."
     }
   }
 }

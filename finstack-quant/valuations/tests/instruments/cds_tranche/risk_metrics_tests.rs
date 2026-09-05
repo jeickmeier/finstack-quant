@@ -44,7 +44,7 @@ fn test_cs01_sell_protection_typically_positive() {
     // Arrange
     let mut tranche = mezzanine_tranche();
     tranche.side = TrancheSide::SellProtection;
-    let market = standard_market_context();
+    let market = replayable_market_context();
     let as_of = base_date();
 
     // Act
@@ -52,11 +52,11 @@ fn test_cs01_sell_protection_typically_positive() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Cs01Hazard],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            &[MetricId::Cs01],
+            crate::test_support::credit::pricing_options(),
         )
         .unwrap();
-    let cs01 = *result.measures.get("cs01_hazard").unwrap();
+    let cs01 = *result.measures.get("cs01").unwrap();
 
     // Assert
     // For protection seller, higher spreads typically increase PV
@@ -67,7 +67,7 @@ fn test_cs01_sell_protection_typically_positive() {
 #[test]
 fn test_cs01_buy_sell_opposite_sign() {
     // Arrange
-    let market = standard_market_context();
+    let market = replayable_market_context();
     let as_of = base_date();
 
     let sell_tranche = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
@@ -78,24 +78,24 @@ fn test_cs01_buy_sell_opposite_sign() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Cs01Hazard],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            &[MetricId::Cs01],
+            crate::test_support::credit::pricing_options(),
         )
         .unwrap()
         .measures
-        .get("cs01_hazard")
+        .get("cs01")
         .copied()
         .unwrap();
     let cs01_buy = buy_tranche
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Cs01Hazard],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            &[MetricId::Cs01],
+            crate::test_support::credit::pricing_options(),
         )
         .unwrap()
         .measures
-        .get("cs01_hazard")
+        .get("cs01")
         .copied()
         .unwrap();
 
@@ -106,26 +106,6 @@ fn test_cs01_buy_sell_opposite_sign() {
         0.001,
         "Buy and sell CS01 should have opposite signs",
     );
-}
-
-#[test]
-fn test_cs01_hazard_rate_bump() {
-    // Arrange
-    let tranche = mezzanine_tranche();
-    let market = standard_market_context();
-    let as_of = base_date();
-
-    // Act
-    let result = tranche.price_with_metrics(
-        &market,
-        as_of,
-        &[MetricId::Cs01Hazard],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
-    );
-
-    // Assert
-    assert!(result.is_ok());
-    assert!(result.unwrap().measures["cs01_hazard"].is_finite());
 }
 
 #[test]
@@ -216,101 +196,6 @@ fn test_direct_and_registered_cs01_share_quote_replay_convention() {
     assert!(
         (direct - registered).abs() <= tolerance,
         "direct and registered CS01 must share hazard replay, recovery preservation, and bump normalization: direct={direct}, registered={registered}, tolerance={tolerance}"
-    );
-}
-
-#[test]
-fn test_cs01_preserves_bespoke_index_structure_during_bumps() {
-    let market = market_context_with_issuers(5);
-    let as_of = base_date();
-    let tranche = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
-    let pricer = CDSTranchePricer::new();
-
-    let index = market.get_credit_index(&tranche.credit_index_id).unwrap();
-    // Replicate the production fallback for a manually built index curve:
-    // symmetric model-hazard shifts preserve the heterogeneous issuer bundle.
-    let bump_bp = 1.0;
-    let bumped_curve_up = index
-        .index_credit_curve
-        .with_parallel_hazard_rate_bump_bp(bump_bp)
-        .unwrap();
-    let bumped_curve_down = index
-        .index_credit_curve
-        .with_parallel_hazard_rate_bump_bp(-bump_bp)
-        .unwrap();
-
-    let mut builder_up =
-        finstack_quant_core::market_data::term_structures::CreditIndexData::builder()
-            .num_constituents(index.num_constituents)
-            .recovery_rate(index.recovery_rate)
-            .index_credit_curve(std::sync::Arc::new(bumped_curve_up))
-            .base_correlation_curve(std::sync::Arc::clone(&index.base_correlation_curve));
-    if let Some(curves) = index.issuer_credit_curves.clone() {
-        builder_up = builder_up.issuer_curves(curves);
-    }
-    if let Some(rates) = index.issuer_recovery_rates.clone() {
-        builder_up = builder_up.issuer_recovery_rates(rates);
-    }
-    if let Some(weights) = index.issuer_weights.clone() {
-        builder_up = builder_up.issuer_weights(weights);
-    }
-    let bumped_up = builder_up.build().unwrap();
-
-    let mut builder_down =
-        finstack_quant_core::market_data::term_structures::CreditIndexData::builder()
-            .num_constituents(index.num_constituents)
-            .recovery_rate(index.recovery_rate)
-            .index_credit_curve(std::sync::Arc::new(bumped_curve_down))
-            .base_correlation_curve(std::sync::Arc::clone(&index.base_correlation_curve));
-    if let Some(curves) = index.issuer_credit_curves.clone() {
-        builder_down = builder_down.issuer_curves(curves);
-    }
-    if let Some(rates) = index.issuer_recovery_rates.clone() {
-        builder_down = builder_down.issuer_recovery_rates(rates);
-    }
-    if let Some(weights) = index.issuer_weights.clone() {
-        builder_down = builder_down.issuer_weights(weights);
-    }
-    let bumped_down = builder_down.build().unwrap();
-
-    let pv_up = pricer
-        .price_tranche(
-            &tranche,
-            &market
-                .clone()
-                .insert_credit_index(&tranche.credit_index_id, bumped_up),
-            as_of,
-        )
-        .unwrap()
-        .amount();
-    let pv_down = pricer
-        .price_tranche(
-            &tranche,
-            &market
-                .clone()
-                .insert_credit_index(&tranche.credit_index_id, bumped_down),
-            as_of,
-        )
-        .unwrap()
-        .amount();
-    let expected_cs01 = (pv_up - pv_down) / (2.0 * bump_bp);
-    let actual_cs01 = *tranche
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Cs01Hazard],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap()
-        .measures
-        .get("cs01_hazard")
-        .unwrap();
-
-    relative_eq(
-        actual_cs01,
-        expected_cs01,
-        1e-6,
-        "CS01 bumps should preserve bespoke issuer curves, recoveries, and weights",
     );
 }
 

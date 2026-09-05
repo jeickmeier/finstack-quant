@@ -551,9 +551,9 @@ impl CDSTranchePricer {
     ///
     /// # Errors
     ///
-    /// Returns a calibration error when the hazard curve carries no par-spread
-    /// points (a λ-bump fallback would silently change units); use the
-    /// `cs01_hazard` metric for direct hazard-rate bumps in that case.
+    /// Returns a calibration error when the hazard curve has no replayable
+    /// par-spread calibration recipe; a direct hazard-rate bump would silently
+    /// change the metric's market-risk units.
     #[must_use = "CS01 result should be used for hedging"]
     pub fn calculate_cs01(
         &self,

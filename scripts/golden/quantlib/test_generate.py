@@ -195,4 +195,6 @@ def test_generate_other_rates_is_complete(tmp_path, product: str) -> None:
         assert "dv01" in fixture["expected"]
     if product == "fixed_callable_oas_bond":
         assert "oas" in fixture["expected"]
+    if product in {"single_name_cds", "fixed_hazard_bond", "floating_hazard_bond"}:
+        assert all(not metric.startswith("cs01") for metric in fixture["expected"])
     assert all(math.isfinite(value) for value in fixture["expected"].values())

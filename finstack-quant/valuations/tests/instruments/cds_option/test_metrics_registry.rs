@@ -90,7 +90,7 @@ fn test_metrics_registry_delta() {
 #[ignore = "slow: covered by mise rust-test-slow"]
 fn test_metrics_registry_all_greeks() {
     let as_of = date!(2025 - 01 - 01);
-    let market = standard_market(as_of);
+    let market = replayable_standard_market(as_of);
     let option = CDSOptionBuilder::new().build(as_of);
 
     let pv = option.value(&market, as_of).unwrap();
@@ -259,39 +259,6 @@ fn test_cs01_dependency_propagates_replay_error() {
         .compute(&[MetricId::Delta, MetricId::Cs01], &mut ctx)
         .expect_err("standard option CS01 requires quote-space replay");
     assert!(error.to_string().contains("calibration recipe"));
-}
-
-#[test]
-fn test_cds_option_rejects_hazard_rate_cs01_metrics() {
-    let as_of = date!(2025 - 01 - 01);
-    let market = standard_market(as_of);
-    let option = CDSOptionBuilder::new().build(as_of);
-
-    let pv = option.value(&market, as_of).unwrap();
-    let mut ctx = MetricContext::new(
-        std::sync::Arc::new(option),
-        std::sync::Arc::new(market),
-        as_of,
-        pv,
-        MetricContext::default_config(),
-    );
-
-    let registry = standard_registry();
-    let err = registry
-        .compute(&[MetricId::Cs01Hazard], &mut ctx)
-        .expect_err("CDS option should not expose hazard-rate CS01");
-    assert!(matches!(
-        err,
-        finstack_quant_core::Error::MetricNotApplicable { .. }
-    ));
-
-    let err = registry
-        .compute(&[MetricId::BucketedCs01Hazard], &mut ctx)
-        .expect_err("CDS option should not expose bucketed hazard-rate CS01");
-    assert!(matches!(
-        err,
-        finstack_quant_core::Error::MetricNotApplicable { .. }
-    ));
 }
 
 #[test]

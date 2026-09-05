@@ -1089,29 +1089,19 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
-        // If the loan has exercisable call options (Hard/Soft), use tree-based
-        // pricing to capture optionality with frictional exercise.
-        // MakeWhole calls are non-economic by design and do not require a tree.
-        if self.credit_curve_id.is_some() {
-            return crate::instruments::fixed_income::term_loan::pricing::TermLoanTreePricer::new()
-                .price_callable(self, curves, as_of);
-        }
-        if let Some(ref cs) = self.call_schedule {
-            let has_exercisable = cs
-                .calls
-                .iter()
-                .any(|c| !matches!(c.call_type, super::spec::LoanCallType::MakeWhole { .. }));
-            if has_exercisable {
-                return crate::instruments::fixed_income::term_loan::pricing::TermLoanTreePricer::new(
+        match self.default_model() {
+            crate::pricer::ModelKey::Tree => crate::instruments::fixed_income::term_loan::pricing::TermLoanTreePricer::new()
+                .price_callable(self, curves, as_of),
+            crate::pricer::ModelKey::Discounting => {
+                crate::instruments::fixed_income::term_loan::pricing::TermLoanDiscountingPricer::price(
+                    self, curves, as_of,
                 )
-                .price_callable(self, curves, as_of);
             }
+            model => Err(finstack_quant_core::Error::Validation(format!(
+                "TermLoan '{}' has no pricer for model {model:?}",
+                self.id
+            ))),
         }
-
-        // Otherwise delegate to deterministic discounting pricer.
-        crate::instruments::fixed_income::term_loan::pricing::TermLoanDiscountingPricer::price(
-            self, curves, as_of,
-        )
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {

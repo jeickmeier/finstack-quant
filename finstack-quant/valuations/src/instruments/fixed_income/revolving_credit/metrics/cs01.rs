@@ -4,9 +4,9 @@
 //! facility's cashflows on a single discount curve and survival-weights them
 //! **only when a hazard curve is present** (plus a recovery leg). Consequently:
 //!
-//! - **With** a credit curve, a par-spread / hazard bump moves the PV, so CS01
-//!   is reported via the canonical hazard CS01 (the calculator delegates to
-//!   [`GenericParallelCs01`]).
+//! - **With** a replayable credit curve, a par-spread bump followed by hazard
+//!   rebootstrap moves the PV, so CS01 is reported via the canonical
+//!   [`GenericParallelCs01`] calculator.
 //! - **Without** a credit curve, survival is identically `1.0` and the recovery
 //!   leg vanishes, so the canonical CS01 is zero. Credit-spread risk is then
 //!   reported via the market-standard z-spread bump in

@@ -252,8 +252,7 @@ Registered for `InstrumentType::RevolvingCredit` in `metrics/mod.rs`:
 | `MetricId` | Meaning |
 |-----------|---------|
 | `Dv01`, `BucketedDv01` | Parallel and key-rate curve risk |
-| `Cs01`, `BucketedCs01` | Hazard CS01 when a credit curve is present, z-spread CS01 otherwise |
-| `Cs01Hazard`, `BucketedCs01Hazard` | Explicit hazard CS01 (zero with no credit curve) |
+| `Cs01`, `BucketedCs01` | Par-spread rebootstrap CS01 with a replayable credit curve; z-spread CS01 otherwise |
 | `custom("utilization_rate")` | Drawn / commitment at the valuation date |
 | `custom("available_capacity")` | Commitment − drawn |
 | `custom("weighted_average_cost")` | Approximate all-in cost of the facility |

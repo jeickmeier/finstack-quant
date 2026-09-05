@@ -6,7 +6,7 @@
     "description": "Hull-White (2004) Table 7 benchmark: [10,100]% tranche on a 100-name homogeneous pool at flat Gaussian correlation 0.1.",
     "valuation_date": "2006-08-31",
     "source": "textbook",
-    "source_detail": "Hull, J. and White, A. (2004), 'Valuation of a CDO and an nth to Default CDS Without Monte Carlo Simulation', Journal of Derivatives 12(2), Table 7. Fixture: 100-name homogeneous pool, flat hazard 1%/yr (Act/Act ISDA), recovery 40%, flat 5% continuously-compounded risk-free rate (Act/360), 5Y quarterly premium (2006-09-01 to 2011-09-01, Act/360, Following), Gaussian copula at flat correlation. Expected outputs are the published breakeven running spreads in bp (whole-bp table resolution); cross-referenced against QuantLib test-suite/cdo.cpp hwData7, which validates QuantLib's own CDO engines against the same table at 1-10bp absolute / 4-7% relative tolerance.",
+    "source_detail": "Hull, J. and White, A. (2004), 'Valuation of a CDO and an nth to Default CDS Without Monte Carlo Simulation', Journal of Derivatives 12(2), Table 7. Fixture: 100-name homogeneous pool, flat hazard 1%/yr (Act/Act ISDA), recovery 40%, flat 5% continuously-compounded risk-free rate (Act/360), 5Y quarterly premium (2006-09-01 to 2011-09-01, Act/360, Following), Gaussian copula at flat correlation. Expected outputs are the published breakeven running spreads in bp (whole-bp table resolution); cross-referenced against QuantLib test-suite/cdo.cpp hwData7, which validates QuantLib's own CDO engines against the same table at 1-10bp absolute / 4-7% relative tolerance. The former direct intensity-shift CS01 regression pin was removed on 2026-09-04 because this source fixture has no replayable par-spread calibration and therefore cannot assert canonical CS01.",
     "captured_by": "claude",
     "captured_on": "2026-07-22",
     "last_reviewed_by": "claude",
@@ -162,8 +162,7 @@
   },
   "expected": {
     "par_spread": 1.0,
-    "dv01": 111.050230972731,
-    "cs01_hazard": 165.366906529613
+    "dv01": 111.050230972731
   },
   "tolerances": {
     "par_spread": {
@@ -174,11 +173,6 @@
       "abs": 1e-06,
       "rel": 5e-09,
       "tolerance_reason": "Internal deterministic regression pin, NOT a Hull-White value (the paper publishes only fair spreads). Computed by finstack's own dv01 calculator on this analytic fixture on 2026-07-22 and pinned at ~10x FP-residual tightness so refactor drift is caught; the external benchmark assertion for this fixture is par_spread."
-    },
-    "cs01_hazard": {
-      "abs": 1e-06,
-      "rel": 5e-09,
-      "tolerance_reason": "Internal deterministic regression pin, NOT an external benchmark value. Re-pinned from the library's explicit direct hazard-shift calculator on 2026-07-23 at ~10x FP-residual tightness so refactor drift is caught; external/textbook assertions remain on other metrics where present."
     }
   }
 }

@@ -79,10 +79,7 @@ pub(crate) mod yield_dv01;
 
 pub(crate) use accrued::AccruedInterestCalculator;
 pub(crate) use convexity::ConvexityCalculator;
-pub(crate) use cs01::{
-    BondBucketedCs01Calculator, BondBucketedCs01HazardCalculator, BondCs01Calculator,
-    BondCs01HazardCalculator,
-};
+pub(crate) use cs01::{BondBucketedCs01Calculator, BondCs01Calculator};
 pub(crate) use duration_macaulay::MacaulayDurationCalculator;
 pub(crate) use duration_modified::ModifiedDurationCalculator;
 pub(crate) use dv01::{BondBucketedDv01Calculator, BondDv01Calculator};
@@ -225,8 +222,6 @@ pub(crate) fn register_bond_metrics(
 
             (Cs01, BondCs01Calculator),
             (BucketedCs01, BondBucketedCs01Calculator),
-            (Cs01Hazard, BondCs01HazardCalculator),
-            (BucketedCs01Hazard, BondBucketedCs01HazardCalculator),
             // Always quote-reproducing Z-spread risk, even when CS01 uses a
             // hazard/par-CDS curve.
             (SpreadDuration, BondSpreadDurationCalculator),

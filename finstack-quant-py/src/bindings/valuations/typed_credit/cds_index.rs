@@ -692,9 +692,8 @@ impl PyCDSIndex {
     ///
     /// Mirrors Rust ``CDSIndex::cs01`` using the cached recalibration
     /// provider: the hazard curve(s) are rebootstrapped after a 1bp parallel
-    /// spread bump. Hazard curves built by hand (without a calibration
-    /// recipe) raise; use ``metric(market, as_of, "cs01_hazard")`` for a
-    /// direct hazard-rate bump instead.
+    /// spread bump. Hazard curves built by hand without a lossless calibration
+    /// recipe raise.
     ///
     /// Parameters
     /// ----------

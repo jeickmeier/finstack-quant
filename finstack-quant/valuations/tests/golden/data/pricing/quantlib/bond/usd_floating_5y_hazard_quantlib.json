@@ -1,6 +1,5 @@
 {
   "expected": {
-    "cs01_hazard": -0.04293913574739605,
     "dv01": 0.0005073088978591045,
     "npv": 97.02324095152741
   },
@@ -167,17 +166,13 @@
   "model": "discounting",
   "schema": "finstack_quant.golden/1",
   "tolerances": {
-    "cs01_hazard": {
-      "rel": 0.005,
-      "tolerance_reason": "Credit floater validation target: price within 0.01 per 100, parallel DV01 within 0.5%, and direct hazard CS01 within 0.5%; zero recovery isolates survival weighting."
-    },
     "dv01": {
       "rel": 0.005,
-      "tolerance_reason": "Credit floater validation target: price within 0.01 per 100, parallel DV01 within 0.5%, and direct hazard CS01 within 0.5%; zero recovery isolates survival weighting."
+      "tolerance_reason": "Credit floater validation target: price within 0.01 per 100 and parallel DV01 within 0.5%; zero recovery isolates survival weighting."
     },
     "npv": {
       "abs": 0.01,
-      "tolerance_reason": "Credit floater validation target: price within 0.01 per 100, parallel DV01 within 0.5%, and direct hazard CS01 within 0.5%; zero recovery isolates survival weighting."
+      "tolerance_reason": "Credit floater validation target: price within 0.01 per 100 and parallel DV01 within 0.5%; zero recovery isolates survival weighting."
     }
   }
 }

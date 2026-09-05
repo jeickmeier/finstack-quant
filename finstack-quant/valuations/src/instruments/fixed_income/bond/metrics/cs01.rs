@@ -44,10 +44,7 @@
 //! [`price_from_z_spread`]: crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread
 //! [`ZSpreadCalculator`]: crate::instruments::fixed_income::bond::ZSpreadCalculator
 
-use super::risk_view::{
-    active_model_consumes_credit, plain_rate_quote_requires_z_spread,
-    with_bond_direct_hazard_risk_view, with_bond_risk_view,
-};
+use super::risk_view::{active_model_consumes_credit, with_bond_risk_view};
 use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::BondZSpreadPricingKernel;
@@ -301,50 +298,6 @@ impl MetricCalculator for BondBucketedCs01Calculator {
             Cow::Borrowed(&[])
         } else {
             Cow::Borrowed(self.dependencies())
-        }
-    }
-}
-
-/// Bond direct hazard-rate CS01 evaluated around the quote-reproducing risk view.
-pub(crate) struct BondCs01HazardCalculator;
-
-impl MetricCalculator for BondCs01HazardCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        with_bond_direct_hazard_risk_view(context, |ctx| {
-            crate::metrics::GenericParallelCs01Hazard::<Bond>::default().calculate(ctx)
-        })
-    }
-
-    fn dynamic_dependencies<'a>(&'a self, context: &MetricContext) -> Cow<'a, [MetricId]> {
-        let needs_z_spread = context
-            .instrument_as::<Bond>()
-            .is_ok_and(|bond| plain_rate_quote_requires_z_spread(context, bond));
-        if needs_z_spread {
-            Cow::Borrowed(&[MetricId::ZSpread])
-        } else {
-            Cow::Borrowed(&[])
-        }
-    }
-}
-
-/// Bond bucketed hazard-rate CS01 evaluated around the quote-reproducing risk view.
-pub(crate) struct BondBucketedCs01HazardCalculator;
-
-impl MetricCalculator for BondBucketedCs01HazardCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        with_bond_direct_hazard_risk_view(context, |ctx| {
-            crate::metrics::GenericBucketedCs01Hazard::<Bond>::default().calculate(ctx)
-        })
-    }
-
-    fn dynamic_dependencies<'a>(&'a self, context: &MetricContext) -> Cow<'a, [MetricId]> {
-        let needs_z_spread = context
-            .instrument_as::<Bond>()
-            .is_ok_and(|bond| plain_rate_quote_requires_z_spread(context, bond));
-        if needs_z_spread {
-            Cow::Borrowed(&[MetricId::ZSpread])
-        } else {
-            Cow::Borrowed(&[])
         }
     }
 }

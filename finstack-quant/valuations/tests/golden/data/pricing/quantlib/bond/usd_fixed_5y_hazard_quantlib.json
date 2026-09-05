@@ -1,6 +1,5 @@
 {
   "expected": {
-    "cs01_hazard": -0.0426528810792135,
     "dv01": -0.0426266048735684,
     "npv": 95.35267772630202
   },
@@ -129,17 +128,13 @@
   "model": "discounting",
   "schema": "finstack_quant.golden/1",
   "tolerances": {
-    "cs01_hazard": {
-      "rel": 0.001,
-      "tolerance_reason": "Independent zero-recovery credit-bond target: price within 0.002 per 100 and DV01/direct hazard CS01 within 0.1%; zero recovery removes recovery-payment timing differences."
-    },
     "dv01": {
       "rel": 0.001,
-      "tolerance_reason": "Independent zero-recovery credit-bond target: price within 0.002 per 100 and DV01/direct hazard CS01 within 0.1%; zero recovery removes recovery-payment timing differences."
+      "tolerance_reason": "Independent zero-recovery credit-bond target: price within 0.002 per 100 and DV01 within 0.1%; zero recovery removes recovery-payment timing differences."
     },
     "npv": {
       "abs": 0.002,
-      "tolerance_reason": "Independent zero-recovery credit-bond target: price within 0.002 per 100 and DV01/direct hazard CS01 within 0.1%; zero recovery removes recovery-payment timing differences."
+      "tolerance_reason": "Independent zero-recovery credit-bond target: price within 0.002 per 100 and DV01 within 0.1%; zero recovery removes recovery-payment timing differences."
     }
   }
 }

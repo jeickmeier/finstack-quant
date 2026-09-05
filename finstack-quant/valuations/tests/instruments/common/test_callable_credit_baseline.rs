@@ -64,6 +64,19 @@ fn market() -> MarketContext {
         .insert(hazard_curve())
 }
 
+fn replayable_market() -> MarketContext {
+    let source = MarketContext::new().insert(discount_curve());
+    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+        &source,
+        as_of(),
+        "USD-HAZ",
+        "CALLABLE-CREDIT-ENTITY",
+        "USD-OIS",
+    )
+    .expect("hazard calibration should succeed");
+    source.insert(hazard)
+}
+
 /// Fixed-rate callable bond routed onto the rates-credit tree by an explicit
 /// `credit_curve_id`.
 fn callable_credit_bond() -> Bond {
@@ -143,12 +156,12 @@ fn apply_baseline_regime(
 /// The pinned value uses the deterministic instrument-derived seed and the
 /// test-only 128-estimator budget set by [`apply_baseline_regime`].
 const BASELINE_BOND_PV: f64 = 986_735.637_112_065;
-/// PV of the callable credit-risky term loan under the same regime, corrected
-/// by the same calibration/valuation consistency fix.
-const BASELINE_LOAN_PV: f64 = 9_817_924.463_984_11;
+/// PV of the callable credit-risky term loan under the same regime after
+/// dirty-call settlement and survival-on-continuation rollback.
+const BASELINE_LOAN_PV: f64 = 9_862_618.652_354_98;
 /// OAS (bp) recovered by re-solving at the term loan's own model price.
 /// Non-zero only by the clean/dirty accrued conversion inside the solve.
-const BASELINE_LOAN_OAS_BP: f64 = -1.215_370_145_7;
+const BASELINE_LOAN_OAS_BP: f64 = -1.191_513_994_3;
 
 #[test]
 fn callable_credit_bond_pv_baseline() {
@@ -346,10 +359,9 @@ fn legacy_vol_channel_is_rejected_on_the_credit_path() {
 #[test]
 fn risk_metrics_share_the_resolved_model_inputs() {
     use finstack_quant_valuations::instruments::Instrument;
-    use finstack_quant_valuations::instruments::PricingOptions;
     use finstack_quant_valuations::metrics::MetricId;
 
-    let market = market();
+    let market = replayable_market();
     let mut bond = callable_credit_bond();
     apply_baseline_regime(&mut bond.instrument_pricing_overrides);
 
@@ -359,10 +371,10 @@ fn risk_metrics_share_the_resolved_model_inputs() {
             as_of(),
             &[
                 MetricId::Vega,
-                MetricId::Cs01Hazard,
+                MetricId::Cs01,
                 MetricId::EmbeddedOptionValue,
             ],
-            PricingOptions::default(),
+            crate::test_support::credit::pricing_options(),
         )
         .expect("credit-risky callable must produce risk metrics");
 
@@ -373,10 +385,7 @@ fn risk_metrics_share_the_resolved_model_inputs() {
          the bump moved a channel the model no longer reads: {vega}"
     );
 
-    let cs01 = *result
-        .measures
-        .get("cs01_hazard")
-        .expect("cs01_hazard measure");
+    let cs01 = *result.measures.get("cs01").expect("cs01 measure");
     assert!(
         cs01.is_finite() && cs01.abs() > 1e-9,
         "CS01 must be live on the rates-credit path: {cs01}"

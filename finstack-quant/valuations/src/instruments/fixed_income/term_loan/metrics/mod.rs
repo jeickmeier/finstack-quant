@@ -69,6 +69,7 @@ mod embedded_option_value;
 pub(crate) mod irr_helpers;
 mod oas;
 mod oid_eir;
+mod risk_view;
 mod ytc;
 mod ytm;
 mod ytn;
@@ -118,29 +119,10 @@ pub(crate) fn register_term_loan_metrics(
 
             // Theta is now registered universally in metrics::standard_registry()
 
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::TermLoan,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::TermLoan,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
-
-            // CS01 follows the active valuation model. The default credit-tree
-            // path consumes the hazard curve and therefore delegates to the
-            // canonical hazard rebootstrap. Explicit deterministic discounting
-            // uses the market-standard z-spread fallback instead.
-            (Cs01, crate::metrics::ZSpreadParallelCs01::<
-                crate::instruments::TermLoan,
-            >::hazard_when_credit_curve_and_model()),
-            (BucketedCs01, crate::metrics::ZSpreadBucketedCs01::<
-                crate::instruments::TermLoan,
-            >::hazard_when_credit_curve_and_model()),
-            (Cs01Hazard, crate::metrics::GenericParallelCs01Hazard::<
-                crate::instruments::TermLoan,
-            >::with_empty_credit_curve_zero()),
-            (BucketedCs01Hazard, crate::metrics::GenericBucketedCs01Hazard::<
-                crate::instruments::TermLoan,
-            >::with_empty_credit_curve_zero()),
+            (Dv01, risk_view::TermLoanParallelDv01Calculator),
+            (BucketedDv01, risk_view::TermLoanBucketedDv01Calculator),
+            (Cs01, risk_view::TermLoanCs01Calculator),
+            (BucketedCs01, risk_view::TermLoanBucketedCs01Calculator),
         ]
     }
 

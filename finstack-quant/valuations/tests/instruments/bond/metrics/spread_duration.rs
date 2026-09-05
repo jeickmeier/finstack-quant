@@ -7,7 +7,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::constants::ONE_BASIS_POINT;
@@ -51,12 +51,14 @@ fn bullet_5y(credit: bool) -> (Bond, MarketContext) {
 
     if credit {
         bond.credit_curve_id = Some(CurveId::new("USD-CREDIT"));
-        let hazard = HazardCurve::builder("USD-CREDIT")
-            .base_date(as_of)
-            .recovery_rate(0.4)
-            .knots([(0.0, 0.02), (7.0, 0.02)])
-            .build()
-            .expect("hazard builds");
+        let hazard = crate::test_support::credit::calibrated_hazard_curve(
+            &market,
+            as_of,
+            "USD-CREDIT",
+            "USD-CREDIT-ENTITY",
+            "USD-OIS",
+        )
+        .expect("hazard calibration succeeds");
         market = market.insert(hazard);
     }
     (bond, market)
@@ -72,11 +74,7 @@ struct SpreadMetrics {
 fn priced(credit: bool) -> SpreadMetrics {
     let (bond, market) = bullet_5y(credit);
     let as_of = date!(2025 - 01 - 06);
-    let credit_risk_metric = if credit {
-        MetricId::Cs01Hazard
-    } else {
-        MetricId::Cs01
-    };
+    let credit_risk_metric = MetricId::Cs01;
     let result = bond
         .price_with_metrics(
             &market,
@@ -87,7 +85,7 @@ fn priced(credit: bool) -> SpreadMetrics {
                 credit_risk_metric.clone(),
                 MetricId::SpreadDuration,
             ],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            crate::test_support::credit::pricing_options(),
         )
         .expect("bond must emit spread_duration");
     let duration_mod = *result

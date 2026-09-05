@@ -38,7 +38,7 @@ fn metric_value(
             market,
             as_of,
             std::slice::from_ref(&metric),
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            crate::test_support::credit::pricing_options(),
         )
         .expect("metric should compute");
     result.measures[&metric]
@@ -120,12 +120,12 @@ fn test_risky_pv01_parity_equal_hazards() {
 }
 
 #[test]
-fn test_hazard_cs01_parity_equal_hazards() {
-    // Test: direct hazard CS01 consistency across modes
+fn test_cs01_parity_equal_spreads() {
+    // Test: par-spread CS01 consistency across modes
     //
-    // CS01 uses finite-difference bumping of hazard curves:
-    // - Single-curve: bumps HZ-INDEX by 1bp
-    // - Constituents: bumps each HZ1..HZn by 1bp independently
+    // CS01 reboots hazard curves from bumped CDS par spreads:
+    // - Single-curve: bumps the HZ-INDEX quote set by 1bp
+    // - Constituents: bumps each HZ1..HZn quote set by 1bp
     //
     // With identical hazard rates, the sum of constituent CS01s should
     // equal the single-curve CS01.
@@ -136,10 +136,10 @@ fn test_hazard_cs01_parity_equal_hazards() {
     let idx_single = standard_single_curve_index("CDX-SINGLE", start, end, 10_000_000.0);
     let idx_constituents = standard_constituents_index("CDX-CONST", start, end, 10_000_000.0, 5);
 
-    let ctx = multi_constituent_market_context(as_of, 5);
+    let ctx = replayable_multi_constituent_market_context(as_of, 5);
 
-    let cs01_single = metric_value(&idx_single, &ctx, as_of, MetricId::Cs01Hazard);
-    let cs01_constituents = metric_value(&idx_constituents, &ctx, as_of, MetricId::Cs01Hazard);
+    let cs01_single = metric_value(&idx_single, &ctx, as_of, MetricId::Cs01);
+    let cs01_constituents = metric_value(&idx_constituents, &ctx, as_of, MetricId::Cs01);
 
     // CS01 uses same bump size in both modes - tight for identical hazards
     relative_eq(cs01_single, cs01_constituents, 0.01, "CS01 parity");

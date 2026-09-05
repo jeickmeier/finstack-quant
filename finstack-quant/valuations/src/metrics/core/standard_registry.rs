@@ -10,7 +10,6 @@ use super::{
 use crate::metrics::risk::{GenericExpectedShortfall, GenericHVar, VarConfig};
 use crate::metrics::sensitivities::breakeven::BreakevenCalculator;
 use crate::metrics::sensitivities::carry_decomposition::CarryDecompositionCalculator;
-use crate::metrics::sensitivities::cs01::{GenericBucketedCs01Hazard, GenericParallelCs01Hazard};
 use crate::metrics::sensitivities::theta::GenericThetaAny;
 
 static STANDARD_REGISTRY: OnceLock<MetricRegistry> = OnceLock::new();
@@ -63,7 +62,6 @@ pub fn standard_registry() -> &'static MetricRegistry {
 fn build_standard_registry() -> std::result::Result<MetricRegistry, MetricRegistryError> {
     let mut registry = MetricRegistry::new();
     register_universal_metrics(&mut registry)?;
-    register_credit_cs01_metrics(&mut registry)?;
     register_equity_instrument_metrics(&mut registry)?;
     register_fixed_income_instrument_metrics(&mut registry)?;
     register_rates_instrument_metrics(&mut registry)?;
@@ -296,33 +294,5 @@ fn register_universal_metrics(
         Arc::new(GenericExpectedShortfall::new(VarConfig::var_95())),
         &[],
     )?;
-    Ok(())
-}
-
-fn register_credit_cs01_metrics(
-    registry: &mut MetricRegistry,
-) -> std::result::Result<(), MetricRegistryError> {
-    // Cs01Hazard (direct hazard-rate bump, parallel)
-    registry.register_metric(
-        MetricId::Cs01Hazard,
-        Arc::new(GenericParallelCs01Hazard::<
-            crate::instruments::CreditDefaultSwap,
-        >::default()),
-        &[crate::pricer::InstrumentType::Cds],
-    )?;
-    // Cs01Hazard for CDSTranche and RevolvingCredit are registered locally
-    // by their respective metrics modules with custom wrappers.
-
-    // BucketedCs01Hazard (direct hazard-rate bump, bucketed)
-    registry.register_metric(
-        MetricId::BucketedCs01Hazard,
-        Arc::new(GenericBucketedCs01Hazard::<
-            crate::instruments::CreditDefaultSwap,
-        >::default()),
-        &[crate::pricer::InstrumentType::Cds],
-    )?;
-    // BucketedCs01Hazard for CDSTranche and RevolvingCredit are registered
-    // locally by their respective metrics modules with custom wrappers. CDS
-    // options intentionally expose only quoted-spread CS01, not hazard-rate CS01.
     Ok(())
 }

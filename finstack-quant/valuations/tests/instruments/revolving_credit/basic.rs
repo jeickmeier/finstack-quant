@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     BaseRateSpec, DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
@@ -208,29 +208,29 @@ fn test_revolving_credit_standard_metrics() {
 
     let disc_curve = build_flat_discount_curve(0.04, val_date, "USD-OIS");
 
-    // Create hazard curve for CS01 calculation
-    let hazard_curve = HazardCurve::builder("BORROWER-A")
-        .base_date(val_date)
-        .recovery_rate(0.40)
-        .knots(vec![
-            (0.0, 1.0),
-            (1.0, 0.99),
-            (2.0, 0.975),
-            (3.0, 0.96),
-            (5.0, 0.92),
-        ])
-        .build()
-        .unwrap();
+    let source = MarketContext::new().insert(disc_curve);
+    let hazard_curve = crate::test_support::credit::calibrated_hazard_curve(
+        &source,
+        val_date,
+        "BORROWER-A",
+        "BORROWER-A-ENTITY",
+        "USD-OIS",
+    )
+    .expect("hazard calibration should succeed");
+    let market = source.insert(hazard_curve);
 
-    let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
-
-    // Test rate, direct hazard, and time-decay metrics.
+    // Test rate, canonical par-spread, and time-decay metrics.
     let result = facility
         .price_with_metrics(
             &market,
             val_date,
-            &[MetricId::Dv01, MetricId::Cs01Hazard, MetricId::Theta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            &[
+                MetricId::Dv01,
+                MetricId::Cs01,
+                MetricId::BucketedCs01,
+                MetricId::Theta,
+            ],
+            crate::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -249,32 +249,22 @@ fn test_revolving_credit_standard_metrics() {
         dv01
     );
 
-    // CS01 should be non-zero (PV changes when credit spreads widen)
-    // For a lender position, CS01 should be negative (PV decreases when spreads widen)
-    // but we allow for small values that might round to zero
-    let cs01 = result.measures.get("cs01_hazard").unwrap();
+    // Canonical CS01 reboots the hazard curve from bumped par spreads.
+    let cs01 = result.measures.get("cs01").unwrap();
     assert!(cs01.is_finite(), "CS01 should be finite, got {}", cs01);
-    // CS01 should be negative for lender position, but allow for very small values
-    if cs01.abs() > 1e-6 {
-        assert!(
-            *cs01 < 0.0,
-            "CS01 should be negative for lender position when non-zero, got {}",
-            cs01
-        );
-        // CS01 magnitude should be similar to DV01 (both measure sensitivity to rate/spread changes)
-        assert!(
-            (dv01.abs() - cs01.abs()).abs() < 200.0,
-            "DV01 and CS01 magnitudes should be similar: DV01={}, CS01={}",
-            dv01,
-            cs01
-        );
-    } else {
-        // If CS01 is very small, just verify it's computed
-        println!(
-            "CS01 is very small ({}), which may be expected for low credit risk",
-            cs01
-        );
-    }
+    assert!(
+        *cs01 < -1e-6,
+        "CS01 should be negative and non-zero for a lender position, got {}",
+        cs01
+    );
+    let bucketed_cs01 = result.measures["bucketed_cs01"];
+    assert!(
+        bucketed_cs01.is_finite() && bucketed_cs01 < -1e-6,
+        "bucketed CS01 should be finite, negative, and non-zero, got {bucketed_cs01}"
+    );
+    assert!(result.measures.iter().any(|(key, value)| {
+        key.as_str().starts_with("bucketed_cs01::BORROWER-A::") && value.abs() > 1e-6
+    }));
 
     // Theta (1-day time decay) - for a lending position with positive carry,
     // theta can be positive (earning interest/fees) or negative depending on

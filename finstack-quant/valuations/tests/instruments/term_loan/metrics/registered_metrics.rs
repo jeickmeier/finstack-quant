@@ -4,8 +4,8 @@
 //!
 //! - `all_in_rate` is finite and positive for a plain loan, and rises when an
 //!   upfront fee is charged (the fee is part of the borrower's cash cost).
-//! - `EmbeddedOptionValue` = P_straight − P_callable, so it is strictly
-//!   positive for a callable loan and exactly zero when there is no call
+//! - `EmbeddedOptionValue` = P_callable − P_straight, so it is strictly
+//!   negative for a callable loan and exactly zero when there is no call
 //!   schedule.
 
 use crate::common::test_helpers::flat_discount_curve;
@@ -149,7 +149,7 @@ fn test_embedded_option_value_zero_for_non_callable() {
 }
 
 #[test]
-fn test_embedded_option_value_positive_for_callable() {
+fn test_embedded_option_value_negative_for_callable() {
     let loan = term_loan(None, true);
     let eov = metric(
         &loan,
@@ -158,7 +158,83 @@ fn test_embedded_option_value_positive_for_callable() {
     );
 
     assert!(
-        eov.is_finite() && eov > 0.0,
-        "a callable loan's embedded (borrower) call option must have positive value, got {eov}"
+        eov.is_finite() && eov < 0.0,
+        "a callable loan's holder embedded option value must be negative, got {eov}"
     );
+}
+
+#[test]
+fn oas_and_eov_round_trip_at_quoted_oas() {
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer;
+
+    let as_of = date!(2025 - 01 - 01);
+    let mut loan = term_loan(None, true);
+    let market = market();
+    let pricer = TermLoanTreePricer::new();
+    let oas_bp = pricer
+        .calculate_oas(&loan, &market, as_of, 95.0)
+        .expect("OAS from discounted quote");
+    assert!(
+        oas_bp.abs() > 1.0,
+        "a 95 clean quote must produce a material OAS, got {oas_bp}"
+    );
+
+    loan.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas_bp / 10_000.0);
+    let priced = loan
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Oas, MetricId::EmbeddedOptionValue],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("quoted-OAS metrics");
+    let oas_decimal = *priced.measures.get("oas").unwrap();
+    let eov = *priced.measures.get("embedded_option_value").unwrap();
+    assert!((oas_decimal * 10_000.0 - oas_bp).abs() < 1e-8);
+
+    let pv_callable = pricer
+        .price_callable(&loan, &market, as_of)
+        .expect("callable at quoted OAS")
+        .amount();
+    let mut straight = loan;
+    straight.call_schedule = None;
+    let pv_straight = pricer
+        .price_callable(&straight, &market, as_of)
+        .expect("straight at quoted OAS")
+        .amount();
+    assert!(
+        (eov - (pv_callable - pv_straight)).abs() < 1.0,
+        "EOV must equal P_callable − P_straight at the same OAS: \
+         eov={eov}, callable={pv_callable}, straight={pv_straight}"
+    );
+    assert!(eov < 0.0 && pv_callable < pv_straight);
+}
+
+#[test]
+fn tree_only_option_metrics_reject_discounting_model() {
+    use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::pricer::ModelKey;
+
+    let as_of = date!(2025 - 01 - 01);
+    let mut loan = term_loan(None, true);
+    loan.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(95.0);
+    let market = market();
+    let options = PricingOptions::default().with_model(ModelKey::Discounting);
+
+    for metric in [MetricId::Oas, MetricId::EmbeddedOptionValue] {
+        let error = loan
+            .price_with_metrics(
+                &market,
+                as_of,
+                std::slice::from_ref(&metric),
+                options.clone(),
+            )
+            .expect_err("tree-only option metric must reject discounting");
+        assert!(
+            error.to_string().contains("require the Tree model"),
+            "unexpected {metric} error: {error}"
+        );
+    }
 }

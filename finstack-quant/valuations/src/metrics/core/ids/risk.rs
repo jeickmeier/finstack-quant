@@ -89,10 +89,6 @@ impl MetricId {
     ///
     /// Units: currency per 1bp spread move.
     ///
-    /// # Note
-    ///
-    /// Distinct from `Cs01Hazard`, which bumps hazard rates directly instead of
-    /// quoted spreads.
     pub const Cs01: Self = Self(Cow::Borrowed("cs01"));
 
     /// Bucketed DV01 risk for pointwise or tenor-bucket rate moves.
@@ -111,18 +107,6 @@ impl MetricId {
     ///
     /// Units: currency per 1bp bucket move.
     pub const BucketedCs01: Self = Self(Cow::Borrowed("bucketed_cs01"));
-
-    /// Credit spread sensitivity via direct hazard rate bump (CS01 Hazard)
-    ///
-    /// Unlike `Cs01` which bumps par spreads and re-bootstraps, this metric
-    /// directly shifts hazard rates. Use when par spread points are unavailable
-    /// or when hazard-rate sensitivity is specifically needed.
-    pub const Cs01Hazard: Self = Self(Cow::Borrowed("cs01_hazard"));
-
-    /// Bucketed credit spread risk via direct hazard-rate bumps.
-    ///
-    /// Units: currency per 1bp hazard-rate bucket move.
-    pub const BucketedCs01Hazard: Self = Self(Cow::Borrowed("bucketed_cs01_hazard"));
 
     // Other Risk Metrics
 

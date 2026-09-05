@@ -4,18 +4,15 @@
 //! - DV01 (interest rate sensitivity)
 //! - CS01 (credit spread sensitivity)
 //! - Risky PV01 (premium spread sensitivity)
-//! - Hazard CS01 (hazard rate sensitivity)
 //! - Bucketed DV01 (term structure sensitivity)
 //! - Risk metric scaling with notional
 //! - Risk metric sign conventions
 
 use super::test_utils::*;
-use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
-use serde_json::json;
 use time::macros::date;
 
 #[test]
@@ -50,17 +47,17 @@ fn test_cs01_positive() {
     let as_of = start;
 
     let idx = standard_single_curve_index("CDX-CS01", start, end, 10_000_000.0);
-    let ctx = standard_market_context(as_of);
+    let ctx = replayable_standard_market_context(as_of);
 
     let result = idx
         .price_with_metrics(
             &ctx,
             as_of,
-            &[MetricId::Cs01Hazard],
+            &[MetricId::Cs01],
             crate::test_support::credit::pricing_options(),
         )
         .unwrap();
-    let cs01 = *result.measures.get("cs01_hazard").unwrap();
+    let cs01 = *result.measures.get("cs01").unwrap();
 
     assert_positive(cs01, "CS01");
 }
@@ -87,33 +84,6 @@ fn test_dv01_calculation() {
 
     // DV01 = PV(rate+1bp) - PV(base); sign depends on instrument structure
     assert!(dv01.is_finite(), "DV01 should be finite");
-}
-
-#[test]
-fn test_hazard_cs01_calculation() {
-    // Test: Hazard CS01 (parallel hazard bump sensitivity)
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-
-    let idx = standard_single_curve_index("CDX-HCS01", start, end, 10_000_000.0);
-    let ctx = standard_market_context(as_of);
-
-    let result = idx
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::Cs01Hazard],
-            crate::test_support::credit::pricing_options(),
-        )
-        .unwrap();
-
-    // CS01 should be present
-    let cs01 = result
-        .measures
-        .get("cs01_hazard")
-        .expect("hazard CS01 should be present");
-    assert!(cs01.is_finite(), "CS01 should be finite");
 }
 
 #[test]
@@ -162,7 +132,7 @@ fn test_cs01_increases_with_maturity() {
     // Test: CS01 increases with longer maturity
     let start = date!(2025 - 01 - 01);
     let as_of = start;
-    let ctx = standard_market_context(as_of);
+    let ctx = replayable_standard_market_context(as_of);
 
     let idx_3y = standard_single_curve_index("CDX-3Y", start, date!(2028 - 01 - 01), 10_000_000.0);
     let idx_5y = standard_single_curve_index("CDX-5Y", start, date!(2030 - 01 - 01), 10_000_000.0);
@@ -171,7 +141,7 @@ fn test_cs01_increases_with_maturity() {
         .price_with_metrics(
             &ctx,
             as_of,
-            &[MetricId::Cs01Hazard],
+            &[MetricId::Cs01],
             crate::test_support::credit::pricing_options(),
         )
         .unwrap();
@@ -179,13 +149,13 @@ fn test_cs01_increases_with_maturity() {
         .price_with_metrics(
             &ctx,
             as_of,
-            &[MetricId::Cs01Hazard],
+            &[MetricId::Cs01],
             crate::test_support::credit::pricing_options(),
         )
         .unwrap();
 
-    let cs01_3y = *result_3y.measures.get("cs01_hazard").unwrap();
-    let cs01_5y = *result_5y.measures.get("cs01_hazard").unwrap();
+    let cs01_3y = *result_3y.measures.get("cs01").unwrap();
+    let cs01_5y = *result_5y.measures.get("cs01").unwrap();
 
     assert!(
         cs01_3y < cs01_5y,
@@ -260,16 +230,15 @@ fn test_risky_pv01_single_vs_constituents() {
 fn test_cs01_single_vs_constituents() {
     // Test: CS01 consistency across pricing modes
     //
-    // Both modes use identical hazard rates (0.015) and recovery (40%).
-    // CS01 is computed by bumping hazard curves by 1bp and repricing.
-    // - Single-curve: bumps HZ-INDEX
-    // - Constituents: bumps each HZ1..HZ5 independently and sums
+    // Both modes use identical replayable par-spread quotes and recovery.
+    // CS01 is computed by bumping those quotes by 1bp, re-bootstrapping the
+    // hazard curves, and repricing.
     //
     // With identical curves, both should produce similar results.
     let start = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
     let as_of = start;
-    let ctx = multi_constituent_market_context(as_of, 5);
+    let ctx = replayable_multi_constituent_market_context(as_of, 5);
 
     let idx_single = standard_single_curve_index("CDX-SINGLE", start, end, 10_000_000.0);
     let idx_const = standard_constituents_index("CDX-CONST", start, end, 10_000_000.0, 5);
@@ -278,7 +247,7 @@ fn test_cs01_single_vs_constituents() {
         .price_with_metrics(
             &ctx,
             as_of,
-            &[MetricId::Cs01Hazard],
+            &[MetricId::Cs01],
             crate::test_support::credit::pricing_options(),
         )
         .unwrap();
@@ -286,13 +255,13 @@ fn test_cs01_single_vs_constituents() {
         .price_with_metrics(
             &ctx,
             as_of,
-            &[MetricId::Cs01Hazard],
+            &[MetricId::Cs01],
             crate::test_support::credit::pricing_options(),
         )
         .unwrap();
 
-    let cs01_single = *result_single.measures.get("cs01_hazard").unwrap();
-    let cs01_const = *result_const.measures.get("cs01_hazard").unwrap();
+    let cs01_single = *result_single.measures.get("cs01").unwrap();
+    let cs01_const = *result_const.measures.get("cs01").unwrap();
 
     // 5% tolerance: aggregation of per-constituent CS01 vs single curve
     relative_eq(cs01_single, cs01_const, 0.05, "CS01 parity");
@@ -475,13 +444,13 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
 #[test]
 #[ignore = "slow: covered by mise rust-test-slow"]
 fn test_bucketed_cs01_reconciles_to_parallel_constituents() {
-    // Same reconciliation in `Constituents` mode: the bucketed calculator bumps
-    // every constituent curve at each tenor and reprices the index end-to-end.
+    // In `Constituents` mode, the bucketed calculator bumps each constituent's
+    // replayable quote set one tenor at a time and reprices end-to-end.
     // Expensive under parallel CI load (N curves × tenors × central-diff reprices).
     let start = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
     let as_of = start;
-    let ctx = multi_constituent_market_context(as_of, 5);
+    let ctx = replayable_multi_constituent_market_context(as_of, 5);
 
     let idx = standard_constituents_index("CDX-BKT-CONST", start, end, 10_000_000.0, 5);
 
@@ -489,15 +458,15 @@ fn test_bucketed_cs01_reconciles_to_parallel_constituents() {
         .price_with_metrics(
             &ctx,
             as_of,
-            &[MetricId::Cs01Hazard, MetricId::BucketedCs01Hazard],
+            &[MetricId::Cs01, MetricId::BucketedCs01],
             crate::test_support::credit::pricing_options(),
         )
         .unwrap();
 
-    let cs01 = *result.measures.get("cs01_hazard").expect("cs01 present");
+    let cs01 = *result.measures.get("cs01").expect("cs01 present");
     let bucketed = *result
         .measures
-        .get("bucketed_cs01_hazard")
+        .get("bucketed_cs01")
         .expect("bucketed_cs01 present");
     assert!(
         cs01.is_finite() && bucketed.is_finite(),
@@ -513,7 +482,7 @@ fn test_bucketed_cs01_reconciles_to_parallel_constituents() {
     let series_sum: f64 = result
         .measures
         .iter()
-        .filter(|(k, _)| k.as_str().starts_with("bucketed_cs01_hazard::"))
+        .filter(|(k, _)| k.as_str().starts_with("bucketed_cs01::"))
         .map(|(_, v)| *v)
         .sum();
     relative_eq(
@@ -525,258 +494,6 @@ fn test_bucketed_cs01_reconciles_to_parallel_constituents() {
 }
 
 #[test]
-fn bucketed_hazard_cs01_reports_each_distinct_constituent_curve() {
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-    let index = standard_constituents_index("CDX-BKT-DISTINCT", start, end, 10_000_000.0, 2);
-    let market = MarketContext::new()
-        .insert(flat_discount_curve("USD-OIS", as_of, 0.03))
-        .insert(flat_hazard_curve(
-            "HZ-INDEX",
-            as_of,
-            STANDARD_RECOVERY_SENIOR,
-            STANDARD_HAZARD_RATE,
-        ))
-        .insert(flat_hazard_curve(
-            "HZ1",
-            as_of,
-            STANDARD_RECOVERY_SENIOR,
-            0.01,
-        ))
-        .insert(flat_hazard_curve(
-            "HZ2",
-            as_of,
-            STANDARD_RECOVERY_SENIOR,
-            0.03,
-        ));
-    let mut config = FinstackConfig::default();
-    config
-        .extensions
-        .insert(
-            "valuations.sensitivities.v1",
-            json!({"cs01_buckets_years": [1.0, 5.0, 10.0]}),
-        )
-        .expect("valid sensitivity configuration");
-
-    let result = index
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Cs01Hazard, MetricId::BucketedCs01Hazard],
-            crate::test_support::credit::pricing_options().with_config(&config),
-        )
-        .expect("constituent hazard CS01 should compute");
-
-    let parallel = result.measures[MetricId::Cs01Hazard.as_str()];
-    let bucketed = result.measures[MetricId::BucketedCs01Hazard.as_str()];
-    let curve_total = |curve_id: &str| {
-        [1, 5, 10]
-            .into_iter()
-            .map(|tenor| {
-                let key = format!("bucketed_cs01_hazard::{curve_id}::{tenor}y");
-                *result
-                    .measures
-                    .get(key.as_str())
-                    .unwrap_or_else(|| panic!("missing constituent bucket {key}"))
-            })
-            .sum::<f64>()
-    };
-    let hz1_total = curve_total("HZ1");
-    let hz2_total = curve_total("HZ2");
-
-    assert!(
-        hz1_total.is_finite() && hz1_total.abs() > 1.0,
-        "HZ1 bucketed hazard CS01 must be finite and non-zero: {hz1_total}"
-    );
-    assert!(
-        hz2_total.is_finite() && hz2_total.abs() > 1.0,
-        "HZ2 bucketed hazard CS01 must be finite and non-zero: {hz2_total}"
-    );
-    assert!(
-        (hz1_total - hz2_total).abs() > 1.0,
-        "distinct constituent curves must retain distinct bucket values: \
-         HZ1={hz1_total}, HZ2={hz2_total}"
-    );
-    relative_eq(
-        bucketed,
-        hz1_total + hz2_total,
-        1e-12,
-        "bucketed aggregate vs constituent curve totals",
-    );
-    relative_eq(
-        bucketed,
-        parallel,
-        0.02,
-        "bucketed constituent hazard CS01 vs parallel hazard CS01",
-    );
-}
-
-#[test]
-fn bucketed_hazard_cs01_uses_each_non_aligned_curve_node_once() {
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-    let index = standard_constituents_index("CDX-BKT-NON-ALIGNED", start, end, 10_000_000.0, 1);
-    let constituent_hazard =
-        finstack_quant_core::market_data::term_structures::HazardCurve::builder("HZ1")
-            .base_date(as_of)
-            .recovery_rate(STANDARD_RECOVERY_SENIOR)
-            .knots([(0.75, 0.01), (2.5, 0.0175), (4.5, 0.025)])
-            .build()
-            .expect("non-aligned constituent hazard curve");
-    let market = MarketContext::new()
-        .insert(flat_discount_curve("USD-OIS", as_of, 0.03))
-        .insert(flat_hazard_curve(
-            "HZ-INDEX",
-            as_of,
-            STANDARD_RECOVERY_SENIOR,
-            STANDARD_HAZARD_RATE,
-        ))
-        .insert(constituent_hazard);
-
-    let result = index
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Cs01Hazard, MetricId::BucketedCs01Hazard],
-            crate::test_support::credit::pricing_options(),
-        )
-        .expect("non-aligned constituent hazard CS01 should compute");
-    let constituent_buckets: Vec<_> = result
-        .measures
-        .iter()
-        .filter(|(key, _)| key.as_str().starts_with("bucketed_cs01_hazard::HZ1::"))
-        .collect();
-    let bucket_sum: f64 = constituent_buckets.iter().map(|(_, value)| **value).sum();
-
-    assert_eq!(
-        constituent_buckets.len(),
-        3,
-        "three hazard nodes must produce exactly three effective buckets: {constituent_buckets:?}"
-    );
-    relative_eq(
-        result.measures[MetricId::BucketedCs01Hazard.as_str()],
-        bucket_sum,
-        1e-12,
-        "non-aligned bucket aggregate vs series",
-    );
-    relative_eq(
-        bucket_sum,
-        result.measures[MetricId::Cs01Hazard.as_str()],
-        0.02,
-        "non-aligned hazard nodes vs parallel hazard CS01",
-    );
-}
-
-#[test]
-fn bucketed_hazard_cs01_single_node_is_not_repeated() {
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-    let index = standard_single_curve_index("CDX-BKT-SINGLE-NODE", start, end, 10_000_000.0);
-    let single_node =
-        finstack_quant_core::market_data::term_structures::HazardCurve::builder("HZ-INDEX")
-            .base_date(as_of)
-            .recovery_rate(STANDARD_RECOVERY_SENIOR)
-            .knots([(5.0, 0.02)])
-            .build()
-            .expect("single-node hazard curve");
-    let market = MarketContext::new()
-        .insert(flat_discount_curve("USD-OIS", as_of, 0.03))
-        .insert(single_node);
-
-    let result = index
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Cs01Hazard, MetricId::BucketedCs01Hazard],
-            crate::test_support::credit::pricing_options(),
-        )
-        .expect("single-node hazard CS01 should compute");
-    let buckets: Vec<_> = result
-        .measures
-        .iter()
-        .filter(|(key, _)| key.as_str().starts_with("bucketed_cs01_hazard::HZ-INDEX::"))
-        .collect();
-
-    assert_eq!(
-        buckets.len(),
-        1,
-        "one hazard node must produce one bucket, not repeated parallel bumps: {buckets:?}"
-    );
-    relative_eq(
-        result.measures[MetricId::BucketedCs01Hazard.as_str()],
-        result.measures[MetricId::Cs01Hazard.as_str()],
-        1e-12,
-        "single-node bucketed vs parallel hazard CS01",
-    );
-}
-
-#[test]
-fn constituent_using_index_curve_id_is_included_once() {
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-    let mut constituents = equal_weight_constituents(2);
-    constituents[0].credit.credit_curve_id = "HZ-INDEX".into();
-    let index = standard_single_curve_index("CDX-SHARED-CURVE", start, end, 10_000_000.0)
-        .with_constituents(constituents);
-    let market = MarketContext::new()
-        .insert(flat_discount_curve("USD-OIS", as_of, 0.03))
-        .insert(flat_hazard_curve(
-            "HZ-INDEX",
-            as_of,
-            STANDARD_RECOVERY_SENIOR,
-            0.0125,
-        ))
-        .insert(flat_hazard_curve(
-            "HZ2",
-            as_of,
-            STANDARD_RECOVERY_SENIOR,
-            0.0275,
-        ));
-
-    let result = index
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Cs01Hazard, MetricId::BucketedCs01Hazard],
-            crate::test_support::credit::pricing_options(),
-        )
-        .expect("shared index/constituent hazard curve risk should compute");
-    let shared_buckets: Vec<_> = result
-        .measures
-        .iter()
-        .filter(|(key, _)| key.as_str().starts_with("bucketed_cs01_hazard::HZ-INDEX::"))
-        .collect();
-    let other_buckets: Vec<_> = result
-        .measures
-        .iter()
-        .filter(|(key, _)| key.as_str().starts_with("bucketed_cs01_hazard::HZ2::"))
-        .collect();
-    let bucket_sum: f64 = shared_buckets
-        .iter()
-        .chain(&other_buckets)
-        .map(|(_, value)| **value)
-        .sum();
-
-    assert_eq!(
-        shared_buckets.len(),
-        3,
-        "the shared index-level curve must appear once per effective node"
-    );
-    assert_eq!(other_buckets.len(), 3);
-    assert!(shared_buckets.iter().any(|(_, value)| value.abs() > 1.0));
-    relative_eq(
-        bucket_sum,
-        result.measures[MetricId::Cs01Hazard.as_str()],
-        0.02,
-        "unique constituent curve buckets vs parallel hazard CS01",
-    );
-}
-
-#[test]
 fn test_all_risk_metrics_together() {
     // Test: All risk metrics computed together
     let start = date!(2025 - 01 - 01);
@@ -784,9 +501,9 @@ fn test_all_risk_metrics_together() {
     let as_of = start;
 
     let idx = standard_single_curve_index("CDX-ALL-RISK", start, end, 10_000_000.0);
-    let ctx = standard_market_context(as_of);
+    let ctx = replayable_standard_market_context(as_of);
 
-    let metrics = vec![MetricId::RiskyPv01, MetricId::Cs01Hazard, MetricId::Dv01];
+    let metrics = vec![MetricId::RiskyPv01, MetricId::Cs01, MetricId::Dv01];
 
     let result = idx
         .price_with_metrics(
@@ -798,7 +515,7 @@ fn test_all_risk_metrics_together() {
         .unwrap();
 
     assert!(result.measures.contains_key("risky_pv01"));
-    assert!(result.measures.contains_key("cs01_hazard"));
+    assert!(result.measures.contains_key("cs01"));
     assert!(result.measures.contains_key("dv01"));
 }
 
@@ -839,9 +556,9 @@ fn test_risk_metrics_finite() {
     let as_of = start;
 
     let idx = standard_single_curve_index("CDX-FINITE", start, end, 10_000_000.0);
-    let ctx = standard_market_context(as_of);
+    let ctx = replayable_standard_market_context(as_of);
 
-    let metrics = vec![MetricId::RiskyPv01, MetricId::Cs01Hazard, MetricId::Dv01];
+    let metrics = vec![MetricId::RiskyPv01, MetricId::Cs01, MetricId::Dv01];
 
     let result = idx
         .price_with_metrics(
@@ -862,14 +579,9 @@ fn test_risk_metrics_finite() {
     }
 }
 
-// Recovery01 and Cs01Hazard
-//
-// Both are registered on the CDS Index metric calculator but were previously
-// unexercised. Recovery01 is the PV sensitivity to a +1% recovery-rate bump;
-// Cs01Hazard is the central-difference sensitivity to a direct parallel hazard
-// shift (an alternative to the par-spread-rebootstrap `Cs01`). These tests
-// guard against either metric silently regressing to zero/NaN or losing its
-// linearity in notional.
+// Recovery01 is the PV sensitivity to a +1% recovery-rate bump. These tests
+// guard against it silently regressing to zero/NaN or losing linearity in
+// notional.
 
 #[test]
 fn test_recovery01_finite_and_nonzero() {
@@ -940,79 +652,6 @@ fn test_recovery01_scales_with_notional() {
         rec01_20mm,
         20_000_000.0,
         "Recovery01",
-        0.05,
-    );
-}
-
-#[test]
-fn test_cs01_hazard_is_finite_and_nonzero() {
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-    let ctx = standard_market_context(as_of);
-    let idx = standard_single_curve_index("CDX-CS01H", start, end, 10_000_000.0);
-
-    let result = idx
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::Cs01Hazard],
-            crate::test_support::credit::pricing_options(),
-        )
-        .unwrap();
-    let cs01_hazard = *result.measures.get("cs01_hazard").unwrap();
-
-    assert!(
-        cs01_hazard.is_finite(),
-        "Cs01Hazard should be finite, got {}",
-        cs01_hazard
-    );
-    assert!(
-        cs01_hazard.abs() > 0.0,
-        "Cs01Hazard should be non-zero for a live index, got {}",
-        cs01_hazard
-    );
-}
-
-#[test]
-fn test_cs01_hazard_scales_with_notional() {
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-    let ctx = standard_market_context(as_of);
-
-    let idx_10mm = standard_single_curve_index("CDX-CS01H-10", start, end, 10_000_000.0);
-    let idx_20mm = standard_single_curve_index("CDX-CS01H-20", start, end, 20_000_000.0);
-
-    let cs01h_10mm = *idx_10mm
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::Cs01Hazard],
-            crate::test_support::credit::pricing_options(),
-        )
-        .unwrap()
-        .measures
-        .get("cs01_hazard")
-        .unwrap();
-    let cs01h_20mm = *idx_20mm
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::Cs01Hazard],
-            crate::test_support::credit::pricing_options(),
-        )
-        .unwrap()
-        .measures
-        .get("cs01_hazard")
-        .unwrap();
-
-    assert_linear_scaling(
-        cs01h_10mm,
-        10_000_000.0,
-        cs01h_20mm,
-        20_000_000.0,
-        "Cs01Hazard",
         0.05,
     );
 }

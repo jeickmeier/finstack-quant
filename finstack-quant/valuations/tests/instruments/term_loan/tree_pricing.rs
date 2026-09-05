@@ -1,6 +1,6 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
-use finstack_quant_cashflows::builder::specs::CouponType;
+use finstack_quant_cashflows::builder::specs::{CouponType, FloatingRateSpec};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -8,11 +8,12 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    LoanCall, LoanCallSchedule, LoanCallType, TermLoan,
+    LoanCall, LoanCallSchedule, LoanCallType, RateSpec, TermLoan,
 };
+use rust_decimal::Decimal;
 use time::macros::date;
 
-use crate::common::test_helpers::flat_discount_curve;
+use crate::common::test_helpers::{flat_discount_curve, flat_forward_curve};
 
 fn build_callable_loan(as_of: Date) -> TermLoan {
     let maturity = date!(2030 - 01 - 01);
@@ -403,5 +404,210 @@ fn tree_uses_short_rate_sigma_not_option_implied_volatility() {
     assert!(
         (rate_vol_pv - base_pv).abs() > 1e-4,
         "the dedicated short-rate sigma must reach the tree: base={base_pv}, overridden={rate_vol_pv}"
+    );
+}
+
+fn build_floating_callable(as_of: Date) -> TermLoan {
+    TermLoan::builder()
+        .id(InstrumentId::new("TL-FLOAT-CALLABLE"))
+        .currency(Currency::USD)
+        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .issue_date(as_of)
+        .maturity(date!(2030 - 01 - 01))
+        .rate(RateSpec::Floating(FloatingRateSpec {
+            index_id: CurveId::new("USD-SOFR-3M"),
+            spread_bp: Decimal::new(400, 0),
+            gearing: Decimal::ONE,
+            gearing_includes_spread: true,
+            index_floor_bp: None,
+            all_in_floor_bp: None,
+            all_in_cap_bp: None,
+            index_cap_bp: None,
+            overnight_index_constraints: Default::default(),
+            reset_frequency: Tenor::quarterly(),
+            index_tenor: None,
+            reset_lag_days: 0,
+            fixing_calendar_id: None,
+            overnight_compounding: None,
+            overnight_basis: None,
+            fallback: Default::default(),
+        }))
+        .frequency(Tenor::quarterly())
+        .day_count(DayCount::Act360)
+        .business_day_convention(BusinessDayConvention::ModifiedFollowing)
+        .calendar_id_opt(None)
+        .stub(StubKind::None)
+        .discount_curve_id(CurveId::from("USD-OIS"))
+        .credit_curve_id_opt(None)
+        .amortization(
+            finstack_quant_valuations::instruments::fixed_income::term_loan::AmortizationSpec::None,
+        )
+        .coupon_type(CouponType::Cash)
+        .upfront_fee_opt(None)
+        .ddtl_opt(None)
+        .covenants_opt(None)
+        .oid_eir_opt(None)
+        .call_schedule_opt(Some(LoanCallSchedule {
+            calls: vec![LoanCall {
+                date: date!(2027 - 01 - 01),
+                price_pct_of_par: 101.0,
+                call_type: LoanCallType::Hard,
+            }],
+        }))
+        .settlement_days(0)
+        .attributes(Default::default())
+        .build()
+        .unwrap()
+}
+
+#[test]
+fn floating_callable_rejects_stochastic_short_rate_tree() {
+    let as_of = date!(2025 - 01 - 01);
+    let mut loan = build_floating_callable(as_of);
+    loan.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
+    let market = base_market(as_of);
+    let pricer =
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer::new();
+    let err = pricer
+        .price_callable(&loan, &market, as_of)
+        .expect_err("stochastic rates-only floating must be rejected");
+    let message = err.to_string();
+    assert!(
+        message.contains("preproject") && message.contains("credit_curve_id"),
+        "unexpected rejection message: {message}"
+    );
+}
+
+#[test]
+fn floating_callable_deterministic_short_rate_still_prices() {
+    let as_of = date!(2025 - 01 - 01);
+    let mut loan = build_floating_callable(as_of);
+    loan.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.0);
+    let market = MarketContext::new()
+        .insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .insert(flat_forward_curve(0.04, as_of, "USD-SOFR-3M"));
+    let pricer =
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer::new();
+    let pv = pricer
+        .price_callable(&loan, &market, as_of)
+        .expect("zero-vol floating tree")
+        .amount();
+    assert!(pv.is_finite() && pv > 0.0, "pv={pv}");
+}
+
+#[test]
+fn floating_callable_defaults_to_frozen_projection() {
+    let as_of = date!(2025 - 01 - 01);
+    let loan = build_floating_callable(as_of);
+    let market = MarketContext::new()
+        .insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
+        .insert(flat_forward_curve(0.04, as_of, "USD-SOFR-3M"));
+    let pv =
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer::new()
+            .price_callable(&loan, &market, as_of)
+            .expect("unset rates-only floating volatility should freeze projection")
+            .amount();
+    assert!(pv.is_finite() && pv > 0.0, "pv={pv}");
+}
+
+#[test]
+fn quoted_oas_discounts_off_grid_cashflows_at_event_time() {
+    use finstack_quant_core::cashflow::CFKind;
+
+    let as_of = date!(2025 - 01 - 01);
+    let mut loan = build_callable_loan(as_of);
+    loan.call_schedule = None;
+    loan.instrument_pricing_overrides.model_config.tree_steps = Some(3);
+    loan.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.0);
+    loan.instrument_pricing_overrides.market_quotes.quoted_oas = Some(0.02);
+    let market = base_market(as_of);
+    let settlement = loan.settlement_date(as_of).expect("settlement");
+    let discount = market.get_discount("USD-OIS").expect("discount curve");
+    let schedule = loan.cashflow_schedule(&market, as_of).expect("schedule");
+    let expected = schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| flow.date > settlement && flow.kind != CFKind::Pik)
+        .try_fold(0.0, |pv, flow| {
+            let t = discount.day_count().year_fraction(
+                settlement,
+                flow.date,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?;
+            let df = discount.df_between_dates(settlement, flow.date)?;
+            Ok::<_, finstack_quant_core::Error>(pv + flow.amount.amount() * df * (-0.02 * t).exp())
+        })
+        .expect("analytical OAS PV");
+    let actual =
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer::new()
+            .price_callable(&loan, &market, as_of)
+            .expect("tree OAS PV")
+            .amount();
+    assert!(
+        (actual - expected).abs() < 1.0,
+        "OAS must discount at true event times: actual={actual}, expected={expected}"
+    );
+}
+
+#[test]
+fn off_cycle_immediate_par_call_includes_accrued() {
+    let issue = date!(2025 - 01 - 01);
+    let as_of = date!(2025 - 02 - 15);
+    let mut loan = TermLoan::builder()
+        .id(InstrumentId::new("TL-OFFCYCLE-CALL"))
+        .currency(Currency::USD)
+        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .issue_date(issue)
+        .maturity(date!(2030 - 01 - 01))
+        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .frequency(Tenor::quarterly())
+        .day_count(DayCount::Act360)
+        .business_day_convention(BusinessDayConvention::ModifiedFollowing)
+        .calendar_id_opt(None)
+        .stub(StubKind::None)
+        .discount_curve_id(CurveId::from("USD-OIS"))
+        .credit_curve_id_opt(None)
+        .amortization(
+            finstack_quant_valuations::instruments::fixed_income::term_loan::AmortizationSpec::None,
+        )
+        .coupon_type(CouponType::Cash)
+        .upfront_fee_opt(None)
+        .ddtl_opt(None)
+        .covenants_opt(None)
+        .oid_eir_opt(None)
+        .call_schedule_opt(Some(LoanCallSchedule {
+            calls: vec![LoanCall {
+                date: as_of,
+                price_pct_of_par: 100.0,
+                call_type: LoanCallType::Hard,
+            }],
+        }))
+        .settlement_days(0)
+        .attributes(Default::default())
+        .build()
+        .unwrap();
+    loan.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.0);
+    let market = base_market(as_of);
+    let schedule = loan.cashflow_schedule(&market, as_of).expect("schedule");
+    let accrued = finstack_quant_cashflows::accrual::accrued_interest_amount(
+        &schedule,
+        as_of,
+        &loan.accrual_config(),
+    )
+    .expect("accrued");
+    let pricer =
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer::new();
+    let pv = pricer
+        .price_callable(&loan, &market, as_of)
+        .expect("off-cycle call")
+        .amount();
+    assert!(
+        accrued > 1.0,
+        "fixture must sit inside a coupon period, accrued={accrued}"
+    );
+    assert!(
+        (pv - (10_000_000.0 + accrued)).abs() < 1.0,
+        "immediate in-the-money par call must settle dirty: pv={pv}, dirty={}",
+        10_000_000.0 + accrued
     );
 }

@@ -15,7 +15,7 @@
 //! - bump conventions such as per-1bp or per-1 vol point
 //! - sign conventions for long-holder, payer/receiver, or spot-up interpretations
 //! - distinctions between similarly named measures such as `Dv01`, `Pv01`,
-//!   `YieldDv01`, and `Cs01Hazard`
+//!   `YieldDv01`, and `Cs01`
 //!
 //! Consumers should interpret values from
 //! [`crate::results::ValuationResult::measures`] through
@@ -311,11 +311,9 @@ pub(crate) use sensitivities::config::from_finstack_config_or_default as resolve
 pub(crate) use sensitivities::cross_factor::{
     make_credit_bumper, make_fx_bumper, make_rates_bumper, make_spot_bumper, make_vol_bumper,
 };
-pub(crate) use sensitivities::cs01::{
-    GenericBucketedCs01, GenericBucketedCs01Hazard, GenericParallelCs01, GenericParallelCs01Hazard,
-};
+pub(crate) use sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01};
 pub(crate) use sensitivities::cs01_z_spread::{
-    ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01,
+    quoted_z_spread, ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01,
 };
 pub(crate) use sensitivities::dv01::{Dv01CalculatorConfig, UnifiedDv01Calculator};
 pub(crate) use sensitivities::fd_greeks::{

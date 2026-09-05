@@ -417,9 +417,14 @@ fn test_zero_hazard_rate() {
 fn test_metrics_with_zero_notional() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
-    let (disc, hazard) = build_curves(as_of);
+    let (disc, _) = build_curves(as_of);
 
-    let market = MarketContext::new().insert(disc).insert(hazard);
+    let source = MarketContext::new().insert(disc);
+    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+        &source, as_of, "CORP", "CORP", "USD_OIS",
+    )
+    .expect("hazard calibration should succeed");
+    let market = source.insert(hazard);
 
     let cds = crate::test_support::credit::cds_buy_protection(
         "ZERO_METRICS",
@@ -437,22 +442,17 @@ fn test_metrics_with_zero_notional() {
             &market,
             as_of,
             &[
-                MetricId::Cs01Hazard,
+                MetricId::Cs01,
                 MetricId::RiskyPv01,
                 MetricId::ExpectedLoss,
                 MetricId::JumpToDefault,
             ],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            crate::test_support::credit::pricing_options(),
         )
         .unwrap();
 
     // All notional-dependent metrics should be zero
-    for k in [
-        "cs01_hazard",
-        "risky_pv01",
-        "expected_loss",
-        "jump_to_default",
-    ] {
+    for k in ["cs01", "risky_pv01", "expected_loss", "jump_to_default"] {
         let v = *result.measures.get(k).unwrap();
         assert!(
             v.abs() < 1e-12,

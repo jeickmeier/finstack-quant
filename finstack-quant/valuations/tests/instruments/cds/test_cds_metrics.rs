@@ -25,11 +25,11 @@ use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::recalibration::QuoteBump;
 use time::macros::date;
 
-fn sum_bucketed_cs01_hazard(result: &finstack_quant_valuations::results::ValuationResult) -> f64 {
+fn sum_bucketed_cs01(result: &finstack_quant_valuations::results::ValuationResult) -> f64 {
     result
         .measures
         .iter()
-        .filter(|(id, _)| id.as_str().starts_with("bucketed_cs01_hazard::"))
+        .filter(|(id, _)| id.as_str().starts_with("bucketed_cs01::"))
         .map(|(_, v)| *v)
         .sum()
 }
@@ -120,6 +120,15 @@ fn create_test_market(as_of: Date) -> MarketContext {
         .insert(build_test_hazard(0.015, 0.40, as_of, "CORP"))
 }
 
+fn create_replayable_test_market(as_of: Date) -> MarketContext {
+    let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
+    let hazard = crate::test_support::credit::calibrated_hazard_curve(
+        &source, as_of, "CORP", "CORP", "USD_OIS",
+    )
+    .expect("hazard calibration should succeed");
+    source.insert(hazard)
+}
+
 fn create_test_cds(as_of: Date, maturity: Date) -> CreditDefaultSwap {
     crate::test_support::credit::cds_buy_protection(
         "METRICS_TEST",
@@ -139,18 +148,18 @@ fn test_cs01_positive_for_buyer() {
     let maturity = date!(2029 - 01 - 01);
 
     let cds = create_test_cds(as_of, maturity);
-    let market = create_test_market(as_of);
+    let market = create_replayable_test_market(as_of);
 
     let result = cds
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Cs01Hazard],
+            &[MetricId::Cs01],
             crate::test_support::credit::pricing_options(),
         )
         .unwrap();
 
-    let cs01 = *result.measures.get("cs01_hazard").unwrap();
+    let cs01 = *result.measures.get("cs01").unwrap();
 
     assert!(cs01 > 0.0, "CS01 should be positive for protection buyer");
     // For $10M 5Y CDS with 1.5% hazard rate, CS01 ≈ notional × (1-rec) × annuity × 1bp ≈ $2,700
@@ -507,87 +516,6 @@ fn deal_quote_override_rejects_non_matching_replay_maturity() {
 }
 
 #[test]
-fn test_cs01_hazard_vs_risky_pv01_consistency() {
-    // Standard CS01 rejects a manual curve; the explicitly named hazard metric
-    // retains direct-intensity finite differences.
-    let as_of = date!(2024 - 01 - 01);
-    let maturity = date!(2029 - 01 - 01);
-
-    let cds = create_test_cds(as_of, maturity);
-
-    // Ensure hazard builder used in market has explicit base/daycount/recovery.
-    // Use a hazard curve without a replay recipe.
-    let market = {
-        let mut ctx = MarketContext::new();
-        let disc = DiscountCurve::builder("USD_OIS")
-            .base_date(as_of)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 1.0), (10.0, (-(0.05_f64 * 10.0_f64)).exp())])
-            .build()
-            .unwrap();
-        let hazard = HazardCurve::builder(cds.protection.credit_curve_id.clone())
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .recovery_rate(0.4)
-            .knots([(0.0, 0.01), (5.0, 0.012), (10.0, 0.013)])
-            .build()
-            .unwrap();
-        ctx = ctx.insert(disc).insert(hazard);
-        ctx
-    };
-
-    // Use value_raw for high-precision comparison (matches how CS01 metric is now computed)
-    use finstack_quant_valuations::instruments::Instrument;
-    // Manually compute the same central finite-difference CS01 definition used by the metric.
-    let hazard = market
-        .get_hazard(cds.protection.credit_curve_id.as_str())
-        .unwrap();
-    let bumped_up = hazard.with_parallel_hazard_rate_bump_bp(1.0).unwrap();
-    let bumped_down = hazard.with_parallel_hazard_rate_bump_bp(-1.0).unwrap();
-    let pv_up = cds
-        .value_raw(&market.clone().insert(bumped_up), as_of)
-        .unwrap();
-    let pv_down = cds
-        .value_raw(&market.clone().insert(bumped_down), as_of)
-        .unwrap();
-    let expected_cs01 = (pv_up - pv_down) / 2.0; // per 1bp central difference
-
-    let standard_error = cds
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Cs01],
-            crate::test_support::credit::pricing_options(),
-        )
-        .expect_err("standard CS01 requires quote-space replay");
-    assert!(
-        standard_error.to_string().contains("calibration recipe"),
-        "unexpected error: {standard_error}"
-    );
-
-    let result = cds
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Cs01Hazard],
-            crate::test_support::credit::pricing_options(),
-        )
-        .unwrap();
-    let cs01 = *result.measures.get("cs01_hazard").unwrap();
-    assert!(cs01 > 0.0, "hazard CS01 should be positive");
-
-    let tol = 1e-6_f64.max(1e-8 * expected_cs01.abs());
-    assert!(
-        (cs01 - expected_cs01).abs() <= tol,
-        "hazard CS01 should match direct finite-difference bump: metric={}, expected={}, diff={}, tol={}",
-        cs01,
-        expected_cs01,
-        (cs01 - expected_cs01).abs(),
-        tol
-    );
-}
-
-#[test]
 #[ignore = "slow: covered by mise rust-test-slow"]
 fn test_bucketed_cs01_reconciles_with_parallel_under_cds_convention() {
     let as_of = date!(2026 - 03 - 20);
@@ -600,33 +528,34 @@ fn test_bucketed_cs01_reconciles_with_parallel_under_cds_convention() {
     cds.doc_clause = Some(CdsDocClause::IsdaNa);
 
     let discount = build_test_discount(0.035, as_of, discount_id.as_str());
-    let hazard = HazardCurve::builder(hazard_id)
-        .base_date(as_of)
-        .day_count(DayCount::Act365F)
-        .recovery_rate(0.4)
-        .knots([
-            (0.0, 0.0060),
-            (1.0, 0.0080),
-            (3.0, 0.0120),
-            (5.0, 0.0180),
-            (7.0, 0.0200),
-        ])
-        .par_spreads([(1.0, 50.0), (3.0, 80.0), (5.0, 120.0), (7.0, 150.0)])
-        .build()
-        .unwrap();
-    let market = MarketContext::new().insert(discount).insert(hazard);
+    let source = MarketContext::new().insert(discount);
+    let hazard = crate::test_support::credit::calibrated_hazard_curve_with_pillars(
+        &source,
+        as_of,
+        hazard_id.as_str(),
+        hazard_id.as_str(),
+        discount_id.as_str(),
+        &[
+            (365, 50.0),
+            (3 * 365, 80.0),
+            (5 * 365, 120.0),
+            (7 * 365, 150.0),
+        ],
+    )
+    .expect("hazard calibration should succeed");
+    let market = source.insert(hazard);
 
     let result = cds
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Cs01Hazard, MetricId::BucketedCs01Hazard],
+            &[MetricId::Cs01, MetricId::BucketedCs01],
             crate::test_support::credit::pricing_options(),
         )
         .unwrap();
-    let parallel = *result.measures.get("cs01_hazard").unwrap();
-    let bucket_total = *result.measures.get("bucketed_cs01_hazard").unwrap();
-    let bucket_sum = sum_bucketed_cs01_hazard(&result);
+    let parallel = *result.measures.get("cs01").unwrap();
+    let bucket_total = *result.measures.get("bucketed_cs01").unwrap();
+    let bucket_sum = sum_bucketed_cs01(&result);
 
     let total_tol = 1e-6_f64.max(1e-10 * bucket_total.abs());
     assert!(
@@ -1371,38 +1300,15 @@ fn test_theta_metric() {
 }
 
 #[test]
-fn test_hazard_cs01_metric() {
-    let as_of = date!(2024 - 01 - 01);
-    let maturity = date!(2029 - 01 - 01);
-
-    let cds = create_test_cds(as_of, maturity);
-    let market = create_test_market(as_of);
-
-    let result = cds
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Cs01Hazard],
-            crate::test_support::credit::pricing_options(),
-        )
-        .unwrap();
-
-    let cs01 = *result.measures.get("cs01_hazard").unwrap();
-
-    assert!(cs01 > 0.0, "CS01 should be positive");
-    assert!(cs01.is_finite(), "CS01 should be finite");
-}
-
-#[test]
 fn test_multiple_metrics_simultaneously() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
 
     let cds = create_test_cds(as_of, maturity);
-    let market = create_test_market(as_of);
+    let market = create_replayable_test_market(as_of);
 
     let metrics = vec![
-        MetricId::Cs01Hazard,
+        MetricId::Cs01,
         MetricId::RiskyPv01,
         MetricId::ParSpread,
         MetricId::ProtectionLegPv,
@@ -1423,7 +1329,7 @@ fn test_multiple_metrics_simultaneously() {
         .unwrap();
 
     // All metrics should be present
-    assert!(result.measures.contains_key("cs01_hazard"));
+    assert!(result.measures.contains_key("cs01"));
     assert!(result.measures.contains_key("risky_pv01"));
     assert!(result.measures.contains_key("par_spread"));
     assert!(result.measures.contains_key("protection_leg_pv"));
@@ -1524,7 +1430,7 @@ fn test_metrics_scale_with_notional() {
 #[test]
 fn test_cs01_increases_with_tenor() {
     let as_of = date!(2024 - 01 - 01);
-    let market = create_test_market(as_of);
+    let market = create_replayable_test_market(as_of);
 
     let mut cs01_values = Vec::new();
 
@@ -1536,12 +1442,12 @@ fn test_cs01_increases_with_tenor() {
             .price_with_metrics(
                 &market,
                 as_of,
-                &[MetricId::Cs01Hazard],
+                &[MetricId::Cs01],
                 crate::test_support::credit::pricing_options(),
             )
             .unwrap();
 
-        let cs01 = *result.measures.get("cs01_hazard").unwrap();
+        let cs01 = *result.measures.get("cs01").unwrap();
         cs01_values.push((years, cs01));
     }
 

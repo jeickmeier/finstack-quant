@@ -8,7 +8,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule};
@@ -50,21 +50,6 @@ fn build_callable_credit_bond(as_of: time::Date) -> Bond {
 fn build_market(as_of: time::Date) -> MarketContext {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
-        .knots([(0.0, 1.0), (1.0, 0.96), (2.0, 0.91)])
-        .build()
-        .expect("discount curve should build");
-    let hazard = HazardCurve::builder("USD-CREDIT")
-        .base_date(as_of)
-        .recovery_rate(0.4)
-        .knots([(0.0, 0.015), (2.0, 0.015)])
-        .build()
-        .expect("hazard curve should build");
-    MarketContext::new().insert(disc).insert(hazard)
-}
-
-fn build_replayable_market(as_of: time::Date) -> MarketContext {
-    let disc = DiscountCurve::builder("USD-OIS")
-        .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.96), (2.0, 0.91), (5.0, 0.78)])
         .build()
         .expect("discount curve should build");
@@ -94,11 +79,11 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Cs01Hazard, MetricId::CleanPrice],
-            PricingOptions::default(),
+            &[MetricId::Cs01, MetricId::CleanPrice],
+            crate::test_support::credit::pricing_options(),
         )
         .expect("unquoted callable-credit bond should price");
-    let base_cs01 = *base.measures.get("cs01_hazard").unwrap();
+    let base_cs01 = *base.measures.get("cs01").unwrap();
     let model_clean = *base.measures.get("clean_price").unwrap() / 1_000_000.0 * 100.0;
     assert!(
         base_cs01.abs() > 1e-3,
@@ -115,17 +100,17 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
             &market,
             as_of,
             &[
-                MetricId::Cs01Hazard,
-                MetricId::BucketedCs01Hazard,
+                MetricId::Cs01,
+                MetricId::BucketedCs01,
                 MetricId::Dv01,
                 MetricId::BucketedDv01,
                 MetricId::EmbeddedOptionValue,
             ],
-            PricingOptions::default(),
+            crate::test_support::credit::pricing_options(),
         )
         .expect("quoted callable-credit bond should price");
 
-    let cs01 = *result.measures.get("cs01_hazard").unwrap();
+    let cs01 = *result.measures.get("cs01").unwrap();
     let dv01 = *result.measures.get("dv01").unwrap();
     let eov = *result.measures.get("embedded_option_value").unwrap();
 
@@ -151,7 +136,7 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
     let bcs = result
         .measures
         .iter()
-        .filter(|(k, v)| k.as_str().starts_with("bucketed_cs01_hazard") && v.abs() > 1e-6)
+        .filter(|(k, v)| k.as_str().starts_with("bucketed_cs01::USD-CREDIT::") && v.abs() > 1e-6)
         .count();
     let bdv = result
         .measures
@@ -172,7 +157,7 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
 #[test]
 fn test_unquoted_callable_explicit_models_skip_quote_spread_dependencies() {
     let as_of = date!(2025 - 01 - 01);
-    let market = build_replayable_market(as_of);
+    let market = build_market(as_of);
     let mut bond = build_callable_credit_bond(as_of);
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default().with_hw1f_sigma(0.0);
 

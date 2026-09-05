@@ -560,13 +560,12 @@ mod cs01_invariants {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DateExt, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
 
     use finstack_quant_valuations::instruments::Instrument;
-    use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+    use finstack_quant_valuations::metrics::MetricId;
     use proptest::prelude::*;
-    use std::sync::Arc;
     use time::macros::date;
 
     fn build_cds_market(flat_rate: f64, hazard_rate: f64) -> MarketContext {
@@ -585,20 +584,24 @@ mod cs01_invariants {
             .build()
             .unwrap();
 
-        let hazard = HazardCurve::builder("TEST-CREDIT")
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .recovery_rate(0.4)
-            .knots(vec![
-                (0.0, hazard_rate),
-                (1.0, hazard_rate),
-                (5.0, hazard_rate),
-                (10.0, hazard_rate),
-            ])
-            .build()
-            .unwrap();
+        let source = MarketContext::new().insert(disc);
+        let spread_bp = hazard_rate * 0.6 * 10_000.0;
+        let hazard = crate::credit_support::calibrated_hazard_curve_with_pillars(
+            &source,
+            as_of,
+            "TEST-CREDIT",
+            "TEST-CREDIT",
+            "USD-OIS",
+            &[
+                (365, spread_bp),
+                (3 * 365, spread_bp),
+                (5 * 365, spread_bp),
+                (10 * 365, spread_bp),
+            ],
+        )
+        .expect("hazard calibration should succeed");
 
-        MarketContext::new().insert(disc).insert(hazard)
+        source.insert(hazard)
     }
 
     proptest! {
@@ -627,22 +630,14 @@ mod cs01_invariants {
             ).expect("CDS construction should succeed");
 
             let market = build_cds_market(0.04, hazard_rate);
-            let pv = cds.value(&market, as_of).expect("Valuation should succeed");
-
-            let metrics = vec![MetricId::Cs01Hazard];
-            let registry = standard_registry();
-
-            let mut context = MetricContext::new(
-                Arc::new(cds),
-                Arc::new(market),
+            let results = cds.price_with_metrics(
+                &market,
                 as_of,
-                pv,
-                MetricContext::default_config(),
-            );
-
-            let results = registry.compute(&metrics, &mut context).expect("Metrics should compute");
-            let cs01 = results
-                .get(&MetricId::Cs01Hazard)
+                &[MetricId::Cs01],
+                crate::credit_support::pricing_options(),
+            ).expect("Metrics should compute");
+            let cs01 = results.measures
+                .get(&MetricId::Cs01)
                 .copied()
                 .unwrap_or(0.0);
 
@@ -813,12 +808,11 @@ mod bucketed_cs01_invariants {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DateExt, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
 
     use finstack_quant_valuations::instruments::Instrument;
-    use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
-    use std::sync::Arc;
+    use finstack_quant_valuations::metrics::MetricId;
     use time::macros::date;
 
     fn build_cds_market(flat_rate: f64, hazard_rate: f64) -> MarketContext {
@@ -837,20 +831,24 @@ mod bucketed_cs01_invariants {
             .build()
             .unwrap();
 
-        let hazard = HazardCurve::builder("TEST-CREDIT")
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .recovery_rate(0.4)
-            .knots(vec![
-                (0.0, hazard_rate),
-                (1.0, hazard_rate),
-                (5.0, hazard_rate),
-                (10.0, hazard_rate),
-            ])
-            .build()
-            .unwrap();
+        let source = MarketContext::new().insert(disc);
+        let spread_bp = hazard_rate * 0.6 * 10_000.0;
+        let hazard = crate::credit_support::calibrated_hazard_curve_with_pillars(
+            &source,
+            as_of,
+            "TEST-CREDIT",
+            "TEST-CREDIT",
+            "USD-OIS",
+            &[
+                (365, spread_bp),
+                (3 * 365, spread_bp),
+                (5 * 365, spread_bp),
+                (10 * 365, spread_bp),
+            ],
+        )
+        .expect("hazard calibration should succeed");
 
-        MarketContext::new().insert(disc).insert(hazard)
+        source.insert(hazard)
     }
 
     /// Test that bucketed CS01 values are consistent with parallel CS01.
@@ -875,23 +873,19 @@ mod bucketed_cs01_invariants {
         .expect("CDS construction should succeed");
 
         let market = build_cds_market(0.04, 0.02);
-        let pv = cds.value(&market, as_of).expect("Valuation should succeed");
-
-        let metrics = vec![MetricId::Cs01Hazard, MetricId::BucketedCs01Hazard];
-        let registry = standard_registry();
-
-        let mut context = MetricContext::new(
-            Arc::new(cds),
-            Arc::new(market),
-            as_of,
-            pv,
-            MetricContext::default_config(),
-        );
-
-        let results = registry
-            .compute(&metrics, &mut context)
+        let results = cds
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Cs01, MetricId::BucketedCs01],
+                crate::credit_support::pricing_options(),
+            )
             .expect("Metrics should compute");
-        let parallel_cs01 = results.get(&MetricId::Cs01Hazard).copied().unwrap_or(0.0);
+        let parallel_cs01 = results
+            .measures
+            .get(&MetricId::Cs01)
+            .copied()
+            .unwrap_or(0.0);
 
         // Parallel CS01 should be positive for protection buyer
         assert!(
@@ -901,26 +895,24 @@ mod bucketed_cs01_invariants {
         );
 
         // Check bucketed CS01 properties
-        if let Some(series) = context.computed_series.get(&MetricId::BucketedCs01Hazard) {
-            // At least one bucket should have non-zero value
-            let non_zero_count = series.iter().filter(|(_, v)| v.abs() > 1.0).count();
-            assert!(
-                non_zero_count > 0,
-                "Bucketed CS01 should have at least one non-zero bucket"
-            );
+        let series: Vec<_> = results
+            .measures
+            .iter()
+            .filter(|(id, _)| id.as_str().starts_with("bucketed_cs01::TEST-CREDIT::"))
+            .collect();
+        let non_zero_count = series.iter().filter(|(_, value)| value.abs() > 1.0).count();
+        assert!(
+            non_zero_count > 0,
+            "Bucketed CS01 should have at least one non-zero bucket"
+        );
 
-            // All buckets should have consistent sign (non-negative for protection buyer)
-            // Some buckets may be zero if outside the CDS tenor
-            let negative_buckets: Vec<_> = series
-                .iter()
-                .filter(|(_, v)| *v < -1.0) // Allow small negative due to numerical noise
-                .collect();
-            assert!(
-                negative_buckets.is_empty(),
-                "Bucketed CS01 should not have significantly negative buckets for protection buyer, found: {:?}",
-                negative_buckets
-            );
-        }
+        let bucket_sum: f64 = series.iter().map(|(_, value)| **value).sum();
+        let tolerance = 0.02 * parallel_cs01.abs().max(1.0);
+        assert!(
+            (bucket_sum - parallel_cs01).abs() <= tolerance,
+            "Bucketed quote CS01 should reconcile with parallel CS01: sum={bucket_sum}, \
+             parallel={parallel_cs01}, tolerance={tolerance}"
+        );
     }
 }
 

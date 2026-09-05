@@ -122,7 +122,9 @@ fn test_dm_callable_without_price_rejects() {
             call_type: Default::default(),
         }],
     };
-    let loan = build_floating_loan(Some(call_schedule), InstrumentPricingOverrides::default());
+    let mut overrides = InstrumentPricingOverrides::default();
+    overrides.model_config.hw1f_sigma = Some(0.0);
+    let loan = build_floating_loan(Some(call_schedule), overrides);
     let market = build_market();
     let as_of = date!(2025 - 01 - 01);
 
@@ -163,13 +165,14 @@ fn test_dm_callable_with_quoted_price_succeeds() {
             call_type: Default::default(),
         }],
     };
-    let overrides = InstrumentPricingOverrides {
+    let mut overrides = InstrumentPricingOverrides {
         market_quotes: MarketQuoteOverrides {
             quoted_clean_price: Some(99.0),
             ..Default::default()
         },
         ..Default::default()
     };
+    overrides.model_config.hw1f_sigma = Some(0.0);
     let loan = build_floating_loan(Some(call_schedule), overrides);
     let market = build_market();
     let as_of = date!(2025 - 01 - 01);

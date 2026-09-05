@@ -24,7 +24,10 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
     CDSTranche, TrancheSide,
 };
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::MetricId;
+#[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
+#[path = "../tests/support/credit.rs"]
+mod credit_support;
 use std::hint::black_box;
 use std::sync::Arc;
 use time::Month;
@@ -76,26 +79,22 @@ fn create_market() -> MarketContext {
         .build()
         .unwrap();
 
-    // Index hazard curve
-    let index_curve = HazardCurve::builder("CDX.NA.IG.42")
-        .base_date(base)
-        .recovery_rate(0.40)
-        .knots(vec![
-            (1.0, 0.010),
-            (3.0, 0.014),
-            (5.0, 0.018),
-            (7.0, 0.022),
-            (10.0, 0.028),
-        ])
-        .par_spreads(vec![
-            (1.0, 60.0),
-            (3.0, 75.0),
-            (5.0, 90.0),
-            (7.0, 110.0),
-            (10.0, 130.0),
-        ])
-        .build()
-        .unwrap();
+    let source_market = MarketContext::new().insert(discount_curve);
+    let index_curve = credit_support::calibrated_hazard_curve_with_pillars(
+        &source_market,
+        base,
+        "CDX.NA.IG.42",
+        "CDX.NA.IG.42",
+        "USD-OIS",
+        &[
+            (365, 60.0),
+            (3 * 365, 75.0),
+            (5 * 365, 90.0),
+            (7 * 365, 110.0),
+            (10 * 365, 130.0),
+        ],
+    )
+    .unwrap();
 
     // Base correlation curve
     let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
@@ -118,8 +117,7 @@ fn create_market() -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new()
-        .insert(discount_curve)
+    source_market
         .insert(index_curve)
         .insert_credit_index("CDX.NA.IG.42", index_data)
 }
@@ -141,25 +139,22 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
         .build()
         .unwrap();
 
-    let index_curve = HazardCurve::builder("CDX.NA.IG.42")
-        .base_date(base)
-        .recovery_rate(0.40)
-        .knots(vec![
-            (1.0, 0.012),
-            (3.0, 0.016),
-            (5.0, 0.020),
-            (7.0, 0.024),
-            (10.0, 0.030),
-        ])
-        .par_spreads(vec![
-            (1.0, 65.0),
-            (3.0, 80.0),
-            (5.0, 95.0),
-            (7.0, 115.0),
-            (10.0, 135.0),
-        ])
-        .build()
-        .unwrap();
+    let source_market = MarketContext::new().insert(discount_curve);
+    let index_curve = credit_support::calibrated_hazard_curve_with_pillars(
+        &source_market,
+        base,
+        "CDX.NA.IG.42",
+        "CDX.NA.IG.42",
+        "USD-OIS",
+        &[
+            (365, 65.0),
+            (3 * 365, 80.0),
+            (5 * 365, 95.0),
+            (7 * 365, 115.0),
+            (10 * 365, 135.0),
+        ],
+    )
+    .unwrap();
 
     let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
         .knots(vec![
@@ -201,8 +196,7 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new()
-        .insert(discount_curve)
+    source_market
         .insert(index_curve)
         .insert_credit_index("CDX.NA.IG.42", index_data)
 }
@@ -230,29 +224,22 @@ fn bench_cds_tranche_npv(c: &mut Criterion) {
 }
 
 fn bench_cds_tranche_cs01(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cds_tranche_cs01_hazard");
+    let mut group = c.benchmark_group("cds_tranche_cs01");
     let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let registry = standard_registry();
-
     let tranche = create_tranche(3.0, 7.0, 5);
 
-    group.bench_function("cs01_hazard", |b| {
+    group.bench_function("cs01", |b| {
         b.iter(|| {
-            // The benchmark fixture uses a manually specified intensity curve,
-            // so direct hazard-shift CS01 is the financially valid risk measure.
-            let base_pv = tranche.value(black_box(&market), black_box(as_of)).unwrap();
-            let mut context = MetricContext::new(
-                Arc::new(tranche.clone()),
-                Arc::new(market.clone()),
-                as_of,
-                base_pv,
-                MetricContext::default_config(),
-            );
-            let results = registry
-                .compute(&[MetricId::Cs01Hazard], &mut context)
+            let result = tranche
+                .price_with_metrics(
+                    black_box(&market),
+                    black_box(as_of),
+                    &[MetricId::Cs01],
+                    credit_support::pricing_options(),
+                )
                 .unwrap();
-            black_box(*results.get(&MetricId::Cs01Hazard).unwrap())
+            black_box(result)
         });
     });
 
@@ -305,24 +292,19 @@ fn bench_cds_tranche_all_metrics(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_tranche_all_metrics");
     let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let registry = standard_registry();
 
     let tranche = create_tranche(3.0, 7.0, 5);
 
     group.bench_function("all_metrics", |b| {
         b.iter(|| {
-            let _npv = tranche.value(black_box(&market), black_box(as_of));
-
-            // CS01 via generic calculator
-            let _base_pv = *_npv.as_ref().unwrap();
-            let mut context = MetricContext::new(
-                Arc::new(tranche.clone()),
-                Arc::new(market.clone()),
-                as_of,
-                _base_pv,
-                MetricContext::default_config(),
-            );
-            let _ = registry.compute(&[MetricId::Cs01], &mut context);
+            let _cs01 = tranche
+                .price_with_metrics(
+                    black_box(&market),
+                    black_box(as_of),
+                    &[MetricId::Cs01],
+                    credit_support::pricing_options(),
+                )
+                .unwrap();
 
             let _corr_delta = tranche.correlation_delta(black_box(&market), black_box(as_of));
             let _jtd = tranche.jump_to_default(black_box(&market), black_box(as_of));

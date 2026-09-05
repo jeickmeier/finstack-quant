@@ -85,8 +85,8 @@
   dependencies. Portfolio factor-model orchestration resolves the aggregate
   index to its bound hazard curve when applying credit shocks.
 - CDS-index bucketed CS01 and tranche Recovery01 now propagate failed
-  par-spread recalibration instead of silently switching to direct-hazard or
-  frozen-curve risk.
+  par-spread recalibration instead of silently switching to a different risk
+  definition or frozen-curve risk.
 - CDS-option quadrature and synthetic-underlying modules are crate-private;
   callers use the validated instrument and metric surfaces.
 

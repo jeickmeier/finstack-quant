@@ -37,10 +37,7 @@
 //! the decomposition, not an artefact.
 //!
 //! Standard CS01 requires a lossless calibration recipe and rejects
-//! directly-specified or otherwise unreplayable hazard curves. Direct
-//! intensity sensitivity is available only through the explicitly named
-//! `cs01_hazard` / `bucketed_cs01_hazard` metrics, keeping spread and hazard
-//! risk distinct and auditable.
+//! directly-specified or otherwise unreplayable hazard curves.
 //!
 //! # Units and Sign Convention
 //!
@@ -115,6 +112,8 @@ pub(crate) fn validate_buckets_strictly_increasing(
 }
 
 /// Return each effective direct-hazard node once, in curve order.
+// Retained with the generic hazard engines until the next consolidation slice.
+#[allow(dead_code)]
 pub(crate) fn effective_hazard_node_times(hazard: &HazardCurve) -> Vec<f64> {
     let mut nodes: Vec<f64> = hazard.knot_points().map(|(time, _)| time).collect();
     nodes.dedup_by(|left, right| {
@@ -125,6 +124,8 @@ pub(crate) fn effective_hazard_node_times(hazard: &HazardCurve) -> Vec<f64> {
 }
 
 /// Format an actual hazard-node time without collapsing distinct nodes.
+// Retained with the generic hazard engines until the next consolidation slice.
+#[allow(dead_code)]
 pub(crate) fn format_hazard_node_label(years: f64) -> std::borrow::Cow<'static, str> {
     if super::config::STANDARD_BUCKETS_YEARS
         .iter()
@@ -160,8 +161,7 @@ pub(crate) fn require_hazard_replay(
         message: format!(
             "{operation} requires a lossless calibration recipe for hazard curve '{}' \
              (a curve produced by the calibration pipeline, not one built directly from \
-             hazard rates); request `cs01_hazard` / `bucketed_cs01_hazard` instead for \
-             direct hazard-rate (intensity) risk",
+             hazard rates)",
             hazard.id()
         ),
         category: "cs01_rebootstrap".to_string(),
@@ -612,182 +612,6 @@ where
         let total = compute_key_rate_cs01_series_with_context_raw(
             context, &hazard_id, series_id, &request, reval,
         )?;
-
-        Ok(total)
-    }
-}
-
-/// Generic parallel CS01 calculator using direct hazard-rate bumps.
-///
-/// Unlike `GenericParallelCs01` which bumps par spreads and re-bootstraps,
-/// this directly shifts hazard rates. Registered as `MetricId::Cs01Hazard`.
-pub(crate) struct GenericParallelCs01Hazard<I> {
-    /// When `true`, an instrument with no credit curve reports CS01 as `0.0`
-    /// instead of raising a validation error.
-    empty_credit_curve_zero: bool,
-    _phantom: PhantomData<I>,
-}
-
-impl<I> Default for GenericParallelCs01Hazard<I> {
-    fn default() -> Self {
-        Self {
-            empty_credit_curve_zero: false,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> GenericParallelCs01Hazard<I> {
-    /// Construct a calculator that reports CS01 as `0.0` for instruments with
-    /// no credit curve, rather than raising a validation error.
-    pub(crate) fn with_empty_credit_curve_zero() -> Self {
-        Self {
-            empty_credit_curve_zero: true,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> MetricCalculator for GenericParallelCs01Hazard<I>
-where
-    I: Instrument + 'static,
-{
-    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let instrument: &I = context.instrument_as()?;
-        let Some((hazard_id, _discount_id)) =
-            resolve_optional_cs01_curves(instrument, self.empty_credit_curve_zero, "CS01Hazard")?
-        else {
-            return Ok(0.0);
-        };
-
-        let bump_bp = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_overrides(),
-        )?
-        .credit_spread_bump_bp;
-
-        let curves = Arc::clone(&context.curves);
-        let base_ctx = curves.as_ref();
-        let hazard = base_ctx.get_hazard(hazard_id.as_str())?;
-        let hazard_ref = hazard.as_ref();
-
-        let as_of = context.as_of;
-
-        let bumped_up = hazard_ref.with_parallel_hazard_rate_bump_bp(bump_bp)?;
-        let bumped_down = hazard_ref.with_parallel_hazard_rate_bump_bp(-bump_bp)?;
-
-        let (pv_up, pv_down) = context.with_market_scratch(|ctx, scratch| {
-            let reval = |market: &MarketContext| ctx.reprice_raw(market, as_of);
-            let pv_up = reprice_with_hazard(scratch, bumped_up, &hazard, reval)?;
-            let pv_down = reprice_with_hazard(scratch, bumped_down, &hazard, reval)?;
-            Ok((pv_up, pv_down))
-        })?;
-
-        let cs01 = sensitivity_central_diff(pv_up, pv_down, bump_bp);
-
-        context.computed.insert(
-            MetricId::custom(format!("cs01_hazard::{}", hazard_id.as_str())),
-            cs01,
-        );
-
-        Ok(cs01)
-    }
-}
-
-/// Generic bucketed CS01 calculator using direct hazard-rate bumps.
-///
-/// Unlike `GenericBucketedCs01` which bumps par spreads and re-bootstraps,
-/// this directly shifts hazard rates at each tenor. Registered as
-/// `MetricId::BucketedCs01Hazard`.
-pub(crate) struct GenericBucketedCs01Hazard<I> {
-    /// When `true`, an instrument with no credit curve reports CS01 as `0.0`
-    /// instead of raising a validation error.
-    empty_credit_curve_zero: bool,
-    _phantom: PhantomData<I>,
-}
-
-impl<I> Default for GenericBucketedCs01Hazard<I> {
-    fn default() -> Self {
-        Self {
-            empty_credit_curve_zero: false,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> GenericBucketedCs01Hazard<I> {
-    /// Construct a calculator that reports CS01 as `0.0` for instruments with
-    /// no credit curve, rather than raising a validation error.
-    pub(crate) fn with_empty_credit_curve_zero() -> Self {
-        Self {
-            empty_credit_curve_zero: true,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> MetricCalculator for GenericBucketedCs01Hazard<I>
-where
-    I: Instrument + 'static,
-{
-    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let instrument: &I = context.instrument_as()?;
-        let Some((hazard_id, _discount_id)) = resolve_optional_cs01_curves(
-            instrument,
-            self.empty_credit_curve_zero,
-            "BucketedCs01Hazard",
-        )?
-        else {
-            return Ok(0.0);
-        };
-
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_overrides(),
-        )?;
-        let bump_bp = defaults.credit_spread_bump_bp;
-
-        let curves = Arc::clone(&context.curves);
-        let base_ctx = curves.as_ref();
-        let hazard = base_ctx.get_hazard(hazard_id.as_str())?;
-        let hazard_ref = hazard.as_ref();
-        let node_times = effective_hazard_node_times(hazard_ref);
-        let single_node = node_times.len() == 1;
-
-        let as_of = context.as_of;
-
-        let (series, total) = context.with_market_scratch(|ctx, scratch| {
-            let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> = Vec::new();
-            let mut total_acc = NeumaierAccumulator::new();
-
-            for t in node_times {
-                let label = format_hazard_node_label(t);
-
-                let bumped_up = if single_node {
-                    hazard_ref.with_parallel_hazard_rate_bump_bp(bump_bp)?
-                } else {
-                    hazard_ref.with_tenor_hazard_rate_bumps_bp(&[(t, bump_bp)])?
-                };
-                let bumped_down = if single_node {
-                    hazard_ref.with_parallel_hazard_rate_bump_bp(-bump_bp)?
-                } else {
-                    hazard_ref.with_tenor_hazard_rate_bumps_bp(&[(t, -bump_bp)])?
-                };
-
-                let reval = |market: &MarketContext| ctx.reprice_raw(market, as_of);
-                let pv_up = reprice_with_hazard(scratch, bumped_up, &hazard, reval)?;
-                let pv_down = reprice_with_hazard(scratch, bumped_down, &hazard, reval)?;
-
-                let cs01 = sensitivity_central_diff(pv_up, pv_down, bump_bp);
-                series.push((label, cs01));
-                total_acc.add(cs01);
-            }
-
-            Ok((series, total_acc.total()))
-        })?;
-
-        let series_id = MetricId::custom(format!("bucketed_cs01_hazard::{}", hazard_id.as_str()));
-        context.store_bucketed_series(series_id, series);
 
         Ok(total)
     }

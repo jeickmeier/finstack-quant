@@ -89,7 +89,7 @@ pub(crate) fn price_envelope(
 /// * `market` - `MarketContext` object or market-context JSON string.
 /// * `as_of` - Valuation date (date-like or ISO string).
 /// * `model` - Model key (`"default"` selects the instrument-native model).
-/// * `metric` - Fully qualified metric identifier (`"dv01"`, `"cs01_hazard"`, …).
+/// * `metric` - Fully qualified metric identifier (`"dv01"`, `"cs01"`, …).
 pub(crate) fn envelope_metric_value(
     py: Python<'_>,
     envelope_json: String,
@@ -274,7 +274,7 @@ macro_rules! instrument_pricing_methods {
             ///     Valuation date, either a date-like object or an ISO 8601 string.
             /// metric_id : str
             ///     Fully qualified metric identifier, e.g. ``"dv01"``,
-            ///     ``"cs01_hazard"``, ``"delta"``.
+            ///     ``"cs01"``, ``"delta"``.
             /// model : str, optional
             ///     Model key (default ``"default"`` — the instrument-native model).
             ///

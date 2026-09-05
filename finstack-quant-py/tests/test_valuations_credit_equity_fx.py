@@ -13,16 +13,17 @@ from __future__ import annotations
 import datetime
 import json
 import math
+from pathlib import Path
 import pickle
 
 import pytest
 
+from finstack_quant.calibration import calibrate
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import (
     DiscountCurve,
     FxMatrix,
-    HazardCurve,
     MarketContext,
     VolSurface,
 )
@@ -57,10 +58,28 @@ def _discount(curve_id: str, rate: float) -> DiscountCurve:
 
 
 def _credit_market() -> MarketContext:
-    market = MarketContext()
-    market.insert(_discount("USD-OIS", 0.04))
-    market.insert(HazardCurve("CORP-HAZARD", BASE, [(0.0, 0.02), (5.0, 0.02), (10.0, 0.02)], recovery_rate=0.4))
-    market.insert(HazardCurve("CDX.NA.IG.HAZARD", BASE, [(0.0, 0.01), (5.0, 0.01), (10.0, 0.01)], recovery_rate=0.4))
+    fixture_path = (
+        Path(__file__).parents[2] / "finstack-quant/calibration/examples/market_bootstrap/03_single_name_hazard.json"
+    )
+    template = json.loads(fixture_path.read_text())
+
+    def calibrated_market(curve_id: str, entity: str, spread_bp: float | None = None) -> MarketContext:
+        envelope = json.loads(json.dumps(template))
+        envelope.pop("$schema", None)
+        for step in envelope["plan"]["steps"]:
+            step["base_date"] = BASE.isoformat()
+            if step["kind"] == "hazard":
+                step.update({"id": curve_id, "curve_id": curve_id, "entity": entity})
+        for quote in envelope["market_data"]:
+            if quote["kind"] == "cds_quote":
+                quote["entity"] = entity
+                if spread_bp is not None:
+                    quote["spread_bp"] = spread_bp
+        return calibrate(json.dumps(envelope)).market
+
+    market = calibrated_market("CORP-HAZARD", "CORP")
+    index_market = calibrated_market("CDX.NA.IG.HAZARD", "CDX.NA.IG", 60.0)
+    market.insert(index_market.get_hazard("CDX.NA.IG.HAZARD"))
     return market
 
 
@@ -134,7 +153,7 @@ class TestCreditDefaultSwap:
         assert isinstance(result, ValuationResult)
         assert math.isfinite(result.price)
 
-    def test_upfront_builds_prices_and_reports_cs01_hazard(self) -> None:
+    def test_upfront_builds_prices_and_reports_cs01(self) -> None:
         premium, protection = _cds_legs()
         upfront_date = datetime.date(2024, 6, 25)
         cds = (
@@ -157,10 +176,10 @@ class TestCreditDefaultSwap:
         assert cds.attributes.get_meta("desk") == "credit"
         assert json.loads(cds.to_json())["instrument"]["spec"]["upfront"] is not None
 
-        result = cds.price(_credit_market(), "2024-06-20", "hazard_rate", metrics=["cs01_hazard"])
+        result = cds.price(_credit_market(), "2024-06-20", "hazard_rate", metrics=["cs01"])
         keys = result.metric_keys()
-        assert any(key.startswith("cs01_hazard") for key in keys), keys
-        cs01 = cds.metric(_credit_market(), "2024-06-20", "cs01_hazard", "hazard_rate")
+        assert any(key.startswith("cs01") for key in keys), keys
+        cs01 = cds.metric(_credit_market(), "2024-06-20", "cs01", "hazard_rate")
         assert math.isfinite(cs01)
 
     def test_get_par_spread_is_close_to_flat_hazard_spread(self) -> None:

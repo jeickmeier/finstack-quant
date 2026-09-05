@@ -87,12 +87,12 @@ impl MetricGroup {
             MetricGroup::Carry => (29, 40),
             MetricGroup::Sensitivity => (40, 59),
             MetricGroup::Greeks => (59, 84),
-            MetricGroup::Credit => (84, 102),
-            MetricGroup::Rates => (102, 130),
-            MetricGroup::Fx => (130, 137),
-            MetricGroup::Equity => (137, 155),
-            MetricGroup::StructuredCredit => (155, 184),
-            MetricGroup::Alternatives => (184, 210),
+            MetricGroup::Credit => (84, 100),
+            MetricGroup::Rates => (100, 128),
+            MetricGroup::Fx => (128, 135),
+            MetricGroup::Equity => (135, 153),
+            MetricGroup::StructuredCredit => (153, 182),
+            MetricGroup::Alternatives => (182, 208),
         }
     }
 }

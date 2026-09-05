@@ -66,8 +66,6 @@ pub(crate) fn register_cds_tranche_metrics(
         metrics: [
             (Cs01, cs01::CdsTrancheCs01Calculator),
             (BucketedCs01, cs01::CdsTrancheBucketedCs01Calculator),
-            (Cs01Hazard, cs01::CdsTrancheCs01HazardCalculator),
-            (BucketedCs01Hazard, cs01::CdsTrancheBucketedCs01HazardCalculator),
             (ParSpread, par_spread::ParSpreadCalculator),
             (ExpectedLoss, expected_loss::ExpectedLossCalculator),
             (JumpToDefault, jump_to_default::JumpToDefaultCalculator),

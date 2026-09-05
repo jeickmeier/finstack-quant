@@ -49,11 +49,13 @@
 //! - `TermLoan` for the instrument type
 
 use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::z_spread_discount_factor;
 use crate::instruments::fixed_income::term_loan::types::RateSpec;
 use crate::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
+use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
@@ -78,6 +80,32 @@ fn npv_by_date(
             continue;
         }
         total = total.checked_add(*amount * disc.df_between_dates(as_of, *date)?)?;
+    }
+    Ok(total)
+}
+
+fn npv_by_date_at_spread(
+    disc: &DiscountCurve,
+    as_of: finstack_quant_core::dates::Date,
+    flows: &[(finstack_quant_core::dates::Date, Money)],
+    spread: f64,
+    compounds_per_year: f64,
+) -> finstack_quant_core::Result<Money> {
+    if flows.is_empty() {
+        return Err(finstack_quant_core::InputError::TooFewPoints.into());
+    }
+
+    let mut total = Money::new(0.0, flows[0].1.currency());
+    for (date, amount) in flows {
+        if *date <= as_of {
+            continue;
+        }
+        let t = disc
+            .day_count()
+            .year_fraction(as_of, *date, DayCountContext::default())?;
+        let base_df = disc.df_between_dates(as_of, *date)?;
+        let df = z_spread_discount_factor(base_df, t, spread, compounds_per_year)?;
+        total = total.checked_add(*amount * df)?;
     }
     Ok(total)
 }
@@ -177,7 +205,27 @@ impl TermLoanDiscountingPricer {
         let (settlement_date, flows) = Self::pricing_flows(loan, market, as_of)?;
         let disc = market.get_discount(loan.discount_curve_id.as_str())?;
 
-        npv_by_date(disc.as_ref(), settlement_date, &flows)
+        if let Some(spread) = loan
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_z_spread
+        {
+            let years = loan.frequency.to_years();
+            let compounds_per_year = if years > 0.0 && years.is_finite() {
+                (1.0 / years).round().max(1.0)
+            } else {
+                1.0
+            };
+            npv_by_date_at_spread(
+                disc.as_ref(),
+                settlement_date,
+                &flows,
+                spread,
+                compounds_per_year,
+            )
+        } else {
+            npv_by_date(disc.as_ref(), settlement_date, &flows)
+        }
     }
 
     /// Build the holder-view cashflows the discounting pricer values, anchored

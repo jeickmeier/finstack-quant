@@ -268,6 +268,20 @@ impl MarketQuoteOverrides {
         self.price_driver_count() > 0
     }
 
+    /// Clear every quote field that can replace model value.
+    pub(crate) fn clear_price_drivers(&mut self) {
+        self.quoted_clean_price = None;
+        self.quoted_dirty_price_currency = None;
+        self.quoted_ytm = None;
+        self.quoted_ytw = None;
+        self.quoted_z_spread = None;
+        self.quoted_oas = None;
+        self.quoted_discount_margin = None;
+        self.quoted_i_spread = None;
+        self.quoted_asw_market = None;
+        self.quoted_japanese_simple_yield = None;
+    }
+
     /// Validate market quote values for finiteness, non-negativity, and
     /// mutual exclusivity among price-driving fields.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {

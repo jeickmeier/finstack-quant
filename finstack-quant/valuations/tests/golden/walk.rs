@@ -27,7 +27,6 @@ const ZERO_RISK_METRICS_REQUIRING_REASON: &[&str] = &[
     "bucketed_dv01",
     "convexity",
     "cs01",
-    "cs01_hazard",
     "delta",
     "duration_mod",
     "dv01",
@@ -413,10 +412,8 @@ fn validate_required_pricing_risk_metrics(fixture: &GoldenFixture) -> Result<(),
         if !has_expected_metric(fixture, "dv01") {
             return Err("credit pricing fixtures must assert dv01".to_string());
         }
-        if !has_expected_metric(fixture, "cs01") && !has_expected_metric(fixture, "cs01_hazard") {
-            return Err(
-                "credit pricing fixtures must assert cs01 or explicit cs01_hazard".to_string(),
-            );
+        if fixture.metadata.source == "formula" && !has_expected_metric(fixture, "cs01") {
+            return Err("formula credit pricing fixtures must assert canonical cs01".to_string());
         }
     }
 
@@ -586,23 +583,23 @@ mod tests {
     }
 
     #[test]
-    fn credit_pricing_body_accepts_explicit_hazard_cs01() {
+    fn quantlib_credit_pricing_body_accepts_missing_incomparable_cs01() {
         let fixture = load_fixture(FLAT_HAZARD_CDS_FIXTURE);
 
         validate_pricing_body(&fixture)
-            .expect("manual hazard fixtures may assert explicit hazard sensitivity");
+            .expect("QuantLib direct-hazard references need not assert incomparable CS01");
     }
 
     #[test]
-    fn credit_pricing_body_requires_quote_or_hazard_cs01() {
-        let mut fixture = load_fixture(FLAT_HAZARD_CDS_FIXTURE);
+    fn regression_credit_pricing_body_requires_canonical_cs01() {
+        let mut fixture = load_fixture("pricing/regression_goldens/cds/usd_5y_cds_self_test.json");
         fixture.expected.remove("cs01");
-        fixture.expected.remove("cs01_hazard");
+        fixture.tolerances.remove("cs01");
 
         let err = validate_pricing_body(&fixture)
-            .expect_err("credit fixtures must assert a named credit sensitivity");
+            .expect_err("regression credit fixtures must assert canonical CS01");
 
-        assert!(err.contains("cs01_hazard"), "unexpected error: {err}");
+        assert!(err.contains("canonical cs01"), "unexpected error: {err}");
     }
 
     #[test]

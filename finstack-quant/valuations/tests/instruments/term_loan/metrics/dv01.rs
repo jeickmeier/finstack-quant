@@ -158,3 +158,167 @@ fn test_dv01_increases_with_maturity() {
         dv01_short
     );
 }
+
+#[test]
+fn quoted_callable_dv01_freezes_solved_oas() {
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer;
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::{
+        LoanCall, LoanCallSchedule, LoanCallType,
+    };
+
+    let as_of = date!(2025 - 01 - 01);
+    let mut loan = TermLoan::builder()
+        .id("TL-DV01-CALLABLE".into())
+        .currency(Currency::USD)
+        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .issue_date(as_of)
+        .maturity(date!(2030 - 01 - 01))
+        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .frequency(Tenor::semi_annual())
+        .day_count(DayCount::Act360)
+        .business_day_convention(BusinessDayConvention::ModifiedFollowing)
+        .calendar_id_opt(None)
+        .stub(StubKind::None)
+        .discount_curve_id(CurveId::from("USD-OIS"))
+        .amortization(AmortizationSpec::None)
+        .coupon_type(CouponType::Cash)
+        .upfront_fee_opt(None)
+        .ddtl_opt(None)
+        .covenants_opt(None)
+        .call_schedule_opt(Some(LoanCallSchedule {
+            calls: vec![LoanCall {
+                date: date!(2027 - 01 - 01),
+                price_pct_of_par: 101.0,
+                call_type: LoanCallType::Hard,
+            }],
+        }))
+        .attributes(Default::default())
+        .build()
+        .unwrap();
+
+    let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+    let pricer = TermLoanTreePricer::new();
+    let oas_bp = pricer
+        .calculate_oas(&loan, &market, as_of, 90.0)
+        .expect("OAS from discounted quote");
+    assert!(
+        oas_bp.abs() > 1.0,
+        "a 90 clean quote must produce a material OAS, got {oas_bp}"
+    );
+
+    loan.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(90.0);
+    let quoted = loan
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Dv01, MetricId::BucketedDv01, MetricId::Oas],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("quoted callable metrics");
+    let dv01_quoted = *quoted.measures.get("dv01").unwrap();
+    let oas_decimal = *quoted.measures.get("oas").unwrap();
+    assert!(dv01_quoted.is_finite() && dv01_quoted.abs() > 1.0);
+    assert!((oas_decimal * 10_000.0 - oas_bp).abs() < 1e-4);
+
+    let mut pinned = loan.clone();
+    pinned
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = None;
+    pinned.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas_bp / 10_000.0);
+    let pinned_result = pinned
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Dv01],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("OAS-pinned DV01");
+    let dv01_pinned = *pinned_result.measures.get("dv01").unwrap();
+    assert!(
+        (dv01_quoted - dv01_pinned).abs() / dv01_quoted.abs() < 1e-6,
+        "clean-quote DV01 must match frozen-OAS DV01: quoted={dv01_quoted}, pinned={dv01_pinned}"
+    );
+
+    let mut unquoted = loan;
+    unquoted
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = None;
+    let dv01_zero_oas = *unquoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Dv01],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("unquoted DV01")
+        .measures
+        .get("dv01")
+        .unwrap();
+    assert!(
+        (dv01_quoted - dv01_zero_oas).abs() > 1.0,
+        "a wide OAS must change callable DV01: quoted={dv01_quoted}, zero_oas={dv01_zero_oas}"
+    );
+}
+
+#[test]
+fn quoted_callable_discounting_dv01_uses_quote_spread_not_tree_oas() {
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::{
+        LoanCall, LoanCallSchedule, LoanCallType,
+    };
+    use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::pricer::ModelKey;
+
+    let as_of = date!(2025 - 01 - 01);
+    let mut loan = TermLoan::builder()
+        .id("TL-DV01-DISCOUNTING-QUOTE".into())
+        .currency(Currency::USD)
+        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .issue_date(as_of)
+        .maturity(date!(2030 - 01 - 01))
+        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .frequency(Tenor::semi_annual())
+        .day_count(DayCount::Act360)
+        .business_day_convention(BusinessDayConvention::ModifiedFollowing)
+        .calendar_id_opt(None)
+        .stub(StubKind::None)
+        .discount_curve_id(CurveId::from("USD-OIS"))
+        .amortization(AmortizationSpec::None)
+        .coupon_type(CouponType::Cash)
+        .call_schedule_opt(Some(LoanCallSchedule {
+            calls: vec![LoanCall {
+                date: date!(2027 - 01 - 01),
+                price_pct_of_par: 101.0,
+                call_type: LoanCallType::Hard,
+            }],
+        }))
+        .attributes(Default::default())
+        .build()
+        .unwrap();
+    let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+    let options = PricingOptions::default().with_model(ModelKey::Discounting);
+
+    loan.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(90.0);
+    let quoted = loan
+        .price_with_metrics(&market, as_of, &[MetricId::Dv01], options.clone())
+        .expect("quoted discounting DV01");
+    let quoted_dv01 = quoted.measures["dv01"];
+
+    loan.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = None;
+    let unquoted = loan
+        .price_with_metrics(&market, as_of, &[MetricId::Dv01], options)
+        .expect("unquoted discounting DV01");
+    let unquoted_dv01 = unquoted.measures["dv01"];
+
+    assert!(
+        (quoted_dv01 - unquoted_dv01).abs() > 1.0,
+        "discounting quote spread must change DV01: quoted={quoted_dv01}, unquoted={unquoted_dv01}"
+    );
+}

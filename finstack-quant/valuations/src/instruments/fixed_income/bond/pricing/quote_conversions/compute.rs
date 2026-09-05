@@ -20,17 +20,9 @@ use std::sync::Arc;
 /// pricing calls evaluate the model PV. Used by inversion helpers that need
 /// the raw model response even when the bond carries a quoted price override.
 pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
-    let quotes = &mut bond.instrument_pricing_overrides.market_quotes;
-    quotes.quoted_clean_price = None;
-    quotes.quoted_dirty_price_currency = None;
-    quotes.quoted_ytm = None;
-    quotes.quoted_ytw = None;
-    quotes.quoted_z_spread = None;
-    quotes.quoted_oas = None;
-    quotes.quoted_discount_margin = None;
-    quotes.quoted_i_spread = None;
-    quotes.quoted_asw_market = None;
-    quotes.quoted_japanese_simple_yield = None;
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .clear_price_drivers();
 }
 
 /// Convert between price, yield, and spread metrics for a bond.

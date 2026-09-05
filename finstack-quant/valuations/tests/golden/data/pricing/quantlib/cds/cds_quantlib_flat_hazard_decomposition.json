@@ -1,6 +1,5 @@
 {
   "expected": {
-    "cs01_hazard": 2811.5386566023517,
     "dv01": 52.99810024019098,
     "npv": -198586.76210266817,
     "par_spread": 58.19641516560695,
@@ -154,10 +153,6 @@
   "model": "hazard_rate",
   "schema": "finstack_quant.golden/1",
   "tolerances": {
-    "cs01_hazard": {
-      "abs": 1.0,
-      "tolerance_reason": "QuantLib central finite difference under a direct 1bp hazard-rate bump."
-    },
     "dv01": {
       "abs": 0.1,
       "tolerance_reason": "QuantLib central finite difference under a 1bp parallel continuous-rate bump."

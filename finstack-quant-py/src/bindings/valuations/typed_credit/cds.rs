@@ -51,8 +51,8 @@ pub(crate) fn cds_convention_from_str(value: &str) -> PyResult<CdsConvention> {
 /// Build with ``CreditDefaultSwap.builder()`` or start from
 /// ``CreditDefaultSwap.example()``; instances are accepted directly by
 /// ``price_instrument`` and expose ``price`` / ``metric`` themselves. The
-/// desk CS01 on a hand-built hazard curve is the ``"cs01_hazard"`` metric
-/// (``"cs01"`` requires a calibration recipe on the curve).
+/// ``"cs01"`` and ``"bucketed_cs01"`` metrics rebootstrap a quote-backed
+/// hazard curve from its stored calibration recipe.
 ///
 /// Examples
 /// --------

@@ -71,9 +71,6 @@ def build_single_name_cds() -> dict[str, Any]:
     cds = _quantlib_cds()
     premium_leg_pv = abs(cds.couponLegNPV())
     dv01 = (_quantlib_cds(rate=FLAT_RATE + BUMP_BP).NPV() - _quantlib_cds(rate=FLAT_RATE - BUMP_BP).NPV()) / 2.0
-    cs01_hazard = (
-        _quantlib_cds(hazard=FLAT_HAZARD + BUMP_BP).NPV() - _quantlib_cds(hazard=FLAT_HAZARD - BUMP_BP).NPV()
-    ) / 2.0
     quantlib_reason = "Strict executable QuantLib IsdaCdsEngine decomposition benchmark."
     canonical_reason = (
         "Canonical sum of discounted survival-weighted accruals, excluding the "
@@ -195,7 +192,6 @@ def build_single_name_cds() -> dict[str, Any]:
             "protection_leg_pv": cds.defaultLegNPV(),
             "premium_leg_pv": premium_leg_pv,
             "dv01": dv01,
-            "cs01_hazard": cs01_hazard,
         },
         "tolerances": {
             "npv": tolerance(1.0, quantlib_reason),
@@ -205,10 +201,6 @@ def build_single_name_cds() -> dict[str, Any]:
             "protection_leg_pv": tolerance(1.0, quantlib_reason),
             "premium_leg_pv": tolerance(1.0, quantlib_reason),
             "dv01": tolerance(0.1, "QuantLib central finite difference under a 1bp parallel continuous-rate bump."),
-            "cs01_hazard": tolerance(
-                1.0,
-                "QuantLib central finite difference under a direct 1bp hazard-rate bump.",
-            ),
         },
     }
     fixture["instrument"] = {
